@@ -490,7 +490,7 @@ impl<'a> Instrumenter<'a> {
         // Add invariant assertions after function call when invariant holds in the
         // body of the current function, but the called function does not assert
         // invariants.
-        // The asserted invariant ensures the the invariant
+        // The asserted invariant ensures the invariant
         // holds in the body of the current function, as is required.
         let fun_id = self.builder.fun_env.get_qualified_id();
         if !disabled_inv_fun_set.contains(&fun_id)

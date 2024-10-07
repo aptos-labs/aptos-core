@@ -22,6 +22,31 @@ fun m::test() {
   9: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: &u64
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 5
+  1: $t0 := borrow_local($t1)
+  2: $t2 := move($t0)
+  3: drop($t2)
+  4: $t4 := 5
+  5: $t3 := borrow_local($t4)
+  6: $t0 := move($t3)
+  7: $t6 := read_ref($t0)
+  8: $t7 := 5
+  9: $t5 := ==($t6, $t7)
+ 10: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -91,6 +116,31 @@ fun m::test() {
  10: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: &u64
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64 [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 5
+  1: $t0 := borrow_local($t1)
+  2: $t2 := move($t0)
+  3: drop($t2)
+  4: $t4 := 5
+  5: $t2 := borrow_local($t4)
+  6: $t0 := move($t2)
+  7: $t6 := read_ref($t0)
+  8: $t7 := 5
+  9: $t5 := ==($t6, $t7)
+ 10: return ()
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -106,21 +156,15 @@ B0:
 	0: LdU64(5)
 	1: StLoc[0](loc0: u64)
 	2: ImmBorrowLoc[0](loc0: u64)
-	3: StLoc[1](loc1: &u64)
-	4: MoveLoc[1](loc1: &u64)
-	5: Pop
-	6: LdU64(5)
-	7: StLoc[2](loc2: u64)
-	8: ImmBorrowLoc[2](loc2: u64)
-	9: StLoc[1](loc1: &u64)
-	10: MoveLoc[1](loc1: &u64)
-	11: StLoc[3](loc3: &u64)
-	12: MoveLoc[3](loc3: &u64)
-	13: ReadRef
-	14: LdU64(5)
-	15: Eq
-	16: Pop
-	17: Ret
+	3: Pop
+	4: LdU64(5)
+	5: StLoc[2](loc2: u64)
+	6: ImmBorrowLoc[2](loc2: u64)
+	7: ReadRef
+	8: LdU64(5)
+	9: Eq
+	10: Pop
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

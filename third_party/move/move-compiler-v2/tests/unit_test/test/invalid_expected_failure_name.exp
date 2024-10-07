@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: Invalid expected failure code assignment
+  ┌─ tests/unit_test/test/invalid_expected_failure_name.move:4:7
+  │
+4 │     #[expected_failure=1]
+  │       ^^^^^^^^^^^^^^^^^^
+  │       │
+  │       Expect an #[expected_failure(...)] attribute for error specification

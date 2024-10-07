@@ -105,6 +105,10 @@ impl MetadataView {
         self.compaction_timestamps.clone()
     }
 
+    pub fn all_state_snapshots(&self) -> &[StateSnapshotBackupMeta] {
+        &self.state_snapshot_backups
+    }
+
     pub fn select_state_snapshot(
         &self,
         target_version: Version,
@@ -115,14 +119,14 @@ impl MetadataView {
             .sorted()
             .rev()
             .find(|m| m.version <= target_version)
-            .map(Clone::clone))
+            .cloned())
     }
 
     pub fn expect_state_snapshot(&self, version: Version) -> Result<StateSnapshotBackupMeta> {
         self.state_snapshot_backups
             .iter()
             .find(|m| m.version == version)
-            .map(Clone::clone)
+            .cloned()
             .ok_or_else(|| anyhow!("State snapshot not found at version {}", version))
     }
 

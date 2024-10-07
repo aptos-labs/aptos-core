@@ -8,10 +8,14 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::gas_schedule;
     use aptos_framework::jwk_consensus_config;
     use aptos_framework::jwks;
+    use aptos_framework::keyless_account;
+    use aptos_framework::randomness_api_v0_config;
     use aptos_framework::randomness_config;
+    use aptos_framework::randomness_config_seqnum;
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_state;
     use aptos_framework::stake;
+    use aptos_framework::system_addresses;
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
@@ -39,16 +43,20 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Apply buffered on-chain configs (except for ValidatorSet, which is done inside `reconfiguration::reconfigure()`).
     /// Re-enable validator set changes.
     /// Run the default reconfiguration to enter the new epoch.
-    public(friend) fun finish(account: &signer) {
-        dkg::try_clear_incomplete_session(account);
-        consensus_config::on_new_epoch();
-        execution_config::on_new_epoch();
-        gas_schedule::on_new_epoch();
-        std::version::on_new_epoch();
-        jwk_consensus_config::on_new_epoch();
-        jwks::on_new_epoch();
-        randomness_config::on_new_epoch();
-        features::on_new_epoch(account);
+    public(friend) fun finish(framework: &signer) {
+        system_addresses::assert_aptos_framework(framework);
+        dkg::try_clear_incomplete_session(framework);
+        consensus_config::on_new_epoch(framework);
+        execution_config::on_new_epoch(framework);
+        gas_schedule::on_new_epoch(framework);
+        std::version::on_new_epoch(framework);
+        features::on_new_epoch(framework);
+        jwk_consensus_config::on_new_epoch(framework);
+        jwks::on_new_epoch(framework);
+        keyless_account::on_new_epoch(framework);
+        randomness_config_seqnum::on_new_epoch(framework);
+        randomness_config::on_new_epoch(framework);
+        randomness_api_v0_config::on_new_epoch(framework);
         reconfiguration::reconfigure();
     }
 

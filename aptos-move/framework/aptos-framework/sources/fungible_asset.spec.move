@@ -75,7 +75,7 @@ spec aptos_framework::fungible_asset {
     /// Enforcement: Audited that the store is properly initialized with zero balance.
     ///
     /// No.: 10
-    /// Requirement: A store should only be deleted if it's balance is zero.
+    /// Requirement: A store should only be deleted if its balance is zero.
     /// Criticality: Medium
     /// Implementation: The remove_store function validates the store's balance and removes the store under the object
     /// address.

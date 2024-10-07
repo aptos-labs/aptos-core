@@ -3,8 +3,13 @@
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
 use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
-use aptos_gas_schedule::gas_params::{instr::*, txn::*};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_gas_schedule::{
+    gas_feature_versions::*,
+    gas_params::{instr::*, txn::*},
+};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -96,6 +101,13 @@ where
             MutBorrowField => MUT_BORROW_FIELD,
             ImmBorrowFieldGeneric => IMM_BORROW_FIELD_GENERIC,
             MutBorrowFieldGeneric => MUT_BORROW_FIELD_GENERIC,
+            ImmBorrowVariantField => IMM_BORROW_VARIANT_FIELD,
+            MutBorrowVariantField => MUT_BORROW_VARIANT_FIELD,
+            ImmBorrowVariantFieldGeneric => IMM_BORROW_VARIANT_FIELD_GENERIC,
+            MutBorrowVariantFieldGeneric => MUT_BORROW_VARIANT_FIELD_GENERIC,
+            TestVariant => TEST_VARIANT,
+            TestVariantGeneric => TEST_VARIANT_GENERIC,
+
             FreezeRef => FREEZE_REF,
 
             CastU8 => CAST_U8,
@@ -519,6 +531,22 @@ where
         self.algebra.charge_storage_fee(amount, gas_unit_price)
     }
 
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_transaction(txn_size);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_event(event);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op_size: &WriteOpSize) -> VMResult<()> {
         let cost = self.io_pricing().io_gas_per_write(key, op_size);
 
@@ -534,6 +562,16 @@ where
 
         self.algebra
             .charge_execution(MIN_TRANSACTION_GAS_UNITS + INTRINSIC_GAS_PER_BYTE * excess)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_keyless(&mut self) -> VMResult<()> {
+        if self.feature_version() < RELEASE_V1_12 {
+            return Ok(());
+        }
+
+        self.algebra
+            .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
     }
 }

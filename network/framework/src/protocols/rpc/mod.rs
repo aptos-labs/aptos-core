@@ -51,9 +51,8 @@ use crate::{
         RECEIVED_LABEL, REQUEST_LABEL, RESPONSE_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
-    peer::PeerNotification,
     protocols::{
-        network::SerializedRequest,
+        network::{ReceivedMessage, SerializedRequest},
         wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
     },
     ProtocolId,
@@ -70,12 +69,11 @@ use bytes::Bytes;
 use error::RpcError;
 use futures::{
     channel::oneshot,
-    future::{BoxFuture, FusedFuture, Future, FutureExt},
-    sink::SinkExt,
+    future::{BoxFuture, FusedFuture, FutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
+use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 pub mod error;
 
@@ -207,8 +205,8 @@ impl InboundRpcs {
     /// Handle a new inbound `RpcRequest` message off the wire.
     pub fn handle_inbound_request(
         &mut self,
-        peer_notifs_tx: &mut aptos_channel::Sender<ProtocolId, PeerNotification>,
-        request: RpcRequest,
+        peer_notifs_tx: &aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+        mut request: ReceivedMessage,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
 
@@ -225,9 +223,13 @@ impl InboundRpcs {
             return Err(RpcError::TooManyPending(self.max_concurrent_inbound_rpcs));
         }
 
-        let protocol_id = request.protocol_id;
-        let request_id = request.request_id;
-        let priority = request.priority;
+        let peer_id = request.sender.peer_id();
+        let NetworkMessage::RpcRequest(rpc_request) = &request.message else {
+            return Err(RpcError::InvalidRpcResponse);
+        };
+        let protocol_id = rpc_request.protocol_id;
+        let request_id = rpc_request.request_id;
+        let priority = rpc_request.priority;
 
         trace!(
             NetworkSchema::new(network_context).remote_peer(&self.remote_peer_id),
@@ -237,19 +239,15 @@ impl InboundRpcs {
             request_id,
             protocol_id,
         );
-        self.update_inbound_rpc_request_metrics(protocol_id, request.raw_request.len() as u64);
+        self.update_inbound_rpc_request_metrics(protocol_id, rpc_request.raw_request.len() as u64);
 
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
 
         // Forward request to PeerManager for handling.
         let (response_tx, response_rx) = oneshot::channel();
-        let notif = PeerNotification::RecvRpc(InboundRpcRequest {
-            protocol_id,
-            data: Bytes::from(request.raw_request),
-            res_tx: response_tx,
-        });
-        if let Err(err) = peer_notifs_tx.push(protocol_id, notif) {
+        request.rpc_replier = Some(Arc::new(response_tx));
+        if let Err(err) = peer_notifs_tx.push((peer_id, protocol_id), request) {
             counters::rpc_messages(network_context, REQUEST_LABEL, INBOUND_LABEL, FAILED_LABEL)
                 .inc();
             return Err(err.into());
@@ -317,16 +315,16 @@ impl InboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_response(
         &mut self,
-    ) -> impl Future<Output = Result<(RpcResponse, ProtocolId), RpcError>> + FusedFuture + '_ {
+    ) -> impl FusedFuture<Output = Result<(RpcResponse, ProtocolId), RpcError>> + '_ {
         self.inbound_rpc_tasks.select_next_some()
     }
 
     /// Handle a completed response from the application handler. If successful,
     /// we update the appropriate counters and enqueue the response message onto
     /// the outbound write queue.
-    pub async fn send_outbound_response(
+    pub fn send_outbound_response(
         &mut self,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
         maybe_response: Result<(RpcResponse, ProtocolId), RpcError>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
@@ -354,7 +352,7 @@ impl InboundRpcs {
             response.request_id,
         );
         let message = NetworkMessage::RpcResponse(response);
-        write_reqs_tx.send(message).await?;
+        write_reqs_tx.push((), message)?;
 
         // Update the outbound RPC response metrics
         self.update_outbound_rpc_response_metrics(protocol_id, res_len);
@@ -433,10 +431,10 @@ impl OutboundRpcs {
     }
 
     /// Handle a new outbound rpc request from the application layer.
-    pub async fn handle_outbound_request(
+    pub fn handle_outbound_request(
         &mut self,
         request: OutboundRpcRequest,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
         let peer_id = &self.remote_peer_id;
@@ -499,7 +497,7 @@ impl OutboundRpcs {
             priority: Priority::default(),
             raw_request: Vec::from(request_data.as_ref()),
         });
-        write_reqs_tx.send(message).await?;
+        write_reqs_tx.push((), message)?;
 
         // Update the outbound RPC request metrics
         self.update_outbound_rpc_request_metrics(protocol_id, req_len);
@@ -598,7 +596,7 @@ impl OutboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_request(
         &mut self,
-    ) -> impl Future<Output = (RequestId, Result<(f64, u64), RpcError>)> + FusedFuture + '_ {
+    ) -> impl FusedFuture<Output = (RequestId, Result<(f64, u64), RpcError>)> + '_ {
         self.outbound_rpc_tasks.select_next_some()
     }
 
@@ -668,13 +666,16 @@ impl OutboundRpcs {
                         FAILED_LABEL,
                     )
                     .inc();
-                    warn!(
-                        NetworkSchema::new(network_context).remote_peer(peer_id),
-                        "{} Error making outbound RPC request to {} (request_id {}). Error: {}",
-                        network_context,
-                        peer_id.short_str(),
-                        request_id,
-                        error
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(10)),
+                        warn!(
+                            NetworkSchema::new(network_context).remote_peer(peer_id),
+                            "[sampled] {} Error making outbound RPC request to {} (request_id {}). Error: {}",
+                            network_context,
+                            peer_id.short_str(),
+                            request_id,
+                            error
+                        )
                     );
                 }
             },

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `x` of type `M::S<signer>` does not have the `copy` ability
+  ┌─ tests/ability-check/v1-signer/copy_loc_transitive.move:5:9
+  │
+5 │         copy x
+  │         ^^^^^^ explicitly copied here

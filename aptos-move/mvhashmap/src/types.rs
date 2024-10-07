@@ -1,19 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    delta_change_set::DeltaOp,
-    types::{DelayedFieldsSpeculativeError, PanicOr},
-};
+use aptos_aggregator::{delta_change_set::DeltaOp, types::DelayedFieldsSpeculativeError};
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
+    error::PanicOr,
     executable::ExecutableDescriptor,
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
-use derivative::Derivative;
-use move_binary_format::errors::PartialVMError;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
 
@@ -30,14 +26,13 @@ pub struct StorageVersion;
 // TODO: Find better representations for this, a similar one for TxnIndex.
 pub type Version = Result<(TxnIndex, Incarnation), StorageVersion>;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Flag {
-    Done,
-    Estimate,
+    Done = 0,
+    Estimate = 1,
 }
 
-#[derive(Debug, Derivative)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MVGroupError {
     /// The base group contents are not initialized.
     Uninitialized,
@@ -45,8 +40,6 @@ pub enum MVGroupError {
     TagNotFound,
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
-    /// Tag serialization is needed for group size computation.
-    TagSerializationError(#[derivative(PartialEq = "ignore")] PartialVMError),
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
@@ -81,14 +74,25 @@ impl GroupReadResult {
     pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
         match self {
             GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
-            _ => unreachable!("Expected a value"),
+            GroupReadResult::Size(size) => {
+                unreachable!("Expected group value, found size {:?}", size)
+            },
+            GroupReadResult::Uninitialized => {
+                unreachable!("Expected group value, found uninitialized")
+            },
         }
     }
 
     pub fn into_size(self) -> ResourceGroupSize {
         match self {
             GroupReadResult::Size(size) => size,
-            _ => unreachable!("Expected size"),
+            GroupReadResult::Value(maybe_bytes, maybe_layout) => unreachable!(
+                "Expected size, found value bytes = {:?}, layout = {:?}",
+                maybe_bytes, maybe_layout
+            ),
+            GroupReadResult::Uninitialized => {
+                unreachable!("Expected group size, found uninitialized")
+            },
         }
     }
 }
@@ -246,13 +250,13 @@ pub(crate) mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
-        access_path::AccessPath,
         executable::ModulePath,
         state_store::state_value::StateValue,
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
+    use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
     use std::{fmt::Debug, hash::Hash, sync::Arc};
 
     #[derive(Clone, Eq, Hash, PartialEq, Debug)]
@@ -262,8 +266,15 @@ pub(crate) mod test {
     );
 
     impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
-        fn module_path(&self) -> Option<AccessPath> {
-            None
+        fn is_module_path(&self) -> bool {
+            false
+        }
+
+        fn from_address_and_module_name(
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> Self {
+            unreachable!("Irrelevant for test")
         }
     }
 

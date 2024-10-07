@@ -18,12 +18,8 @@ use move_abigen::{Abigen, AbigenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_bytecode_utils::Modules;
-use move_command_line_common::{
-    env::get_bytecode_version_from_env,
-    files::{
-        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
-        SOURCE_MAP_EXTENSION,
-    },
+use move_command_line_common::files::{
+    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_compiler::{
     attr_derivation,
@@ -31,6 +27,7 @@ use move_compiler::{
     shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
     Compiler,
 };
+use move_compiler_v2::Experiment;
 use move_docgen::{Docgen, DocgenOptions};
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions,
@@ -326,7 +323,7 @@ impl OnDiskCompiledPackage {
         &self,
         package_name: Symbol,
         compiled_unit: &CompiledUnitWithSource,
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
     ) -> Result<()> {
         let root_package = self.package.compiled_package_info.package_name;
         assert!(self.root_path.ends_with(root_package.as_str()));
@@ -352,7 +349,7 @@ impl OnDiskCompiledPackage {
                 .with_extension(MOVE_COMPILED_EXTENSION),
             compiled_unit
                 .unit
-                .serialize(get_bytecode_version_from_env(bytecode_version))
+                .serialize(Some(bytecode_version))
                 .as_slice(),
         )?;
         self.save_under(
@@ -519,15 +516,15 @@ impl CompiledPackage {
         // TODO: add more tests for the different caching cases
         !(package.has_source_changed_since_last_compile(resolved_package) // recompile if source has changed
             // Recompile if the flags are different
-                || package.are_build_flags_different(&resolution_graph.build_options)
-                // Force root package recompilation in test mode
-                || resolution_graph.build_options.test_mode && is_root_package
-                // Recompile if force recompilation is set
-                || resolution_graph.build_options.force_recompilation) &&
-                // Dive deeper to make sure that instantiations haven't changed since that
-                // can be changed by other packages above us in the dependency graph possibly
-                package.package.compiled_package_info.address_alias_instantiation
-                    == resolved_package.resolution_table
+            || package.are_build_flags_different(&resolution_graph.build_options)
+            // Force root package recompilation in test mode
+            || resolution_graph.build_options.test_mode && is_root_package
+            // Recompile if force recompilation is set
+            || resolution_graph.build_options.force_recompilation) &&
+            // Dive deeper to make sure that instantiations haven't changed since that
+            // can be changed by other packages above us in the dependency graph possibly
+            package.package.compiled_package_info.address_alias_instantiation
+                == resolved_package.resolution_table
     }
 
     pub(crate) fn build_all<W: Write>(
@@ -621,7 +618,7 @@ impl CompiledPackage {
         // If bytecode dependency is not empty, do not allow renaming
         if !bytecode_deps.is_empty() {
             if let Some(pkg_name) = resolution_graph.contains_renaming() {
-                anyhow::bail!(
+                bail!(
                     "Found address renaming in package '{}' when \
                     building with bytecode dependencies -- this is currently not supported",
                     pkg_name
@@ -630,23 +627,32 @@ impl CompiledPackage {
         }
 
         // invoke the compiler
-        let mut paths = src_deps;
-        paths.push(sources_package_paths.clone());
+        let effective_compiler_version = config.compiler_version.unwrap_or_default();
+        let effective_language_version = config.language_version.unwrap_or_default();
+        effective_compiler_version.check_language_support(effective_language_version)?;
 
-        let (file_map, all_compiled_units) = match config.compiler_version.unwrap_or_default() {
+        let (file_map, all_compiled_units, optional_global_env) = match config
+            .compiler_version
+            .unwrap_or_default()
+        {
             CompilerVersion::V1 => {
+                let mut paths = src_deps;
+                paths.push(sources_package_paths.clone());
                 let compiler =
                     Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
                 compiler_driver_v1(compiler)?
             },
-            CompilerVersion::V2 => {
+            version @ CompilerVersion::V2_0 | version @ CompilerVersion::V2_1 => {
                 let to_str_vec = |ps: &[Symbol]| {
                     ps.iter()
                         .map(move |s| s.as_str().to_owned())
                         .collect::<Vec<_>>()
                 };
                 let mut global_address_map = BTreeMap::new();
-                for pack in paths.iter().chain(bytecode_deps.iter()) {
+                for pack in std::iter::once(&sources_package_paths)
+                    .chain(src_deps.iter())
+                    .chain(bytecode_deps.iter())
+                {
                     for (name, val) in &pack.named_address_map {
                         if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
                         {
@@ -664,9 +670,13 @@ impl CompiledPackage {
                         }
                     }
                 }
-
-                let options = move_compiler_v2::Options {
-                    sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+                let mut options = move_compiler_v2::Options {
+                    sources: sources_package_paths
+                        .paths
+                        .iter()
+                        .map(|path| path.as_str().to_owned())
+                        .collect(),
+                    sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
                     dependencies: bytecode_deps
                         .iter()
                         .flat_map(|x| to_str_vec(&x.paths))
@@ -677,8 +687,13 @@ impl CompiledPackage {
                         .collect(),
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
+                    language_version: Some(effective_language_version),
+                    compiler_version: Some(version),
+                    compile_test_code: flags.keep_testing_functions(),
+                    experiments: config.experiments.clone(),
                     ..Default::default()
                 };
+                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },
         };
@@ -719,8 +734,10 @@ impl CompiledPackage {
                 deps_compiled_units.push((package_name, unit))
             }
         }
-        let bytecode_version = get_bytecode_version_from_env(config.bytecode_version);
-
+        let bytecode_version = config
+            .language_version
+            .unwrap_or_default()
+            .infer_bytecode_version(config.bytecode_version);
         let mut compiled_docs = None;
         let mut compiled_abis = None;
         let mut move_model = None;
@@ -738,13 +755,20 @@ impl CompiledPackage {
             if skip_attribute_checks {
                 flags = flags.set_skip_attribute_checks(true)
             }
-            let model = run_model_builder_with_options_and_compilation_flags(
-                vec![sources_package_paths],
-                deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
-                ModelBuilderOptions::default(),
-                flags,
-                &known_attributes,
-            )?;
+
+            let model = if let Some(env) = optional_global_env {
+                env
+            } else {
+                run_model_builder_with_options_and_compilation_flags(
+                    // Otherwise, use V1 generated model
+                    vec![sources_package_paths],
+                    vec![],
+                    deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
+                    ModelBuilderOptions::default(),
+                    flags,
+                    &known_attributes,
+                )?
+            };
 
             if resolution_graph.build_options.generate_docs {
                 compiled_docs = Some(Self::build_docs(
@@ -817,12 +841,12 @@ impl CompiledPackage {
                     let name_conflict_error_msg = occurence_infos
                         .into_iter()
                         .map(|(name, is_module, fpath)| {
-                                format!(
-                                    "\t{} '{}' at path '{}'",
-                                    if is_module { "Module" } else { "Script" },
-                                    name,
-                                    fpath
-                                )
+                            format!(
+                                "\t{} '{}' at path '{}'",
+                                if is_module { "Module" } else { "Script" },
+                                name,
+                                fpath
+                            )
                         })
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -848,7 +872,7 @@ impl CompiledPackage {
     pub(crate) fn save_to_disk(
         &self,
         under_path: PathBuf,
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
     ) -> Result<OnDiskCompiledPackage> {
         self.check_filepaths_ok()?;
         assert!(under_path.ends_with(CompiledPackageLayout::Root.path()));
@@ -915,7 +939,7 @@ impl CompiledPackage {
     }
 
     fn build_abis(
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
         model: &GlobalEnv,
         compiled_units: &[CompiledUnitWithSource],
     ) -> Vec<(String, Vec<u8>)> {
@@ -924,11 +948,11 @@ impl CompiledPackage {
             .map(|unit| match &unit.unit {
                 CompiledUnit::Script(script) => (
                     script.name.to_string(),
-                    unit.unit.serialize(bytecode_version),
+                    unit.unit.serialize(Some(bytecode_version)),
                 ),
                 CompiledUnit::Module(module) => (
                     module.name.to_string(),
-                    unit.unit.serialize(bytecode_version),
+                    unit.unit.serialize(Some(bytecode_version)),
                 ),
             })
             .collect();
@@ -1034,7 +1058,8 @@ pub(crate) fn apply_named_address_renaming(
         .collect()
 }
 
-pub(crate) fn make_source_and_deps_for_compiler(
+/// Collects source and dependency files with their address mappings.
+pub fn make_source_and_deps_for_compiler(
     resolution_graph: &ResolvedGraph,
     root: &ResolvedPackage,
     deps: Vec<(
@@ -1089,7 +1114,11 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
     let mut writer = StandardStream::stderr(ColorChoice::Auto);
     match move_compiler_v2::run_move_compiler(&mut writer, options) {
-        Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units)),
+        Ok((env, units)) => Ok((
+            move_compiler_v2::make_files_source_text(&env),
+            units,
+            Some(env),
+        )),
         Err(_) => {
             // Error reported, exit
             std::process::exit(1);
@@ -1103,5 +1132,9 @@ pub fn build_and_report_no_exit_v2_driver(
 ) -> CompilerDriverResult {
     let mut writer = StandardStream::stderr(ColorChoice::Auto);
     let (env, units) = move_compiler_v2::run_move_compiler(&mut writer, options)?;
-    Ok((move_compiler_v2::make_files_source_text(&env), units))
+    Ok((
+        move_compiler_v2::make_files_source_text(&env),
+        units,
+        Some(env),
+    ))
 }

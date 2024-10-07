@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{compat::Sha3_256, Uniform};
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
@@ -10,7 +11,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
     on_chain_config::{OnChainConfig, OnChainConsensusConfig},
-    randomness::{PerBlockRandomness, RandMetadataToSign, WVUF},
+    randomness::{PerBlockRandomness, RandMetadata, WVUF},
     validator_verifier::ValidatorConsensusInfo,
 };
 use digest::Digest;
@@ -28,6 +29,8 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod entry_func_attrs;
+mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]
@@ -38,14 +41,6 @@ async fn get_current_version(rest_client: &Client) -> u64 {
         .unwrap()
         .inner()
         .version
-}
-
-async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {
-    let maybe_response = rest_client
-        .get_account_resource_bcs::<T>(CORE_CODE_ADDRESS, T::struct_tag().to_string().as_str())
-        .await;
-    let response = maybe_response.unwrap();
-    response.into_inner()
 }
 
 #[allow(dead_code)]
@@ -72,7 +67,7 @@ async fn wait_for_dkg_finish(
     target_epoch: Option<u64>,
     time_limit_secs: u64,
 ) -> DKGSessionState {
-    let mut dkg_state = get_on_chain_resource::<DKGState>(client).await;
+    let mut dkg_state = utils::get_on_chain_resource::<DKGState>(client).await;
     let timer = Instant::now();
     while timer.elapsed().as_secs() < time_limit_secs
         && !(dkg_state.in_progress.is_none()
@@ -85,7 +80,7 @@ async fn wait_for_dkg_finish(
                     == target_epoch))
     {
         tokio::time::sleep(Duration::from_secs(1)).await;
-        dkg_state = get_on_chain_resource::<DKGState>(client).await;
+        dkg_state = utils::get_on_chain_resource::<DKGState>(client).await;
     }
     assert!(timer.elapsed().as_secs() < time_limit_secs);
     dkg_state.last_complete().clone()
@@ -244,7 +239,7 @@ async fn verify_randomness(
     );
 
     // Compare the outputs from 2 paths.
-    let rand_metadata = RandMetadataToSign {
+    let rand_metadata = RandMetadata {
         epoch: on_chain_block_randomness.epoch,
         round: on_chain_block_randomness.round,
     };

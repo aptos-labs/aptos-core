@@ -21,3 +21,12 @@ pub static DKG_STAGE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static ROUNDING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_dkg_rounding_seconds",
+        "Rounding seconds and counts by method",
+        &["method"]
+    )
+    .unwrap()
+});

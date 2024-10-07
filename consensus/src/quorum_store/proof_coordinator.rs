@@ -12,11 +12,9 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{
     BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::bls12381;
 use aptos_logger::prelude::*;
-use aptos_types::{
-    aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
-};
+use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::Arc,
@@ -55,7 +53,7 @@ impl IncrementalProofState {
 
     fn add_signature(
         &mut self,
-        signed_batch_info: SignedBatchInfo,
+        signed_batch_info: &SignedBatchInfo,
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != &self.info {
@@ -77,7 +75,7 @@ impl IncrementalProofState {
                 let signer = signed_batch_info.signer();
                 if self
                     .aggregated_signature
-                    .insert(signer, signed_batch_info.signature())
+                    .insert(signer, signed_batch_info.signature().clone())
                     .is_none()
                 {
                     self.aggregated_voting_power += voting_power as u128;
@@ -122,9 +120,7 @@ impl IncrementalProofState {
         }
         self.completed = true;
 
-        match validator_verifier
-            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()))
-        {
+        match validator_verifier.aggregate_signatures(self.aggregated_signature.iter()) {
             Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         }
@@ -138,11 +134,10 @@ impl IncrementalProofState {
 pub(crate) struct ProofCoordinator {
     peer_id: PeerId,
     proof_timeout_ms: usize,
-    digest_to_proof: HashMap<HashValue, IncrementalProofState>,
-    digest_to_time: HashMap<HashValue, u64>,
+    batch_info_to_proof: HashMap<BatchInfo, IncrementalProofState>,
     // to record the batch creation time
+    batch_info_to_time: HashMap<BatchInfo, u64>,
     timeouts: Timeouts<BatchInfo>,
-    committed_batches: HashMap<BatchInfo, IncrementalProofState>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     proof_cache: ProofCache,
@@ -162,10 +157,9 @@ impl ProofCoordinator {
         Self {
             peer_id,
             proof_timeout_ms,
-            digest_to_proof: HashMap::new(),
-            digest_to_time: HashMap::new(),
+            batch_info_to_proof: HashMap::new(),
+            batch_info_to_time: HashMap::new(),
             timeouts: Timeouts::new(),
-            committed_batches: HashMap::new(),
             batch_reader,
             batch_generator_cmd_tx,
             proof_cache,
@@ -188,24 +182,18 @@ impl ProofCoordinator {
         if batch_author != signed_batch_info.author() {
             return Err(SignedBatchInfoError::WrongAuthor);
         }
-        if self
-            .committed_batches
-            .get(signed_batch_info.batch_info())
-            .is_some()
-        {
-            return Err(SignedBatchInfoError::AlreadyCommitted);
-        }
 
         self.timeouts.add(
             signed_batch_info.batch_info().clone(),
             self.proof_timeout_ms,
         );
-        self.digest_to_proof.insert(
-            *signed_batch_info.digest(),
+        self.batch_info_to_proof.insert(
+            signed_batch_info.batch_info().clone(),
             IncrementalProofState::new(signed_batch_info.batch_info().clone()),
         );
-        self.digest_to_time
-            .entry(*signed_batch_info.digest())
+        #[allow(deprecated)]
+        self.batch_info_to_time
+            .entry(signed_batch_info.batch_info().clone())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
         debug!(
             LogSchema::new(LogEvent::ProofOfStoreInit),
@@ -221,33 +209,34 @@ impl ProofCoordinator {
         validator_verifier: &ValidatorVerifier,
     ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
         if !self
-            .digest_to_proof
-            .contains_key(signed_batch_info.digest())
+            .batch_info_to_proof
+            .contains_key(signed_batch_info.batch_info())
         {
             self.init_proof(&signed_batch_info)?;
         }
-        let digest = *signed_batch_info.digest();
-        if let Some(value) = self.digest_to_proof.get_mut(signed_batch_info.digest()) {
-            value.add_signature(signed_batch_info, validator_verifier)?;
+        if let Some(value) = self
+            .batch_info_to_proof
+            .get_mut(signed_batch_info.batch_info())
+        {
+            value.add_signature(&signed_batch_info, validator_verifier)?;
             if !value.completed && value.ready(validator_verifier) {
                 let proof = value.take(validator_verifier);
                 // proof validated locally, so adding to cache
                 self.proof_cache
                     .insert(proof.info().clone(), proof.multi_signature().clone());
                 // quorum store measurements
+                #[allow(deprecated)]
                 let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                     - self
-                        .digest_to_time
-                        .remove(&digest)
-                        .expect("Batch created without recording the time!");
+                        .batch_info_to_time
+                        .remove(signed_batch_info.batch_info())
+                        .ok_or(
+                            // Batch created without recording the time!
+                            SignedBatchInfoError::NoTimeStamps,
+                        )?;
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }
-        } else if let Some(value) = self
-            .committed_batches
-            .get_mut(signed_batch_info.batch_info())
-        {
-            value.add_signature(signed_batch_info, validator_verifier)?;
         } else {
             return Err(SignedBatchInfoError::NotFound);
         }
@@ -255,6 +244,13 @@ impl ProofCoordinator {
     }
 
     fn update_counters_on_expire(state: &IncrementalProofState) {
+        // Count late votes separately
+        if !state.completed && !state.self_voted {
+            counters::BATCH_RECEIVED_LATE_REPLIES_COUNT
+                .inc_by(state.aggregated_signature.len() as u64);
+            return;
+        }
+
         counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.aggregated_signature.len() as f64);
         counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
         if !state.completed {
@@ -265,7 +261,7 @@ impl ProofCoordinator {
     async fn expire(&mut self) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
-            if let Some(state) = self.digest_to_proof.remove(signed_batch_info_info.digest()) {
+            if let Some(state) = self.batch_info_to_proof.remove(&signed_batch_info_info) {
                 if !state.completed {
                     batch_ids.push(signed_batch_info_info.batch_id());
                 }
@@ -285,8 +281,6 @@ impl ProofCoordinator {
                     );
                 }
                 Self::update_counters_on_expire(&state);
-            } else if let Some(state) = self.committed_batches.remove(&signed_batch_info_info) {
-                Self::update_counters_on_expire(&state);
             }
         }
         if self
@@ -303,7 +297,7 @@ impl ProofCoordinator {
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
         mut network_sender: impl QuorumStoreSender,
-        validator_verifier: ValidatorVerifier,
+        validator_verifier: Arc<ValidatorVerifier>,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {
@@ -311,24 +305,30 @@ impl ProofCoordinator {
                 Some(command) = rx.recv() => monitor!("proof_coordinator_handle_command", {
                     match command {
                         ProofCoordinatorCommand::Shutdown(ack_tx) => {
+                            counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofCoordinator::shutdown"]).inc();
                             ack_tx
                                 .send(())
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
                         ProofCoordinatorCommand::CommitNotification(batches) => {
+                            counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofCoordinator::commit_notification"]).inc();
                             for batch in batches {
                                 let digest = batch.digest();
-                                if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
+                                if let Entry::Occupied(existing_proof) = self.batch_info_to_proof.entry(batch.clone()) {
                                     if batch == *existing_proof.get().batch_info() {
                                         let incremental_proof = existing_proof.get();
                                         if incremental_proof.completed {
                                             counters::BATCH_SUCCESSFUL_CREATION.observe(1.0);
                                         } else {
-                                            warn!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
+                                            info!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
                                         }
-                                        let committed_proof = existing_proof.remove();
-                                        self.committed_batches.insert(batch, committed_proof);
+                                        debug!(
+                                            LogSchema::new(LogEvent::ProofOfStoreCommit),
+                                            digest = digest,
+                                            batch_id = batch.batch_id().id,
+                                            proof_completed = incremental_proof.completed,
+                                        );
                                     }
                                 }
                             }

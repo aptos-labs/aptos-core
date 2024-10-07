@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unnecessary acquires annotation
+  ┌─ tests/acquires-checker/copy_ability_tuple.move:8:39
+  │
+8 │     public fun g(s: &signer) acquires R {
+  │                                       ^^

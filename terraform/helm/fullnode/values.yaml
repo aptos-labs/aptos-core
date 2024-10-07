@@ -9,6 +9,8 @@ chain:
   era: 1
   # -- Name of the testnet to connect to. There must be a corresponding entry in .Values.aptos_chains
   name: devnet
+  # -- The value of the `chain_name` label. If empty, defaults to `.Values.chain.name`
+  label:
   # -- Kubernetes Configmap from which to load the genesis.blob and waypoint.txt
   genesisConfigmap:
   # -- Kubernetes Secret from which to load the genesis.blob and waypoint.txt
@@ -20,7 +22,7 @@ aptos_chains:
     waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
     genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
   testnet:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/waypoint.txt
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis_waypoint.txt
     genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
   mainnet:
     waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
@@ -32,7 +34,6 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        seeds: {}
         identity: {}
         inbound_rate_limit_config:
         outbound_rate_limit_config:
@@ -65,6 +66,8 @@ storage:
   class:
   # -- Size of fullnode persistent storage
   size: 1000Gi
+  # -- The name of a VolumeSnapshot to restore from. In unset, the fullnode will start from scratch.
+  snapshotRefForRestore:
 
 service:
   # -- The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally
@@ -101,6 +104,10 @@ logging:
   # -- Address for remote logging
   address:
 
+metrics:
+  # -- The upstream sink for metrics. Supported values are "dev" and "prod"
+  destination: dev
+
 backup:
   image:
     # -- Image repo to use for backup images
@@ -111,7 +118,7 @@ backup:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 4
+      cpu: 8
       memory: 8Gi
     requests:
       cpu: 4
@@ -133,7 +140,7 @@ backup:
       container:
       sas:
     # -- State snapshot interval epochs
-    state_snapshot_interval_epochs: 1
+    state_snapshot_interval_epochs: 2
     # -- Transaction batch size
     transaction_batch_size: 1000000
 

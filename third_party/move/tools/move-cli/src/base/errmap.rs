@@ -3,7 +3,8 @@
 
 use super::reroot_path;
 use clap::*;
-use move_package::{BuildConfig, CompilerVersion, ModelConfig};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::{BuildConfig, ModelConfig};
 use std::path::PathBuf;
 
 /// Generate error map for the package and its dependencies at `path` for use by the Move
@@ -39,6 +40,7 @@ impl Errmap {
             all_files_as_targets: true,
             target_filter: None,
             compiler_version: CompilerVersion::default(),
+            language_version: LanguageVersion::default(),
         })?;
         let mut errmap_gen = move_errmapgen::ErrmapGen::new(&model, &errmap_options);
         errmap_gen.gen();

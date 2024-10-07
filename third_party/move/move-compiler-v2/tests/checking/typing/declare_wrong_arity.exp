@@ -1,5 +1,13 @@
 
 Diagnostics:
+error: tuple type `()` is not allowed as a local variable type
+  ┌─ tests/checking/typing/declare_wrong_arity.move:5:13
+  │
+5 │         let x: ();
+  │             ^
+  │
+  = required by declaration of local `x`
+
 error: cannot adapt `()` to annotated type `u64`
   ┌─ tests/checking/typing/declare_wrong_arity.move:6:13
   │

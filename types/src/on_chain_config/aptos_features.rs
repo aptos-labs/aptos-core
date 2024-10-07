@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use move_binary_format::{
+    file_format_common,
+    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
+};
 use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::FromRepr;
+use strum_macros::{EnumString, FromRepr};
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -67,6 +71,30 @@ pub enum FeatureFlag {
     MAX_OBJECT_NESTING_CHECK = 53,
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
     MULTISIG_V2_ENHANCEMENT = 55,
+    DELEGATION_POOL_ALLOWLISTING = 56,
+    MODULE_EVENT_MIGRATION = 57,
+    REJECT_UNSTABLE_BYTECODE = 58,
+    TRANSACTION_CONTEXT_EXTENSION = 59,
+    COIN_TO_FUNGIBLE_ASSET_MIGRATION = 60,
+    PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
+    OBJECT_NATIVE_DERIVED_ADDRESS = 62,
+    DISPATCHABLE_FUNGIBLE_ASSET = 63,
+    NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE = 64,
+    OPERATIONS_DEFAULT_TO_FA_APT_STORE = 65,
+    AGGREGATOR_V2_IS_AT_LEAST_API = 66,
+    CONCURRENT_FUNGIBLE_BALANCE = 67,
+    DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
+    LIMIT_VM_TYPE_SIZE = 69,
+    ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
+    DISALLOW_USER_NATIVES = 71,
+    ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
+    USE_COMPATIBILITY_CHECKER_V2 = 73,
+    ENABLE_ENUM_TYPES = 74,
+    ENABLE_RESOURCE_ACCESS_CONTROL = 75,
+    REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    FEDERATED_KEYLESS = 77,
+    TRANSACTION_SIMULATION_ENHANCEMENT = 78,
+    COLLECTION_OWNER = 79,
 }
 
 impl FeatureFlag {
@@ -76,7 +104,10 @@ impl FeatureFlag {
             FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
             FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
+            // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
             FeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::RESOURCE_GROUPS,
@@ -113,6 +144,7 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
@@ -120,6 +152,26 @@ impl FeatureFlag {
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
+            FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
+            FeatureFlag::MODULE_EVENT_MIGRATION,
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
+            FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
+            FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
+            FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
+            FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
+            FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::LIMIT_VM_TYPE_SIZE,
+            FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
+            FeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
+            FeatureFlag::USE_COMPATIBILITY_CHECKER_V2,
+            FeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+            FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
         ]
     }
 }
@@ -140,6 +192,7 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
+
         features
     }
 }
@@ -210,12 +263,6 @@ impl Features {
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
-    }
-
     /// Whether the Aggregator V2 delayed fields feature is enabled.
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
@@ -250,12 +297,42 @@ impl Features {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
+    pub fn is_federated_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
+    }
+
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
+    }
+
+    pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn get_max_identifier_size(&self) -> u64 {
+        if self.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
+            IDENTIFIER_SIZE_MAX
+        } else {
+            LEGACY_IDENTIFIER_SIZE_MAX
+        }
+    }
+
+    pub fn get_max_binary_format_version(&self) -> u32 {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
+            file_format_common::VERSION_7
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
+            file_format_common::VERSION_6
+        } else {
+            file_format_common::VERSION_5
+        }
     }
 }
 
@@ -275,17 +352,36 @@ pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
     change_set
 }
 
-#[test]
-fn test_features_into_flag_vec() {
-    let mut features = Features { features: vec![] };
-    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
-    features.enable(FeatureFlag::BN254_STRUCTURES);
-    let flag_vec = features.into_flag_vec();
-    assert_eq!(
-        vec![
-            FeatureFlag::BLS12_381_STRUCTURES,
-            FeatureFlag::BN254_STRUCTURES
-        ],
-        flag_vec
-    );
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_features_into_flag_vec() {
+        let mut features = Features { features: vec![] };
+        features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+        features.enable(FeatureFlag::BN254_STRUCTURES);
+
+        assert_eq!(
+            vec![
+                FeatureFlag::BLS12_381_STRUCTURES,
+                FeatureFlag::BN254_STRUCTURES
+            ],
+            features.into_flag_vec()
+        );
+    }
+
+    #[test]
+    fn test_min_max_binary_format() {
+        // Ensure querying max binary format implementation is correct and checks
+        // versions 5 to 7.
+        assert_eq!(
+            file_format_common::VERSION_5,
+            file_format_common::VERSION_MIN
+        );
+        assert_eq!(
+            file_format_common::VERSION_7,
+            file_format_common::VERSION_MAX
+        );
+    }
 }

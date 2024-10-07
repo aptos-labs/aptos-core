@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: value of type `M::R` does not have the `copy` ability
+  ┌─ tests/ability-check/v1-typing/implicit_deref_borrow_field_not_copyable.move:8:15
+  │
+8 │         R{} = b.r;
+  │               ^^^ reference content copied here
+
+error: value of type `M::R` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/implicit_deref_borrow_field_not_copyable.move:11:15
+   │
+11 │         R{} = bref.r;
+   │               ^^^^^^ reference content copied here

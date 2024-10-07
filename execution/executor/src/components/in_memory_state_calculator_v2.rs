@@ -1,51 +1,55 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
+use crate::metrics::OTHER_TIMERS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{parsed_transaction_output::TransactionsWithParsedOutput, ProofReader};
 use aptos_logger::info;
+use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
     state_delta::StateDelta,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
-    account_view::AccountView,
     epoch_state::EpochState,
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{
         create_empty_sharded_state_updates, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
+        TStateView,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
 };
 use arr_macro::arr;
-use bytes::Bytes;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-struct CoreAccountStateView<'a> {
+struct StateCacheView<'a> {
     base: &'a ShardedStateCache,
     updates: &'a ShardedStateUpdates,
 }
 
-impl<'a> CoreAccountStateView<'a> {
+impl<'a> StateCacheView<'a> {
     pub fn new(base: &'a ShardedStateCache, updates: &'a ShardedStateUpdates) -> Self {
         Self { base, updates }
     }
 }
 
-impl<'a> AccountView for CoreAccountStateView<'a> {
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Bytes>> {
+impl<'a> TStateView for StateCacheView<'a> {
+    type Key = StateKey;
+
+    fn get_state_value(
+        &self,
+        state_key: &Self::Key,
+    ) -> aptos_types::state_store::Result<Option<StateValue>> {
         if let Some(v_opt) = self.updates[state_key.get_shard_id() as usize].get(state_key) {
-            return Ok(v_opt.as_ref().map(StateValue::bytes).cloned());
+            return Ok(v_opt.clone());
         }
         if let Some(entry) = self
             .base
@@ -54,13 +58,13 @@ impl<'a> AccountView for CoreAccountStateView<'a> {
             .as_ref()
         {
             let state_value = entry.value().1.as_ref();
-            return Ok(state_value.map(StateValue::bytes).cloned());
+            return Ok(state_value.cloned());
         }
         Ok(None)
     }
 
-    fn get_account_address(&self) -> Result<Option<AccountAddress>> {
-        Ok(Some(CORE_CODE_ADDRESS))
+    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
+        unreachable!("not supposed to be used.")
     }
 }
 
@@ -281,9 +285,8 @@ impl InMemoryStateCalculatorV2 {
         T: Sync + 'a,
         F: Fn(&'a T) -> &'a WriteSet + Sync,
     {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["get_sharded_state_updates"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["get_sharded_state_updates"]);
+
         outputs
             .par_iter()
             .map(|output| {
@@ -300,9 +303,7 @@ impl InMemoryStateCalculatorV2 {
     }
 
     fn calculate_updates(state_updates_vec: &[ShardedStateUpdates]) -> ShardedStateUpdates {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["calculate_updates"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["calculate_updates"]);
         let mut updates: ShardedStateUpdates = create_empty_sharded_state_updates();
         updates
             .par_iter_mut()
@@ -344,7 +345,7 @@ impl InMemoryStateCalculatorV2 {
         sharded_state_cache: &ShardedStateCache,
         updates: &[&ShardedStateUpdates; 2],
     ) -> StateStorageUsage {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+        let _timer = OTHER_TIMERS
             .with_label_values(&["calculate_usage"])
             .start_timer();
         if old_usage.is_untracked() {
@@ -400,9 +401,7 @@ impl InMemoryStateCalculatorV2 {
         usage: StateStorageUsage,
         proof_reader: &ProofReader,
     ) -> Result<FrozenSparseMerkleTree<StateValue>> {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["make_checkpoint"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["make_checkpoint"]);
 
         // Update SMT.
         //
@@ -420,18 +419,16 @@ impl InMemoryStateCalculatorV2 {
         base: &ShardedStateCache,
         updates: &ShardedStateUpdates,
     ) -> Result<EpochState> {
-        let core_account_view = CoreAccountStateView::new(base, updates);
-        let validator_set = core_account_view
-            .get_validator_set()?
+        let state_cache_view = StateCacheView::new(base, updates);
+        let validator_set = ValidatorSet::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = core_account_view
-            .get_configuration_resource()?
+        let configuration = ConfigurationResource::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
-        Ok(EpochState {
-            epoch: configuration.epoch(),
-            verifier: (&validator_set).into(),
-        })
+        Ok(EpochState::new(
+            configuration.epoch(),
+            (&validator_set).into(),
+        ))
     }
 
     fn validate_input_for_block(

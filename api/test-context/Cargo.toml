@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 aptos-api = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -24,6 +23,7 @@ aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-mempool-notifications = { workspace = true }
 aptos-sdk = { workspace = true }
@@ -37,15 +37,9 @@ bcs = { workspace = true }
 bytes = { workspace = true }
 goldenfile = { workspace = true }
 hyper = { workspace = true }
-poem = { workspace = true }
-poem-openapi = { workspace = true }
-proptest = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-url = { workspace = true }
 warp = { workspace = true }
 warp-reverse-proxy = { workspace = true }

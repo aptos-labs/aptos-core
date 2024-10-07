@@ -192,7 +192,7 @@ fn create_state_keys_and_values(
     (0..num_keys_and_values)
         .map(|_| {
             let state_value = StateValue::new_legacy(random_bytes.clone());
-            (StateKey::raw(vec![]), state_value)
+            (StateKey::raw(&[]), state_value)
         })
         .collect()
 }

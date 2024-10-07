@@ -1,23 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::file_format_generator::{
-    function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
-    MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
-    MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
-    MAX_STRUCT_DEF_INST_COUNT,
+use crate::{
+    file_format_generator::{
+        function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
+        MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
+        MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
+        MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
+    },
+    Experiment, Options,
 };
 use codespan_reporting::diagnostic::Severity;
+use itertools::Itertools;
 use move_binary_format::{
     file_format as FF,
-    file_format::{FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
+    file_format::{AccessKind, FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
     file_format_common,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+};
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, Address, AddressSpecifier, ResourceSpecifier},
+    metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -35,6 +42,8 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Internal state of the module code generator
 #[derive(Debug)]
 pub struct ModuleGenerator {
+    /// Whether to generate access specifiers
+    gen_access_specifiers: bool,
     /// The module index for which we generate code.
     #[allow(unused)]
     module_idx: FF::ModuleHandleIndex,
@@ -67,8 +76,24 @@ pub struct ModuleGenerator {
         BTreeMap<(QualifiedId<StructId>, usize, FF::SignatureIndex), FF::FieldInstantiationIndex>,
     /// A mapping from type sequences to signature indices.
     types_to_signature: BTreeMap<Vec<Type>, FF::SignatureIndex>,
-    /// A mapping from constants sequences to pool indices.
-    cons_to_idx: BTreeMap<Constant, FF::ConstantPoolIndex>,
+    /// A mapping from constants sequences (with the corresponding type information) to pool indices.
+    cons_to_idx: BTreeMap<(Constant, Type), FF::ConstantPoolIndex>,
+    variant_field_to_idx:
+        BTreeMap<(QualifiedId<StructId>, Vec<Symbol>, usize), FF::VariantFieldHandleIndex>,
+    variant_field_inst_to_idx: BTreeMap<
+        (
+            QualifiedId<StructId>,
+            Vec<Symbol>,
+            usize,
+            FF::SignatureIndex,
+        ),
+        FF::VariantFieldInstantiationIndex,
+    >,
+    struct_variant_to_idx: BTreeMap<(QualifiedId<StructId>, Symbol), FF::StructVariantHandleIndex>,
+    struct_variant_inst_to_idx: BTreeMap<
+        (QualifiedId<StructId>, Symbol, FF::SignatureIndex),
+        FF::StructVariantInstantiationIndex,
+    >,
     /// The file-format module we are building.
     pub module: FF::CompiledModule,
     /// The source map for the module.
@@ -95,9 +120,21 @@ impl ModuleGenerator {
         ctx: &ModuleContext,
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
+        let options = module_env.env.get_extension::<Options>().expect("options");
+        let language_version = options.language_version.unwrap_or_default();
+        let compiler_version = options.compiler_version.unwrap_or(CompilerVersion::V2_0);
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
+            && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
+        let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
+        let metadata = Metadata {
+            key: COMPILATION_METADATA_KEY.to_vec(),
+            value: bcs::to_bytes(&compilation_metadata)
+                .expect("Serialization of CompilationMetadata should succeed"),
+        };
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_NEXT,
+            version: file_format_common::VERSION_MAX,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
+            metadata: vec![metadata],
             ..Default::default()
         };
         let source_map = {
@@ -115,6 +152,7 @@ impl ModuleGenerator {
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
         let mut gen = Self {
+            gen_access_specifiers,
             module_idx: FF::ModuleHandleIndex(0),
             module_to_idx: Default::default(),
             name_to_idx: Default::default(),
@@ -126,6 +164,10 @@ impl ModuleGenerator {
             field_inst_to_idx: Default::default(),
             types_to_signature: Default::default(),
             cons_to_idx: Default::default(),
+            variant_field_to_idx: Default::default(),
+            variant_field_inst_to_idx: Default::default(),
+            struct_variant_to_idx: Default::default(),
+            struct_variant_inst_to_idx: Default::default(),
             fun_inst_to_idx: Default::default(),
             main_handle: None,
             script_handle: None,
@@ -145,12 +187,24 @@ impl ModuleGenerator {
             self.module_index(ctx, loc, module_env);
         }
 
+        let options = ctx
+            .env
+            .get_extension::<Options>()
+            .expect("Options is available");
+        let compile_test_code = options.compile_test_code;
+
         for struct_env in module_env.get_structs() {
+            assert!(compile_test_code || !struct_env.is_test_only());
             self.gen_struct(ctx, &struct_env)
         }
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
+            // Do not need to generate code for inline functions
+            if fun_env.is_inline() {
+                continue;
+            }
+            assert!(compile_test_code || !fun_env.is_test_only());
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
         }
@@ -183,26 +237,56 @@ impl ModuleGenerator {
                 .expect(SOURCE_MAP_OK);
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
-        let fields = struct_env.get_fields();
-        let field_information = FF::StructFieldInformation::Declared(
-            fields
-                .map(|f| {
-                    let field_loc = f.get_loc();
-                    self.source_map
-                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
-                        .expect(SOURCE_MAP_OK);
-                    let name = self.name_index(ctx, field_loc, f.get_name());
-                    let signature =
-                        FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
-                    FF::FieldDefinition { name, signature }
+        let field_information = if struct_env.has_variants() {
+            let variants = struct_env
+                .get_variants()
+                .map(|v| FF::VariantDefinition {
+                    name: self.name_index(ctx, struct_env.get_variant_loc(v), v),
+                    fields: struct_env
+                        .get_fields_of_variant(v)
+                        .map(|f| self.field(ctx, def_idx, &f))
+                        .collect_vec(),
                 })
-                .collect(),
-        );
+                .collect_vec();
+            FF::StructFieldInformation::DeclaredVariants(variants)
+        } else if struct_env.is_native() {
+            FF::StructFieldInformation::Native
+        } else {
+            let fields = struct_env.get_fields();
+            FF::StructFieldInformation::Declared(
+                fields.map(|f| self.field(ctx, def_idx, &f)).collect(),
+            )
+        };
         let def = FF::StructDefinition {
             struct_handle,
             field_information,
         };
         self.module.struct_defs.push(def)
+    }
+
+    fn field(
+        &mut self,
+        ctx: &ModuleContext,
+        struct_def_idx: StructDefinitionIndex,
+        field_env: &FieldEnv,
+    ) -> FF::FieldDefinition {
+        let field_loc = field_env.get_loc();
+        let variant_idx = field_env
+            .get_variant()
+            .and_then(|v| field_env.struct_env.get_variant_idx(v));
+        self.source_map
+            .add_struct_field_mapping(struct_def_idx, variant_idx, ctx.env.to_ir_loc(field_loc))
+            .expect(SOURCE_MAP_OK);
+        let mut field_symbol = field_env.get_name();
+        let field_name = ctx.symbol_to_str(field_symbol);
+        // Append `_` if this is a positional field (digits), as the binary format expects proper identifiers
+        if field_name.starts_with(|c: char| c.is_ascii_digit()) {
+            field_symbol = ctx.env.symbol_pool().make(&format!("_{}", field_name));
+        }
+        let name = self.name_index(ctx, field_loc, field_symbol);
+        let signature =
+            FF::TypeSignature(self.signature_token(ctx, field_loc, &field_env.get_type()));
+        FF::FieldDefinition { name, signature }
     }
 
     /// Obtains or creates an index for a signature, a sequence of types.
@@ -418,11 +502,34 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
-        let access_specifiers = fun_env.get_access_specifiers().as_ref().map(|v| {
-            v.iter()
-                .map(|s| self.access_specifier(ctx, fun_env, s))
-                .collect()
-        });
+        let access_specifiers = if self.gen_access_specifiers {
+            fun_env.get_access_specifiers().as_ref().map(|v| {
+                v.iter()
+                    .map(|s| self.access_specifier(ctx, fun_env, s))
+                    .collect()
+            })
+        } else {
+            // Report an error if we cannot drop the access specifiers.
+            // TODO(#12623): remove this once the bug is fixed
+            if fun_env
+                .get_access_specifiers()
+                .map(|v| {
+                    v.iter().any(|s| {
+                        s.kind != AccessKind::Acquires
+                            || s.negated
+                            || !matches!(s.resource.1, ResourceSpecifier::Resource(_))
+                            || !matches!(s.address.1, AddressSpecifier::Any)
+                    })
+                })
+                .unwrap_or_default()
+            {
+                ctx.internal_error(
+                    loc,
+                    "cannot strip extended access specifiers to mitigate bug #12623",
+                )
+            }
+            None
+        };
         let handle = FF::FunctionHandle {
             module,
             name,
@@ -703,6 +810,140 @@ impl ModuleGenerator {
         field_inst_idx
     }
 
+    /// Obtains or creates a variant field handle index.
+    pub fn variant_field_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        variants: &[Symbol],
+        field_env: &FieldEnv,
+    ) -> FF::VariantFieldHandleIndex {
+        let key = (
+            field_env.struct_env.get_qualified_id(),
+            variants.to_vec(),
+            field_env.get_offset(),
+        );
+        if let Some(idx) = self.variant_field_to_idx.get(&key) {
+            return *idx;
+        }
+        let field_idx = FF::VariantFieldHandleIndex(ctx.checked_bound(
+            loc,
+            self.module.variant_field_handles.len(),
+            MAX_FIELD_COUNT,
+            "variant field",
+        ));
+        let variant_offsets = variants
+            .iter()
+            .filter_map(|v| field_env.struct_env.get_variant_idx(*v))
+            .collect_vec();
+        let owner = self.struct_def_index(ctx, loc, &field_env.struct_env);
+        self.module
+            .variant_field_handles
+            .push(FF::VariantFieldHandle {
+                struct_index: owner,
+                variants: variant_offsets,
+                field: field_env.get_offset() as FF::MemberCount,
+            });
+        self.variant_field_to_idx.insert(key, field_idx);
+        field_idx
+    }
+
+    /// Obtains or creates a variant field instantiation handle index.
+    pub fn variant_field_inst_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        variants: &[Symbol],
+        field_env: &FieldEnv,
+        inst: Vec<Type>,
+    ) -> FF::VariantFieldInstantiationIndex {
+        let type_parameters = self.signature(ctx, loc, inst);
+        let key = (
+            field_env.struct_env.get_qualified_id(),
+            variants.to_vec(),
+            field_env.get_offset(),
+            type_parameters,
+        );
+        if let Some(idx) = self.variant_field_inst_to_idx.get(&key) {
+            return *idx;
+        }
+        let idx = FF::VariantFieldInstantiationIndex(ctx.checked_bound(
+            loc,
+            self.module.variant_field_instantiations.len(),
+            MAX_FIELD_INST_COUNT,
+            "variant field instantiation",
+        ));
+        let handle = self.variant_field_index(ctx, loc, variants, field_env);
+        self.module
+            .variant_field_instantiations
+            .push(FF::VariantFieldInstantiation {
+                handle,
+                type_parameters,
+            });
+        self.variant_field_inst_to_idx.insert(key, idx);
+        idx
+    }
+
+    /// Obtains or creates a struct variant handle index.
+    pub fn struct_variant_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+        variant: Symbol,
+    ) -> FF::StructVariantHandleIndex {
+        let key = (struct_env.get_qualified_id(), variant);
+        if let Some(idx) = self.struct_variant_to_idx.get(&key) {
+            return *idx;
+        }
+        let idx = FF::StructVariantHandleIndex(ctx.checked_bound(
+            loc,
+            self.module.struct_variant_handles.len(),
+            MAX_STRUCT_VARIANT_COUNT,
+            "struct variant",
+        ));
+        let struct_index = self.struct_def_index(ctx, loc, struct_env);
+        self.module
+            .struct_variant_handles
+            .push(FF::StructVariantHandle {
+                struct_index,
+                variant: struct_env.get_variant_idx(variant).expect("variant idx"),
+            });
+        self.struct_variant_to_idx.insert(key, idx);
+        idx
+    }
+
+    /// Obtains or creates a struct variant instantiation index.
+    pub fn struct_variant_inst_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+        variant: Symbol,
+        inst: Vec<Type>,
+    ) -> FF::StructVariantInstantiationIndex {
+        let type_parameters = self.signature(ctx, loc, inst);
+        let key = (struct_env.get_qualified_id(), variant, type_parameters);
+        if let Some(idx) = self.struct_variant_inst_to_idx.get(&key) {
+            return *idx;
+        }
+        let idx = FF::StructVariantInstantiationIndex(ctx.checked_bound(
+            loc,
+            self.module.struct_variant_instantiations.len(),
+            MAX_STRUCT_VARIANT_INST_COUNT,
+            "struct variant instantiation",
+        ));
+        let handle = self.struct_variant_index(ctx, loc, struct_env, variant);
+        self.module
+            .struct_variant_instantiations
+            .push(FF::StructVariantInstantiation {
+                handle,
+                type_parameters,
+            });
+        self.struct_variant_inst_to_idx.insert(key, idx);
+        idx
+    }
+
     /// Obtains or generates a constant index.
     pub fn constant_index(
         &mut self,
@@ -711,7 +952,7 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(cons) {
+        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
             return *idx;
         }
         let data = cons
@@ -729,7 +970,7 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert(cons.clone(), idx);
+        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
         idx
     }
 }
@@ -812,6 +1053,7 @@ impl<'env> ModuleContext<'env> {
         // Compute map with direct usage of resources
         let mut usage_map = module
             .get_functions()
+            .filter(|f| !f.is_inline())
             .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
             .collect::<BTreeMap<_, _>>();
         // Now run a fixed-point loop: add resources used by called functions until there are no
@@ -819,6 +1061,9 @@ impl<'env> ModuleContext<'env> {
         loop {
             let mut changes = false;
             for fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 if let Some(callees) = fun.get_called_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();
@@ -856,8 +1101,8 @@ impl<'env> ModuleContext<'env> {
                 if *mid == fun.module_env.get_id() =>
                     {
                         result.insert(*sid);
-                    },
-                _ => {},
+                    }
+                _ => {}
             }
         }
         result

@@ -28,6 +28,7 @@ pub mod delayed_values;
 pub mod gas;
 pub mod loaded_data;
 pub mod natives;
+pub mod resolver;
 pub mod value_serde;
 pub mod value_traversal;
 pub mod values;

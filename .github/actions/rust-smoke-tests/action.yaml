@@ -10,15 +10,6 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
-    # Install nextest
-    - uses: taiki-e/install-action@v1.5.6
-      with:
-        tool: nextest
-
     # Run a postgres database
     - name: Run postgres database
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -29,7 +20,7 @@ runs:
       # Prebuild the aptos-node binary so that tests don't start before the node is built.
       # Also, prebuild the aptos-node binary as a separate step to avoid feature unification issues.
       # Note: --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
+      run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile smoke-test --package smoke-test
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres

@@ -30,16 +30,17 @@ use aptos_api_types::{
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_types::{
-    account_config::CoinStoreResource,
+    account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
+        RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
+    AptosCoinType, CoinType,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM};
-use move_core_types::vm_status::VMStatus;
+use aptos_vm::{AptosSimulationVM, AptosVM};
+use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -553,22 +554,45 @@ impl TransactionsApi {
                 let max_number_of_gas_units =
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
-                // Retrieve account balance to determine max gas available
-                let coin_store = context
-                    .expect_resource_poem::<CoinStoreResource, SubmitTransactionError>(
-                        signed_transaction.sender(),
-                        ledger_info.version(),
-                        &ledger_info,
-                    )?;
+                // Retrieve account balance to determine max gas available, right now this is using
+                // a view function, but we may want to re-evaluate this based on performance
+                let (_, _, state_view) = context
+                    .state_view::<BasicErrorWith404>(Option::None)
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code_no_info(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                        )
+                    })?;
+                let output = AptosVM::execute_view_function(
+                    &state_view,
+                    ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                    ident_str!("balance").into(),
+                    vec![AptosCoinType::type_tag()],
+                    vec![signed_transaction.sender().to_vec()],
+                    context.node_config.api.max_gas_view_function,
+                );
+                let values = output.values.map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code_no_info(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                    )
+                })?;
+                let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code_no_info(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                    )
+                })?;
 
                 let gas_unit_price =
                     estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
                 // With 0 gas price, we set it to max gas units, since we can't divide by 0
                 let max_account_gas_units = if gas_unit_price == 0 {
-                    coin_store.coin()
+                    balance
                 } else {
-                    coin_store.coin() / gas_unit_price
+                    balance / gas_unit_price
                 };
 
                 // To give better error messaging, we should not go below the minimum number of gas units
@@ -769,32 +793,38 @@ impl TransactionsApi {
             let context = self.context.clone();
             let accept_type = accept_type.clone();
 
-            let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
-
+            let (internal_ledger_info_opt, storage_ledger_info) =
+                api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info())
+                    .await?;
+            let storage_version = storage_ledger_info.ledger_version.into();
+            let internal_ledger_version = internal_ledger_info_opt
+                .as_ref()
+                .map(|info| info.ledger_version.into());
+            let latest_ledger_info = internal_ledger_info_opt.unwrap_or(storage_ledger_info);
             let txn_data = self
-                .get_by_hash(hash.into(), &ledger_info)
+                .get_by_hash(hash.into(), storage_version, internal_ledger_version)
                 .await
                 .context(format!("Failed to get transaction by hash {}", hash))
                 .map_err(|err| {
                     BasicErrorWith404::internal_with_code(
                         err,
                         AptosErrorCode::InternalError,
-                        &ledger_info,
+                        &latest_ledger_info,
                     )
                 })?
                 .context(format!("Failed to find transaction with hash: {}", hash))
-                .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+                .map_err(|_| transaction_not_found_by_hash(hash, &latest_ledger_info))?;
 
-            if let TransactionData::Pending(_) = txn_data {
-                if (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms {
-                    tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
-                    continue;
-                }
+            if matches!(txn_data, TransactionData::Pending(_))
+                && (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms
+            {
+                tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
+                continue;
             }
 
             let api = self.clone();
             return api_spawn_blocking(move || {
-                api.get_transaction_inner(&accept_type, txn_data, &ledger_info)
+                api.get_transaction_inner(&accept_type, txn_data, &latest_ledger_info)
             })
             .await;
         }
@@ -808,25 +838,34 @@ impl TransactionsApi {
         let context = self.context.clone();
         let accept_type = accept_type.clone();
 
-        let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+        let (internal_ledger_info_opt, storage_ledger_info) =
+            api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info())
+                .await?;
+        let storage_version = storage_ledger_info.ledger_version.into();
+        let internal_indexer_version = internal_ledger_info_opt
+            .as_ref()
+            .map(|info| info.ledger_version.into());
+        let latest_ledger_info = internal_ledger_info_opt.unwrap_or(storage_ledger_info);
 
         let txn_data = self
-            .get_by_hash(hash.into(), &ledger_info)
+            .get_by_hash(hash.into(), storage_version, internal_indexer_version)
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
                     AptosErrorCode::InternalError,
-                    &ledger_info,
+                    &latest_ledger_info,
                 )
             })?
             .context(format!("Failed to find transaction with hash: {}", hash))
-            .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+            .map_err(|_| transaction_not_found_by_hash(hash, &latest_ledger_info))?;
 
         let api = self.clone();
-        api_spawn_blocking(move || api.get_transaction_inner(&accept_type, txn_data, &ledger_info))
-            .await
+        api_spawn_blocking(move || {
+            api.get_transaction_inner(&accept_type, txn_data, &latest_ledger_info)
+        })
+        .await
     }
 
     fn get_transaction_by_version_inner(
@@ -867,15 +906,14 @@ impl TransactionsApi {
         match accept_type {
             AcceptType::Json => {
                 let state_view = self.context.latest_state_view_poem(ledger_info)?;
-                let resolver = state_view.as_move_resolver();
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
-                        resolver
+                        state_view
                             .as_converter(
                                 self.context.db.clone(),
-                                self.context.table_info_reader.clone(),
+                                self.context.indexer_reader.clone(),
                             )
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
@@ -887,11 +925,8 @@ impl TransactionsApi {
                                 )
                             })?
                     },
-                    TransactionData::Pending(txn) => resolver
-                        .as_converter(
-                            self.context.db.clone(),
-                            self.context.table_info_reader.clone(),
-                        )
+                    TransactionData::Pending(txn) => state_view
+                        .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
                         .map_err(|err| {
@@ -926,9 +961,11 @@ impl TransactionsApi {
             return Ok(GetByVersionResponse::VersionTooOld);
         }
         Ok(GetByVersionResponse::Found(
-            self.context
-                .get_transaction_by_version(version, ledger_info.version())?
-                .into(),
+            TransactionData::from_transaction_onchain_data(
+                self.context
+                    .get_transaction_by_version(version, ledger_info.version())?,
+                ledger_info.version(),
+            )?,
         ))
     }
 
@@ -939,23 +976,30 @@ impl TransactionsApi {
     async fn get_by_hash(
         &self,
         hash: aptos_crypto::HashValue,
-        ledger_info: &LedgerInfo,
+        storage_ledger_version: u64,
+        internal_ledger_version: Option<u64>,
     ) -> anyhow::Result<Option<TransactionData>> {
-        let context = self.context.clone();
-        let version = ledger_info.version();
-        let from_db =
-            tokio::task::spawn_blocking(move || context.get_transaction_by_hash(hash, version))
-                .await
-                .context("Failed to join task to read transaction by hash")?
-                .context("Failed to read transaction by hash from DB")?;
-        Ok(match from_db {
-            None => self
-                .context
-                .get_pending_transaction_by_hash(hash)
-                .await?
-                .map(|t| t.into()),
-            _ => from_db.map(|t| t.into()),
-        })
+        Ok(
+            match self.context.get_pending_transaction_by_hash(hash).await? {
+                None => {
+                    let context_clone = self.context.clone();
+                    tokio::task::spawn_blocking(move || {
+                        context_clone.get_transaction_by_hash(hash, storage_ledger_version)
+                    })
+                    .await
+                    .context("Failed to join task to read transaction by hash")?
+                    .context("Failed to read transaction by hash from DB")?
+                    .map(|t| {
+                        TransactionData::from_transaction_onchain_data(
+                            t,
+                            internal_ledger_version.unwrap_or(storage_ledger_version),
+                        )
+                    })
+                    .transpose()?
+                },
+                Some(t) => Some(t.into()),
+            },
+        )
     }
 
     /// List all transactions for an account
@@ -975,7 +1019,7 @@ impl TransactionsApi {
             address.into(),
             page.start_option(),
             page.limit(&latest_ledger_info)?,
-            latest_ledger_info.version(),
+            account.ledger_version,
             &latest_ledger_info,
         )?;
         match accept_type {
@@ -1069,11 +1113,7 @@ impl TransactionsApi {
             SubmitTransactionPost::Json(data) => self
                 .context
                 .latest_state_view_poem(ledger_info)?
-                .as_move_resolver()
-                .as_converter(
-                    self.context.db.clone(),
-                    self.context.table_info_reader.clone(),
-                )
+                .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(|err| {
@@ -1150,9 +1190,8 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context
-                        .latest_state_view_poem(ledger_info)?.as_move_resolver()
-                        .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
+                    self.context.latest_state_view_poem(ledger_info)?
+                        .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
@@ -1240,11 +1279,10 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
-                    let resolver = state_view.as_move_resolver();
 
                     // We provide the pending transaction so that users have the hash associated
-                    let pending_txn = resolver
-                            .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
+                    let pending_txn = state_view
+                            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                             .map_err(|err| SubmitTransactionError::internal_with_code(
@@ -1356,15 +1394,14 @@ impl TransactionsApi {
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = match output.status().clone() {
-            TransactionStatus::Keep(exec_status) => exec_status,
-            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
-            _ => ExecutionStatus::MiscellaneousError(None),
-        };
+        let exe_status = ExecutionStatus::conmbine_vm_status_for_simulation(
+            output.auxiliary_data(),
+            output.status().clone(),
+        );
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {
-                format!("Script::{}", txn.clone().committed_hash()).to_string()
+                format!("Script::{}", txn.committed_hash()).to_string()
             },
             TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
@@ -1411,7 +1448,7 @@ impl TransactionsApi {
             changes: output.write_set().clone(),
         };
 
-        match accept_type {
+        let result = match accept_type {
             AcceptType::Json => {
                 let transactions = self
                     .context
@@ -1422,8 +1459,7 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
-                        Transaction::UserTransaction(user_txn) => {
-                            let mut txn = *user_txn;
+                        Transaction::UserTransaction(mut user_txn) => {
                             match &vm_status {
                                 VMStatus::Error {
                                     message: Some(msg), ..
@@ -1431,13 +1467,13 @@ impl TransactionsApi {
                                 | VMStatus::ExecutionFailure {
                                     message: Some(msg), ..
                                 } => {
-                                    txn.info.vm_status +=
+                                    user_txn.info.vm_status +=
                                         format!("\nExecution failed with message: {}", msg)
                                             .as_str();
                                 },
                                 _ => (),
                             }
-                            user_transactions.push(txn);
+                            user_transactions.push(user_txn);
                         },
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(
@@ -1457,7 +1493,9 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
             },
-        }
+        };
+
+        result.map(|r| r.with_gas_used(Some(output.gas_used())))
     }
 
     /// Encode message as BCS
@@ -1476,12 +1514,8 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let raw_txn: RawTransaction = resolver
-            .as_converter(
-                self.context.db.clone(),
-                self.context.table_info_reader.clone(),
-            )
+        let raw_txn: RawTransaction = state_view
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {
@@ -1540,7 +1574,7 @@ fn override_gas_parameters(
     );
 
     // TODO: Check that signature is null, this would just be helpful for downstream use
-    SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
+    SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
 }
 
 enum GetByVersionResponse {

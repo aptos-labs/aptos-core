@@ -77,17 +77,25 @@ fn initialize_harness(
     let mut harness = MoveHarness::new_with_executor(executor);
     // Reduce gas scaling, so that smaller differences in gas are caught in comparison testing.
     harness.modify_gas_scaling(1000);
+
+    let common_features = vec![
+        FeatureFlag::AGGREGATOR_V2_API,
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
+    ];
+
     if aggregator_execution_enabled {
         harness.enable_features(
-            vec![
-                FeatureFlag::AGGREGATOR_V2_API,
+            [common_features, vec![
                 FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
                 FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
-            ],
+            ]]
+            .concat(),
             vec![],
         );
     } else {
-        harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
+        harness.enable_features(common_features, vec![
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
@@ -129,7 +137,7 @@ impl ElementType {
                 address: AccountAddress::ONE,
                 module: ident_str!("string").to_owned(),
                 name: ident_str!("String").to_owned(),
-                type_params: vec![],
+                type_args: vec![],
             })),
         }
     }
@@ -369,6 +377,19 @@ impl AggV2TestHarness {
 
     pub fn add_sub(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_sub", agg_loc, &[a, b])
+    }
+
+    pub fn add_if_at_least(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        min_value: u128,
+        delta: u128,
+    ) -> SignedTransaction {
+        self.create_entry_agg_func_with_args(
+            "0x1::aggregator_v2_test::add_if_at_least",
+            agg_loc,
+            &[min_value, delta],
+        )
     }
 
     pub fn add_delete(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {

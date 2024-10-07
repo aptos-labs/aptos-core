@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters};
+use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters, network::BroadcastPeerPriority};
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,8 @@ pub struct MempoolTransaction {
     pub sequence_info: SequenceInfo,
     pub insertion_info: InsertionInfo,
     pub was_parked: bool,
+    // The priority of this node for the sender of this transaction.
+    pub priority_of_sender: Option<BroadcastPeerPriority>,
 }
 
 impl MempoolTransaction {
@@ -36,6 +38,7 @@ impl MempoolTransaction {
         seqno: u64,
         insertion_time: SystemTime,
         client_submitted: bool,
+        priority_of_sender: Option<BroadcastPeerPriority>,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
@@ -48,6 +51,7 @@ impl MempoolTransaction {
             timeline_state,
             insertion_info: InsertionInfo::new(insertion_time, client_submitted, timeline_state),
             was_parked: false,
+            priority_of_sender,
         }
     }
 
@@ -60,7 +64,7 @@ impl MempoolTransaction {
     }
 
     pub(crate) fn get_committed_hash(&self) -> HashValue {
-        self.txn.clone().committed_hash()
+        self.txn.committed_hash()
     }
 
     pub(crate) fn get_estimated_bytes(&self) -> usize {
@@ -111,6 +115,8 @@ pub enum SubmittedBy {
 #[derive(Debug, Clone)]
 pub struct InsertionInfo {
     pub insertion_time: SystemTime,
+    pub ready_time: SystemTime,
+    pub park_time: Option<SystemTime>,
     pub submitted_by: SubmittedBy,
     pub consensus_pulled_counter: Arc<AtomicUsize>,
 }
@@ -130,6 +136,8 @@ impl InsertionInfo {
         };
         Self {
             insertion_time,
+            ready_time: insertion_time,
+            park_time: None,
             submitted_by,
             consensus_pulled_counter: Arc::new(AtomicUsize::new(0)),
         }
@@ -146,7 +154,10 @@ impl InsertionInfo {
 
 #[cfg(test)]
 mod test {
-    use crate::core_mempool::{MempoolTransaction, TimelineState};
+    use crate::{
+        core_mempool::{MempoolTransaction, TimelineState},
+        network::BroadcastPeerPriority,
+    };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         account_address::AccountAddress,
@@ -174,6 +185,7 @@ mod test {
             0,
             SystemTime::now(),
             false,
+            Some(BroadcastPeerPriority::Primary),
         )
     }
 

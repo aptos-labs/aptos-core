@@ -8,18 +8,15 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Address, Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Address, Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{
-        gen_get_ty_param_kinds, infer_abilities, infer_and_check_abilities, is_phantom_type_arg,
-        Constraint, Type, TypeDisplayContext,
-    },
+    ty::{Constraint, Type, TypeDisplayContext},
     well_known,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -123,11 +120,32 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+    pub layout: StructLayout,
     pub attributes: Vec<Attribute>,
     /// Maps simple function names to the qualified symbols of receiver functions. The
     /// symbol can be used to index the global function table.
     pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+    /// Whether the struct is originally empty
+    /// always false when it is enum
+    pub is_empty_struct: bool,
+    pub is_native: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum StructLayout {
+    /// The second bool is true iff the struct has positional fields
+    Singleton(BTreeMap<Symbol, FieldData>, bool),
+    Variants(Vec<StructVariant>),
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StructVariant {
+    pub loc: Loc,
+    pub name: Symbol,
+    pub attributes: Vec<Attribute>,
+    pub fields: BTreeMap<Symbol, FieldData>,
+    pub is_positional: bool,
 }
 
 /// A declaration of a function.
@@ -339,7 +357,8 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+        layout: StructLayout,
+        is_native: bool,
     ) {
         let entry = StructEntry {
             loc,
@@ -348,8 +367,10 @@ impl<'env> ModelBuilder<'env> {
             struct_id,
             abilities,
             type_params,
-            fields,
+            layout,
             receiver_functions: BTreeMap::new(),
+            is_empty_struct: false,
+            is_native,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -456,6 +477,37 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
+    /// Adds friend declarations for package visibility.
+    /// This should only be called when all modules are loaded.
+    pub fn add_friend_decl_for_package_visibility(&mut self) {
+        let target_modules = self
+            .env
+            .get_modules()
+            .filter(|module_env| module_env.is_primary_target() && !module_env.is_script_module())
+            .map(|module_env| module_env.get_id())
+            .collect_vec();
+        for cur_mod in target_modules {
+            let cur_mod_env = self.env.get_module(cur_mod);
+            let cur_mod_name = cur_mod_env.get_name().clone();
+            for need_to_be_friended_by in cur_mod_env.need_to_be_friended_by() {
+                let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friended_by);
+                let already_friended = need_to_be_friend_with
+                    .friend_decls
+                    .iter()
+                    .any(|friend_decl| friend_decl.module_name == cur_mod_name);
+                if !already_friended {
+                    let loc = need_to_be_friend_with.loc.clone();
+                    let friend_decl = FriendDecl {
+                        loc,
+                        module_name: cur_mod_name.clone(),
+                        module_id: Some(cur_mod),
+                    };
+                    need_to_be_friend_with.friend_decls.push(friend_decl);
+                }
+            }
+        }
+    }
+
     pub fn resolve_address(&self, loc: &Loc, addr: &EA::Address) -> NumericalAddress {
         match addr {
             EA::Address::Numerical(_, bytes) => bytes.value,
@@ -487,18 +539,35 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types.
-    pub fn lookup_struct_fields(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+    /// Looks up field declaration, returning a list of optional variant name and type of the field
+    /// in the variant. The variant name is None and the list a singleton for proper struct types.
+    pub fn lookup_struct_field_decl(
+        &self,
+        id: &QualifiedInstId<StructId>,
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        entry
-            .fields
-            .as_ref()
-            .map(|f| {
-                f.iter()
-                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default()
+        let get_instantiated_field = |fields: &BTreeMap<Symbol, FieldData>| {
+            fields
+                .get(&field_name)
+                .map(|data| data.ty.instantiate(&id.inst))
+        };
+        match &entry.layout {
+            StructLayout::Singleton(fields, _) => (
+                get_instantiated_field(fields)
+                    .map(|ty| vec![(None, ty)])
+                    .unwrap_or_default(),
+                false,
+            ),
+            StructLayout::Variants(variants) => (
+                variants
+                    .iter()
+                    .filter_map(|v| get_instantiated_field(&v.fields).map(|ty| (Some(v.name), ty)))
+                    .collect(),
+                true,
+            ),
+            _ => (vec![], false),
+        }
     }
 
     /// Looks up a receiver function for a given type.
@@ -517,6 +586,11 @@ impl<'env> ModelBuilder<'env> {
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
         let struct_name = self.get_struct_name(id);
+        self.lookup_struct_entry_by_name(struct_name)
+    }
+
+    /// Looks up the StructEntry by `struct_name`
+    pub fn lookup_struct_entry_by_name(&self, struct_name: &QualifiedSymbol) -> &StructEntry {
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")
@@ -533,66 +607,8 @@ impl<'env> ModelBuilder<'env> {
             .expect("invalid Type::Struct")
     }
 
-    /// returns the type parameter kinds and the abilities of the struct
-    fn get_struct_sig(&self, mid: ModuleId, sid: StructId) -> (Vec<TypeParameterKind>, AbilitySet) {
-        let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
-        let struct_abilities = struct_entry.abilities;
-        let ty_param_kinds = struct_entry
-            .type_params
-            .iter()
-            .map(|tp| tp.1.clone())
-            .collect_vec();
-        (ty_param_kinds, struct_abilities)
-    }
-
-    fn gen_get_struct_sig(
-        &self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
-        |mid, sid| self.get_struct_sig(mid, sid)
-    }
-
-    /// Specialized `ty::infer_and_check_abilities`
-    /// where the abilities of type arguments are given by `ty_params`
-    pub fn check_instantiation(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) {
-        infer_and_check_abilities(
-            ty,
-            gen_get_ty_param_kinds(ty_params),
-            self.gen_get_struct_sig(),
-            loc,
-            |loc, _, err| self.error(loc, err),
-        );
-    }
-
-    /// Infers the abilities the given type may have,
-    /// if all type params have all abilities.
-    pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        // since all type params have all abilities, it doesn't matter whether it's phantom or not
-        infer_abilities(
-            ty,
-            |_| TypeParameterKind {
-                abilities: AbilitySet::ALL,
-                is_phantom: false,
-            },
-            self.gen_get_struct_sig(),
-        )
-    }
-
-    /// Checks whether a struct is well defined.
-    pub fn ability_check_struct_def(&self, struct_entry: &StructEntry) {
-        if let Some(fields) = &struct_entry.fields {
-            let ty_params = &struct_entry.type_params;
-            for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
-                // check fields are properly instantiated
-                self.check_instantiation(field_ty, ty_params, loc);
-                if is_phantom_type_arg(gen_get_ty_param_kinds(ty_params), field_ty) {
-                    self.error(loc, "phantom type arguments cannot be used")
-                }
-            }
-        }
-    }
-
     /// Gets the name of the struct
-    fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+    pub fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
         self.reverse_struct_table
             .get(&(qid.module_id, qid.id))
             .expect("invalid Type::Struct")

@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: local `x` of type `M::Cup<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-locals/drop_conditional.move:12:9
+   │
+12 │         &x;
+   │         ^^ implicitly dropped here since it is no longer used
+
+error: local `x` of type `M::Pair<M::S, M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-locals/drop_conditional.move:14:9
+   │
+14 │         &x;
+   │         ^^ implicitly dropped here since it is no longer used

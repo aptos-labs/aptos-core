@@ -1,34 +1,33 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-bug: BYTECODE VERIFICATION FAILED
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:13:9
    │
+12 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       -------- field `f` previously mutably borrowed here
 13 │         freeze(s);
-   │         ^^^^^^^^^ ICE failed bytecode verifier: VMError {
-    major_status: FREEZEREF_EXISTS_MUTABLE_BORROW_ERROR,
-    sub_status: None,
-    message: None,
-    exec_state: None,
-    location: Module(
-        ModuleId {
-            address: 0000000000000000000000000000000000000000000000000000000008675309,
-            name: Identifier(
-                "M",
-            ),
-        },
-    ),
-    indices: [
-        (
-            FunctionDefinition,
-            2,
-        ),
-    ],
-    offsets: [
-        (
-            FunctionDefinitionIndex(2),
-            12,
-        ),
-    ],
-}
+   │         ^^^^^^^^^ frozen here
+14 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot freeze value which is still mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:20:9
+   │
+19 │         if (cond) f = &mut s.f else f = &mut s.g;
+   │                       --------          -------- field `g` previously mutably borrowed here
+   │                       │
+   │                       field `f` previously mutably borrowed here
+20 │         freeze(s);
+   │         ^^^^^^^^^ frozen here
+21 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot freeze value which is still mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:27:9
+   │
+26 │         if (cond) x = s else x = other; // error in v2
+   │                   ----- previously mutably borrowed here
+27 │         freeze(s);
+   │         ^^^^^^^^^ frozen here
+28 │         *x;
+   │         -- conflicting reference `x` used here

@@ -61,7 +61,7 @@ pub(crate) fn setup(
     _setup(executor_mode, aggregator_execution_mode, txns, false)
 }
 
-fn setup_allow_fallback(
+pub(crate) fn setup_allow_fallback(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
@@ -523,6 +523,35 @@ proptest! {
             (SUCCESS, h.add_and_read_snapshot_u128(&agg_loc, 100)),
             (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
             (SUCCESS, h.check_derived(&derived_snap_loc, 1210013)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn test_aggregator_is_at_least(test_env in arb_test_env_non_equivalent(10)) {
+        println!("Testing test_aggregator_is_at_least {:?}", test_env);
+        let element_type = ElementType::U64;
+        let use_type = UseType::UseResourceType;
+
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Snapshot)),
+            (SUCCESS, h.init(None, use_type, ElementType::String, StructType::DerivedString)),
+            (SUCCESS, h.new_add(&agg_loc, 400, 100)),
+            (SUCCESS, h.add(&agg_loc, 50)),
+            (SUCCESS, h.add(&agg_loc, 50)),
+            (SUCCESS, h.add_if_at_least(&agg_loc, 180, 50)),
+            (SUCCESS, h.sub(&agg_loc, 50)),
+            (SUCCESS, h.add_if_at_least(&agg_loc, 220, 50)),
+            (SUCCESS, h.check(&agg_loc, 200)),
         ];
 
         h.run_block_in_parts_and_check(

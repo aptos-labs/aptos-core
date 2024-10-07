@@ -158,3 +158,6 @@ fun operators::order($t0: u64, $t1: u64): bool {
  23: label L8
  24: return $t2
 }
+
+
+============ bytecode verification succeeded ========

@@ -13,3 +13,6 @@ fun vector::create(): vector<u64> {
   0: $t0 := ["1", "2", "3"]
   1: return $t0
 }
+
+
+============ bytecode verification succeeded ========

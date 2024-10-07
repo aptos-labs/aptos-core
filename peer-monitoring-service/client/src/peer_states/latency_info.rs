@@ -109,6 +109,14 @@ impl LatencyInfoState {
         }
     }
 
+    /// Returns the latest latency ping in seconds. If no latency
+    /// pings have been recorded, None is returned.
+    pub fn get_latest_latency_ping_secs(&self) -> Option<f64> {
+        self.recorded_latency_ping_durations_secs
+            .last_key_value()
+            .map(|(_, value)| *value)
+    }
+
     /// Returns a copy of the recorded latency pings for test purposes
     #[cfg(test)]
     pub fn get_recorded_latency_pings(&self) -> BTreeMap<u64, f64> {

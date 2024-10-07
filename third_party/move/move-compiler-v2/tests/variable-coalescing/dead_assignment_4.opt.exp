@@ -61,6 +61,55 @@ public fun m::test4($t0: u64): u64 {
   1: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/variable-coalescing/dead_assignment_4.move:9:17
+  │
+9 │         let x = y;
+  │                 ^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/variable-coalescing/dead_assignment_4.move:14:17
+   │
+14 │         let x = y;
+   │                 ^
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+  0: $t0 := 3
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64 [unused]
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64 [unused]
+  0: $t1 := 8
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := 1
+  1: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -128,6 +177,40 @@ public fun m::test2($t0: u64): u64 {
      var $t2: u64 [unused]
   0: $t0 := move($t0)
   1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+  0: $t0 := 8
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: $t0 := 1
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+  0: $t0 := 3
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+  0: return $t0
 }
 
 

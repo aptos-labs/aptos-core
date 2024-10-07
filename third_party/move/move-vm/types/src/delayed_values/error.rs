@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 
@@ -11,5 +14,6 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PartialVMError {
         message
     );
     println!("ERROR: {}", msg);
-    PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR).with_message(msg)
+    PartialVMError::new(StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR)
+        .with_message(msg)
 }

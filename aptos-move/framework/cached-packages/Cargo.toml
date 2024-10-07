@@ -17,7 +17,6 @@ aptos-framework = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
-include_dir = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -30,3 +29,6 @@ aptos-framework = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive"]
+
+[package.metadata.cargo-machete]
+ignored = ["proptest"]

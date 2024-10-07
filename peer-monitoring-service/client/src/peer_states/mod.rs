@@ -25,9 +25,6 @@ mod request_tracker;
 const LOGS_FREQUENCY_SECS: u64 = 180; // 3 minutes
 const METRICS_FREQUENCY_SECS: u64 = 60; // 1 minute
 
-#[cfg(feature = "network-perf-test")] // Disabled by default
-mod performance_monitoring;
-
 /// Refreshes the states of the connected peers
 pub fn refresh_peer_states(
     monitoring_service_config: &PeerMonitoringServiceConfig,

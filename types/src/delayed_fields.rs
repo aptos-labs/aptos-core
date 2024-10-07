@@ -3,40 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::serde_helper::bcs_utils::bcs_size_of_byte_array;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::vm_status::StatusCode;
+use move_binary_format::errors::PartialVMResult;
 use move_vm_types::delayed_values::{
     delayed_field_id::{DelayedFieldID, ExtractWidth},
     error::code_invariant_error,
 };
 use once_cell::sync::Lazy;
-
-// Represents something that should never happen - i.e. a code invariant error,
-// which we would generally just panic, but since we are inside of the VM,
-// we cannot do that.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PanicError {
-    CodeInvariantError(String),
-}
-
-impl ToString for PanicError {
-    fn to_string(&self) -> String {
-        match self {
-            PanicError::CodeInvariantError(e) => e.clone(),
-        }
-    }
-}
-
-impl From<PanicError> for PartialVMError {
-    fn from(err: PanicError) -> Self {
-        match err {
-            PanicError::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
-                    .with_message(msg)
-            },
-        }
-    }
-}
 
 static U64_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u64::MAX.to_string().len());
 static U128_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u128::MAX.to_string().len());

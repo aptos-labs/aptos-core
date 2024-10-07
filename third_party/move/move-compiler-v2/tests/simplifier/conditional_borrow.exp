@@ -95,3 +95,6 @@ module 0x8675::M {
         Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
     }
 } // end 0x8675::M
+
+
+============ bytecode verification succeeded ========

@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/public_packge_visibility.move:2:5
+  │
+2 │     public(package) fun foo() {}
+  │     ^^^^^^^^^^^^^^^ Move 2 language construct is not enabled: public(package) visibility
+
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/public_packge_visibility.move:6:5
+  │
+6 │     public(package) fun main() {}
+  │     ^^^^^^^^^^^^^^^ Move 2 language construct is not enabled: public(package) visibility

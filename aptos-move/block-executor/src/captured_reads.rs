@@ -5,10 +5,7 @@ use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
-    types::{
-        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_mvhashmap::{
     types::{
@@ -20,8 +17,10 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+    error::{code_invariant_error, PanicError, PanicOr},
+    state_store::state_value::StateValueMetadata,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
@@ -304,12 +303,13 @@ pub(crate) struct CapturedReads<T: Transaction> {
 
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
-    /// If there is a speculative failure (e.g. delta application failure, or an
-    /// observed inconsistency), the transaction output is irrelevant (must be
-    /// discarded and transaction re-executed). We have a global flag, as which
-    /// read observed the inconsistency is irrelevant (moreover, typically,
-    /// an error is returned to the VM to wrap up the ongoing execution).
-    speculative_failure: bool,
+    /// If there is a speculative failure (e.g. delta application failure, or an observed
+    /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
+    /// re-executed). We have two global flags, one for speculative failures regarding
+    /// delayed fields, and the second for all other speculative failures, because these
+    /// require different validation behavior (delayed fields are validated commit-time).
+    delayed_field_speculative_failure: bool,
+    non_delayed_field_speculative_failure: bool,
     /// Set if the invarint on CapturedReads intended use is violated. Leads to an alert
     /// and sequential execution fallback.
     incorrect_use: bool,
@@ -444,7 +444,7 @@ impl<T: Transaction> CapturedReads<T> {
             },
             UpdateResult::Inconsistency(m) => {
                 // Record speculative failure.
-                self.speculative_failure = true;
+                self.non_delayed_field_speculative_failure = true;
                 bail!(m);
             },
             UpdateResult::Updated | UpdateResult::Inserted => Ok(()),
@@ -521,7 +521,7 @@ impl<T: Transaction> CapturedReads<T> {
             },
             UpdateResult::Inconsistency(_) => {
                 // Record speculative failure.
-                self.speculative_failure = true;
+                self.delayed_field_speculative_failure = true;
                 Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead))
             },
             UpdateResult::Updated | UpdateResult::Inserted => Ok(()),
@@ -531,7 +531,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_delayed_field_read_error<E: std::fmt::Debug>(&mut self, e: &PanicOr<E>) {
         match e {
             PanicOr::CodeInvariantError(_) => self.incorrect_use = true,
-            PanicOr::Or(_) => self.speculative_failure = true,
+            PanicOr::Or(_) => self.delayed_field_speculative_failure = true,
         };
     }
 
@@ -554,7 +554,7 @@ impl<T: Transaction> CapturedReads<T> {
         data_map: &VersionedData<T::Key, T::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool {
-        if self.speculative_failure {
+        if self.non_delayed_field_speculative_failure {
             return false;
         }
 
@@ -590,14 +590,14 @@ impl<T: Transaction> CapturedReads<T> {
     ) -> bool {
         use MVGroupError::*;
 
-        if self.speculative_failure {
+        if self.non_delayed_field_speculative_failure {
             return false;
         }
 
         self.group_reads.iter().all(|(key, group)| {
             let mut ret = true;
             if let Some(size) = group.collected_size {
-                ret &= Ok(size) == group_map.get_group_size(key, idx_to_validate);
+                ret &= group_map.validate_group_size(key, idx_to_validate, size);
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
@@ -622,28 +622,25 @@ impl<T: Transaction> CapturedReads<T> {
                     Err(Uninitialized) => {
                         unreachable!("May not be uninitialized if captured for validation");
                     },
-                    Err(TagSerializationError(_)) => {
-                        unreachable!("Should not require tag serialization");
-                    },
                 }
             })
         })
     }
 
     // This validation needs to be called at commit time
-    // (as it internally uses read_latest_committed_value to get the current value).
+    // (as it internally uses read_latest_predicted_value to get the current value).
     pub(crate) fn validate_delayed_field_reads(
         &self,
         delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
         idx_to_validate: TxnIndex,
     ) -> Result<bool, PanicError> {
-        if self.speculative_failure {
+        if self.delayed_field_speculative_failure {
             return Ok(false);
         }
 
         use MVDelayedFieldsError::*;
         for (id, read_value) in &self.delayed_field_reads {
-            match delayed_fields.read_latest_committed_value(
+            match delayed_fields.read_latest_predicted_value(
                 id,
                 idx_to_validate,
                 ReadPosition::BeforeCurrentTxn,
@@ -707,8 +704,12 @@ impl<T: Transaction> CapturedReads<T> {
         ret
     }
 
-    pub(crate) fn mark_failure(&mut self) {
-        self.speculative_failure = true;
+    pub(crate) fn mark_failure(&mut self, delayed_field_failure: bool) {
+        if delayed_field_failure {
+            self.delayed_field_speculative_failure = true;
+        } else {
+            self.non_delayed_field_speculative_failure = true;
+        }
     }
 
     pub(crate) fn mark_incorrect_use(&mut self) {
@@ -756,8 +757,11 @@ impl<T: Transaction> UnsyncReadSet<T> {
 mod test {
     use super::*;
     use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
-    use aptos_mvhashmap::types::StorageVersion;
-    use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
+    use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
+    use aptos_types::executable::ExecutableTestType;
+    use claims::{
+        assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
+    };
     use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
@@ -1204,7 +1208,7 @@ mod test {
         let with_metadata_reads = with_metadata_reads_by_kind();
 
         let resolved = DataRead::Resolved::<ValueType>(200);
-        let mixed_reads = vec![
+        let mixed_reads = [
             deletion_reads[0].clone(),
             with_metadata_reads[1].clone(),
             resolved,
@@ -1268,7 +1272,8 @@ mod test {
         let deletion_metadata = DataRead::Metadata(None);
         let exists = DataRead::Exists(true);
 
-        assert!(!captured_reads.speculative_failure);
+        assert!(!captured_reads.non_delayed_field_speculative_failure);
+        assert!(!captured_reads.delayed_field_speculative_failure);
         let key = KeyType::<u32>(20, false);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), exists));
         assert_err!(captured_reads.capture_read(
@@ -1276,22 +1281,57 @@ mod test {
             use_tag.then_some(30),
             deletion_metadata.clone()
         ));
-        assert!(captured_reads.speculative_failure);
+        assert!(captured_reads.non_delayed_field_speculative_failure);
+        assert!(!captured_reads.delayed_field_speculative_failure);
 
-        captured_reads.speculative_failure = false;
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        captured_reads.non_delayed_field_speculative_failure = false;
+        captured_reads.delayed_field_speculative_failure = false;
         let key = KeyType::<u32>(21, false);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), deletion_metadata));
         assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), resolved));
-        assert!(captured_reads.speculative_failure);
+        assert!(captured_reads.non_delayed_field_speculative_failure);
+        assert!(!captured_reads.validate_data_reads(mvhashmap.data(), 0));
+        assert!(!captured_reads.validate_group_reads(mvhashmap.group_data(), 0));
+        assert!(!captured_reads.delayed_field_speculative_failure);
+        assert_ok_eq!(
+            captured_reads.validate_delayed_field_reads(mvhashmap.delayed_fields(), 0),
+            true
+        );
 
-        captured_reads.speculative_failure = false;
+        captured_reads.non_delayed_field_speculative_failure = false;
+        captured_reads.delayed_field_speculative_failure = false;
         let key = KeyType::<u32>(22, false);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), metadata));
         assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), versioned_legacy));
-        assert!(captured_reads.speculative_failure);
+        assert!(captured_reads.non_delayed_field_speculative_failure);
+        assert!(!captured_reads.delayed_field_speculative_failure);
 
-        captured_reads.speculative_failure = false;
-        captured_reads.mark_failure();
-        assert!(captured_reads.speculative_failure);
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        captured_reads.non_delayed_field_speculative_failure = false;
+        captured_reads.delayed_field_speculative_failure = false;
+        captured_reads.mark_failure(true);
+        assert!(!captured_reads.non_delayed_field_speculative_failure);
+        assert!(captured_reads.validate_data_reads(mvhashmap.data(), 0));
+        assert!(captured_reads.validate_group_reads(mvhashmap.group_data(), 0));
+        assert!(captured_reads.delayed_field_speculative_failure);
+        assert_ok_eq!(
+            captured_reads.validate_delayed_field_reads(mvhashmap.delayed_fields(), 0),
+            false
+        );
+
+        captured_reads.mark_failure(true);
+        assert!(!captured_reads.non_delayed_field_speculative_failure);
+        assert!(captured_reads.delayed_field_speculative_failure);
+
+        captured_reads.delayed_field_speculative_failure = false;
+        captured_reads.mark_failure(false);
+        assert!(captured_reads.non_delayed_field_speculative_failure);
+        assert!(!captured_reads.delayed_field_speculative_failure);
+        captured_reads.mark_failure(true);
+        assert!(captured_reads.non_delayed_field_speculative_failure);
+        assert!(captured_reads.delayed_field_speculative_failure);
     }
 }

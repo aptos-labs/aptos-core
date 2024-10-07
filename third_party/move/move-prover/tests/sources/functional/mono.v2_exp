@@ -64,7 +64,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/mono.move:80: vec_vec
    =         x = <redacted>
-   =     at tests/sources/functional/mono.move:79: vec_vec
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:81: vec_vec
    =     at tests/sources/functional/mono.move:82: vec_vec (spec)

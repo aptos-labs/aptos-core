@@ -19,3 +19,6 @@ module 0x8675309::M {
         1
     }
 } // end 0x8675309::M
+
+
+============ bytecode verification succeeded ========

@@ -13,6 +13,21 @@ fun m::test($t0: u64): u64 {
   4: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64
+     var $t4: &u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := move($t2)
+  2: $t4 := move($t3)
+  3: $t1 := read_ref($t4)
+  4: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -51,6 +66,19 @@ fun m::test($t0: u64): u64 {
   2: $t2 := move($t2)
   3: $t1 := read_ref($t2)
   4: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64 [unused]
+     var $t4: &u64 [unused]
+  0: $t2 := borrow_local($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
 }
 
 

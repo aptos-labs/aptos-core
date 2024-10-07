@@ -1,9 +1,11 @@
 /// This module defines structs and methods to initialize the gas schedule, which dictates how much
 /// it costs to execute Move on the network.
 module aptos_framework::gas_schedule {
+    use std::bcs;
     use std::error;
     use std::string::String;
     use std::vector;
+    use aptos_std::aptos_hash;
     use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
@@ -21,6 +23,7 @@ module aptos_framework::gas_schedule {
     /// The provided gas schedule bytes are empty or invalid
     const EINVALID_GAS_SCHEDULE: u64 = 1;
     const EINVALID_GAS_FEATURE_VERSION: u64 = 2;
+    const EINVALID_GAS_SCHEDULE_HASH: u64 = 3;
 
     struct GasEntry has store, copy, drop {
         key: String,
@@ -99,12 +102,45 @@ module aptos_framework::gas_schedule {
         config_buffer::upsert(new_gas_schedule);
     }
 
+    /// Set the gas schedule for the next epoch, typically called by on-chain governance.
+    /// Abort if the version of the given schedule is lower than the current version.
+    /// Require a hash of the old gas schedule to be provided and will abort if the hashes mismatch.
+    public fun set_for_next_epoch_check_hash(
+        aptos_framework: &signer,
+        old_gas_schedule_hash: vector<u8>,
+        new_gas_schedule_blob: vector<u8>
+    ) acquires GasScheduleV2 {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(!vector::is_empty(&new_gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+
+        let new_gas_schedule: GasScheduleV2 = from_bytes(new_gas_schedule_blob);
+        if (exists<GasScheduleV2>(@aptos_framework)) {
+            let cur_gas_schedule = borrow_global<GasScheduleV2>(@aptos_framework);
+            assert!(
+                new_gas_schedule.feature_version >= cur_gas_schedule.feature_version,
+                error::invalid_argument(EINVALID_GAS_FEATURE_VERSION)
+            );
+            let cur_gas_schedule_bytes = bcs::to_bytes(cur_gas_schedule);
+            let cur_gas_schedule_hash = aptos_hash::sha3_512(cur_gas_schedule_bytes);
+            assert!(
+                cur_gas_schedule_hash == old_gas_schedule_hash,
+                error::invalid_argument(EINVALID_GAS_SCHEDULE_HASH)
+            );
+        };
+
+        config_buffer::upsert(new_gas_schedule);
+    }
+
     /// Only used in reconfigurations to apply the pending `GasScheduleV2`, if there is any.
-    public(friend) fun on_new_epoch() acquires GasScheduleV2 {
+    public(friend) fun on_new_epoch(framework: &signer) acquires GasScheduleV2 {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<GasScheduleV2>()) {
-            let new_gas_schedule: GasScheduleV2 = config_buffer::extract<GasScheduleV2>();
-            let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
-            *gas_schedule = new_gas_schedule;
+            let new_gas_schedule = config_buffer::extract<GasScheduleV2>();
+            if (exists<GasScheduleV2>(@aptos_framework)) {
+                *borrow_global_mut<GasScheduleV2>(@aptos_framework) = new_gas_schedule;
+            } else {
+                move_to(framework, new_gas_schedule);
+            }
         }
     }
 

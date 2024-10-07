@@ -58,4 +58,9 @@ module aptos_framework::aggregator_factory {
     public fun initialize_aggregator_factory_for_test(aptos_framework: &signer) {
         initialize_aggregator_factory(aptos_framework);
     }
+
+    #[test_only]
+    public fun aggregator_factory_exists_for_testing(): bool {
+        exists<AggregatorFactory>(@aptos_framework)
+    }
 }

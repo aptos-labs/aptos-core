@@ -7,7 +7,7 @@ module 0xcafe::m {
         (f)(s, x)
     }
     private fun pattern(s: m::S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x: x: u64 }, _y: u64): (m::S<u64>, u64)| {
+        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (m::S<u64>, u64)| {
           let y: u64 = x;
           Add<u64>(x, y)
         })
@@ -28,7 +28,7 @@ module 0xcafe::m {
     }
     private fun pattern$lambda$1(param$0: m::S<u64>,_y: u64): u64 {
         {
-          let m::S<u64>{ x: x: u64 }: m::S<u64> = param$0;
+          let m::S<u64>{ x } = param$0;
           {
             let y: u64 = x;
             Add<u64>(x, y)

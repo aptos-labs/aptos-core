@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: value of type `signer` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-signer/read_ref_transitive.move:15:9
+   │
+15 │         x.s
+   │         ^^^ reference content copied here

@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: cannot assign `u8` to left-hand side of type `u64`
+   ┌─ tests/checking/typing/expected_actual_assign.move:13:9
+   │
+13 │         x = 1u8;
+   │         ^
+
+error: cannot assign `vector<_>` to left-hand side of type `integer`
+   ┌─ tests/checking/typing/expected_actual_assign.move:18:9
+   │
+18 │         x = vector[];
+   │         ^
+
+error: cannot assign `S` to left-hand side of type `R`
+   ┌─ tests/checking/typing/expected_actual_assign.move:24:9
+   │
+24 │         R{y} = s;
+   │         ^^^^
+
+error: cannot assign `integer` to left-hand side of type `R`
+   ┌─ tests/checking/typing/expected_actual_assign.move:25:9
+   │
+25 │         R{y} = 1;
+   │         ^^^^
+
+error: cannot assign `S` to left-hand side of type `R`
+   ┌─ tests/checking/typing/expected_actual_assign.move:32:10
+   │
+32 │         (R{y}, x) = (s, y);
+   │          ^^^^

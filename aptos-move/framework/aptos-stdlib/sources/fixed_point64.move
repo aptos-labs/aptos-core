@@ -29,22 +29,22 @@ module aptos_std::fixed_point64 {
     /// Abort code on calculation result is negative.
     const ENEGATIVE_RESULT: u64 = 0x10006;
 
-    /// Returns x - y. x must be not less than y.
-    public fun sub(x: FixedPoint64, y: FixedPoint64): FixedPoint64 {
-        let x_raw = get_raw_value(x);
+    /// Returns self - y. self must be not less than y.
+    public fun sub(self: FixedPoint64, y: FixedPoint64): FixedPoint64 {
+        let x_raw = get_raw_value(self);
         let y_raw = get_raw_value(y);
         assert!(x_raw >= y_raw, ENEGATIVE_RESULT);
         create_from_raw_value(x_raw - y_raw)
     }
     spec sub {
         pragma opaque;
-        aborts_if x.value < y.value with ENEGATIVE_RESULT;
-        ensures result.value == x.value - y.value;
+        aborts_if self.value < y.value with ENEGATIVE_RESULT;
+        ensures result.value == self.value - y.value;
     }
 
-    /// Returns x + y. The result cannot be greater than MAX_U128.
-    public fun add(x: FixedPoint64, y: FixedPoint64): FixedPoint64 {
-        let x_raw = get_raw_value(x);
+    /// Returns self + y. The result cannot be greater than MAX_U128.
+    public fun add(self: FixedPoint64, y: FixedPoint64): FixedPoint64 {
+        let x_raw = get_raw_value(self);
         let y_raw = get_raw_value(y);
         let result = (x_raw as u256) + (y_raw as u256);
         assert!(result <= MAX_U128, ERATIO_OUT_OF_RANGE);
@@ -52,8 +52,8 @@ module aptos_std::fixed_point64 {
     }
     spec add {
         pragma opaque;
-        aborts_if (x.value as u256) + (y.value as u256) > MAX_U128 with ERATIO_OUT_OF_RANGE;
-        ensures result.value == x.value + y.value;
+        aborts_if (self.value as u256) + (y.value as u256) > MAX_U128 with ERATIO_OUT_OF_RANGE;
+        ensures result.value == self.value + y.value;
     }
 
     /// Multiply a u128 integer by a fixed-point number, truncating any
@@ -172,13 +172,13 @@ module aptos_std::fixed_point64 {
     /// Accessor for the raw u128 value. Other less common operations, such as
     /// adding or subtracting FixedPoint64 values, can be done using the raw
     /// values directly.
-    public fun get_raw_value(num: FixedPoint64): u128 {
-        num.value
+    public fun get_raw_value(self: FixedPoint64): u128 {
+        self.value
     }
 
     /// Returns true if the ratio is zero.
-    public fun is_zero(num: FixedPoint64): bool {
-        num.value == 0
+    public fun is_zero(self: FixedPoint64): bool {
+        self.value == 0
     }
 
     /// Returns the smaller of the two FixedPoint64 numbers.
@@ -223,89 +223,89 @@ module aptos_std::fixed_point64 {
         }
     }
 
-    /// Returns true if num1 <= num2
-    public fun less_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value <= num2.value
+    /// Returns true if self <= num2
+    public fun less_or_equal(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value <= num2.value
     }
     spec less_or_equal {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_less_or_equal(num1, num2);
+        ensures result == spec_less_or_equal(self, num2);
     }
-    spec fun spec_less_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value <= num2.value
+    spec fun spec_less_or_equal(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value <= num2.value
     }
 
-    /// Returns true if num1 < num2
-    public fun less(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value < num2.value
+    /// Returns true if self < num2
+    public fun less(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value < num2.value
     }
     spec less {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_less(num1, num2);
+        ensures result == spec_less(self, num2);
     }
-    spec fun spec_less(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value < num2.value
+    spec fun spec_less(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value < num2.value
     }
 
-    /// Returns true if num1 >= num2
-    public fun greater_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value >= num2.value
+    /// Returns true if self >= num2
+    public fun greater_or_equal(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value >= num2.value
     }
     spec greater_or_equal {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_greater_or_equal(num1, num2);
+        ensures result == spec_greater_or_equal(self, num2);
     }
-    spec fun spec_greater_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value >= num2.value
+    spec fun spec_greater_or_equal(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value >= num2.value
     }
 
-    /// Returns true if num1 > num2
-    public fun greater(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value > num2.value
+    /// Returns true if self > num2
+    public fun greater(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value > num2.value
     }
     spec greater {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_greater(num1, num2);
+        ensures result == spec_greater(self, num2);
     }
-    spec fun spec_greater(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value > num2.value
+    spec fun spec_greater(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value > num2.value
     }
 
-    /// Returns true if num1 = num2
-    public fun equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value == num2.value
+    /// Returns true if self = num2
+    public fun equal(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value == num2.value
     }
     spec equal {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_equal(num1, num2);
+        ensures result == spec_equal(self, num2);
     }
-    spec fun spec_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value == num2.value
+    spec fun spec_equal(self: FixedPoint64, num2: FixedPoint64): bool {
+        self.value == num2.value
     }
 
-    /// Returns true if num1 almost equals to num2, which means abs(num1-num2) <= precision
-    public fun almost_equal(num1: FixedPoint64, num2: FixedPoint64, precision: FixedPoint64): bool {
-        if (num1.value > num2.value) {
-            (num1.value - num2.value <= precision.value)
+    /// Returns true if self almost equals to num2, which means abs(num1-num2) <= precision
+    public fun almost_equal(self: FixedPoint64, num2: FixedPoint64, precision: FixedPoint64): bool {
+        if (self.value > num2.value) {
+            (self.value - num2.value <= precision.value)
         } else {
-            (num2.value - num1.value <= precision.value)
+            (num2.value - self.value <= precision.value)
         }
     }
     spec almost_equal {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_almost_equal(num1, num2, precision);
+        ensures result == spec_almost_equal(self, num2, precision);
     }
-    spec fun spec_almost_equal(num1: FixedPoint64, num2: FixedPoint64, precision: FixedPoint64): bool {
-        if (num1.value > num2.value) {
-            (num1.value - num2.value <= precision.value)
+    spec fun spec_almost_equal(self: FixedPoint64, num2: FixedPoint64, precision: FixedPoint64): bool {
+        if (self.value > num2.value) {
+            (self.value - num2.value <= precision.value)
         } else {
-            (num2.value - num1.value <= precision.value)
+            (num2.value - self.value <= precision.value)
         }
     }
     /// Create a fixedpoint value from a u128 value.
@@ -329,27 +329,27 @@ module aptos_std::fixed_point64 {
     }
 
     /// Returns the largest integer less than or equal to a given number.
-    public fun floor(num: FixedPoint64): u128 {
-        num.value >> 64
+    public fun floor(self: FixedPoint64): u128 {
+        self.value >> 64
     }
     spec floor {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_floor(num);
+        ensures result == spec_floor(self);
     }
-    spec fun spec_floor(val: FixedPoint64): u128 {
-        let fractional = val.value % (1 << 64);
+    spec fun spec_floor(self: FixedPoint64): u128 {
+        let fractional = self.value % (1 << 64);
         if (fractional == 0) {
-            val.value >> 64
+            self.value >> 64
         } else {
-            (val.value - fractional) >> 64
+            (self.value - fractional) >> 64
         }
     }
 
     /// Rounds up the given FixedPoint64 to the next largest integer.
-    public fun ceil(num: FixedPoint64): u128 {
-        let floored_num = floor(num) << 64;
-        if (num.value == floored_num) {
+    public fun ceil(self: FixedPoint64): u128 {
+        let floored_num = floor(self) << 64;
+        if (self.value == floored_num) {
             return floored_num >> 64
         };
         let val = ((floored_num as u256) + (1 << 64));
@@ -360,41 +360,41 @@ module aptos_std::fixed_point64 {
         pragma verify_duration_estimate = 1000;
         pragma opaque;
         aborts_if false;
-        ensures result == spec_ceil(num);
+        ensures result == spec_ceil(self);
     }
-    spec fun spec_ceil(val: FixedPoint64): u128 {
-        let fractional = val.value % (1 << 64);
+    spec fun spec_ceil(self: FixedPoint64): u128 {
+        let fractional = self.value % (1 << 64);
         let one = 1 << 64;
         if (fractional == 0) {
-            val.value >> 64
+            self.value >> 64
         } else {
-            (val.value - fractional + one) >> 64
+            (self.value - fractional + one) >> 64
         }
     }
 
     /// Returns the value of a FixedPoint64 to the nearest integer.
-    public fun round(num: FixedPoint64): u128 {
-        let floored_num = floor(num) << 64;
+    public fun round(self: FixedPoint64): u128 {
+        let floored_num = floor(self) << 64;
         let boundary = floored_num + ((1 << 64) / 2);
-        if (num.value < boundary) {
+        if (self.value < boundary) {
             floored_num >> 64
         } else {
-            ceil(num)
+            ceil(self)
         }
     }
     spec round {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_round(num);
+        ensures result == spec_round(self);
     }
-    spec fun spec_round(val: FixedPoint64): u128 {
-        let fractional = val.value % (1 << 64);
+    spec fun spec_round(self: FixedPoint64): u128 {
+        let fractional = self.value % (1 << 64);
         let boundary = (1 << 64) / 2;
         let one = 1 << 64;
         if (fractional < boundary) {
-            (val.value - fractional) >> 64
+            (self.value - fractional) >> 64
         } else {
-            (val.value - fractional + one) >> 64
+            (self.value - fractional + one) >> 64
         }
     }
 

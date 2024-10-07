@@ -307,7 +307,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         let mut state_keys_and_values = vec![];
         for _ in start_index..=end_index {
             state_keys_and_values.push((
-                StateKey::raw(HashValue::random().to_vec()),
+                StateKey::raw(HashValue::random().as_ref()),
                 StateValue::from(vec![]),
             ));
         }

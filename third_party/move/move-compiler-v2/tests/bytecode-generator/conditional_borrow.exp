@@ -350,3 +350,6 @@ public fun M::testb(): u64 {
   6: $t0 := +($t1, $t4)
   7: return $t0
 }
+
+
+============ bytecode verification succeeded ========

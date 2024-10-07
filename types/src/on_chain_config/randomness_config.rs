@@ -70,6 +70,22 @@ impl AsMoveAny for ConfigV2 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct RandomnessConfigSeqNum {
+    pub seq_num: u64,
+}
+
+impl RandomnessConfigSeqNum {
+    pub fn default_if_missing() -> Self {
+        Self { seq_num: 0 }
+    }
+}
+
+impl OnChainConfig for RandomnessConfigSeqNum {
+    const MODULE_IDENTIFIER: &'static str = "randomness_config_seqnum";
+    const TYPE_IDENTIFIER: &'static str = "RandomnessConfigSeqNum";
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct RandomnessConfigMoveStruct {
     variant: MoveAny,
 }
@@ -96,6 +112,42 @@ impl OnChainRandomnessConfig {
             secrecy_threshold,
             reconstruction_threshold,
         })
+    }
+
+    pub fn new_v2(
+        secrecy_threshold_in_percentage: u64,
+        reconstruct_threshold_in_percentage: u64,
+        fast_path_secrecy_threshold_in_percentage: u64,
+    ) -> Self {
+        let secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let reconstruction_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(reconstruct_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let fast_path_secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(fast_path_secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        Self::V2(ConfigV2 {
+            secrecy_threshold,
+            reconstruction_threshold,
+            fast_path_secrecy_threshold,
+        })
+    }
+
+    /// Used by DKG and Consensus on a new epoch to determine the actual `OnChainRandomnessConfig` to be used.
+    pub fn from_configs(
+        local_seqnum: u64,
+        onchain_seqnum: u64,
+        onchain_raw_config: Option<RandomnessConfigMoveStruct>,
+    ) -> Self {
+        if local_seqnum > onchain_seqnum {
+            Self::default_disabled()
+        } else {
+            onchain_raw_config
+                .and_then(|onchain_raw| OnChainRandomnessConfig::try_from(onchain_raw).ok())
+                .unwrap_or_else(OnChainRandomnessConfig::default_if_missing)
+        }
     }
 }
 

@@ -5,7 +5,7 @@
 pub mod codes;
 
 use crate::{
-    command_line::{COLOR_MODE_ENV_VAR, MOVE_COMPILER_DEBUG_ENV_VAR},
+    command_line::COLOR_MODE_ENV_VAR,
     diagnostics::codes::{DiagnosticCode, DiagnosticInfo, Severity},
 };
 use codespan_reporting::{
@@ -299,10 +299,14 @@ impl Diagnostic {
         }
     }
 
-    fn add_backtrace(msg: &str, is_bug: bool) -> String {
-        static DEBUG_COMPILER: Lazy<bool> =
-            Lazy::new(|| read_bool_env_var(MOVE_COMPILER_DEBUG_ENV_VAR));
-        if is_bug || *DEBUG_COMPILER {
+    fn add_backtrace(msg: &str, _is_bug: bool) -> String {
+        // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
+        // actually generate a backtrace.
+        static DUMP_BACKTRACE: Lazy<bool> = Lazy::new(|| {
+            read_bool_env_var(crate::command_line::MOVE_COMPILER_BACKTRACE_ENV_VAR)
+                | read_bool_env_var(crate::command_line::MVC_BACKTRACE_ENV_VAR)
+        });
+        if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
             if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)

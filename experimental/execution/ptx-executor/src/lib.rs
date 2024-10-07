@@ -101,7 +101,7 @@ impl VMExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(BlockOutput::new(ret))
+        Ok(BlockOutput::new(ret, None))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

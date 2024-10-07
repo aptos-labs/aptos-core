@@ -13,17 +13,14 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-bcs = { workspace = true }
 handlebars = { workspace = true }
 inferno = { workspace = true }
 regex = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
 
-aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-meter = { workspace = true }
-aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
 

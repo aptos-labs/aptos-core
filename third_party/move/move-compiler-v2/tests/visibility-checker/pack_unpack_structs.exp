@@ -1,0 +1,51 @@
+
+Diagnostics:
+error: Invalid operation: pack of `D::G` can only be done within the defining module `0x41::D`
+   ┌─ tests/visibility-checker/pack_unpack_structs.move:13:16
+   │
+13 │     public fun foo(): C::T {
+   │                ^^^
+14 │         C::T {g: G{}}
+   │                  --- packed here
+
+error: Invalid operation: pack of `C::T` can only be done within the defining module `0x43::C`
+   ┌─ tests/visibility-checker/pack_unpack_structs.move:13:16
+   │
+13 │     public fun foo(): C::T {
+   │                ^^^
+14 │         C::T {g: G{}}
+   │         ------------- packed here
+
+error: Invalid operation: unpack of `C::T` can only be done within the defining module `0x43::C`
+   ┌─ tests/visibility-checker/pack_unpack_structs.move:16:16
+   │
+16 │     public fun bar(c: C::T) {
+   │                ^^^
+17 │         let C::T { g } = c;
+   │             ---------- unpacked here
+
+error: Invalid operation: unpack of `D::G` can only be done within the defining module `0x41::D`
+   ┌─ tests/visibility-checker/pack_unpack_structs.move:16:16
+   │
+16 │     public fun bar(c: C::T) {
+   │                ^^^
+17 │         let C::T { g } = c;
+18 │         let G {} = g;
+   │             ---- unpacked here
+
+error: Invalid operation: unpack of `C::T` can only be done within the defining module `0x43::C`
+   ┌─ tests/visibility-checker/pack_unpack_structs.move:20:16
+   │
+20 │     public fun bar_ref(c: &C::T) {
+   │                ^^^^^^^
+21 │         let C::T { g } = c;
+   │             ---------- unpacked here
+
+error: Invalid operation: unpack of `D::G` can only be done within the defining module `0x41::D`
+   ┌─ tests/visibility-checker/pack_unpack_structs.move:20:16
+   │
+20 │     public fun bar_ref(c: &C::T) {
+   │                ^^^^^^^
+21 │         let C::T { g } = c;
+22 │         let G {} = g;
+   │             ---- unpacked here

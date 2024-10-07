@@ -17,7 +17,6 @@ aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
 bitvec = { workspace = true }

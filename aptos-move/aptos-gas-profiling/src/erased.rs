@@ -3,8 +3,8 @@
 
 use crate::{
     log::{
-        CallFrame, Dependency, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees,
-        WriteStorage, WriteTransient,
+        CallFrame, Dependency, EventStorage, EventTransient, ExecutionAndIOCosts,
+        ExecutionGasEvent, StorageFees, WriteStorage, WriteTransient,
     },
     render::Render,
     FrameName, TransactionGasLog,
@@ -182,6 +182,12 @@ impl CallFrame {
     }
 }
 
+impl EventTransient {
+    fn to_erased(&self) -> Node<InternalGas> {
+        Node::new(format!("{}", Render(&self.ty)), self.cost)
+    }
+}
+
 impl WriteTransient {
     fn to_erased(&self) -> Node<InternalGas> {
         Node::new(
@@ -211,6 +217,8 @@ impl ExecutionAndIOCosts {
 
         nodes.push(Node::new("intrinsic", self.intrinsic_cost));
 
+        nodes.push(Node::new("keyless", self.keyless_cost));
+
         if !self.dependencies.is_empty() {
             let deps = Node::new_with_children(
                 "dependencies",
@@ -222,20 +230,34 @@ impl ExecutionAndIOCosts {
 
         nodes.push(self.call_graph.to_erased());
 
-        let writes = Node::new_with_children(
-            "writes",
-            0,
-            self.write_set_transient
-                .iter()
-                .map(|write| write.to_erased()),
-        );
-        nodes.push(writes);
+        nodes.push(self.ledger_writes());
 
         TypeErasedExecutionAndIoCosts {
             gas_scaling_factor: self.gas_scaling_factor,
             total: self.total,
             tree: Node::new_with_children("execution & IO (gas unit, full trace)", 0, nodes),
         }
+    }
+
+    fn ledger_writes(&self) -> Node<InternalGas> {
+        let transaction = Node::new(
+            "transaction",
+            self.transaction_transient.unwrap_or_else(|| 0.into()),
+        );
+        let events = Node::new_with_children(
+            "events",
+            0,
+            self.events_transient.iter().map(|event| event.to_erased()),
+        );
+        let write_ops = Node::new_with_children(
+            "state write ops",
+            0,
+            self.write_set_transient
+                .iter()
+                .map(|write| write.to_erased()),
+        );
+
+        Node::new_with_children("ledger writes", 0, vec![transaction, events, write_ops])
     }
 }
 

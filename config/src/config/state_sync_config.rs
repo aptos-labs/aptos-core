@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // The maximum message size per state sync message
-const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; /* 10 MiB */
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 3000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 3000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
@@ -139,7 +139,7 @@ impl Default for StateSyncDriverConfig {
             max_pending_data_chunks: 50,
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
-            num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
+            num_versions_to_skip_snapshot_sync: 400_000_000, // At 5k TPS, this allows a node to fail for about 24 hours.
         }
     }
 }
@@ -362,7 +362,7 @@ impl Default for AptosDataMultiFetchConfig {
             enable_multi_fetch: true,
             additional_requests_per_peer_bucket: 1,
             min_peers_for_multi_fetch: 2,
-            max_peers_for_multi_fetch: 5,
+            max_peers_for_multi_fetch: 3,
             multi_fetch_peer_bucket_size: 10,
         }
     }
@@ -396,6 +396,8 @@ pub struct AptosDataClientConfig {
     pub data_poller_config: AptosDataPollerConfig,
     /// The aptos data multi-fetch config for the data client
     pub data_multi_fetch_config: AptosDataMultiFetchConfig,
+    /// Whether or not to ignore peers with low peer scores
+    pub ignore_low_score_peers: bool,
     /// The aptos latency filtering config for the data client
     pub latency_filtering_config: AptosLatencyFilteringConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
@@ -431,6 +433,7 @@ impl Default for AptosDataClientConfig {
         Self {
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
+            ignore_low_score_peers: true,
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,

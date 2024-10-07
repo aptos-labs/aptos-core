@@ -5,3 +5,6 @@ warning: Unused parameter `x`. Consider removing or prefixing with an underscore
   │
 6 │     fun unused_arg<T: drop>(x: T) {
   │                             ^
+
+
+============ bytecode verification succeeded ========

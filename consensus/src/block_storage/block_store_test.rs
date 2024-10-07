@@ -8,9 +8,7 @@ use crate::{
     test_utils::{
         build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
     },
-    util::mock_time_service::SimulatedTimeService,
 };
-use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
     block::{
         block_test_utils::{
@@ -27,9 +25,8 @@ use aptos_crypto::{HashValue, PrivateKey};
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
-use futures_channel::mpsc::unbounded;
 use proptest::prelude::*;
-use std::{cmp::min, collections::HashSet, sync::Arc};
+use std::{cmp::min, collections::HashSet};
 
 #[tokio::test]
 async fn test_highest_block_and_quorum_cert() {
@@ -130,7 +127,7 @@ proptest! {
                 let known_parent = block_store.block_exists(block.parent_id());
                 let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
                 let verify_res = block.verify_well_formed();
-                let res = timed_block_on(&runtime, block_store.insert_ordered_block(block.clone()));
+                let res = timed_block_on(&runtime, block_store.insert_block(block.clone()));
                 if !certified_parent {
                     prop_assert!(verify_res.is_err());
                 } else if !known_parent {
@@ -284,11 +281,8 @@ async fn test_insert_vote() {
     let block = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
         .await;
-    let time_service = Arc::new(SimulatedTimeService::new());
-    let (delayed_qc_tx, _) = unbounded();
 
-    let mut pending_votes =
-        PendingVotes::new(time_service, delayed_qc_tx, QcAggregatorType::NoDelay);
+    let mut pending_votes = PendingVotes::new();
 
     assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
     for (i, voter) in signers.iter().enumerate().take(10).skip(1) {
@@ -366,9 +360,7 @@ async fn test_illegal_timestamp() {
         Vec::new(),
     )
     .unwrap();
-    let result = block_store
-        .insert_ordered_block(block_with_illegal_timestamp)
-        .await;
+    let result = block_store.insert_block(block_with_illegal_timestamp).await;
     assert!(result.is_err());
 }
 

@@ -25,47 +25,47 @@ jobs:
     name: "Build Ubuntu 20.04 binary"
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cli-builds
+          name: cli-builds-ubuntu-20.04
           path: aptos-cli-*.zip
 
   build-ubuntu22-binary:
     name: "Build Ubuntu 22.04 binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cli-builds
+          name: cli-builds-ubuntu-22.04
           path: aptos-cli-*.zip
 
   build-windows-binary:
     name: "Build Windows binary"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
       - name: Upload Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cli-builds
+          name: cli-builds-windows
           path: aptos-cli-*.zip
 
   release-binaries:
@@ -81,9 +81,10 @@ jobs:
     if: ${{ inputs.dry_run }} == 'false'
     steps:
       - name: Download prebuilt binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: cli-builds
+          pattern: cli-builds-*
+          merge-multiple: true
       - name: Create GitHub Release
         uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # pin@v1.2.1
         with:

@@ -6,9 +6,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 13 │     fun c<T1, T2>() {
    │         ^
    │
-   = `c<T1, T2>` calls `d<T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:13
-   = `d<T2>` calls `b<u64, T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:15
-   = `b<u64, T2>` calls `c<M::S<T2>, bool>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:20
+   = `c<T1, T2>` calls `d<T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:15
+   = `d<T2>` calls `b<u64, T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:20
+   = `b<u64, T2>` calls `c<M::S<T2>, bool>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:10
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-tests/complex_1.move:26:9
@@ -16,8 +16,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 26 │     fun f<T>() {
    │         ^
    │
-   = `f<T>` calls `g<T>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:26
-   = `g<T>` calls `f<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:27
+   = `f<T>` calls `g<T>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:27
+   = `g<T>` calls `f<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:31
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-tests/complex_1.move:30:9
@@ -25,5 +25,5 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 30 │     fun g<T>() {
    │         ^
    │
-   = `g<T>` calls `f<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:30
-   = `f<M::S<T>>` calls `g<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:31
+   = `g<T>` calls `f<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:31
+   = `f<M::S<T>>` calls `g<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:27

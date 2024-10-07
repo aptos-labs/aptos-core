@@ -1,0 +1,27 @@
+
+Diagnostics:
+error: local `ref` of type `M::HasDrop<M::NoAbilities, M::NoAbilities>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid2.move:11:9
+   │
+11 │         *ref = HasDrop<NoAbilities, NoAbilities> { a: NoAbilities { } };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference content dropped here
+
+error: value of type `M::HasDrop<M::NoAbilities, M::NoAbilities>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid2.move:16:9
+   │
+16 │         _ = HasDrop<NoAbilities, NoAbilities> { a: NoAbilities { } };
+   │         ^ implicitly dropped here since it is no longer used
+
+error: local `_x` of type `M::HasDrop<M::NoAbilities, M::NoAbilities>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid2.move:20:51
+   │
+20 │       fun f3(_x: HasDrop<NoAbilities, NoAbilities>) {
+   │ ╭───────────────────────────────────────────────────^
+21 │ │     }
+   │ ╰─────^ implicitly dropped here since it is no longer used
+
+error: local `x` of type `M::HasCopy<M::NoAbilities, M::NoAbilities>` does not have the `copy` ability
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid2.move:25:10
+   │
+25 │         (copy x, x)
+   │          ^^^^^^ explicitly copied here

@@ -72,3 +72,6 @@ fun if_else::if_else_nested($t0: bool, $t1: u64): u64 {
  19: label L5
  20: return $t2
 }
+
+
+============ bytecode verification succeeded ========

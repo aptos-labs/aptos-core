@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::authenticator::EphemeralPublicKey;
+use aptos_types::transaction::authenticator::{AnyPublicKey, AnySignature, EphemeralPublicKey};
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
+pub mod account_recovery_db;
 pub mod jwt;
 pub mod vuf;
 
@@ -23,6 +24,27 @@ where
 {
     let s = String::deserialize(deserializer)?;
     hex::decode(s).map_err(D::Error::custom)
+}
+
+/// Custom serialization function to convert Vec<u8> into a hex string with the 0x prefix.
+fn serialize_bytes_to_hex_with_0x<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_string = format!("0x{}", hex::encode(bytes));
+    serializer.serialize_str(&hex_string)
+}
+
+/// Custom deserialization function to convert a hex string with the 0x prefix back into Vec<u8>.
+fn deserialize_bytes_from_hex_with_0x<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if !s.starts_with("0x") {
+        return Err(D::Error::custom("String is not prefixed by '0x'"));
+    }
+    hex::decode(&s[2..]).map_err(D::Error::custom)
 }
 
 /// Custom serialization function to convert `EphemeralPublicKey` into a hex string.
@@ -68,11 +90,91 @@ pub struct PepperRequest {
     pub epk_blinder: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uid_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derivation_path: Option<String>,
 }
 
 /// The response to `PepperRequest`, which contains either the pepper or a processing error.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PepperResponse {
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub pepper: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex_with_0x",
+        deserialize_with = "deserialize_bytes_from_hex_with_0x"
+    )]
+    pub address: Vec<u8>,
+}
+
+fn serialize_anypk_to_hex<S>(pk: &AnyPublicKey, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let pk_bytes = pk.to_bytes();
+    serialize_bytes_to_hex(&pk_bytes, serializer)
+}
+
+fn deserialize_anypk_from_hex<'de, D>(deserializer: D) -> Result<AnyPublicKey, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bytes = deserialize_bytes_from_hex(deserializer)?;
+    let pk = AnyPublicKey::try_from(bytes.as_slice()).map_err(D::Error::custom)?;
+    Ok(pk)
+}
+
+fn serialize_anysig_to_hex<S>(sig: &AnySignature, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let sig_bytes = sig.to_bytes();
+    serialize_bytes_to_hex(&sig_bytes, serializer)
+}
+
+fn deserialize_anysig_from_hex<'de, D>(deserializer: D) -> Result<AnySignature, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bytes = deserialize_bytes_from_hex(deserializer)?;
+    let sig = AnySignature::try_from(bytes.as_slice()).map_err(D::Error::custom)?;
+    Ok(sig)
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VerifyRequest {
+    #[serde(
+        serialize_with = "serialize_anypk_to_hex",
+        deserialize_with = "deserialize_anypk_from_hex"
+    )]
+    pub public_key: AnyPublicKey,
+    #[serde(
+        serialize_with = "serialize_anysig_to_hex",
+        deserialize_with = "deserialize_anysig_from_hex"
+    )]
+    pub signature: AnySignature,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub message: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex_with_0x",
+        deserialize_with = "deserialize_bytes_from_hex_with_0x"
+    )]
+    pub address: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VerifyResponse {
+    pub success: bool,
+}
+
+/// The response to /signature, which contains the VUF signature.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SignatureResponse {
     #[serde(
         serialize_with = "serialize_bytes_to_hex",
         deserialize_with = "deserialize_bytes_from_hex"

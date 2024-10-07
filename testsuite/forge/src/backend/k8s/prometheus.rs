@@ -4,7 +4,7 @@
 use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
 use again::RetryPolicy;
 use anyhow::{anyhow, bail};
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use k8s_openapi::api::core::v1::Secret;
 use once_cell::sync::Lazy;
 use prometheus_http_query::{
@@ -185,7 +185,14 @@ pub async fn query_range_with_metadata(
             new_query
         )
     })?;
-    if range.len() != 1 {
+    if range.is_empty() {
+        warn!(
+            "Missing data for start={}, end={}, query={}",
+            start_time, end_time, new_query
+        );
+        return Ok(Vec::new());
+    }
+    if range.len() > 1 {
         bail!(
             "Expected only one range vector from prometheus, recieved {} ({:?}). start={}, end={}, query={}",
             range.len(),
@@ -205,7 +212,7 @@ pub async fn query_range_with_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MockSecretApi;
+    use crate::MockK8sResourceApi;
     use k8s_openapi::ByteString;
     use kube::api::ObjectMeta;
     use prometheus_http_query::Error as PrometheusError;
@@ -216,7 +223,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_client_secret() {
-        let secret_api = Arc::new(MockSecretApi::from_secret(Some(Secret {
+        let secret_api = Arc::new(MockK8sResourceApi::from_resource(Secret {
             metadata: ObjectMeta {
                 name: Some("prometheus-read-only".to_string()),
                 ..ObjectMeta::default()
@@ -234,7 +241,7 @@ mod tests {
             string_data: None,
             type_: None,
             immutable: None,
-        })));
+        }));
 
         create_prometheus_client_from_environment(secret_api)
             .await
@@ -243,7 +250,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_client_none() {
-        let secret_api = Arc::new(MockSecretApi::from_secret(None));
+        let secret_api = Arc::new(MockK8sResourceApi::new());
 
         create_prometheus_client_from_environment(secret_api)
             .await
@@ -252,7 +259,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_client_env() {
-        let secret_api = Arc::new(MockSecretApi::from_secret(None));
+        let secret_api = Arc::new(MockK8sResourceApi::new());
 
         env::set_var("PROMETHEUS_URL", "http://prometheus.site");
 

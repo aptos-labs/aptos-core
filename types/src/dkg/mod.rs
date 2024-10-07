@@ -3,6 +3,7 @@
 
 use self::real_dkg::RealDKG;
 use crate::{
+    dkg::real_dkg::rounding::DKGRoundingProfile,
     on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
@@ -19,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
     fmt::{Debug, Formatter},
+    time::Duration,
 };
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
@@ -108,6 +110,12 @@ impl DKGSessionMetadata {
     }
 }
 
+impl MayHaveRoundingSummary for DKGSessionMetadata {
+    fn rounding_summary(&self) -> Option<&RoundingSummary> {
+        None
+    }
+}
+
 /// Reflection of Move type `0x1::dkg::DKGSessionState`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionState {
@@ -146,10 +154,22 @@ impl OnChainConfig for DKGState {
     const TYPE_IDENTIFIER: &'static str = "DKGState";
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct RoundingSummary {
+    pub method: String,
+    pub output: DKGRoundingProfile,
+    pub error: Option<String>,
+    pub exec_time: Duration,
+}
+
+pub trait MayHaveRoundingSummary {
+    fn rounding_summary(&self) -> Option<&RoundingSummary>;
+}
+
 /// NOTE: this is a subset of the full scheme. Some data items/algorithms are not used in DKG and are omitted.
 pub trait DKGTrait: Debug {
     type DealerPrivateKey;
-    type PublicParams: Clone + Debug + Send + Sync;
+    type PublicParams: Clone + Debug + Send + Sync + MayHaveRoundingSummary;
     type Transcript: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a>;
     type InputSecret: Uniform;
     type DealtSecret;

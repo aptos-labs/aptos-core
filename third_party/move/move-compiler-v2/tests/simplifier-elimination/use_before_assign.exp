@@ -18,3 +18,11 @@ module <SELF>_0 {
         }
     }
 } // end <SELF>_0
+
+
+Diagnostics:
+error: use of unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign.move:4:13
+  │
+4 │     let y = x;
+  │             ^

@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: cannot drop local `x` which is still borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc_struct_invalid.move:7:9
+  │
+6 │         let y = &x;
+  │                 -- local `x` previously borrowed here
+7 │         x = X { b: true };
+  │         ^^^^^^^^^^^^^^^^^ dropped here
+8 │         move y;
+  │         ------ conflicting reference `y` used here
+
+error: cannot drop local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc_struct_invalid.move:16:9
+   │
+15 │         let z = &y.z;
+   │                 ---- field `z` via local `s` previously borrowed here
+16 │         s = S { z: 7 };
+   │         ^^^^^^^^^^^^^^ dropped here
+17 │         z;
+   │         - conflicting reference `z` used here

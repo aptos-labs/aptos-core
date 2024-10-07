@@ -502,8 +502,11 @@ fn create_continuous_syncer(
     // Create the mock db reader with the given synced version
     let mut mock_database_reader = create_mock_db_reader();
     mock_database_reader
-        .expect_get_latest_version()
-        .returning(move || Ok(synced_version));
+        .expect_get_synced_version()
+        .returning(move || Ok(Some(synced_version)));
+    mock_database_reader
+        .expect_get_pre_committed_version()
+        .returning(move || Ok(Some(synced_version)));
     mock_database_reader
         .expect_get_latest_epoch_state()
         .returning(move || Ok(create_epoch_state(current_epoch)));

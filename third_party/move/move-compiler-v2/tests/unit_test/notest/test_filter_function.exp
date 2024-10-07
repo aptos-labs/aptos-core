@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: no function named `bar` found
+  ┌─ tests/unit_test/notest/test_filter_function.move:6:24
+  │
+6 │     public fun foo() { bar() }
+  │                        ^^^^^

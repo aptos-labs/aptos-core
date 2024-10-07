@@ -5,7 +5,7 @@ use anyhow::{bail, format_err, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -191,7 +191,7 @@ pub struct EmitArgs {
 
     #[clap(long, default_value = "false")]
     /// Skip minting account during initialization
-    pub skip_minting_accounts: bool,
+    pub skip_funding_accounts: bool,
 
     #[clap(long)]
     pub latency_polling_interval_s: Option<f32>,
@@ -215,6 +215,27 @@ pub struct EmitArgs {
 
     #[clap(long)]
     pub coins_per_account_override: Option<u64>,
+
+    #[clap(flatten)]
+    pub account_type_args: AccountTypeArgs,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+pub struct AccountTypeArgs {
+    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
+    pub account_type: AccountType,
+
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, requires = "proof_file_path", requires = "epk_expiry_date_secs", requires = "keyless_jwt")]
+    pub keyless_ephem_secret_key: Option<ConfigKey<Ed25519PrivateKey>>,
+
+    #[clap(long)]
+    pub proof_file_path: Option<String>,
+
+    #[clap(long)]
+    pub epk_expiry_date_secs: Option<u64>,
+
+    #[clap(long)]
+    pub keyless_jwt: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
@@ -231,6 +252,12 @@ pub struct CreateAccountsArgs {
     /// used and printed.
     #[clap(long)]
     pub account_minter_seed: Option<String>,
+
+    #[clap(long)]
+    pub keyless_jwt: Option<String>,
+
+    #[clap(long)]
+    pub proof_file_path: Option<String>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

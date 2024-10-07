@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -30,7 +29,6 @@ debug-ignore = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
 gcp-bigquery-client = { workspace = true }
-hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
@@ -41,7 +39,6 @@ reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_repr = { workspace = true }
 serde_yaml = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -49,6 +46,9 @@ tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 warp = { workspace = true }
+
+[features]
+bigquery_integration_tests = []
 
 [dev-dependencies]
 claims = { workspace = true }

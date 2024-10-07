@@ -95,6 +95,10 @@ impl<D: TAugmentedData> AugDataStore<D> {
         self.certified_data.get(&self.config.author()).cloned()
     }
 
+    pub fn my_certified_aug_data_exists(&self) -> bool {
+        self.certified_data.contains_key(&self.config.author())
+    }
+
     pub fn add_aug_data(&mut self, data: AugData<D>) -> anyhow::Result<AugDataSignature> {
         if let Some(existing_data) = self.data.get(data.author()) {
             ensure!(

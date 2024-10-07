@@ -386,6 +386,17 @@ impl PartialVMError {
             indices,
             offsets,
         } = *self.0;
+        let bt = std::backtrace::Backtrace::capture();
+        let message = if std::backtrace::BacktraceStatus::Captured == bt.status() {
+            if let Some(message) = message {
+                Some(format!("{}\nBacktrace: {:#?}", message, bt).to_string())
+            } else {
+                Some(format!("Backtrace: {:#?}", bt).to_string())
+            }
+        } else {
+            message
+        };
+
         VMError(Box::new(VMError_ {
             major_status,
             sub_status,
@@ -534,7 +545,7 @@ impl fmt::Display for PartialVMError {
         }
 
         if let Some(msg) = &self.0.message {
-            status = format!("{} and message {}", status, msg);
+            status = format!("{} and message '{}'", status, msg);
         }
 
         for (kind, index) in &self.0.indices {

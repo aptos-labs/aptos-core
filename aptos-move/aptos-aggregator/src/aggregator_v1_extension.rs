@@ -5,9 +5,10 @@ use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::AggregatorV1Resolver,
-    types::{expect_ok, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
+    types::{DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
 };
 use aptos_types::{
+    error::expect_ok,
     state_store::{state_key::StateKey, table::TableHandle},
     PeerId,
 };
@@ -26,7 +27,7 @@ pub struct AggregatorID(pub StateKey);
 
 impl AggregatorID {
     pub fn new(handle: TableHandle, key: PeerId) -> Self {
-        let state_key = StateKey::table_item(handle, key.to_vec());
+        let state_key = StateKey::table_item(&handle, key.as_ref());
         AggregatorID(state_key)
     }
 

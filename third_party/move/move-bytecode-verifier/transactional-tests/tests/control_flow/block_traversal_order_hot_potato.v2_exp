@@ -1,0 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-39:
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::Test'. Got VMError: {
+    major_status: STLOC_UNSAFE_TO_DESTROY_ERROR,
+    sub_status: None,
+    location: 0x1::Test,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 8)],
+}

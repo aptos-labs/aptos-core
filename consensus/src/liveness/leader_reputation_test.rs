@@ -499,7 +499,7 @@ impl DbReader for MockDbReader {
     }
 
     /// Returns the latest version, error on on non-bootstrapped DB.
-    fn get_latest_version(&self) -> aptos_storage_interface::Result<Version> {
+    fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version> {
         let version = *self.idx.lock();
         let mut to_add = self.to_add_event_after_call.lock();
         if let Some((epoch, round)) = *to_add {
@@ -655,7 +655,8 @@ fn test_extract_epoch_to_proposers_impl() {
                     .iter()
                     .map(|author| ValidatorConsensusInfo::new(*author, public_key.clone(), 1))
                     .collect::<Vec<_>>(),
-            ),
+            )
+            .into(),
         }
     }
 

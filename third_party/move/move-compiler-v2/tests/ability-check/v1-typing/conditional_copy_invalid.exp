@@ -1,0 +1,61 @@
+
+Diagnostics:
+error: local `x` of type `M::Box<M::R>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:15:16
+   │
+15 │         ignore(copy x);
+   │                ^^^^^^ explicitly copied here
+
+error: local `x` of type `M::Box<M::Box<M::R>>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:17:16
+   │
+17 │         ignore(copy x);
+   │                ^^^^^^ explicitly copied here
+
+error: local `x` of type `M::Box<T>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:19:16
+   │
+19 │         ignore(copy x);
+   │                ^^^^^^ explicitly copied here
+
+error: local `x` of type `M::Box<M::Box<T>>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:21:16
+   │
+21 │         ignore(copy x);
+   │                ^^^^^^ explicitly copied here
+
+error: local `x` of type `M::Pair<M::S, M::R>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:23:16
+   │
+23 │         ignore(copy x);
+   │                ^^^^^^ explicitly copied here
+
+error: local `x` of type `M::Box<M::R>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:27:16
+   │
+27 │         ignore(*x);
+   │                ^^ reference content copied here
+
+error: local `x` of type `M::Box<M::Box<M::R>>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:29:16
+   │
+29 │         ignore(*x);
+   │                ^^ reference content copied here
+
+error: local `x` of type `M::Box<T>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:31:16
+   │
+31 │         ignore(*x);
+   │                ^^ reference content copied here
+
+error: local `x` of type `M::Box<M::Box<T>>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:33:16
+   │
+33 │         ignore(*x);
+   │                ^^ reference content copied here
+
+error: local `x` of type `M::Pair<M::R, M::S>` does not have the `copy` ability
+   ┌─ tests/ability-check/v1-typing/conditional_copy_invalid.move:35:16
+   │
+35 │         ignore(*x);
+   │                ^^ reference content copied here

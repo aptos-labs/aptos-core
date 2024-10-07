@@ -196,7 +196,7 @@ variable "utility_instance_type" {
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
   type        = string
-  default     = "t2d-standard-16"
+  default     = "t2d-standard-60"
 }
 
 variable "utility_instance_enable_taint" {
@@ -241,6 +241,12 @@ variable "gke_autoscaling_max_node_count" {
   default     = 250
 }
 
+variable "enable_vertical_pod_autoscaling" {
+  description = "Enable vertical pod autoscaling"
+  type        = bool
+  default     = false
+}
+
 ### Naming overrides
 
 variable "helm_release_name_override" {
@@ -261,6 +267,18 @@ variable "cluster_ipv4_cidr_block" {
   description = "The IP address range of the container pods in this cluster, in CIDR notation. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#cluster_ipv4_cidr_block"
   type        = string
   default     = ""
+}
+
+variable "router_nat_ip_allocate_option" {
+  description = "The method of NAT IP allocation for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#router_nat_ip_allocate_option"
+  type        = string
+  default     = "MANUAL_ONLY"
+}
+
+variable "enable_endpoint_independent_mapping" {
+  description = "Enable endpoint independent mapping for the NAT router"
+  type        = bool
+  default     = true
 }
 
 variable "enable_clouddns" {

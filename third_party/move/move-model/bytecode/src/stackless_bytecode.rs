@@ -12,6 +12,7 @@ use move_model::{
     ast::{Address, Exp, ExpData, MemoryLabel, Spec, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
+    symbol::Symbol,
     ty::{Type, TypeDisplayContext},
 };
 use std::{
@@ -66,11 +67,11 @@ impl SpecBlockId {
 /// The kind of an assignment in the bytecode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AssignKind {
-    /// The assign copies the lhs value.
+    /// The assign copies the rhs value.
     Copy,
-    /// The assign moves the lhs value.
+    /// The assign moves the rhs value.
     Move,
-    /// The assign stores the lhs value.
+    /// The assign stores the rhs value.
     // TODO: figure out why we can't treat this as either copy or move. The lifetime analysis
     // currently makes a difference of this case. It originates from stack code where Copy
     // and Move push on the stack and Store pops.
@@ -159,6 +160,14 @@ pub enum Operation {
     MoveFrom(ModuleId, StructId, Vec<Type>),
     Exists(ModuleId, StructId, Vec<Type>),
 
+    // Variants
+    // Below the `Symbol` is the name of the variant. In the case of `Vec<Symbol>`,
+    // it is a list of variants the value needs to have
+    TestVariant(ModuleId, StructId, Symbol, Vec<Type>),
+    PackVariant(ModuleId, StructId, Symbol, Vec<Type>),
+    UnpackVariant(ModuleId, StructId, Symbol, Vec<Type>),
+    BorrowVariantField(ModuleId, StructId, Vec<Symbol>, Vec<Type>, usize),
+
     // Borrow
     BorrowLoc,
     BorrowField(ModuleId, StructId, Vec<Type>, usize),
@@ -171,8 +180,8 @@ pub enum Operation {
     Release,
 
     ReadRef,
-    WriteRef,
-    FreezeRef,
+    WriteRef, // arguments: (reference, value)
+    FreezeRef(/*explicit*/ bool),
     Vector,
 
     // Unary
@@ -224,6 +233,7 @@ pub enum Operation {
 
     // Get shortcut
     GetField(ModuleId, StructId, Vec<Type>, usize),
+    GetVariantField(ModuleId, StructId, Vec<Symbol>, Vec<Type>, usize),
     GetGlobal(ModuleId, StructId, Vec<Type>),
 
     // Special ops
@@ -252,6 +262,10 @@ impl Operation {
             Operation::OpaqueCallEnd(_, _, _) => false,
             Operation::Pack(_, _, _) => false,
             Operation::Unpack(_, _, _) => false,
+            Operation::TestVariant(_, _, _, _) => false,
+            Operation::PackVariant(_, _, _, _) => false,
+            Operation::UnpackVariant(_, _, _, _) => true, // aborts if not given variant
+            Operation::BorrowVariantField(_, _, _, _, _) => true, // aborts if not given variant
             Operation::MoveTo(_, _, _) => true,
             Operation::MoveFrom(_, _, _) => true,
             Operation::Exists(_, _, _) => false,
@@ -259,13 +273,14 @@ impl Operation {
             Operation::BorrowField(_, _, _, _) => false,
             Operation::BorrowGlobal(_, _, _) => true,
             Operation::GetField(_, _, _, _) => false,
+            Operation::GetVariantField(_, _, _, _, _) => true, // aborts if not given variant
             Operation::GetGlobal(_, _, _) => true,
             Operation::Uninit => false,
             Operation::Drop => false,
             Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
-            Operation::FreezeRef => false,
+            Operation::FreezeRef(_) => false,
             Operation::Vector => false,
             Operation::Havoc(_) => false,
             Operation::Stop => false,
@@ -356,7 +371,7 @@ pub enum BorrowEdge {
     /// Direct borrow.
     Direct,
     /// Field borrow with static offset.
-    Field(QualifiedInstId<StructId>, usize),
+    Field(QualifiedInstId<StructId>, Option<Vec<Symbol>>, usize),
     /// Vector borrow with dynamic index.
     Index(IndexEdgeKind),
     /// Composed sequence of edges.
@@ -374,7 +389,9 @@ impl BorrowEdge {
 
     pub fn instantiate(&self, params: &[Type]) -> Self {
         match self {
-            Self::Field(qid, offset) => Self::Field(qid.instantiate_ref(params), *offset),
+            Self::Field(qid, variant, offset) => {
+                Self::Field(qid.instantiate_ref(params), variant.clone(), *offset)
+            },
             Self::Hyper(edges) => {
                 let new_edges = edges.iter().map(|e| e.instantiate(params)).collect();
                 Self::Hyper(new_edges)
@@ -753,6 +770,20 @@ impl Bytecode {
                     GetField(mid, sid, tys, field_num) => {
                         GetField(*mid, *sid, Type::instantiate_slice(tys, params), *field_num)
                     },
+                    BorrowVariantField(mid, sid, variants, tys, field_num) => BorrowVariantField(
+                        *mid,
+                        *sid,
+                        variants.clone(),
+                        Type::instantiate_slice(tys, params),
+                        *field_num,
+                    ),
+                    GetVariantField(mid, sid, variants, tys, field_num) => GetVariantField(
+                        *mid,
+                        *sid,
+                        variants.clone(),
+                        Type::instantiate_slice(tys, params),
+                        *field_num,
+                    ),
                     // storage
                     MoveTo(mid, sid, tys) => {
                         MoveTo(*mid, *sid, Type::instantiate_slice(tys, params))
@@ -1100,6 +1131,32 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                 write!(f, "unpack {}", self.struct_str(*mid, *sid, targs))?;
             },
 
+            // Variants
+            TestVariant(mid, sid, variant, targs) => {
+                write!(
+                    f,
+                    "test_variant {}::{}",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
+            },
+            PackVariant(mid, sid, variant, targs) => {
+                write!(
+                    f,
+                    "pack_variant {}::{}",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
+            },
+            UnpackVariant(mid, sid, variant, targs) => {
+                write!(
+                    f,
+                    "unpack_variant {}::{}",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
+            },
+
             // Borrow
             BorrowLoc => {
                 write!(f, "borrow_local")?;
@@ -1118,6 +1175,30 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     field_env.get_name().display(struct_env.symbol_pool())
                 )?;
             },
+            BorrowVariantField(mid, sid, variants, targs, offset) => {
+                let variants_str = variants
+                    .iter()
+                    .map(|v| v.display(self.func_target.symbol_pool()))
+                    .join("|");
+                write!(
+                    f,
+                    "borrow_variant_field<{}::{}>",
+                    self.struct_str(*mid, *sid, targs),
+                    variants_str,
+                )?;
+                let struct_env = self
+                    .func_target
+                    .global_env()
+                    .get_module(*mid)
+                    .into_struct(*sid);
+                let field_env =
+                    struct_env.get_field_by_offset_optional_variant(Some(variants[0]), *offset);
+                write!(
+                    f,
+                    ".{}",
+                    field_env.get_name().display(struct_env.symbol_pool())
+                )?;
+            },
             BorrowGlobal(mid, sid, targs) => {
                 write!(f, "borrow_global<{}>", self.struct_str(*mid, *sid, targs))?;
             },
@@ -1129,6 +1210,30 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     .get_module(*mid)
                     .into_struct(*sid);
                 let field_env = struct_env.get_field_by_offset(*offset);
+                write!(
+                    f,
+                    ".{}",
+                    field_env.get_name().display(struct_env.symbol_pool())
+                )?;
+            },
+            GetVariantField(mid, sid, variants, targs, offset) => {
+                let variants_str = variants
+                    .iter()
+                    .map(|v| v.display(self.func_target.symbol_pool()))
+                    .join("|");
+                write!(
+                    f,
+                    "get_variant_field<{}::{}>",
+                    self.struct_str(*mid, *sid, targs),
+                    variants_str,
+                )?;
+                let struct_env = self
+                    .func_target
+                    .global_env()
+                    .get_module(*mid)
+                    .into_struct(*sid);
+                let field_env =
+                    struct_env.get_field_by_offset_optional_variant(Some(variants[0]), *offset);
                 write!(
                     f,
                     ".{}",
@@ -1166,8 +1271,12 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             WriteRef => {
                 write!(f, "write_ref")?;
             },
-            FreezeRef => {
-                write!(f, "freeze_ref")?;
+            FreezeRef(explicit) => {
+                if *explicit {
+                    write!(f, "freeze_ref")?;
+                } else {
+                    write!(f, "freeze_ref(implicit)")?;
+                }
             },
             Vector => {
                 write!(f, "vector")?;
@@ -1375,9 +1484,14 @@ impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
         use BorrowEdge::*;
         let tctx = TypeDisplayContext::new(self.env);
         match self.edge {
-            Field(qid, field) => {
+            Field(qid, variant, field) => {
                 let struct_env = self.env.get_struct(qid.to_qualified_id());
-                let field_env = struct_env.get_field_by_offset(*field);
+                let field_env = if variant.is_none() {
+                    struct_env.get_field_by_offset_optional_variant(None, *field)
+                } else {
+                    let v = variant.clone().unwrap()[0];
+                    struct_env.get_field_by_offset_optional_variant(Some(v), *field)
+                };
                 let field_type = field_env.get_type().instantiate(&qid.inst);
                 write!(
                     f,

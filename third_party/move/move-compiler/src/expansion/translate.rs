@@ -9,7 +9,10 @@ use crate::{
     diagnostics::{codes::DeprecatedItem, Diagnostic},
     expansion::{
         aliases::{AliasMap, AliasSet},
-        ast::{self as E, Address, Fields, ModuleIdent, ModuleIdent_, SpecId},
+        ast::{
+            self as E, Address, Fields, LValueOrDotDot_, LValue_, ModuleAccess_, ModuleIdent,
+            ModuleIdent_, SequenceItem_, SpecId,
+        },
         byte_string, hex_string,
     },
     parser::ast::{
@@ -83,7 +86,7 @@ impl<'env, 'map> Context<'env, 'map> {
 
     fn set_current_module(&mut self, module: Option<ModuleIdent>) {
         self.in_deprecated_code = match &module {
-            Some(m) => self.module_deprecation_attribute_locs.get(m).is_some(),
+            Some(m) => self.module_deprecation_attribute_locs.contains_key(m),
             None => false,
         };
         self.current_module = module;
@@ -527,8 +530,7 @@ fn module_(
     let current_module = sp(name_loc, ModuleIdent_::new(*context.cur_address(), name));
     if context
         .module_deprecation_attribute_locs
-        .get(&current_module)
-        .is_some()
+        .contains_key(&current_module)
     {
         context.in_deprecated_code = true;
     }
@@ -646,7 +648,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
     check_valid_module_member_name(context, ModuleMemberKind::Function, pfunction.name.0);
     let (function_name, function) = function_(context, pfunction);
     match &function.visibility {
-        E::Visibility::Public(loc) | E::Visibility::Friend(loc) => {
+        E::Visibility::Public(loc) | E::Visibility::Package(loc) | E::Visibility::Friend(loc) => {
             let msg = format!(
                 "Invalid '{}' visibility modifier. \
                 Script functions are not callable from other Move functions.",
@@ -1396,7 +1398,7 @@ fn struct_def_(
         name,
         abilities: abilities_vec,
         type_parameters: pty_params,
-        fields: pfields,
+        layout: pfields,
     } = pstruct;
     let was_in_deprecated_code = context.enter_possibly_deprecated_member(&name.0);
     let attributes = flatten_attributes(context, AttributePosition::Struct, attributes);
@@ -1405,46 +1407,88 @@ fn struct_def_(
         .aliases
         .shadow_for_type_parameters(type_parameters.iter().map(|tp| &tp.name));
     let abilities = ability_set(context, "modifier", abilities_vec);
-    let fields = struct_fields(context, &name, pfields);
+    let fields = struct_layout(context, &name, pfields);
     let sdef = E::StructDefinition {
         attributes,
         loc,
         abilities,
         type_parameters,
-        fields,
+        layout: fields,
     };
     context.set_to_outer_scope(old_aliases);
     context.set_in_deprecated_code(was_in_deprecated_code);
     (name, sdef)
 }
 
-fn struct_fields(
+fn struct_layout(
     context: &mut Context,
-    sname: &StructName,
-    pfields: P::StructFields,
-) -> E::StructFields {
-    let pfields_vec = match pfields {
-        P::StructFields::Native(loc) => return E::StructFields::Native(loc),
-        P::StructFields::Defined(v) => v,
-    };
+    _sname: &StructName,
+    parsed_layout: P::StructLayout,
+) -> E::StructLayout {
+    match parsed_layout {
+        P::StructLayout::Native(loc) => E::StructLayout::Native(loc),
+        P::StructLayout::Singleton(fields, is_positional) => {
+            E::StructLayout::Singleton(struct_fields(context, fields), is_positional)
+        },
+        P::StructLayout::Variants(variants) => {
+            let mut previous_variants = BTreeMap::new();
+            E::StructLayout::Variants(
+                variants
+                    .into_iter()
+                    .map(|v| {
+                        if !is_valid_struct_constant_or_schema_name(v.name.0.value.as_str()) {
+                            let msg = format!(
+                                "Invalid variant name '{}'. variant names must start with 'A'..'Z'",
+                                v.name
+                            );
+                            context
+                                .env
+                                .add_diag(diag!(Declarations::InvalidName, (v.loc, msg)));
+                        }
+                        if let Some(old_loc) = previous_variants.insert(v.name, v.loc) {
+                            context.env.add_diag(diag!(
+                                Declarations::DuplicateItem,
+                                (
+                                    v.loc,
+                                    format!("Duplicate definition for variant '{}'", v.name),
+                                ),
+                                (old_loc, "Variant previously defined here"),
+                            ));
+                        }
+                        E::StructVariant {
+                            attributes: flatten_attributes(
+                                context,
+                                AttributePosition::Struct,
+                                v.attributes,
+                            ),
+                            loc: v.loc,
+                            name: v.name,
+                            fields: struct_fields(context, v.fields),
+                            is_positional: v.is_positional,
+                        }
+                    })
+                    .collect(),
+            )
+        },
+    }
+}
+
+fn struct_fields(context: &mut Context, fields: Vec<(P::Field, P::Type)>) -> Fields<E::Type> {
     let mut field_map = UniqueMap::new();
-    for (idx, (field, pt)) in pfields_vec.into_iter().enumerate() {
+    for (idx, (field, pt)) in fields.into_iter().enumerate() {
         let t = type_(context, pt);
         if let Err((field, old_loc)) = field_map.add(field, (idx, t)) {
             context.env.add_diag(diag!(
                 Declarations::DuplicateItem,
                 (
                     field.loc(),
-                    format!(
-                        "Duplicate definition for field '{}' in struct '{}'",
-                        field, sname
-                    ),
+                    format!("Duplicate definition for field '{}'", field),
                 ),
                 (old_loc, "Field previously defined here"),
             ));
         }
     }
-    E::StructFields::Defined(field_map)
+    field_map
 }
 
 //**************************************************************************************************
@@ -1559,7 +1603,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
     let attributes = flatten_attributes(context, AttributePosition::Function, pattributes);
     let visibility = visibility(pvisibility);
     let (old_aliases, signature) = function_signature(context, psignature);
-    let (acquires, access_specifiers) = if context.env.flags().v2() {
+    let (acquires, access_specifiers) = if context.env.flags().compiler_v2() {
         (vec![], access_specifier_list(context, access_specifiers))
     } else {
         (
@@ -1608,7 +1652,7 @@ fn access_specifier_list_as_acquires(
             Syntax::InvalidAccessSpecifier,
             (
                 loc,
-                "compiler version 1 only supports simple 'acquires <resource_name>' clauses"
+                "language version 1 only supports simple 'acquires <resource_name>' clauses"
                     .to_owned()
             )
         ));
@@ -1649,6 +1693,10 @@ fn access_specifier_list_as_acquires(
                             && check_wildcard(context, second)
                             && check_wildcard(context, third)
                     },
+                    NameAccessChain_::Four(..) => {
+                        invalid_variant_access(context, specifier.loc);
+                        false
+                    },
                 };
                 if ok {
                     if let Some(maccess) = name_access_chain(
@@ -1666,6 +1714,13 @@ fn access_specifier_list_as_acquires(
         }
     }
     acquires
+}
+
+fn invalid_variant_access(context: &mut Context, loc: Loc) {
+    context.env.add_diag(diag!(
+        Syntax::InvalidVariantAccess,
+        (loc, "variant name not expected in this context".to_owned())
+    ));
 }
 
 fn access_specifier(context: &mut Context, specifier: P::AccessSpecifier) -> E::AccessSpecifier {
@@ -1712,6 +1767,10 @@ fn access_specifier_name_access_chain(
     chain: NameAccessChain,
 ) -> (Option<Address>, Option<ModuleName>, Option<Name>) {
     match chain.value {
+        NameAccessChain_::Four(..) => {
+            invalid_variant_access(context, chain.loc);
+            (None, None, None)
+        },
         NameAccessChain_::One(name) if name.value.as_str() == "*" => {
             // A single wildcard means any resource at the specified address, e.g. `*(0x2)`
             (None, None, None)
@@ -1810,7 +1869,8 @@ fn access_specifier_name_access_chain(
 
 fn address_specifier(context: &mut Context, specifier: P::AddressSpecifier) -> E::AddressSpecifier {
     let s = match specifier.value {
-        AddressSpecifier_::Empty | AddressSpecifier_::Any => E::AddressSpecifier_::Any,
+        AddressSpecifier_::Empty => E::AddressSpecifier_::Empty,
+        AddressSpecifier_::Any => E::AddressSpecifier_::Any,
         AddressSpecifier_::Literal(addr) => E::AddressSpecifier_::Literal(addr),
         AddressSpecifier_::Name(name) => E::AddressSpecifier_::Name(name),
         AddressSpecifier_::Call(chain, type_args, name) => {
@@ -1834,6 +1894,7 @@ fn visibility(pvisibility: P::Visibility) -> E::Visibility {
     match pvisibility {
         P::Visibility::Public(loc) => E::Visibility::Public(loc),
         P::Visibility::Script(loc) => E::Visibility::Public(loc),
+        P::Visibility::Package(loc) => E::Visibility::Package(loc),
         P::Visibility::Friend(loc) => E::Visibility::Friend(loc),
         P::Visibility::Internal => E::Visibility::Internal,
     }
@@ -2207,6 +2268,7 @@ enum Access {
     Term,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 enum DeprecatedMemberKind {}
 
@@ -2223,12 +2285,15 @@ fn name_access_chain(
         (Access::ApplyPositional, PN::One(n))
         | (Access::ApplyNamed, PN::One(n))
         | (Access::Type, PN::One(n)) => match context.aliases.member_alias_get(&n) {
-            Some((mident, mem)) => EN::ModuleAccess(mident, mem),
-            None => EN::Name(n),
+            Some((mident, mem)) => EN::ModuleAccess(mident, mem, None),
+            None => {
+                // left unresolved
+                EN::Name(n)
+            },
         },
         (Access::Term, PN::One(n)) if is_valid_struct_constant_or_schema_name(n.value.as_str()) => {
             match context.aliases.member_alias_get(&n) {
-                Some((mident, mem)) => EN::ModuleAccess(mident, mem),
+                Some((mident, mem)) => EN::ModuleAccess(mident, mem, None),
                 None => EN::Name(n),
             }
         },
@@ -2239,27 +2304,56 @@ fn name_access_chain(
                 .add_diag(unexpected_address_module_error(loc, nloc, access));
             return None;
         },
-
-        (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => match context.aliases.module_alias_get(&n1) {
-            None => {
+        (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => {
+            if let Some((mident, mem)) = context.aliases.member_alias_get(&n1).filter(|_| {
+                context.env.flags().lang_v2()
+                    && is_valid_struct_constant_or_schema_name(n1.value.as_str())
+                    && is_valid_struct_constant_or_schema_name(n2.value.as_str())
+            }) {
+                // n1 is interpreted as a type and n2 as a variant in the type
+                EN::ModuleAccess(mident, mem, Some(n2))
+            } else if let Some(mident) = context.aliases.module_alias_get(&n1) {
+                // n1 is interpreted as a module and n2 as type.
+                EN::ModuleAccess(mident, n2, None)
+            } else {
                 context.env.add_diag(diag!(
                     NameResolution::UnboundModule,
-                    (n1.loc, format!("Unbound module alias '{}'", n1))
+                    (n1.loc, format!("Unbound module or type alias '{}'", n1))
                 ));
                 return None;
-            },
-            Some(mident) => EN::ModuleAccess(mident, n2),
+            }
         },
         (_, PN::Three(sp!(ident_loc, (ln, n2)), n3)) => {
+            let default_interpretation = |context: &mut Context| {
+                let addr = address(context, /* suggest_declaration */ false, ln);
+                let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
+                EN::ModuleAccess(mident, n3, None)
+            };
+            match &ln.value {
+                LeadingNameAccess_::Name(n1)
+                    if is_valid_struct_constant_or_schema_name(n2.value.as_str()) =>
+                {
+                    // Attempt to interpret n1 as module alias. This is for
+                    // reaching struct variants as in `module::Struct::Variant`.
+                    if let Some(mident) = context.aliases.module_alias_get(n1) {
+                        EN::ModuleAccess(mident, n2, Some(n3))
+                    } else {
+                        default_interpretation(context)
+                    }
+                },
+                _ => default_interpretation(context),
+            }
+        },
+        (_, PN::Four(sp!(ident_loc, (ln, n2)), n3, n4)) => {
             let addr = address(context, /* suggest_declaration */ false, ln);
             let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
-            EN::ModuleAccess(mident, n3)
+            EN::ModuleAccess(mident, n3, Some(n4))
         },
     };
 
     if let Some(deprecated_item_kind) = deprecated_item_kind {
         match &tn_ {
-            EN::ModuleAccess(mident, n) => {
+            EN::ModuleAccess(mident, n, _) => {
                 check_for_deprecated_member_use(context, Some(mident), n, deprecated_item_kind);
             },
             EN::Name(n) => {
@@ -2297,7 +2391,7 @@ fn name_access_chain_to_module_ident(
             };
             Some(module_ident(context, sp(loc, pmident_)))
         },
-        PN::Three(sp!(ident_loc, (ln, n)), mem) => {
+        PN::Three(sp!(ident_loc, (ln, n)), mem) | PN::Four(sp!(ident_loc, (ln, n)), mem, _) => {
             // Process the module ident just for errors
             let pmident_ = P::ModuleIdent_ {
                 address: ln,
@@ -2420,7 +2514,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Move(v) => EE::Move(v),
         PE::Copy(v) => EE::Copy(v),
-        PE::Name(_pn, Some(_ty)) if !context.in_spec_context => {
+        PE::Name(_pn, Some(_ty)) if !context.in_spec_context && !context.env.flags().lang_v2() => {
             context.env.add_diag(diag!(
                 Syntax::SpecContextRestricted,
                 (
@@ -2502,14 +2596,29 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             };
             EE::IfElse(eb, et, ef)
         },
+        PE::Match(pd, parms) => {
+            let discriminator = exp(context, *pd);
+            let match_arms = parms
+                .into_iter()
+                .map(|parm| {
+                    let loc = parm.loc;
+                    let (pbl, pc, pb) = parm.value;
+                    let bind_list = bind_list(context, pbl).expect("bind list always present");
+                    let opt_cond = pc.map(|e| *exp(context, e));
+                    let body = *exp(context, pb);
+                    sp(loc, (bind_list, opt_cond, body))
+                })
+                .collect::<Vec<_>>();
+            EE::Match(discriminator, match_arms)
+        },
         PE::While(pb, ploop) => EE::While(exp(context, *pb), exp(context, *ploop)),
         PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
         PE::Lambda(pbs, pe) => {
-            let bs_opt = bind_list(context, pbs);
+            let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
-            match bs_opt {
-                Some(bs) => EE::Lambda(bs, Box::new(e)),
+            match tbs_opt {
+                Some(tbs) => EE::Lambda(tbs, Box::new(e)),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -2545,7 +2654,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::ExpList(exps(context, pes))
         },
 
-        PE::Assign(lvalue, rhs) => {
+        PE::Assign(lvalue, op_opt, rhs) => {
             let l_opt = lvalues(context, *lvalue);
             let er = exp(context, *rhs);
             match l_opt {
@@ -2553,9 +2662,101 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
                 },
-                Some(LValue::Assigns(al)) => EE::Assign(al, er),
-                Some(LValue::Mutate(el)) => EE::Mutate(el, er),
-                Some(LValue::FieldMutate(edotted)) => EE::FieldMutate(edotted, er),
+                Some(LValue::Assigns(al)) => match op_opt {
+                    Some(op) => {
+                        if al.value.len() == 1 {
+                            match &al.value[0] {
+                                // x += e (similarly for other binary operators)
+                                // =>
+                                // { let t = e; x = x + t; }
+                                sp!(var_loc, LValue_::Var(module_access, ty_opt)) => {
+                                    let x = sp(
+                                        *var_loc,
+                                        EE::Name(module_access.clone(), ty_opt.clone()),
+                                    );
+                                    // t, let t = e;
+                                    let (t, bind) =
+                                        let_symbol_eq_exp(er.loc, Symbol::from("$t"), *er);
+                                    // x + t;
+                                    let rhs_expanded =
+                                        sp(loc, EE::BinopExp(Box::new(x), op, Box::new(t)));
+                                    // x = x + t;
+                                    let assign = sp(loc, EE::Assign(al, Box::new(rhs_expanded)));
+                                    // { let t = e; x = x + t; }
+                                    let sequence =
+                                        VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
+                                    EE::Block(sequence)
+                                },
+                                _ => {
+                                    context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
+                                    EE::UnresolvedError
+                                },
+                            }
+                        } else {
+                            context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
+                            EE::UnresolvedError
+                        }
+                    },
+                    None => EE::Assign(al, er),
+                },
+                Some(LValue::Mutate(el)) => {
+                    match op_opt {
+                        // *e1 += e2
+                        // =>
+                        // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
+                        Some(op) => {
+                            // t2, let t2 = e2;
+                            let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
+                            // t1, let t1 = e1;
+                            let (tmp1, bind1) =
+                                let_symbol_eq_exp(el.loc, Symbol::from("$t1"), match &el.value {
+                                    EE::Index(..) => sp(el.loc, EE::Borrow(true, el)),
+                                    _ => *el,
+                                });
+                            // *t1
+                            let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
+                            // *t1 + t2
+                            let rhs_expanded =
+                                sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
+                            // *t1 = *t1 + t2
+                            let assign =
+                                sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
+                            // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
+                            let sequence =
+                                VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
+                            EE::Block(sequence)
+                        },
+                        None => EE::Mutate(el, er),
+                    }
+                },
+                Some(LValue::FieldMutate(edotted)) => match op_opt {
+                    // e1.f += e2
+                    // =>
+                    // { let t2 = e2; let t1 = &mut e1.f; *t1 = *t1 + t2 }
+                    Some(op) => {
+                        let lhs_loc = edotted.loc;
+                        // t2, let t2 = e2;
+                        let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
+                        // e1.f
+                        let e = sp(lhs_loc, EE::ExpDotted(edotted));
+                        // &mut e1.f
+                        let e_mut = sp(lhs_loc, EE::Borrow(true, Box::new(e)));
+                        // t1, let t1 = &mut e1.f;
+                        let (tmp1, bind1) = let_symbol_eq_exp(lhs_loc, Symbol::from("$t1"), e_mut);
+                        // *t1
+                        let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
+                        // *t1 + t2
+                        let rhs_expanded =
+                            sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
+                        // *t1 = *t1 + t2
+                        let assign = sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
+                        // { let t2 = e2; let t1 = &mut e1.f; *t1 = *t1 + t2 }
+                        let sequence =
+                            VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
+                        EE::Block(sequence)
+                    },
+                    None => EE::FieldMutate(edotted, er),
+                },
             }
         },
         PE::Return(pe_opt) => {
@@ -2593,14 +2794,26 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             },
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
+        PE::Test(e, tys) => EE::Test(
+            exp(context, *e),
+            tys.into_iter().map(|ty| type_(context, ty)).collect(),
+        ),
         PE::Index(e, i) => {
-            if context.in_spec_context {
+            if context.env.flags().lang_v2() || context.in_spec_context {
                 EE::Index(exp(context, *e), exp(context, *i))
             } else {
-                let msg = "`_[_]` index operator only allowed in specifications";
-                context
-                    .env
-                    .add_diag(diag!(Syntax::SpecContextRestricted, (loc, msg)));
+                // If it is a name, call `name_access_chain` to avoid
+                // the unused alias warning
+                if let PE::Name(pn, _) = e.value {
+                    let _ = name_access_chain(context, Access::Term, pn, None);
+                }
+                context.env.add_diag(diag!(
+                    Syntax::UnsupportedLanguageItem,
+                    (
+                        loc,
+                        "`_[_]` index operator in non-specification code only allowed in Move 2 and beyond"
+                    )
+                ));
                 EE::UnresolvedError
             }
         },
@@ -2765,6 +2978,24 @@ fn fields<T>(
 // LValues
 //**************************************************************************************************
 
+fn typed_bind_list(
+    context: &mut Context,
+    sp!(loc, pbs_): P::TypedBindList,
+) -> Option<E::TypedLValueList> {
+    let bs_: Option<Vec<E::TypedLValue>> = pbs_
+        .into_iter()
+        .map(|tpb| typed_bind(context, tpb))
+        .collect();
+    Some(sp(loc, bs_?))
+}
+
+fn typed_bind(context: &mut Context, sp!(loc, tpb_): P::TypedBind) -> Option<E::TypedLValue> {
+    let P::TypedBind_(pb, opt_type) = tpb_;
+    let b = bind(context, pb)?;
+    let ot = opt_type.map(|ty| type_(context, ty));
+    Some(sp(loc, E::TypedLValue_(b, ot)))
+}
+
 fn bind_list(context: &mut Context, sp!(loc, pbs_): P::BindList) -> Option<E::LValueList> {
     let bs_: Option<Vec<E::LValue>> = pbs_.into_iter().map(|pb| bind(context, pb)).collect();
     Some(sp(loc, bs_?))
@@ -2790,8 +3021,20 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
     use P::Bind_ as PB;
     let b_ = match pb_ {
         PB::Var(v) => {
-            check_valid_local_name(context, &v);
-            EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+            if context.env.flags().lang_v2()
+                && is_valid_struct_constant_or_schema_name(v.value().as_str())
+            {
+                // Interpret as an unqualified module access
+                EL::Unpack(
+                    sp(v.loc(), ModuleAccess_::Name(v.0)),
+                    None,
+                    Fields::new(),
+                    None,
+                )
+            } else {
+                check_valid_local_name(context, &v);
+                EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+            }
         },
         PB::Unpack(ptn, ptys_opt, pfields) => {
             // check for type use
@@ -2802,12 +3045,62 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 Some(DeprecatedItem::Struct),
             )?;
             let tys_opt = optional_types(context, ptys_opt);
-            let vfields: Option<Vec<(Field, E::LValue)>> = pfields
+            let mut dotdot = None;
+            let mut vfields = vec![];
+            for (i, pfield) in pfields.iter().enumerate() {
+                match &pfield.value {
+                    P::BindFieldOrDotDot_::FieldBind(field, pbind) => {
+                        let lval = bind(context, pbind.clone())?;
+                        vfields.push((*field, lval));
+                    },
+                    P::BindFieldOrDotDot_::DotDot => {
+                        if i != pfields.len() - 1 {
+                            context.env.add_diag(diag!(
+                                Syntax::UnexpectedToken,
+                                (pfield.loc, "`..` must be at the end in a named field list")
+                            ));
+                        } else {
+                            dotdot = Some(sp(pfield.loc, E::DotDot_));
+                        }
+                    },
+                }
+            }
+            let fields = fields(context, loc, "deconstruction binding", "binding", vfields);
+            EL::Unpack(tn, tys_opt, fields, dotdot)
+        },
+        PB::PositionalUnpack(ptn, ptys_opt, pargs) => {
+            let tn = name_access_chain(
+                context,
+                Access::ApplyPositional,
+                *ptn,
+                Some(DeprecatedItem::Struct),
+            )?;
+            let tys_opt = optional_types(context, ptys_opt);
+            let mut dot_seen = false;
+            let fields: Option<Vec<E::LValueOrDotDot>> = pargs
                 .into_iter()
-                .map(|(f, pb)| Some((f, bind(context, pb)?)))
+                .map(|pb_or_dotdot| {
+                    let sp!(loc, pb_or_dotdot_) = pb_or_dotdot;
+                    match pb_or_dotdot_ {
+                        P::BindOrDotDot_::Bind(pb) => {
+                            bind(context, pb).map(|b| sp(b.loc, LValueOrDotDot_::LValue(b)))
+                        },
+                        P::BindOrDotDot_::DotDot => {
+                            if dot_seen {
+                                context.env.add_diag(diag!(
+                                    Syntax::UnexpectedToken,
+                                    (loc, "there can be at most one `..` per struct or variant pattern")
+                                ));
+                                None
+                            } else {
+                                dot_seen = true;
+                                Some(sp(loc, LValueOrDotDot_::DotDot))
+                            }
+                        },
+                    }
+                })
                 .collect();
-            let fields = fields(context, loc, "deconstruction binding", "binding", vfields?);
-            EL::Unpack(tn, tys_opt, fields)
+            EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
         },
     };
     Some(sp(loc, b_))
@@ -2828,6 +3121,10 @@ fn lvalues(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<LValue> {
             let al_opt: Option<E::LValueList_> =
                 pes.into_iter().map(|pe| assign(context, pe)).collect();
             L::Assigns(sp(loc, al_opt?))
+        },
+        PE::Index(_, _) if context.env.flags().lang_v2() => {
+            let er = exp(context, sp(loc, e_));
+            L::Mutate(er)
         },
         PE::Dereference(pr) => {
             let er = exp(context, *pr);
@@ -2864,6 +3161,10 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
 
             return None;
         },
+        PE::Name(sp!(_, P::NameAccessChain_::Four(_, _, _)), _) => {
+            invalid_variant_access(context, loc);
+            return None;
+        },
         PE::Name(n, Some(_)) if !context.in_spec_context => {
             let msg = format!(
                 "Unexpected assignment of instantiated type without fields outside of a spec \
@@ -2882,7 +3183,7 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
         PE::Name(pn, ptys_opt) => {
             let en = name_access_chain(context, Access::Term, pn, Some(DeprecatedItem::Struct))?;
             match &en.value {
-                E::ModuleAccess_::ModuleAccess(m, n) if !context.in_spec_context => {
+                E::ModuleAccess_::ModuleAccess(m, n, _) if !context.in_spec_context => {
                     let msg = format!(
                         "Unexpected assignment of module access without fields outside of a spec \
                          context.\nIf you are trying to unpack a struct, try adding fields, e.g. \
@@ -2909,7 +3210,9 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
             )?;
             let tys_opt = optional_types(context, ptys_opt);
             let efields = assign_unpack_fields(context, loc, pfields)?;
-            EL::Unpack(en, tys_opt, efields)
+            // we have not implemented .. in the LHS of an assignment
+            // and the `pfields` doesn't have a `..` in it, so we use `None` here
+            EL::Unpack(en, tys_opt, efields, None)
         },
         _ => {
             context.env.add_diag(diag!(
@@ -3021,6 +3324,16 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound_names_exp(unbound, et);
             unbound_names_exp(unbound, econd)
         },
+        EE::Match(ed, arms) => {
+            unbound_names_exp(unbound, ed);
+            for arm in arms {
+                unbound_names_binds(unbound, &arm.value.0);
+                if let Some(c) = &arm.value.1 {
+                    unbound_names_exp(unbound, c)
+                }
+                unbound_names_exp(unbound, &arm.value.2)
+            }
+        },
         EE::While(econd, eloop) => {
             unbound_names_exp(unbound, eloop);
             unbound_names_exp(unbound, econd)
@@ -3031,7 +3344,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Lambda(ls, er) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
-            unbound_names_binds(unbound, ls);
+            unbound_names_typed_binds(unbound, ls);
         },
         EE::Quant(_, rs, trs, cr_opt, er) => {
             unbound_names_exp(unbound, er);
@@ -3055,6 +3368,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         | EE::UnaryExp(_, e)
         | EE::Borrow(_, e)
         | EE::Cast(e, _)
+        | EE::Test(e, _)
         | EE::Annotate(e, _) => unbound_names_exp(unbound, e),
         EE::FieldMutate(ed, er) => {
             unbound_names_exp(unbound, er);
@@ -3107,6 +3421,12 @@ fn unbound_names_binds(unbound: &mut UnboundNames, sp!(_, ls_): &E::LValueList) 
         .for_each(|l| unbound_names_bind(unbound, l))
 }
 
+fn unbound_names_typed_binds(unbound: &mut UnboundNames, sp!(_, ls_): &E::TypedLValueList) {
+    ls_.iter()
+        .rev()
+        .for_each(|sp!(_loc, E::TypedLValue_(l, _opt_ty))| unbound_names_bind(unbound, l))
+}
+
 fn unbound_names_binds_with_range(
     unbound: &mut UnboundNames,
     sp!(_, rs_): &E::LValueWithRangeList,
@@ -3127,9 +3447,24 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Var(sp!(_, E::ModuleAccess_::ModuleAccess(..)), _) => {
             // Qualified vars are not considered in unbound set.
         },
-        EL::Unpack(_, _, efields) => efields
+        EL::Unpack(_, _, efields, _hasdotdot) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_bind(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => {
+            let loc = ls.loc;
+            let ls = ls
+                .value
+                .iter()
+                .filter_map(|l| {
+                    if let sp!(_, LValueOrDotDot_::LValue(l)) = l {
+                        Some(l.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            unbound_names_binds(unbound, &sp(loc, ls))
+        },
     }
 }
 
@@ -3148,9 +3483,24 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Var(sp!(_, E::ModuleAccess_::ModuleAccess(..)), _) => {
             // Qualified vars are not considered in unbound set.
         },
-        EL::Unpack(_, _, efields) => efields
+        EL::Unpack(_, _, efields, _) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_assign(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => {
+            let loc = ls.loc;
+            let ls = ls
+                .value
+                .iter()
+                .filter_map(|l| {
+                    if let sp!(_, LValueOrDotDot_::LValue(l)) = l {
+                        Some(l.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            unbound_names_assigns(unbound, &sp(loc, ls))
+        },
     }
 }
 
@@ -3404,4 +3754,24 @@ fn restricted_name_error(case: NameCase, loc: Loc, restricted: &str) -> Diagnost
         restricted = restricted,
     );
     diag!(NameResolution::ReservedName, (loc, msg))
+}
+
+//**************************************************************************************************
+// Utility functions
+//**************************************************************************************************
+
+/// Returns expansion expressions `(t, let t = e)` where `t` is a variable named `symbol`
+fn let_symbol_eq_exp(loc: Loc, symbol: Symbol, e: E::Exp) -> (E::Exp, E::SequenceItem) {
+    // t
+    let tmp_name = sp(loc, symbol);
+    let mod_acc = ModuleAccess_::Name(tmp_name);
+    let tmp_ = E::Exp_::Name(sp(loc, mod_acc.clone()), None);
+    let tmp = sp(loc, tmp_);
+    // let t = e;
+    let lval_ = LValue_::Var(sp(loc, mod_acc), None);
+    let lval = sp(loc, lval_);
+    let lvals = sp(loc, vec![lval]);
+    let bind_ = SequenceItem_::Bind(lvals, e);
+    let bind = sp(loc, bind_);
+    (tmp, bind)
 }

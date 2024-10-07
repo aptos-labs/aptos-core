@@ -1,30 +1,27 @@
 
 Diagnostics:
-error: same mutable reference in value is also used in other value in argument list
+error: cannot transfer mutable value since it is borrowed
   ┌─ tests/reference-safety/multiple_use_invalid.move:5:9
   │
 5 │         s(&mut s.x, &mut s.x)
   │         ^^^^^^^^^^^^^^^^^^^^^
-  │         │ │         │
-  │         │ │         previous mutable field borrow
-  │         │ previous mutable field borrow
-  │         requirement enforced here
+  │         │ │
+  │         │ previously mutably borrowed here
+  │         transfer attempted here
 
-error: same mutable reference in local `r` is also used in other local `x` in argument list
+error: cannot transfer mutable local `r` since it is borrowed
    ┌─ tests/reference-safety/multiple_use_invalid.move:11:9
    │
- 9 │         let r = &mut s.x;
-   │                 -------- previous mutable field borrow
 10 │         let x = r;
+   │                 - previously mutably borrowed here
 11 │         s(r, x)
-   │         ^^^^^^^ requirement enforced here
+   │         ^^^^^^^ transfer attempted here
 
-error: same mutable reference in local `r1` is also used in other local `r2` in argument list
+error: cannot transfer mutable local `r2` since it is borrowed
    ┌─ tests/reference-safety/multiple_use_invalid.move:20:9
    │
 18 │         let r1 = &mut x;
-   │                  ------ previous mutable local borrow
+   │                  ------ previously mutably borrowed here
 19 │         let r2 = &mut x;
-   │                  ------ previous mutable local borrow
 20 │         s(r1, r2)
-   │         ^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^ transfer attempted here

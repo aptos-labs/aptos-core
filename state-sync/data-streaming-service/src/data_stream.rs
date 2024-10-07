@@ -228,8 +228,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         }
 
         self.notifications_to_responses
-            .get(notification_id)
-            .is_some()
+            .contains_key(notification_id)
     }
 
     /// Notifies the Aptos data client of a bad client response
@@ -838,16 +837,6 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 .ok_or_else(|| {
                     Error::IntegerOverflow("Number of entries to remove has overflown!".into())
                 })?;
-
-            debug!(
-                (LogSchema::new(LogEntry::StreamNotification)
-                    .stream_id(self.data_stream_id)
-                    .event(LogEvent::Success)
-                    .message(&format!(
-                        "Garbage collecting {:?} items from the notification response map.",
-                        num_entries_to_remove
-                    )))
-            );
 
             // Collect all the keys that need to removed. Note: BTreeMap keys
             // are sorted, so we'll remove the lowest notification IDs. These

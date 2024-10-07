@@ -63,3 +63,35 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+
+Diagnostics:
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign_loop.move:4:24
+  │
+4 │         loop { let y = move x + 1; x = 0; y; }
+  │                        ^^^^^^
+
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign_loop.move:9:24
+  │
+9 │         loop { let y = x + 1; if (cond) { continue }; x = 0; y; }
+  │                        ^^^^^
+
+error: use of possibly unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_loop.move:14:24
+   │
+14 │         loop { let y = &x; _ = move y; x = 0 }
+   │                        ^^
+
+error: use of unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_loop.move:19:24
+   │
+19 │         loop { let y = &x; _ = move y; if (cond) { x = 0 }; break };
+   │                        ^^
+
+error: use of possibly unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_loop.move:20:9
+   │
+20 │         x;
+   │         ^

@@ -10,13 +10,18 @@ use crate::{
         storage::PeersAndMetadata,
     },
     peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
+        ConnectionNotification, ConnectionRequestSender, PeerManagerRequest,
         PeerManagerRequestSender,
     },
     protocols::{
-        network::{Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::{ProtocolId, ProtocolIdSet},
+        network::{
+            Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender,
+            ReceivedMessage,
+        },
+        wire::{
+            handshake::v1::{ProtocolId, ProtocolIdSet},
+            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        },
     },
     transport::ConnectionMetadata,
 };
@@ -27,7 +32,6 @@ use aptos_config::{
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
-use futures::channel::oneshot;
 use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
@@ -39,7 +43,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 
 // Useful test constants for timeouts
 const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
@@ -390,8 +394,13 @@ fn test_peers_and_metadata_caching() {
     );
 
     // Update the peer metadata for peer 1
-    let peer_monitoring_metadata =
-        PeerMonitoringMetadata::new(Some(1010101.0), None, None, Some("Internal string".into()));
+    let peer_monitoring_metadata = PeerMonitoringMetadata::new(
+        Some(1010101.0),
+        None,
+        None,
+        None,
+        Some("Internal string".into()),
+    );
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata.clone())
         .unwrap();
@@ -425,6 +434,110 @@ fn test_peers_and_metadata_caching() {
         PeerSet::new(),
         expected_peers_and_metadata.clone(),
     );
+}
+
+#[tokio::test]
+async fn test_peers_and_metadata_subscriptions() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    let mut connection_events = peers_and_metadata.subscribe();
+
+    match connection_events.try_recv() {
+        Ok(unwanted_event) => {
+            panic!(
+                "connection_events should be empty but got {:?}",
+                unwanted_event,
+            )
+        },
+        Err(tre) => match tre {
+            TryRecvError::Empty => {
+                // ok
+            },
+            TryRecvError::Disconnected => {
+                panic!("connection_events disconnected early")
+            },
+        },
+    }
+
+    let (peer_network_id_1, connection_1) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+    match tokio::time::timeout(Duration::from_secs(1), connection_events.recv()).await {
+        Ok(msg) => match msg {
+            None => {
+                panic!("no pending connection event")
+            },
+            Some(notif) => match notif {
+                ConnectionNotification::NewPeer(conn_meta, network_id) => {
+                    assert_eq!(network_id, NetworkId::Validator);
+                    assert_eq!(conn_meta, connection_1);
+                },
+                ConnectionNotification::LostPeer(_, _) => {
+                    panic!("should get connect but got lost")
+                },
+            },
+        },
+        Err(te) => {
+            panic!("timeout waiting for connection event: {:?}", te);
+        },
+    }
+
+    // new subscripton should immediately get notified of existing connection
+    let mut sub2 = peers_and_metadata.subscribe();
+    match sub2.try_recv() {
+        Ok(notif) => match notif {
+            ConnectionNotification::NewPeer(conn_meta, network_id) => {
+                assert_eq!(network_id, NetworkId::Validator);
+                assert_eq!(conn_meta, connection_1);
+            },
+            ConnectionNotification::LostPeer(_, _) => {
+                panic!("should get connect but got lost");
+            },
+        },
+        Err(_) => {
+            panic!("should have pending NewPeer");
+        },
+    }
+    // but not more than that
+    match sub2.try_recv() {
+        Ok(unwanted_event) => {
+            panic!(
+                "connection_events should be empty but got {:?}",
+                unwanted_event,
+            )
+        },
+        Err(tre) => match tre {
+            TryRecvError::Empty => {
+                // ok
+            },
+            TryRecvError::Disconnected => {
+                panic!("connection_events disconnected early")
+            },
+        },
+    }
+    sub2.close();
+
+    peers_and_metadata
+        .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
+        .unwrap();
+    match connection_events.try_recv() {
+        Ok(notif) => match notif {
+            ConnectionNotification::NewPeer(_, _) => {
+                panic!("expecting lost but got new")
+            },
+            ConnectionNotification::LostPeer(conn_meta, network_id) => {
+                assert_eq!(network_id, NetworkId::Validator);
+                assert_eq!(conn_meta, connection_1);
+            },
+        },
+        Err(_tre) => {
+            panic!("no pending connection event")
+        },
+    }
 }
 
 #[test]
@@ -579,7 +692,7 @@ async fn test_network_client_missing_network_sender() {
 
     // Verify that sending a message to all peers without a network simply logs the errors
     network_client
-        .send_to_peers(DummyMessage::new_empty(), &[bad_peer_network_id])
+        .send_to_peers(DummyMessage::new_empty(), vec![bad_peer_network_id])
         .unwrap();
 }
 
@@ -711,7 +824,7 @@ async fn test_network_client_network_senders_direct_send() {
     // Verify that broadcast messages are sent on matching networks and protocols
     let dummy_message = DummyMessage::new(2323);
     network_client
-        .send_to_peers(dummy_message.clone(), &[
+        .send_to_peers(dummy_message.clone(), vec![
             peer_network_id_1,
             peer_network_id_2,
         ])
@@ -902,7 +1015,7 @@ fn create_network_sender_and_events(
     HashMap<NetworkId, NetworkSender<DummyMessage>>,
     NetworkServiceEvents<DummyMessage>,
     HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
-    HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 ) {
     let mut network_senders = HashMap::new();
     let mut network_and_events = HashMap::new();
@@ -914,15 +1027,13 @@ fn create_network_sender_and_events(
         let (inbound_request_sender, inbound_request_receiver) = create_aptos_channel();
         let (outbound_request_sender, outbound_request_receiver) = create_aptos_channel();
         let (connection_outbound_sender, _connection_outbound_receiver) = create_aptos_channel();
-        let (_connection_inbound_sender, connection_inbound_receiver) = create_aptos_channel();
 
         // Create the network sender and events
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(outbound_request_sender),
             ConnectionRequestSender::new(connection_outbound_sender),
         );
-        let network_events =
-            NetworkEvents::new(inbound_request_receiver, connection_inbound_receiver, None);
+        let network_events = NetworkEvents::new(inbound_request_receiver, None, true);
 
         // Save the sender, events and receivers
         network_senders.insert(*network_id, network_sender);
@@ -1071,7 +1182,7 @@ async fn wait_for_network_event(
     >,
     inbound_request_senders: &mut HashMap<
         NetworkId,
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     >,
     network_events: &mut NetworkEvents<DummyMessage>,
     is_rpc_request: bool,
@@ -1099,12 +1210,18 @@ async fn wait_for_network_event(
                     assert_eq!(outbound_rpc_request.timeout, message_wait_time);
 
                     // Create and return the peer manager notification
-                    let inbound_rpc_request = InboundRpcRequest {
-                        protocol_id: outbound_rpc_request.protocol_id,
-                        data: outbound_rpc_request.data,
-                        res_tx: oneshot::channel().0,
+                    let rmsg = ReceivedMessage {
+                        message: NetworkMessage::RpcRequest(RpcRequest{
+                            protocol_id: outbound_rpc_request.protocol_id,
+                            request_id: 0,
+                            priority: 0,
+                            raw_request: outbound_rpc_request.data.into(),
+                        }),
+                        sender: PeerNetworkId::new(expected_network_id, peer_id),
+                        receive_timestamp_micros: 0,
+                        rpc_replier: Some(Arc::new(outbound_rpc_request.res_tx)),
                     };
-                    (outbound_rpc_request.protocol_id, PeerManagerNotification::RecvRpc(peer_id, inbound_rpc_request))
+                    (outbound_rpc_request.protocol_id, rmsg)
                 }
                 PeerManagerRequest::SendDirectSend(peer_id, message) => {
                     // Verify the request is correct
@@ -1113,7 +1230,17 @@ async fn wait_for_network_event(
                     assert_eq!(Some(message.protocol_id), expected_direct_send_protocol_id);
 
                     // Create and return the peer manager notification
-                    (message.protocol_id, PeerManagerNotification::RecvMessage(peer_id, message))
+                    let rmsg = ReceivedMessage {
+                        message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                            protocol_id: message.protocol_id,
+                            priority: 0,
+                            raw_msg: message.mdata.into(),
+                        }),
+                        sender: PeerNetworkId::new(expected_network_id, peer_id),
+                        receive_timestamp_micros: 0,
+                        rpc_replier: None,
+                    };
+                    (message.protocol_id, rmsg)
                 }
             };
 
@@ -1142,7 +1269,6 @@ async fn wait_for_network_event(
                 assert_eq!(dummy_message, expected_dummy_message);
                 assert_eq!(Some(protocol_id), expected_rpc_protocol_id);
             },
-            _ => panic!("Invalid dummy event found: {:?}", dummy_event),
         },
         Err(elapsed) => panic!(
             "Timed out while waiting to receive a message on the network events receiver. Elapsed: {:?}",

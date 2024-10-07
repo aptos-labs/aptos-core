@@ -32,7 +32,7 @@ use crate::{
     monitor,
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -330,7 +330,7 @@ pub struct DagBootstrapper {
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     proof_notifier: Arc<dyn ProofNotifier>,
     time_service: aptos_time_service::TimeService,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
     execution_client: Arc<dyn TExecutionClient>,
@@ -355,7 +355,7 @@ impl DagBootstrapper {
         dag_network_sender: Arc<dyn TDAGNetworkSender>,
         proof_notifier: Arc<dyn ProofNotifier>,
         time_service: aptos_time_service::TimeService,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         execution_client: Arc<dyn TExecutionClient>,
@@ -432,7 +432,12 @@ impl DagBootstrapper {
             .epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
-            .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
+            .map(|p| {
+                self.epoch_state
+                    .verifier
+                    .get_voting_power(&p)
+                    .expect("No voting power associated with AccountAddress!")
+            })
             .collect();
 
         Arc::new(LeaderReputationAdapter::new(
@@ -566,6 +571,7 @@ impl DagBootstrapper {
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let rb = Arc::new(ReliableBroadcast::new(
+            self.self_peer,
             validators.clone(),
             self.rb_network_sender.clone(),
             rb_backoff_policy,
@@ -620,6 +626,8 @@ impl DagBootstrapper {
                     .health_config
                     .pipeline_backpressure_config
                     .clone(),
+                // TODO: add pipeline backpressure based on execution speed to DAG config
+                None,
             ),
             ordered_notifier.clone(),
         );
@@ -730,7 +738,7 @@ pub(super) fn bootstrap_dag_for_test(
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     proof_notifier: Arc<dyn ProofNotifier>,
     time_service: aptos_time_service::TimeService,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     execution_client: Arc<dyn TExecutionClient>,
 ) -> (

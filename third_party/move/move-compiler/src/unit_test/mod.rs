@@ -48,12 +48,19 @@ pub enum ExpectedFailure {
     ExpectedWithError(ExpectedMoveError),
 }
 
-#[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq)]
 pub struct ExpectedMoveError(
     pub StatusCode,
     pub Option<u64>,
     pub move_binary_format::errors::Location,
+    pub Option<String>,
 );
+
+impl PartialEq for ExpectedMoveError {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1 && self.2 == other.2
+    }
+}
 
 pub struct ExpectedMoveErrorDisplay<'a> {
     error: &'a ExpectedMoveError,
@@ -119,7 +126,7 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use move_binary_format::errors::Location;
         let Self {
-            error: ExpectedMoveError(status, sub_status, location),
+            error: ExpectedMoveError(status, sub_status, location, msg),
             is_past_tense,
         } = self;
         let status_val: u64 = (*status).into();
@@ -147,6 +154,11 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
         } else if let Some(code) = sub_status {
             write!(f, " with sub-status {code}")?
         };
+        if let Some(msg) = msg {
+            if status != &StatusCode::ABORTED {
+                write!(f, " with error message: \"{}\". Error", msg)?;
+            }
+        }
         if status != &StatusCode::OUT_OF_GAS {
             write!(f, " originating")?;
         }

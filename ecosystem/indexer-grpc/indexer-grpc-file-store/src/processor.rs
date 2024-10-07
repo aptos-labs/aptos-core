@@ -18,6 +18,7 @@ use tracing::debug;
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 const SERVICE_TYPE: &str = "file_worker";
+const MAX_CONCURRENT_BATCHES: usize = 50;
 
 /// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
@@ -34,7 +35,7 @@ impl Processor {
         enable_cache_compression: bool,
     ) -> Result<Self> {
         let cache_storage_format = if enable_cache_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::Base64UncompressedProto
         };
@@ -132,8 +133,10 @@ impl Processor {
             while start_version + (FILE_ENTRY_TRANSACTION_COUNT) < cache_worker_latest {
                 batches.push(start_version);
                 start_version += FILE_ENTRY_TRANSACTION_COUNT;
+                if batches.len() >= MAX_CONCURRENT_BATCHES {
+                    break;
+                }
             }
-
             // we're too close to the head
             if batches.is_empty() {
                 debug!(
@@ -150,6 +153,7 @@ impl Processor {
 
             // Create thread and fetch transactions
             let mut tasks = vec![];
+
             for start_version in batches {
                 let mut cache_operator_clone = self.cache_operator.clone();
                 let mut file_store_operator_clone = self.file_store_operator.clone_box();
@@ -172,7 +176,9 @@ impl Processor {
                         Some(FILE_ENTRY_TRANSACTION_COUNT as i64),
                         None,
                     );
-
+                    for (i, txn) in transactions.iter().enumerate() {
+                        assert_eq!(txn.version, start_version + i as u64);
+                    }
                     let upload_start_time = std::time::Instant::now();
                     let (start, end) = file_store_operator_clone
                         .upload_transaction_batch(chain_id, transactions)

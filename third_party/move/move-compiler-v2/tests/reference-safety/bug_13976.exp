@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: cannot transfer mutable value since it is borrowed
+   ┌─ tests/reference-safety/bug_13976.move:12:13
+   │
+11 │ ╭         lifted_lambda(&mut a,
+   │                         ------ previously mutably borrowed here
+12 │ │             lifted_lambda(&mut a, z))
+   │ │             ^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+   │ ╰─────────────────────────────────────' conflicting reference used here

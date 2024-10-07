@@ -2,22 +2,23 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, format_err, Error, Result};
+use anyhow::{anyhow, bail, format_err, Error, Result};
 use clap::Parser;
 use colored::*;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
     file_format::{
-        Ability, AbilitySet, Bytecode, CodeUnit, FieldHandleIndex, FunctionDefinition,
+        Ability, AbilitySet, Bytecode, CodeUnit, FieldDefinition, FunctionDefinition,
         FunctionDefinitionIndex, FunctionHandle, ModuleHandle, Signature, SignatureIndex,
         SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructTypeParameter, TableIndex, TypeSignature, Visibility,
+        StructTypeParameter, StructVariantHandleIndex, TableIndex, VariantIndex, Visibility,
     },
+    views::FieldOrVariantIndex,
 };
 use move_bytecode_source_map::{
     mapping::SourceMapping,
-    source_map::{FunctionSourceMap, SourceName},
+    source_map::{FunctionSourceMap, SourceName, StructSourceMap},
 };
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule, NamedCompiledScript};
 use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
@@ -28,7 +29,7 @@ use std::collections::HashMap;
 /// Holds the various options that we support while disassembling code.
 #[derive(Debug, Default, Parser)]
 pub struct DisassemblerOptions {
-    /// Only print non-private functions
+    /// Only print public functions.
     #[clap(long = "only-public")]
     pub only_externally_visible: bool,
 
@@ -43,6 +44,10 @@ pub struct DisassemblerOptions {
     /// Print the locals inside each function body.
     #[clap(long = "print-locals")]
     pub print_locals: bool,
+
+    /// Print bytecode statistics for the module.
+    #[clap(long = "print-bytecode-stats")]
+    pub print_bytecode_stats: bool,
 }
 
 impl DisassemblerOptions {
@@ -52,6 +57,7 @@ impl DisassemblerOptions {
             print_code: true,
             print_basic_blocks: true,
             print_locals: true,
+            print_bytecode_stats: false,
         }
     }
 }
@@ -238,6 +244,17 @@ impl<'a> Disassembler<'a> {
         }
     }
 
+    fn get_instruction_count(&self) -> usize {
+        match self.source_mapper.bytecode {
+            BinaryIndexedView::Module(module) => module
+                .function_defs
+                .iter()
+                .map(|function| function.code.as_ref().map(|c| c.code.len()).unwrap_or(0))
+                .sum(),
+            BinaryIndexedView::Script(script) => script.code.code.len(),
+        }
+    }
+
     //***************************************************************************
     // Code Coverage Helpers
     //***************************************************************************
@@ -294,57 +311,130 @@ impl<'a> Disassembler<'a> {
     // Formatting Helpers
     //***************************************************************************
 
-    fn name_for_field(&self, field_idx: FieldHandleIndex) -> Result<String> {
-        let field_handle = self.source_mapper.bytecode.field_handle_at(field_idx)?;
-        let struct_def = self
-            .source_mapper
-            .bytecode
-            .struct_def_at(field_handle.owner)?;
-        let field_def = match &struct_def.field_information {
-            StructFieldInformation::Native => {
-                return Err(format_err!("Attempt to access field on a native struct"));
-            },
-            StructFieldInformation::Declared(fields) => fields
-                .get(field_handle.field as usize)
-                .ok_or_else(|| format_err!("Bad field index"))?,
-        };
-        let field_name = self
-            .source_mapper
-            .bytecode
-            .identifier_at(field_def.name)
-            .to_string();
-        let struct_handle = self
-            .source_mapper
-            .bytecode
-            .struct_handle_at(struct_def.struct_handle);
-        let struct_name = self
-            .source_mapper
-            .bytecode
-            .identifier_at(struct_handle.name)
-            .to_string();
-        Ok(format!("{}.{}", struct_name, field_name))
+    fn name_for_struct(&self, idx: StructDefinitionIndex) -> Result<String> {
+        let code = self.source_mapper.bytecode;
+        let struct_def = code.struct_def_at(idx)?;
+        Ok(code
+            .identifier_at(code.struct_handle_at(struct_def.struct_handle).name)
+            .to_string())
     }
 
-    fn type_for_field(&self, field_idx: FieldHandleIndex) -> Result<String> {
-        let field_handle = self.source_mapper.bytecode.field_handle_at(field_idx)?;
-        let struct_def = self
-            .source_mapper
-            .bytecode
-            .struct_def_at(field_handle.owner)?;
-        let field_def = match &struct_def.field_information {
-            StructFieldInformation::Native => {
-                return Err(format_err!("Attempt to access field on a native struct"));
+    fn name_for_struct_variant(&self, idx: StructVariantHandleIndex) -> Result<String> {
+        let code = self.source_mapper.bytecode;
+        let struct_variant_handle = code.struct_variant_handle_at(idx)?;
+        let struct_name = self.name_for_struct(struct_variant_handle.struct_index)?;
+        let variant_name = self.name_for_variant(
+            struct_variant_handle.struct_index,
+            struct_variant_handle.variant,
+        )?;
+        Ok(format!("{}/{}", struct_name, variant_name))
+    }
+
+    fn name_for_variant(
+        &self,
+        idx: StructDefinitionIndex,
+        variant: VariantIndex,
+    ) -> Result<String> {
+        let code = self.source_mapper.bytecode;
+        let struct_def = code.struct_def_at(idx)?;
+        let variant_name = struct_def
+            .field_information
+            .variants()
+            .get(variant as usize)
+            .ok_or_else(|| anyhow!("Inconsistent variant offset"))?
+            .name;
+        Ok(format!("{}", code.identifier_at(variant_name)))
+    }
+
+    fn name_for_field(&self, field_idx: FieldOrVariantIndex) -> Result<String> {
+        let code = self.source_mapper.bytecode;
+        match field_idx {
+            FieldOrVariantIndex::FieldIndex(idx) => {
+                let field_handle = code.field_handle_at(idx)?;
+                let struct_name = self.name_for_struct(field_handle.owner)?;
+                let struct_def = code.struct_def_at(field_handle.owner)?;
+                let field_name = struct_def
+                    .field_information
+                    .fields(None)
+                    .get(field_handle.field as usize)
+                    .ok_or_else(|| anyhow!("Inconsistent field offset"))?
+                    .name;
+                Ok(format!(
+                    "{}.{}",
+                    struct_name,
+                    code.identifier_at(field_name)
+                ))
             },
-            StructFieldInformation::Declared(fields) => fields
-                .get(field_handle.field as usize)
-                .ok_or_else(|| format_err!("Bad field index"))?,
+            FieldOrVariantIndex::VariantFieldIndex(idx) => {
+                let field_handle = code.variant_field_handle_at(idx)?;
+                let struct_def = code.struct_def_at(field_handle.struct_index)?;
+                Ok(field_handle
+                    .variants
+                    .iter()
+                    .map(|v| {
+                        let variant_name = self.name_for_variant(field_handle.struct_index, *v)?;
+                        let field_name = struct_def
+                            .field_information
+                            .fields(Some(*v))
+                            .get(field_handle.field as usize)
+                            .map(|f| {
+                                self.source_mapper
+                                    .bytecode
+                                    .identifier_at(f.name)
+                                    .to_string()
+                            })
+                            .ok_or_else(|| anyhow!("Inconsistent field offset"))?;
+                        Ok(format!("{}.{}", variant_name, field_name))
+                    })
+                    .collect::<Result<Vec<String>>>()?
+                    .join("|"))
+            },
+        }
+    }
+
+    fn type_for_field(&self, field_idx: FieldOrVariantIndex) -> Result<String> {
+        let code = self.source_mapper.bytecode;
+        let (field_ty, struct_def_idx) = match field_idx {
+            FieldOrVariantIndex::FieldIndex(idx) => {
+                let field_handle = code.field_handle_at(idx)?;
+                let struct_def = code.struct_def_at(field_handle.owner)?;
+                (
+                    struct_def
+                        .field_information
+                        .fields(None)
+                        .get(field_handle.field as usize)
+                        .ok_or_else(|| anyhow!("Inconsistent field offset"))?
+                        .signature
+                        .0
+                        .clone(),
+                    field_handle.owner,
+                )
+            },
+            FieldOrVariantIndex::VariantFieldIndex(idx) => {
+                let field_handle = code.variant_field_handle_at(idx)?;
+                // We can take any representative for verified code.
+                let Some(variant) = field_handle.variants.first().cloned() else {
+                    bail!("Inconsistent empty variant field list")
+                };
+                let struct_def = code.struct_def_at(field_handle.struct_index)?;
+                (
+                    struct_def
+                        .field_information
+                        .fields(Some(variant))
+                        .get(field_handle.field as usize)
+                        .ok_or_else(|| anyhow!("Inconsistent field offset"))?
+                        .signature
+                        .0
+                        .clone(),
+                    field_handle.struct_index,
+                )
+            },
         };
         let struct_source_info = self
             .source_mapper
             .source_map
-            .get_struct_source_map(field_handle.owner)?;
-        let field_type_sig = field_def.signature.0.clone();
-        let ty = self.disassemble_sig_tok(field_type_sig, &struct_source_info.type_parameters)?;
+            .get_struct_source_map(struct_def_idx)?;
+        let ty = self.disassemble_sig_tok(field_ty, &struct_source_info.type_parameters)?;
         Ok(ty)
     }
 
@@ -354,22 +444,27 @@ impl<'a> Disassembler<'a> {
         signature: &Signature,
         type_param_context: &[SourceName],
     ) -> Result<(String, String)> {
-        let struct_definition = self.get_struct_def(struct_idx)?;
+        let name = self.name_for_struct(struct_idx)?;
         let type_arguments = signature
             .0
             .iter()
             .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), type_param_context))
             .collect::<Result<Vec<String>>>()?;
+        Ok((name, Self::format_type_params(&type_arguments)))
+    }
 
-        let struct_handle = self
-            .source_mapper
-            .bytecode
-            .struct_handle_at(struct_definition.struct_handle);
-        let name = self
-            .source_mapper
-            .bytecode
-            .identifier_at(struct_handle.name)
-            .to_string();
+    fn variant_struct_type_info(
+        &self,
+        struct_variant_idx: StructVariantHandleIndex,
+        signature: &Signature,
+        type_param_context: &[SourceName],
+    ) -> Result<(String, String)> {
+        let name = self.name_for_struct_variant(struct_variant_idx)?;
+        let type_arguments = signature
+            .0
+            .iter()
+            .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), type_param_context))
+            .collect::<Result<Vec<String>>>()?;
         Ok((name, Self::format_type_params(&type_arguments)))
     }
 
@@ -609,8 +704,9 @@ impl<'a> Disassembler<'a> {
                 Ok(format!("ImmBorrowLoc[{}]({}: {})", local_idx, name, ty))
             },
             Bytecode::MutBorrowField(field_idx) => {
-                let name = self.name_for_field(*field_idx)?;
-                let ty = self.type_for_field(*field_idx)?;
+                let idx = FieldOrVariantIndex::FieldIndex(*field_idx);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
                 Ok(format!("MutBorrowField[{}]({}: {})", field_idx, name, ty))
             },
             Bytecode::MutBorrowFieldGeneric(field_idx) => {
@@ -618,16 +714,18 @@ impl<'a> Disassembler<'a> {
                     .source_mapper
                     .bytecode
                     .field_instantiation_at(*field_idx)?;
-                let name = self.name_for_field(field_inst.handle)?;
-                let ty = self.type_for_field(field_inst.handle)?;
+                let idx = FieldOrVariantIndex::FieldIndex(field_inst.handle);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
                 Ok(format!(
                     "MutBorrowFieldGeneric[{}]({}: {})",
                     field_idx, name, ty
                 ))
             },
             Bytecode::ImmBorrowField(field_idx) => {
-                let name = self.name_for_field(*field_idx)?;
-                let ty = self.type_for_field(*field_idx)?;
+                let idx = FieldOrVariantIndex::FieldIndex(*field_idx);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
                 Ok(format!("ImmBorrowField[{}]({}: {})", field_idx, name, ty))
             },
             Bytecode::ImmBorrowFieldGeneric(field_idx) => {
@@ -635,10 +733,55 @@ impl<'a> Disassembler<'a> {
                     .source_mapper
                     .bytecode
                     .field_instantiation_at(*field_idx)?;
-                let name = self.name_for_field(field_inst.handle)?;
-                let ty = self.type_for_field(field_inst.handle)?;
+                let idx = FieldOrVariantIndex::FieldIndex(field_inst.handle);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
                 Ok(format!(
                     "ImmBorrowFieldGeneric[{}]({}: {})",
+                    field_idx, name, ty
+                ))
+            },
+            Bytecode::MutBorrowVariantField(field_idx) => {
+                let idx = FieldOrVariantIndex::VariantFieldIndex(*field_idx);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
+                Ok(format!(
+                    "MutBorrowVariantField[{}]({}: {})",
+                    field_idx, name, ty
+                ))
+            },
+            Bytecode::MutBorrowVariantFieldGeneric(field_idx) => {
+                let field_inst = self
+                    .source_mapper
+                    .bytecode
+                    .variant_field_instantiation_at(*field_idx)?;
+                let idx = FieldOrVariantIndex::VariantFieldIndex(field_inst.handle);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
+                Ok(format!(
+                    "MutBorrowVariantFieldGeneric[{}]({}: {})",
+                    field_idx, name, ty
+                ))
+            },
+            Bytecode::ImmBorrowVariantField(field_idx) => {
+                let idx = FieldOrVariantIndex::VariantFieldIndex(*field_idx);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
+                Ok(format!(
+                    "ImmBorrowVariantField[{}]({}: {})",
+                    field_idx, name, ty
+                ))
+            },
+            Bytecode::ImmBorrowVariantFieldGeneric(field_idx) => {
+                let field_inst = self
+                    .source_mapper
+                    .bytecode
+                    .variant_field_instantiation_at(*field_idx)?;
+                let idx = FieldOrVariantIndex::VariantFieldIndex(field_inst.handle);
+                let name = self.name_for_field(idx)?;
+                let ty = self.type_for_field(idx)?;
+                Ok(format!(
+                    "ImmBorrowVariantFieldGeneric[{}]({}: {})",
                     field_idx, name, ty
                 ))
             },
@@ -651,14 +794,9 @@ impl<'a> Disassembler<'a> {
                 Ok(format!("Pack[{}]({}{})", struct_idx, name, ty_params))
             },
             Bytecode::PackGeneric(struct_idx) => {
-                let struct_inst = self
-                    .source_mapper
-                    .bytecode
-                    .struct_instantiation_at(*struct_idx)?;
-                let type_params = self
-                    .source_mapper
-                    .bytecode
-                    .signature_at(struct_inst.type_parameters);
+                let code = self.source_mapper.bytecode;
+                let struct_inst = code.struct_instantiation_at(*struct_idx)?;
+                let type_params = code.signature_at(struct_inst.type_parameters);
                 let (name, ty_params) = self.struct_type_info(
                     struct_inst.def,
                     type_params,
@@ -678,14 +816,9 @@ impl<'a> Disassembler<'a> {
                 Ok(format!("Unpack[{}]({}{})", struct_idx, name, ty_params))
             },
             Bytecode::UnpackGeneric(struct_idx) => {
-                let struct_inst = self
-                    .source_mapper
-                    .bytecode
-                    .struct_instantiation_at(*struct_idx)?;
-                let type_params = self
-                    .source_mapper
-                    .bytecode
-                    .signature_at(struct_inst.type_parameters);
+                let code = self.source_mapper.bytecode;
+                let struct_inst = code.struct_instantiation_at(*struct_idx)?;
+                let type_params = code.signature_at(struct_inst.type_parameters);
                 let (name, ty_params) = self.struct_type_info(
                     struct_inst.def,
                     type_params,
@@ -693,6 +826,81 @@ impl<'a> Disassembler<'a> {
                 )?;
                 Ok(format!(
                     "UnpackGeneric[{}]({}{})",
+                    struct_idx, name, ty_params
+                ))
+            },
+            Bytecode::PackVariant(struct_idx) => {
+                let (name, ty_params) = self.variant_struct_type_info(
+                    *struct_idx,
+                    &Signature(vec![]),
+                    &function_source_map.type_parameters,
+                )?;
+                Ok(format!(
+                    "PackVariant[{}]({}{})",
+                    struct_idx, name, ty_params
+                ))
+            },
+            Bytecode::PackVariantGeneric(struct_idx) => {
+                let code = self.source_mapper.bytecode;
+                let struct_inst = code.struct_variant_instantiation_at(*struct_idx)?;
+                let type_params = code.signature_at(struct_inst.type_parameters);
+                let (name, ty_params) = self.variant_struct_type_info(
+                    struct_inst.handle,
+                    type_params,
+                    &function_source_map.type_parameters,
+                )?;
+                Ok(format!(
+                    "PackVariantGeneric[{}]({}{})",
+                    struct_idx, name, ty_params
+                ))
+            },
+            Bytecode::UnpackVariant(struct_idx) => {
+                let (name, ty_params) = self.variant_struct_type_info(
+                    *struct_idx,
+                    &Signature(vec![]),
+                    &function_source_map.type_parameters,
+                )?;
+                Ok(format!(
+                    "UnpackVariant[{}]({}{})",
+                    struct_idx, name, ty_params
+                ))
+            },
+            Bytecode::UnpackVariantGeneric(struct_idx) => {
+                let code = self.source_mapper.bytecode;
+                let struct_inst = code.struct_variant_instantiation_at(*struct_idx)?;
+                let type_params = code.signature_at(struct_inst.type_parameters);
+                let (name, ty_params) = self.variant_struct_type_info(
+                    struct_inst.handle,
+                    type_params,
+                    &function_source_map.type_parameters,
+                )?;
+                Ok(format!(
+                    "UnpackVariantGeneric[{}]({}{})",
+                    struct_idx, name, ty_params
+                ))
+            },
+            Bytecode::TestVariant(struct_idx) => {
+                let (name, ty_params) = self.variant_struct_type_info(
+                    *struct_idx,
+                    &Signature(vec![]),
+                    &function_source_map.type_parameters,
+                )?;
+                Ok(format!(
+                    "TestVariant[{}]({}{})",
+                    struct_idx, name, ty_params
+                ))
+            },
+            Bytecode::TestVariantGeneric(struct_idx) => {
+                let code = self.source_mapper.bytecode;
+                let struct_inst = code.struct_variant_instantiation_at(*struct_idx)?;
+                let type_params = code.signature_at(struct_inst.type_parameters);
+                let (name, ty_params) = self.variant_struct_type_info(
+                    struct_inst.handle,
+                    type_params,
+                    &function_source_map.type_parameters,
+                )?;
+                Ok(format!(
+                    "TestVariantGeneric[{}]({}{})",
                     struct_idx, name, ty_params
                 ))
             },
@@ -1175,27 +1383,15 @@ impl<'a> Disassembler<'a> {
             .source_mapper
             .source_map
             .get_struct_source_map(struct_def_idx)?;
-
-        let field_info: Option<Vec<(&IdentStr, &TypeSignature)>> =
-            match &struct_definition.field_information {
-                StructFieldInformation::Native => None,
-                StructFieldInformation::Declared(fields) => Some(
-                    fields
-                        .iter()
-                        .map(|field_definition| {
-                            let type_sig = &field_definition.signature;
-                            let field_name = self
-                                .source_mapper
-                                .bytecode
-                                .identifier_at(field_definition.name);
-                            (field_name, type_sig)
-                        })
-                        .collect(),
-                ),
-            };
-
-        let native = if field_info.is_none() { "native " } else { "" };
-
+        let name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(struct_handle.name)
+            .to_string();
+        let ty_params = Self::disassemble_struct_type_formals(
+            &struct_source_map.type_parameters,
+            &struct_handle.type_parameters,
+        );
         let abilities = if struct_handle.abilities == AbilitySet::EMPTY {
             String::new()
         } else {
@@ -1207,44 +1403,59 @@ impl<'a> Disassembler<'a> {
             format!(" has {}", ability_vec.join(", "))
         };
 
-        let name = self
-            .source_mapper
-            .bytecode
-            .identifier_at(struct_handle.name)
-            .to_string();
-
-        let ty_params = Self::disassemble_struct_type_formals(
-            &struct_source_map.type_parameters,
-            &struct_handle.type_parameters,
-        );
-        let mut fields = match field_info {
-            None => vec![],
-            Some(field_info) => field_info
-                .iter()
-                .map(|(name, ty)| {
-                    let ty_str =
-                        self.disassemble_sig_tok(ty.0.clone(), &struct_source_map.type_parameters)?;
-                    Ok(format!("{}: {}", name, ty_str))
-                })
-                .collect::<Result<Vec<String>>>()?,
-        };
-
-        if let Some(first_elem) = fields.first_mut() {
-            first_elem.insert_str(0, "{\n\t");
+        match &struct_definition.field_information {
+            StructFieldInformation::Native => {
+                Ok(format!("native struct {}{}{}", name, ty_params, abilities))
+            },
+            StructFieldInformation::Declared(fields) => Ok(format!(
+                "struct {}{}{} {{\n{}\n}}",
+                name,
+                ty_params,
+                abilities,
+                self.print_fields(struct_source_map, fields.iter())
+            )),
+            StructFieldInformation::DeclaredVariants(variants) => {
+                let variant_strs = variants
+                    .iter()
+                    .map(|v| {
+                        let name_str = self.source_mapper.bytecode.identifier_at(v.name);
+                        format!(
+                            " {}{{\n{}\n }}",
+                            name_str,
+                            self.print_fields(struct_source_map, v.fields.iter())
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",\n");
+                Ok(format!(
+                    "enum {}{}{} {{\n{}\n}}",
+                    name, ty_params, abilities, variant_strs
+                ))
+            },
         }
+    }
 
-        if let Some(last_elem) = fields.last_mut() {
-            last_elem.push_str("\n}");
-        }
-
-        Ok(format!(
-            "{native}struct {name}{ty_params}{abilities} {fields}",
-            native = native,
-            name = name,
-            ty_params = ty_params,
-            abilities = abilities,
-            fields = &fields.join(",\n\t"),
-        ))
+    fn print_fields<'l>(
+        &self,
+        source_map: &StructSourceMap,
+        fields: impl Iterator<Item = &'l FieldDefinition>,
+    ) -> String {
+        fields
+            .map(|field_definition| {
+                let field_name = self
+                    .source_mapper
+                    .bytecode
+                    .identifier_at(field_definition.name);
+                let ty_str = self
+                    .disassemble_sig_tok(
+                        field_definition.signature.0.clone(),
+                        &source_map.type_parameters,
+                    )
+                    .unwrap_or_else(|_| "??".to_string());
+                format!("\t{}: {}", field_name, ty_str)
+            })
+            .collect::<Vec<_>>()
+            .join(",\n")
     }
 
     pub fn disassemble(&self) -> Result<String> {
@@ -1309,18 +1520,27 @@ impl<'a> Disassembler<'a> {
                 })
                 .collect::<Result<Vec<String>>>()?,
         };
+
+        let stats = if self.options.print_bytecode_stats {
+            let count = self.get_instruction_count();
+            format!("\n\n// Total number of instructions: {}\n", count)
+        } else {
+            "".to_owned()
+        };
+
         let imports_str = if imports.is_empty() {
             "".to_string()
         } else {
             format!("\n{}\n\n", imports.join("\n"))
         };
         Ok(format!(
-            "// Move bytecode v{version}\n{header} {{{imports}\n{struct_defs}\n\n{function_defs}\n}}",
+            "// Move bytecode v{version}\n{header} {{{imports}\n{struct_defs}\n\n{function_defs}\n}}{stats}",
             version = version,
             header = header,
             imports = &imports_str,
             struct_defs = &struct_defs.join("\n"),
-            function_defs = &function_defs.join("\n")
+            function_defs = &function_defs.join("\n"),
+            stats = stats
         ))
     }
 }

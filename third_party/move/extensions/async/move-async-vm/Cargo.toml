@@ -9,10 +9,10 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.52"
-better_any = "0.1.1"
-bytes = "1.4.0"
-itertools = "0.10.0"
+anyhow = { workspace = true }
+better_any = { workspace = true }
+bytes = { workspace = true }
+itertools = { workspace = true }
 move-binary-format = { path = "../../../move-binary-format" }
 move-command-line-common = { path = "../../../move-command-line-common" }
 move-compiler = { path = "../../../move-compiler" }
@@ -20,14 +20,11 @@ move-core-types = { path = "../../../move-core/types" }
 move-vm-runtime = { path = "../../../move-vm/runtime", features = ["debugging"] }
 move-vm-test-utils = { path = "../../../move-vm/test-utils" }
 move-vm-types = { path = "../../../move-vm/types" }
-sha3 = "0.9.1"
-smallvec = "1.6.1"
-walkdir = "2.3.1"
-
-bcs = { workspace = true }
+sha3 = { workspace = true }
+smallvec = { workspace = true }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
+datatest-stable = { workspace = true }
 move-prover-test-utils = { path = "../../../move-prover/test-utils" }
 move-stdlib = { path = "../../../move-stdlib", features = ["testing"] }
 

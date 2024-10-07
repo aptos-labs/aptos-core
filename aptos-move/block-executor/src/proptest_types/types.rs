@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    explicit_sync_wrapper::ExplicitSyncWrapper,
-    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
-};
+use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
@@ -13,10 +10,9 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
-    delayed_fields::PanicError,
+    error::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -29,17 +25,21 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
-use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use aptos_vm_types::{
+    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resource_group_adapter::{
+        decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
+    },
+};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet, HashMap, HashSet},
-    convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -99,7 +99,10 @@ where
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
             let bytes = bcs::to_bytes(&group).unwrap();
-            Ok(Some(StateValue::new_legacy(bytes.into())))
+            Ok(Some(StateValue::new_with_metadata(
+                bytes.into(),
+                raw_metadata(5),
+            )))
         } else {
             Ok(None)
         }
@@ -154,30 +157,22 @@ pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
 );
 
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
-    fn module_path(&self) -> Option<AccessPath> {
-        // Since K is generic, use its hash to assign addresses.
-        let mut hasher = DefaultHasher::new();
-        self.0.hash(&mut hasher);
-        let mut hashed_address = vec![1u8; AccountAddress::LENGTH - 8];
-        hashed_address.extend_from_slice(&hasher.finish().to_ne_bytes());
+    fn is_module_path(&self) -> bool {
+        self.1
+    }
 
-        if self.1 {
-            Some(AccessPath {
-                address: AccountAddress::new(hashed_address.try_into().unwrap()),
-                path: b"/foo/b".to_vec(),
-            })
-        } else {
-            None
-        }
+    fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
+        unimplemented!()
     }
 }
 
+// TODO: this is now very similar to WriteOp, should be a wrapper and remove boilerplate below.
 #[derive(Debug)]
 pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     bytes: Option<Bytes>,
     metadata: StateValueMetadata,
-    write_op_kind: ExplicitSyncWrapper<WriteOpKind>,
+    write_op_kind: WriteOpKind,
 }
 
 impl Clone for ValueType {
@@ -214,7 +209,7 @@ impl ValueType {
         Self {
             bytes,
             metadata,
-            write_op_kind: ExplicitSyncWrapper::new(kind),
+            write_op_kind: kind,
         }
     }
 
@@ -232,13 +227,11 @@ impl ValueType {
                 v.into()
             }),
             metadata: StateValueMetadata::none(),
-            write_op_kind: ExplicitSyncWrapper::new(
-                if !use_value {
-                    WriteOpKind::Deletion
-                } else {
-                    WriteOpKind::Creation
-                },
-            ),
+            write_op_kind: if !use_value {
+                WriteOpKind::Deletion
+            } else {
+                WriteOpKind::Creation
+            },
         }
     }
 
@@ -247,13 +240,11 @@ impl ValueType {
         Self {
             bytes: (len > 0).then_some(vec![100_u8; len].into()),
             metadata,
-            write_op_kind: ExplicitSyncWrapper::new(
-                if len == 0 {
-                    WriteOpKind::Deletion
-                } else {
-                    WriteOpKind::Creation
-                },
-            ),
+            write_op_kind: if len == 0 {
+                WriteOpKind::Deletion
+            } else {
+                WriteOpKind::Creation
+            },
         }
     }
 }
@@ -275,18 +266,16 @@ impl TransactionWrite for ValueType {
         Self {
             bytes: maybe_bytes,
             metadata: maybe_metadata,
-            write_op_kind: ExplicitSyncWrapper::new(
-                if empty {
-                    WriteOpKind::Deletion
-                } else {
-                    WriteOpKind::Creation
-                },
-            ),
+            write_op_kind: if empty {
+                WriteOpKind::Deletion
+            } else {
+                WriteOpKind::Creation
+            },
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
-        self.write_op_kind.dereference().clone()
+        self.write_op_kind.clone()
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
@@ -330,6 +319,9 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
     /// Generate gas for different incarnations of the transactions.
     #[proptest(strategy = "vec(any::<Index>(), params.incarnation_alternatives)")]
     gas: Vec<Index>,
+    /// Generate seeds for group metadata.
+    #[proptest(strategy = "vec(vec(any::<Index>(), 3), params.incarnation_alternatives)")]
+    metadata_seeds: Vec<Vec<Index>>,
     /// Generate indices to derive random behavior for querying resource group sizes.
     /// For now hardcoding 3 resource groups.
     #[proptest(
@@ -354,21 +346,43 @@ pub(crate) struct MockIncarnation<K, E> {
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
     pub(crate) writes: Vec<(K, ValueType)>,
     pub(crate) group_reads: Vec<(K, u32)>,
-    pub(crate) group_writes: Vec<(K, HashMap<u32, ValueType>)>,
-    /// Keys to query group size for
-    pub(crate) group_sizes: Vec<K>,
+    pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, ValueType>)>,
+    /// Keys to query group size for - false is querying size, true is querying metadata.
+    pub(crate) group_queries: Vec<(K, bool)>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     /// A vector of events.
     pub(crate) events: Vec<E>,
+    metadata_seeds: [u64; 3],
     /// total execution gas to be charged for mock incarnation execution.
     pub(crate) gas: u64,
 }
 
 impl<K, E> MockIncarnation<K, E> {
     /// Group writes are derived from normal transaction behavior, transforming one MockIncarnation
-    /// into another one with group_reads / group_writes / group_sizes set. Hence, the constructor
+    /// into another one with group_reads / group_writes / group_queries set. Hence, the constructor
     /// here always sets it to an empty vector.
+    pub(crate) fn new_with_metadata_seeds(
+        reads: Vec<K>,
+        writes: Vec<(K, ValueType)>,
+        deltas: Vec<(K, DeltaOp)>,
+        events: Vec<E>,
+        metadata_seeds: [u64; 3],
+        gas: u64,
+    ) -> Self {
+        Self {
+            reads,
+            writes,
+            group_reads: vec![],
+            group_writes: vec![],
+            group_queries: vec![],
+            deltas,
+            events,
+            metadata_seeds,
+            gas,
+        }
+    }
+
     pub(crate) fn new(
         reads: Vec<K>,
         writes: Vec<(K, ValueType)>,
@@ -381,9 +395,10 @@ impl<K, E> MockIncarnation<K, E> {
             writes,
             group_reads: vec![],
             group_writes: vec![],
-            group_sizes: vec![],
+            group_queries: vec![],
             deltas,
             events,
+            metadata_seeds: [0; 3],
             gas,
         }
     }
@@ -504,17 +519,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                         Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
                         None => {
                             // One out of 23 writes will be a deletion
-                            let is_deletion = allow_deletes
-                                && ValueType::from_value(value.clone(), true)
-                                    .as_u128()
-                                    .unwrap()
-                                    .unwrap()
-                                    % 23
-                                    == 0;
-                            incarnation_writes.push((
-                                KeyType(key, module_write_fn(i)),
-                                ValueType::from_value(value.clone(), !is_deletion),
-                            ));
+                            let val_u128 = ValueType::from_value(value.clone(), true)
+                                .as_u128()
+                                .unwrap()
+                                .unwrap();
+                            let is_deletion = allow_deletes && val_u128 % 23 == 0;
+                            let mut value = ValueType::from_value(value.clone(), !is_deletion);
+                            value.metadata = raw_metadata((val_u128 >> 64) as u64);
+                            incarnation_writes.push((KeyType(key, module_write_fn(i)), value));
                         },
                     }
                 }
@@ -589,12 +601,25 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         .into_iter()
         .zip(reads)
         .zip(gas)
-        .map(|(((writes, deltas), reads), gas)| {
-            MockIncarnation::new(
+        .zip(
+            self.metadata_seeds
+                .into_iter()
+                .map(|vec| {
+                    [
+                        vec[0].index(100000) as u64,
+                        vec[1].index(100000) as u64,
+                        vec[2].index(100000) as u64,
+                    ]
+                })
+                .collect::<Vec<_>>(),
+        )
+        .map(|((((writes, deltas), reads), gas), metadata_seeds)| {
+            MockIncarnation::new_with_metadata_seeds(
                 reads,
                 writes,
                 deltas,
                 vec![], // events
+                metadata_seeds,
                 gas,
             )
         })
@@ -701,6 +726,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 if !inner_ops.is_empty() {
                     group_writes.push((
                         KeyType(universe[universe_len - 1 - idx].clone(), false),
+                        raw_metadata(behavior.metadata_seeds[idx]),
                         inner_ops,
                     ));
                 }
@@ -713,20 +739,25 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             behavior.group_reads = group_reads;
             behavior.group_writes = group_writes;
 
-            behavior.group_sizes = group_size_query_pcts
+            behavior.group_queries = group_size_query_pcts
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, size_query_pct)| match size_query_pct {
                     Some(size_query_pct) => {
-                        assert_le!(*size_query_pct, 100, "Must be percetange point (0..100]");
+                        assert_le!(*size_query_pct, 100, "Must be percentage point (0..100]");
                         let indicator = match idx {
                             0 => group_size_query_indicators[behavior_idx].0,
                             1 => group_size_query_indicators[behavior_idx].1,
                             2 => group_size_query_indicators[behavior_idx].2,
                             _ => unreachable!("Test uses 3 groups"),
                         };
-                        (indicator < *size_query_pct)
-                            .then(|| KeyType(universe[universe_len - 1 - idx].clone(), false))
+                        (indicator < *size_query_pct).then(|| {
+                            (
+                                KeyType(universe[universe_len - 1 - idx].clone(), false),
+                                // TODO: handle metadata queries more uniformly w. size.
+                                indicator % 2 == 0,
+                            )
+                        })
                     },
                     None => None,
                 })
@@ -823,12 +854,12 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Argument = ();
+    type Environment = ();
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_argument: Self::Argument) -> Self {
+    fn init(_env: Self::Environment, _state_view: &impl TStateView<Key = K>) -> Self {
         Self::new()
     }
 
@@ -857,15 +888,16 @@ where
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
-                    match k.module_path() {
-                        Some(_) => match view.get_module_bytes(k) {
+                    if k.is_module_path() {
+                        match view.get_module_bytes(k) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
-                        },
-                        None => match view.get_resource_bytes(k, None) {
+                        }
+                    } else {
+                        match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
-                        },
+                        }
                     }
                 }
                 // Read from groups.
@@ -877,75 +909,130 @@ where
                     }
                 }
 
-                let read_group_sizes = behavior
-                    .group_sizes
+                let read_group_size_or_metadata = behavior
+                    .group_queries
                     .iter()
-                    .map(|group_key| {
-                        (
-                            group_key.clone(),
-                            view.resource_group_size(group_key)
-                                .expect("Group must exist and size computation must succeed")
-                                .get(),
-                        )
+                    .map(|(group_key, query_metadata)| {
+                        let res = if *query_metadata {
+                            GroupSizeOrMetadata::Metadata(
+                                view.get_resource_state_value_metadata(group_key)
+                                    .expect("Group must exist and size computation must succeed"),
+                            )
+                        } else {
+                            GroupSizeOrMetadata::Size(
+                                view.resource_group_size(group_key)
+                                    .expect("Group must exist and size computation must succeed")
+                                    .get(),
+                            )
+                        };
+
+                        (group_key.clone(), res)
                     })
                     .collect();
 
                 let mut group_writes = vec![];
-                for (key, inner_ops) in behavior.group_writes.iter() {
+                for (key, metadata, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
+                    let group_size = view.resource_group_size(key).unwrap();
+                    let mut new_group_size = view.resource_group_size(key).unwrap();
                     for (tag, inner_op) in inner_ops.iter() {
                         let exists = view
                             .get_resource_from_group(key, tag, None)
                             .unwrap()
                             .is_some();
-
-                        // inner op is either deletion or creation.
-                        assert!(!inner_op.is_modification());
-                        if exists == inner_op.is_deletion() {
-                            // insert the provided inner op.
-                            new_inner_ops.insert(*tag, inner_op.clone());
-                        }
-
                         assert!(
                             *tag != RESERVED_TAG || exists,
                             "RESERVED_TAG must always be present in groups in tests"
                         );
 
-                        if exists && inner_op.is_creation() {
-                            // Adjust the type, otherwise executor will assert.
-                            if inner_op.bytes().unwrap()[0] % 4 < 3 || *tag == RESERVED_TAG {
-                                new_inner_ops.insert(
-                                    *tag,
+                        // inner op is either deletion or creation.
+                        assert!(!inner_op.is_modification());
+
+                        let maybe_op = if exists {
+                            Some(
+                                if inner_op.is_creation()
+                                    && (inner_op.bytes().unwrap()[0] % 4 < 3
+                                        || *tag == RESERVED_TAG)
+                                {
                                     ValueType::new(
                                         inner_op.bytes.clone(),
-                                        inner_op.metadata.clone(),
+                                        StateValueMetadata::none(),
                                         WriteOpKind::Modification,
-                                    ),
-                                );
-                            } else {
-                                new_inner_ops.insert(
-                                    *tag,
+                                    )
+                                } else {
                                     ValueType::new(
                                         None,
                                         StateValueMetadata::none(),
                                         WriteOpKind::Deletion,
-                                    ),
-                                );
+                                    )
+                                },
+                            )
+                        } else {
+                            inner_op.is_creation().then(|| inner_op.clone())
+                        };
+
+                        if let Some(new_inner_op) = maybe_op {
+                            if exists {
+                                let old_tagged_value_size =
+                                    view.resource_size_in_group(key, tag).unwrap();
+                                let old_size =
+                                    group_tagged_resource_size(tag, old_tagged_value_size).unwrap();
+                                // let _ =
+                                // decrement_size_for_remove_tag(&mut new_group_size, old_size);
+                                if decrement_size_for_remove_tag(&mut new_group_size, old_size)
+                                    .is_err()
+                                {
+                                    // Check it only happens for speculative executions that may not
+                                    // commit by returning incorrect (empty) output.
+                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                }
                             }
+                            if !new_inner_op.is_deletion() {
+                                let new_size = group_tagged_resource_size(
+                                    tag,
+                                    inner_op.bytes.as_ref().unwrap().len(),
+                                )
+                                .unwrap();
+                                if increment_size_for_add_tag(&mut new_group_size, new_size)
+                                    .is_err()
+                                {
+                                    // Check it only happens for speculative executions that may not
+                                    // commit by returning incorrect (empty) output.
+                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                }
+                            }
+
+                            new_inner_ops.insert(*tag, new_inner_op);
                         }
                     }
 
-                    if !inner_ops.is_empty() {
-                        // Not testing metadata_op here, always modification.
-                        group_writes.push((
-                            key.clone(),
-                            ValueType::new(
-                                Some(Bytes::new()),
-                                raw_metadata(5),
-                                WriteOpKind::Modification,
-                            ),
-                            new_inner_ops,
-                        ));
+                    if !new_inner_ops.is_empty() {
+                        if group_size.get() > 0
+                            && new_group_size == ResourceGroupSize::zero_combined()
+                        {
+                            // TODO: reserved tag currently prevents this code from being run.
+                            // Group got deleted.
+                            group_writes.push((
+                                key.clone(),
+                                ValueType::new(None, metadata.clone(), WriteOpKind::Deletion),
+                                new_group_size,
+                                new_inner_ops,
+                            ));
+                        } else {
+                            let op_kind = if group_size.get() == 0 {
+                                WriteOpKind::Creation
+                            } else {
+                                WriteOpKind::Modification
+                            };
+
+                            // Not testing metadata_op here, always modification.
+                            group_writes.push((
+                                key.clone(),
+                                ValueType::new(Some(Bytes::new()), metadata.clone(), op_kind),
+                                new_group_size,
+                                new_inner_ops,
+                            ));
+                        }
                     }
                 }
 
@@ -956,7 +1043,7 @@ where
                     deltas: behavior.deltas.clone(),
                     events: behavior.events.to_vec(),
                     read_results,
-                    read_group_sizes,
+                    read_group_size_or_metadata,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
                     skipped: false,
@@ -981,14 +1068,20 @@ pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
 }
 
 #[derive(Debug)]
+pub(crate) enum GroupSizeOrMetadata {
+    Size(u64),
+    Metadata(Option<StateValueMetadata>),
+}
+
+#[derive(Debug)]
 pub(crate) struct MockOutput<K, E> {
     pub(crate) writes: Vec<(K, ValueType)>,
     // Key, metadata_op, inner_ops
-    pub(crate) group_writes: Vec<(K, ValueType, HashMap<u32, ValueType>)>,
+    pub(crate) group_writes: Vec<(K, ValueType, ResourceGroupSize, HashMap<u32, ValueType>)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
-    pub(crate) read_group_sizes: Vec<(K, u64)>,
+    pub(crate) read_group_size_or_metadata: Vec<(K, GroupSizeOrMetadata)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
     pub(crate) skipped: bool,
@@ -1007,7 +1100,7 @@ where
     fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
-            .filter(|(k, _)| k.module_path().is_none())
+            .filter(|(k, _)| !k.is_module_path())
             .cloned()
             .map(|(k, v)| (k, Arc::new(v), None))
             .collect()
@@ -1016,7 +1109,7 @@ where
     fn module_write_set(&self) -> BTreeMap<K, ValueType> {
         self.writes
             .iter()
-            .filter(|(k, _)| k.module_path().is_some())
+            .filter(|(k, _)| k.is_module_path())
             .cloned()
             .collect()
     }
@@ -1071,15 +1164,17 @@ where
     ) -> Vec<(
         K,
         ValueType,
+        ResourceGroupSize,
         BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
     )> {
         self.group_writes
             .iter()
             .cloned()
-            .map(|(group_key, metadata_v, inner_ops)| {
+            .map(|(group_key, metadata_v, group_size, inner_ops)| {
                 (
                     group_key,
                     metadata_v,
+                    group_size,
                     inner_ops.into_iter().map(|(k, v)| (k, (v, None))).collect(),
                 )
             })
@@ -1093,7 +1188,7 @@ where
             deltas: vec![],
             events: vec![],
             read_results: vec![],
-            read_group_sizes: vec![],
+            read_group_size_or_metadata: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
             skipped: true,
@@ -1107,7 +1202,7 @@ where
             deltas: vec![],
             events: vec![],
             read_results: vec![],
-            read_group_sizes: vec![],
+            read_group_size_or_metadata: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
             skipped: true,
@@ -1125,12 +1220,26 @@ where
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: Vec<(
+        patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) -> Result<(), PanicError> {
+        let resources: HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value> =
+            patched_resource_write_set.clone().into_iter().collect();
+        for (key, _, size, _) in &self.group_writes {
+            let v = resources.get(key).unwrap();
+            if v.is_deletion() {
+                assert_eq!(*size, ResourceGroupSize::zero_combined());
+            } else {
+                assert_eq!(
+                    size.get(),
+                    resources.get(key).unwrap().bytes().map_or(0, |b| b.len()) as u64
+                );
+            }
+        }
+
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input

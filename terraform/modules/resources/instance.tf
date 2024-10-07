@@ -47,8 +47,8 @@ locals {
     "t2d-standard-48" = { cores = 48, memory = 192 }
     "t2d-standard-60" = { cores = 60, memory = 240 }
   }
-  # leave 1 core for the system
-  available_cores = local.machine_shapes[var.instance_type].cores - 1
+  # leave 2 cores for the system
+  available_cores = local.machine_shapes[var.instance_type].cores - 2
   # leave 4 GB for the system
   available_memory = local.machine_shapes[var.instance_type].memory - 4
 

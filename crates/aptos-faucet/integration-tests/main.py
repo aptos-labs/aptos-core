@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-This script is how we orchestrate running a local testnet and then the faucet
+This script is how we orchestrate running a localnet and then the faucet
 integration tests against it.
 
 Example invocation:
   python3 main.py --local-testnet-network devnet
 
-This would run a local testnet built from the devnet release branch and then run the
+This would run a localnet built from the devnet release branch and then run the
 faucet integration tests against it.
 
 The script confirms that pre-existing conditions are suitable, e.g. checking that a
@@ -50,7 +50,7 @@ def parse_args():
         "--image-repo-with-project",
         default="aptoslabs",
         help=(
-            "What docker image repo (+ project) to use for the local testnet. "
+            "What docker image repo (+ project) to use for the localnet. "
             "By default we use Docker Hub: %(default)s (so, just aptoslabs for the "
             "project since Docker Hub is the implied default repo). If you want to "
             "specify a different repo, it might look like this: "
@@ -62,7 +62,7 @@ def parse_args():
         required=True,
         choices=VALID_NETWORK_OPTIONS,
         help=(
-            "What branch the Aptos CLI used for the local testnet should be built "
+            "What branch the Aptos CLI used for the localnet should be built "
             'from. If "custom", --tag must be set.'
         ),
     )
@@ -126,7 +126,7 @@ def main():
     # Build and run the faucet integration tests.
     run_faucet_integration_tests()
 
-    # Stop the local testnet.
+    # Stop the localnet.
     stop_node(container_name)
 
     return True

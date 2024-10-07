@@ -33,12 +33,8 @@ B0:
 	0: MoveLoc[0](Arg0: S)
 	1: Unpack[1](S)
 	2: Unpack[0](T)
-	3: StLoc[2](Arg2: u64)
-	4: StLoc[1](Arg1: u64)
-	5: CopyLoc[1](Arg1: u64)
-	6: MoveLoc[2](Arg2: u64)
-	7: Add
-	8: Ret
+	3: Add
+	4: Ret
 }
 assign_struct(Arg0: &mut S) /* def_idx: 3 */ {
 B0:

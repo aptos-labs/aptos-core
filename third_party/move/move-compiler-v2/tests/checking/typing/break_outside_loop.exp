@@ -23,3 +23,23 @@ module 0x8675309::M {
         break
     }
 } // end 0x8675309::M
+
+
+Diagnostics:
+error: missing enclosing loop statement
+  ┌─ tests/checking/typing/break_outside_loop.move:6:9
+  │
+6 │         break
+  │         ^^^^^
+
+error: missing enclosing loop statement
+   ┌─ tests/checking/typing/break_outside_loop.move:10:9
+   │
+10 │         break;
+   │         ^^^^^
+
+error: missing enclosing loop statement
+   ┌─ tests/checking/typing/break_outside_loop.move:14:21
+   │
+14 │         if (x >= 5) break;
+   │                     ^^^^^

@@ -36,7 +36,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{CommitHistoryResource, OnChainConfig},
+    on_chain_config::CommitHistoryResource,
     state_store::state_key::StateKey,
 };
 use async_trait::async_trait;
@@ -141,7 +141,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) {
-        let anchor = ordered_nodes.last().unwrap();
+        let anchor = ordered_nodes
+            .last()
+            .expect("ordered_nodes shuld not be empty");
         let epoch = anchor.epoch();
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
@@ -328,7 +330,7 @@ impl StorageAdapter {
         Ok(bcs::from_bytes(
             self.aptos_db
                 .get_state_value_by_version(
-                    &StateKey::access_path(CommitHistoryResource::access_path().unwrap()),
+                    &StateKey::on_chain_config::<CommitHistoryResource>()?,
                     latest_version,
                 )?
                 .ok_or_else(|| format_err!("Resource doesn't exist"))?
@@ -378,22 +380,22 @@ impl DAGStorage for StorageAdapter {
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         let timer = counters::FETCH_COMMIT_HISTORY_DURATION.start_timer();
-        let version = self.aptos_db.get_latest_version()?;
+        let version = self.aptos_db.get_latest_ledger_info_version()?;
         let resource = self.get_commit_history_resource(version)?;
         let handle = resource.table_handle();
         let mut commit_events = vec![];
         for i in 1..=std::cmp::min(k, resource.length()) {
             let idx = (resource.next_idx() + resource.max_capacity() - i as u32)
                 % resource.max_capacity();
-            let new_block_event = bcs::from_bytes::<NewBlockEvent>(
-                self.aptos_db
-                    .get_state_value_by_version(
-                        &StateKey::table_item(*handle, bcs::to_bytes(&idx).unwrap()),
-                        version,
-                    )?
-                    .ok_or_else(|| format_err!("Table item doesn't exist"))?
-                    .bytes(),
-            )?;
+            // idx is an u32, so it's not possible to fail to convert it to bytes
+            let idx_bytes = bcs::to_bytes(&idx)
+                .map_err(|e| anyhow::anyhow!("Failed to serialize index: {:?}", e))?;
+            let state_value = self
+                .aptos_db
+                .get_state_value_by_version(&StateKey::table_item(handle, &idx_bytes), version)?
+                .ok_or_else(|| anyhow::anyhow!("Table item doesn't exist"))?;
+            let new_block_event = bcs::from_bytes::<NewBlockEvent>(state_value.bytes())
+                .map_err(|e| anyhow::anyhow!("Failed to deserialize NewBlockEvent: {:?}", e))?;
             if self
                 .epoch_to_validators
                 .contains_key(&new_block_event.epoch())

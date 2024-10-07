@@ -1,0 +1,28 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct T {
+        x: bool,
+        y: u8,
+        z: address,
+    }
+    struct S {
+        0: bool,
+        1: u8,
+        2: address,
+    }
+    private fun extra_dotdot(x: test::S,y: test::T) {
+        {
+          let test::S{ 0: _x, 1: _, 2: _ } = x;
+          {
+            let test::S{ 0: _, 1: _, 2: _ } = x;
+            {
+              let test::S{ 0: _, 1: _, 2: _ } = x;
+              {
+                let test::T{ x: _, y: _, z: _ } = y;
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test

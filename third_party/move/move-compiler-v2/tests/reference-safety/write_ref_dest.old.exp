@@ -1,0 +1,10 @@
+
+Diagnostics:
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/reference-safety/write_ref_dest.move:16:9
+   │
+16 │         (y, _) = (*&y, 1);
+   │         ^^^^^^^^^^^^^^^^^
+
+
+============ bytecode verification succeeded ========

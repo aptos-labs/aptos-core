@@ -29,6 +29,7 @@ mod network;
 #[cfg(test)]
 mod network_tests;
 mod payload_client;
+mod pending_order_votes;
 mod pending_votes;
 pub mod persistent_liveness_storage;
 mod pipeline;
@@ -48,6 +49,7 @@ mod txn_notifier;
 pub mod util;
 
 mod block_preparer;
+pub mod consensus_observer;
 /// AptosBFT implementation
 pub mod consensus_provider;
 /// Required by the telemetry service
@@ -56,7 +58,6 @@ mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
-mod qc_aggregator;
 mod transaction_deduper;
 mod transaction_filter;
 mod transaction_shuffler;

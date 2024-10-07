@@ -5,10 +5,7 @@
 #[cfg(feature = "testing")]
 use aptos_aggregator::resolver::TAggregatorV1View;
 #[cfg(feature = "testing")]
-use aptos_aggregator::{
-    bounded_math::SignedU128,
-    types::{DelayedFieldsSpeculativeError, PanicOr},
-};
+use aptos_aggregator::{bounded_math::SignedU128, types::DelayedFieldsSpeculativeError};
 #[cfg(feature = "testing")]
 use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
@@ -26,7 +23,7 @@ use aptos_types::{
 #[cfg(feature = "testing")]
 use aptos_types::{
     chain_id::ChainId,
-    delayed_fields::PanicError,
+    error::{PanicError, PanicOr},
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
@@ -85,10 +82,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        false
-    }
-
     fn get_delayed_field_value(
         &self,
         _id: &Self::Identifier,
@@ -129,7 +122,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!()
     }
 }
@@ -163,12 +156,16 @@ pub fn aptos_natives(
         misc_gas_params,
         timed_features,
         features,
+        None,
     );
 
-    aptos_natives_with_builder(&mut builder)
+    aptos_natives_with_builder(&mut builder, false)
 }
 
-pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
+pub fn aptos_natives_with_builder(
+    builder: &mut SafeNativeBuilder,
+    inject_create_signer_for_gov_sim: bool,
+) -> NativeFunctionTable {
     #[allow(unreachable_code)]
     aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()
@@ -176,6 +173,7 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             builder,
+            inject_create_signer_for_gov_sim,
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
@@ -223,6 +221,7 @@ pub fn configure_for_unit_test() {
 
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
+    use aptos_framework::natives::object::NativeObjectContext;
     use aptos_table_natives::NativeTableContext;
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
@@ -231,15 +230,18 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
         vec![1],
         vec![1],
         ChainId::test().id(),
+        None,
     ));
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
+        false,
         &*DUMMY_RESOLVER,
     ));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
+    exts.add(NativeObjectContext::default());
 
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();

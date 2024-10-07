@@ -80,6 +80,8 @@ L1:	loc1: u64
 L2:	loc2: u64
 L3:	loc3: u64
 L4:	loc4: u64
+L5:	loc5: u64
+L6:	loc6: u64
 B0:
 	0: LdU64(0)
 	1: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
@@ -91,34 +93,38 @@ B1:
 	6: ImmBorrowLoc[0](loc0: vector<u64>)
 	7: Call 1vector::is_empty<u64>(&vector<u64>): bool
 	8: Not
-	9: BrFalse(16)
+	9: BrFalse(20)
 B2:
 	10: MutBorrowLoc[0](loc0: vector<u64>)
 	11: VecPopBack(5)
 	12: StLoc[2](loc2: u64)
-	13: LdU64(0)
-	14: StLoc[1](loc1: u64)
-	15: Branch(17)
+	13: MoveLoc[1](loc1: u64)
+	14: StLoc[3](loc3: u64)
+	15: MoveLoc[2](loc2: u64)
+	16: StLoc[4](loc4: u64)
+	17: LdU64(0)
+	18: StLoc[1](loc1: u64)
+	19: Branch(21)
 B3:
-	16: Branch(18)
+	20: Branch(22)
 B4:
-	17: Branch(6)
+	21: Branch(6)
 B5:
-	18: MoveLoc[1](loc1: u64)
-	19: StLoc[3](loc3: u64)
-	20: LdU64(0)
-	21: StLoc[4](loc4: u64)
-	22: MoveLoc[3](loc3: u64)
-	23: MoveLoc[4](loc4: u64)
-	24: Eq
-	25: BrFalse(27)
+	22: MoveLoc[1](loc1: u64)
+	23: StLoc[5](loc5: u64)
+	24: LdU64(0)
+	25: StLoc[6](loc6: u64)
+	26: MoveLoc[5](loc5: u64)
+	27: MoveLoc[6](loc6: u64)
+	28: Eq
+	29: BrFalse(31)
 B6:
-	26: Branch(29)
+	30: Branch(33)
 B7:
-	27: LdU64(0)
-	28: Abort
+	31: LdU64(0)
+	32: Abort
 B8:
-	29: Ret
+	33: Ret
 }
 }
 ============ bytecode verification succeeded ========

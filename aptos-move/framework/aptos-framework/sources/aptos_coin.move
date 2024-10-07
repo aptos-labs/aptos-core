@@ -1,9 +1,9 @@
 /// This module defines a minimal and generic Coin and Balance.
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module aptos_framework::aptos_coin {
-    use std::string;
     use std::error;
     use std::signer;
+    use std::string;
     use std::vector;
     use std::option::{Self, Option};
 
@@ -69,6 +69,7 @@ module aptos_framework::aptos_coin {
 
     /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
     /// accounts.
+    /// Expects account and APT store to be registered before calling.
     public(friend) fun configure_accounts_for_test(
         aptos_framework: &signer,
         core_resources: &signer,
@@ -77,7 +78,6 @@ module aptos_framework::aptos_coin {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
-        coin::register<AptosCoin>(core_resources);
         let coins = coin::mint<AptosCoin>(
             18446744073709551615,
             &mint_cap,
@@ -150,17 +150,55 @@ module aptos_framework::aptos_coin {
     }
 
     #[test_only]
+    use aptos_framework::account;
+    #[test_only]
     use aptos_framework::aggregator_factory;
+    #[test_only]
+    use aptos_framework::fungible_asset::FungibleAsset;
+
+    #[test_only]
+    public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
+        ensure_initialized_with_apt_fa_metadata_for_test();
+        coin::coin_to_fungible_asset(
+            coin::mint(
+                amount,
+                &borrow_global<MintCapStore>(@aptos_framework).mint_cap
+            )
+        )
+    }
+
+    #[test_only]
+    public fun ensure_initialized_with_apt_fa_metadata_for_test() {
+        let aptos_framework = account::create_signer_for_test(@aptos_framework);
+        if (!exists<MintCapStore>(@aptos_framework)) {
+            if (!aggregator_factory::aggregator_factory_exists_for_testing()) {
+                aggregator_factory::initialize_aggregator_factory_for_test(&aptos_framework);
+            };
+            let (burn_cap, mint_cap) = initialize(&aptos_framework);
+            coin::destroy_burn_cap(burn_cap);
+            coin::destroy_mint_cap(mint_cap);
+        };
+        coin::create_coin_conversion_map(&aptos_framework);
+        coin::create_pairing<AptosCoin>(&aptos_framework);
+    }
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
-        initialize(aptos_framework)
+        let (burn_cap, mint_cap) = initialize(aptos_framework);
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+        (burn_cap, mint_cap)
     }
 
     // This is particularly useful if the aggregator_factory is already initialized via another call path.
     #[test_only]
-    public fun initialize_for_test_without_aggregator_factory(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
-        initialize(aptos_framework)
+    public fun initialize_for_test_without_aggregator_factory(
+        aptos_framework: &signer
+    ): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+        let (burn_cap, mint_cap) = initialize(aptos_framework);
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+        (burn_cap, mint_cap)
     }
 }

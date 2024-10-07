@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: undeclared `0x1::M::Foo`
+  ┌─ tests/unit_test/notest/test_filter_struct.move:9:23
+  │
+9 │     public fun foo(): Foo {
+  │                       ^^^
+
+error: undeclared struct `M::Foo`
+   ┌─ tests/unit_test/notest/test_filter_struct.move:10:9
+   │
+10 │         Foo {}
+   │         ^^^

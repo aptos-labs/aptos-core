@@ -32,7 +32,7 @@ spec aptos_framework::config_buffer {
         let key = type_info::type_name<T>();
         aborts_if !simple_map::spec_contains_key(configs.configs, key);
         include any::UnpackAbortsIf<T> {
-            x: simple_map::spec_get(configs.configs, key)
+            self: simple_map::spec_get(configs.configs, key)
         };
     }
 
@@ -48,22 +48,20 @@ spec aptos_framework::config_buffer {
     spec schema OnNewEpochAbortsIf<T> {
         use aptos_std::type_info;
         let type_name = type_info::type_name<T>();
-        aborts_if spec_fun_does_exist<T>(type_name) && !exists<T>(@aptos_framework);
         let configs = global<PendingConfigs>(@aptos_framework);
         // TODO(#12015)
         include spec_fun_does_exist<T>(type_name) ==> any::UnpackAbortsIf<T> {
-            x: simple_map::spec_get(configs.configs, type_name)
+            self: simple_map::spec_get(configs.configs, type_name)
         };
     }
 
     spec schema OnNewEpochRequirement<T> {
         use aptos_std::type_info;
         let type_name = type_info::type_name<T>();
-        requires spec_fun_does_exist<T>(type_name) ==> exists<T>(@aptos_framework);
         let configs = global<PendingConfigs>(@aptos_framework);
         // TODO(#12015)
         include spec_fun_does_exist<T>(type_name) ==> any::UnpackRequirement<T> {
-            x: simple_map::spec_get(configs.configs, type_name)
+            self: simple_map::spec_get(configs.configs, type_name)
         };
     }
 

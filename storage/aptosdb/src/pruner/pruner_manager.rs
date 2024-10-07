@@ -34,6 +34,7 @@ pub trait PrunerManager: Sync {
     // in memory progress.
     fn save_min_readable_version(&self, min_readable_version: Version) -> Result<()>;
 
+    #[allow(unused)]
     fn is_pruning_pending(&self) -> bool;
 
     /// (For tests only.) Notifies the worker thread and waits for it to finish its job by polling

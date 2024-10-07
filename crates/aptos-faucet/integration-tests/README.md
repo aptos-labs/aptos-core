@@ -1,5 +1,5 @@
 # Faucet integration tests
-This directory contains Python code to help with running the faucet integration tests. It takes care of spinning up a local testnet, moving the mint key where it is expected, checking that a Redis server is up, and running the integration tests.
+This directory contains Python code to help with running the faucet integration tests. It takes care of spinning up a localnet, moving the mint key where it is expected, checking that a Redis server is up, and running the integration tests.
 
 ## Requirements
 We use [Poetry](https://python-poetry.org/docs/#installation) for packaging and dependency management:

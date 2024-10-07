@@ -1,0 +1,247 @@
+// -- Model dump before bytecode pipeline
+module 0x2::Token {
+    struct Coin {
+        type: #0,
+        value: u64,
+    }
+    public fun create<ATy>(type: #0,value: u64): Token::Coin<#0> {
+        pack Token::Coin<ATy>(type, value)
+    }
+    public fun value<ATy>(coin: &Token::Coin<#0>): u64 {
+        select Token::Coin.value<&Token::Coin<ATy>>(coin)
+    }
+    public fun deposit<ATy>(coin: &mut Token::Coin<#0>,check: Token::Coin<#0>) {
+        {
+          let Token::Coin<ATy>{ type, value } = check;
+          if Eq<ATy>(Borrow(Immutable)(select Token::Coin.type<&mut Token::Coin<ATy>>(coin)), Borrow(Immutable)(type)) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          select Token::Coin.value<&mut Token::Coin<ATy>>(coin) = Add<u64>(select Token::Coin.value<&mut Token::Coin<ATy>>(coin), value);
+          Tuple()
+        }
+    }
+    public fun destroy_zero<ATy>(coin: Token::Coin<#0>) {
+        {
+          let Token::Coin<ATy>{ type: _, value } = coin;
+          if Eq<u64>(value, 0) {
+            Tuple()
+          } else {
+            Abort(11)
+          }
+        }
+    }
+    public fun join<ATy>(xus: Token::Coin<#0>,coin2: Token::Coin<#0>): Token::Coin<#0> {
+        Token::deposit<ATy>(Borrow(Mutable)(xus), coin2);
+        xus
+    }
+    public fun split<ATy>(coin: Token::Coin<#0>,amount: u64): (Token::Coin<#0>, Token::Coin<#0>) {
+        {
+          let other: Token::Coin<ATy> = Token::withdraw<ATy>(Borrow(Mutable)(coin), amount);
+          Tuple(coin, other)
+        }
+    }
+    public fun withdraw<ATy>(coin: &mut Token::Coin<#0>,amount: u64): Token::Coin<#0> {
+        if Ge<u64>(select Token::Coin.value<&mut Token::Coin<ATy>>(coin), amount) {
+          Tuple()
+        } else {
+          Abort(10)
+        };
+        select Token::Coin.value<&mut Token::Coin<ATy>>(coin) = Sub<u64>(select Token::Coin.value<&mut Token::Coin<ATy>>(coin), amount);
+        pack Token::Coin<ATy>(Deref(Borrow(Immutable)(select Token::Coin.type<&mut Token::Coin<ATy>>(coin))), amount)
+    }
+} // end 0x2::Token
+module 0x70dd::ToddNickels {
+    use 0x2::Token; // resolved as: 0x2::Token
+    use std::signer;
+    struct T {
+        dummy_field: bool,
+    }
+    struct Wallet {
+        nickels: Token::Coin<ToddNickels::T>,
+    }
+    public fun init(account: &signer) {
+        if Eq<address>(signer::address_of(account), 0x70dd) {
+          Tuple()
+        } else {
+          Abort(42)
+        };
+        MoveTo<ToddNickels::Wallet>(account, pack ToddNickels::Wallet(Token::create<ToddNickels::T>(pack ToddNickels::T(false), 0)))
+    }
+    public fun destroy(c: Token::Coin<ToddNickels::T>)
+        acquires ToddNickels::Wallet(*)
+     {
+        Token::deposit<ToddNickels::T>(Borrow(Mutable)(select ToddNickels::Wallet.nickels<&mut ToddNickels::Wallet>(BorrowGlobal(Mutable)<ToddNickels::Wallet>(0x70dd))), c)
+    }
+    public fun mint(account: &signer): Token::Coin<ToddNickels::T> {
+        if Eq<address>(signer::address_of(account), 0x70dd) {
+          Tuple()
+        } else {
+          Abort(42)
+        };
+        Token::create<ToddNickels::T>(pack ToddNickels::T(false), 5)
+    }
+} // end 0x70dd::ToddNickels
+module 0xb055::OneToOneMarket {
+    use std::signer;
+    use 0x2::Token; // resolved as: 0x2::Token
+    struct BorrowRecord {
+        record: u64,
+    }
+    struct DepositRecord {
+        record: u64,
+    }
+    struct Pool {
+        coin: Token::Coin<#0>,
+    }
+    struct Price {
+        price: u64,
+    }
+    public fun borrow<In,Out>(account: &signer,amount: u64): Token::Coin<#1>
+        acquires OneToOneMarket::Price(*)
+        acquires OneToOneMarket::Pool(*)
+        acquires OneToOneMarket::DepositRecord(*)
+        acquires OneToOneMarket::BorrowRecord(*)
+     {
+        if Le<u64>(amount, OneToOneMarket::max_borrow_amount<In, Out>(account)) {
+          Tuple()
+        } else {
+          Abort(1025)
+        };
+        OneToOneMarket::update_borrow_record<In, Out>(account, amount);
+        {
+          let pool: &mut OneToOneMarket::Pool<Out> = BorrowGlobal(Mutable)<OneToOneMarket::Pool<Out>>(0xb055);
+          Token::withdraw<Out>(Borrow(Mutable)(select OneToOneMarket::Pool.coin<&mut OneToOneMarket::Pool<Out>>(pool)), amount)
+        }
+    }
+    public fun deposit<In,Out>(account: &signer,coin: Token::Coin<#0>)
+        acquires OneToOneMarket::Pool(*)
+        acquires OneToOneMarket::DepositRecord(*)
+     {
+        {
+          let amount: u64 = Token::value<In>(Borrow(Immutable)(coin));
+          OneToOneMarket::update_deposit_record<In, Out>(account, amount);
+          {
+            let pool: &mut OneToOneMarket::Pool<In> = BorrowGlobal(Mutable)<OneToOneMarket::Pool<In>>(0xb055);
+            Token::deposit<In>(Borrow(Mutable)(select OneToOneMarket::Pool.coin<&mut OneToOneMarket::Pool<In>>(pool)), coin)
+          }
+        }
+    }
+    private fun accept<AssetType>(account: &signer,init: Token::Coin<#0>) {
+        {
+          let sender: address = signer::address_of(account);
+          if Not(exists<OneToOneMarket::Pool<AssetType>>(sender)) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          MoveTo<OneToOneMarket::Pool<AssetType>>(account, pack OneToOneMarket::Pool<AssetType>(init))
+        }
+    }
+    private fun borrowed_amount<In,Out>(account: &signer): u64
+        acquires OneToOneMarket::BorrowRecord(*)
+     {
+        {
+          let sender: address = signer::address_of(account);
+          if Not(exists<OneToOneMarket::BorrowRecord<In, Out>>(sender)) {
+            return 0
+          } else {
+            Tuple()
+          };
+          select OneToOneMarket::BorrowRecord.record<&OneToOneMarket::BorrowRecord<In, Out>>(BorrowGlobal(Immutable)<OneToOneMarket::BorrowRecord<In, Out>>(sender))
+        }
+    }
+    private fun deposited_amount<In,Out>(account: &signer): u64
+        acquires OneToOneMarket::DepositRecord(*)
+     {
+        {
+          let sender: address = signer::address_of(account);
+          if Not(exists<OneToOneMarket::DepositRecord<In, Out>>(sender)) {
+            return 0
+          } else {
+            Tuple()
+          };
+          select OneToOneMarket::DepositRecord.record<&OneToOneMarket::DepositRecord<In, Out>>(BorrowGlobal(Immutable)<OneToOneMarket::DepositRecord<In, Out>>(sender))
+        }
+    }
+    private fun max_borrow_amount<In,Out>(account: &signer): u64
+        acquires OneToOneMarket::Price(*)
+        acquires OneToOneMarket::Pool(*)
+        acquires OneToOneMarket::DepositRecord(*)
+        acquires OneToOneMarket::BorrowRecord(*)
+     {
+        {
+          let input_deposited: u64 = OneToOneMarket::deposited_amount<In, Out>(account);
+          {
+            let output_deposited: u64 = OneToOneMarket::borrowed_amount<In, Out>(account);
+            {
+              let input_into_output: u64 = Mul<u64>(input_deposited, select OneToOneMarket::Price.price<&OneToOneMarket::Price<In, Out>>(BorrowGlobal(Immutable)<OneToOneMarket::Price<In, Out>>(0xb055)));
+              {
+                let max_output: u64 = if Lt<u64>(input_into_output, output_deposited) {
+                  0
+                } else {
+                  Sub<u64>(input_into_output, output_deposited)
+                };
+                {
+                  let available_output: u64 = {
+                    let pool: &OneToOneMarket::Pool<Out> = BorrowGlobal(Immutable)<OneToOneMarket::Pool<Out>>(0xb055);
+                    Token::value<Out>(Borrow(Immutable)(select OneToOneMarket::Pool.coin<&OneToOneMarket::Pool<Out>>(pool)))
+                  };
+                  if Lt<u64>(max_output, available_output) {
+                    max_output
+                  } else {
+                    available_output
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun register_price<In,Out>(account: &signer,initial_in: Token::Coin<#0>,initial_out: Token::Coin<#1>,price: u64) {
+        {
+          let sender: address = signer::address_of(account);
+          if Eq<address>(sender, 0xb055) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          OneToOneMarket::accept<In>(account, initial_in);
+          OneToOneMarket::accept<Out>(account, initial_out);
+          MoveTo<OneToOneMarket::Price<In, Out>>(account, pack OneToOneMarket::Price<In, Out>(price))
+        }
+    }
+    private fun update_borrow_record<In,Out>(account: &signer,amount: u64)
+        acquires OneToOneMarket::BorrowRecord(*)
+     {
+        {
+          let sender: address = signer::address_of(account);
+          if Not(exists<OneToOneMarket::BorrowRecord<In, Out>>(sender)) {
+            MoveTo<OneToOneMarket::BorrowRecord<In, Out>>(account, pack OneToOneMarket::BorrowRecord<In, Out>(0))
+          } else {
+            Tuple()
+          };
+          {
+            let record: &mut u64 = Borrow(Mutable)(select OneToOneMarket::BorrowRecord.record<&mut OneToOneMarket::BorrowRecord<In, Out>>(BorrowGlobal(Mutable)<OneToOneMarket::BorrowRecord<In, Out>>(sender)));
+            record = Add<u64>(Deref(record), amount)
+          }
+        }
+    }
+    private fun update_deposit_record<In,Out>(account: &signer,amount: u64)
+        acquires OneToOneMarket::DepositRecord(*)
+     {
+        {
+          let sender: address = signer::address_of(account);
+          if Not(exists<OneToOneMarket::DepositRecord<In, Out>>(sender)) {
+            MoveTo<OneToOneMarket::DepositRecord<In, Out>>(account, pack OneToOneMarket::DepositRecord<In, Out>(0))
+          } else {
+            Tuple()
+          };
+          {
+            let record: &mut u64 = Borrow(Mutable)(select OneToOneMarket::DepositRecord.record<&mut OneToOneMarket::DepositRecord<In, Out>>(BorrowGlobal(Mutable)<OneToOneMarket::DepositRecord<In, Out>>(sender)));
+            record = Add<u64>(Deref(record), amount)
+          }
+        }
+    }
+} // end 0xb055::OneToOneMarket

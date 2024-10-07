@@ -40,14 +40,18 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     env, str,
-    sync::Arc,
+    sync::{atomic::AtomicU32, Arc},
 };
-use tokio::{runtime::Runtime, time::Duration};
+use tokio::{
+    runtime::{Handle, Runtime},
+    task::block_in_place,
+    time::Duration,
+};
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
-    root_account: LocalAccount,
+    root_account: Arc<LocalAccount>,
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
@@ -86,6 +90,7 @@ impl K8sSwarm {
             )
         })?;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
+        let root_account = Arc::new(root_account);
 
         let mut versions = HashMap::new();
         let cur_version = Version::new(0, image_tag.to_string());
@@ -178,7 +183,7 @@ impl K8sSwarm {
             self.get_kube_client(),
             Some(self.kube_namespace.clone()),
         ));
-        let (peer_id, mut k8snode) = install_public_fullnode(
+        let (peer_id, k8snode) = install_public_fullnode(
             stateful_set_api,
             configmap_api,
             persistent_volume_claim_api,
@@ -201,7 +206,7 @@ impl K8sSwarm {
 
 #[async_trait::async_trait]
 impl Swarm for K8sSwarm {
-    async fn health_check(&mut self) -> Result<()> {
+    async fn health_check(&self) -> Result<()> {
         let nodes = self.validators.values().collect();
         let unhealthy_nodes = nodes_healthcheck(nodes).await.unwrap();
         if !unhealthy_nodes.is_empty() {
@@ -221,24 +226,8 @@ impl Swarm for K8sSwarm {
         Box::new(validators.into_iter())
     }
 
-    fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        let mut validators: Vec<_> = self
-            .validators
-            .values_mut()
-            .map(|v| v as &'a mut dyn Validator)
-            .collect();
-        validators.sort_by_key(|v| v.index());
-        Box::new(validators.into_iter())
-    }
-
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {
         self.validators.get(&id).map(|v| v as &dyn Validator)
-    }
-
-    fn validator_mut(&mut self, id: PeerId) -> Option<&mut dyn Validator> {
-        self.validators
-            .get_mut(&id)
-            .map(|v| v as &mut dyn Validator)
     }
 
     /// TODO: this should really be a method on Node rather than Swarm
@@ -281,22 +270,8 @@ impl Swarm for K8sSwarm {
         Box::new(full_nodes.into_iter())
     }
 
-    fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
-        let mut full_nodes: Vec<_> = self
-            .fullnodes
-            .values_mut()
-            .map(|n| n as &'a mut dyn FullNode)
-            .collect();
-        full_nodes.sort_by_key(|n| n.index());
-        Box::new(full_nodes.into_iter())
-    }
-
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
         self.fullnodes.get(&id).map(|v| v as &dyn FullNode)
-    }
-
-    fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode> {
-        self.fullnodes.get_mut(&id).map(|v| v as &mut dyn FullNode)
     }
 
     fn add_validator(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
@@ -337,11 +312,11 @@ impl Swarm for K8sSwarm {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn chain_info(&mut self) -> ChainInfo<'_> {
+    fn chain_info(&self) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(0);
         let inspection_service_url = self.get_inspection_service_url(0);
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
@@ -457,11 +432,11 @@ impl Swarm for K8sSwarm {
         bail!("No prom client");
     }
 
-    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(idx);
         let inspection_service_url = self.get_inspection_service_url(idx);
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
@@ -492,12 +467,30 @@ async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<V
     Ok(stateful_sets)
 }
 
-fn stateful_set_name_matches(sts: &StatefulSet, suffix: &str) -> bool {
-    if let Some(s) = sts.metadata.name.as_ref() {
-        s.contains(suffix)
-    } else {
-        false
+/// Check if the stateful set labels match the given labels
+fn stateful_set_labels_matches(sts: &StatefulSet, labels: &BTreeMap<String, String>) -> bool {
+    if sts.metadata.labels.is_none() {
+        return false;
     }
+    let sts_labels = sts
+        .metadata
+        .labels
+        .as_ref()
+        .expect("Failed to get StatefulSet labels");
+    labels.iter().all(|(k, v)| {
+        let truncated_k = k.chars().take(63).collect::<String>();
+        let truncated_v = v.chars().take(63).collect::<String>();
+        // warn if the label is truncated
+        if truncated_k != *k || truncated_v != *v {
+            warn!(
+                "Label truncated during search: {} -> {}, {} -> {}",
+                k, truncated_k, v, truncated_v
+            );
+        }
+        sts_labels
+            .get(&truncated_k)
+            .map_or(false, |val| val == &truncated_v)
+    })
 }
 
 fn parse_service_name_from_stateful_set_name(
@@ -570,7 +563,7 @@ fn get_k8s_node_from_stateful_set(
         peer_id: PeerId::random(),
         index,
         service_name,
-        rest_api_port,
+        rest_api_port: AtomicU32::new(rest_api_port),
         version: Version::new(0, image_tag),
         namespace: namespace.to_string(),
         haproxy_enabled: enable_haproxy,
@@ -587,7 +580,21 @@ pub(crate) async fn get_validators(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let validators = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_name_matches(sts, "validator"))
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    (
+                        "app.kubernetes.io/name".to_string(),
+                        "validator".to_string(),
+                    ),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-node".to_string(),
+                    ),
+                ]),
+            )
+        })
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -597,7 +604,7 @@ pub(crate) async fn get_validators(
     Ok(validators)
 }
 
-pub(crate) async fn get_fullnodes(
+pub(crate) async fn get_validator_fullnodes(
     client: K8sClient,
     kube_namespace: &str,
     use_port_forward: bool,
@@ -606,7 +613,18 @@ pub(crate) async fn get_fullnodes(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let fullnodes = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_name_matches(sts, "fullnode"))
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-node".to_string(),
+                    ),
+                ]),
+            )
+        })
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -689,11 +707,15 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
 
 impl Drop for K8sSwarm {
     fn drop(&mut self) {
-        let runtime = Runtime::new().unwrap();
         if !self.keep {
-            runtime
-                .block_on(uninstall_testnet_resources(self.kube_namespace.clone()))
-                .unwrap();
+            let fut = uninstall_testnet_resources(self.kube_namespace.clone());
+            match Handle::try_current() {
+                Ok(handle) => block_in_place(move || handle.block_on(fut).unwrap()),
+                Err(_err) => {
+                    let runtime = Runtime::new().unwrap();
+                    runtime.block_on(fut).unwrap();
+                },
+            }
         } else {
             println!("Keeping kube_namespace {}", self.kube_namespace);
         }
@@ -812,6 +834,7 @@ impl ChaosExperimentOps for RealChaosExperimentOps {
 mod tests {
     use super::*;
     use crate::chaos_schema::ChaosCondition;
+    use kube::api::ObjectMeta;
 
     #[test]
     fn test_parse_service_name_from_stateful_set_name() {
@@ -885,5 +908,98 @@ mod tests {
             stress_chaos,
         };
         assert!(chaos_ops.are_chaos_experiments_active().await.unwrap());
+    }
+
+    #[test]
+    fn test_stateful_set_labels_matches() {
+        // Create a StatefulSet with some labels
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "validator".to_string());
+        labels.insert("component".to_string(), "blockchain".to_string());
+
+        let sts = StatefulSet {
+            metadata: ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // All labels match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "blockchain".to_string());
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // Subset of labels match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // One label doesn't match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "database".to_string());
+        assert!(!stateful_set_labels_matches(&sts, &match_labels));
+
+        // Extra label in match_labels
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "blockchain".to_string());
+        match_labels.insert("extra".to_string(), "label".to_string());
+        assert!(!stateful_set_labels_matches(&sts, &match_labels));
+
+        // Empty match_labels
+        let match_labels = BTreeMap::new();
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // StatefulSet with no labels
+        let sts_no_labels = StatefulSet {
+            metadata: ObjectMeta {
+                labels: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        assert!(!stateful_set_labels_matches(&sts_no_labels, &match_labels));
+
+        // StatefulSet with truncated labels
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "validator".to_string());
+        // component label is truncated to 63 characters
+        labels.insert(
+            "component".to_string(),
+            "blockchain"
+                .to_string()
+                .repeat(10)
+                .chars()
+                .take(63)
+                .collect::<String>(),
+        );
+
+        let sts_truncated_labels = StatefulSet {
+            metadata: ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut match_labels = BTreeMap::new();
+        // we try to match with the full label, which we dont know if it's truncated or not
+        match_labels.insert(
+            "component".to_string(),
+            "blockchain"
+                .to_string()
+                .repeat(10)
+                .chars()
+                .collect::<String>(),
+        );
+        // it should match because the labels are the same when truncated
+        assert!(stateful_set_labels_matches(
+            &sts_truncated_labels,
+            &match_labels
+        ));
     }
 }

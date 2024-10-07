@@ -648,7 +648,7 @@ impl VerificationAnalysisProcessor {
         // - `I` is not relevant to the caller and we should not instrument `I` in the caller.
         // This information will be consumed in the invariant instrumentation phase later.
 
-        // Step 1: remove suspended invariants from the the relevance set. These suspended
+        // Step 1: remove suspended invariants from the relevance set. These suspended
         // invariants themselves forms a relevance set which will be considered as directly
         // accessed/modified in all callers of this function.
         let mut pruned = BTreeMap::new();

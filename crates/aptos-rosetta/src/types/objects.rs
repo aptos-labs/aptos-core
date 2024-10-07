@@ -28,12 +28,12 @@ use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
+    account_config::{AccountResource, CoinStoreResourceUntyped, WithdrawEvent},
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     event::EventKey,
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
 };
@@ -106,7 +106,7 @@ impl Amount {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BalanceExemption {}
 
-/// Representation of a Block for a blockchain.  For aptos it is the version
+/// Representation of a Block for a blockchain.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Block.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -856,6 +856,7 @@ pub enum TransactionType {
     BlockMetadataExt,
     StateCheckpoint,
     Validator,
+    BlockEpilogue,
 }
 
 impl Display for TransactionType {
@@ -868,6 +869,7 @@ impl Display for TransactionType {
             BlockMetadataExt => "BlockResourceExt",
             StateCheckpoint => "StateCheckpoint",
             Validator => "Validator",
+            BlockEpilogue => "BlockEpilogue",
         })
     }
 }
@@ -877,6 +879,7 @@ impl Transaction {
         server_context: &RosettaContext,
         txn: TransactionOnChainData,
     ) -> ApiResult<Transaction> {
+        // Parses the events, changesets, and metadata out of each transaction
         use aptos_types::transaction::Transaction::*;
         let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
             UserTransaction(user_txn) => {
@@ -892,6 +895,7 @@ impl Transaction {
             ),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
+            BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
         };
 
         // Operations must be sequential and operation index must always be in the same order
@@ -961,6 +965,8 @@ impl Transaction {
                 txn.gas_unit_price(),
             ));
         }
+
+        // TODO: Handle storage gas refund (though nothing currently in Rosetta refunds)
 
         Ok(Transaction {
             transaction_identifier: (&txn_info).into(),
@@ -1152,6 +1158,7 @@ fn parse_failed_operations_from_txn_payload(
     operations
 }
 
+/// Parses a 0x1::coin::transfer to a Withdraw and Deposit
 fn parse_transfer_from_txn_payload(
     payload: &EntryFunction,
     currency: Currency,
@@ -1231,7 +1238,7 @@ async fn parse_operations_from_write_set(
         struct_tag.address,
         struct_tag.module.as_str(),
         struct_tag.name.as_str(),
-        struct_tag.type_params.len(),
+        struct_tag.type_args.len(),
     ) {
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
             parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
@@ -1261,7 +1268,7 @@ async fn parse_operations_from_write_set(
                 .await
         },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
-            if let Some(type_tag) = struct_tag.type_params.first() {
+            if let Some(type_tag) = struct_tag.type_args.first() {
                 // TODO: This will need to be updated to support more coins
                 if type_tag == &native_coin_tag() {
                     parse_coinstore_changes(
@@ -1291,6 +1298,7 @@ async fn parse_operations_from_write_set(
     }
 }
 
+/// Parses any account resource changes, in this case only create account is supported
 fn parse_account_resource_changes(
     version: u64,
     address: AccountAddress,
@@ -1527,6 +1535,7 @@ fn parse_stake_pool_resource_changes(
     Ok(operations)
 }
 
+/// Handles 0x1::staking_contract resource changes
 async fn parse_staking_contract_resource_changes(
     owner_address: AccountAddress,
     data: &[u8],
@@ -1679,6 +1688,7 @@ async fn parse_staking_contract_resource_changes(
     Ok(operations)
 }
 
+/// Parses 0x1::staking_contract commission updates
 async fn parse_update_commission(
     _owner_address: AccountAddress,
     data: &[u8],
@@ -1724,6 +1734,7 @@ async fn parse_update_commission(
     Ok(operations)
 }
 
+/// Parses delegation pool changes to resources
 async fn parse_delegation_pool_resource_changes(
     _owner_address: AccountAddress,
     _data: &[u8],
@@ -1745,7 +1756,7 @@ async fn parse_delegation_pool_resource_changes(
             struct_tag.name.as_str(),
         ) {
             (AccountAddress::ONE, DELEGATION_POOL_MODULE, WITHDRAW_STAKE_EVENT) => {
-                let event: WithdrawUndelegedEvent =
+                let event: WithdrawUndelegatedEvent =
                     if let Ok(event) = bcs::from_bytes(e.event_data()) {
                         event
                     } else {
@@ -1773,6 +1784,7 @@ async fn parse_delegation_pool_resource_changes(
     Ok(operations)
 }
 
+/// Parses coin store direct changes, for withdraws and deposits
 async fn parse_coinstore_changes(
     currency: Currency,
     version: u64,
@@ -1781,7 +1793,7 @@ async fn parse_coinstore_changes(
     events: &[ContractEvent],
     mut operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
-    let coin_store: CoinStoreResource = if let Ok(coin_store) = bcs::from_bytes(data) {
+    let coin_store: CoinStoreResourceUntyped = if let Ok(coin_store) = bcs::from_bytes(data) {
         coin_store
     } else {
         warn!(
@@ -1792,6 +1804,8 @@ async fn parse_coinstore_changes(
     };
 
     let mut operations = vec![];
+
+    // TODO: Handle Event V2 here for migration from Event V1
 
     // Skip if there is no currency that can be found
     let withdraw_amounts = get_amount_from_event(events, coin_store.withdraw_events().key());
@@ -1852,6 +1866,7 @@ fn get_fee_statement_from_event(events: &[ContractEvent]) -> Vec<FeeStatement> {
         .collect()
 }
 
+/// Filters events given a specific event key
 fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
     events: &[ContractEvent],
     event_key: &EventKey,
@@ -1901,8 +1916,10 @@ pub enum InternalOperation {
 
 impl InternalOperation {
     /// Pulls the [`InternalOperation`] from the set of [`Operation`]
+    /// TODO: this needs to be broken up
     pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
         match operations.len() {
+            // Single operation actions
             1 => {
                 if let Some(operation) = operations.first() {
                     match OperationType::from_str(&operation.operation_type) {
@@ -2147,7 +2164,9 @@ impl InternalOperation {
                     operations
                 ))))
             },
+            // Double operation actions (only coin transfer)
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
+            // Anything else is not expected
             _ => Err(ApiError::InvalidOperations(Some(format!(
                 "Unrecognized operation combination {:?}",
                 operations

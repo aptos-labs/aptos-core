@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]
-use aptos_admin_service::profiling::start_cpu_profiling;
+use aptos_system_utils::profiling::start_cpu_profiling;
 use backtrace::Backtrace;
 use clap::Parser;
 use prometheus::{Encoder, TextEncoder};
@@ -166,6 +166,7 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 
     let subscriber = tracing_subscriber::fmt()
         .json()
+        .flatten_event(true)
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)

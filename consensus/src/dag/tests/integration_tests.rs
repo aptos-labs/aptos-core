@@ -7,7 +7,7 @@ use crate::{
     network::{IncomingDAGRequest, NetworkSender, RpcResponder},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
     test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
 };
@@ -17,7 +17,7 @@ use aptos_consensus_types::common::Author;
 use aptos_logger::debug;
 use aptos_network::{
     application::interface::NetworkClient,
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{self, Event, NetworkEvents, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolIdSet,
@@ -67,10 +67,7 @@ impl DagBootstrapUnit {
         >,
         all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
-        let epoch_state = Arc::new(EpochState {
-            epoch,
-            verifier: storage.get_validator_set().into(),
-        });
+        let epoch_state = Arc::new(EpochState::new(epoch, storage.get_validator_set().into()));
         let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
         let dag_storage =
             dag_test::MockStorage::new_with_ledger_info(ledger_info, epoch_state.clone());
@@ -78,7 +75,7 @@ impl DagBootstrapUnit {
         let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
-        let payload_manager = Arc::new(PayloadManager::DirectMempool);
+        let payload_manager = Arc::new(DirectMempoolPayloadManager::new());
 
         let execution_client = Arc::new(DummyExecutionClient);
 
@@ -136,7 +133,7 @@ fn create_network(
     playground: &mut NetworkPlayground,
     id: usize,
     author: Author,
-    validators: ValidatorVerifier,
+    validators: Arc<ValidatorVerifier>,
 ) -> (
     NetworkSender,
     Box<
@@ -147,7 +144,6 @@ fn create_network(
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
-    let (_, conn_status_rx) = conn_notifs_channel::new();
     let network_sender = network::NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
@@ -159,7 +155,7 @@ fn create_network(
         playground.peer_protocols(),
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+    let network_events = NetworkEvents::new(consensus_rx, None, true);
 
     let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
@@ -179,6 +175,7 @@ fn bootstrap_nodes(
     validators: ValidatorVerifier,
 ) -> (Vec<DagBootstrapUnit>, Vec<UnboundedReceiver<OrderedBlocks>>) {
     let peers_and_metadata = playground.peer_protocols();
+    let validators = Arc::new(validators);
     let (nodes, ordered_node_receivers) = signers
         .iter()
         .enumerate()
@@ -195,7 +192,7 @@ fn bootstrap_nodes(
                 .insert_connection_metadata(peer_network_id, conn_meta)
                 .unwrap();
 
-            let (_, storage) = MockStorage::start_for_testing((&validators).into());
+            let (_, storage) = MockStorage::start_for_testing((&*validators).into());
             let (network, network_events) =
                 create_network(playground, id, signer.author(), validators.clone());
 

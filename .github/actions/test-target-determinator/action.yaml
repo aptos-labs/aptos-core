@@ -1,0 +1,53 @@
+name: Test Target Determinator
+description: Runs the test target determinator
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+outputs:
+  run_execution_performance_test:
+    description: "Returns true if the execution performance test should be run"
+    value: ${{ steps.execution_performance_determinator.outputs.run_execution_performance_test }}
+  run_framework_upgrade_test:
+    description: "Returns true if the framework upgrade test should be run"
+    value: ${{ steps.framework_upgrade_determinator.outputs.run_framework_upgrade_test }}
+
+runs:
+  using: composite
+  steps:
+    # Checkout the repository and setup the rust toolchain
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0 # Fetch all git history for accurate target determination
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Output the changed files
+    - name: Output the changed files
+      run: cargo x changed-files -vv
+      shell: bash
+
+    # Output the affected packages
+    - name: Output the affected packages
+      run: cargo x affected-packages -vv
+      shell: bash
+
+    # Run the execution performance test determinator
+    - name: Run the execution performance test determinator
+      id: execution_performance_determinator
+      run: |
+          export RESULT=$(cargo x targeted-execution-performance-tests | awk -F'Execution performance test required: ' '{print $2}')
+          echo "Execution performance test required: $RESULT"
+          echo "run_execution_performance_test=$RESULT" >> $GITHUB_OUTPUT
+      shell: bash
+
+    # Run the framework upgrade test determinator
+    - name: Run the framework upgrade test determinator
+      id: framework_upgrade_determinator
+      run: |
+        export RESULT=$(cargo x targeted-framework-upgrade-tests | awk -F'Framework upgrade test required: ' '{print $2}')
+        echo "Framework upgrade test required: $RESULT"
+        echo "run_framework_upgrade_test=$RESULT" >> $GITHUB_OUTPUT
+      shell: bash

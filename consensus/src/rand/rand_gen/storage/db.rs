@@ -16,7 +16,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_logger::info;
-use aptos_schemadb::{schema::Schema, Options, ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{schema::Schema, Options, SchemaBatch, DB};
 use std::{path::Path, sync::Arc, time::Instant};
 
 pub struct RandDb {
@@ -71,14 +71,14 @@ impl RandDb {
     }
 
     fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
-        let mut iter = self.db.iter::<S>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<S>()?;
         iter.seek_to_first();
         Ok(iter
-            .map(|e| match e {
-                Ok((k, v)) => Ok((k, v)),
-                Err(e) => Err(e.into()),
+            .filter_map(|e| match e {
+                Ok((k, v)) => Some((k, v)),
+                Err(_) => None,
             })
-            .collect::<Result<Vec<(S::Key, S::Value)>>>()?)
+            .collect::<Vec<(S::Key, S::Value)>>())
     }
 }
 

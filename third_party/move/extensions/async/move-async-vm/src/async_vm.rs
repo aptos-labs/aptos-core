@@ -14,17 +14,20 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    module_traversal::*,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
-use move_vm_types::values::{Reference, Value};
+use move_vm_types::{
+    resolver::MoveResolver,
+    values::{Reference, Value},
+};
 use std::{
     collections::HashMap,
     error::Error,
@@ -67,10 +70,10 @@ impl AsyncVM {
             .collect();
         Ok(AsyncVM {
             move_vm: MoveVM::new(
-                natives.into_iter().chain(
-                    natives::actor_natives(async_lib_addr, actor_gas_parameters).into_iter(),
-                ),
-            )?,
+                natives
+                    .into_iter()
+                    .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
+            ),
             actor_metadata,
             message_table,
         })
@@ -81,7 +84,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r impl MoveResolver,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -96,7 +99,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r impl MoveResolver,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
@@ -198,6 +201,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the initializer.
         let gas_before = gas_status.remaining_gas();
+        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
             .execute_function_bypass_visibility(
@@ -206,6 +210,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 gas_status,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -294,9 +299,17 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the handler.
         let gas_before = gas_status.remaining_gas();
+        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
-            .execute_function_bypass_visibility(module_id, handler_id, vec![], args, gas_status)
+            .execute_function_bypass_visibility(
+                module_id,
+                handler_id,
+                vec![],
+                args,
+                gas_status,
+                &mut TraversalContext::new(&traversal_storage),
+            )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();

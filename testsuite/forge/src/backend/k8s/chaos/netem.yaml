@@ -22,7 +22,7 @@ spec:
     rate: "{rate}mbps"
     limit: 20971520 # placeholder value. not supported by tc netem
     buffer: 10000 # placeholder value. not supported by tc netem
-  direction: both
+  direction: to 
   target:
     selector:
       namespaces:
@@ -30,3 +30,5 @@ spec:
       expressionSelectors:
         - {{ key: app.kubernetes.io/instance, operator: In, values: [{target_instance_labels}] }}
     mode: all
+  # This is required to ensure that the network chaos is applied when using service IPs instead of pod IPs
+  externalTargets: [{service_targets}]
