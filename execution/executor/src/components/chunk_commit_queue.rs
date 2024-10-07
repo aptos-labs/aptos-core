@@ -75,7 +75,10 @@ impl ChunkCommitQueue {
         &mut self,
         chunk_to_update_ledger: ChunkToUpdateLedger,
     ) -> Result<()> {
-        self.latest_state = chunk_to_update_ledger.result_state.clone();
+        self.latest_state = chunk_to_update_ledger
+            .state_checkpoint_output
+            .result_state
+            .clone();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
         Ok(())
@@ -126,7 +129,7 @@ impl ChunkCommitQueue {
             self.to_update_ledger.is_empty(),
             "Mixed usage of different modes."
         );
-        self.latest_state = chunk.result_state.clone();
+        self.latest_state = chunk.state_checkpoint_output.result_state.clone();
         self.latest_txn_accumulator = chunk.ledger_update_output.transaction_accumulator.clone();
         self.to_commit.push_back(Some(chunk));
         Ok(())

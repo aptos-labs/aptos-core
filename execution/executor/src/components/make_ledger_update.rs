@@ -31,9 +31,6 @@ impl MakeLedgerUpdate {
     ) -> Result<LedgerUpdateOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["assemble_ledger_diff_for_block"]);
 
-        // Update counters.
-        chunk_output.update_counters_for_processed_chunk();
-
         // Calculate hashes
         let to_commit = &chunk_output.to_commit;
         let txn_outs = to_commit.parsed_outputs();
@@ -93,32 +90,35 @@ impl MakeLedgerUpdate {
     ) -> (Vec<TransactionInfo>, Vec<ContractEvent>) {
         let _timer = OTHER_TIMERS.timer_with(&["process_events_and_writeset_hashes"]);
 
+        let mut txn_infos = Vec::with_capacity(to_commit.len());
+        let mut subscribable_events = Vec::new();
         izip!(
             to_commit.iter(),
             state_checkpoint_hashes,
             event_hashes,
             writeset_hashes
         )
-        .map(
+        .for_each(
             |((txn, txn_out), state_checkpoint_hash, event_root_hash, write_set_hash)| {
-                let subscribable_events: Vec<ContractEvent> = txn_out
-                    .events()
-                    .iter()
-                    .filter(should_forward_to_subscription_service)
-                    .cloned()
-                    .collect();
-                let txn_info = TransactionInfo::new(
+                subscribable_events.extend(
+                    txn_out
+                        .events()
+                        .iter()
+                        .filter(|evt| should_forward_to_subscription_service(evt))
+                        .cloned(),
+                );
+                txn_infos.push(TransactionInfo::new(
                     txn.hash(),
-                    write_set_hash,
-                    event_root_hash,
-                    state_checkpoint_hash.cloned(),
+                    write_set_hash.clone(),
+                    event_root_hash.clone(),
+                    state_checkpoint_hash.clone(),
                     txn_out.gas_used(),
                     txn_out.status().as_kept_status().expect("Already sorted."),
-                );
-                (txn_info, subscribable_events)
+                ));
             },
-        )
-        .unzip()
+        );
+
+        (txn_infos, subscribable_events)
     }
 }
 

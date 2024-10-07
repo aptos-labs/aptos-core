@@ -27,6 +27,8 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use std::sync::Arc;
+use crate::components::make_ledger_update::MakeLedgerUpdate;
+use crate::components::make_state_checkpoint::MakeStateCheckpoint;
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
@@ -67,9 +69,9 @@ pub fn maybe_bootstrap<V: VMExecutor>(
 }
 
 pub struct GenesisCommitter {
-    db: Arc<dyn DbWriter>,
+    _db: Arc<dyn DbWriter>,
     output: ExecutedChunk,
-    base_state_version: Option<Version>,
+    _base_state_version: Option<Version>,
     waypoint: Waypoint,
 }
 
@@ -87,10 +89,10 @@ impl GenesisCommitter {
         let waypoint = Waypoint::new_epoch_boundary(ledger_info)?;
 
         Ok(Self {
-            db,
+            _db: db,
             output,
             waypoint,
-            base_state_version,
+            _base_state_version: base_state_version,
         })
     }
 
@@ -99,6 +101,8 @@ impl GenesisCommitter {
     }
 
     pub fn commit(self) -> Result<()> {
+        todo!()
+        /* FIXME(aldenhu)
         self.db.save_transactions(
             self.output.transactions_to_commit(),
             self.output
@@ -120,6 +124,7 @@ impl GenesisCommitter {
         // DB bootstrapped, avoid anything that could fail after this.
 
         Ok(())
+         */
     }
 }
 
@@ -144,22 +149,33 @@ pub fn calculate_genesis<V: VMExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let (mut output, _, _) = MakeChunkOutput::by_transaction_execution::<V>(
+    let chunk_output = MakeChunkOutput::by_transaction_execution::<V>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         None, /* append_state_checkpoint_to_block */
-    )?
-    .apply_to_ledger(&executed_trees, None)?;
+    )?;
     ensure!(
-        !output.transactions_to_commit().is_empty(),
+        !chunk_output.to_commit.is_empty(),
         "Genesis txn execution failed."
     );
+    ensure!(
+        chunk_output.ends_epoch(),
+        "Genesis txn didn't output reconfig event."
+    );
+    let state_checkpoint_output = MakeStateCheckpoint::make(&chunk_output, &executed_trees.state, None, true)?;
+    let ledger_update_output = MakeLedgerUpdate::make(
+        &chunk_output,
+        &state_checkpoint_output.state_checkpoint_hashes,
+        &executed_trees.transaction_accumulator
+    )?;
 
     let timestamp_usecs = if genesis_version == 0 {
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
+        todo!()
+        /* FIXME(aldenhu):
         let state_view = output.result_view().verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
@@ -173,32 +189,28 @@ pub fn calculate_genesis<V: VMExecutor>(
             "Genesis txn didn't bump epoch."
         );
         get_state_timestamp(&state_view)?
+         */
     };
-    ensure!(
-        output.next_epoch_state.is_some(),
-        "Genesis txn didn't output reconfig event."
-    );
 
-    let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
+    let _ledger_info_with_sigs = LedgerInfoWithSignatures::new(
         LedgerInfo::new(
             BlockInfo::new(
                 epoch,
                 GENESIS_ROUND,
                 genesis_block_id(),
-                output
-                    .ledger_update_output
-                    .transaction_accumulator
-                    .root_hash(),
+                ledger_update_output.transaction_accumulator.root_hash(),
                 genesis_version,
                 timestamp_usecs,
-                output.next_epoch_state.clone(),
+                chunk_output.next_epoch_state.clone(),
             ),
             genesis_block_id(), /* consensus_data_hash */
         ),
         AggregateSignature::empty(), /* signatures */
     );
-    output.ledger_info = Some(ledger_info_with_sigs);
+    todo!()
 
+    /* FIXME(aldenhu): remove ExecutedChunk (use ChunkToCommit)?
+    output.ledger_info = Some(ledger_info_with_sigs);
     let committer = GenesisCommitter::new(
         db.writer.clone(),
         output,
@@ -209,8 +221,11 @@ pub fn calculate_genesis<V: VMExecutor>(
         &committer.output.ledger_info, committer.waypoint,
     );
     Ok(committer)
+     */
 }
 
+// FIXME(aldenhu):
+#[allow(dead_code)]
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value_bytes(&StateKey::resource_typed::<TimestampResource>(

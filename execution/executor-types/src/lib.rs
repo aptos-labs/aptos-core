@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
-use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
 use aptos_crypto::{
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
@@ -44,12 +43,12 @@ use std::{
 };
 
 pub mod chunk_output;
+pub mod chunk_to_commit;
 mod error;
 mod executed_chunk;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
-pub mod chunk_to_commit;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -144,9 +143,8 @@ pub trait BlockExecutorTrait: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
-        let state_checkpoint_output =
-            self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
-        self.ledger_update(block_id, parent_block_id, state_checkpoint_output)
+        self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
+        self.ledger_update(block_id, parent_block_id)
     }
 
     /// Executes a block and returns the state checkpoint output.
@@ -155,13 +153,12 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput>;
+    ) -> ExecutorResult<()>;
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
     #[cfg(any(test, feature = "fuzzing"))]

@@ -629,17 +629,19 @@ impl TransactionRestoreBatchController {
                         .with_label_values(&["commit_txn_chunk"])
                         .start_timer();
                     tokio::task::spawn_blocking(move || {
-                        let v = chunk_replayer.commit()?;
-                        let total_replayed = v - first_version + 1;
-                        TRANSACTION_REPLAY_VERSION.set(v as i64);
+                        let committed_chunk = chunk_replayer.commit()?;
+                        let next_version = committed_chunk.chunk_output.next_version();
+                        let total_replayed = next_version - first_version;
+                        let last_version = next_version - 1;
+                        TRANSACTION_REPLAY_VERSION.set(last_version as i64);
                         info!(
-                            version = v,
+                            version = last_version,
                             accumulative_tps = (total_replayed as f64
                                 / replay_start.elapsed().as_secs_f64())
                                 as u64,
                             "Transactions replayed."
                         );
-                        Ok(v)
+                        Ok(last_version)
                     })
                     .await?
                 }

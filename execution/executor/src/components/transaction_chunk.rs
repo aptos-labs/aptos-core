@@ -98,7 +98,7 @@ impl TransactionChunkWithProof for TransactionListWithProof {
         let chunk_out = {
             let _timer = VM_EXECUTE_CHUNK.start_timer();
 
-            ChunkOutput::by_transaction_execution::<V>(
+            MakeChunkOutput::by_transaction_execution::<V>(
                 sig_verified_txns.into(),
                 state_view,
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),

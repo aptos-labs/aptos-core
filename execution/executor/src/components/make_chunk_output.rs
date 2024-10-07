@@ -13,6 +13,7 @@ use aptos_executor_types::{
     ParsedTransactionOutput,
 };
 use aptos_logger::error;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
 use aptos_types::{
     block_executor::{
@@ -29,7 +30,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
         Transaction, TransactionOutput, TransactionStatus, Version,
     },
-    write_set::WriteSet,
+    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMExecutor;
 use std::{iter, sync::Arc};
@@ -67,11 +68,13 @@ impl MakeChunkOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ChunkOutput> {
+        let first_version = state_view.next_version();
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
         let state_cache = state_view.into_state_cache();
         RawChunkOutputParser {
+            first_version,
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache,
@@ -86,6 +89,7 @@ impl MakeChunkOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ChunkOutput> {
+        let first_version = state_view.next_version();
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
@@ -99,6 +103,7 @@ impl MakeChunkOutput {
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
         RawChunkOutputParser {
+            first_version,
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
                 .map(|t| t.into_txn().into_inner())
@@ -117,7 +122,10 @@ impl MakeChunkOutput {
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
 
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
+        {
+            let _timer = OTHER_TIMERS.timer_with(&["update_counters__by_output"]);
+            update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
+        }
 
         // collect all accounts touched and dedup
         let write_set = transaction_outputs
@@ -145,14 +153,14 @@ impl MakeChunkOutput {
     ) -> Result<Vec<TransactionOutput>> {
         if !get_remote_addresses().is_empty() {
             Ok(V::execute_block_sharded(
-                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                &REMOTE_SHARDED_BLOCK_EXECUTOR.lock(),
                 partitioned_txns,
                 state_view,
                 onchain_config,
             )?)
         } else {
             Ok(V::execute_block_sharded(
-                SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                &SHARDED_BLOCK_EXECUTOR.lock(),
                 partitioned_txns,
                 state_view,
                 onchain_config,
@@ -208,12 +216,6 @@ impl MakeChunkOutput {
             ),
         };
         Ok(transaction_outputs)
-    }
-
-    pub(crate) fn update_counters_for_processed_chunk(&self) {
-        for x in [&self.to_commit, &self.to_discard, &self.to_retry] {
-            update_counters_for_processed_chunk(x.txns(), x.parsed_outputs(), "execution");
-        }
     }
 }
 
@@ -271,7 +273,15 @@ impl RawChunkOutputParser {
         );
         let next_epoch_state = to_commit
             .ends_with_reconfig()
-            .then(|| Self::expect_next_epoch_state(&to_commit)?);
+            .then(|| Self::ensure_next_epoch_state(&to_commit))
+            .transpose()?;
+
+        {
+            let _timer = OTHER_TIMERS.timer_with(&["update_counters__by_execution"]);
+            for x in [&to_commit, &to_discard, &to_retry] {
+                update_counters_for_processed_chunk(x.txns(), x.parsed_outputs(), "execution");
+            }
+        }
 
         Ok(ChunkOutput {
             first_version,
@@ -384,11 +394,11 @@ impl RawChunkOutputParser {
         to_commit
     }
 
-    fn expect_next_epoch_state(to_commit: &TransactionsWithParsedOutput) -> Result<EpochState> {
+    fn ensure_next_epoch_state(to_commit: &TransactionsWithParsedOutput) -> Result<EpochState> {
         let last_write_set = to_commit
             .parsed_outputs()
             .last()
-            .ok_or_else(|| Err(anyhow!("to_commit is empty.")))?
+            .ok_or_else(|| anyhow!("to_commit is empty."))?
             .write_set();
 
         let write_set_view = WriteSetStateView {
@@ -400,10 +410,10 @@ impl RawChunkOutputParser {
         let configuration = ConfigurationResource::fetch_config(&write_set_view)
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
-        Ok(EpochState {
-            epoch: configuration.epoch(),
-            verifier: (&validator_set).into(),
-        })
+        Ok(EpochState::new(
+            configuration.epoch(),
+            (&validator_set).into(),
+        ))
     }
 }
 
@@ -421,7 +431,7 @@ impl<'a> TStateView for WriteSetStateView<'a> {
         Ok(self
             .write_set
             .get(state_key)
-            .flat_map(|write_op| write_op.as_state_value()))
+            .and_then(|write_op| write_op.as_state_value()))
     }
 
     fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {

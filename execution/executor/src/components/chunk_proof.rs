@@ -60,7 +60,7 @@ impl ChunkProof {
         next_epoch_state: Option<&EpochState>,
     ) -> Result<Option<LedgerInfoWithSignatures>> {
         let verified_li = self.verified_target_li.ledger_info();
-        let txn_accumulator = ledger_update_output.transaction_accumulator();
+        let txn_accumulator = &ledger_update_output.transaction_accumulator;
 
         if verified_li.version() + 1 == txn_accumulator.num_leaves() {
             // If the chunk corresponds to the target LI, the target LI can be added to storage.
@@ -73,30 +73,30 @@ impl ChunkProof {
             Ok(Some(self.verified_target_li.clone()))
         } else if let Some(epoch_change_li) = &self.epoch_change_li {
             // If the epoch change LI is present, it must match the version of the chunk:
-            let epoch_change_li = epoch_change_li.ledger_info();
+            let li = epoch_change_li.ledger_info();
 
             // Verify that the given ledger info corresponds to the new accumulator.
             ensure!(
-                epoch_change_li.transaction_accumulator_hash() == txn_accumulator.root_hash(),
+                li.transaction_accumulator_hash() == txn_accumulator.root_hash(),
                 "Root hash of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li,
+                li,
                 txn_accumulator,
             );
             ensure!(
-                epoch_change_li.version() + 1 == txn_accumulator.num_leaves(),
+                li.version() + 1 == txn_accumulator.num_leaves(),
                 "Version of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li,
+                li,
                 txn_accumulator,
             );
             ensure!(
-                epoch_change_li.ends_epoch(),
+                li.ends_epoch(),
                 "Epoch change LI does not carry validator set. version:{}",
-                epoch_change_li.version(),
+                li.version(),
             );
             ensure!(
-                epoch_change_li.next_epoch_state() == next_epoch_state,
+                li.next_epoch_state() == next_epoch_state,
                 "New validator set of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li.ledger_info().next_epoch_state(),
+                li.next_epoch_state(),
                 next_epoch_state,
             );
             Ok(Some(epoch_change_li.clone()))

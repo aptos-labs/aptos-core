@@ -16,7 +16,6 @@ use crate::{
     metrics::{APPLY_CHUNK, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE, EXECUTE_CHUNK},
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
@@ -34,12 +33,10 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::TransactionInfoListWithProof,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
+        TransactionListWithProof, TransactionOutputListWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -192,11 +189,12 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             StateViewId::ChunkExecution { first_version },
             self.db.reader.clone(),
             first_version,
-            latest_state.current.clone(),
+            &latest_state.current,
             Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
         )?)
     }
 
+    /* FIXME(aldenhu): confirm remove
     fn verify_extends_ledger(
         &self,
         proof: &TransactionInfoListWithProof,
@@ -215,6 +213,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         Ok(())
     }
+     */
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__total"]);
@@ -608,9 +607,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             None, /* append_state_checkpoint_to_block */
         )?;
         // not `zip_eq`, deliberately
-        for (version, txn_out, txn_info, write_set, events) in multizip((
+        for (version, (_txn, txn_out), txn_info, write_set, events) in multizip((
             begin_version..end_version,
-            chunk_output.transaction_outputs.iter(),
+            chunk_output.to_commit.iter(),
             transaction_infos.iter(),
             write_sets.iter(),
             event_vecs.iter(),
@@ -637,15 +636,17 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     /// It's guaranteed that there's no known broken versions or epoch endings in the range.
     fn remove_and_apply(
         &self,
-        executed_chunk: &mut Option<ExecutedChunk>,
-        latest_view: &mut ExecutedTrees,
-        transactions: &mut Vec<Transaction>,
-        transaction_infos: &mut Vec<TransactionInfo>,
-        write_sets: &mut Vec<WriteSet>,
-        event_vecs: &mut Vec<Vec<ContractEvent>>,
-        begin_version: Version,
-        end_version: Version,
+        _executed_chunk: &mut Option<ExecutedChunk>,
+        _latest_view: &mut ExecutedTrees,
+        _transactions: &mut Vec<Transaction>,
+        _transaction_infos: &mut Vec<TransactionInfo>,
+        _write_sets: &mut Vec<WriteSet>,
+        _event_vecs: &mut Vec<Vec<ContractEvent>>,
+        _begin_version: Version,
+        _end_version: Version,
     ) -> Result<()> {
+        todo!()
+        /* FIXME(aldenhu): redo
         let num_txns = (end_version - begin_version) as usize;
         let txn_infos: Vec<_> = transaction_infos.drain(..num_txns).collect();
         let txns_and_outputs = multizip((
@@ -709,5 +710,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         }
         *latest_view = executed_chunk.as_ref().unwrap().result_view();
         Ok(())
+         */
     }
 }

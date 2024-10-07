@@ -509,6 +509,7 @@ impl StateStore {
                 .freeze(&buffered_state.current_state().base);
             let latest_snapshot_state_view = CachedStateView::new_impl(
                 StateViewId::Miscellaneous,
+                snapshot.map(|(ver, _hash)| ver),
                 snapshot,
                 speculative_state,
                 Arc::new(AsyncProofFetcher::new(state_db.clone())),
@@ -534,7 +535,7 @@ impl StateStore {
             let (updates_until_last_checkpoint, state_after_last_checkpoint) =
                 InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
                     buffered_state.current_state(),
-                    latest_snapshot_state_view.into_state_cache(),
+                    &latest_snapshot_state_view.into_state_cache(),
                     last_checkpoint_index,
                     &write_sets,
                 )?;

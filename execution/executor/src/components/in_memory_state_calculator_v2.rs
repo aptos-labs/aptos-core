@@ -56,7 +56,6 @@ impl InMemoryStateCalculatorV2 {
             &chunk_output.state_cache,
             state_updates_vec,
             last_checkpoint_index,
-            chunk_output.to_commit.ends_epoch(),
             is_block,
         )
     }
@@ -74,7 +73,6 @@ impl InMemoryStateCalculatorV2 {
             state_cache,
             state_updates_vec,
             last_checkpoint_index,
-            /*new_epoch=*/ false,
             /*is_block=*/ false,
         )?;
 

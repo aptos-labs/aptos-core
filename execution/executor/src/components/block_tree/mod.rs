@@ -12,21 +12,19 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::{chunk_output::ChunkOutput, state_checkpoint_output::StateCheckpointOutput, ExecutorError, LedgerUpdateOutput, StateComputeResult};
+use aptos_executor_types::{
+    chunk_output::ChunkOutput, chunk_to_commit::ChunkToCommit,
+    state_checkpoint_output::StateCheckpointOutput, ExecutorError, LedgerUpdateOutput,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::{DbReader, ExecutedTrees};
-use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
-use itertools::Chunk;
+use aptos_types::ledger_info::LedgerInfo;
+use once_cell::sync::OnceCell;
 use std::{
-    cell::OnceCell,
     collections::{hash_map::Entry, HashMap},
-    iter::Once,
     sync::{mpsc::Receiver, Arc, Weak},
 };
-use aptos_executor_types::chunk_to_commit::ChunkToCommit;
-use aptos_types::proof::accumulator::InMemoryTransactionAccumulator;
-use aptos_types::transaction::Version;
 
 pub struct Block {
     pub id: HashValue,
@@ -91,7 +89,7 @@ impl BlockLookupInner {
     fn fetch_or_add_block(
         &mut self,
         id: HashValue,
-        output: ExecutionOutput,
+        output: BlockOutput,
         parent_id: Option<HashValue>,
         block_lookup: &Arc<BlockLookup>,
     ) -> Result<(Arc<Block>, bool, Option<Arc<Block>>)> {
@@ -286,7 +284,7 @@ impl BlockTree {
     }
 }
 
-pub(crate) struct BlockOutput {
+pub struct BlockOutput {
     pub chunk_output: ChunkOutput,
     pub state_checkpoint_output: OnceCell<StateCheckpointOutput>,
     pub ledger_update_output: OnceCell<LedgerUpdateOutput>,
@@ -392,5 +390,9 @@ impl BlockOutput {
             state_checkpoint_output: self.expect_state_checkpoint_output(),
             ledger_update_output: self.expect_ledger_update_output(),
         }
+    }
+
+    pub fn is_same_state(&self, other: &Self) -> bool {
+        self.chunk_output.statuses_for_input_txns == other.chunk_output.statuses_for_input_txns
     }
 }

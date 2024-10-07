@@ -5,16 +5,12 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    chunk_output::ChunkOutput, parsed_transaction_output::TransactionsWithParsedOutput,
+    chunk_output::ChunkOutput, chunk_to_commit::ChunkToCommit,
+    parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::StateCheckpointOutput, ChunkCommitNotification, LedgerUpdateOutput,
 };
 use aptos_storage_interface::ExecutedTrees;
-use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionOutputProvider, TransactionToCommit},
-};
-use itertools::izip;
-use crate::chunk_to_commit::ChunkToCommit;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
 // FIXME(aldenhu): eliminate or proper naming or move to executor
 #[derive(Debug)]

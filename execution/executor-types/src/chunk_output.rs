@@ -4,12 +4,10 @@
 
 use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 use anyhow::{ensure, Result};
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    state_store::state_value::StateValue,
     transaction::{BlockEndInfo, TransactionStatus, Version},
 };
 
