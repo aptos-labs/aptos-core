@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_logger::error;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
@@ -9,7 +10,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use arc_swap::ArcSwapOption;
 use bytes::Bytes;
-use claims::assert_ok;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
@@ -91,14 +91,14 @@ impl CachedAptosEnvironment {
 static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<CachedAptosEnvironment>>> =
     Lazy::new(|| Mutex::new(None));
 
-/// Initializes the module cache for the framework that can live over multiple blocks. Should be
-/// called at block boundaries.
+/// Initializes the module cache for the framework that can live over multiple blocks. This
+/// function should only be called at the block boundaries.
 pub fn initialize_cross_block_framework_cache(
     state_view: &impl StateView,
     runtime_environment: &RuntimeEnvironment,
 ) {
-    // We need to check that the framework is really cached. We check if transaction validation
-    // module is cached.
+    // Check that the framework is cached - it is sufficient to check that transaction validation
+    // module is in cache.
     if check_module_exists_in_cross_block_framework_cache(
         &AccountAddress::ONE,
         ident_str!("transaction_validation"),
@@ -106,6 +106,8 @@ pub fn initialize_cross_block_framework_cache(
         return;
     }
 
+    // Otherwise, we need to cache the framework. For that, we will load all modules from the
+    // release bundle.
     let mut cache = hashbrown::HashMap::new();
     let module_storage = state_view.as_aptos_code_storage(runtime_environment);
     let framework = aptos_cached_packages::head_release_bundle();
@@ -117,11 +119,18 @@ pub fn initialize_cross_block_framework_cache(
         let module_id = module.self_id();
 
         let state_key = StateKey::module_id(&module_id);
-        let state_value = assert_ok!(state_view.get_state_value(&state_key));
-        let module =
-            assert_ok!(module_storage.fetch_verified_module(module_id.address(), module_id.name()));
+        let state_value = state_view.get_state_value(&state_key);
+        let module = module_storage.fetch_verified_module(module_id.address(), module_id.name());
 
-        if let (Some(state_value), Some(module)) = (state_value, module) {
+        // In general, we should not see any errors, but ensure to log an error in case we see one.
+        if let Err(err) = &state_value {
+            error!("Error when getting the state value for module {}::{} to store in cross-block framework cache: {:?}", module_id.address(), module_id.name(), err);
+        }
+        if let Err(err) = &module {
+            error!("Error when fetching a verified module {}::{} to store in cross-block framework cache: {:?}", module_id.address(), module_id.name(), err);
+        }
+
+        if let (Ok(Some(state_value)), Ok(Some(module))) = (state_value, module) {
             let entry =
                 ModuleStorageEntry::from_state_value_and_verified_module(state_value, module);
             cache.insert(module_id, entry);
@@ -235,11 +244,16 @@ pub(crate) fn fetch_verified_module_from_cross_block_framework_cache(
     None
 }
 
-/// Flushes the cross-block cache for framework modules. Used when the framework is upgraded.
+/// Flushes the cross-block cache for framework modules. Used when the framework is upgraded. Can
+/// be called during the block execution.
 pub(crate) fn flush_cross_block_framework_cache() {
     CROSS_BLOCK_FRAMEWORK_CACHE.store(None)
 }
 
+// Note:
+//   There can be concurrent accesses to the framework cache, hence we use the arc swap. For
+//   instance, we can read from cache while a transaction is being committed and is publishing the
+//   framework (flushing the cache).
 static CROSS_BLOCK_FRAMEWORK_CACHE: Lazy<
     ArcSwapOption<hashbrown::HashMap<ModuleId, ModuleStorageEntry>>,
 > = Lazy::new(|| ArcSwapOption::new(None));
