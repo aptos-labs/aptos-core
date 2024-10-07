@@ -7,7 +7,7 @@ use crate::{
     MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
     MoveValue, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use anyhow::{bail, Context as AnyhowContext};
+use anyhow::{bail, Context as AnyhowContext, Result};
 use aptos_crypto::{
     ed25519::{self, Ed25519PublicKey, ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH},
     multi_ed25519::{self, MultiEd25519PublicKey, BITMAP_NUM_OF_BYTES, MAX_NUM_OF_KEYS},
@@ -70,9 +70,21 @@ pub enum TransactionData {
     Pending(Box<SignedTransaction>),
 }
 
-impl From<TransactionOnChainData> for TransactionData {
-    fn from(txn: TransactionOnChainData) -> Self {
-        Self::OnChain(txn)
+impl TransactionData {
+    pub fn from_transaction_onchain_data(
+        txn: TransactionOnChainData,
+        latest_ledger_version: u64,
+    ) -> Result<Self> {
+        if txn.version > latest_ledger_version {
+            match txn.transaction {
+                aptos_types::transaction::Transaction::UserTransaction(txn) => {
+                    Ok(Self::Pending(Box::new(txn)))
+                },
+                _ => bail!("convert non-user onchain transaction to pending shouldn't exist"),
+            }
+        } else {
+            Ok(Self::OnChain(txn))
+        }
     }
 }
 

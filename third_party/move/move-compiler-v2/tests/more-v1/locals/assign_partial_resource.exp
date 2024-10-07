@@ -1,0 +1,59 @@
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/more-v1/locals/assign_partial_resource.move:6:21
+  │
+6 │         if (cond) { r = R{}; };
+  │                     ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:13:29
+   │
+13 │         if (cond) {} else { r = R{}; };
+   │                             ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:20:24
+   │
+20 │         while (cond) { r = R{} };
+   │                        ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:27:16
+   │
+27 │         loop { r = R{} }
+   │                ^^^^^^^
+
+
+Diagnostics:
+error: local `r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/more-v1/locals/assign_partial_resource.move:6:21
+  │
+6 │         if (cond) { r = R{}; };
+  │                     ^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:13:29
+   │
+13 │         if (cond) {} else { r = R{}; };
+   │                             ^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:20:24
+   │
+20 │         while (cond) { r = R{} };
+   │                        ^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `x` of type `T` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:31:21
+   │
+31 │         if (cond) { x = y };
+   │                     ^^^^^ implicitly dropped here since it is no longer used
+
+error: local `y` of type `T` does not have the `copy` ability
+   ┌─ tests/more-v1/locals/assign_partial_resource.move:31:21
+   │
+31 │         if (cond) { x = y };
+   │                     ^^^^^ copy needed here because value is still in use
+32 │         (x, y)
+   │             - used here

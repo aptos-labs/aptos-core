@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/invalid_call_lhs_parens_around_name.move:3:14
+  │
+3 │         (foo)()
+  │              ^
+  │              │
+  │              Unexpected '('
+  │              Expected ';'

@@ -12,17 +12,15 @@ use crate::counters;
 use aptos_consensus_types::{
     common::Author,
     quorum_cert::QuorumCert,
+    round_timeout::RoundTimeout,
     timeout_2chain::{TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures},
     vote::Vote,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::{
-        LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures, VerificationStatus,
-    },
-    validator_verifier::VerifyError,
+    ledger_info::{LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
+    validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{collections::HashMap, fmt, sync::Arc};
 
@@ -86,13 +84,89 @@ impl PendingVotes {
         }
     }
 
+    /// Insert a RoundTimeout and return a TimeoutCertificate if it can be formed
+    pub fn insert_round_timeout(
+        &mut self,
+        round_timeout: &RoundTimeout,
+        validator_verifier: &ValidatorVerifier,
+    ) -> VoteReceptionResult {
+        //
+        // Let's check if we can create a TC
+        //
+
+        let timeout = round_timeout.two_chain_timeout();
+        let signature = round_timeout.signature();
+
+        let validator_voting_power = validator_verifier
+            .get_voting_power(&round_timeout.author())
+            .unwrap_or(0);
+        if validator_voting_power == 0 {
+            warn!(
+                "Received vote with no voting power, from {}",
+                round_timeout.author()
+            );
+        }
+        let cur_epoch = round_timeout.epoch();
+        let cur_round = round_timeout.round();
+
+        counters::CONSENSUS_CURRENT_ROUND_TIMEOUT_VOTED_POWER
+            .with_label_values(&[&round_timeout.author().to_string()])
+            .set(validator_voting_power as f64);
+        counters::CONSENSUS_LAST_TIMEOUT_VOTE_EPOCH
+            .with_label_values(&[&round_timeout.author().to_string()])
+            .set(cur_epoch as i64);
+        counters::CONSENSUS_LAST_TIMEOUT_VOTE_ROUND
+            .with_label_values(&[&round_timeout.author().to_string()])
+            .set(cur_round as i64);
+
+        let partial_tc = self
+            .maybe_partial_2chain_tc
+            .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
+        partial_tc.add(round_timeout.author(), timeout.clone(), signature.clone());
+        let tc_voting_power =
+            match validator_verifier.check_voting_power(partial_tc.signers(), true) {
+                Ok(_) => {
+                    return match partial_tc.aggregate_signatures(validator_verifier) {
+                        Ok(tc_with_sig) => {
+                            VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
+                        },
+                        Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
+                    };
+                },
+                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+                Err(error) => {
+                    error!(
+                        "MUST_FIX: 2-chain timeout vote received could not be added: {}, vote: {}",
+                        error, timeout
+                    );
+                    return VoteReceptionResult::ErrorAddingVote(error);
+                },
+            };
+
+        // Echo timeout if receive f+1 timeout message.
+        if !self.echo_timeout {
+            let f_plus_one = validator_verifier.total_voting_power()
+                - validator_verifier.quorum_voting_power()
+                + 1;
+            if tc_voting_power >= f_plus_one {
+                self.echo_timeout = true;
+                return VoteReceptionResult::EchoTimeout(tc_voting_power);
+            }
+        }
+
+        //
+        // No TC could be formed, return the TC's voting power
+        //
+
+        VoteReceptionResult::VoteAdded(tc_voting_power)
+    }
+
     /// Insert a vote and if the vote is valid, return a QuorumCertificate preferentially over a
     /// TimeoutCertificate if either can can be formed
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        epoch_state: Arc<EpochState>,
-        verification_status: VerificationStatus,
+        validator_verifier: &ValidatorVerifier,
     ) -> VoteReceptionResult {
         // derive data from vote
         let li_digest = vote.ledger_info().hash();
@@ -147,7 +221,7 @@ impl PendingVotes {
             )
         });
 
-        let validator_voting_power = epoch_state.verifier.get_voting_power(&vote.author());
+        let validator_voting_power = validator_verifier.get_voting_power(&vote.author());
 
         if validator_voting_power.is_none() {
             warn!("Received vote from an unknown author: {}", vote.author());
@@ -155,14 +229,13 @@ impl PendingVotes {
         }
         let validator_voting_power =
             validator_voting_power.expect("Author must exist in the validator set.");
-
         if validator_voting_power == 0 {
             warn!("Received vote with no voting power, from {}", vote.author());
         }
         let cur_epoch = vote.vote_data().proposed().epoch() as i64;
         let cur_round = vote.vote_data().proposed().round() as i64;
         counters::CONSENSUS_CURRENT_ROUND_QUORUM_VOTING_POWER
-            .set(epoch_state.verifier.quorum_voting_power() as f64);
+            .set(validator_verifier.quorum_voting_power() as f64);
 
         if !vote.is_timeout() {
             counters::CONSENSUS_CURRENT_ROUND_VOTED_POWER
@@ -185,18 +258,14 @@ impl PendingVotes {
             },
             VoteStatus::NotEnoughVotes(li_with_sig) => {
                 // add this vote to the ledger info with signatures
-                li_with_sig.add_signature(
-                    vote.author(),
-                    vote.signature().clone(),
-                    verification_status,
-                );
+                li_with_sig.add_signature(vote.author(), vote.signature_with_status());
 
                 // check if we have enough signatures to create a QC
-                match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
+                match li_with_sig.check_voting_power(validator_verifier, true) {
                     // a quorum of signature was reached, a new QC is formed
                     Ok(aggregated_voting_power) => {
                         assert!(
-                                aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
+                                aggregated_voting_power >= validator_verifier.quorum_voting_power(),
                                 "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                             );
                         let verification_result = {
@@ -204,17 +273,20 @@ impl PendingVotes {
                                 .with_label_values(&["vote_aggregate_and_verify"])
                                 .start_timer();
 
-                            li_with_sig.aggregate_and_verify(epoch_state.clone())
+                            li_with_sig.aggregate_and_verify(validator_verifier)
                         };
-                        return match verification_result {
+                        match verification_result {
                             Ok(ledger_info_with_sig) => {
                                 *status = VoteStatus::EnoughVotes(ledger_info_with_sig.clone());
-                                VoteReceptionResult::NewQuorumCertificate(Arc::new(
+                                return VoteReceptionResult::NewQuorumCertificate(Arc::new(
                                     QuorumCert::new(vote.vote_data().clone(), ledger_info_with_sig),
-                                ))
+                                ));
                             },
-                            Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
-                        };
+                            Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
+                                voting_power
+                            },
+                            Err(e) => return VoteReceptionResult::ErrorAggregatingSignature(e),
+                        }
                     },
 
                     // not enough votes
@@ -251,32 +323,30 @@ impl PendingVotes {
                 .maybe_partial_2chain_tc
                 .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
             partial_tc.add(vote.author(), timeout.clone(), signature.clone());
-            let tc_voting_power = match epoch_state
-                .verifier
-                .check_voting_power(partial_tc.signers(), true)
-            {
-                Ok(_) => {
-                    return match partial_tc.aggregate_signatures(&epoch_state.verifier) {
-                        Ok(tc_with_sig) => {
-                            VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
-                        },
-                        Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
-                    };
-                },
-                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
-                Err(error) => {
-                    error!(
+            let tc_voting_power =
+                match validator_verifier.check_voting_power(partial_tc.signers(), true) {
+                    Ok(_) => {
+                        return match partial_tc.aggregate_signatures(validator_verifier) {
+                            Ok(tc_with_sig) => VoteReceptionResult::New2ChainTimeoutCertificate(
+                                Arc::new(tc_with_sig),
+                            ),
+                            Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
+                        };
+                    },
+                    Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+                    Err(error) => {
+                        error!(
                         "MUST_FIX: 2-chain timeout vote received could not be added: {}, vote: {}",
                         error, vote
                     );
-                    return VoteReceptionResult::ErrorAddingVote(error);
-                },
-            };
+                        return VoteReceptionResult::ErrorAddingVote(error);
+                    },
+                };
 
             // Echo timeout if receive f+1 timeout message.
             if !self.echo_timeout {
-                let f_plus_one = epoch_state.verifier.total_voting_power()
-                    - epoch_state.verifier.quorum_voting_power()
+                let f_plus_one = validator_verifier.total_voting_power()
+                    - validator_verifier.quorum_voting_power()
                     + 1;
                 if tc_voting_power >= f_plus_one {
                     self.echo_timeout = true;
@@ -348,12 +418,10 @@ impl fmt::Display for PendingVotes {
                 VoteStatus::NotEnoughVotes(li) => {
                     write!(
                         f,
-                        "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
+                        "LI {} has {} verified votes, {} unverified votes",
                         li_digest,
                         li.verified_voters().count(),
-                        li.verified_voters().collect::<Vec<_>>(),
                         li.unverified_voters().count(),
-                        li.unverified_voters().collect::<Vec<_>>()
                     )?;
                 },
             }
@@ -379,20 +447,16 @@ impl fmt::Display for PendingVotes {
 
 #[cfg(test)]
 mod tests {
-    use super::{PendingVotes, VoteReceptionResult};
+    use super::{PendingVotes, VoteReceptionResult, VoteStatus};
     use aptos_consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
     use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
     use aptos_types::{
-        aggregate_signature::PartialSignatures,
-        block_info::BlockInfo,
-        epoch_state::EpochState,
-        ledger_info::{LedgerInfo, VerificationStatus},
-        validator_verifier::{random_validator_verifier, VerifyError},
+        aggregate_signature::PartialSignatures, block_info::BlockInfo, ledger_info::LedgerInfo,
+        validator_verifier::random_validator_verifier,
     };
     use itertools::Itertools;
-    use std::sync::Arc;
 
     /// Creates a random ledger info for epoch 1 and round 1.
     fn random_ledger_info() -> LedgerInfo {
@@ -414,8 +478,7 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
-        let (signers, verifier) = random_validator_verifier(4, Some(2), false);
-        let epoch_state = Arc::new(EpochState::new(5, verifier));
+        let (signers, validator_verifier) = random_validator_verifier(4, Some(2), false);
         let mut pending_votes = PendingVotes::new();
 
         // create random vote from validator[0]
@@ -424,23 +487,16 @@ mod tests {
         let vote_data_1_author_0 =
             Vote::new(vote_data_1, signers[0].author(), li1, &signers[0]).unwrap();
 
+        vote_data_1_author_0.set_verified();
         // first time a new vote is added -> VoteAdded
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote_data_1_author_0,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote_data_1_author_0, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
 
         // same author voting for the same thing -> DuplicateVote
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote_data_1_author_0,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote_data_1_author_0, &validator_verifier),
             VoteReceptionResult::DuplicateVote
         );
 
@@ -454,12 +510,9 @@ mod tests {
             &signers[0],
         )
         .unwrap();
+        vote_data_2_author_0.set_verified();
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote_data_2_author_0,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote_data_2_author_0, &validator_verifier),
             VoteReceptionResult::EquivocateVote
         );
 
@@ -471,27 +524,21 @@ mod tests {
             &signers[1],
         )
         .unwrap();
+        vote_data_2_author_1.set_verified();
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote_data_2_author_1,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote_data_2_author_1, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
 
         // two votes for the ledger info -> NewQuorumCertificate
         let vote_data_2_author_2 =
             Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]).unwrap();
-        match pending_votes.insert_vote(
-            &vote_data_2_author_2,
-            epoch_state.clone(),
-            VerificationStatus::Verified,
-        ) {
+        vote_data_2_author_2.set_verified();
+        match pending_votes.insert_vote(&vote_data_2_author_2, &validator_verifier) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
                     .ledger_info()
-                    .check_voting_power(&epoch_state.verifier)
+                    .check_voting_power(&validator_verifier)
                     .is_ok());
             },
             _ => {
@@ -505,14 +552,14 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
-        let (signers, verifier) = random_validator_verifier(7, Some(3), false);
-        let epoch_state = Arc::new(EpochState::new(5, verifier));
+        let (signers, validator_verifier) = random_validator_verifier(7, Some(3), false);
         let mut pending_votes = PendingVotes::new();
 
         // create random vote from validator[0]
         let mut li = random_ledger_info();
         let vote_data = random_vote_data();
         li.set_consensus_data_hash(vote_data.hash());
+        let li_hash = li.hash();
 
         let mut partial_sigs = PartialSignatures::empty();
 
@@ -557,49 +604,52 @@ mod tests {
 
         // first time a new vote is added -> VoteAdded
         assert_eq!(
-            pending_votes.insert_vote(&vote_0, epoch_state.clone(), VerificationStatus::Unverified),
+            pending_votes.insert_vote(&vote_0, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
         partial_sigs.add_signature(signers[0].author(), vote_0.signature().clone());
 
         // same author voting for the same thing -> DuplicateVote
+        vote_0.set_verified();
         assert_eq!(
-            pending_votes.insert_vote(&vote_0, epoch_state.clone(), VerificationStatus::Verified),
+            pending_votes.insert_vote(&vote_0, &validator_verifier),
             VoteReceptionResult::DuplicateVote
         );
 
         assert_eq!(
-            pending_votes.insert_vote(&vote_1, epoch_state.clone(), VerificationStatus::Unverified),
+            pending_votes.insert_vote(&vote_1, &validator_verifier),
             VoteReceptionResult::VoteAdded(2)
         );
         partial_sigs.add_signature(signers[1].author(), vote_1.signature().clone());
 
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 0);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 0);
 
         assert_eq!(
-            pending_votes.insert_vote(&vote_2, epoch_state.clone(), VerificationStatus::Unverified),
-            VoteReceptionResult::ErrorAggregatingSignature(VerifyError::TooLittleVotingPower {
-                voting_power: 2,
-                expected_voting_power: 3
-            })
+            pending_votes.insert_vote(&vote_2, &validator_verifier),
+            VoteReceptionResult::VoteAdded(2)
         );
 
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
+        let (_, vote_status) = pending_votes.li_digest_to_votes.get(&li_hash).unwrap();
+        match vote_status {
+            VoteStatus::NotEnoughVotes(li_with_sig) => {
+                assert_eq!(li_with_sig.verified_voters().count(), 2);
+                assert_eq!(li_with_sig.unverified_voters().count(), 0);
+            },
+            _ => {
+                panic!("QC should not be formed yet.");
+            },
+        }
 
         partial_sigs.add_signature(signers[3].author(), vote_3.signature().clone());
-        let aggregated_sig = epoch_state
-            .verifier
+        let aggregated_sig = validator_verifier
             .aggregate_signatures(partial_sigs.signatures_iter())
             .unwrap();
-        match pending_votes.insert_vote(
-            &vote_3,
-            epoch_state.clone(),
-            VerificationStatus::Unverified,
-        ) {
+        match pending_votes.insert_vote(&vote_3, &validator_verifier) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
                     .ledger_info()
-                    .check_voting_power(&epoch_state.clone().verifier)
+                    .check_voting_power(&validator_verifier)
                     .is_ok());
                 assert_eq!(
                     qc.ledger_info().signatures().clone(),
@@ -611,15 +661,11 @@ mod tests {
             },
         };
 
-        match pending_votes.insert_vote(
-            &vote_4,
-            epoch_state.clone(),
-            VerificationStatus::Unverified,
-        ) {
+        match pending_votes.insert_vote(&vote_4, &validator_verifier) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
                     .ledger_info()
-                    .check_voting_power(&epoch_state.clone().verifier)
+                    .check_voting_power(&validator_verifier)
                     .is_ok());
                 assert_eq!(
                     qc.ledger_info().signatures().clone(),
@@ -631,7 +677,7 @@ mod tests {
             },
         };
 
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
     }
 
     #[test]
@@ -639,8 +685,7 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
-        let (signers, verifier) = random_validator_verifier(4, None, false);
-        let epoch_state = Arc::new(EpochState::new(5, verifier));
+        let (signers, validator_verifier) = random_validator_verifier(4, None, false);
         let mut pending_votes = PendingVotes::new();
 
         // submit a new vote from validator[0] -> VoteAdded
@@ -648,12 +693,9 @@ mod tests {
         let vote0 = random_vote_data();
         let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]).unwrap();
 
+        vote0_author_0.set_verified();
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote0_author_0,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote0_author_0, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
 
@@ -663,11 +705,7 @@ mod tests {
         vote0_author_0.add_2chain_timeout(timeout, signature);
 
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote0_author_0,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote0_author_0, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
 
@@ -675,12 +713,9 @@ mod tests {
         let li1 = random_ledger_info();
         let vote1 = random_vote_data();
         let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]).unwrap();
+        vote1_author_1.set_verified();
         assert_eq!(
-            pending_votes.insert_vote(
-                &vote1_author_1,
-                epoch_state.clone(),
-                VerificationStatus::Verified
-            ),
+            pending_votes.insert_vote(&vote1_author_1, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
         );
 
@@ -688,11 +723,7 @@ mod tests {
         let timeout = vote1_author_1.generate_2chain_timeout(certificate_for_genesis());
         let signature = timeout.sign(&signers[1]).unwrap();
         vote1_author_1.add_2chain_timeout(timeout, signature);
-        match pending_votes.insert_vote(
-            &vote1_author_1,
-            epoch_state.clone(),
-            VerificationStatus::Verified,
-        ) {
+        match pending_votes.insert_vote(&vote1_author_1, &validator_verifier) {
             VoteReceptionResult::EchoTimeout(voting_power) => {
                 assert_eq!(voting_power, 2);
             },
@@ -709,20 +740,14 @@ mod tests {
         let timeout = vote2_author_2.generate_2chain_timeout(certificate_for_genesis());
         let signature = timeout.sign(&signers[2]).unwrap();
         vote2_author_2.add_2chain_timeout(timeout, signature);
-
-        match pending_votes.insert_vote(
-            &vote2_author_2,
-            epoch_state.clone(),
-            VerificationStatus::Verified,
-        ) {
+        vote2_author_2.set_verified();
+        match pending_votes.insert_vote(&vote2_author_2, &validator_verifier) {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
-                assert!(epoch_state
-                    .verifier
+                assert!(validator_verifier
                     .check_voting_power(
                         tc.signatures_with_rounds()
                             .get_voters(
-                                &epoch_state
-                                    .verifier
+                                &validator_verifier
                                     .get_ordered_account_addresses_iter()
                                     .collect_vec()
                             )

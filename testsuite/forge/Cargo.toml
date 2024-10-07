@@ -62,6 +62,9 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 
+[dev-dependencies]
+serde_merge = { workspace = true }
+
 [features]
 default = []
 testing = ["aptos-global-constants/testing"]

@@ -8,12 +8,12 @@ use crate::{
     util::time_service::{SendTask, TimeService},
 };
 use aptos_consensus_types::{
-    common::Round, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutWithPartialSignatures,
-    vote::Vote,
+    common::Round, round_timeout::RoundTimeout, sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
-use aptos_types::{epoch_state::EpochState, ledger_info::VerificationStatus};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
@@ -157,6 +157,8 @@ pub struct RoundState {
     pending_votes: PendingVotes,
     // Vote sent locally for the current round.
     vote_sent: Option<Vote>,
+    // Timeout sent locally for the current round.
+    timeout_sent: Option<RoundTimeout>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
 }
@@ -204,13 +206,14 @@ impl RoundState {
             timeout_sender,
             pending_votes,
             vote_sent: None,
+            timeout_sent: None,
             abort_handle: None,
         }
     }
 
     /// Return if already voted for timeout
-    pub fn is_vote_timeout(&self) -> bool {
-        self.vote_sent.as_ref().map_or(false, |v| v.is_timeout())
+    pub fn is_timeout_sent(&self) -> bool {
+        self.vote_sent.as_ref().map_or(false, |v| v.is_timeout()) || self.timeout_sent.is_some()
     }
 
     /// Return the current round.
@@ -249,6 +252,7 @@ impl RoundState {
             self.current_round = new_round;
             self.pending_votes = PendingVotes::new();
             self.vote_sent = None;
+            self.timeout_sent = None;
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
@@ -273,17 +277,27 @@ impl RoundState {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        epoch_state: Arc<EpochState>,
-        verification_status: VerificationStatus,
+        validator_verifier: &ValidatorVerifier,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.pending_votes
-                .insert_vote(vote, epoch_state, verification_status)
+            self.pending_votes.insert_vote(vote, validator_verifier)
         } else {
             VoteReceptionResult::UnexpectedRound(
                 vote.vote_data().proposed().round(),
                 self.current_round,
             )
+        }
+    }
+
+    pub fn insert_round_timeout(
+        &mut self,
+        timeout: &RoundTimeout,
+        verifier: &ValidatorVerifier,
+    ) -> VoteReceptionResult {
+        if timeout.round() == self.current_round {
+            self.pending_votes.insert_round_timeout(timeout, verifier)
+        } else {
+            VoteReceptionResult::UnexpectedRound(timeout.round(), self.current_round)
         }
     }
 
@@ -293,8 +307,18 @@ impl RoundState {
         }
     }
 
+    pub fn record_round_timeout(&mut self, timeout: RoundTimeout) {
+        if timeout.round() == self.current_round {
+            self.timeout_sent = Some(timeout)
+        }
+    }
+
     pub fn vote_sent(&self) -> Option<Vote> {
         self.vote_sent.clone()
+    }
+
+    pub fn timeout_sent(&self) -> Option<RoundTimeout> {
+        self.timeout_sent.clone()
     }
 
     /// Setup the timeout task and return the duration of the current timeout

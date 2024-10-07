@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/liveness/move_in_infinite_loop_branched.move:5:28
+  │
+5 │             loop { let y = move x; y / y; }
+  │                            ^^^^^^
+  │                            │
+  │                            attempted to move here
+  │                            used here
+
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/liveness/move_in_infinite_loop_branched.move:7:28
+  │
+7 │             loop { let y = move x; y % y; }
+  │                            ^^^^^^
+  │                            │
+  │                            attempted to move here
+  │                            used here

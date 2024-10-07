@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
+use crate::metrics::OTHER_TIMERS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{parsed_transaction_output::TransactionsWithParsedOutput, ProofReader};
 use aptos_logger::info;
+use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
@@ -284,9 +285,8 @@ impl InMemoryStateCalculatorV2 {
         T: Sync + 'a,
         F: Fn(&'a T) -> &'a WriteSet + Sync,
     {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["get_sharded_state_updates"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["get_sharded_state_updates"]);
+
         outputs
             .par_iter()
             .map(|output| {
@@ -303,9 +303,7 @@ impl InMemoryStateCalculatorV2 {
     }
 
     fn calculate_updates(state_updates_vec: &[ShardedStateUpdates]) -> ShardedStateUpdates {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["calculate_updates"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["calculate_updates"]);
         let mut updates: ShardedStateUpdates = create_empty_sharded_state_updates();
         updates
             .par_iter_mut()
@@ -347,7 +345,7 @@ impl InMemoryStateCalculatorV2 {
         sharded_state_cache: &ShardedStateCache,
         updates: &[&ShardedStateUpdates; 2],
     ) -> StateStorageUsage {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+        let _timer = OTHER_TIMERS
             .with_label_values(&["calculate_usage"])
             .start_timer();
         if old_usage.is_untracked() {
@@ -403,9 +401,7 @@ impl InMemoryStateCalculatorV2 {
         usage: StateStorageUsage,
         proof_reader: &ProofReader,
     ) -> Result<FrozenSparseMerkleTree<StateValue>> {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["make_checkpoint"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["make_checkpoint"]);
 
         // Update SMT.
         //
@@ -429,10 +425,10 @@ impl InMemoryStateCalculatorV2 {
         let configuration = ConfigurationResource::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
-        Ok(EpochState {
-            epoch: configuration.epoch(),
-            verifier: (&validator_set).into(),
-        })
+        Ok(EpochState::new(
+            configuration.epoch(),
+            (&validator_set).into(),
+        ))
     }
 
     fn validate_input_for_block(

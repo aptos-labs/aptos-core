@@ -112,3 +112,116 @@ error: type `NoC` is missing required ability `copy`
    │
    = required by instantiating type parameter `T2` of struct `Pair`
    = required by instantiating type parameter `T:copy + drop + store` of function `cds`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:34:24
+   │
+13 │     struct Sc<phantom T: copy> {}
+   │                       - declaration of type parameter `T`
+   ·
+34 │         let Sc {} = Sc<NoC> {};
+   │                        ^^^
+   │
+   = required by instantiating type parameter `phantom T:copy` of struct `Sc`
+
+error: type `Cup<u64>` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:35:24
+   │
+13 │     struct Sc<phantom T: copy> {}
+   │                       - declaration of type parameter `T`
+   ·
+35 │         let Sc {} = Sc<Cup<u64>> {};
+   │                        ^^^^^^^^
+   │
+   = required by instantiating type parameter `phantom T:copy` of struct `Sc`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:36:24
+   │
+13 │     struct Sc<phantom T: copy> {}
+   │                       - declaration of type parameter `T`
+   ·
+36 │         let Sc {} = Sc<Box<NoC>> {};
+   │                        ^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `phantom T:copy` of struct `Sc`
+
+error: type `NoK` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:37:24
+   │
+14 │     struct Sk<phantom T: key> {}
+   │                       - declaration of type parameter `T`
+   ·
+37 │         let Sk {} = Sk<NoK> {};
+   │                        ^^^
+   │
+   = required by instantiating type parameter `phantom T:key` of struct `Sk`
+
+error: type `Cup<u64>` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:38:24
+   │
+14 │     struct Sk<phantom T: key> {}
+   │                       - declaration of type parameter `T`
+   ·
+38 │         let Sk {} = Sk<Cup<u64>> {};
+   │                        ^^^^^^^^
+   │
+   = required by instantiating type parameter `phantom T:key` of struct `Sk`
+
+error: type `Cup<u64>` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:39:24
+   │
+14 │     struct Sk<phantom T: key> {}
+   │                       - declaration of type parameter `T`
+   ·
+39 │         let Sk {} = Sk<Box<Cup<u64>>> {};
+   │                        ^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `phantom T:key` of struct `Sk`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:40:28
+   │
+15 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+40 │         let Scds {} = Scds<NoC> {};
+   │                            ^^^
+   │
+   = required by instantiating type parameter `phantom T:copy + drop + store` of struct `Scds`
+
+error: type `Cup<u64>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:41:28
+   │
+15 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+41 │         let Scds {} = Scds<Cup<u64>> {};
+   │                            ^^^^^^^^
+   │
+   = required by instantiating type parameter `phantom T:copy + drop + store` of struct `Scds`
+
+error: type `Cup<NoC>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:42:28
+   │
+15 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+42 │         let Scds {} = Scds<Cup<NoC>> {};
+   │                            ^^^^^^^^
+   │
+   = required by instantiating type parameter `phantom T:copy + drop + store` of struct `Scds`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:43:28
+   │
+15 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+43 │         let Scds {} = Scds<Pair<u64, NoC>> {};
+   │                            ^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `Pair`
+   = required by instantiating type parameter `phantom T:copy + drop + store` of struct `Scds`

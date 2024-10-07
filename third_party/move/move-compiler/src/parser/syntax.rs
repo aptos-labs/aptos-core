@@ -82,14 +82,41 @@ fn add_type_args_ambiguity_label(loc: Loc, mut diag: Box<Diagnostic>) -> Box<Dia
 //**************************************************************************************************
 
 fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
-    if !context.env.flags().lang_v2() {
-        context.env.add_diag(diag!(
-            Syntax::UnsupportedLanguageItem,
-            (
-                loc,
-                format!("Move 2 language construct is not enabled: {}", description)
-            )
-        ));
+    require_language_version_msg(
+        context,
+        loc,
+        LanguageVersion::V2,
+        &format!("Move 2 language construct is not enabled: {}", description),
+    )
+}
+
+fn require_language_version(
+    context: &mut Context,
+    loc: Loc,
+    min_language_version: LanguageVersion,
+    description: &str,
+) -> bool {
+    require_language_version_msg(
+        context,
+        loc,
+        min_language_version,
+        &format!(
+            "Move language construct `{}` is not enabled until version {}",
+            description, min_language_version
+        ),
+    )
+}
+
+fn require_language_version_msg(
+    context: &mut Context,
+    loc: Loc,
+    min_language_version: LanguageVersion,
+    msg: &str,
+) -> bool {
+    if context.env.flags().language_version() < min_language_version {
+        context
+            .env
+            .add_diag(diag!(Syntax::UnsupportedLanguageItem, (loc, msg)));
         false
     } else {
         true
@@ -159,14 +186,6 @@ fn consume_token_(
         ))
     }
 }
-
-// let unexp_loc = current_token_loc(tokens);
-// let unexp_msg = format!("Unexpected {}", current_token_error_string(tokens));
-
-// let end_loc = tokens.previous_end_loc();
-// let addr_loc = make_loc(tokens.file_hash(), start_loc, end_loc);
-// let exp_msg = format!("Expected '::' {}", case);
-// Err(vec![(unexp_loc, unexp_msg), (addr_loc, exp_msg)])
 
 // Check for the identifier token with specified value and return an error if it does not match.
 fn consume_identifier(tokens: &mut Lexer, value: &str) -> Result<(), Box<Diagnostic>> {
@@ -781,6 +800,26 @@ fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Box<Diagnost
     Ok((f, arg))
 }
 
+// Parse an optionally typed binding:
+//     TypedBind = Bind ( ":" <Type> )?
+fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    let bind = parse_bind(context)?;
+    let ty_opt = if match_token(context.tokens, Tok::Colon)? {
+        Some(parse_type(context)?)
+    } else {
+        None
+    };
+    let end_loc = context.tokens.previous_end_loc();
+    let typed_bind_ = TypedBind_(bind, ty_opt);
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        end_loc,
+        typed_bind_,
+    ))
+}
+
 // Parse a binding:
 //      Bind =
 //          <Var>
@@ -895,14 +934,14 @@ fn parse_bind_or_dotdot(context: &mut Context) -> Result<BindOrDotDot, Box<Diagn
 
 // Parse a list of bindings for lambda.
 //      LambdaBindList =
-//          "|" Comma<Bind> "|"
-fn parse_lambda_bind_list(context: &mut Context) -> Result<BindList, Box<Diagnostic>> {
+//          "|" Comma<TypedBind> "|"
+fn parse_lambda_bind_list(context: &mut Context) -> Result<TypedBindList, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let b = parse_comma_list(
         context,
         Tok::Pipe,
         Tok::Pipe,
-        parse_bind,
+        parse_typed_bind,
         "a variable or structure binding",
     )?;
     let end_loc = context.tokens.previous_end_loc();
@@ -1514,7 +1553,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     );
     let update = sp(
         for_loc,
-        Exp_::Assign(Box::new(iter_exp.clone()), Box::new(updated_exp)),
+        Exp_::Assign(Box::new(iter_exp.clone()), None, Box::new(updated_exp)),
     );
 
     // Create the assignment "flag = true;"
@@ -1528,7 +1567,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     let true_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(true))));
     let assign_iter = sp(
         for_loc,
-        Exp_::Assign(Box::new(flag_exp.clone()), Box::new(true_exp.clone())),
+        Exp_::Assign(Box::new(flag_exp.clone()), None, Box::new(true_exp.clone())),
     );
 
     // construct flag conditional "if (flag) { update; } else { flag = true; }"
@@ -1832,6 +1871,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 //          | <Quantifier>                  spec only
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
+//          | <UnaryExp> ("+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=") <Exp>
 //          | <UnaryExp> ("as" | "is") Type
 fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -1850,30 +1890,78 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
         _ => {
-            // This could be either an assignment or a binary operator
+            // This could be either an assignment, operator assignment (e.g., +=), or a binary operator
             // expression, or a cast or test
             let lhs = parse_unary_exp(context)?;
-            if context.tokens.peek() != Tok::Equal {
-                if let Some(exp) =
-                    parse_cast_or_test_exp(context, &lhs, /*allow_colon_exp*/ false)?
-                {
-                    let loc = make_loc(
-                        context.tokens.file_hash(),
-                        start_loc,
-                        context.tokens.previous_end_loc(),
+            let current_token = context.tokens.peek();
+            match current_token {
+                Tok::Equal => {
+                    context.tokens.advance()?; // consume the "="
+                    let rhs = Box::new(parse_exp(context)?);
+                    Exp_::Assign(Box::new(lhs), None, rhs)
+                },
+                Tok::PlusEqual
+                | Tok::SubEqual
+                | Tok::MulEqual
+                | Tok::ModEqual
+                | Tok::DivEqual
+                | Tok::BitOrEqual
+                | Tok::BitAndEqual
+                | Tok::XorEqual
+                | Tok::ShlEqual
+                | Tok::ShrEqual => {
+                    require_language_version(
+                        context,
+                        current_token_loc(context.tokens),
+                        LanguageVersion::V2_1,
+                        &current_token.to_string(),
                     );
-                    return Ok(sp(loc, exp));
-                } else {
-                    return parse_binop_exp(context, lhs, /* min_prec */ 1);
-                }
+                    let op_loc = context.tokens.advance_with_loc()?; // consume the "op="
+                    let rhs = Box::new(parse_exp(context)?);
+                    Exp_::Assign(
+                        Box::new(lhs),
+                        Some(sp(
+                            op_loc,
+                            op_equal_to_binop(&current_token).expect("binop"),
+                        )),
+                        rhs,
+                    )
+                },
+                _ => {
+                    if let Some(exp) =
+                        parse_cast_or_test_exp(context, &lhs, /*allow_colon_exp*/ false)?
+                    {
+                        let loc = make_loc(
+                            context.tokens.file_hash(),
+                            start_loc,
+                            context.tokens.previous_end_loc(),
+                        );
+                        return Ok(sp(loc, exp));
+                    } else {
+                        return parse_binop_exp(context, lhs, /* min_prec */ 1);
+                    }
+                },
             }
-            context.tokens.advance()?; // consume the "="
-            let rhs = Box::new(parse_exp(context)?);
-            Exp_::Assign(Box::new(lhs), rhs)
         },
     };
     let end_loc = context.tokens.previous_end_loc();
     Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, exp))
+}
+
+fn op_equal_to_binop(token: &Tok) -> Option<BinOp_> {
+    match token {
+        Tok::PlusEqual => Some(BinOp_::Add),
+        Tok::SubEqual => Some(BinOp_::Sub),
+        Tok::MulEqual => Some(BinOp_::Mul),
+        Tok::ModEqual => Some(BinOp_::Mod),
+        Tok::DivEqual => Some(BinOp_::Div),
+        Tok::BitOrEqual => Some(BinOp_::BitOr),
+        Tok::BitAndEqual => Some(BinOp_::BitAnd),
+        Tok::XorEqual => Some(BinOp_::Xor),
+        Tok::ShlEqual => Some(BinOp_::Shl),
+        Tok::ShrEqual => Some(BinOp_::Shr),
+        _ => None,
+    }
 }
 
 // Get the precedence of a binary operator. The minimum precedence value

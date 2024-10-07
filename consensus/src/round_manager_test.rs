@@ -42,6 +42,7 @@ use aptos_consensus_types::{
     common::{Author, Payload, Round},
     pipeline::commit_decision::CommitDecision,
     proposal_msg::ProposalMsg,
+    round_timeout::RoundTimeoutMsg,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     utils::PayloadTxnsSize,
@@ -66,7 +67,7 @@ use aptos_secure_storage::Storage;
 use aptos_types::{
     epoch_state::EpochState,
     jwks::QuorumCertifiedUpdate,
-    ledger_info::{LedgerInfo, VerificationStatus},
+    ledger_info::LedgerInfo,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
@@ -231,10 +232,7 @@ impl NodeSetup {
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
-        let epoch_state = Arc::new(EpochState {
-            epoch: 1,
-            verifier: storage.get_validator_set().into(),
-        });
+        let epoch_state = Arc::new(EpochState::new(1, storage.get_validator_set().into()));
         let validators = epoch_state.verifier.clone();
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -447,6 +445,17 @@ impl NodeSetup {
         }
     }
 
+    pub async fn next_timeout(&mut self) -> RoundTimeoutMsg {
+        match self.next_network_message().await {
+            ConsensusMsg::RoundTimeoutMsg(v) => *v,
+            msg => panic!(
+                "Unexpected Consensus Message: {:?} on node {}",
+                msg,
+                self.identity_desc()
+            ),
+        }
+    }
+
     pub async fn next_commit_decision(&mut self) -> CommitDecision {
         match self.next_network_message().await {
             ConsensusMsg::CommitDecisionMsg(v) => *v,
@@ -637,11 +646,10 @@ fn process_and_vote_on_proposal(
     info!("Processing votes on node {}", proposer_node.identity_desc());
     if process_votes {
         for vote_msg in votes {
+            vote_msg.vote().set_verified();
             timed_block_on(
                 runtime,
-                proposer_node
-                    .round_manager
-                    .process_vote_msg(vote_msg, VerificationStatus::Verified),
+                proposer_node.round_manager.process_vote_msg(vote_msg),
             )
             .unwrap();
         }
@@ -690,11 +698,9 @@ fn new_round_on_quorum_cert() {
             .await
             .unwrap();
         let vote_msg = node.next_vote().await;
+        vote_msg.vote().set_verified();
         // Adding vote to form a QC
-        node.round_manager
-            .process_vote_msg(vote_msg, VerificationStatus::Verified)
-            .await
-            .unwrap();
+        node.round_manager.process_vote_msg(vote_msg).await.unwrap();
 
         // round 2 should start
         let proposal_msg = node.next_proposal().await;
@@ -1494,6 +1500,46 @@ fn nil_vote_on_timeout() {
 }
 
 #[test]
+/// Generate a Timeout upon timeout if no votes have been sent in the round.
+fn timeout_round_on_timeout() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let local_config = ConsensusConfig {
+        enable_round_timeout_msg: true,
+        ..Default::default()
+    };
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        Some(local_config),
+        None,
+        None,
+    );
+    let node = &mut nodes[0];
+    let genesis = node.block_store.ordered_root();
+    timed_block_on(&runtime, async {
+        node.next_proposal().await;
+        // Process the outgoing vote message and verify that it contains a round signature
+        // and that the vote extends genesis.
+        node.round_manager
+            .process_local_timeout(1)
+            .await
+            .unwrap_err();
+        let timeout_msg = node.next_timeout().await;
+
+        let timeout = timeout_msg.timeout();
+
+        assert_eq!(timeout.round(), 1);
+        assert_eq!(timeout.author(), node.signer.author());
+        assert_eq!(timeout.epoch(), 1);
+        assert_eq!(timeout.two_chain_timeout().hqc_round(), genesis.round());
+    });
+}
+
+#[test]
 /// If the node votes in a round, upon timeout the same vote is re-sent with a timeout signature.
 fn vote_resent_on_timeout() {
     let runtime = consensus_runtime();
@@ -1535,6 +1581,50 @@ fn vote_resent_on_timeout() {
 }
 
 #[test]
+/// If the node votes in a round, upon timeout the same vote is re-sent with a timeout signature.
+fn timeout_sent_on_timeout_after_vote() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let local_config = ConsensusConfig {
+        enable_round_timeout_msg: true,
+        ..Default::default()
+    };
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        1,
+        None,
+        None,
+        Some(local_config),
+        None,
+        None,
+    );
+    let node = &mut nodes[0];
+    timed_block_on(&runtime, async {
+        let proposal_msg = node.next_proposal().await;
+        let id = proposal_msg.proposal().id();
+        node.round_manager
+            .process_proposal_msg(proposal_msg)
+            .await
+            .unwrap();
+        let vote_msg = node.next_vote().await;
+        let vote = vote_msg.vote();
+        assert!(!vote.is_timeout());
+        assert_eq!(vote.vote_data().proposed().id(), id);
+        // Process the outgoing vote message and verify that it contains a round signature
+        // and that the vote is the same as above.
+        node.round_manager
+            .process_local_timeout(1)
+            .await
+            .unwrap_err();
+        let timeout_msg = node.next_timeout().await;
+
+        assert_eq!(timeout_msg.round(), vote.vote_data().proposed().round());
+        assert_eq!(timeout_msg.sync_info(), vote_msg.sync_info());
+    });
+}
+
+#[test]
 #[ignore] // TODO: this test needs to be fixed!
 fn sync_on_partial_newer_sync_info() {
     let runtime = consensus_runtime();
@@ -1553,7 +1643,7 @@ fn sync_on_partial_newer_sync_info() {
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
         // commit block 1 after 4 rounds
-        for _ in 1..=4 {
+        for i in 1..=4 {
             let proposal_msg = node.next_proposal().await;
 
             node.round_manager
@@ -1561,11 +1651,11 @@ fn sync_on_partial_newer_sync_info() {
                 .await
                 .unwrap();
             let vote_msg = node.next_vote().await;
+            if i < 2 {
+                vote_msg.vote().set_verified();
+            }
             // Adding vote to form a QC
-            node.round_manager
-                .process_vote_msg(vote_msg, VerificationStatus::Verified)
-                .await
-                .unwrap();
+            node.round_manager.process_vote_msg(vote_msg).await.unwrap();
         }
         let block_4 = node.next_proposal().await;
         node.round_manager
@@ -1660,10 +1750,8 @@ fn safety_rules_crash() {
 
             // sign proposal
             reset_safety_rules(&mut node);
-            node.round_manager
-                .process_vote_msg(vote_msg, VerificationStatus::Verified)
-                .await
-                .unwrap();
+            vote_msg.vote().set_verified();
+            node.round_manager.process_vote_msg(vote_msg).await.unwrap();
         }
 
         // verify the last sign proposal happened
@@ -1702,10 +1790,10 @@ fn echo_timeout() {
         // node 0 doesn't timeout and should echo the timeout after 2 timeout message
         for i in 0..3 {
             let timeout_vote = node_0.next_vote().await;
-            let result = node_0
-                .round_manager
-                .process_vote_msg(timeout_vote, VerificationStatus::Verified)
-                .await;
+            if i < 2 {
+                timeout_vote.vote().set_verified();
+            }
+            let result = node_0.round_manager.process_vote_msg(timeout_vote).await;
             // first and third message should not timeout
             if i == 0 || i == 2 {
                 assert!(result.is_ok());
@@ -1718,11 +1806,16 @@ fn echo_timeout() {
 
         let node_1 = &mut nodes[1];
         // it receives 4 timeout messages (1 from each) and doesn't echo since it already timeout
-        for _ in 0..4 {
+        for i in 0..4 {
             let timeout_vote = node_1.next_vote().await;
+            // Verifying only some vote messages to check that round manager can accept both
+            // verified and unverified votes
+            if i < 2 {
+                timeout_vote.vote().set_verified();
+            }
             node_1
                 .round_manager
-                .process_vote_msg(timeout_vote, VerificationStatus::Verified)
+                .process_vote_msg(timeout_vote)
                 .await
                 .unwrap();
         }
@@ -2041,11 +2134,12 @@ pub fn forking_retrieval_test() {
                 }
 
                 let vote_msg_on_timeout = node.next_vote().await;
+                vote_msg_on_timeout.vote().set_verified();
                 assert!(vote_msg_on_timeout.vote().is_timeout());
                 if node.id != behind_node {
                     let result = node
                         .round_manager
-                        .process_vote_msg(vote_msg_on_timeout, VerificationStatus::Verified)
+                        .process_vote_msg(vote_msg_on_timeout)
                         .await;
 
                     if node.id == forking_node && i == 2 {

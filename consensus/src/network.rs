@@ -29,6 +29,7 @@ use aptos_consensus_types::{
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
+    round_timeout::RoundTimeoutMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
@@ -198,7 +199,7 @@ pub struct NetworkSender {
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-    validators: ValidatorVerifier,
+    validators: Arc<ValidatorVerifier>,
     time_service: aptos_time_service::TimeService,
 }
 
@@ -207,7 +208,7 @@ impl NetworkSender {
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-        validators: ValidatorVerifier,
+        validators: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
             author,
@@ -317,6 +318,8 @@ impl NetworkSender {
     }
 
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+
         let self_author = self.author;
         let mut other_validators: Vec<_> = self
             .validators
@@ -402,6 +405,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg) {
+        fail_point!("consensus::send::round_timeout", |_| ());
+        let msg = ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout));
         self.broadcast(msg).await
     }
 
@@ -749,6 +758,7 @@ impl NetworkTask {
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
