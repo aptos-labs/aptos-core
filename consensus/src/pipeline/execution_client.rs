@@ -283,8 +283,6 @@ impl ExecutionProxyClient {
             consensus_observer_config,
             consensus_publisher,
             self.consensus_config
-                .optimistic_sig_verification_for_commit_votes,
-            self.consensus_config
                 .max_pending_rounds_in_commit_vote_cache,
         );
 

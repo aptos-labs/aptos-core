@@ -18,16 +18,14 @@ use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
-    epoch_state::EpochState,
     ledger_info::{
         LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures,
-        VerificationStatus,
+        SignatureWithStatus,
     },
+    validator_verifier::ValidatorVerifier,
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -45,83 +43,29 @@ fn generate_commit_ledger_info(
     )
 }
 
-fn verify_signatures(
-    unverified_signatures: PartialSignatures,
-    epoch_state: Arc<EpochState>,
+fn ledger_info_with_unverified_signatures(
+    unverified_votes: Vec<CommitVote>,
     commit_ledger_info: &LedgerInfo,
-) -> PartialSignatures {
-    // Returns a valid partial signature from a set of unverified signatures.
-    // TODO: Validating individual signatures in expensive. Replace this with optimistic signature
-    // verification for BLS. Here, we can implement a tree-based batch verification technique that
-    // filters out invalid signature shares much faster when there are only a few of them
-    // (e.g., [LM07]: Finding Invalid Signatures in Pairing-Based Batches,
-    // by Law, Laurie and Matt, Brian J., in Cryptography and Coding, 2007).
-    if let Ok(aggregated_signature) = epoch_state
-        .verifier
-        .aggregate_signatures(unverified_signatures.signatures_iter())
-    {
-        if epoch_state
-            .verifier
-            .verify_multi_signatures(commit_ledger_info, &aggregated_signature)
-            .is_ok()
-        {
-            return unverified_signatures;
+) -> LedgerInfoWithUnverifiedSignatures {
+    let mut li_with_sig = LedgerInfoWithUnverifiedSignatures::new(commit_ledger_info.clone());
+    for vote in unverified_votes {
+        let author = vote.author();
+        let sig = vote.signature_with_status();
+        if vote.ledger_info() == commit_ledger_info {
+            li_with_sig.add_signature(author, sig);
+        } else {
+            li_with_sig.add_signature(author, &SignatureWithStatus::from(sig.signature().clone()));
         }
     }
-
-    PartialSignatures::new(
-        unverified_signatures
-            .signatures()
-            .clone()
-            .into_par_iter()
-            .flat_map(|(account_address, signature)| {
-                let _timer = counters::VERIFY_MSG
-                    .with_label_values(&["commit_votes_from_ordered_bufer_item"])
-                    .start_timer();
-                if epoch_state
-                    .verifier
-                    .verify(account_address, commit_ledger_info, &signature)
-                    .is_ok()
-                {
-                    return Some((account_address, signature));
-                }
-                None
-            })
-            .collect(),
-    )
-}
-
-fn generate_executed_item_from_ordered(
-    commit_info: BlockInfo,
-    executed_blocks: Vec<PipelinedBlock>,
-    verified_signatures: PartialSignatures,
-    callback: StateComputerCommitCallBackType,
-    ordered_proof: LedgerInfoWithSignatures,
-    order_vote_enabled: bool,
-) -> BufferItem {
-    debug!("{} advance to executed from ordered", commit_info);
-    let mut partial_commit_proof = LedgerInfoWithUnverifiedSignatures::new(
-        generate_commit_ledger_info(&commit_info, &ordered_proof, order_vote_enabled),
-    );
-    for (author, sig) in verified_signatures.signatures() {
-        partial_commit_proof.add_signature(*author, sig.clone(), VerificationStatus::Verified);
-    }
-    BufferItem::Executed(Box::new(ExecutedItem {
-        executed_blocks,
-        partial_commit_proof,
-        callback,
-        commit_info,
-        ordered_proof,
-    }))
+    li_with_sig
 }
 
 fn aggregate_commit_proof(
     commit_ledger_info: &LedgerInfo,
     verified_signatures: &PartialSignatures,
-    epoch_state: Arc<EpochState>,
+    validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
-    let aggregated_sig = epoch_state
-        .verifier
+    let aggregated_sig = validator
         .aggregate_signatures(verified_signatures.signatures_iter())
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
@@ -130,7 +74,7 @@ fn aggregate_commit_proof(
 // we differentiate buffer items at different stages
 // for better code readability
 pub struct OrderedItem {
-    pub unverified_signatures: PartialSignatures,
+    pub unverified_votes: Vec<CommitVote>,
     // This can happen in the fast forward sync path, where we can receive the commit proof
     // from peers.
     pub commit_proof: Option<LedgerInfoWithSignatures>,
@@ -181,10 +125,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-        unverified_signatures: PartialSignatures,
+        unverified_votes: Vec<CommitVote>,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures,
+            unverified_votes,
             commit_proof: None,
             callback,
             ordered_blocks,
@@ -196,7 +140,7 @@ impl BufferItem {
     pub fn advance_to_executed_or_aggregated(
         self,
         executed_blocks: Vec<PipelinedBlock>,
-        epoch_state: Arc<EpochState>,
+        validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
     ) -> Self {
@@ -205,7 +149,7 @@ impl BufferItem {
                 let OrderedItem {
                     ordered_blocks,
                     commit_proof,
-                    unverified_signatures,
+                    unverified_votes,
                     callback,
                     ordered_proof,
                 } = *ordered_item;
@@ -246,21 +190,11 @@ impl BufferItem {
                         order_vote_enabled,
                     );
 
-                    let verified_signatures = verify_signatures(
-                        unverified_signatures,
-                        epoch_state.clone(),
+                    let mut partial_commit_proof = ledger_info_with_unverified_signatures(
+                        unverified_votes,
                         &commit_ledger_info,
                     );
-                    if (epoch_state
-                        .verifier
-                        .check_voting_power(verified_signatures.signatures().keys(), true))
-                    .is_ok()
-                    {
-                        let commit_proof = aggregate_commit_proof(
-                            &commit_ledger_info,
-                            &verified_signatures,
-                            epoch_state,
-                        );
+                    if let Ok(commit_proof) = partial_commit_proof.aggregate_and_verify(validator) {
                         debug!(
                             "{} advance to aggregated from ordered",
                             commit_proof.commit_info()
@@ -271,14 +205,13 @@ impl BufferItem {
                             callback,
                         }))
                     } else {
-                        generate_executed_item_from_ordered(
-                            commit_info,
+                        Self::Executed(Box::new(ExecutedItem {
                             executed_blocks,
-                            verified_signatures,
+                            partial_commit_proof,
                             callback,
+                            commit_info,
                             ordered_proof,
-                            order_vote_enabled,
-                        )
+                        }))
                     }
                 }
             },
@@ -334,7 +267,7 @@ impl BufferItem {
                     partial_commit_proof: local_commit_proof,
                     ..
                 } = *signed_item;
-                assert_eq!(local_commit_proof.commit_info(), commit_proof.commit_info(),);
+                assert_eq!(local_commit_proof.commit_info(), commit_proof.commit_info());
                 debug!(
                     "{} advance to aggregated with commit decision",
                     commit_proof.commit_info()
@@ -385,12 +318,12 @@ impl BufferItem {
         }
     }
 
-    pub fn try_advance_to_aggregated(self, epoch_state: Arc<EpochState>) -> Self {
+    pub fn try_advance_to_aggregated(self, validator: &ValidatorVerifier) -> Self {
         match self {
             Self::Signed(signed_item) => {
                 if signed_item
                     .partial_commit_proof
-                    .check_voting_power(&epoch_state.verifier, true)
+                    .check_voting_power(validator, true)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG
@@ -399,7 +332,7 @@ impl BufferItem {
                     if let Ok(commit_proof) = signed_item
                         .partial_commit_proof
                         .clone()
-                        .aggregate_and_verify(epoch_state.clone())
+                        .aggregate_and_verify(validator)
                     {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: signed_item.executed_blocks,
@@ -413,7 +346,7 @@ impl BufferItem {
             Self::Executed(executed_item) => {
                 if executed_item
                     .partial_commit_proof
-                    .check_voting_power(&epoch_state.verifier, true)
+                    .check_voting_power(validator, true)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG
@@ -423,7 +356,7 @@ impl BufferItem {
                     if let Ok(commit_proof) = executed_item
                         .partial_commit_proof
                         .clone()
-                        .aggregate_and_verify(epoch_state.clone())
+                        .aggregate_and_verify(validator)
                     {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: executed_item.executed_blocks,
@@ -462,14 +395,10 @@ impl BufferItem {
             .round()
     }
 
-    pub fn add_signature_if_matched(
-        &mut self,
-        vote: CommitVote,
-        verification_status: VerificationStatus,
-    ) -> anyhow::Result<()> {
+    pub fn add_signature_if_matched(&mut self, vote: CommitVote) -> anyhow::Result<()> {
         let target_commit_info = vote.commit_info();
         let author = vote.author();
-        let signature = vote.signature().clone();
+        let signature = vote.signature_with_status();
         match self {
             Self::Ordered(ordered) => {
                 if ordered
@@ -481,29 +410,21 @@ impl BufferItem {
                     // when advancing to executed item, we will check if the sigs are valid.
                     // each author at most stores a single sig for each item,
                     // so an adversary will not be able to flood our memory.
-                    ordered
-                        .unverified_signatures
-                        .add_signature(author, signature);
+                    ordered.unverified_votes.push(vote);
                     return Ok(());
                 }
             },
             Self::Executed(executed) => {
                 if executed.commit_info == *target_commit_info {
-                    executed.partial_commit_proof.add_signature(
-                        author,
-                        signature,
-                        verification_status,
-                    );
+                    executed
+                        .partial_commit_proof
+                        .add_signature(author, signature);
                     return Ok(());
                 }
             },
             Self::Signed(signed) => {
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
-                    signed.partial_commit_proof.add_signature(
-                        author,
-                        signature,
-                        verification_status,
-                    );
+                    signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
             },

@@ -38,11 +38,8 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress,
-    aggregate_signature::PartialSignatures,
-    epoch_change::EpochChangeProof,
-    epoch_state::EpochState,
-    ledger_info::{LedgerInfoWithSignatures, VerificationStatus},
+    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
 use futures::{
@@ -162,7 +159,6 @@ pub struct BufferManager {
     back_pressure_enabled: bool,
     highest_committed_round: Round,
     latest_round: Round,
-    optimistic_sig_verification_for_commit_votes: bool,
 
     // Consensus publisher for downstream observers.
     consensus_observer_config: ConsensusObserverConfig,
@@ -204,7 +200,6 @@ impl BufferManager {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
-        optimistic_sig_verification_for_commit_votes: bool,
         max_pending_rounds_in_commit_vote_cache: u64,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
@@ -264,7 +259,6 @@ impl BufferManager {
             back_pressure_enabled,
             highest_committed_round,
             latest_round: highest_committed_round,
-            optimistic_sig_verification_for_commit_votes,
             consensus_observer_config,
             consensus_publisher,
 
@@ -420,23 +414,18 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let mut unverified_signatures = PartialSignatures::empty();
+        let mut unverified_votes = vec![];
         if let Some(block) = ordered_blocks.last() {
             if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
-                votes
-                    .values()
-                    .filter(|vote| vote.commit_info().id() == block.id())
-                    .for_each(|vote| {
-                        unverified_signatures.add_signature(vote.author(), vote.signature().clone())
-                    });
+                for (_, vote) in votes {
+                    if vote.commit_info().id() == block.id() {
+                        unverified_votes.push(vote);
+                    }
+                }
             }
         }
-        let item = BufferItem::new_ordered(
-            ordered_blocks,
-            ordered_proof,
-            callback,
-            unverified_signatures,
-        );
+        let item =
+            BufferItem::new_ordered(ordered_blocks, ordered_proof, callback, unverified_votes);
         self.buffer.push_back(item);
     }
 
@@ -690,7 +679,7 @@ impl BufferManager {
         let round = item.round();
         let mut new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
-            self.epoch_state.clone(),
+            &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
             self.order_vote_enabled,
         );
@@ -752,11 +741,7 @@ impl BufferManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    fn process_commit_message(
-        &mut self,
-        commit_msg: IncomingCommitRequest,
-        verification_status: VerificationStatus,
-    ) -> Option<HashValue> {
+    fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
         let IncomingCommitRequest {
             req,
             protocol,
@@ -774,14 +759,14 @@ impl BufferManager {
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
-                    let new_item = match item.add_signature_if_matched(vote, verification_status) {
+                    let new_item = match item.add_signature_if_matched(vote) {
                         Ok(()) => {
                             let response =
                                 ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
                             if let Ok(bytes) = protocol.to_bytes(&response) {
                                 let _ = response_sender.send(Ok(bytes.into()));
                             }
-                            item.try_advance_to_aggregated(self.epoch_state.clone())
+                            item.try_advance_to_aggregated(&self.epoch_state.verifier)
                         },
                         Err(e) => {
                             error!(
@@ -943,31 +928,11 @@ impl BufferManager {
             while let Some(commit_msg) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
-                let optimistic_sig_verification_for_commit_votes =
-                    self.optimistic_sig_verification_for_commit_votes;
                 bounded_executor
                     .spawn(async move {
-                        // When this flag is enabled, we skip verification of commit vote for now.
-                        // Once enough commit votes are received, we will aggregate and verifyt them optimistically.
-                        if optimistic_sig_verification_for_commit_votes {
-                            if let CommitMessage::Vote(vote) = &commit_msg.req {
-                                if !epoch_state_clone
-                                    .verifier
-                                    .pessimistic_verify_set()
-                                    .contains(&vote.author())
-                                {
-                                    let _ = tx.unbounded_send((
-                                        commit_msg,
-                                        VerificationStatus::Unverified,
-                                    ));
-                                    return;
-                                }
-                            }
-                        }
                         match commit_msg.req.verify(&epoch_state_clone.verifier) {
                             Ok(_) => {
-                                let _ =
-                                    tx.unbounded_send((commit_msg, VerificationStatus::Verified));
+                                let _ = tx.unbounded_send(commit_msg);
                             },
                             Err(e) => warn!("Invalid commit message: {}", e),
                         }
@@ -1028,9 +993,9 @@ impl BufferManager {
                     self.pending_commit_votes.retain(|rnd, _| *rnd > round);
                     self.highest_committed_round = round
                 },
-                Some((rpc_request, verification_status)) = verified_commit_msg_rx.next() => {
+                Some(rpc_request) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request, verification_status) {
+                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root();
