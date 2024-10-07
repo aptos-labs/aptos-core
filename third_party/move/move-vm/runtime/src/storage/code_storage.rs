@@ -7,10 +7,10 @@ use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
-/// Returns the hash (SHA-3-256) of the script.
-pub fn script_hash(serialized_script: &[u8]) -> [u8; 32] {
+/// Returns the hash (SHA-3-256) of the bytes. Used for both modules and scripts.
+pub fn compute_code_hash(bytes: &[u8]) -> [u8; 32] {
     let mut sha3_256 = Sha3_256::new();
-    sha3_256.update(serialized_script);
+    sha3_256.update(bytes);
     sha3_256.finalize().into()
 }
 
