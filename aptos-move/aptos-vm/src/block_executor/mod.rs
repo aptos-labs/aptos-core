@@ -12,9 +12,12 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
-    cross_block_caches::CachedAptosEnvironment, errors::BlockExecutionError,
-    executor::BlockExecutor, task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
+    cross_block_caches::{initialize_cross_block_framework_cache, CachedAptosEnvironment},
+    errors::BlockExecutionError,
+    executor::BlockExecutor,
+    task::TransactionOutput as BlockExecutorTransactionOutput,
+    txn_commit_hook::TransactionCommitHook,
+    types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -40,6 +43,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
+use move_vm_runtime::WithRuntimeEnvironment;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
@@ -418,6 +422,10 @@ impl BlockAptosVM {
 
         let environment =
             CachedAptosEnvironment::fetch_with_delayed_field_optimization_enabled(state_view);
+        if environment.vm_config().use_loader_v2 {
+            initialize_cross_block_framework_cache(state_view, environment.runtime_environment());
+        }
+
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {

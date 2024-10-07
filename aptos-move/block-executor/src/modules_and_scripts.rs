@@ -6,6 +6,15 @@ use crate::{
         FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS, GET_MODULE_STATE_VALUE_SECONDS,
         READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS,
     },
+    cross_block_caches::{
+        check_module_exists_in_cross_block_framework_cache,
+        fetch_deserialized_module_from_cross_block_framework_cache,
+        fetch_module_bytes_from_cross_block_framework_cache,
+        fetch_module_metadata_from_cross_block_framework_cache,
+        fetch_module_size_in_bytes_from_cross_block_framework_cache,
+        fetch_module_state_value_metadata_from_cross_block_framework_cache,
+        fetch_verified_module_from_cross_block_framework_cache,
+    },
     view::{LatestView, ViewState},
 };
 use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion};
@@ -26,7 +35,7 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    logging::expect_no_verification_errors, script_hash, CodeStorage, Module, ModuleStorage,
+    compute_code_hash, logging::expect_no_verification_errors, CodeStorage, Module, ModuleStorage,
     RuntimeEnvironment, Script, WithRuntimeEnvironment,
 };
 use move_vm_types::{module_cyclic_dependency_error, module_linker_error};
@@ -45,6 +54,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        if let Some(state_value_metadata) =
+            fetch_module_state_value_metadata_from_cross_block_framework_cache(address, module_name)
+        {
+            return Ok(Some(state_value_metadata));
+        }
+
         Ok(self
             .read_module_storage(address, module_name)
             .map_err(|e| e.to_partial())?
@@ -60,7 +75,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         &self,
         serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
-        let hash = script_hash(serialized_script);
+        let hash = compute_code_hash(serialized_script);
 
         let maybe_compiled_script = match &self.latest_view {
             ViewState::Sync(state) => state
@@ -93,7 +108,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
     }
 
     fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        let hash = script_hash(serialized_script);
+        let hash = compute_code_hash(serialized_script);
 
         let maybe_verified_script = match &self.latest_view {
             ViewState::Sync(state) => state
@@ -149,6 +164,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
+        if check_module_exists_in_cross_block_framework_cache(address, module_name) {
+            return Ok(true);
+        }
+
         let exists = self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -161,6 +180,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
+        if let Some(bytes) =
+            fetch_module_bytes_from_cross_block_framework_cache(address, module_name)
+        {
+            return Ok(Some(bytes));
+        }
+
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -172,6 +197,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
+        if let Some(size) =
+            fetch_module_size_in_bytes_from_cross_block_framework_cache(address, module_name)
+        {
+            return Ok(Some(size));
+        }
+
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -183,6 +214,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
+        if let Some(metadata) =
+            fetch_module_metadata_from_cross_block_framework_cache(address, module_name)
+        {
+            return Ok(Some(metadata));
+        }
+
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -194,6 +231,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
+        if let Some(compiled_module) =
+            fetch_deserialized_module_from_cross_block_framework_cache(address, module_name)
+        {
+            return Ok(Some(compiled_module));
+        }
+
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -205,6 +248,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
+        if let Some(module) =
+            fetch_verified_module_from_cross_block_framework_cache(address, module_name)
+        {
+            return Ok(Some(module));
+        }
+
         let _timer = FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS.start_timer();
 
         let (version, entry) = match self

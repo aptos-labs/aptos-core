@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    compute_code_hash,
     logging::expect_no_verification_errors,
-    script_hash,
     storage::{
         environment::{ambassador_impl_WithRuntimeEnvironment, WithRuntimeEnvironment},
         implementations::unsync_module_storage::AsUnsyncModuleStorage,
@@ -139,7 +139,7 @@ impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
-        let hash = script_hash(serialized_script);
+        let hash = compute_code_hash(serialized_script);
         let mut storage = self.script_storage.borrow_mut();
 
         Ok(match storage.entry(hash) {
@@ -159,7 +159,7 @@ impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
-        let hash = script_hash(serialized_script);
+        let hash = compute_code_hash(serialized_script);
         let mut storage = self.script_storage.borrow_mut();
 
         Ok(match storage.entry(hash) {
@@ -233,14 +233,14 @@ mod test {
         let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
 
         let serialized_script = script(vec!["a"]);
-        let hash_1 = script_hash(&serialized_script);
+        let hash_1 = compute_code_hash(&serialized_script);
 
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.matches(vec![hash_1], |e| matches!(e, Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, Verified(..))));
 
         let serialized_script = script(vec!["b"]);
-        let hash_2 = script_hash(&serialized_script);
+        let hash_2 = compute_code_hash(&serialized_script);
 
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.module_storage().does_not_have_cached_modules());
@@ -262,7 +262,7 @@ mod test {
         let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
 
         let serialized_script = script(vec!["a"]);
-        let hash = script_hash(&serialized_script);
+        let hash = compute_code_hash(&serialized_script);
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.module_storage().does_not_have_cached_modules());
         assert!(code_storage.matches(vec![hash], |e| matches!(e, S::Deserialized(..))));

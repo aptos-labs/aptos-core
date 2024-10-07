@@ -36,7 +36,7 @@ pub use loader::{LoadedFunction, Module, Script};
 #[cfg(any(test, feature = "testing"))]
 pub use storage::implementations::unreachable_code_storage;
 pub use storage::{
-    code_storage::{ambassador_impl_CodeStorage, script_hash, CodeStorage},
+    code_storage::{ambassador_impl_CodeStorage, compute_code_hash, CodeStorage},
     environment::{
         ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
     },
