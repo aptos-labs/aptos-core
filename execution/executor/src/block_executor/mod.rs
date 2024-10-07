@@ -336,18 +336,18 @@ where
         }
 
         let ledger_update_output = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                    MakeLedgerUpdate::make(
+            MakeLedgerUpdate::make(
+                &block.output.chunk_output,
+                &block.output.expect_state_checkpoint_output().state_checkpoint_hashes,
+                &parent_block.output.expect_ledger_update_output().transaction_accumulator,
+            )
+        })?;
 
-                    )
-                })?;
-                output
-            };
-
-        let state_compute_result = output.as_state_compute_result(
-            parent_accumulator,
-            block.output.epoch_state().clone(),
+        let state_compute_result = ledger_update_output.as_state_compute_result(
+            &parent_block.output.expect_ledger_update_output().transaction_accumulator,
+            block.output.chunk_output.next_epoch_state.clone(),
         );
-        block.output.set_ledger_update(output);
+        block.output.set_ledger_update_output_once(ledger_update_output);
         Ok(state_compute_result)
     }
 
@@ -366,20 +366,25 @@ where
         let block = blocks.pop().expect("guaranteed");
         let parent_block = blocks.pop().expect("guaranteed");
 
-        let result_in_memory_state = block.output.state().clone();
-
         fail_point!("executor::pre_commit_block", |_| {
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
         });
 
-        let ledger_update = block.output.get_ledger_update();
-        if !ledger_update.transactions_to_commit().is_empty() {
+        let chunk_to_commit = block.output.expect_chunk_to_commit();
+        let parent = parent_block.output.expect_chunk_to_commit();
+
+        if !block.output.chunk_output.to_commit.is_empty() {
             let _timer = SAVE_TRANSACTIONS.start_timer();
+
             self.db.writer.pre_commit_ledger(
-                ledger_update.transactions_to_commit(),
-                ledger_update.first_version(),
-                parent_block.output.state().base_version,
-                false,
+                &chunk_to_commit.make_transactions_to_commit(),
+                chunk_to_commit.chunk_output.first_version,
+                parent.state_checkpoint_output.result_state.base_version,
+                false /* sync_commit */,
+
+                state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+                sharded_state_cache: Option<&ShardedStateCache>,
+
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
                 ledger_update.state_updates_until_last_checkpoint.clone(),

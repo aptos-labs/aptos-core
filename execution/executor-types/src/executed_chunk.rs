@@ -14,7 +14,9 @@ use aptos_types::{
     transaction::{TransactionOutputProvider, TransactionToCommit},
 };
 use itertools::izip;
+use crate::chunk_to_commit::ChunkToCommit;
 
+// FIXME(aldenhu): eliminate or proper naming or move to executor
 #[derive(Debug)]
 pub struct ExecutedChunk {
     pub chunk_output: ChunkOutput,
@@ -125,25 +127,12 @@ impl ExecutedChunk {
          */
     }
 
-    pub fn make_txns_to_commit(&self) -> Vec<TransactionToCommit> {
-        // TODO(aldenhu): see timer on the call site, consider avoiding cloning.
-        izip!(
-            self.chunk_output.to_commit.iter(),
-            &self.state_checkpoint_output.per_version_state_updates,
-            &self.ledger_update_output.transaction_infos,
-        )
-        .map(|((txn, txn_out), state_updates, txn_info)| {
-            TransactionToCommit::new(
-                txn.clone(),
-                txn_info.clone(),
-                state_updates.clone(),
-                txn_out.get_transaction_output().write_set().clone(),
-                txn_out.get_transaction_output().events().to_vec(),
-                txn_out.is_reconfig(),
-                txn_out.get_transaction_output().auxiliary_data().clone(),
-            )
-        })
-        .collect()
+    pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
+        ChunkToCommit {
+            chunk_output: &self.chunk_output,
+            state_checkpoint_output: &self.state_checkpoint_output,
+            ledger_update_output: &self.ledger_update_output,
+        }
     }
 }
 

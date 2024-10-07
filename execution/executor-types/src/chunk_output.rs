@@ -14,6 +14,7 @@ use aptos_types::{
 };
 
 // FIXME(aldenhu): check debug impls
+// FIXME(aldenh): proper naming
 #[derive(Debug)]
 pub struct ChunkOutput {
     pub first_version: Version,

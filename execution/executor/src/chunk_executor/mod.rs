@@ -232,7 +232,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             let txns_to_commit = {
                 let _timer =
                     CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__make_txns_to_commit"]);
-                chunk.make_txns_to_commit()
+                chunk.as_chunk_to_commit().make_transactions_to_commit()
             };
             let state_updates_before_last_checkpoint = {
                 let _timer =

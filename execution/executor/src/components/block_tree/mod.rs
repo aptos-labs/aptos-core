@@ -24,6 +24,7 @@ use std::{
     iter::Once,
     sync::{mpsc::Receiver, Arc, Weak},
 };
+use aptos_executor_types::chunk_to_commit::ChunkToCommit;
 use aptos_types::proof::accumulator::InMemoryTransactionAccumulator;
 use aptos_types::transaction::Version;
 
@@ -385,21 +386,11 @@ impl BlockOutput {
         self.chunk_output.ends_epoch()
     }
 
-    pub fn as_state_compute_result(&self, parent_accumulator: &InMemoryTransactionAccumulator) -> StateComputeResult {
-        assert!(self.is_complete());
-        let accumulator = &self.expect_ledger_update_output().transaction_accumulator;
-        StateComputeResult::new(
-            accumulator.root_hash(),
-            accumulator.frozen_subtree_roots().to_vec(),
-            self.chunk_output.next_version(),
-            parent_accumulator.frozen_subtree_roots().to_vec(),
-            self.chunk_output.first_version,
-            self.chunk_output.next_epoch_state.clone(),
-            self.chunk_output.statuses_for_input_txns.clone(),
-            self.expect_ledger_update_output().transaction_info_hashes.clone(),
-            // FIXME(aldenhu): move to first stage
-            self.expect_ledger_update_output().subscribable_events.clone(),
-            self.chunk_output.block_end_info.clone(),
-        )
+    pub fn expect_chunk_to_commit(&self) -> ChunkToCommit {
+        ChunkToCommit {
+            chunk_output: &self.chunk_output,
+            state_checkpoint_output: self.expect_state_checkpoint_output(),
+            ledger_update_output: self.expect_ledger_update_output(),
+        }
     }
 }
