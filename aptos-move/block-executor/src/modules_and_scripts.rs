@@ -33,7 +33,10 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    metadata::Metadata,
+};
 use move_vm_runtime::{
     compute_code_hash, logging::expect_no_verification_errors, CodeStorage, Module, ModuleStorage,
     RuntimeEnvironment, Script, WithRuntimeEnvironment,
@@ -305,9 +308,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     /// Returns the module storage entry built from the current view. If it is not in
     /// multi-version or non-sync data structures, fetches it from the base view.
-    fn read_module_storage_by_key(
+    fn read_module_storage(
         &self,
-        key: &T::Key,
+        address: &AccountAddress,
+        module_name: &IdentStr,
     ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
         let _timer = READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS.start_timer();
 
@@ -317,50 +321,48 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 if let Some(read) = state
                     .captured_reads
                     .borrow()
-                    .get_captured_module_storage_read(key)
+                    .get_captured_module_storage_read(address, module_name)
                 {
                     return Ok(read.clone());
                 }
 
                 // Otherwise, we need to go to the multi-version data structure to get it, and
                 // record under captured reads.
+                let module_id = ModuleId::new(*address, module_name.to_owned());
                 let read = state
                     .versioned_map
                     .code_storage()
                     .module_storage()
-                    .get_or_else(key, self.txn_idx, || {
-                        self.get_base_module_storage_entry(key)
+                    .get_or_else(&module_id, self.txn_idx, || {
+                        let key = T::Key::from_address_and_module_name(address, module_name);
+                        self.get_base_module_storage_entry(&key)
                     })?;
                 state
                     .captured_reads
                     .borrow_mut()
-                    .capture_module_storage_read(key.clone(), read.clone());
+                    .capture_module_storage_read(module_id, read.clone());
                 Ok(read)
             },
             ViewState::Unsync(state) => {
-                state.read_set.borrow_mut().module_reads.insert(key.clone());
-                Ok(match state.unsync_map.fetch_module(key) {
+                state
+                    .read_set
+                    .borrow_mut()
+                    .module_storage_reads
+                    .insert(ModuleId::new(*address, module_name.to_owned()));
+                Ok(match state.unsync_map.fetch_module(address, module_name) {
                     // For sequential execution, indices do not matter, but we still return
                     // them to have uniform interfaces.
                     Some(entry) => ModuleStorageRead::before_txn_idx(self.txn_idx, entry),
-                    None => match self.get_base_module_storage_entry(key)? {
-                        Some(entry) => ModuleStorageRead::storage_version(entry),
-                        None => ModuleStorageRead::DoesNotExist,
+                    None => {
+                        let key = T::Key::from_address_and_module_name(address, module_name);
+                        match self.get_base_module_storage_entry(&key)? {
+                            Some(entry) => ModuleStorageRead::storage_version(entry),
+                            None => ModuleStorageRead::DoesNotExist,
+                        }
                     },
                 })
             },
         }
-    }
-
-    /// Similar to [LatestView::read_module_storage_by_key], but allows to resolve module
-    /// storage entries based on addresses and names.
-    fn read_module_storage(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
-        let key = T::Key::from_address_and_module_name(address, module_name);
-        self.read_module_storage_by_key(&key)
     }
 
     /// Similar to [LatestView::read_module_storage], but in case the module does not exist,
@@ -442,26 +444,26 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         // Finally, change the entry in the module storage to the verified one, in order to
         // make sure that everyone sees the verified module.
-        let key = T::Key::from_address_and_module_name(address, module_name);
+        let id = ModuleId::new(*address, module_name.to_owned());
         match &self.latest_view {
             ViewState::Sync(state) => {
                 state
                     .captured_reads
                     .borrow_mut()
                     .capture_module_storage_read(
-                        key.clone(),
+                        id.clone(),
                         ModuleStorageRead::Versioned(version.clone(), verified_entry.clone()),
                     );
                 state
                     .versioned_map
                     .code_storage()
                     .module_storage()
-                    .write_if_not_verified(&key, version, verified_entry);
+                    .write_if_not_verified(&id, version, verified_entry);
             },
             ViewState::Unsync(state) => {
                 state
                     .unsync_map
-                    .write_module_storage_entry(key, verified_entry);
+                    .write_module_storage_entry(id, verified_entry);
             },
         }
         Ok(module)
