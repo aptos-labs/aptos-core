@@ -9,8 +9,10 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
-use std::collections::HashMap;
+use std::{cmp::Reverse, collections::HashMap, mem};
 use aptos_block_partitioner::v3::build_partitioning_result;
+use itertools::Itertools;
+use aptos_types::account_address::AccountAddress;
 
 /// A partitioner that does not reorder and assign txns to shards in a round-robin way.
 /// Only for testing the correctness or sharded execution V3.
@@ -32,7 +34,8 @@ impl BlockPartitioner for FanoutPartitioner {
             println!("Senders: {}, accesses: {}", compressed_graph.sender_to_idx.len(), compressed_graph.access_to_idx.len());
         }
 
-        let sender_to_shard_idxs = (compressed_graph.sender_start_idx..compressed_graph.sender_end_idx).map(|i| i as usize % num_shards).collect::<Vec<_>>();
+        let sender_to_shard_idxs = priority_bfs_preassign(&compressed_graph, num_shards as u16);
+        // let sender_to_shard_idxs = (compressed_graph.sender_start_idx..compressed_graph.sender_end_idx).map(|i| i as usize % num_shards).collect::<Vec<_>>();
 
         let shard_idxs = transactions.iter().map(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize] as usize).collect();
 
@@ -183,4 +186,67 @@ impl PartitionerConfig for V3FanoutPartitionerConfig {
     fn build(&self) -> Box<dyn BlockPartitioner> {
         Box::new(FanoutPartitioner::default())
     }
+}
+
+const UNASSIGNED_SHARD: u16 = u16::MAX;
+
+fn priority_bfs_preassign(graph: &CompressedGraph, num_shards: u16) -> Vec<u16> {
+    let any_vertex_end_index = graph.access_end_idx.max(graph.sender_end_idx);
+
+    let total_weight = graph.sender_weights.iter().sum::<u32>();
+    let max_shard_weight = 1 + total_weight / num_shards as u32;
+
+    println!("Total {} txns, to split across {} shards, with at most {} in each.", total_weight, num_shards, max_shard_weight);
+    let mut assigned = vec![UNASSIGNED_SHARD; any_vertex_end_index as usize];
+    let mut cur_bucket_idx = 0;
+    let mut bucket_weights = vec![0u32; (num_shards + 1) as usize];
+
+    // let mut start_vertex_to_degree = (0 .. any_vertex_end_index).map(|sender_idx| (sender_idx, graph.edges.get_edges(sender_idx).len() as u32)).collect::<Vec<_>>();
+    let mut start_vertex_to_degree = (graph.sender_start_idx .. graph.sender_end_idx).map(|sender_idx| (sender_idx, graph.edges.get_edges(sender_idx).len() as u32)).collect::<Vec<_>>();
+    start_vertex_to_degree.sort_by_key(|(_idx, degree)| Reverse(*degree));
+
+    for (sender_idx, _) in start_vertex_to_degree {
+        if assigned[sender_idx as usize] == UNASSIGNED_SHARD {
+            let mut current_to_visit = vec![sender_idx];
+            let mut next_to_visit = HashMap::new();
+
+            while !current_to_visit.is_empty()  {
+                for cur in &current_to_visit {
+                    assigned[*cur as usize] = cur_bucket_idx;
+                    let weight = graph.get_weight(*cur);
+                    if weight > 0 {
+                        assert!(cur_bucket_idx < num_shards, "{:?}, {}, {}", bucket_weights, max_shard_weight, weight);
+                        bucket_weights[cur_bucket_idx as usize] += weight;
+
+                        if bucket_weights[cur_bucket_idx as usize] >= max_shard_weight {
+                            println!("Done {} with {}", cur_bucket_idx, weight);
+                            break;
+                        }
+                    }
+
+                    for connected in graph.edges.get_edges(*cur) {
+                        if assigned[*connected as usize] == UNASSIGNED_SHARD {
+                            *next_to_visit.entry(*connected).or_insert(0) += 1;
+                        }
+                    }
+                }
+
+                if bucket_weights[cur_bucket_idx as usize] >= max_shard_weight {
+                    break;
+                }
+
+                let mut to_sort = HashMap::new();
+                mem::swap(&mut to_sort, &mut next_to_visit);
+                let mut new_to_visit = to_sort.into_iter().sorted_by_key(|(_idx, connections)| Reverse(*connections)).map(|(idx, _connections)| idx).collect::<Vec<_>>();
+                mem::swap(&mut current_to_visit, &mut new_to_visit);
+            }
+
+            if bucket_weights[cur_bucket_idx as usize] >= max_shard_weight {
+                println!("Filled another bucket {}, going to next {:?}", cur_bucket_idx, bucket_weights);
+                cur_bucket_idx += 1;
+            }
+        }
+    }
+
+    assigned
 }
