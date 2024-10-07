@@ -62,6 +62,7 @@ pub struct ValueSerDeContext<'a> {
     #[allow(dead_code)]
     pub(crate) function_extension: Option<&'a dyn FunctionValueExtension>,
     pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
+    pub(crate) legacy_signer: bool,
 }
 
 impl<'a> ValueSerDeContext<'a> {
@@ -71,7 +72,14 @@ impl<'a> ValueSerDeContext<'a> {
         Self {
             function_extension: None,
             delayed_fields_extension: None,
+            legacy_signer: false,
         }
+    }
+
+    /// Serialize signer with legacy format to maintain backwards compatibility.
+    pub fn with_legacy_signer(mut self) -> Self {
+        self.legacy_signer = true;
+        self
     }
 
     /// Custom (de)serializer such that supports lookup of the argument types of a function during
@@ -89,6 +97,7 @@ impl<'a> ValueSerDeContext<'a> {
         Self {
             function_extension: self.function_extension,
             delayed_fields_extension: None,
+            legacy_signer: self.legacy_signer,
         }
     }
 

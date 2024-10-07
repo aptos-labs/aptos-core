@@ -6,8 +6,8 @@ module 0x42.M {
     struct S { f: u64 }
 
     public t(
-        x: u64,
         a: signer,
+        x: u64,
         s: Self.S,
         r1: &Self.S,
         r2: &mut Self.S
@@ -17,4 +17,4 @@ module 0x42.M {
     }
 }
 
-//# run 0x42::M::t --args 0 @0x1 2 3 4
+//# run 0x42::M::t --signers 0x1 --args 0 2 3 4

@@ -18,12 +18,21 @@
 
 ## Function `borrow_address`
 
-Borrows the address of the signer
-Conceptually, you can think of the <code><a href="signer.md#0x1_signer">signer</a></code> as being a struct wrapper around an
-address
-```
-struct signer has drop { addr: address }
-```
+signer is a builtin move type that represents an address that has been verfied by the VM.
+
+VM Runtime representation is equivalent to following:
+enum signer has drop {
+Master { account: address },
+Permissioned { account: address, permissions_address: address },
+}
+
+for bcs serialization:
+struct signer has drop {
+account: address,
+}
+^ The discrepency is needed to maintain backwards compatibility of signer serialization
+semantics.
+
 <code>borrow_address</code> borrows this inner field
 
 
