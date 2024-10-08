@@ -98,7 +98,7 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
+      - uses: aptos-labs/aptos-core/.github/actions/get-latest-docker-image-tag@main
         id: get-docker-image-tag
         with:
           branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
