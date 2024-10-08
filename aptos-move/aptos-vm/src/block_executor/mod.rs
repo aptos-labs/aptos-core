@@ -417,7 +417,7 @@ impl BlockAptosVM {
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
         let environment =
-            CachedAptosEnvironment::fetch_with_delayed_field_optimization_enabled(state_view);
+            CachedAptosEnvironment::fetch_with_delayed_field_optimization_enabled(state_view)?;
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {

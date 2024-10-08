@@ -1100,7 +1100,9 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
-        CrossBlockModuleCache::populate_cache_at_block_end(versioned_cache.code_cache());
+        CrossBlockModuleCache::populate_from_sync_code_cache_at_block_end(
+            versioned_cache.code_cache(),
+        );
 
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1513,6 +1515,9 @@ where
         ret.resize_with(num_txns, E::Output::skip_output);
 
         counters::update_state_counters(unsync_map.stats(), false);
+        CrossBlockModuleCache::populate_from_unsync_code_cache_at_block_end(
+            unsync_map.code_cache(),
+        );
 
         let block_end_info = if self
             .config
@@ -1568,6 +1573,11 @@ where
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
             init_speculative_logs(signature_verified_block.len());
+
+            // Flush the cache and the environment to re-run from the "clean" state.
+            env.runtime_environment()
+                .flush_struct_name_and_info_caches();
+            CrossBlockModuleCache::flush_at_block_start();
 
             info!("parallel execution requiring fallback");
         }

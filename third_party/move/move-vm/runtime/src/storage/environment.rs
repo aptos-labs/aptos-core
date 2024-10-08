@@ -16,7 +16,7 @@ use ambassador::delegatable_trait;
 use bytes::Bytes;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    errors::{Location, PartialVMError, VMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -249,6 +249,20 @@ impl RuntimeEnvironment {
     /// struct layouts, tags and depth formulae.
     pub(crate) fn ty_cache(&self) -> &StructInfoCache {
         &self.ty_cache
+    }
+
+    /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the
+    /// cache at block boundaries.
+    pub fn struct_name_index_map_size(&self) -> PartialVMResult<usize> {
+        self.struct_name_index_map.checked_len()
+    }
+
+    /// Flushes the global caches with struct name indices and the struct information. Note that
+    /// when calling this function, modules that still store indices into struct name cache must
+    /// also be invalidated.
+    pub fn flush_struct_name_and_info_caches(&self) {
+        self.ty_cache.flush();
+        self.struct_name_index_map.flush();
     }
 }
 
