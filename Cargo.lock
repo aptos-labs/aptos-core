@@ -1576,6 +1576,7 @@ dependencies = [
  "move-core-types",
  "namable_closures",
  "nonmax",
+ "ordered-float 3.9.2",
  "rand 0.7.3",
  "rayon",
  "smallvec",

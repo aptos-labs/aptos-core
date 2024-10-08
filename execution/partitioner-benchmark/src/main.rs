@@ -4,7 +4,7 @@
 mod clustered_txns_generator;
 
 use std::time::Instant;
-use aptos_fanout_partitioner::fanout::FanoutPartitioner;
+use aptos_fanout_partitioner::fanout::{FanoutFormula, FanoutPartitioner, InitStrategy};
 use clap::Parser;
 use aptos_block_partitioner::v3::V3NaivePartitioner;
 use aptos_block_partitioner::BlockPartitioner;
@@ -43,8 +43,8 @@ struct Args {
     #[clap(long, default_value_t = String::from("v3-naive"))]
     pub partitioner_type: String,
 
-    #[clap(long, default_value_t = 10)]
-    pub num_shards: usize,
+    #[clap(long)]
+    pub num_shards: Vec<usize>,
 
     #[clap(long)]
     pub debug_logs: bool,
@@ -54,6 +54,21 @@ struct Args {
 
     #[clap(long, default_value_t = 1000)]
     pub v3_reorderer_max_window_size: usize,
+
+    #[clap(long)]
+    pub fanout_detailed_debug_logs: bool,
+
+    #[clap(long, default_value_t = 10)]
+    pub fanout_num_iterations: usize,
+
+    #[clap(long)]
+    pub fanout_init_randomly: bool,
+
+    #[clap(long, default_value_t = 0.2)]
+    pub fanout_probability: f32,
+
+    #[clap(long, default_value_t = 1.0)]
+    pub fanout_move_probability: f64,
 }
 
 fn main() {
@@ -78,15 +93,30 @@ fn main() {
     assert_eq!(args.num_txns, txns.len());
 
     // Determine the partitioner type
-    let partitioner: Box<dyn BlockPartitioner> = match args.partitioner_type.as_str() {
-        "v3-naive" => Box::new(V3NaivePartitioner { print_debug_stats: args.debug_logs }),
-        "v3-orderer" => Box::new(V3ReorderingPartitioner {
+    let partitioners: Vec<Box<dyn BlockPartitioner>> = match args.partitioner_type.as_str() {
+        "v3-naive" => vec![Box::new(V3NaivePartitioner { print_debug_stats: args.debug_logs })],
+        "v3-orderer" => vec![Box::new(V3ReorderingPartitioner {
             print_debug_stats: args.debug_logs,
             min_ordered_transaction_before_execution: args.v3_reorderer_min_ordered_transaction_before_execution,
             max_window_size: args.v3_reorderer_max_window_size,
-        }),
-        "v3-fennel" => Box::new(V3FennelBasedPartitioner { print_debug_stats: args.debug_logs }),
-        "fanout" => Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs }),
+        })],
+        "v3-fennel" => vec![Box::new(V3FennelBasedPartitioner { print_debug_stats: args.debug_logs })],
+        "fanout" => vec![Box::new(FanoutPartitioner {
+            print_debug_stats: args.debug_logs,
+            print_detailed_debug_stats: args.fanout_detailed_debug_logs,
+            num_iterations: args.fanout_num_iterations,
+            init_strategy: if args.fanout_init_randomly { InitStrategy::Random } else { InitStrategy::PriorityBfs },
+            move_probability: args.fanout_move_probability,
+            fanout_formula: FanoutFormula::new(args.fanout_probability),
+        })],
+        "fanout_sweep" => vec![
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 50, init_strategy: InitStrategy::Random, move_probability: 0.8, fanout_formula: FanoutFormula::new(args.fanout_probability) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 0, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(args.fanout_probability) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(0.2) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(0.5) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(0.8) }),
+            Box::new(V3FennelBasedPartitioner { print_debug_stats: args.debug_logs }),
+        ],
         _ => {
             error!("Unsupported partitioner type: {}", args.partitioner_type);
             return;
@@ -95,10 +125,14 @@ fn main() {
 
     // Partition the transactions
     let num_txns = txns.len();
-    let start_time = Instant::now();
-    let partitioned_txns = partitioner.partition(txns, args.num_shards);
-    let elapsed_time = start_time.elapsed();
-    assert_eq!(num_txns, partitioned_txns.num_sharded_txns());
-    info!("Partitioning tps {:.2} ({} txns / {:.2} s; debug prints {})",
-          num_txns as f64 / elapsed_time.as_secs_f64(), num_txns, elapsed_time.as_secs_f64(), args.debug_logs);
+    for partitioner in partitioners {
+        for num_shards in args.num_shards.clone() {
+            let start_time = Instant::now();
+            let partitioned_txns = partitioner.partition(txns.clone(), num_shards);
+            let elapsed_time = start_time.elapsed();
+            assert_eq!(num_txns, partitioned_txns.num_sharded_txns());
+            info!("Partitioning tps {:.2} ({} txns / {:.2} s; debug prints {})",
+                  num_txns as f64 / elapsed_time.as_secs_f64(), num_txns, elapsed_time.as_secs_f64(), args.debug_logs);
+        }
+    }
 }

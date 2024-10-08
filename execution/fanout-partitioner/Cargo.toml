@@ -28,6 +28,7 @@ rayon = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
 move-core-types = { workspace = true }
+ordered-float = { workspace = true }
 
 [features]
 # Enables the metis partitioner, which requires metis to be installed on the system.

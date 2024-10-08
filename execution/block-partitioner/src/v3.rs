@@ -89,6 +89,7 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
     // Track remote dependencies:
     // shard_idx -> self_local_idx -> (owner_txn_local_idx, shard_idx)
     let mut remote_dependency_positions: Vec<HashMap<usize, HashSet<(usize, usize)>>> = vec![HashMap::new(); num_shards];
+    let mut all_owners_by_key: HashMap<StateKey, HashSet<u32>> = HashMap::new();
 
     for (cur_txn_idx, transaction) in transactions.into_iter().enumerate() {
         let cur_shard_idx = shard_idxs[cur_txn_idx];
@@ -124,6 +125,9 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
         // Update owner table with writes.
         for loc in transaction.write_hints.iter() {
             owners_by_key.insert(loc.state_key().clone(), cur_txn_idx as u32);
+            if print_debug_stats {
+                all_owners_by_key.entry(loc.state_key().clone()).or_default().insert(cur_shard_idx as u32);
+            }
         }
 
         partitions[cur_shard_idx].append_txn(cur_txn_idx as u32, transaction);
@@ -132,7 +136,7 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
     let global_idx_lists_by_shard = partitions.iter().map(|p| p.global_idxs.clone()).collect();
 
     if print_debug_stats {
-        partitioning_stats(&partitions, remote_dependency_positions, num_txns);
+        partitioning_stats(&partitions, remote_dependency_positions, all_owners_by_key, num_txns);
     }
 
     PartitionedTransactionsV3 {
@@ -142,7 +146,7 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
     }
 }
 
-fn partitioning_stats(partitions: &Vec<PartitionV3>, remote_dependency_positions: Vec<HashMap<usize, HashSet<(usize, usize)>>>, num_txns: usize) {
+fn partitioning_stats(partitions: &Vec<PartitionV3>, remote_dependency_positions: Vec<HashMap<usize, HashSet<(usize, usize)>>>, all_owners_by_key: HashMap<StateKey, HashSet<u32>>, num_txns: usize) {
     let num_shards = partitions.len();
     let avg_txns_per_shard = num_txns as f64 / num_shards as f64;
 
@@ -239,4 +243,10 @@ fn partitioning_stats(partitions: &Vec<PartitionV3>, remote_dependency_positions
 
     let overall_dep_to_owner_pos_diff_avg = overall_dep_to_owner_pos_diff as f64 / overall_remote_deps as f64;
     info!("[Overall dep-to-owner diff] Overall avg dep_to_owner_pos_diff: {:.2}; Norm avg: {:.2}", overall_dep_to_owner_pos_diff_avg, overall_dep_to_owner_pos_diff_avg / avg_txns_per_shard as f64, );
+
+    let write_loc_num = all_owners_by_key.len();
+    let owners_total_sum = all_owners_by_key.values().map(|set| set.len()).sum::<usize>();
+    let write_loc_max_owners = all_owners_by_key.values().map(|set| set.len()).max().unwrap();
+
+    info!("[Overall location to owner stat] Overall avg num owners: {:.3}; max owners: {}", owners_total_sum as f32 / write_loc_num as f32, write_loc_max_owners);
 }
