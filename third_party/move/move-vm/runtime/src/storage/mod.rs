@@ -11,4 +11,3 @@ pub mod environment;
 pub mod implementations;
 pub mod module_storage;
 pub mod publishing;
-pub mod verifier;

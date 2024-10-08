@@ -50,7 +50,7 @@ impl Script {
             struct_names.push(struct_name_index_map.struct_name_to_idx(StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
-            }));
+            })?);
         }
 
         let mut function_refs = vec![];
