@@ -2226,7 +2226,7 @@ impl<'a> PatDisplay<'a> {
         Self { show_type, ..self }
     }
 
-    fn type_ctx(&self) -> TypeDisplayContext<'a> {
+    fn type_ctx(&self) -> TypeDisplayContext {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {
@@ -3268,7 +3268,7 @@ fn indent(fmt: impl fmt::Display) -> String {
 }
 
 impl<'a> ExpDisplay<'a> {
-    fn type_ctx(&self) -> TypeDisplayContext<'a> {
+    fn type_ctx(&self) -> TypeDisplayContext {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {

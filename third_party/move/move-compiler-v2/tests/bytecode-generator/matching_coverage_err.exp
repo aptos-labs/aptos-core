@@ -22,7 +22,7 @@ module 0xc0ffee::m {
             b: 0xc0ffee::m::Box,
         }
     }
-    public fun exhaustive_tuple(i: &0xc0ffee::m::Inner) {
+    public fun exhaustive_tuple(i: &Inner) {
         match (Tuple(i, i)) {
           (m::Inner::Inner1{ x: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
@@ -33,7 +33,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun exhaustive_via_merge(o: &0xc0ffee::m::Outer) {
+    public fun exhaustive_via_merge(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -50,7 +50,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive(o: &0xc0ffee::m::Outer) {
+    public fun non_exhaustive(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -61,7 +61,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive_because_of_cond(o: &0xc0ffee::m::Outer) {
+    public fun non_exhaustive_because_of_cond(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -75,7 +75,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive_because_of_nested(o: &0xc0ffee::m::Outer) {
+    public fun non_exhaustive_because_of_nested(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -89,7 +89,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive_tuple(i: &0xc0ffee::m::Inner) {
+    public fun non_exhaustive_tuple(i: &Inner) {
         match (Tuple(i, i)) {
           (m::Inner::Inner1{ x: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
@@ -97,7 +97,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive_tuple2(i: &0xc0ffee::m::Inner) {
+    public fun non_exhaustive_tuple2(i: &Inner) {
         match (Tuple(i, i)) {
           (m::Inner::Inner1{ x: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
@@ -108,7 +108,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun unreachable(o: &0xc0ffee::m::Outer) {
+    public fun unreachable(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -125,7 +125,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun unreachable_via_overlaying_pattern(o: &0xc0ffee::m::Outer) {
+    public fun unreachable_via_overlaying_pattern(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -145,7 +145,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun unreachable_via_repeated_pattern(o: &0xc0ffee::m::Outer) {
+    public fun unreachable_via_repeated_pattern(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()

@@ -9,13 +9,13 @@ module 0x42::M {
     struct S {
         dummy_field: bool,
     }
-    public fun eat(r: 0x42::M::R) {
+    public fun eat(r: R) {
         M::R{ dummy_field: _ } = r
     }
 } // end 0x42::M
 module <SELF>_0 {
     use 0x42::M::{S, R, Cup}; // resolved as: 0x42::M
-    private fun main<T>(_s: &signer,_a0: #0,_a1: vector<#0>,_a2: vector<vector<#0>>,_a3: 0x42::M::S,_a4: 0x42::M::R,_a5: 0x42::M::Cup<u8>,_a6: 0x42::M::Cup<#0>,_a7: vector<0x42::M::S>) {
+    private fun main<T>(_s: &signer,_a0: T,_a1: vector<T>,_a2: vector<vector<T>>,_a3: M::S,_a4: M::R,_a5: M::Cup<u8>,_a6: M::Cup<T>,_a7: vector<M::S>) {
         Abort(0)
     }
 } // end <SELF>_0

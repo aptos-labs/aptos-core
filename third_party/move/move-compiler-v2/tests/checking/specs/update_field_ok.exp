@@ -4,7 +4,7 @@ module 0x42::update_field_ok {
         x: u64,
         y: u64,
     }
-    private fun f(r: &mut 0x42::update_field_ok::R) {
+    private fun f(r: &mut R) {
         select update_field_ok::R.x<&mut R>(r) = 1;
         Tuple()
     }
@@ -13,7 +13,7 @@ module 0x42::update_field_ok {
       ensures Eq<0x42::update_field_ok::R>(Freeze(false)($t0), update_field_ok::assign_x_1(Old<0x42::update_field_ok::R>($t0)));
     }
 
-    spec fun assign_x_1(r: 0x42::update_field_ok::R): 0x42::update_field_ok::R {
+    spec fun assign_x_1(r: R): R {
         update update_field_ok::R.x<0x42::update_field_ok::R>(r, 1)
     }
 } // end 0x42::update_field_ok

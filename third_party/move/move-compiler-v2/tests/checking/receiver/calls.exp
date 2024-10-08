@@ -3,19 +3,19 @@ module 0x42::m {
     struct S {
         x: u64,
     }
-    private inline fun inline_receiver_ref_mut(self: &mut 0x42::m::S,y: u64): u64 {
+    private inline fun inline_receiver_ref_mut(self: &mut S,y: u64): u64 {
         Add<u64>(select m::S.x<&mut S>(self), y)
     }
-    private fun receiver(self: 0x42::m::S,y: u64): u64 {
+    private fun receiver(self: S,y: u64): u64 {
         Add<u64>(select m::S.x<S>(self), y)
     }
-    private fun receiver_ref(self: &0x42::m::S,y: u64): u64 {
+    private fun receiver_ref(self: &S,y: u64): u64 {
         Add<u64>(select m::S.x<&S>(self), y)
     }
-    private fun receiver_ref_mut(self: &mut 0x42::m::S,y: u64): u64 {
+    private fun receiver_ref_mut(self: &mut S,y: u64): u64 {
         Add<u64>(select m::S.x<&mut S>(self), y)
     }
-    private fun test_call_styles(s: 0x42::m::S): u64 {
+    private fun test_call_styles(s: S): u64 {
         m::receiver(s, 1);
         m::receiver_ref(Borrow(Immutable)(s), 1);
         m::receiver_ref_mut(Borrow(Mutable)(s), 1);

@@ -6,10 +6,10 @@ module 0x8675309::M {
     private fun bar(_s: &mut u64,_u: u64) {
         Tuple()
     }
-    private fun foo(_s: &0x8675309::M::S,_u: u64) {
+    private fun foo(_s: &S,_u: u64) {
         Tuple()
     }
-    private fun t0(s: &mut 0x8675309::M::S) {
+    private fun t0(s: &mut S) {
         {
           let x: u64 = 0;
           {
@@ -34,7 +34,7 @@ module 0x8675309::M {
           }
         }
     }
-    private fun t1(s: &mut 0x8675309::M::S) {
+    private fun t1(s: &mut S) {
         M::bar(Borrow(Mutable)(select M::S.f<&mut S>(s)), select M::S.f<&mut S>(s) = 0;
         1)
     }

@@ -6,7 +6,7 @@ module 0x815::m {
             0: u64,
         }
     }
-    private fun t(self: 0x815::m::E): u64 {
+    private fun t(self: E): u64 {
         {
           let m::E::Some{ 0: x } = self;
           x

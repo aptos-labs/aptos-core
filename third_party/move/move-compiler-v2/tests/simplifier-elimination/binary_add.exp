@@ -53,7 +53,7 @@ module 0x8675309::M {
     struct R {
         f: u64,
     }
-    private fun t0(x: u64,r: 0x8675309::M::R) {
+    private fun t0(x: u64,r: R) {
         Add<u64>(Copy(x), Move(x));
         Add<u64>(select M::R.f<R>(r), select M::R.f<R>(r));
         Add<u64>(Add<u64>(Add<u64>(1, select M::R.f<R>(r)), select M::R.f<R>(r)), 0);

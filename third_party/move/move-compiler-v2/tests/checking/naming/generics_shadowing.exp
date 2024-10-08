@@ -3,7 +3,7 @@ module 0x2::M {
     struct S {
         dummy_field: bool,
     }
-    private fun foo<S>(s: #0): #0 {
+    private fun foo<S>(s: S): S {
         {
           let s: S = s;
           {

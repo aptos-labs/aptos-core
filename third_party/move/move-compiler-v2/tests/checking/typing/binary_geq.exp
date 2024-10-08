@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct R {
         f: u64,
     }
-    private fun t0(x: u64,r: 0x8675309::M::R) {
+    private fun t0(x: u64,r: R) {
         true;
         true;
         false;

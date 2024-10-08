@@ -7,7 +7,7 @@ module 0x8675309::M {
     struct X {
         dummy_field: bool,
     }
-    private fun t0(x: &u64,x_mut: &mut u64,s: &0x8675309::M::S,s_mut: &mut 0x8675309::M::S) {
+    private fun t0(x: &u64,x_mut: &mut u64,s: &S,s_mut: &mut S) {
         Deref(x);
         Deref(x_mut);
         Deref(s);

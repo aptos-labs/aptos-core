@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct Coin {
         dummy_field: bool,
     }
-    private fun foo(c: 0x8675309::M::Coin) {
+    private fun foo(c: Coin) {
         M::Coin{ dummy_field: _ } = c;
         Tuple()
     }

@@ -9,7 +9,7 @@ module 0x8675309::M {
     struct X3 {
         f: u64,
     }
-    private fun t0(x1: &0x8675309::M::X1,x1_mut: &mut 0x8675309::M::X1,x2: &0x8675309::M::X2,x2_mut: &mut 0x8675309::M::X2) {
+    private fun t0(x1: &X1,x1_mut: &mut X1,x2: &X2,x2_mut: &mut X2) {
         select M::X3.f<X3>(select M::X2.x3<X2>(select M::X1.x2<&X1>(x1)));
         select M::X3.f<X3>(select M::X2.x3<X2>(select M::X1.x2<&mut X1>(x1_mut)));
         select M::X3.f<X3>(select M::X2.x3<&X2>(x2));

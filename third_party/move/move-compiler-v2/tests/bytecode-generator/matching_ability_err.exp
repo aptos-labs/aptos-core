@@ -22,7 +22,7 @@ module 0xc0ffee::m {
             b: 0xc0ffee::m::Box,
         }
     }
-    public fun condition_requires_copy(o: 0xc0ffee::m::Outer): 0xc0ffee::m::Outer {
+    public fun condition_requires_copy(o: Outer): Outer {
         match (o) {
           m::Outer::One{ i } if m::consume(i) => {
             pack m::Outer::One(i)
@@ -33,7 +33,7 @@ module 0xc0ffee::m {
         }
 
     }
-    private fun consume(self: 0xc0ffee::m::Inner): bool {
+    private fun consume(self: Inner): bool {
         match (self) {
           m::Inner::Inner1{ x: _ } => {
             Tuple()
@@ -45,7 +45,7 @@ module 0xc0ffee::m {
         ;
         true
     }
-    public fun matched_value_not_consumed(o: 0xc0ffee::m::Outer) {
+    public fun matched_value_not_consumed(o: Outer) {
         match (o) {
           m::Outer::One{ i: _ } => {
             Tuple()

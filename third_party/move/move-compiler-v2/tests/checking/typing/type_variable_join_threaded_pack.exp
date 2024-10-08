@@ -3,13 +3,13 @@ module 0x2::Container {
     struct T {
         f: #0,
     }
-    public fun get<V>(_self: &0x2::Container::T<#0>): #0 {
+    public fun get<V>(_self: &T<V>): V {
         Abort(0)
     }
-    public fun new<V>(): 0x2::Container::T<#0> {
+    public fun new<V>(): T<V> {
         Abort(0)
     }
-    public fun put<V>(_self: &mut 0x2::Container::T<#0>,_item: #0) {
+    public fun put<V>(_self: &mut T<V>,_item: V) {
         Abort(0)
     }
 } // end 0x2::Container
@@ -19,7 +19,7 @@ module 0x2::M {
         f1: #0,
         f2: #0,
     }
-    private fun t0(): 0x2::M::Box<u64> {
+    private fun t0(): Box<u64> {
         {
           let v: Container::T<u64> = Container::new<u64>();
           {

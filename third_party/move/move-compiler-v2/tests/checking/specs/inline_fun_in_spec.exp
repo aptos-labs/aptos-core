@@ -32,7 +32,7 @@ module 0x42::m {
     };
     }
 
-    private inline fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+    private inline fun exec<T,R>(f: |T|R,x: T): R {
         {
           let r: R = (f)(x);
           spec {
@@ -74,7 +74,7 @@ module 0x42::m {
     });
     }
 
-    private inline fun get<R>(a: address): &#0 {
+    private inline fun get<R>(a: address): &R {
         BorrowGlobal(Immutable)<R>(a)
     }
 } // end 0x42::m

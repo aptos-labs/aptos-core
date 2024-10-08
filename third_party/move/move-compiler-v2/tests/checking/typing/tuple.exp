@@ -3,7 +3,7 @@ module 0x42::tuple {
     struct S {
         f: u64,
     }
-    private fun tuple(x: u64): (u64, 0x42::tuple::S) {
+    private fun tuple(x: u64): (u64, S) {
         Tuple(x, pack tuple::S(Add<u64>(x, 1)))
     }
     private fun use_tuple(x: u64): u64 {

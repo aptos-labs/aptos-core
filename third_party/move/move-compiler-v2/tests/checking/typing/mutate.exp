@@ -3,10 +3,10 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun bar(s: &mut 0x8675309::M::S): &mut 0x8675309::M::S {
+    private fun bar(s: &mut S): &mut S {
         s
     }
-    private fun baz(): 0x8675309::M::S {
+    private fun baz(): S {
         pack M::S(0)
     }
     private fun foo(x: &mut u64): &mut u64 {

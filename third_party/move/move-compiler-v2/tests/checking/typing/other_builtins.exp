@@ -1,6 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
-    private fun any<T>(): #0 {
+    private fun any<T>(): T {
         Abort(0)
     }
     private fun foo(x: &mut u64) {

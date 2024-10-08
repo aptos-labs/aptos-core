@@ -7,10 +7,10 @@ module 0x42::pack_unpack {
         f: u64,
         g: 0x42::pack_unpack::T,
     }
-    private fun pack(x: u64,y: u64): 0x42::pack_unpack::S {
+    private fun pack(x: u64,y: u64): S {
         pack pack_unpack::S(x, pack pack_unpack::T(y))
     }
-    private fun unpack(s: 0x42::pack_unpack::S): (u64, u64) {
+    private fun unpack(s: S): (u64, u64) {
         {
           let pack_unpack::S{ f, g: pack_unpack::T{ h } } = s;
           Tuple(f, h)

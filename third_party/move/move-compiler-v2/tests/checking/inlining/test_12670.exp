@@ -4,7 +4,7 @@ module 0x1::Test {
     struct S {
         x: u8,
     }
-    private fun foo(xs: vector<0x1::Test::S>) {
+    private fun foo(xs: vector<S>) {
         {
           let sum: u8 = 0;
           {

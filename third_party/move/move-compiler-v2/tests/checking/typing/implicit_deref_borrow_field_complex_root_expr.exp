@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(cond: bool,s: &0x8675309::M::S,s_mut: &mut 0x8675309::M::S) {
+    private fun t0(cond: bool,s: &S,s_mut: &mut S) {
         select M::S.f<&S>(if cond {
           s
         } else {

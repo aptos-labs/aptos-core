@@ -47,7 +47,7 @@ module 0x8675::M {
           }
         }
     }
-    private fun test1b(r: 0x8675::M::S): u64 {
+    private fun test1b(r: S): u64 {
         {
           let x: S = pack M::S(3);
           {

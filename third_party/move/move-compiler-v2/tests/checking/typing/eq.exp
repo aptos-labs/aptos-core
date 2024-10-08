@@ -9,7 +9,7 @@ module 0x8675309::M {
     struct S {
         u: u64,
     }
-    private fun t0(r: &0x8675309::M::R,r_mut: &mut 0x8675309::M::R,s: 0x8675309::M::S,s_ref: &0x8675309::M::S,s_mut: &mut 0x8675309::M::S) {
+    private fun t0(r: &R,r_mut: &mut R,s: S,s_ref: &S,s_mut: &mut S) {
         false;
         false;
         false;

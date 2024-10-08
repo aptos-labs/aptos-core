@@ -12,10 +12,10 @@ module 0x8675::M {
         f: u64,
         g: u64,
     }
-    private fun id<T>(r: &#0): &#0 {
+    private fun id<T>(r: &T): &T {
         r
     }
-    private fun id_mut<T>(r: &mut #0): &mut #0 {
+    private fun id_mut<T>(r: &mut T): &mut T {
         r
     }
     private inline fun iterloop(x: u64,y: &u64): u64 {

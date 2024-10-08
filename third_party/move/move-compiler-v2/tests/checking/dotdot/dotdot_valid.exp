@@ -45,13 +45,13 @@ module 0x42::test {
         2: u32,
         3: u64,
     }
-    private inline fun lambda_param(f: |0x42::test::S2|bool): bool {
+    private inline fun lambda_param(f: |S2|bool): bool {
         {
           let x: S2 = pack test::S2(true, pack test::S0(false));
           (f)(x)
         }
     }
-    private fun nested1(x: 0x42::test::S4<bool>) {
+    private fun nested1(x: S4<bool>) {
         {
           let test::S4<bool>{ x: _x, y: _ } = x;
           {
@@ -75,7 +75,7 @@ module 0x42::test {
           }
         }
     }
-    private fun nested1_ref(x: &0x42::test::S4<bool>) {
+    private fun nested1_ref(x: &S4<bool>) {
         {
           let test::S4<bool>{ x: _x, y: _ } = x;
           {
@@ -99,67 +99,67 @@ module 0x42::test {
           }
         }
     }
-    private fun nested2(x: 0x42::test::S5<bool, 0x42::test::S1>) {
+    private fun nested2(x: S5<bool, S1>) {
         {
           let test::S5<bool, S1>{ 0: _, 1: test::S1{ 0: _ } } = x;
           Tuple()
         }
     }
-    private fun nested2_ref(x: &0x42::test::S5<bool, 0x42::test::S1>) {
+    private fun nested2_ref(x: &S5<bool, S1>) {
         {
           let test::S5<bool, S1>{ 0: _, 1: test::S1{ 0: _ } } = x;
           Tuple()
         }
     }
-    private fun nested3(x: 0x42::test::S5<bool, 0x42::test::S4<bool>>) {
+    private fun nested3(x: S5<bool, S4<bool>>) {
         {
           let test::S5<bool, S4<bool>>{ 0: _, 1: test::S4<bool>{ x: _, y: _ } } = x;
           Tuple()
         }
     }
-    private fun nested3_ref(x: &0x42::test::S5<bool, 0x42::test::S4<bool>>) {
+    private fun nested3_ref(x: &S5<bool, S4<bool>>) {
         {
           let test::S5<bool, S4<bool>>{ 0: _, 1: test::S4<bool>{ x: _, y: _ } } = x;
           Tuple()
         }
     }
-    private fun nested4(x: 0x42::test::S4<0x42::test::S1>) {
+    private fun nested4(x: S4<S1>) {
         {
           let test::S4<S1>{ x: test::S1{ 0: _ }, y: _ } = x;
           Tuple()
         }
     }
-    private fun nested4_ref(x: &0x42::test::S4<0x42::test::S1>) {
+    private fun nested4_ref(x: &S4<S1>) {
         {
           let test::S4<S1>{ x: test::S1{ 0: _ }, y: _ } = x;
           Tuple()
         }
     }
-    private fun simple_0(x: 0x42::test::S0) {
+    private fun simple_0(x: S0) {
         {
           let test::S0{ dummy_field: _ } = x;
           Tuple()
         }
     }
-    private fun simple_0_ref(x: &0x42::test::S0) {
+    private fun simple_0_ref(x: &S0) {
         {
           let test::S0{ dummy_field: _ } = x;
           Tuple()
         }
     }
-    private fun simple_1(x: 0x42::test::S1) {
+    private fun simple_1(x: S1) {
         {
           let test::S1{ 0: _ } = x;
           Tuple()
         }
     }
-    private fun simple_1_ref(x: &mut 0x42::test::S1) {
+    private fun simple_1_ref(x: &mut S1) {
         {
           let test::S1{ 0: _ } = x;
           Tuple()
         }
     }
-    private fun simple_2(x: 0x42::test::S2) {
+    private fun simple_2(x: S2) {
         {
           let test::S2{ 0: _, 1: _ } = x;
           {
@@ -186,7 +186,7 @@ module 0x42::test {
           }
         }
     }
-    private fun simple_2_ref(x: &0x42::test::S2) {
+    private fun simple_2_ref(x: &S2) {
         {
           let test::S2{ 0: _, 1: _ } = x;
           {
@@ -213,7 +213,7 @@ module 0x42::test {
           }
         }
     }
-    private fun simple_3(x: 0x42::test::S3) {
+    private fun simple_3(x: S3) {
         {
           let test::S3{ x: _, y: _ } = x;
           {
@@ -225,7 +225,7 @@ module 0x42::test {
           }
         }
     }
-    private fun simple_3_ref(x: 0x42::test::S3) {
+    private fun simple_3_ref(x: S3) {
         {
           let test::S3{ x: _, y: _ } = x;
           {
@@ -237,7 +237,7 @@ module 0x42::test {
           }
         }
     }
-    private fun simple_4(x: 0x42::test::E1): u8 {
+    private fun simple_4(x: E1): u8 {
         match (x) {
           test::E1::A{ 0: x, 1: _ } => {
             x
@@ -251,7 +251,7 @@ module 0x42::test {
         }
 
     }
-    private fun simple_4_ref(x: &0x42::test::E1): &u8 {
+    private fun simple_4_ref(x: &E1): &u8 {
         match (x) {
           test::E1::A{ 0: x, 1: _ } => {
             x
@@ -262,7 +262,7 @@ module 0x42::test {
         }
 
     }
-    private fun simple_5(x: 0x42::test::E1): u8 {
+    private fun simple_5(x: E1): u8 {
         match (x) {
           test::E1::A{ 0: _, 1: y } => {
             if y {
@@ -280,7 +280,7 @@ module 0x42::test {
         }
 
     }
-    private fun simple_6(x: &0x42::test::S7) {
+    private fun simple_6(x: &S7) {
         {
           let test::S7{ 0: _w, 1: _, 2: _, 3: _z } = x;
           {

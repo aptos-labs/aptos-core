@@ -29,22 +29,22 @@ module 0x42::test {
         x: #0,
         y: u8,
     }
-    private fun S0_inhabited(): 0x42::test::S0 {
+    private fun S0_inhabited(): S0 {
         pack test::S0(false)
     }
-    private fun S1_inhabited(): 0x42::test::S1 {
+    private fun S1_inhabited(): S1 {
         pack test::S1(0)
     }
-    private fun S2_inhabited(): 0x42::test::S2 {
+    private fun S2_inhabited(): S2 {
         pack test::S2(0, false)
     }
-    private fun S3_test<T>(x: #0): 0x42::test::S3<#0> {
+    private fun S3_test<T>(x: T): S3<T> {
         pack test::S3<T>(x, 0)
     }
-    private fun nested_0(): 0x42::test::S3<0x42::test::S4> {
+    private fun nested_0(): S3<S4> {
         pack test::S3<S4>(pack test::S4(false), 0)
     }
-    private fun nested_1(): 0x42::test::S5<0x42::test::S0> {
+    private fun nested_1(): S5<S0> {
         pack test::S5<S0>(pack test::S0(false), 0)
     }
     private fun test_variant() {

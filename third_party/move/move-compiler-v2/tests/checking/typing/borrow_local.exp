@@ -6,7 +6,7 @@ module 0x8675309::M {
     struct S {
         dummy_field: bool,
     }
-    private fun t0(b: bool,u: u64,s: 0x8675309::M::S,r: 0x8675309::M::R): 0x8675309::M::R {
+    private fun t0(b: bool,u: u64,s: S,r: R): R {
         Borrow(Immutable)(b);
         Borrow(Mutable)(b);
         Borrow(Immutable)(u);
@@ -17,7 +17,7 @@ module 0x8675309::M {
         Borrow(Mutable)(r);
         r
     }
-    private fun t1(): 0x8675309::M::R {
+    private fun t1(): R {
         {
           let b: bool = true;
           {

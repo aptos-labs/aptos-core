@@ -6,10 +6,10 @@ module 0x42::m {
     struct ObjectCore {
         owner: address,
     }
-    private fun make(): 0x42::m::Object {
+    private fun make(): Object {
         Abort(0)
     }
-    private fun owner_correct(o: 0x42::m::Object): address
+    private fun owner_correct(o: Object): address
         acquires 0x42::m::ObjectCore(*)
      {
         {
@@ -17,7 +17,7 @@ module 0x42::m {
           select m::ObjectCore.owner<&ObjectCore>(BorrowGlobal(Immutable)<ObjectCore>(addr))
         }
     }
-    private fun owner_read_ref_missing(o: 0x42::m::Object): address
+    private fun owner_read_ref_missing(o: Object): address
         acquires 0x42::m::ObjectCore(*)
      {
         select m::ObjectCore.owner<&ObjectCore>(BorrowGlobal(Immutable)<ObjectCore>(select m::Object.inner<Object>(o)))

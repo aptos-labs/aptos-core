@@ -12,7 +12,7 @@ module 0xc0ffee::m {
           }
         }
     }
-    public fun foo(s: 0xc0ffee::m::S) {
+    public fun foo(s: S) {
         {
           let _: S = s;
           Tuple()

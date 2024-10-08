@@ -9,10 +9,10 @@ module 0x42::operators {
     private fun bools(x: bool,y: bool): bool {
         Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
     }
-    private fun equality<T>(x: #0,y: #0): bool {
+    private fun equality<T>(x: T,y: T): bool {
         Eq<T>(x, y)
     }
-    private fun inequality<T>(x: #0,y: #0): bool {
+    private fun inequality<T>(x: T,y: T): bool {
         Neq<T>(x, y)
     }
     private fun order(x: u64,y: u64): bool {

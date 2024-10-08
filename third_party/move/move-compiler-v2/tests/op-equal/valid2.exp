@@ -3,7 +3,7 @@ module 0xc0ffee::m {
     struct S {
         x: u64,
     }
-    private fun foo(self: &mut 0xc0ffee::m::S): u64 {
+    private fun foo(self: &mut S): u64 {
         {
           let $t1: &mut u64 = Borrow(Mutable)(select m::S.x<&mut S>(self));
           $t1 = Add<u64>(Deref($t1), 1)

@@ -3,30 +3,30 @@ module 0x42::m {
     struct S {
         x: #0,
     }
-    private fun id<T>(self: 0x42::m::S<#0>): 0x42::m::S<#0> {
+    private fun id<T>(self: S<T>): S<T> {
         self
     }
-    private inline fun inlined<T>(f: |0x42::m::S<#0>|0x42::m::S<#0>,s: 0x42::m::S<#0>) {
+    private inline fun inlined<T>(f: |S<T>|S<T>,s: S<T>) {
         (f)(s);
         Tuple()
     }
-    private fun receiver<T>(self: 0x42::m::S<#0>,y: #0) {
+    private fun receiver<T>(self: S<T>,y: T) {
         select m::S.x<S<T>>(self) = y;
         Tuple()
     }
-    private fun receiver_more_generics<T,R>(self: 0x42::m::S<#0>,_y: #1) {
+    private fun receiver_more_generics<T,R>(self: S<T>,_y: R) {
         Tuple()
     }
-    private fun receiver_needs_type_args<T,R>(self: 0x42::m::S<#0>,_y: #0) {
+    private fun receiver_needs_type_args<T,R>(self: S<T>,_y: T) {
         Abort(1)
     }
-    private fun receiver_ref<T>(self: &0x42::m::S<#0>,_y: #0) {
+    private fun receiver_ref<T>(self: &S<T>,_y: T) {
         Tuple()
     }
-    private fun receiver_ref_mut<T>(self: &mut 0x42::m::S<#0>,y: #0) {
+    private fun receiver_ref_mut<T>(self: &mut S<T>,y: T) {
         select m::S.x<&mut S<T>>(self) = y
     }
-    private fun test_call_styles(s: 0x42::m::S<u64>,x: u64) {
+    private fun test_call_styles(s: S<u64>,x: u64) {
         m::receiver<u64>(s, x);
         m::receiver_ref<u64>(Borrow(Immutable)(s), x);
         m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
@@ -34,7 +34,7 @@ module 0x42::m {
         m::receiver_needs_type_args<u64, u8>(s, x);
         Tuple()
     }
-    private fun test_receiver_inference(s: 0x42::m::S<u64>) {
+    private fun test_receiver_inference(s: S<u64>) {
         {
           let (s: S<u64>): (S<u64>) = Tuple(s);
           {

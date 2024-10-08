@@ -4,7 +4,7 @@ module 0x8675309::M {
         f1: #0,
         f2: #0,
     }
-    private fun new<T>(): 0x8675309::M::Box<#0> {
+    private fun new<T>(): Box<T> {
         Abort(0)
     }
     private fun t0() {

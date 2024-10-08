@@ -3,7 +3,7 @@ module 0x42::m {
     struct S {
         dummy_field: bool,
     }
-    private fun f(_s: 0x42::m::S): 0x42::m::S {
+    private fun f(_s: S): S {
         pack m::S(false)
     }
     private fun d() {

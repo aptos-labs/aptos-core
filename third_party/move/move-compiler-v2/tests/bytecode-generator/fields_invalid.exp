@@ -7,7 +7,7 @@ module 0x42::fields {
         f: u64,
         g: 0x42::fields::T,
     }
-    private fun write_ref(x: &0x42::fields::S) {
+    private fun write_ref(x: &S) {
         select fields::T.h<T>(select fields::S.g<&S>(x)) = 42;
         Tuple()
     }

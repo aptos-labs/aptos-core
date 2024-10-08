@@ -25,7 +25,7 @@ module 0x42::move_function_in_spec {
           Eq<address>(select move_function_in_spec::TypeInfo.account_address<&TypeInfo>(ty), new_addr)
         }
     }
-    public fun type_of<T>(): 0x42::move_function_in_spec::TypeInfo {
+    public fun type_of<T>(): TypeInfo {
         Abort(1)
     }
     spec fun $no_change(target: address,new_addr: address): bool {
@@ -34,7 +34,7 @@ module 0x42::move_function_in_spec {
           Eq<address>(select move_function_in_spec::TypeInfo.account_address<0x42::move_function_in_spec::TypeInfo>(ty), new_addr)
         }
     }
-    spec fun $type_of<T>(): 0x42::move_function_in_spec::TypeInfo {
+    spec fun $type_of<T>(): TypeInfo {
         Tuple()
     }
 } // end 0x42::move_function_in_spec

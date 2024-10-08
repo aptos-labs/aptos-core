@@ -15,19 +15,19 @@ module 0x42::M {
         y: bool,
         z: vector<u64>,
     }
-    public fun f(r: 0x42::M::R): 0x42::M::T {
+    public fun f(r: R): T {
         pack M::T(select M::S.x<S>(select M::R.s<R>(r)))
     }
-    spec fun struct_access(s: 0x42::M::S): u64 {
+    spec fun struct_access(s: S): u64 {
         select M::S.x<0x42::M::S>(s)
     }
-    spec fun nested_struct_access(r: 0x42::M::R): bool {
+    spec fun nested_struct_access(r: R): bool {
         select M::S.y<0x42::M::S>(select M::R.s<0x42::M::R>(r))
     }
-    spec fun struct_pack(x: u64,y: bool,z: vector<u64>): 0x42::M::S {
+    spec fun struct_pack(x: u64,y: bool,z: vector<u64>): S {
         pack M::S(x, y, z)
     }
-    spec fun struct_pack_other_order(x: u64,y: bool,z: vector<u64>): 0x42::M::S {
+    spec fun struct_pack_other_order(x: u64,y: bool,z: vector<u64>): S {
         {
           let $z: vector<u64> = z;
           {
@@ -36,13 +36,13 @@ module 0x42::M {
           }
         }
     }
-    spec fun generic_struct_pack(x: u64,y: bool): 0x42::M::G<u64> {
+    spec fun generic_struct_pack(x: u64,y: bool): G<u64> {
         pack M::G<u64>(x, y)
     }
-    spec fun generic_struct_pack_instantiated(x: u64,y: bool): 0x42::M::G<u64> {
+    spec fun generic_struct_pack_instantiated(x: u64,y: bool): G<u64> {
         pack M::G<u64>(x, y)
     }
-    spec fun resource_global(addr: address): 0x42::M::T {
+    spec fun resource_global(addr: address): T {
         global<0x42::M::T>(addr)
     }
     spec fun resource_global_exists(addr: address): bool {

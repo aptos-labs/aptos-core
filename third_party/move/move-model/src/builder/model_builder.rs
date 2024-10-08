@@ -269,6 +269,7 @@ impl<'env> ModelBuilder<'env> {
             module_name: None,
             display_type_vars: false,
             used_modules: BTreeSet::new(),
+            use_module_qualification: false,
         }
     }
 

@@ -5,10 +5,10 @@ module 0x42::pack_unpack {
         f2: u8,
         f3: u8,
     }
-    private fun pack1(x: u8,y: u8,z: u8): 0x42::pack_unpack::S {
+    private fun pack1(x: u8,y: u8,z: u8): S {
         pack pack_unpack::S(x, y, z)
     }
-    private fun pack2(x: u8,y: u8,z: u8): 0x42::pack_unpack::S {
+    private fun pack2(x: u8,y: u8,z: u8): S {
         {
           let $f1: u8 = x;
           {
@@ -17,13 +17,13 @@ module 0x42::pack_unpack {
           }
         }
     }
-    private fun pack3(x: u8,y: u8,z: u8): 0x42::pack_unpack::S {
+    private fun pack3(x: u8,y: u8,z: u8): S {
         {
           let $f2: u8 = x;
           pack pack_unpack::S(y, $f2, z)
         }
     }
-    private fun pack4(x: u8,y: u8,z: u8): 0x42::pack_unpack::S {
+    private fun pack4(x: u8,y: u8,z: u8): S {
         {
           let $f2: u8 = x;
           {
@@ -32,13 +32,13 @@ module 0x42::pack_unpack {
           }
         }
     }
-    private fun pack5(x: u8,y: u8,z: u8): 0x42::pack_unpack::S {
+    private fun pack5(x: u8,y: u8,z: u8): S {
         {
           let $f3: u8 = x;
           pack pack_unpack::S(y, z, $f3)
         }
     }
-    private fun pack6(x: u8,y: u8,z: u8): 0x42::pack_unpack::S {
+    private fun pack6(x: u8,y: u8,z: u8): S {
         {
           let $f3: u8 = x;
           {

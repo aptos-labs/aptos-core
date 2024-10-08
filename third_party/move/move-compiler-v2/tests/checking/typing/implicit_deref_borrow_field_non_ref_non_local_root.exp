@@ -3,13 +3,13 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun bar(): 0x8675309::M::S {
+    private fun bar(): S {
         pack M::S(0)
     }
-    private fun foo(): &0x8675309::M::S {
+    private fun foo(): &S {
         Abort(0)
     }
-    private fun t0(cond: bool,_s: 0x8675309::M::S) {
+    private fun t0(cond: bool,_s: S) {
         select M::S.f<&S>(M::foo());
         select M::S.f<S>(M::bar());
         select M::S.f<&S>(if cond {

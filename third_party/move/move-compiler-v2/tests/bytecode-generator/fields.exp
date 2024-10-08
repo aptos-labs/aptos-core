@@ -10,26 +10,26 @@ module 0x42::fields {
         f: u64,
         g: 0x42::fields::T,
     }
-    private fun read_generic_val(x: 0x42::fields::G<u64>): u64 {
+    private fun read_generic_val(x: G<u64>): u64 {
         select fields::G.f<G<u64>>(x)
     }
-    private fun read_ref(x: &0x42::fields::S): u64 {
+    private fun read_ref(x: &S): u64 {
         select fields::T.h<T>(select fields::S.g<&S>(x))
     }
-    private fun read_val(x: 0x42::fields::S): u64 {
+    private fun read_val(x: S): u64 {
         select fields::T.h<T>(select fields::S.g<S>(x))
     }
-    private fun write_generic_val(x: &mut 0x42::fields::G<u64>,v: u64) {
+    private fun write_generic_val(x: &mut G<u64>,v: u64) {
         select fields::G.f<&mut G<u64>>(x) = v
     }
-    private fun write_local_direct(): 0x42::fields::S {
+    private fun write_local_direct(): S {
         {
           let x: S = pack fields::S(0, pack fields::T(0));
           select fields::T.h<T>(select fields::S.g<S>(x)) = 42;
           x
         }
     }
-    private fun write_local_via_ref(): 0x42::fields::S {
+    private fun write_local_via_ref(): S {
         {
           let x: S = pack fields::S(0, pack fields::T(0));
           {
@@ -39,7 +39,7 @@ module 0x42::fields {
           }
         }
     }
-    private fun write_local_via_ref_2(): 0x42::fields::S {
+    private fun write_local_via_ref_2(): S {
         {
           let x: S = pack fields::S(0, pack fields::T(0));
           {
@@ -49,11 +49,11 @@ module 0x42::fields {
           }
         }
     }
-    private fun write_param(x: &mut 0x42::fields::S) {
+    private fun write_param(x: &mut S) {
         select fields::T.h<T>(select fields::S.g<&mut S>(x)) = 42;
         Tuple()
     }
-    private fun write_val(x: 0x42::fields::S): 0x42::fields::S {
+    private fun write_val(x: S): S {
         select fields::T.h<T>(select fields::S.g<S>(x)) = 42;
         x
     }

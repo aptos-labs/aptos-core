@@ -55,7 +55,7 @@ module 0xc0ffee::m {
             b: 0xc0ffee::m::Box,
         }
     }
-    public fun inner_value(self: 0xc0ffee::m::Inner): u64 {
+    public fun inner_value(self: Inner): u64 {
         match (self) {
           m::Inner::Inner1{ x } => {
             x
@@ -66,7 +66,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun is_inner1(self: &0xc0ffee::m::Inner): bool {
+    public fun is_inner1(self: &Inner): bool {
         match (self) {
           m::Inner::Inner1{ x: _ } => {
             true
@@ -77,7 +77,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun is_some<A>(x: &0xc0ffee::m::Option<#0>): bool {
+    public fun is_some<A>(x: &Option<A>): bool {
         match (x) {
           m::Option::None<A> => {
             false
@@ -88,7 +88,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun is_some_dropped<A>(x: 0xc0ffee::m::Option<#0>): bool {
+    public fun is_some_dropped<A>(x: Option<A>): bool {
         match (x) {
           m::Option::None<A> => {
             false
@@ -99,7 +99,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun is_some_specialized(x: &0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>): bool {
+    public fun is_some_specialized(x: &Option<Option<u64>>): bool {
         match (x) {
           m::Option::None<Option<u64>> => {
             false
@@ -113,7 +113,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun outer_value(o: 0xc0ffee::m::Outer): u64 {
+    public fun outer_value(o: Outer): u64 {
         match (o) {
           m::Outer::None => {
             0
@@ -127,7 +127,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun outer_value_nested(o: 0xc0ffee::m::Outer): u64 {
+    public fun outer_value_nested(o: Outer): u64 {
         match (o) {
           m::Outer::None => {
             0
@@ -144,7 +144,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun outer_value_with_cond(o: 0xc0ffee::m::Outer): u64 {
+    public fun outer_value_with_cond(o: Outer): u64 {
         match (o) {
           m::Outer::None => {
             0
@@ -161,7 +161,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun outer_value_with_cond_ref(o: &0xc0ffee::m::Outer): bool {
+    public fun outer_value_with_cond_ref(o: &Outer): bool {
         match (o) {
           m::Outer::None => {
             false
@@ -178,7 +178,7 @@ module 0xc0ffee::m {
         }
 
     }
-    private fun select_common_fields(s: 0xc0ffee::m::CommonFields): u64 {
+    private fun select_common_fields(s: CommonFields): u64 {
         Add<u64>(select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<CommonFields>(s), match (s) {
           m::CommonFields::Foo{ x: _, y } => {
             y
@@ -189,13 +189,13 @@ module 0xc0ffee::m {
         }
         )
     }
-    private fun select_common_fields_different_offset(s: 0xc0ffee::m::CommonFieldsAtDifferentOffset): u64 {
+    private fun select_common_fields_different_offset(s: CommonFieldsAtDifferentOffset): u64 {
         select_variants m::CommonFieldsAtDifferentOffset.Bar.z|m::CommonFieldsAtDifferentOffset.Baz.z|m::CommonFieldsAtDifferentOffset.Balt.z<CommonFieldsAtDifferentOffset>(s)
     }
-    private fun test_common(s: 0xc0ffee::m::CommonFields): bool {
+    private fun test_common(s: CommonFields): bool {
         test_variants m::CommonFields::Foo|Bar(s)
     }
-    private fun test_common_ref(s: &0xc0ffee::m::CommonFields): bool {
+    private fun test_common_ref(s: &CommonFields): bool {
         test_variants m::CommonFields::Foo|Bar(s)
     }
 } // end 0xc0ffee::m

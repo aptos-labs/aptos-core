@@ -10,10 +10,10 @@ module 0x815::m {
             z: u32,
         }
     }
-    private fun caller(c: 0x815::m::CommonFields): bool {
+    private fun caller(c: CommonFields): bool {
         m::match(c)
     }
-    private fun match(c: 0x815::m::CommonFields): bool {
+    private fun match(c: CommonFields): bool {
         match (c) {
           m::CommonFields::Foo{ x, y: _ } => {
             Gt<u64>(x, 0)

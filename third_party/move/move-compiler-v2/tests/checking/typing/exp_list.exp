@@ -6,10 +6,10 @@ module 0x8675309::M {
     struct S {
         dummy_field: bool,
     }
-    private fun t0(): (u64, 0x8675309::M::S, 0x8675309::M::R<0x8675309::M::R<u64>>) {
+    private fun t0(): (u64, S, R<R<u64>>) {
         Tuple(0, pack M::S(false), pack M::R<R<u64>>(pack M::R<u64>(1)))
     }
-    private fun t1(s: &0x8675309::M::S,r: &mut 0x8675309::M::R<u64>): (u64, &0x8675309::M::S, &mut 0x8675309::M::R<u64>) {
+    private fun t1(s: &S,r: &mut R<u64>): (u64, &S, &mut R<u64>) {
         Tuple(0, s, r)
     }
 } // end 0x8675309::M

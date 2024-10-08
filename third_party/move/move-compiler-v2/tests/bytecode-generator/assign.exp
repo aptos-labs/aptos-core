@@ -7,7 +7,7 @@ module 0x42::assign {
         f: u64,
         g: 0x42::assign::T,
     }
-    private fun assign_field(s: &mut 0x42::assign::S,f: u64) {
+    private fun assign_field(s: &mut S,f: u64) {
         select assign::S.f<&mut S>(s) = f;
         Tuple()
     }
@@ -15,11 +15,11 @@ module 0x42::assign {
         x = 42;
         Tuple()
     }
-    private fun assign_pattern(s: 0x42::assign::S,f: u64,h: u64): u64 {
+    private fun assign_pattern(s: S,f: u64,h: u64): u64 {
         assign::S{ f, g: assign::T{ h } } = s;
         Add<u64>(f, h)
     }
-    private fun assign_struct(s: &mut 0x42::assign::S) {
+    private fun assign_struct(s: &mut S) {
         s = pack assign::S(42, pack assign::T(42));
         Tuple()
     }

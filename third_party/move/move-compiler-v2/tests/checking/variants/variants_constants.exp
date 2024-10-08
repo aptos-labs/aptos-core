@@ -33,7 +33,7 @@ module 0x815::m {
           Eq<u64>(select_variants m::Color.RGB.red<Color>(c), 1)
         }
     }
-    private fun t4(c: &0x815::m::Color) {
+    private fun t4(c: &Color) {
         match (c) {
           m::Color::Red => {
             Abort(1)

@@ -3,16 +3,16 @@ module 0x8675309::M {
     struct S {
         dummy_field: bool,
     }
-    private fun imm<T>(_x: &#0) {
+    private fun imm<T>(_x: &T) {
         Tuple()
     }
-    private fun imm_imm<T>(_x: &#0,_y: &#0) {
+    private fun imm_imm<T>(_x: &T,_y: &T) {
         Tuple()
     }
-    private fun imm_mut<T>(_x: &#0,_y: &mut #0) {
+    private fun imm_mut<T>(_x: &T,_y: &mut T) {
         Tuple()
     }
-    private fun mut_imm<T>(_x: &mut #0,_y: &#0) {
+    private fun mut_imm<T>(_x: &mut T,_y: &T) {
         Tuple()
     }
     private fun t0() {

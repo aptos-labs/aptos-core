@@ -10,10 +10,10 @@ module 0x815::m {
     struct ValueWrap {
         val: u64,
     }
-    private fun contains<T1,T2>(self: &0x815::m::Table<#0, #1>,_key: #0): bool {
+    private fun contains<T1,T2>(self: &Table<T1, T2>,_key: T1): bool {
         true
     }
-    private fun add<T1,T2>(self: &mut 0x815::m::Table<#0, #1>,_key: #0,_val: #1) {
+    private fun add<T1,T2>(self: &mut Table<T1, T2>,_key: T1,_val: T2) {
         Tuple()
     }
     public fun add_when_missing(key: address,val: u64)

@@ -12,20 +12,20 @@ module 0x42::M {
     spec {
     }
 
-    private native fun contains<K,V>(t: &0x42::M::MyTable2<#0, #1>,k: #0): bool;
-    private native fun borrow<K,V>(t: &0x42::M::MyTable2<#0, #1>,k: #0): &#1;
-    private native fun borrow_mut<K,V>(t: &mut 0x42::M::MyTable1<#0, #1>,k: #0): &mut #1;
-    private native fun destroy_empty<K,V>(t: 0x42::M::MyTable1<#0, #1>);
-    private native fun length<K,V>(t: &0x42::M::MyTable1<#0, #1>): u64;
-    private native fun remove<K,V>(t: &mut 0x42::M::MyTable2<#0, #1>,k: #0): #1;
-    private native fun new<K,V>(): 0x42::M::MyTable1<#0, #1>;
-    private native fun new2<K,V>(): 0x42::M::MyTable2<#0, #1>;
-    spec fun spec_len<K,V>(t: 0x42::M::MyTable1<#0, #1>): num;
-    spec fun spec_set<K,V>(t: 0x42::M::MyTable1<#0, #1>,k: #0,v: #1): 0x42::M::MyTable1<#0, #1>;
-    spec fun spec_get<K,V>(t: 0x42::M::MyTable1<#0, #1>,k: #0): #1;
-    spec fun spec_len2<K,V>(t: 0x42::M::MyTable2<#0, #1>): num;
-    spec fun spec_del<K,V>(t: 0x42::M::MyTable2<#0, #1>): num;
-    spec fun spec_has_key<K,V>(t: 0x42::M::MyTable2<#0, #1>,k: #0): bool;
+    private native fun contains<K,V>(t: &MyTable2<K, V>,k: K): bool;
+    private native fun borrow<K,V>(t: &MyTable2<K, V>,k: K): &V;
+    private native fun borrow_mut<K,V>(t: &mut MyTable1<K, V>,k: K): &mut V;
+    private native fun destroy_empty<K,V>(t: MyTable1<K, V>);
+    private native fun length<K,V>(t: &MyTable1<K, V>): u64;
+    private native fun remove<K,V>(t: &mut MyTable2<K, V>,k: K): V;
+    private native fun new<K,V>(): MyTable1<K, V>;
+    private native fun new2<K,V>(): MyTable2<K, V>;
+    spec fun spec_len<K,V>(t: MyTable1<#0, #1>): num;
+    spec fun spec_set<K,V>(t: MyTable1<#0, #1>,k: #0,v: #1): MyTable1<#0, #1>;
+    spec fun spec_get<K,V>(t: MyTable1<#0, #1>,k: #0): #1;
+    spec fun spec_len2<K,V>(t: MyTable2<#0, #1>): num;
+    spec fun spec_del<K,V>(t: MyTable2<#0, #1>): num;
+    spec fun spec_has_key<K,V>(t: MyTable2<#0, #1>,k: #0): bool;
 } // end 0x42::M
 
 // -- Sourcified model before bytecode pipeline

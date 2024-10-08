@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct R {
         f: bool,
     }
-    private fun t0(x: bool,r: 0x8675309::M::R) {
+    private fun t0(x: bool,r: R) {
         false;
         true;
         Not(x);

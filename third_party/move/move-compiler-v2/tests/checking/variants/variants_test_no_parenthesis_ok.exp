@@ -17,19 +17,19 @@ module 0x815::m {
             0: u64,
         }
     }
-    private fun test(c: 0x815::m::Color): bool {
+    private fun test(c: Color): bool {
         test_variants m::Color::Red|RGB(c)
     }
-    private fun test_fully_qualified(c: 0x815::m::Color): bool {
+    private fun test_fully_qualified(c: Color): bool {
         test_variants m::Color::Red(c)
     }
-    private fun test_generic<T>(x: &0x815::m::Generic<#0>): bool {
+    private fun test_generic<T>(x: &Generic<T>): bool {
         test_variants m::Generic::Foo<T>(x)
     }
-    private fun test_generic_qualified<T>(x: &0x815::m::Generic<#0>): bool {
+    private fun test_generic_qualified<T>(x: &Generic<T>): bool {
         test_variants m::Generic::Foo<T>(x)
     }
-    private fun test_qualified(c: 0x815::m::Color): bool {
+    private fun test_qualified(c: Color): bool {
         test_variants m::Color::Red|RGB(c)
     }
 } // end 0x815::m

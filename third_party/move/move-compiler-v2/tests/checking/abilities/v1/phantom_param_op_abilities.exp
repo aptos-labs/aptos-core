@@ -18,7 +18,7 @@ module 0x42::M {
     struct RequireStore {
         a: #0,
     }
-    private fun f1(ref: &mut 0x42::M::HasDrop<0x42::M::NoAbilities, u64>) {
+    private fun f1(ref: &mut HasDrop<NoAbilities, u64>) {
         ref = pack M::HasDrop<NoAbilities, u64>(1);
         Tuple()
     }
@@ -26,17 +26,17 @@ module 0x42::M {
         _: HasDrop<NoAbilities, u64> = pack M::HasDrop<NoAbilities, u64>(1);
         Tuple()
     }
-    private fun f3(_x: 0x42::M::HasDrop<0x42::M::NoAbilities, u64>) {
+    private fun f3(_x: HasDrop<NoAbilities, u64>) {
         Tuple()
     }
-    private fun f4(x: 0x42::M::HasCopy<0x42::M::NoAbilities, u64>): (0x42::M::HasCopy<0x42::M::NoAbilities, u64>, 0x42::M::HasCopy<0x42::M::NoAbilities, u64>) {
+    private fun f4(x: HasCopy<NoAbilities, u64>): (HasCopy<NoAbilities, u64>, HasCopy<NoAbilities, u64>) {
         Tuple(Copy(x), x)
     }
-    private fun f5(s: &signer,x: 0x42::M::HasKey<0x42::M::NoAbilities, u64>) {
+    private fun f5(s: &signer,x: HasKey<NoAbilities, u64>) {
         MoveTo<HasKey<NoAbilities, u64>>(s, x);
         Tuple()
     }
-    private fun f6(): 0x42::M::HasKey<0x42::M::NoAbilities, u64>
+    private fun f6(): HasKey<NoAbilities, u64>
         acquires 0x42::M::HasKey(*)
      {
         MoveFrom<HasKey<NoAbilities, u64>>(0x0)
@@ -44,7 +44,7 @@ module 0x42::M {
     private fun f7(): bool {
         exists<HasKey<NoAbilities, u64>>(0x0)
     }
-    private fun f8(): 0x42::M::RequireStore<0x42::M::HasStore<0x42::M::NoAbilities, u64>> {
+    private fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
         pack M::RequireStore<HasStore<NoAbilities, u64>>(pack M::HasStore<NoAbilities, u64>(1))
     }
 } // end 0x42::M

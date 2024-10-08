@@ -7,20 +7,20 @@ module 0x42::freeze_mut_ref {
     struct S {
         dummy_field: bool,
     }
-    public fun borrow_mut<Element>(map: &mut vector<#0>): &#0 {
+    public fun borrow_mut<Element>(map: &mut vector<Element>): &Element {
         Freeze(false)(vector::borrow_mut<Element>(map, 0))
     }
-    public fun borrow_mut2<Element>(v: &mut #0): &#0 {
+    public fun borrow_mut2<Element>(v: &mut Element): &Element {
         Freeze(false)(v)
     }
-    public fun borrow_mut3<Element>(v1: &mut #0,v2: &#0): &#0 {
+    public fun borrow_mut3<Element>(v1: &mut Element,v2: &Element): &Element {
         if true {
           Freeze(false)(v1)
         } else {
           v2
         }
     }
-    public fun borrow_mut4<Element>(v: &mut #0): &#0 {
+    public fun borrow_mut4<Element>(v: &mut Element): &Element {
         return Freeze(false)(v)
     }
     private fun t0() {
@@ -30,7 +30,7 @@ module 0x42::freeze_mut_ref {
           Tuple()
         }
     }
-    private fun t1(s: &mut 0x42::freeze_mut_ref::S): &0x42::freeze_mut_ref::S {
+    private fun t1(s: &mut S): &S {
         Freeze(false)(s)
     }
     private fun t2(u1: &mut u64,u2: &mut u64): (&u64, &mut u64) {
@@ -46,7 +46,7 @@ module 0x42::freeze_mut_ref {
           }
         }
     }
-    public fun t5(s: &mut 0x42::freeze_mut_ref::G) {
+    public fun t5(s: &mut G) {
         {
           let x: u64 = 0;
           {
@@ -69,7 +69,7 @@ module 0x42::freeze_mut_ref {
           }
         }
     }
-    private fun t6(cond: bool,s: &mut 0x42::freeze_mut_ref::S,other: &0x42::freeze_mut_ref::S) {
+    private fun t6(cond: bool,s: &mut S,other: &S) {
         {
           let x: &S;
           if cond {
@@ -80,7 +80,7 @@ module 0x42::freeze_mut_ref {
           Tuple()
         }
     }
-    private fun t7(cond: bool,s: &mut 0x42::freeze_mut_ref::S,other: &0x42::freeze_mut_ref::S) {
+    private fun t7(cond: bool,s: &mut S,other: &S) {
         {
           let _x: &S;
           _x: &S = if cond {
@@ -91,7 +91,7 @@ module 0x42::freeze_mut_ref {
           Tuple()
         }
     }
-    private fun t8(cond: bool,s: &mut 0x42::freeze_mut_ref::S,other: &0x42::freeze_mut_ref::S) {
+    private fun t8(cond: bool,s: &mut S,other: &S) {
         {
           let _x: &S = if cond {
             Freeze(false)(s)

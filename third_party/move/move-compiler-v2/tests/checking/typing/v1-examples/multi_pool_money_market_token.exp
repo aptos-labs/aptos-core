@@ -22,13 +22,13 @@ module 0x2::Token {
         type: #0,
         value: u64,
     }
-    public fun create<ATy>(type: #0,value: u64): 0x2::Token::Coin<#0> {
+    public fun create<ATy>(type: ATy,value: u64): Coin<ATy> {
         pack Token::Coin<ATy>(type, value)
     }
-    public fun value<ATy>(coin: &0x2::Token::Coin<#0>): u64 {
+    public fun value<ATy>(coin: &Coin<ATy>): u64 {
         select Token::Coin.value<&Coin<ATy>>(coin)
     }
-    public fun deposit<ATy>(coin: &mut 0x2::Token::Coin<#0>,check: 0x2::Token::Coin<#0>) {
+    public fun deposit<ATy>(coin: &mut Coin<ATy>,check: Coin<ATy>) {
         {
           let Token::Coin<ATy>{ type, value } = check;
           if Eq<ATy>(Borrow(Immutable)(select Token::Coin.type<&mut Coin<ATy>>(coin)), Borrow(Immutable)(type)) {
@@ -40,7 +40,7 @@ module 0x2::Token {
           Tuple()
         }
     }
-    public fun destroy_zero<ATy>(coin: 0x2::Token::Coin<#0>) {
+    public fun destroy_zero<ATy>(coin: Coin<ATy>) {
         {
           let Token::Coin<ATy>{ type: _, value } = coin;
           if Eq<u64>(value, 0) {
@@ -50,17 +50,17 @@ module 0x2::Token {
           }
         }
     }
-    public fun join<ATy>(xus: 0x2::Token::Coin<#0>,coin2: 0x2::Token::Coin<#0>): 0x2::Token::Coin<#0> {
+    public fun join<ATy>(xus: Coin<ATy>,coin2: Coin<ATy>): Coin<ATy> {
         Token::deposit<ATy>(Borrow(Mutable)(xus), coin2);
         xus
     }
-    public fun split<ATy>(coin: 0x2::Token::Coin<#0>,amount: u64): (0x2::Token::Coin<#0>, 0x2::Token::Coin<#0>) {
+    public fun split<ATy>(coin: Coin<ATy>,amount: u64): (Coin<ATy>, Coin<ATy>) {
         {
           let other: Coin<ATy> = Token::withdraw<ATy>(Borrow(Mutable)(coin), amount);
           Tuple(coin, other)
         }
     }
-    public fun withdraw<ATy>(coin: &mut 0x2::Token::Coin<#0>,amount: u64): 0x2::Token::Coin<#0> {
+    public fun withdraw<ATy>(coin: &mut Coin<ATy>,amount: u64): Coin<ATy> {
         if Ge<u64>(select Token::Coin.value<&mut Coin<ATy>>(coin), amount) {
           Tuple()
         } else {
@@ -73,12 +73,12 @@ module 0x2::Token {
 module 0x2::Map {
     struct T {
     }
-    public native fun empty<K,V>(): 0x2::Map::T<#0, #1>;
-    public native fun remove<K,V>(m: &0x2::Map::T<#0, #1>,k: &#0): #1;
-    public native fun contains_key<K,V>(m: &0x2::Map::T<#0, #1>,k: &#0): bool;
-    public native fun get<K,V>(m: &0x2::Map::T<#0, #1>,k: &#0): &#1;
-    public native fun get_mut<K,V>(m: &mut 0x2::Map::T<#0, #1>,k: &#0): &mut #1;
-    public native fun insert<K,V>(m: &0x2::Map::T<#0, #1>,k: #0,v: #1);
+    public native fun empty<K,V>(): T<K, V>;
+    public native fun remove<K,V>(m: &T<K, V>,k: &K): V;
+    public native fun contains_key<K,V>(m: &T<K, V>,k: &K): bool;
+    public native fun get<K,V>(m: &T<K, V>,k: &K): &V;
+    public native fun get_mut<K,V>(m: &mut T<K, V>,k: &K): &mut V;
+    public native fun insert<K,V>(m: &T<K, V>,k: K,v: V);
 } // end 0x2::Map
 module 0x3::OneToOneMarket {
     use std::signer;
@@ -96,7 +96,7 @@ module 0x3::OneToOneMarket {
     struct Price {
         price: u64,
     }
-    public fun borrow<In,Out>(account: &signer,pool_owner: address,amount: u64): 0x2::Token::Coin<#1>
+    public fun borrow<In,Out>(account: &signer,pool_owner: address,amount: u64): Token::Coin<Out>
         acquires 0x3::OneToOneMarket::Price(*)
         acquires 0x3::OneToOneMarket::Pool(*)
         acquires 0x3::OneToOneMarket::DepositRecord(*)
@@ -113,7 +113,7 @@ module 0x3::OneToOneMarket {
           Token::withdraw<Out>(Borrow(Mutable)(select OneToOneMarket::Pool.coin<&mut Pool<Out>>(pool)), amount)
         }
     }
-    public fun deposit<In,Out>(account: &signer,pool_owner: address,coin: 0x2::Token::Coin<#0>)
+    public fun deposit<In,Out>(account: &signer,pool_owner: address,coin: Token::Coin<In>)
         acquires 0x3::OneToOneMarket::Pool(*)
         acquires 0x3::OneToOneMarket::DepositRecord(*)
      {
@@ -126,7 +126,7 @@ module 0x3::OneToOneMarket {
           }
         }
     }
-    private fun accept<AssetType>(account: &signer,init: 0x2::Token::Coin<#0>) {
+    private fun accept<AssetType>(account: &signer,init: Token::Coin<AssetType>) {
         {
           let sender: address = signer::address_of(account);
           if Not(exists<Pool<AssetType>>(sender)) {
@@ -211,7 +211,7 @@ module 0x3::OneToOneMarket {
           }
         }
     }
-    public fun register_price<In,Out>(account: &signer,initial_in: 0x2::Token::Coin<#0>,initial_out: 0x2::Token::Coin<#1>,price: u64) {
+    public fun register_price<In,Out>(account: &signer,initial_in: Token::Coin<In>,initial_out: Token::Coin<Out>,price: u64) {
         OneToOneMarket::accept<In>(account, initial_in);
         OneToOneMarket::accept<Out>(account, initial_out);
         MoveTo<Price<In, Out>>(account, pack OneToOneMarket::Price<In, Out>(price))
@@ -284,12 +284,12 @@ module 0x70dd::ToddNickels {
         };
         MoveTo<Wallet>(account, pack ToddNickels::Wallet(Token::create<T>(pack ToddNickels::T(false), 0)))
     }
-    public fun destroy(c: 0x2::Token::Coin<0x70dd::ToddNickels::T>)
+    public fun destroy(c: Token::Coin<T>)
         acquires 0x70dd::ToddNickels::Wallet(*)
      {
         Token::deposit<T>(Borrow(Mutable)(select ToddNickels::Wallet.nickels<&mut Wallet>(BorrowGlobal(Mutable)<Wallet>(0x70dd))), c)
     }
-    public fun mint(account: &signer): 0x2::Token::Coin<0x70dd::ToddNickels::T> {
+    public fun mint(account: &signer): Token::Coin<T> {
         if Eq<address>(signer::address_of(account), 0x70dd) {
           Tuple()
         } else {

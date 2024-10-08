@@ -38,7 +38,7 @@ module 0x42::test {
           }
         }
     }
-    private fun assign1(x: 0x42::test::S1): u64 {
+    private fun assign1(x: S1): u64 {
         {
           let count: u64 = 0;
           loop {
@@ -60,14 +60,14 @@ module 0x42::test {
           count
         }
     }
-    private fun assign_chained(x: 0x42::test::S3) {
+    private fun assign_chained(x: S3) {
         Add<u8>(Add<u8>(select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.0<S3>(x))), select test::S0.x<S0>(select test::S3.1<S3>(x))), select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.2<S3>(x))));
         select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.0<S3>(x))) = 0;
         select test::S0.x<S0>(select test::S3.1<S3>(x)) = 1;
         select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.2<S3>(x))) = 2;
         Tuple()
     }
-    private fun assign_enum(x: &mut 0x42::test::E) {
+    private fun assign_enum(x: &mut E) {
         match (x) {
           test::E::V1{ 0: x, 1: y } => {
             x = 42;
@@ -83,12 +83,12 @@ module 0x42::test {
         }
 
     }
-    private fun simple(x: 0x42::test::S1) {
+    private fun simple(x: S1) {
         select test::S1.0<S1>(x) = 42;
         select test::S1.1<S1>(x) = true;
         Tuple()
     }
-    private fun simple_ref(x: &mut 0x42::test::S1) {
+    private fun simple_ref(x: &mut S1) {
         select test::S1.0<&mut S1>(x) = 42;
         select test::S1.1<&mut S1>(x) = true;
         Tuple()

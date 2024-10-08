@@ -11,7 +11,7 @@ module 0x8675309::M {
         f: u64,
         g: u64,
     }
-    private fun t(r1: &mut u64,r2: &mut u64,s: &mut 0x8675309::M::S) {
+    private fun t(r1: &mut u64,r2: &mut u64,s: &mut S) {
         Eq<u64>(Freeze(false)(r1), Freeze(false)(r1));
         Eq<u64>(Freeze(false)(r1), Freeze(false)(r2));
         Eq<u64>(Freeze(false)(r2), Freeze(false)(r2));
@@ -30,13 +30,13 @@ module 0x8675309::M {
         Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))));
         Tuple()
     }
-    private fun t1(p: &mut 0x8675309::M::P) {
+    private fun t1(p: &mut P) {
         {
           let comp: bool = Eq<B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut P>(p))));
           select M::B.f<B>(select M::P.b1<&mut P>(p)) = comp
         }
     }
-    private fun t2(p: &mut 0x8675309::M::P) {
+    private fun t2(p: &mut P) {
         {
           let comp: bool = Neq<B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut P>(p))));
           select M::B.f<B>(select M::P.b1<&mut P>(p)) = comp

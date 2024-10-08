@@ -3,10 +3,10 @@ module 0x7b::M {
     struct S {
         dummy_field: bool,
     }
-    public fun s(): 0x7b::M::S {
+    public fun s(): S {
         pack M::S(false)
     }
-    public fun take(_s: 0x7b::M::S) {
+    public fun take(_s: S) {
         Tuple()
     }
 } // end 0x7b::M

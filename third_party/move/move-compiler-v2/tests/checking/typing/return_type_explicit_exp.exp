@@ -13,7 +13,7 @@ module 0x8675309::M {
     private fun t1(): u64 {
         return 0
     }
-    private fun t2(): (u64, bool, 0x8675309::M::R) {
+    private fun t2(): (u64, bool, R) {
         loop {
           if true {
             return Tuple(0, false, pack M::R(false))

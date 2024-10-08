@@ -4,7 +4,7 @@ module 0x8675309::M {
         f: u64,
         b: u8,
     }
-    private fun t0(x: u64,b: u8,r: 0x8675309::M::R) {
+    private fun t0(x: u64,b: u8,r: R) {
         0;
         1;
         0;

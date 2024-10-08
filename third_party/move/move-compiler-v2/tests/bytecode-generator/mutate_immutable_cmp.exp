@@ -9,7 +9,7 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(s: &mut 0x8675309::M::S) {
+    private fun t0(s: &mut S) {
         s = pack M::S(2);
         s = pack M::S(0);
         Borrow(Immutable)(0) = 1;

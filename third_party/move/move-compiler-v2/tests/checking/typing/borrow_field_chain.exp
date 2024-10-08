@@ -9,7 +9,7 @@ module 0x8675309::M {
     struct X3 {
         f: u64,
     }
-    private fun t0(x1: &0x8675309::M::X1,x1_mut: &mut 0x8675309::M::X1) {
+    private fun t0(x1: &X1,x1_mut: &mut X1) {
         Borrow(Immutable)(select M::X1.x2<&X1>(x1));
         Borrow(Immutable)(select M::X2.x3<X2>(select M::X1.x2<&X1>(x1)));
         Borrow(Immutable)(select M::X3.f<X3>(select M::X2.x3<X2>(select M::X1.x2<&X1>(x1))));

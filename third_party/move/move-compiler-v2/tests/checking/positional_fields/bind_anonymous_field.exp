@@ -15,7 +15,7 @@ module 0x42::test {
         0: bool,
         1: 0x42::test::S0,
     }
-    private fun match(x: 0x42::test::E1) {
+    private fun match(x: E1) {
         match (x) {
           test::E1::V1{ 0: test::S0{ 0: _x } } => {
             Tuple()
@@ -26,13 +26,13 @@ module 0x42::test {
         }
 
     }
-    private fun nested(x: 0x42::test::S1) {
+    private fun nested(x: S1) {
         {
           let test::S1{ 0: _x, 1: test::S0{ 0: _y } } = x;
           Tuple()
         }
     }
-    private fun simple(x: 0x42::test::S0) {
+    private fun simple(x: S0) {
         {
           let test::S0{ 0: _x } = x;
           Tuple()
