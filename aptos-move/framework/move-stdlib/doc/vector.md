@@ -30,7 +30,6 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `reverse_slice`](#0x1_vector_reverse_slice)
 -  [Function `append`](#0x1_vector_append)
 -  [Function `reverse_append`](#0x1_vector_reverse_append)
--  [Function `split_off`](#0x1_vector_split_off)
 -  [Function `trim`](#0x1_vector_trim)
 -  [Function `trim_reverse`](#0x1_vector_trim_reverse)
 -  [Function `is_empty`](#0x1_vector_is_empty)
@@ -531,53 +530,15 @@ Pushes all of the elements of the <code>other</code> vector into the <code>self<
 
 </details>
 
-<a id="0x1_vector_split_off"></a>
-
-## Function `split_off`
-
-Splits the collection into two at the given index.
-Returns a newly allocated vector containing the elements in the range [at, len).
-After the call, the original vector will be left containing the elements [0, at)
-with its previous capacity unchanged.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_split_off">split_off</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, at: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_split_off">split_off</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, at: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
-    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(self);
-    <b>assert</b>!(at &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
-
-    <b>let</b> other = <a href="vector.md#0x1_vector_empty">empty</a>();
-    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-        <a href="vector.md#0x1_vector_range_move">range_move</a>(self, at, len - at, &<b>mut</b> other, 0);
-    } <b>else</b> {
-        <b>while</b> (len &gt; at) {
-            <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> other, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(self));
-            len = len - 1;
-        };
-        <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> other);
-    };
-
-    other
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_vector_trim"></a>
 
 ## Function `trim`
 
-Trim a vector to a smaller size, returning the evicted elements in order
+Splits (trims) the collection into two at the given index.
+Returns a newly allocated vector containing the elements in the range [new_len, len).
+After the call, the original vector will be left containing the elements [0, new_len)
+with its previous capacity unchanged.
+In many languages this is also called <code>split_off</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
@@ -590,9 +551,21 @@ Trim a vector to a smaller size, returning the evicted elements in order
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
-    <b>let</b> res = <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>(self, new_len);
-    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> res);
-    res
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(self);
+    <b>assert</b>!(new_len &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
+
+    <b>let</b> other = <a href="vector.md#0x1_vector_empty">empty</a>();
+    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
+        <a href="vector.md#0x1_vector_range_move">range_move</a>(self, new_len, len - new_len, &<b>mut</b> other, 0);
+    } <b>else</b> {
+        <b>while</b> (len &gt; new_len) {
+            <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> other, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(self));
+            len = len - 1;
+        };
+        <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> other);
+    };
+
+    other
 }
 </code></pre>
 
