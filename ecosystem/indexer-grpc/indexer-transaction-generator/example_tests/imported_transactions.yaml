@@ -12,6 +12,7 @@ testnet:
     5979639459: 5979639459_coin_register
     5992795934: 5992795934_fa_activities
     5523474016: 5523474016_validator_txn
+    5523474017: 5523474017_test_txn
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
