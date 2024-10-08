@@ -43,6 +43,12 @@ impl fmt::Debug for MetricSamples {
     }
 }
 
+impl Default for MetricSamples {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SystemMetrics {
     pub cpu_core_metrics: MetricSamples,
@@ -124,10 +130,8 @@ impl LatencyBreakdown {
         self.0.keys().cloned().collect()
     }
 
-    pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> &MetricSamples {
-        self.0
-            .get(slice)
-            .unwrap_or_else(|| panic!("Missing latency breakdown for {:?}", slice))
+    pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> Option<&MetricSamples> {
+        self.0.get(slice)
     }
 
     pub fn join(&self, other: &LatencyBreakdown) -> LatencyBreakdown {

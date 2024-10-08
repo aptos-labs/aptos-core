@@ -2409,11 +2409,11 @@ fn indexer_test() -> ForgeConfig {
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 100),
-            (100, 0.5, 0.5, 0.5),
+            (100, 1.0, 1.0, 1.0),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture30KWith200Change, 100),
-            (100, 0.5, 0.5, 0.5),
+            (100, 1.0, 1.0, 1.0),
         ),
         (
             TransactionWorkload::new(
