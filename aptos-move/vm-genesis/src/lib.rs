@@ -72,6 +72,8 @@ const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
+// Allows an APY with 2 decimals of precision to be specified as a u64.
+const APY_PRECISION: u64 = 10_000;
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
@@ -88,6 +90,8 @@ pub struct GenesisConfiguration {
     pub min_voting_threshold: u64,
     pub recurring_lockup_duration_secs: u64,
     pub required_proposer_stake: u64,
+    // The APY rewards rate specified as a percentage plus 3 decimals of precision.
+    // That is, 10% should be written as 10_000.
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voters: Vec<AccountAddress>,
@@ -402,8 +406,8 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
         "Recurring lockup duration must be at least as long as epoch duration"
     );
     assert!(
-        genesis_config.rewards_apy_percentage > 0 && genesis_config.rewards_apy_percentage < 100,
-        "Rewards APY must be > 0% and < 100%"
+        genesis_config.rewards_apy_percentage > 0 && genesis_config.rewards_apy_percentage < APY_PRECISION,
+        "Rewards APY must between >= 1 (i.e. 0.01%) and < 10,000 (i.e. 100%)"
     );
     assert!(
         genesis_config.voting_duration_secs > 0,
@@ -472,7 +476,7 @@ fn initialize(
     let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_config.epoch_duration_secs;
     // Multiplication before division to minimize rounding errors due to integer division.
     let rewards_rate_numerator = (genesis_config.rewards_apy_percentage * rewards_rate_denominator
-        / 100)
+        / APY_PRECISION)
         / num_epochs_in_a_year;
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
@@ -1125,7 +1129,7 @@ pub fn generate_test_genesis(
             max_stake: 100_000_000_000_000,
             recurring_lockup_duration_secs: 7200,
             required_proposer_stake: 0,
-            rewards_apy_percentage: 10,
+            rewards_apy_percentage: 1000,
             voting_duration_secs: 3600,
             voters: vec![
                 AccountAddress::from_hex_literal("0xdd1").unwrap(),
@@ -1189,7 +1193,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M SUPRA.
         recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
         required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M SUPRA
-        rewards_apy_percentage: 10,
+        rewards_apy_percentage: 1000,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voters: vec![
             AccountAddress::from_hex_literal("0xdd1").unwrap(),
