@@ -5,12 +5,13 @@ use crate::{
     ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult, APTOS_SCRIPT_BUILDER_KEY,
 };
 use move_binary_format::{
-    access::ScriptAccess,
+    access::{ModuleAccess, ScriptAccess},
     builders::CompiledScriptBuilder,
     errors::{PartialVMError, PartialVMResult},
     file_format::*,
 };
 use move_core_types::{
+    identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
     transaction_argument::TransactionArgument,
@@ -24,8 +25,8 @@ struct Context {
     script: CompiledScript,
     // Arguments to the compiled script.
     args: Vec<Vec<u8>>,
-    // Type arguments to the compiled script.
-    ty_args: Vec<TypeTag>,
+    // (nth move call) -> (type arguments for the call)
+    ty_args: Vec<Vec<SignatureToken>>,
     // (nth move call) -> (starting position of its return values in the local pool)
     returned_val_to_local: Vec<u16>,
     // (nth move call) -> (starting position of its arguments in the argument pool)
@@ -38,11 +39,12 @@ struct Context {
     locals: Vec<SignatureToken>,
     // Parameter signature pool of the script. We will use this pool to replace the pool in CompiledScript.
     parameters: Vec<SignatureToken>,
-    // Pool to count distinct number of generic type arguments in the calls.
-    ty_args_to_idx: BTreeMap<TypeTag, u16>,
 }
 
-fn instantiate(token: &SignatureToken, subst_mapping: &BTreeMap<u16, u16>) -> SignatureToken {
+fn instantiate(
+    token: &SignatureToken,
+    subst_mapping: &BTreeMap<u16, SignatureToken>,
+) -> SignatureToken {
     use SignatureToken::*;
 
     match token {
@@ -66,7 +68,7 @@ fn instantiate(token: &SignatureToken, subst_mapping: &BTreeMap<u16, u16>) -> Si
         ),
         Reference(ty) => Reference(Box::new(instantiate(ty, subst_mapping))),
         MutableReference(ty) => MutableReference(Box::new(instantiate(ty, subst_mapping))),
-        TypeParameter(idx) => TypeParameter(*subst_mapping.get(idx).unwrap()),
+        TypeParameter(idx) => subst_mapping.get(idx).unwrap().clone(),
     }
 }
 
@@ -105,6 +107,7 @@ impl Context {
     // Generate instructions for invoking one batched call.
     fn compile_batched_call(
         &mut self,
+        current_call_idx: usize,
         call: &BatchedFunctionCall,
         func_id: FunctionHandleIndex,
     ) -> PartialVMResult<()> {
@@ -114,26 +117,8 @@ impl Context {
         //
         // Creates mapping from local type argument index to type argument index in the script
         let mut subst_mapping = BTreeMap::new();
-        for (idx, ty_param) in call.ty_args.iter().enumerate() {
-            subst_mapping.insert(
-                idx as u16,
-                if let Some(stored_idx) = self.ty_args_to_idx.get(ty_param) {
-                    // Type argument would be de-duped to help type equality check.
-                    *stored_idx
-                } else {
-                    // Type argument is not yet seen, allocate a new type argument in the script.
-                    let new_call_idx = self.ty_args.len() as u16;
-                    if new_call_idx == TableIndex::MAX {
-                        return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
-                    }
-                    self.script
-                        .type_parameters
-                        .push(*func_handle.type_parameters.get(idx).unwrap());
-                    self.ty_args_to_idx.insert(ty_param.clone(), new_call_idx);
-                    self.ty_args.push(ty_param.clone());
-                    new_call_idx
-                },
-            );
+        for (idx, ty_param) in self.ty_args[current_call_idx].iter().enumerate() {
+            subst_mapping.insert(idx as u16, ty_param.clone());
         }
 
         // Instructions for loading parameters
@@ -192,10 +177,7 @@ impl Context {
                 FunctionInstantiationIndex(self.script.function_instantiations.len() as u16);
 
             // Generic call type arguments will always be instantiated with script's type parameters.
-            let inst_sig = subst_mapping
-                .values()
-                .map(|idx| SignatureToken::TypeParameter(*idx))
-                .collect();
+            let inst_sig = self.ty_args[current_call_idx].clone();
 
             let type_parameters = self.import_signature(Signature(inst_sig))?;
             self.script
@@ -266,6 +248,72 @@ pub(crate) struct Script {
     pub args: Vec<TransactionArgument>,
 }
 
+// Given a module, return the handle idx of the named struct
+fn find_struct<'a>(
+    map: &'a BTreeMap<ModuleId, CompiledModule>,
+    module_id: &ModuleId,
+    struct_name: &IdentStr,
+) -> PartialVMResult<(&'a CompiledModule, StructHandleIndex)> {
+    if let Some(module) = map.get(module_id) {
+        for (idx, handle) in module.struct_handles().iter().enumerate() {
+            if module.identifier_at(handle.name) == struct_name {
+                return Ok((module, StructHandleIndex::new(idx as TableIndex)));
+            }
+        }
+        return Err(
+            PartialVMError::new(StatusCode::LOOKUP_FAILED).with_message(format!(
+                "Struct {}::{} doesn't yet exist in the cache",
+                module_id, struct_name
+            )),
+        );
+    }
+    Err(
+        PartialVMError::new(StatusCode::LOOKUP_FAILED).with_message(format!(
+            "Module {} doesn't yet exist in the cache",
+            module_id
+        )),
+    )
+}
+
+fn import_type_tag(
+    script_builder: &mut CompiledScriptBuilder,
+    type_tag: &TypeTag,
+    module_resolver: &BTreeMap<ModuleId, CompiledModule>,
+) -> PartialVMResult<SignatureToken> {
+    Ok(match type_tag {
+        TypeTag::Address => SignatureToken::Address,
+        TypeTag::U8 => SignatureToken::U8,
+        TypeTag::U16 => SignatureToken::U16,
+        TypeTag::U32 => SignatureToken::U32,
+        TypeTag::U64 => SignatureToken::U64,
+        TypeTag::U128 => SignatureToken::U128,
+        TypeTag::U256 => SignatureToken::U256,
+        TypeTag::Bool => SignatureToken::Bool,
+        TypeTag::Signer => SignatureToken::Signer,
+        TypeTag::Vector(t) => SignatureToken::Vector(Box::new(import_type_tag(
+            script_builder,
+            t,
+            module_resolver,
+        )?)),
+        TypeTag::Struct(s) => {
+            let (module, handle_idx) =
+                find_struct(module_resolver, &s.module_id(), s.name.as_ident_str())?;
+            let struct_idx = script_builder.import_struct(module, handle_idx)?;
+            if s.type_args.is_empty() {
+                SignatureToken::Struct(struct_idx)
+            } else {
+                SignatureToken::StructInstantiation(
+                    struct_idx,
+                    s.type_args
+                        .iter()
+                        .map(|ty| import_type_tag(script_builder, ty, module_resolver))
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                )
+            }
+        },
+    })
+}
+
 #[allow(clippy::field_reassign_with_default)]
 pub fn generate_script_from_batched_calls(
     calls: &[BatchedFunctionCall],
@@ -279,23 +327,36 @@ pub fn generate_script_from_batched_calls(
         .map(|call| {
             let target_module = match module_resolver.get(&call.module) {
                 Some(module) => module,
-                None => return Err(PartialVMError::new(StatusCode::LOOKUP_FAILED)),
+                None => {
+                    return Err(PartialVMError::new(StatusCode::LOOKUP_FAILED)
+                        .with_message(format!("Module {} is not yet loaded", call.module)))
+                },
             };
             script_builder.import_call_by_name(&call.function, target_module)
         })
         .collect::<PartialVMResult<Vec<_>>>()?;
+    let call_type_params = calls
+        .iter()
+        .map(|call| {
+            call.ty_args
+                .iter()
+                .map(|ty| import_type_tag(&mut script_builder, ty, module_resolver))
+                .collect::<PartialVMResult<Vec<_>>>()
+        })
+        .collect::<PartialVMResult<Vec<_>>>()?;
     context.script = script_builder.into_script();
+    context.ty_args = call_type_params;
     context.add_signers(signer_count)?;
     context.allocate_parameters(calls)?;
-    for (call, fh_idx) in calls.iter().zip(call_idxs.into_iter()) {
-        context.compile_batched_call(call, fh_idx)?;
+    for (call_count, (call, fh_idx)) in calls.iter().zip(call_idxs.into_iter()).enumerate() {
+        context.compile_batched_call(call_count, call, fh_idx)?;
     }
     context.script.code.code.push(Bytecode::Ret);
     context.script.parameters = context.import_signature(Signature(context.parameters.clone()))?;
     context.script.code.locals = context.import_signature(Signature(context.locals.clone()))?;
     move_bytecode_verifier::verify_script(&context.script).map_err(|err| {
         err.to_partial()
-            .with_message(format!("{:?}", context.script))
+            .append_message_with_separator(',', format!("{:?}", context.script))
     })?;
     context.script.metadata.push(Metadata {
         key: APTOS_SCRIPT_BUILDER_KEY.to_owned(),
@@ -308,7 +369,7 @@ pub fn generate_script_from_batched_calls(
         .map_err(|_| PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR))?;
     Ok(bcs::to_bytes(&Script {
         code: bytes,
-        ty_args: context.ty_args,
+        ty_args: vec![],
         args: context
             .args
             .into_iter()

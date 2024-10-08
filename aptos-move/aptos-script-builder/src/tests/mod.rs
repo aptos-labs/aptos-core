@@ -11,10 +11,7 @@ use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, language_storage::ModuleId, value::MoveValue,
 };
-use std::{
-    path::PathBuf,
-    str::FromStr
-};
+use std::{path::PathBuf, str::FromStr};
 
 fn load_module(builder: &mut BatchedFunctionCallBuilder, harness: &MoveHarness, module_name: &str) {
     let module = ModuleId::from_str(module_name).unwrap();
@@ -78,6 +75,7 @@ fn chained_deposit() {
 
     let mut builder = BatchedFunctionCallBuilder::single_signer();
     load_module(&mut builder, &h, "0x1::coin");
+    load_module(&mut builder, &h, "0x1::aptos_coin");
     load_module(&mut builder, &h, "0x1::primary_fungible_store");
     let mut returns_1 = builder
         .add_batched_call_wasm(
@@ -142,6 +140,7 @@ fn chained_deposit_mismatch() {
 
     let mut builder = BatchedFunctionCallBuilder::single_signer();
     load_module(&mut builder, &h, "0x1::coin");
+    load_module(&mut builder, &h, "0x1::aptos_coin");
     load_module(&mut builder, &h, "0x1::primary_fungible_store");
     let mut returns_1 = builder
         .add_batched_call_wasm(
@@ -179,6 +178,7 @@ fn chained_deposit_invalid_copy() {
 
     let mut builder = BatchedFunctionCallBuilder::single_signer();
     load_module(&mut builder, &h, "0x1::coin");
+    load_module(&mut builder, &h, "0x1::aptos_coin");
     load_module(&mut builder, &h, "0x1::primary_fungible_store");
     let mut returns_1 = builder
         .add_batched_call_wasm(
@@ -239,21 +239,342 @@ fn chained_deposit_invalid_copy() {
 fn test_module() {
     let mut h = MoveHarness::new();
     let account = h.new_account_at(AccountAddress::ONE);
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let mut seq_num = 10;
+
     let module_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("tests")
         .join("test_modules");
     h.publish_package_cache_building(&account, &module_path);
 
-    // Create a copyable value and copy it twice
+    let mut run_txn = |batch_builder: BatchedFunctionCallBuilder, h: &mut MoveHarness| {
+        let script = batch_builder.generate_batched_calls().unwrap();
+        let txn = alice
+            .transaction()
+            .script(bcs::from_bytes(&script).unwrap())
+            .sequence_number(seq_num)
+            .sign();
 
-    // Create a droppable value and never use it.
+        seq_num += 1;
+
+        assert_eq!(
+            h.run(txn),
+            TransactionStatus::Keep(ExecutionStatus::Success)
+        );
+    };
+
+    // Create a copyable value and copy it twice
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_copyable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_copyable_value".to_string(),
+            vec![],
+            vec![
+                returns_1.copy().unwrap(),
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_copyable_value".to_string(),
+            vec![],
+            vec![
+                returns_1,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
+
+    // Copying a non-copyable value should return error on call.
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_non_droppable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert!(builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_non_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns_1.copy().unwrap(),
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .is_err());
+
+    // Create a value and pass it to the wrong type
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_non_droppable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert!(builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns_1,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .is_err());
+
+    // Create a non droppable value and never use it.
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let _returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_non_droppable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert!(builder.generate_batched_calls().is_err());
 
     // Create a value and pass by reference
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_copyable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "check_copyable_value".to_string(),
+            vec![],
+            vec![
+                returns_1.borrow().unwrap(),
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_copyable_value".to_string(),
+            vec![],
+            vec![
+                returns_1,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
 
     // Create a value and pass by mutable reference and then mutate.
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_non_droppable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "mutate_non_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns_1.borrow_mut().unwrap(),
+                BatchArgumentWASM::new_bytes(MoveValue::U8(42).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_non_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns_1,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(42).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
 
     // Create a value and pass it to a generic function
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_non_droppable_value".to_string(),
+            vec![],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
 
-    // Create a copyable value with generics and pass it over.
+    let returns_2 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "id".to_string(),
+            vec!["0x1::batched_execution::NonDroppableValue".to_string()],
+            vec![returns_1],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_non_droppable_value".to_string(),
+            vec![],
+            vec![
+                returns_2,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
+
+    // Create a droppable value with generics and don't use it
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_generic_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap();
+    run_txn(builder, &mut h);
+
+    // Create a generic value and consume it
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_generic_non_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_generic_non_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![
+                returns_1,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+
+    run_txn(builder, &mut h);
+
+    // Create a generic value and destruct it with wrong type parameter.
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    load_module(&mut builder, &h, "0x1::batched_execution");
+    let returns_1 = builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "create_generic_non_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Foo".to_string()],
+            vec![BatchArgumentWASM::new_bytes(
+                MoveValue::U8(10).simple_serialize().unwrap(),
+            )],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert!(builder
+        .add_batched_call_wasm(
+            "0x1::batched_execution".to_string(),
+            "consume_generic_non_droppable_value".to_string(),
+            vec!["0x1::batched_execution::Bar".to_string()],
+            vec![
+                returns_1,
+                BatchArgumentWASM::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+            ],
+        )
+        .is_err());
 }

@@ -275,7 +275,7 @@ impl CompiledScriptBuilder {
         let idx = match self.function_pool.get(&(module_id, name)) {
             Some(idx) => Ok(*idx),
             None => {
-                let idx = self.script.struct_handles.len();
+                let idx = self.script.function_handles.len();
                 if self.script.function_handles.len() >= TableIndex::MAX as usize {
                     return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
                 }

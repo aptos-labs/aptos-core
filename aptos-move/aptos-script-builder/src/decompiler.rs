@@ -11,7 +11,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
 };
 use std::collections::BTreeMap;
@@ -42,12 +42,7 @@ impl LocalState {
         }
     }
 
-    fn process_script(
-        &mut self,
-        script: &CompiledScript,
-        ty_args: &[TypeTag],
-        args: &[Vec<u8>],
-    ) -> anyhow::Result<()> {
+    fn process_script(&mut self, script: &CompiledScript, args: &[Vec<u8>]) -> anyhow::Result<()> {
         let mut op_codes = script.code.code.iter().peekable();
         while !(matches!(op_codes.peek(), Some(Bytecode::Ret))) {
             while !matches!(
@@ -58,19 +53,19 @@ impl LocalState {
                     .next()
                     .ok_or_else(|| anyhow!("Unexpected end of opcode sequence"))?
                     .clone();
-                self.process_input_argument(op_code, script, ty_args, args)?;
+                self.process_input_argument(op_code, script, args)?;
             }
             let op_code = op_codes
                 .next()
                 .ok_or_else(|| anyhow!("Unexpected end of opcode sequence"))?
                 .clone();
-            self.process_call(op_code, script, ty_args, args)?;
+            self.process_call(op_code, script, args)?;
             while matches!(op_codes.peek(), Some(Bytecode::StLoc(_))) {
                 let op_code = op_codes
                     .next()
                     .ok_or_else(|| anyhow!("Unexpected end of opcode sequence"))?
                     .clone();
-                self.process_return(op_code, script, ty_args, args)?;
+                self.process_return(op_code, script, args)?;
             }
             self.add_new_call()?;
         }
@@ -100,7 +95,6 @@ impl LocalState {
         &mut self,
         op: Bytecode,
         script: &CompiledScript,
-        _ty_args: &[TypeTag],
         args: &[Vec<u8>],
     ) -> anyhow::Result<()> {
         let (operation_type, local_idx) = match op {
@@ -147,7 +141,6 @@ impl LocalState {
         &mut self,
         op: Bytecode,
         script: &CompiledScript,
-        ty_args: &[TypeTag],
         _args: &[Vec<u8>],
     ) -> anyhow::Result<()> {
         let (fh_idx, ty_args) = match op {
@@ -160,13 +153,7 @@ impl LocalState {
                         .signature_at(inst.type_parameters)
                         .0
                         .iter()
-                        .map(|tok| match tok {
-                            SignatureToken::TypeParameter(idx) => ty_args
-                                .get(*idx as usize)
-                                .ok_or_else(|| anyhow!("Type parameter access out of bound"))
-                                .cloned(),
-                            _ => bail!("Unexpected type argument: {:?}", tok),
-                        })
+                        .map(|tok| Self::type_tag_from_sig_token(script, tok))
                         .collect::<Result<Vec<_>>>()?,
                 )
             },
@@ -183,7 +170,6 @@ impl LocalState {
         &mut self,
         op: Bytecode,
         _script: &CompiledScript,
-        _ty_args: &[TypeTag],
         _args: &[Vec<u8>],
     ) -> anyhow::Result<()> {
         match op {
@@ -198,13 +184,62 @@ impl LocalState {
         }
         Ok(())
     }
+
+    fn type_tag_from_sig_token(
+        script: &CompiledScript,
+        token: &SignatureToken,
+    ) -> anyhow::Result<TypeTag> {
+        Ok(match token {
+            SignatureToken::Address => TypeTag::Address,
+            SignatureToken::U8 => TypeTag::U8,
+            SignatureToken::U16 => TypeTag::U16,
+            SignatureToken::U32 => TypeTag::U32,
+            SignatureToken::U64 => TypeTag::U64,
+            SignatureToken::U128 => TypeTag::U128,
+            SignatureToken::U256 => TypeTag::U256,
+            SignatureToken::Bool => TypeTag::Bool,
+            SignatureToken::Signer => TypeTag::Signer,
+            SignatureToken::Vector(s) => {
+                TypeTag::Vector(Box::new(Self::type_tag_from_sig_token(script, s)?))
+            },
+            SignatureToken::Struct(s) => {
+                let module_handle = script.module_handle_at(script.struct_handle_at(*s).module);
+                TypeTag::Struct(Box::new(StructTag {
+                    module: script.identifier_at(module_handle.name).to_owned(),
+                    address: *script.address_identifier_at(module_handle.address),
+                    name: script
+                        .identifier_at(script.struct_handle_at(*s).name)
+                        .to_owned(),
+                    type_args: vec![],
+                }))
+            },
+            SignatureToken::TypeParameter(_)
+            | SignatureToken::Reference(_)
+            | SignatureToken::MutableReference(_) => {
+                bail!("Not supported arugment type: {:?}", token);
+            },
+            SignatureToken::StructInstantiation(s, ty_args) => {
+                let module_handle = script.module_handle_at(script.struct_handle_at(*s).module);
+                TypeTag::Struct(Box::new(StructTag {
+                    module: script.identifier_at(module_handle.name).to_owned(),
+                    address: *script.address_identifier_at(module_handle.address),
+                    name: script
+                        .identifier_at(script.struct_handle_at(*s).name)
+                        .to_owned(),
+                    type_args: ty_args
+                        .iter()
+                        .map(|tok| Self::type_tag_from_sig_token(script, tok))
+                        .collect::<anyhow::Result<Vec<_>>>()?,
+                }))
+            },
+        })
+    }
 }
 
 /// Public function to decompiled a script and return the batched form for better readability.
 pub fn generate_batched_call_payload(
     script_code: &[u8],
     args: &[TransactionArgument],
-    ty_args: &[TypeTag],
 ) -> anyhow::Result<Vec<BatchedFunctionCall>> {
     let compiled_script = CompiledScript::deserialize(script_code)
         .map_err(|err| anyhow!("Failed to deserialize payload: {:?}", err))?;
@@ -217,7 +252,7 @@ pub fn generate_batched_call_payload(
     }
     let mut state = LocalState::new();
     let converted_args = convert_txn_args(args);
-    state.process_script(&compiled_script, ty_args, &converted_args)?;
+    state.process_script(&compiled_script, &converted_args)?;
     Ok(state.payload)
 }
 
@@ -226,13 +261,14 @@ pub fn generate_batched_call_payload_serialized(
     script: &[u8],
 ) -> anyhow::Result<Vec<BatchedFunctionCall>> {
     let script = bcs::from_bytes::<crate::codegen::Script>(script)?;
-    generate_batched_call_payload(&script.code, &script.args, &script.ty_args)
+    generate_batched_call_payload(&script.code, &script.args)
 }
-
 
 /// Wrapper to decompile script in its serialized form and wrap it with wasm errors.
 #[wasm_bindgen]
-pub fn generate_batched_call_payload_wasm(script: Vec<u8>) -> Result<Vec<BatchedFunctionCall>, JsValue> {
+pub fn generate_batched_call_payload_wasm(
+    script: Vec<u8>,
+) -> Result<Vec<BatchedFunctionCall>, JsValue> {
     generate_batched_call_payload_serialized(&script)
         .map_err(|err| JsValue::from_str(format!("{:?}", err).as_str()))
 }
