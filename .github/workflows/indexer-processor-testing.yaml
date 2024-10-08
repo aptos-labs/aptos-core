@@ -109,15 +109,19 @@ jobs:
           fi
 
       - id: auth
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
         uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Log active service account email
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
         run: |
           gcloud auth list --filter=status:ACTIVE --format="value(account)"
+
       - id: 'secrets'
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
         uses: 'google-github-actions/get-secretmanager-secrets@v2'
         with:
           secrets: |-
