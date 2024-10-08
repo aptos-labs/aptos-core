@@ -104,8 +104,8 @@ impl TwoChainTimeoutVotes {
 
     fn aggregated_timeout_reason(&self, verifier: &ValidatorVerifier) -> RoundTimeoutReason {
         let mut reason_voting_power: HashMap<RoundTimeoutReason, u128> = HashMap::new();
-        let mut missing_batch_authors: HashMap<Author, u128> = HashMap::new();
-        let ordered_authors = verifier.get_ordered_account_addresses();
+        let mut missing_batch_authors: HashMap<usize, u128> = HashMap::new();
+        // let ordered_authors = verifier.get_ordered_account_addresses();
         for (author, reason) in &self.timeout_reason {
             // To aggregate the reason, we only care about the variant type itself and
             // exclude any data within the variants.
@@ -115,10 +115,8 @@ impl TwoChainTimeoutVotes {
                 | reason @ RoundTimeoutReason::NoQC => reason.clone(),
                 RoundTimeoutReason::PayloadUnavailable { missing_authors } => {
                     for missing_idx in missing_authors.iter_ones() {
-                        if let Some(missing_author) = ordered_authors.get(missing_idx) {
-                            *missing_batch_authors.entry(*missing_author).or_default() +=
-                                verifier.get_voting_power(missing_author).unwrap() as u128;
-                        }
+                        *missing_batch_authors.entry(missing_idx).or_default() +=
+                            verifier.get_voting_power(author).unwrap() as u128;
                     }
                     RoundTimeoutReason::PayloadUnavailable {
                         missing_authors: BitVec::with_num_bits(verifier.len() as u16),
@@ -145,13 +143,12 @@ impl TwoChainTimeoutVotes {
                     if matches!(reason, RoundTimeoutReason::PayloadUnavailable { .. }) {
                         let mut aggregated_bitvec = BitVec::with_num_bits(verifier.len() as u16);
                         let address_to_index = verifier.address_to_validator_index();
-                        for (author, voting_power) in missing_batch_authors {
+                        for (author_idx, voting_power) in missing_batch_authors {
                             if verifier
                                 .check_aggregated_voting_power(voting_power, false)
                                 .is_ok()
                             {
-                                let idx = *address_to_index.get(&author).unwrap() as u16;
-                                aggregated_bitvec.set(idx);
+                                aggregated_bitvec.set(author_idx as u16);
                             }
                         }
                         Some(RoundTimeoutReason::PayloadUnavailable {

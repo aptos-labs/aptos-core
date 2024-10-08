@@ -174,11 +174,10 @@ impl BlockTree {
 
     fn remove_block(&mut self, block_id: HashValue) {
         // Remove the block from the store
-        self.id_to_block.remove(&block_id).and_then(|block| {
+        if let Some(block) = self.id_to_block.remove(&block_id) {
             let round = block.executed_block().round();
             self.round_to_ids.remove(&round);
-            Some(block)
-        });
+        };
         self.id_to_quorum_cert.remove(&block_id);
     }
 
@@ -261,10 +260,15 @@ impl BlockTree {
             let arc_block = Arc::clone(linkable_block.executed_block());
             assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
             // Note: the assumption is that we have/enforce unequivocal proposer election.
-            assert!(self
-                .round_to_ids
-                .insert(arc_block.round(), block_id)
-                .is_none());
+            if let Some(old_block_id) = self.round_to_ids.get(&arc_block.round()) {
+                error!(
+                    "multiple blocks received for round {}. Previous block id: {}",
+                    arc_block.round(),
+                    old_block_id
+                );
+            } else {
+                self.round_to_ids.insert(arc_block.round(), block_id);
+            }
             counters::NUM_BLOCKS_IN_TREE.inc();
             Ok(arc_block)
         }

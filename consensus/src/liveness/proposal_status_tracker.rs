@@ -14,11 +14,12 @@ pub trait TOptQSPullParamsProvider: Send + Sync {
     fn get_params(&self) -> Option<OptQSPayloadPullParams>;
 }
 
-/// A exponential window based algorithm to decide whether to go optimistic or not.
+/// A exponential window based algorithm to decide whether to go optimistic or not, based on
+/// configurable number of past proposal statuses
 ///
 /// Initialize the window at 2.
 /// - For each proposal failure, double the window up to a MAX size
-/// - If there are no failures within the window, the propose optimistic batch
+/// - If there are no failures within the window, then propose optimistic batch
 /// - If there are no failures up to MAX proposals, reset the window to 2.
 pub struct ExponentialWindowFailureTracker {
     window: usize,
@@ -48,31 +49,22 @@ impl ExponentialWindowFailureTracker {
     where
         F: Fn(&NewRoundReason) -> bool,
     {
-        let mut last_consecutive_matching_count = 0;
-        for reason in self.past_round_statuses.iter().rev() {
-            if matcher(reason) {
-                last_consecutive_matching_count += 1;
-            } else {
-                break;
-            }
-        }
-        last_consecutive_matching_count
+        self.past_round_statuses
+            .iter()
+            .rev()
+            .take_while(|reason| matcher(reason))
+            .count()
     }
 
     fn compute_failure_window(&mut self) {
         self.last_consecutive_success_count =
             self.last_consecutive_statuses_matching(|reason| match reason {
-                NewRoundReason::QCReady => true,
-                NewRoundReason::Timeout(timeout_reason) => match timeout_reason {
-                    RoundTimeoutReason::Unknown => true,
-                    RoundTimeoutReason::ProposalNotReceived => true,
-                    RoundTimeoutReason::PayloadUnavailable { .. } => false,
-                    RoundTimeoutReason::NoQC => true,
-                },
+                NewRoundReason::Timeout(RoundTimeoutReason::PayloadUnavailable { .. }) => false,
+                _ => true,
             });
         if self.last_consecutive_success_count == 0 {
             self.window *= 2;
-            self.window = self.window.max(self.max_window);
+            self.window = self.window.min(self.max_window);
         } else if self.last_consecutive_success_count == self.past_round_statuses.len() {
             self.window = 2;
         }

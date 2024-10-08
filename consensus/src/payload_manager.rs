@@ -361,11 +361,11 @@ impl TPayloadManager for QuorumStorePayloadManager {
             Payload::OptQuorumStore(opt_qs_payload) => {
                 let mut missing_authors = BitVec::with_num_bits(self.ordered_authors.len() as u16);
                 for batch in opt_qs_payload.opt_batches().deref() {
-                    if let None = self.batch_reader.exists(batch.digest()) {
+                    if self.batch_reader.exists(batch.digest()).is_none() {
                         let index = *self
                             .address_to_validator_index
                             .get(&batch.author())
-                            .expect("Payload author should have ben verified");
+                            .expect("Payload author should have been verified");
                         missing_authors.set(index as u16);
                     }
                 }
