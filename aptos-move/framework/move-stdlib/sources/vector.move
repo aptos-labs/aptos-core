@@ -139,19 +139,20 @@ module std::vector {
         pragma intrinsic = true;
     }
 
-    /// Splits the collection into two at the given index.
-    /// Returns a newly allocated vector containing the elements in the range [at, len).
-    /// After the call, the original vector will be left containing the elements [0, at)
+    /// Splits (trims) the collection into two at the given index.
+    /// Returns a newly allocated vector containing the elements in the range [new_len, len).
+    /// After the call, the original vector will be left containing the elements [0, new_len)
     /// with its previous capacity unchanged.
-    public fun split_off<Element>(self: &mut vector<Element>, at: u64): vector<Element> {
+    /// In many languages this is also called `split_off`.
+    public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
         let len = length(self);
-        assert!(at <= len, EINDEX_OUT_OF_BOUNDS);
+        assert!(new_len <= len, EINDEX_OUT_OF_BOUNDS);
 
         let other = empty();
         if (USE_MOVE_RANGE) {
-            range_move(self, at, len - at, &mut other, 0);
+            range_move(self, new_len, len - new_len, &mut other, 0);
         } else {
-            while (len > at) {
+            while (len > new_len) {
                 push_back(&mut other, pop_back(self));
                 len = len - 1;
             };
@@ -159,13 +160,6 @@ module std::vector {
         };
 
         other
-    }
-
-    /// Trim a vector to a smaller size, returning the evicted elements in order
-    public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let res = trim_reverse(self, new_len);
-        reverse(&mut res);
-        res
     }
     spec trim {
         pragma intrinsic = true;

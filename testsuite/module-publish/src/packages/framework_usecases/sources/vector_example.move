@@ -17,11 +17,11 @@ module 0xABCD::vector_example {
         vec
     }
 
-    public entry fun test_split_off_append(vec_len: u64, element_len: u64, index: u64, repeats: u64) {
+    public entry fun test_trim_append(vec_len: u64, element_len: u64, index: u64, repeats: u64) {
         let vec = generate_vec(vec_len, element_len);
 
         for (i in 0..repeats) {
-            let part = vector::split_off(&mut vec, index);
+            let part = vector::trim(&mut vec, index);
             vector::append(&mut vec, part);
         };
     }

@@ -105,12 +105,30 @@ module std::vector_tests {
             let v = vector[1, 2];
             assert!(&V::trim(&mut v, 0) == &vector[1, 2], 3);
         };
+        {
+            let v = vector[1, 2, 3, 4, 5, 6];
+            let other = V::trim(&mut v, 4);
+            assert!(v == vector[1, 2, 3, 4], 4);
+            assert!(other == vector[5, 6], 5);
+
+            let other_empty = V::trim(&mut v, 4);
+            assert!(v == vector[1, 2, 3, 4], 6);
+            assert!(other_empty == vector[], 7);
+        };
     }
+
     #[test]
     #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun test_trim_fail() {
         let v = vector[1];
         V::trim(&mut v, 2);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_trim_fail_2() {
+        let v = vector[1, 2, 3];
+        V::trim(&mut v, 4);
     }
 
     #[test]
@@ -952,7 +970,7 @@ module std::vector_tests {
     #[test]
     fun test_destroy() {
         let v = vector[MoveOnly {}];
-        vector::destroy(v, |m| { let MoveOnly {} = m; })
+        V::destroy(v, |m| { let MoveOnly {} = m; })
     }
 
     #[test]
@@ -969,34 +987,14 @@ module std::vector_tests {
     #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun test_replace_empty_abort() {
         let v = vector[];
-        let MoveOnly {} = vector::replace(&mut v, 0, MoveOnly {});
-        vector::destroy_empty(v);
+        let MoveOnly {} = V::replace(&mut v, 0, MoveOnly {});
+        V::destroy_empty(v);
     }
 
     #[test]
     fun test_replace() {
         let v = vector[1, 2, 3, 4];
-        vector::replace(&mut v, 1, 17);
+        V::replace(&mut v, 1, 17);
         assert!(v == vector[1, 17, 3, 4], 0);
-    }
-
-    #[test]
-    fun test_split_off() {
-        let v = vector[1, 2, 3, 4, 5, 6];
-        let other = vector::split_off(&mut v, 4);
-        assert!(v == vector[1, 2, 3, 4], 0);
-        assert!(other == vector[5, 6], 1);
-
-        let other_empty = vector::split_off(&mut v, 4);
-        assert!(v == vector[1, 2, 3, 4], 2);
-        assert!(other_empty == vector[], 3);
-
-    }
-
-    #[test]
-    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
-    fun test_split_off_abort() {
-        let v = vector[1, 2, 3];
-        vector::split_off(&mut v, 4);
     }
 }
