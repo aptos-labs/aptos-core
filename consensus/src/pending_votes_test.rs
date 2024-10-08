@@ -9,6 +9,7 @@ use aptos_types::{
     validator_verifier::{random_validator_verifier, random_validator_verifier_with_voting_power},
 };
 use itertools::Itertools;
+use sha3::digest::generic_array::typenum::Bit;
 
 #[test]
 fn test_two_chain_timeout_votes_aggregation() {
@@ -64,7 +65,7 @@ fn test_two_chain_timeout_aggregate_missing_authors() {
     let epoch = 1;
     let round = 10;
     let (signers, verifier) =
-        random_validator_verifier_with_voting_power(4, None, false, &[3, 3, 1, 1]);
+        random_validator_verifier_with_voting_power(4, None, false, &[3, 3, 2, 1]);
 
     let permutations = [true, true, false, false]
         .iter()
@@ -72,6 +73,7 @@ fn test_two_chain_timeout_aggregate_missing_authors() {
         .permutations(4)
         .unique();
 
+    // Minority nodes report the same set of missing authors
     for permut in permutations {
         let timeout = TwoChainTimeout::new(epoch, round, QuorumCert::dummy());
         let mut two_chain_timeout_votes = TwoChainTimeoutVotes::new(timeout);
@@ -99,4 +101,61 @@ fn test_two_chain_timeout_aggregate_missing_authors() {
             }
         );
     }
+
+    // Not enough votes to form a valid timeout reason
+    let timeout = TwoChainTimeout::new(epoch, round, QuorumCert::dummy());
+    let mut two_chain_timeout_votes = TwoChainTimeoutVotes::new(timeout);
+
+    let author = signers[2].author();
+    let timeout = TwoChainTimeout::new(epoch, round, QuorumCert::dummy());
+    let signature = signers[2].sign(&timeout.signing_format()).unwrap();
+    two_chain_timeout_votes.add(
+        author,
+        timeout,
+        signature,
+        RoundTimeoutReason::PayloadUnavailable {
+            missing_authors: vec![true, false, false, false].into(),
+        },
+    );
+
+    let (_, aggregate_timeout_reason) = two_chain_timeout_votes.unpack_aggregate(&verifier);
+
+    assert_eq!(aggregate_timeout_reason, RoundTimeoutReason::Unknown);
+
+    // Not enough nodes vote for the same node.
+    let timeout = TwoChainTimeout::new(epoch, round, QuorumCert::dummy());
+    let mut two_chain_timeout_votes = TwoChainTimeoutVotes::new(timeout);
+
+    let author = signers[2].author();
+    let timeout = TwoChainTimeout::new(epoch, round, QuorumCert::dummy());
+    let signature = signers[2].sign(&timeout.signing_format()).unwrap();
+    two_chain_timeout_votes.add(
+        author,
+        timeout,
+        signature,
+        RoundTimeoutReason::PayloadUnavailable {
+            missing_authors: vec![false, true, false, false].into(),
+        },
+    );
+
+    let author = signers[3].author();
+    let timeout = TwoChainTimeout::new(epoch, round, QuorumCert::dummy());
+    let signature = signers[3].sign(&timeout.signing_format()).unwrap();
+    two_chain_timeout_votes.add(
+        author,
+        timeout,
+        signature,
+        RoundTimeoutReason::PayloadUnavailable {
+            missing_authors: vec![false, false, false, true].into(),
+        },
+    );
+
+    let (_, aggregate_timeout_reason) = two_chain_timeout_votes.unpack_aggregate(&verifier);
+
+    assert_eq!(
+        aggregate_timeout_reason,
+        RoundTimeoutReason::PayloadUnavailable {
+            missing_authors: BitVec::with_num_bits(4)
+        }
+    );
 }
