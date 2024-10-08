@@ -335,34 +335,12 @@ pub static TASK_VALIDATE_MODULES_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static GET_MODULE_STATE_VALUE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static FETCH_NOT_CACHED_VERIFIED_MODULE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_get_module_state_value",
+        "aptos_fetch_not_cached_verified_module",
         // metric description
-        "The time spent in seconds when getting raw state value from the base view in Block-STM",
-        time_buckets(),
-    )
-    .unwrap()
-});
-
-pub static READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_read_module_entry",
-        // metric description
-        "The time spent in seconds when reading a module entry from VersionedModuleStorage",
-        time_buckets(),
-    )
-    .unwrap()
-});
-
-pub static FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_fetch_verified_module",
-        // metric description
-        "The time spent in seconds when fetching a module from VersionedModuleStorage",
+        "The time spent in seconds when fetching a module from mutable module cache",
         time_buckets(),
     )
     .unwrap()

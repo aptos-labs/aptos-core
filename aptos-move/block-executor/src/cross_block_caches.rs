@@ -1,24 +1,28 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::error;
+use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
+use aptos_mvhashmap::code_cache::SyncCodeCache;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
-    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
+    state_store::{state_value::StateValueMetadata, StateView},
+    vm::modules::ModuleCacheEntry,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
-use arc_swap::ArcSwapOption;
 use bytes::Bytes;
+use crossbeam::utils::CachePadded;
+use hashbrown::HashMap;
 use move_binary_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
-use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment};
+use move_vm_runtime::Module;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use std::{ops::Deref, sync::Arc};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -81,8 +85,8 @@ impl CachedAptosEnvironment {
             id,
             env: env.clone(),
         });
-        flush_cross_block_framework_cache();
         drop(cross_block_environment);
+        CrossBlockModuleCache::flush_at_block_start();
 
         env
     }
@@ -91,169 +95,190 @@ impl CachedAptosEnvironment {
 static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<CachedAptosEnvironment>>> =
     Lazy::new(|| Mutex::new(None));
 
-/// Initializes the module cache for the framework that can live over multiple blocks. This
-/// function should only be called at the block boundaries.
-pub fn initialize_cross_block_framework_cache(
-    state_view: &impl StateView,
-    runtime_environment: &RuntimeEnvironment,
-) {
-    // Check that the framework is cached - it is sufficient to check that transaction validation
-    // module is in cache.
-    if check_module_exists_in_cross_block_framework_cache(
-        &AccountAddress::ONE,
-        ident_str!("transaction_validation"),
-    ) {
-        return;
-    }
+struct CrossBlockModuleCacheEntry {
+    valid: CachePadded<AtomicBool>,
+    verified_entry: ModuleCacheEntry,
+}
 
-    // Otherwise, we need to cache the framework. For that, we will load all modules from the
-    // release bundle.
-    let mut cache = hashbrown::HashMap::new();
-    let module_storage = state_view.as_aptos_code_storage(runtime_environment);
-    let framework = aptos_cached_packages::head_release_bundle();
-
-    // We should not be using the code because it is tied to the release and whatever exists in the
-    // state view currently. We only use compiled modules to be able to fetch addresses and module
-    // names (since package metadata does not store the address information)
-    for (_, module) in framework.code_and_compiled_modules() {
-        let module_id = module.self_id();
-
-        let state_key = StateKey::module_id(&module_id);
-        let state_value = state_view.get_state_value(&state_key);
-        let module = module_storage.fetch_verified_module(module_id.address(), module_id.name());
-
-        // In general, we should not see any errors, but ensure to log an error in case we see one.
-        if let Err(err) = &state_value {
-            error!("Error when getting the state value for module {}::{} to store in cross-block framework cache: {:?}", module_id.address(), module_id.name(), err);
-        }
-        if let Err(err) = &module {
-            error!("Error when fetching a verified module {}::{} to store in cross-block framework cache: {:?}", module_id.address(), module_id.name(), err);
-        }
-
-        if let (Ok(Some(state_value)), Ok(Some(module))) = (state_value, module) {
-            let entry =
-                ModuleStorageEntry::from_state_value_and_verified_module(state_value, module);
-            cache.insert(module_id, entry);
+impl CrossBlockModuleCacheEntry {
+    /// Returns a new valid cache entry. Panics if provided module entry is not verified.
+    fn new(entry: ModuleCacheEntry) -> Self {
+        assert!(entry.is_verified());
+        Self {
+            valid: CachePadded::new(AtomicBool::new(true)),
+            verified_entry: entry,
         }
     }
 
-    CROSS_BLOCK_FRAMEWORK_CACHE.store(Some(Arc::new(cache)));
-}
-
-/// Returns the state value metadata from the cross module framework cache. If the module has not
-/// been cached, or the access is not for the framework, [None] is returned.
-pub(crate) fn fetch_module_state_value_metadata_from_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> Option<StateValueMetadata> {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache
-            .get(&(address, module_name))
-            .map(|e| e.state_value_metadata().clone());
+    /// Marks the entry as invalid.
+    fn mark_invalid(&self) {
+        self.valid.store(false, Ordering::Release)
     }
-    None
-}
 
-/// Returns the true if the module exists in the cross module framework cache. If the module has
-/// not been cached, or the access is not for the framework, false is returned.
-pub(crate) fn check_module_exists_in_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> bool {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache.contains_key(&(address, module_name));
+    /// Returns true if the entry is valid.
+    #[inline(always)]
+    fn is_valid(&self) -> bool {
+        self.valid.load(Ordering::Acquire)
     }
-    false
-}
 
-/// Returns the module size in bytes from the cross module framework cache. If the module has not
-/// been cached, or the access is not for the framework, [None] is returned.
-pub(crate) fn fetch_module_size_in_bytes_from_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> Option<usize> {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache
-            .get(&(address, module_name))
-            .map(|e| e.size_in_bytes());
+    /// Returns the state value metadata if the entry is valid, and [None] otherwise.
+    fn state_value_metadata(&self) -> Option<StateValueMetadata> {
+        self.is_valid()
+            .then(|| self.verified_entry.state_value_metadata().clone())
     }
-    None
-}
 
-/// Returns the module bytes from the cross module framework cache. If the module has not been
-/// cached, or the access is not for the framework, [None] is returned.
-pub(crate) fn fetch_module_bytes_from_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> Option<Bytes> {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache
-            .get(&(address, module_name))
-            .map(|e| e.bytes().clone());
+    /// Returns the module bytes if the entry is valid, and [None] otherwise.
+    fn bytes(&self) -> Option<Bytes> {
+        self.is_valid().then(|| self.verified_entry.bytes().clone())
     }
-    None
-}
 
-/// Returns the metadat from the module from the cross module framework cache. If the module has
-/// not been cached, or the access is not for the framework, [None] is returned.
-pub(crate) fn fetch_module_metadata_from_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> Option<Vec<Metadata>> {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache
-            .get(&(address, module_name))
-            .map(|e| e.metadata().to_vec());
+    /// Returns the module size in bytes if the entry is valid, and [None] otherwise.
+    fn size_in_bytes(&self) -> Option<usize> {
+        self.is_valid().then(|| self.verified_entry.size_in_bytes())
     }
-    None
-}
 
-/// Returns the deserialized module from the cross module framework cache. If the module has not
-/// been cached, or the access is not for the framework, [None] is returned.
-pub(crate) fn fetch_deserialized_module_from_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> Option<Arc<CompiledModule>> {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache
-            .get(&(address, module_name))
-            .map(|e| e.as_compiled_module());
+    /// Returns the module metadata if the entry is valid, and [None] otherwise.
+    fn module_metadata(&self) -> Option<Vec<Metadata>> {
+        self.is_valid()
+            .then(|| self.verified_entry.metadata().to_vec())
     }
-    None
-}
 
-/// Returns the verified module from the cross module framework cache. If the module has not been
-/// cached, or the access is not for the framework, [None] is returned.
-pub(crate) fn fetch_verified_module_from_cross_block_framework_cache(
-    address: &AccountAddress,
-    module_name: &IdentStr,
-) -> Option<Arc<Module>> {
-    let maybe_cache = CROSS_BLOCK_FRAMEWORK_CACHE.load();
-    if let Some(cache) = maybe_cache.deref().as_ref() {
-        return cache.get(&(address, module_name)).map(|e| {
-            e.try_as_verified_module()
-                .expect("Modules stored in framework cache are always verified")
-        });
+    /// Returns the deserialized module if the entry is valid, and [None] otherwise.
+    fn deserialized_module(&self) -> Option<Arc<CompiledModule>> {
+        self.is_valid()
+            .then(|| self.verified_entry.as_compiled_module())
     }
-    None
+
+    /// Returns the verified module if the entry is valid, and [None] otherwise. Panics if the
+    /// entry is not verified.
+    fn verified_module(&self) -> Option<Arc<Module>> {
+        self.is_valid().then(|| {
+            self.verified_entry
+                .try_as_verified_module()
+                .expect("Modules stored in cache are always verified")
+        })
+    }
 }
 
-/// Flushes the cross-block cache for framework modules. Used when the framework is upgraded. Can
-/// be called during the block execution.
-pub(crate) fn flush_cross_block_framework_cache() {
-    CROSS_BLOCK_FRAMEWORK_CACHE.store(None)
+const CROSS_BLOCK_MODULE_CACHE_SIZE: usize = 100_000;
+
+/// Represents an immutable cross-block cache.
+pub(crate) struct CrossBlockModuleCache;
+
+impl CrossBlockModuleCache {
+    /// Flushes the module cache. Should only be called at the start of the block.
+    fn flush_at_block_start() {
+        let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
+        cache.clear();
+    }
+
+    /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
+    /// cache if its size is too large. Should only be called at block end.
+    pub(crate) fn populate_cache_at_block_end(code_cache: &SyncCodeCache) {
+        let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
+        if cache.len() > CROSS_BLOCK_MODULE_CACHE_SIZE {
+            cache.clear();
+        }
+
+        code_cache
+            .module_cache()
+            .collect_verified_entries_into(cache.dereference_mut(), |e| {
+                CrossBlockModuleCacheEntry::new(e.clone())
+            });
+    }
+
+    /// Marks the cached entry (if it exists) as invalid. As a result, all subsequent calls to the
+    /// cache will result in a cache miss.
+    pub(crate) fn mark_invalid(module_id: &ModuleId) {
+        if let Some(entry) = CROSS_BLOCK_MODULE_CACHE.acquire().get(module_id) {
+            entry.mark_invalid();
+        }
+    }
+
+    /// Returns the state value metadata from the cross module cache. If the module has not been
+    /// cached, or is no longer valid due to module publishing, [None] is returned.
+    pub(crate) fn fetch_module_state_value_metadata(
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<StateValueMetadata> {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(&(address, module_name))?
+            .state_value_metadata()
+    }
+
+    /// Returns the true if the module exists in the cross module framework cache. If the module
+    /// has not been cached, false is returned. Note that even if a module has been republished, we
+    /// can still check the cache because modules cannot be deleted.
+    pub(crate) fn check_module_exists(address: &AccountAddress, module_name: &IdentStr) -> bool {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .contains_key(&(address, module_name))
+    }
+
+    /// Returns the module size in bytes from the cross module cache. If the module has not been
+    /// cached, or is no longer valid due to module publishing, [None] is returned.
+    pub(crate) fn fetch_module_size_in_bytes(
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<usize> {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(&(address, module_name))?
+            .size_in_bytes()
+    }
+
+    /// Returns the module bytes from the cross module cache. If the module has not been cached, or
+    /// is no longer valid due to module publishing, [None] is returned.
+    pub(crate) fn fetch_module_bytes(
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<Bytes> {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(&(address, module_name))?
+            .bytes()
+    }
+
+    /// Returns the module metadata from the cross module cache. If the module has not been cached,
+    /// or is no longer valid due to module publishing, [None] is returned.
+    pub(crate) fn fetch_module_metadata(
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<Vec<Metadata>> {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(&(address, module_name))?
+            .module_metadata()
+    }
+
+    /// Returns the deserialized module from the cross module cache. If the module has not been
+    /// cached, or is no longer valid due to module publishing, [None] is returned.
+    pub(crate) fn fetch_deserialized_module(
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<Arc<CompiledModule>> {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(&(address, module_name))?
+            .deserialized_module()
+    }
+
+    /// Returns the verified module from the cross module cache. If the module has not been cached,
+    /// or is no longer valid due to module publishing, [None] is returned.
+    ///
+    /// Panics if cache contains a non-verified entry.
+    pub(crate) fn fetch_verified_module(
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<Arc<Module>> {
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(&(address, module_name))?
+            .verified_module()
+    }
 }
 
-// Note:
-//   There can be concurrent accesses to the framework cache, hence we use the arc swap. For
-//   instance, we can read from cache while a transaction is being committed and is publishing the
-//   framework (flushing the cache).
-static CROSS_BLOCK_FRAMEWORK_CACHE: Lazy<
-    ArcSwapOption<hashbrown::HashMap<ModuleId, ModuleStorageEntry>>,
-> = Lazy::new(|| ArcSwapOption::new(None));
+type SyncCrossBlockModuleCache = ExplicitSyncWrapper<HashMap<ModuleId, CrossBlockModuleCacheEntry>>;
+static CROSS_BLOCK_MODULE_CACHE: Lazy<SyncCrossBlockModuleCache> =
+    Lazy::new(|| ExplicitSyncWrapper::new(HashMap::new()));
