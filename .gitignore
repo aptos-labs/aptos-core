@@ -54,6 +54,7 @@ terraform/testnet/*-vault.ca
 
 # Move Build Output
 build/
+aptos-move/move-examples/*/*/build/*
 
 # Move coverage and tracing information
 .trace
