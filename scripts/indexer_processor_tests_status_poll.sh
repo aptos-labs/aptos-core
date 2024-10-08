@@ -23,8 +23,19 @@ else
     response=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
     "https://api.github.com/repos/aptos-labs/aptos-indexer-processors/actions/runs?event=repository_dispatch&branch=main")
 
+    # Check if the workflow_runs array exists
+    workflow_runs=$(echo "$response" | jq -r '.workflow_runs')
+    if [ "$workflow_runs" == "null" ] || [ -z "$workflow_runs" ]; then
+      echo "No workflow runs found. Response from GitHub API:"
+      echo "$response"  # Output the raw response for debugging
+      echo "Retrying in $sleep_interval seconds..."
+      attempts=$((attempts + 1))
+      sleep $sleep_interval
+      continue
+    fi
+
     # Filter the workflow run by the unique run-name commit hash
-    run_id=$(echo "$response" | jq -r ".workflow_runs[] | select(.name | test(\"$UUID\")) | .id")
+    run_id=$(echo "$workflow_runs" | jq -r ".[] | select(.name | test(\"$UUID\")) | .id")
 
     if [ -n "$run_id" ]; then
       echo "Found workflow run with ID: $run_id"
@@ -57,8 +68,16 @@ while [ "$job_completed" == false ] && [ $job_attempts -lt $max_job_attempts ]; 
   echo "Polling for job status. Attempt $((job_attempts+1)) of $max_job_attempts..."
   jobs_response=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "$jobs_url")
 
+  # Check if the jobs array exists
+  jobs=$(echo "$jobs_response" | jq -r '.jobs')
+  if [ "$jobs" == "null" ] || [ -z "$jobs" ]; then
+    echo "No jobs found in the workflow run. Response from GitHub API:"
+    echo "$jobs_response"  # Output the raw response for debugging
+    exit 1
+  fi
+
   # Loop through the jobs and check their status
-  for job in $(echo "$jobs_response" | jq -r '.jobs[] | @base64'); do
+  for job in $(echo "$jobs" | jq -r '.[] | @base64'); do
     _jq() {
       echo "${job}" | base64 --decode | jq -r "${1}"
     }

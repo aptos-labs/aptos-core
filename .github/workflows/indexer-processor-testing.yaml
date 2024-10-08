@@ -91,6 +91,10 @@ jobs:
 
       - name: Handle New Files and Differences
         run: |
+          echo "Checking outputs from diff_check step..."
+          echo "New file found: ${{ steps.diff_check.outputs.new_file_found }}"
+          echo "Diff found: ${{ steps.diff_check.outputs.diff_found }}"
+          
           if [ "${{ steps.diff_check.outputs.new_file_found }}" == "true" ]; then
             echo "New JSON files detected:"
             echo "${{ steps.diff_check.outputs.new_files }}"  # Print all new files with paths
@@ -121,7 +125,7 @@ jobs:
 
       # Conditionally Dispatch Event to Processor Repo if Differences Found
       - name: Dispatch Event to Processor Repo
-        if: steps.diff_check.outputs.diff_found == 'true'
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
           TOKEN: '${{ steps.secrets.outputs.token }}'
@@ -131,7 +135,10 @@ jobs:
 
       # Poll Processor Repo for Workflow Run Status and Memorize Run ID to check the job status
       - name: Poll for Workflow Run and Wait for Job Completion
-        if: steps.diff_check.outputs.diff_found == 'true'
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
         id: poll_status
         run: |
           . scripts/indexer_processor_tests_status_poll.sh
+        env:
+          GITHUB_TOKEN: ${{ steps.secrets.outputs.token }}  # Pass the correct GitHub token
+          GITHUB_SHA: ${{ github.sha }}

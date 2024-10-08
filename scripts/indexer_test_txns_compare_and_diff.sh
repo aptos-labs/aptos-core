@@ -31,7 +31,6 @@ compare_and_diff() {
     diff_output=$(diff -u /dev/null "$generated_file" || true)
     if [ -n "$diff_output" ]; then
       echo "New file with diff found in $generated_file"
-      diff_found=true
       echo "Diff output for new file:"
       echo "$diff_output"
     fi
@@ -103,7 +102,13 @@ else
   echo "No modified files detected."
 fi
 
-# Set output flags (if integrated in a larger workflow, e.g., GitHub Actions)
+# Debugging logs before setting outputs
+echo "diff_found=$diff_found"
+echo "new_file_found=$new_file_found"
+echo "new_files=$new_files"
+echo "modified_files=$modified_files"
+
+# Set output flags
 echo "diff_found=$diff_found" >> $GITHUB_OUTPUT
 echo "new_file_found=$new_file_found" >> $GITHUB_OUTPUT
 echo "new_files=$new_files" >> $GITHUB_OUTPUT  # Store new files as output
