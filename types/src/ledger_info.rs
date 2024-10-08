@@ -701,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ledger_info_with_mixed_signatures() {
+    fn test_ledger_info_with_unverified_signatures() {
         let ledger_info = LedgerInfo::new(BlockInfo::empty(), HashValue::random());
         const NUM_SIGNERS: u8 = 7;
         // Generate NUM_SIGNERS random signers.
@@ -722,21 +722,21 @@ mod tests {
             ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
 
-        let mut ledger_info_with_mixed_signatures =
+        let mut ledger_info_with_unverified_signatures =
             LedgerInfoWithUnverifiedSignatures::new(ledger_info.clone());
 
         let mut partial_sig = PartialSignatures::empty();
 
         let sig = SignatureWithStatus::from(validator_signers[0].sign(&ledger_info).unwrap());
         sig.set_verified();
-        ledger_info_with_mixed_signatures.add_signature(validator_signers[0].author(), &sig);
+        ledger_info_with_unverified_signatures.add_signature(validator_signers[0].author(), &sig);
 
         partial_sig.add_signature(
             validator_signers[0].author(),
             validator_signers[0].sign(&ledger_info).unwrap(),
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[1].author(),
             &SignatureWithStatus::from(validator_signers[1].sign(&ledger_info).unwrap()),
         );
@@ -747,13 +747,13 @@ mod tests {
 
         let sig2 = SignatureWithStatus::from(validator_signers[2].sign(&ledger_info).unwrap());
         sig2.set_verified();
-        ledger_info_with_mixed_signatures.add_signature(validator_signers[2].author(), &sig2);
+        ledger_info_with_unverified_signatures.add_signature(validator_signers[2].author(), &sig2);
         partial_sig.add_signature(
             validator_signers[2].author(),
             validator_signers[2].sign(&ledger_info).unwrap(),
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[3].author(),
             &SignatureWithStatus::from(validator_signers[3].sign(&ledger_info).unwrap()),
         );
@@ -762,68 +762,83 @@ mod tests {
             validator_signers[3].sign(&ledger_info).unwrap(),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            4
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
                 .unverified_voters()
                 .count(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.verified_voters().count(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier, true),
+            ledger_info_with_unverified_signatures.check_voting_power(&validator_verifier, true),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
             })
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[4].author(),
             &SignatureWithStatus::from(bls12381::Signature::dummy_signature()),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            5
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
                 .unverified_voters()
                 .count(),
             3
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.verified_voters().count(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.aggregate_and_verify(&validator_verifier),
+            ledger_info_with_unverified_signatures.aggregate_and_verify(&validator_verifier),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
             })
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .unverified_voters()
                 .count(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.verified_voters().count(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             4
         );
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
+        assert_eq!(
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            4
+        );
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[5].author(),
             &SignatureWithStatus::from(validator_signers[5].sign(&ledger_info).unwrap()),
         );
@@ -832,19 +847,24 @@ mod tests {
             validator_signers[5].sign(&ledger_info).unwrap(),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            5
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
                 .unverified_voters()
                 .count(),
             1
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.verified_voters().count(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             4
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
@@ -856,52 +876,62 @@ mod tests {
                 .unwrap(),
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .aggregate_and_verify(&validator_verifier)
                 .unwrap(),
             aggregate_sig
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .unverified_voters()
                 .count(),
-            0
+            1
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.verified_voters().count(),
-            5
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
+            4
         );
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[6].author(),
             &SignatureWithStatus::from(bls12381::Signature::dummy_signature()),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            6
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
                 .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             6
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .aggregate_and_verify(&validator_verifier)
                 .unwrap(),
             aggregate_sig
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .unverified_voters()
                 .count(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.verified_voters().count(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             5
         );
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
+        assert_eq!(
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            5
+        );
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 2);
     }
 }

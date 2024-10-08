@@ -33,6 +33,7 @@ use aptos_types::{
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp, environment::Environment, output::VMOutput,
+    resolver::ResourceGroupSize,
 };
 use move_core_types::{
     language_storage::StructTag,
@@ -118,6 +119,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     ) -> Vec<(
         StateKey,
         WriteOp,
+        ResourceGroupSize,
         BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     )> {
         self.vm_output
@@ -131,6 +133,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                     Some((
                         key.clone(),
                         group_write.metadata_op().clone(),
+                        group_write
+                            .maybe_group_op_size()
+                            .unwrap_or(ResourceGroupSize::zero_combined()),
                         group_write
                             .inner_ops()
                             .iter()
