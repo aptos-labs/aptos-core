@@ -1,6 +1,8 @@
 module aptos_framework::nonce_validation {
     use aptos_framework::account;
-    use aptos_std::smart_table::{Self, SmartTable};
+    use aptos_std::table::{Self, Table};
+    use aptos_std::vector;
+    use aptos_std::aptos_hash::sip_hash_from_value;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_validation;
 
@@ -11,8 +13,8 @@ module aptos_framework::nonce_validation {
     }
 
     struct NonceHistory has key {
-        // Key = (sender address, nonce), Value = bool (always set to true).
-        table_1: SmartTable<NonceKey, bool>,
+        // Key = hash(sender address, nonce, txn expiration), value = (vector of nonces).
+        table_1: Table<u64, vector<NonceKey>>,
         // table_2: SmartTable<NonceKey, bool>,
         // Either 1 or 2
         current_table: u64,
@@ -24,9 +26,7 @@ module aptos_framework::nonce_validation {
 
 
     public(friend) fun initialize(aptos_framework: &signer) {
-        // let table_1 = smart_table::new();
-        // let table_1 = smart_table::new_with_config(2000000, 75, 50);
-        let table_1 = smart_table::new_with_config(100000, 75, 5);
+        let table_1 = table::new();
         let nonce_history = NonceHistory {
             table_1,
             // table_2,
@@ -52,11 +52,12 @@ module aptos_framework::nonce_validation {
             nonce,
             txn_expiration_time,
         };
-        // if (nonce_history.current_table == 1) {
-            smart_table::upsert(&mut nonce_history.table_1, nonce_key, true);
-        // } else {
-        //     smart_table::upsert(&mut nonce_history.table_2, nonce_key, true);
-        // };
+        let hash = sip_hash_from_value(&nonce_key);
+        let index = hash % 100000;
+        if (!table::contains(&nonce_history.table_1, index)) {
+            table::add(&mut nonce_history.table_1, index, vector::empty());
+        };
+        vector::push_back(table::borrow_mut(&mut nonce_history.table_1, index), nonce_key);
     }
 
     public(friend) fun nonce_exists(
@@ -64,19 +65,19 @@ module aptos_framework::nonce_validation {
         nonce: u64,
         txn_expiration_time: u64,
     ): bool acquires NonceHistory {
-        let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
         let nonce_key = NonceKey {
             sender_address,
             nonce,
             txn_expiration_time,
         };
-        if (smart_table::contains(&nonce_history.table_1, nonce_key)) {
-            true
-        } else {
-            false
-        }
-        // if (smart_table::contains(&nonce_history.table_2, nonce_key)) {
-        //     return true
-        // };
+        let hash = sip_hash_from_value(&nonce_key);
+        let index = hash % 100000;
+        let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
+        if (table::contains(&nonce_history.table_1, index)) {
+            if (vector::contains(table::borrow(&nonce_history.table_1, index), &nonce_key)) {
+                return true;
+            }
+        };
+        false
     }
 }
