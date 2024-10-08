@@ -3778,6 +3778,17 @@ impl<'env> FieldEnv<'env> {
         FieldId(self.data.name)
     }
 
+    /// Returns true if this is a positional field. Identified by that the name
+    /// of the field is a number.
+    pub fn is_positional(&self) -> bool {
+        self.data
+            .name
+            .display(self.struct_env.symbol_pool())
+            .to_string()
+            .parse::<u64>()
+            .is_ok()
+    }
+
     /// Gets the location of the field declaration.
     pub fn get_loc(&self) -> &Loc {
         &self.data.loc

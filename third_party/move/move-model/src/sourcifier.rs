@@ -944,16 +944,26 @@ impl<'a> ExpSourcifier<'a> {
             emit!(self.wr(), "::{}", self.sym(*v))
         }
         self.print_inst(&qid.inst);
+        let (open, close) = if struct_env
+            .get_fields_optional_variant(*variant)
+            .any(|f| f.is_positional())
+        {
+            ("(", ")")
+        } else {
+            ("{", "}")
+        };
         self.parent.print_list(
-            "{",
+            open,
             ",",
-            "}",
+            close,
             struct_env
                 .get_fields_optional_variant(*variant)
                 .zip(items)
                 .filter(|(f, _)| !self.parent.is_dummy_field(f)),
             |(f, i)| {
-                emit!(self.wr(), "{}: ", self.sym(f.get_name()));
+                if !f.is_positional() {
+                    emit!(self.wr(), "{}: ", self.sym(f.get_name()));
+                }
                 printer(i)
             },
         );

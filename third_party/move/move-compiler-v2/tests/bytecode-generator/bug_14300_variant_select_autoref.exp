@@ -28,7 +28,7 @@ module 0x815::m {
         }
     }
     fun test_common_access(): u8 {
-        let x = Positional::A{0: 42u8};
+        let x = Positional::A(42u8);
         x.A.0 = 19u8;
         20u8
     }

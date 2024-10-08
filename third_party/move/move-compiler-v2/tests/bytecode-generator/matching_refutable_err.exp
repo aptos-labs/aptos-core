@@ -23,7 +23,7 @@ module 0x815::m {
         }
     }
     fun t(self: E): u64 {
-        let E::Some{0: x} = self;
+        let E::Some(x) = self;
         x
     }
 }
