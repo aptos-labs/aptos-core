@@ -141,7 +141,14 @@ impl StructNameCache {
         if let Some(idx) = self.data.read().0.get(&name) {
             return *idx;
         }
+
         let mut inner_data = self.data.write();
+
+        // Check again to avoid double insertion.
+        if let Some(idx) = inner_data.0.get(&name) {
+            return *idx;
+        }
+
         let idx = StructNameIndex(inner_data.1.len());
         inner_data.0.insert(name.clone(), idx);
         inner_data.1.push(name);
