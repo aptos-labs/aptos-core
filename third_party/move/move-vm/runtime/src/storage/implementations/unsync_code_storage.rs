@@ -28,7 +28,7 @@ use std::{
 
 /// Represents an entry in script cache, either deserialized or verified.
 #[derive(Debug)]
-enum ScriptStorageEntry {
+enum ScriptCacheEntry {
     Deserialized(Arc<CompiledScript>),
     Verified(Arc<Script>),
 }
@@ -42,7 +42,7 @@ enum ScriptStorageEntry {
 )]
 #[delegate(ModuleStorage, target = "module_storage", where = "M: ModuleStorage")]
 pub struct UnsyncCodeStorage<M> {
-    script_storage: RefCell<HashMap<[u8; 32], ScriptStorageEntry>>,
+    script_cache: RefCell<HashMap<[u8; 32], ScriptCacheEntry>>,
     module_storage: M,
 }
 
@@ -75,11 +75,11 @@ impl<'a, S: ModuleBytesStorage> AsUnsyncCodeStorage<'a, S> for S {
 }
 
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
-    /// Creates a new storage with no scripts. There are no constrains on which modules exist in
+    /// Creates a new storage with no scripts. There are no constraints on which modules exist in
     /// module storage.
     fn new(module_storage: M) -> Self {
         Self {
-            script_storage: RefCell::new(HashMap::new()),
+            script_cache: RefCell::new(HashMap::new()),
             module_storage,
         }
     }
@@ -137,12 +137,12 @@ impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
         serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
         use hash_map::Entry::*;
-        use ScriptStorageEntry::*;
+        use ScriptCacheEntry::*;
 
         let hash = compute_code_hash(serialized_script);
-        let mut storage = self.script_storage.borrow_mut();
+        let mut script_cache = self.script_cache.borrow_mut();
 
-        Ok(match storage.entry(hash) {
+        Ok(match script_cache.entry(hash) {
             Occupied(e) => match e.get() {
                 Deserialized(compiled_script) => compiled_script.clone(),
                 Verified(script) => script.script.clone(),
@@ -157,12 +157,12 @@ impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
 
     fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         use hash_map::Entry::*;
-        use ScriptStorageEntry::*;
+        use ScriptCacheEntry::*;
 
         let hash = compute_code_hash(serialized_script);
-        let mut storage = self.script_storage.borrow_mut();
+        let mut script_cache = self.script_cache.borrow_mut();
 
-        Ok(match storage.entry(hash) {
+        Ok(match script_cache.entry(hash) {
             Occupied(mut e) => match e.get() {
                 Deserialized(compiled_script) => {
                     let script = self.verify_deserialized_script(compiled_script.clone())?;
@@ -183,19 +183,19 @@ impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
 
 #[cfg(test)]
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
-    fn matches<P: Fn(&ScriptStorageEntry) -> bool>(
+    fn matches<P: Fn(&ScriptCacheEntry) -> bool>(
         &self,
         script_hashes: impl IntoIterator<Item = [u8; 32]>,
         predicate: P,
     ) -> bool {
-        let script_storage = self.script_storage.borrow();
-        let script_hashes_in_storage = script_storage
+        let script_cache = self.script_cache.borrow();
+        let script_hashes_in_cache = script_cache
             .iter()
             .filter_map(|(hash, entry)| predicate(entry).then_some(*hash))
             .collect::<BTreeSet<_>>();
         let script_hashes = script_hashes.into_iter().collect::<BTreeSet<_>>();
-        script_hashes.is_subset(&script_hashes_in_storage)
-            && script_hashes_in_storage.is_subset(&script_hashes)
+        script_hashes.is_subset(&script_hashes_in_cache)
+            && script_hashes_in_cache.is_subset(&script_hashes)
     }
 }
 
@@ -203,7 +203,7 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
 mod test {
     use super::*;
     use crate::storage::implementations::unsync_module_storage::{
-        test::add_module_bytes, ModuleStorageEntry,
+        test::add_module_bytes, ModuleCacheEntry,
     };
     use claims::assert_ok;
     use move_binary_format::{
@@ -222,7 +222,7 @@ mod test {
 
     #[test]
     fn test_deserialized_script_fetching() {
-        use ScriptStorageEntry::*;
+        use ScriptCacheEntry::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
@@ -250,8 +250,8 @@ mod test {
 
     #[test]
     fn test_verified_script_fetching() {
-        use ModuleStorageEntry as M;
-        use ScriptStorageEntry as S;
+        use ModuleCacheEntry as M;
+        use ScriptCacheEntry as S;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);

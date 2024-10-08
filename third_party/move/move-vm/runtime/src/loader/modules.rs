@@ -316,7 +316,7 @@ impl Module {
                     module: module_id,
                     name: struct_name.to_owned(),
                 };
-                struct_idxs.push(struct_name_index_map.struct_name_to_idx(struct_name.clone()));
+                struct_idxs.push(struct_name_index_map.struct_name_to_idx(struct_name.clone())?);
                 struct_names.push(struct_name)
             }
 

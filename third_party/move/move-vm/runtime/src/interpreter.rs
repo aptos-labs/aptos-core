@@ -841,7 +841,7 @@ impl Interpreter {
             Loader::V1(loader) => &loader.name_cache,
             Loader::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
         };
-        let struct_name = struct_name_index_map.idx_to_struct_name(struct_idx);
+        let struct_name = struct_name_index_map.idx_to_struct_name(struct_idx)?;
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }
