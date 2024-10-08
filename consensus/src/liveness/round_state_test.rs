@@ -11,6 +11,7 @@ use crate::{
 use aptos_consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
+    round_timeout::RoundTimeoutReason,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_data::VoteData,
@@ -20,6 +21,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};
@@ -40,10 +42,11 @@ fn test_round_time_interval() {
 #[tokio::test]
 /// Verify that RoundState properly outputs local timeout events upon timeout
 async fn test_basic_timeout() {
+    let (_, verifier) = random_validator_verifier(1, None, false);
     let (mut pm, mut timeout_rx) = make_round_state();
 
     // jump start the round_state
-    pm.process_certificates(generate_sync_info(Some(0), None, None));
+    pm.process_certificates(generate_sync_info(Some(0), None, None), &verifier);
     for _ in 0..2 {
         let round = timeout_rx.next().await.unwrap();
         // Here we just test timeout send retry,
@@ -55,30 +58,31 @@ async fn test_basic_timeout() {
 
 #[test]
 fn test_round_event_generation() {
+    let (_, verifier) = random_validator_verifier(1, None, false);
     let (mut pm, _) = make_round_state();
     // Happy path with new QC
     expect_qc(
         2,
-        pm.process_certificates(generate_sync_info(Some(1), None, None)),
+        pm.process_certificates(generate_sync_info(Some(1), None, None), &verifier),
     );
     // Old QC does not generate anything
     assert!(pm
-        .process_certificates(generate_sync_info(Some(1), None, None))
+        .process_certificates(generate_sync_info(Some(1), None, None), &verifier)
         .is_none());
     // A TC for a higher round
     expect_timeout(
         3,
-        pm.process_certificates(generate_sync_info(None, Some(2), None)),
+        pm.process_certificates(generate_sync_info(None, Some(2), None), &verifier),
     );
     // In case both QC and TC are present choose the one with the higher value
     expect_timeout(
         4,
-        pm.process_certificates(generate_sync_info(Some(2), Some(3), None)),
+        pm.process_certificates(generate_sync_info(Some(2), Some(3), None), &verifier),
     );
     // In case both QC and TC are present with the same value, choose QC
     expect_qc(
         5,
-        pm.process_certificates(generate_sync_info(Some(4), Some(4), None)),
+        pm.process_certificates(generate_sync_info(Some(4), Some(4), None), &verifier),
     );
 }
 
@@ -101,7 +105,10 @@ fn expect_qc(round: Round, event: Option<NewRoundEvent>) {
 fn expect_timeout(round: Round, event: Option<NewRoundEvent>) {
     let event = event.unwrap();
     assert_eq!(round, event.round);
-    assert_eq!(event.reason, NewRoundReason::Timeout);
+    assert_eq!(
+        event.reason,
+        NewRoundReason::Timeout(RoundTimeoutReason::Unknown)
+    );
 }
 
 fn generate_sync_info(

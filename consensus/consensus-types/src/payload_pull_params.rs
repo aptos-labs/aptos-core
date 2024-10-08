@@ -34,7 +34,6 @@ impl std::fmt::Debug for OptQSPayloadPullParams {
 }
 
 impl PayloadPullParameters {
-    #[cfg(test)]
     pub fn new_for_test(
         max_poll_time: Duration,
         max_txns: u64,

@@ -76,14 +76,14 @@ pub(super) struct TwoChainTimeoutVotes {
 }
 
 impl TwoChainTimeoutVotes {
-    fn new(timeout: TwoChainTimeout) -> Self {
+    pub(super) fn new(timeout: TwoChainTimeout) -> Self {
         Self {
             partial_2chain_tc: TwoChainTimeoutWithPartialSignatures::new(timeout.clone()),
             timeout_reason: HashMap::new(),
         }
     }
 
-    fn add(
+    pub(super) fn add(
         &mut self,
         author: Author,
         timeout: TwoChainTimeout,

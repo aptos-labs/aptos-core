@@ -113,9 +113,11 @@ impl PayloadClient for MixedPayloadClient {
 mod tests {
     use crate::payload_client::{
         mixed::MixedPayloadClient, user, validator::DummyValidatorTxnClient, PayloadClient,
-        PayloadPullParameters,
     };
-    use aptos_consensus_types::common::{Payload, PayloadFilter};
+    use aptos_consensus_types::{
+        common::{Payload, PayloadFilter},
+        payload_pull_params::PayloadPullParameters,
+    };
     use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
     use aptos_validator_transaction_pool as vtxn_pool;
     use std::{collections::HashSet, sync::Arc, time::Duration};

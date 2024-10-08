@@ -9,9 +9,10 @@ use crate::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
         },
+        proposal_status_tracker::{TOptQSPullParamsProvider, TPastProposalStatusTracker},
         proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
-        round_state::{ExponentialTimeInterval, RoundState},
+        round_state::{ExponentialTimeInterval, NewRoundReason, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
@@ -40,6 +41,7 @@ use aptos_consensus_types::{
     },
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
     common::{Author, Payload, Round},
+    payload_pull_params::OptQSPayloadPullParams,
     pipeline::commit_decision::CommitDecision,
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
@@ -98,6 +100,20 @@ use tokio::{
     task::JoinHandle,
     time::timeout,
 };
+
+struct MockOptQSPayloadProvider {}
+
+impl TOptQSPullParamsProvider for MockOptQSPayloadProvider {
+    fn get_params(&self) -> Option<OptQSPayloadPullParams> {
+        None
+    }
+}
+
+struct MockPastProposalStatusTracker {}
+
+impl TPastProposalStatusTracker for MockPastProposalStatusTracker {
+    fn push(&self, _status: NewRoundReason) {}
+}
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
@@ -305,6 +321,7 @@ impl NodeSetup {
             false,
             onchain_consensus_config.effective_validator_txn_config(),
             true,
+            Arc::new(MockOptQSPayloadProvider {}),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -332,6 +349,7 @@ impl NodeSetup {
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
             None,
+            Arc::new(MockPastProposalStatusTracker {}),
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -995,13 +1013,14 @@ fn sync_info_carried_on_timeout_vote() {
             .insert_single_quorum_cert(block_0_quorum_cert.clone())
             .unwrap();
 
-        node.round_manager
-            .round_state
-            .process_certificates(SyncInfo::new(
+        node.round_manager.round_state.process_certificates(
+            SyncInfo::new(
                 block_0_quorum_cert.clone(),
                 block_0_quorum_cert.into_wrapped_ledger_info(),
                 None,
-            ));
+            ),
+            &generate_validator_verifier(&[node.signer.clone()]),
+        );
         node.round_manager
             .process_local_timeout(2)
             .await
