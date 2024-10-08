@@ -8,17 +8,11 @@ spec supra_framework::supra_config {
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Requirement: Only aptos framework account is allowed to update the supra protocol configuration.
-    /// Criticality: Medium
-    /// Implementation: The supra_config::set function ensures that the signer is supra_framework.
-    /// Enforcement: Formally verified via [high-level-req-2](set).
-    ///
-    /// No.: 3
     /// Requirement: Only a valid configuration can be used during initialization and update.
     /// Criticality: Medium
     /// Implementation: Both the initialize and set functions validate the config by ensuring its length to be greater
     /// than 0.
-    /// Enforcement: Formally verified via [high-level-req-3.1](initialize) and [high-level-req-3.2](set).
+    /// Enforcement: Formally verified via [high-level-req-2](initialize).
     /// </high-level-req>
     ///
     spec module {
@@ -36,7 +30,7 @@ spec supra_framework::supra_config {
         /// [high-level-req-1]
         aborts_if !system_addresses::is_supra_framework_address(addr);
         aborts_if exists<SupraConfig>(@supra_framework);
-        /// [high-level-req-3.1]
+        /// [high-level-req-2]
         aborts_if !(len(config) > 0);
         ensures global<SupraConfig>(addr) == SupraConfig { config };
     }

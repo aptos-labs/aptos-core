@@ -187,18 +187,10 @@ Only used in reconfigurations to apply the pending <code><a href="supra_config.m
 
 <tr>
 <td>2</td>
-<td>Only aptos framework account is allowed to update the supra protocol configuration.</td>
-<td>Medium</td>
-<td>The supra_config::set function ensures that the signer is supra_framework.</td>
-<td>Formally verified via <a href="#high-level-req-2">set</a>.</td>
-</tr>
-
-<tr>
-<td>3</td>
 <td>Only a valid configuration can be used during initialization and update.</td>
 <td>Medium</td>
 <td>Both the initialize and set functions validate the config by ensuring its length to be greater than 0.</td>
-<td>Formally verified via <a href="#high-level-req-3.1">initialize</a> and <a href="#high-level-req-3.2">set</a>.</td>
+<td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
 </tr>
 
 </table>
@@ -235,7 +227,7 @@ Aborts if StateStorageUsage already exists.
 // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a>&gt;(@supra_framework);
-// This enforces <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> !(len(config) &gt; 0);
 <b>ensures</b> <b>global</b>&lt;<a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a>&gt;(addr) == <a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a> { config };
 </code></pre>

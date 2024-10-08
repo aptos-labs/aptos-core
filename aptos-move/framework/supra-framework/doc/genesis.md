@@ -963,6 +963,8 @@ timeout_duration:u64, balance:u64, num_of_accounts: u32): <a href="../../aptos-s
 
 ## Function `create_initialize_validators_with_commission`
 
+DEPRECATED
+
 
 
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, use_staking_contract: bool, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>&gt;)
@@ -983,10 +985,6 @@ timeout_duration:u64, balance:u64, num_of_accounts: u32): <a href="../../aptos-s
         <b>let</b> validator: &<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a> = validator;
         <a href="genesis.md#0x1_genesis_create_initialize_validator">create_initialize_validator</a>(supra_framework, validator, use_staking_contract);
     });
-
-    // Destroy the aptos framework <a href="account.md#0x1_account">account</a>'s ability <b>to</b> mint coins now that we're done <b>with</b> setting up the initial
-    // validators.
-    <a href="supra_coin.md#0x1_supra_coin_destroy_mint_cap">supra_coin::destroy_mint_cap</a>(supra_framework);
 }
 </code></pre>
 
@@ -997,6 +995,8 @@ timeout_duration:u64, balance:u64, num_of_accounts: u32): <a href="../../aptos-s
 <a id="0x1_genesis_create_initialize_validators"></a>
 
 ## Function `create_initialize_validators`
+
+DEPRECATED
 
 Sets up the initial validator set for the network.
 The validator "owner" accounts, and their authentication
@@ -1372,6 +1372,10 @@ The last step of genesis.
 
 
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    // Destroy the mint <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> owned by the framework <a href="account.md#0x1_account">account</a>. The <a href="stake.md#0x1_stake">stake</a> and <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a>
+    // modules should be the only holders of this <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>, which they will <b>use</b> <b>to</b>
+    // mint <a href="block.md#0x1_block">block</a> rewards and storage refunds, respectively.
+    <a href="supra_coin.md#0x1_supra_coin_destroy_mint_cap">supra_coin::destroy_mint_cap</a>(supra_framework);
     <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
     <a href="chain_status.md#0x1_chain_status_set_genesis_end">chain_status::set_genesis_end</a>(supra_framework);
 }
