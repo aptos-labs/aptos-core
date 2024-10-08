@@ -5,4 +5,4 @@ mod sync;
 mod unsync;
 
 pub use sync::SyncCodeCache;
-pub(crate) use unsync::UnsyncCodeCache;
+pub use unsync::UnsyncCodeCache;
