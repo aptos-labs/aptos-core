@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm::{
-    modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
-    scripts::ScriptCacheEntry,
-};
+use aptos_types::vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry};
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
+use hashbrown::HashMap;
 use move_binary_format::errors::VMResult;
 use move_core_types::language_storage::ModuleId;
 use std::sync::Arc;
@@ -53,7 +51,7 @@ impl SyncCodeCache {
 ///      transaction to override published module because it must have been committed and finished
 ///      the execution before the other transaction can be scheduled for the commit.
 pub struct ModuleCache {
-    cache: DashMap<ModuleId, Arc<ModuleStorageEntry>>,
+    cache: DashMap<ModuleId, Arc<ModuleCacheEntry>>,
 }
 
 impl ModuleCache {
@@ -70,7 +68,7 @@ impl ModuleCache {
     }
 
     /// Stores the module to the code cache.
-    pub fn cache_module(&self, module_id: ModuleId, entry: Arc<ModuleStorageEntry>) {
+    pub fn cache_module(&self, module_id: ModuleId, entry: Arc<ModuleCacheEntry>) {
         self.cache.insert(module_id, entry);
     }
 
@@ -92,9 +90,9 @@ impl ModuleCache {
         &self,
         module_id: &ModuleId,
         init_func: F,
-    ) -> VMResult<Option<Arc<ModuleStorageEntry>>>
+    ) -> VMResult<Option<Arc<ModuleCacheEntry>>>
     where
-        F: Fn() -> VMResult<Option<Arc<ModuleStorageEntry>>>,
+        F: Fn() -> VMResult<Option<Arc<ModuleCacheEntry>>>,
     {
         if let Some(entry) = self.cache.get(module_id) {
             return Ok(Some(entry.clone()));
@@ -116,6 +114,17 @@ impl ModuleCache {
                 }
                 Ok(maybe_entry)
             },
+        }
+    }
+
+    /// Collects the verified modules that were published and loaded during this block. Should only
+    /// be called at the block end.
+    pub fn collect_verified_entries_into<F, V>(&self, collector: &mut HashMap<ModuleId, V>, f: F)
+    where
+        F: Fn(&ModuleCacheEntry) -> V,
+    {
+        for r in self.cache.iter().filter(|r| r.value().is_verified()) {
+            collector.insert(r.key().clone(), f(r.value().as_ref()));
         }
     }
 }

@@ -2,29 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{
-        FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS, GET_MODULE_STATE_VALUE_SECONDS,
-        READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS,
-    },
-    cross_block_caches::{
-        check_module_exists_in_cross_block_framework_cache,
-        fetch_deserialized_module_from_cross_block_framework_cache,
-        fetch_module_bytes_from_cross_block_framework_cache,
-        fetch_module_metadata_from_cross_block_framework_cache,
-        fetch_module_size_in_bytes_from_cross_block_framework_cache,
-        fetch_module_state_value_metadata_from_cross_block_framework_cache,
-        fetch_verified_module_from_cross_block_framework_cache,
-    },
+    counters::FETCH_NOT_CACHED_VERIFIED_MODULE_SECONDS,
+    cross_block_caches::CrossBlockModuleCache,
     view::{LatestView, ViewState},
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::{
-        modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
-        scripts::ScriptCacheEntry,
-    },
+    vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
 };
 use aptos_vm_types::module_and_script_storage::{
     code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
@@ -60,7 +46,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         if let Some(state_value_metadata) =
-            fetch_module_state_value_metadata_from_cross_block_framework_cache(address, module_name)
+            CrossBlockModuleCache::fetch_module_state_value_metadata(address, module_name)
         {
             return Ok(Some(state_value_metadata));
         }
@@ -161,7 +147,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
-        if check_module_exists_in_cross_block_framework_cache(address, module_name) {
+        if CrossBlockModuleCache::check_module_exists(address, module_name) {
             return Ok(true);
         }
 
@@ -173,9 +159,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        if let Some(bytes) =
-            fetch_module_bytes_from_cross_block_framework_cache(address, module_name)
-        {
+        if let Some(bytes) = CrossBlockModuleCache::fetch_module_bytes(address, module_name) {
             return Ok(Some(bytes));
         }
 
@@ -189,8 +173,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
-        if let Some(size) =
-            fetch_module_size_in_bytes_from_cross_block_framework_cache(address, module_name)
+        if let Some(size) = CrossBlockModuleCache::fetch_module_size_in_bytes(address, module_name)
         {
             return Ok(Some(size));
         }
@@ -205,9 +188,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
-        if let Some(metadata) =
-            fetch_module_metadata_from_cross_block_framework_cache(address, module_name)
-        {
+        if let Some(metadata) = CrossBlockModuleCache::fetch_module_metadata(address, module_name) {
             return Ok(Some(metadata));
         }
 
@@ -222,7 +203,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
         if let Some(compiled_module) =
-            fetch_deserialized_module_from_cross_block_framework_cache(address, module_name)
+            CrossBlockModuleCache::fetch_deserialized_module(address, module_name)
         {
             return Ok(Some(compiled_module));
         }
@@ -237,13 +218,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
-        if let Some(module) =
-            fetch_verified_module_from_cross_block_framework_cache(address, module_name)
-        {
+        if let Some(module) = CrossBlockModuleCache::fetch_verified_module(address, module_name) {
             return Ok(Some(module));
         }
 
-        let _timer = FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS.start_timer();
+        let _timer = FETCH_NOT_CACHED_VERIFIED_MODULE_SECONDS.start_timer();
 
         let entry = match self.read_module_storage(address, module_name)? {
             Some(entry) => entry,
@@ -274,13 +253,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_base_module_storage_entry(
         &self,
         key: &T::Key,
-    ) -> VMResult<Option<Arc<ModuleStorageEntry>>> {
-        let _timer = GET_MODULE_STATE_VALUE_SECONDS.start_timer();
+    ) -> VMResult<Option<Arc<ModuleCacheEntry>>> {
         self.get_raw_base_value(key)
             .map_err(|e| e.finish(Location::Undefined))?
-            .map(|s| {
-                ModuleStorageEntry::from_state_value(self.runtime_environment, s).map(Arc::new)
-            })
+            .map(|s| ModuleCacheEntry::from_state_value(self.runtime_environment, s).map(Arc::new))
             .transpose()
     }
 
@@ -290,9 +266,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<ModuleStorageEntry>>> {
-        let _timer = READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS.start_timer();
-
+    ) -> VMResult<Option<Arc<ModuleCacheEntry>>> {
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // If the module read has been previously cached, return early.
@@ -351,7 +325,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Arc<ModuleStorageEntry>> {
+    ) -> VMResult<Arc<ModuleCacheEntry>> {
         self.read_module_storage(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
@@ -361,7 +335,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     /// the verified dependencies are made visible in the module storage.
     fn traversed_published_dependencies(
         &self,
-        entry: Arc<ModuleStorageEntry>,
+        entry: Arc<ModuleCacheEntry>,
         address: &AccountAddress,
         module_name: &IdentStr,
         visited: &mut HashSet<ModuleId>,
