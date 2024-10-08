@@ -1165,14 +1165,11 @@ fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<
 fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
+        workloads: Workloads::TPS(vec![10, 5000, 10000]),
         criteria: [
             (9, 0.9, 0.9, 1.2, 0),
-            (95, 0.9, 1.0, 1.2, 0),
-            (950, 1.2, 1.3, 2.0, 0),
-            (2900, 1.4, 2.2, 2.5, 0),
             (4800, 2.0, 2.5, 3.0, 0),
-            (6700, 2.5, 3.5, 5.0, 0),
+            (9000, 5.0, 7.0, 9.0, 0),
             // TODO add 9k or 10k. Allow some expired transactions (high-load)
         ]
         .into_iter()
