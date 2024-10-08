@@ -14,6 +14,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::nonce_validation;
+    use aptos_framework::transaction_context;
     friend aptos_framework::genesis;
 
     /// This holds information that will be picked up by the VM to call the
@@ -121,7 +122,8 @@ module aptos_framework::transaction_validation {
             //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
             // );
 
-            assert!(!nonce_validation::nonce_exists(transaction_sender, txn_sequence_number, txn_expiration_time),
+            let transaction_hash = transaction_context::get_txn_hash();
+            assert!(!nonce_validation::nonce_exists(transaction_hash, txn_expiration_time),
                 error::invalid_argument(PROLOGUE_NONCE_ALREADY_EXISTS));
             
             nonce_validation::insert_nonce(transaction_sender, txn_sequence_number, txn_expiration_time);

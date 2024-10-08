@@ -7,14 +7,13 @@ module aptos_framework::nonce_validation {
     friend aptos_framework::transaction_validation;
 
     struct NonceKey has copy, drop, store {
-        sender_address: address,
-        nonce: u64,
+        txn_hash: vector<u8>,
         txn_expiration_time: u64,
     }
 
     struct NonceHistory has key {
         // Key = hash(sender address, nonce, txn expiration), value = (vector of nonces).
-        table_1: Table<u64, vector<NonceKey>>,
+        table_1: Table<u64, BigOrderedMap<NonceKey>>,
         // table_2: SmartTable<NonceKey, bool>,
         // Either 1 or 2
         current_table: u64,
