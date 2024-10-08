@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm::{modules::ModuleStorageEntry, scripts::ScriptCacheEntry};
+use aptos_types::vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry};
 use hashbrown::HashMap;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
@@ -15,7 +15,7 @@ pub struct UnsyncCodeCache {
     /// Script cache, indexed by script hashes.
     script_cache: RefCell<HashMap<[u8; 32], ScriptCacheEntry>>,
     /// Module cache, indexed by module address-name pair.
-    module_cache: RefCell<HashMap<ModuleId, Arc<ModuleStorageEntry>>>,
+    module_cache: RefCell<HashMap<ModuleId, Arc<ModuleCacheEntry>>>,
 }
 
 impl UnsyncCodeCache {
@@ -33,7 +33,7 @@ impl UnsyncCodeCache {
     }
 
     /// Stores the module to the code cache.
-    pub fn cache_module(&self, module_id: ModuleId, entry: Arc<ModuleStorageEntry>) {
+    pub fn cache_module(&self, module_id: ModuleId, entry: Arc<ModuleCacheEntry>) {
         self.module_cache.borrow_mut().insert(module_id, entry);
     }
 
@@ -42,7 +42,7 @@ impl UnsyncCodeCache {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> Option<Arc<ModuleStorageEntry>> {
+    ) -> Option<Arc<ModuleCacheEntry>> {
         self.module_cache
             .borrow()
             .get(&(address, module_name))

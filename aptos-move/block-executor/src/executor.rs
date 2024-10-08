@@ -8,7 +8,7 @@ use crate::{
         PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
-    cross_block_caches::flush_cross_block_framework_cache,
+    cross_block_caches::CrossBlockModuleCache,
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
@@ -45,7 +45,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
-    vm::modules::ModuleStorageEntry,
+    vm::modules::ModuleCacheEntry,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -707,23 +707,15 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
-        let mut writes_to_special_address = false;
         for (_, write) in module_write_set {
-            if write.module_address().is_special() {
-                writes_to_special_address = true;
-            }
-
             let (id, write_op) = write.unpack();
-            let entry = ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
+            let entry = ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
+
+            CrossBlockModuleCache::mark_invalid(&id);
             versioned_cache
                 .code_cache()
                 .module_cache()
                 .cache_module(id, Arc::new(entry));
-        }
-
-        // In case framework got upgraded, this should detect it and flush the cache.
-        if writes_to_special_address {
-            flush_cross_block_framework_cache();
         }
         Ok(())
     }
@@ -1108,6 +1100,7 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
+        CrossBlockModuleCache::populate_cache_at_block_end(versioned_cache.code_cache());
 
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1151,14 +1144,11 @@ where
 
         for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
-                // In case the framework gets upgraded, we need to flush the cache.
-                if write.module_address().is_special() {
-                    flush_cross_block_framework_cache();
-                }
-
                 let (id, write_op) = write.unpack();
                 let entry =
-                    ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
+                    ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
+
+                CrossBlockModuleCache::mark_invalid(&id);
                 unsync_map.code_cache().cache_module(id, Arc::new(entry));
             } else {
                 #[allow(deprecated)]

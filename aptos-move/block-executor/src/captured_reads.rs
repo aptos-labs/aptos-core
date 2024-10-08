@@ -25,7 +25,7 @@ use aptos_types::{
     executable::ModulePath,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
+    vm::modules::ModuleCacheEntry,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -312,7 +312,7 @@ pub(crate) struct CapturedReads<T: Transaction> {
     #[deprecated]
     pub(crate) module_reads: Vec<T::Key>,
     /// Captured read modules if V2 loader is used.
-    module_cache_reads: hashbrown::HashMap<ModuleId, Option<Arc<ModuleStorageEntry>>>,
+    module_cache_reads: hashbrown::HashMap<ModuleId, Option<Arc<ModuleCacheEntry>>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -491,7 +491,7 @@ impl<T: Transaction> CapturedReads<T> {
         &self,
         address: &AccountAddress,
         module_id: &IdentStr,
-    ) -> Option<&Option<Arc<ModuleStorageEntry>>> {
+    ) -> Option<&Option<Arc<ModuleCacheEntry>>> {
         self.module_cache_reads.get(&(address, module_id))
     }
 
@@ -499,7 +499,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_module_read(
         &mut self,
         module_id: ModuleId,
-        read: Option<Arc<ModuleStorageEntry>>,
+        read: Option<Arc<ModuleCacheEntry>>,
     ) {
         self.module_cache_reads.insert(module_id, read);
     }
