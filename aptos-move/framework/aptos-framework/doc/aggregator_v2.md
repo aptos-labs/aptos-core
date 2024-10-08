@@ -739,7 +739,7 @@ Useful for when object is sometimes created via string_concat(), and sometimes d
 Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
 snapshot passed needs to have integer type - currently supported types are u64 and u128.
 Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
-If length of prefix and suffix together exceed 1024 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+If length of prefix and suffix together exceeds 1024 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 Parallelism info: This operation enables parallelism.
 

@@ -20,7 +20,10 @@ use move_model::{
     model::VerificationScope,
     options::ModelBuilderOptions,
 };
-use move_prover_boogie_backend::options::{BoogieOptions, CustomNativeOptions, VectorTheory};
+use move_prover_boogie_backend::{
+    options,
+    options::{BoogieOptions, CustomNativeOptions, VectorTheory},
+};
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -808,18 +811,7 @@ impl Options {
                     "../../../../aptos-move/framework/src/aptos-natives.bpl"
                 )
                 .to_vec(),
-                module_instance_names: vec![
-                    (
-                        "0x1::object".to_string(),
-                        "object_instances".to_string(),
-                        true,
-                    ),
-                    (
-                        "0x1::aggregator_v2".to_string(),
-                        "aggregator_v2_instances".to_string(),
-                        true,
-                    ),
-                ],
+                module_instance_names: options::custom_native_options(),
             });
             options
                 .move_named_address_values

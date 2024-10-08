@@ -102,5 +102,4 @@ spec aptos_framework::aggregator_v2 {
     spec fun spec_read_derived_string(snapshot: DerivedStringSnapshot): String {
         snapshot.value
     }
-
 }

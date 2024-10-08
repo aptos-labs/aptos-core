@@ -64,37 +64,37 @@ procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u128'() retur
 
 {% if S == "u64" or S == "u128"  -%}
 
-procedure {:inline 1} $1_aggregator_v2_create_aggregator'{{S}}'($max_value: int) returns (res: $1_aggregator_v2_Aggregator'{{S}}')
-{
-    res := $1_aggregator_v2_Aggregator'{{S}}'(0, $max_value);
-}
-
-
-procedure {:inline 1} $1_aggregator_v2_try_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
- {
-    if ($Dereference(aggregator)->$max_value < value + $Dereference(aggregator)->$value) {
-        res := false;
-        aggregator_updated:= aggregator;
-    } else {
-        res := true;
-        aggregator_updated:= $UpdateMutation(aggregator, $1_aggregator_v2_Aggregator'{{S}}'(value + $Dereference(aggregator)->$value, $Dereference(aggregator)->$max_value));
+    procedure {:inline 1} $1_aggregator_v2_create_aggregator'{{S}}'($max_value: int) returns (res: $1_aggregator_v2_Aggregator'{{S}}')
+    {
+        res := $1_aggregator_v2_Aggregator'{{S}}'(0, $max_value);
     }
-}
 
-procedure {:inline 1} $1_aggregator_v2_try_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
-{
-    if ($Dereference(aggregator)->$value < value) {
-        res := false;
-        aggregator_updated:= aggregator;
-        return;
-    } else {
-        res := true;
-        aggregator_updated:= $UpdateMutation(aggregator, $1_aggregator_v2_Aggregator'{{S}}'($Dereference(aggregator)->$value - value, $Dereference(aggregator)->$max_value));
-        return;
+
+    procedure {:inline 1} $1_aggregator_v2_try_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+    {
+        if ($Dereference(aggregator)->$max_value < value + $Dereference(aggregator)->$value) {
+            res := false;
+            aggregator_updated:= aggregator;
+        } else {
+            res := true;
+            aggregator_updated:= $UpdateMutation(aggregator, $1_aggregator_v2_Aggregator'{{S}}'(value + $Dereference(aggregator)->$value, $Dereference(aggregator)->$max_value));
+        }
     }
-}
 
-   procedure {:inline 1} $1_aggregator_v2_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+    procedure {:inline 1} $1_aggregator_v2_try_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+    {
+        if ($Dereference(aggregator)->$value < value) {
+            res := false;
+            aggregator_updated:= aggregator;
+            return;
+        } else {
+            res := true;
+            aggregator_updated:= $UpdateMutation(aggregator, $1_aggregator_v2_Aggregator'{{S}}'($Dereference(aggregator)->$value - value, $Dereference(aggregator)->$max_value));
+            return;
+        }
+    }
+
+    procedure {:inline 1} $1_aggregator_v2_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
     {
        var try_result: bool;
        var try_aggregator: $Mutation $1_aggregator_v2_Aggregator'{{S}}';

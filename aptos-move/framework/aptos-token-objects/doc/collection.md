@@ -1847,14 +1847,19 @@ After changing the collection's name, to create tokens - only call functions tha
 <b>let</b> supply = <b>global</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_addr);
 <b>let</b> <b>post</b> supply_post = <b>global</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_addr) &&
-    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.current_supply) + 1 &gt; <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.current_supply);
+    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.current_supply) + 1
+        &gt; <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.current_supply);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_addr) &&
-    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.total_minted) + 1 &gt; <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.total_minted);
+    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.total_minted) + 1
+        &gt; <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.total_minted);
 <b>ensures</b>
-    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.current_supply) == <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply_post.current_supply);
+    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.current_supply)
+        == <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply_post.current_supply);
 <b>ensures</b> <b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_addr) &&
-    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.current_supply) + 1 &lt;= <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.current_supply) ==&gt;
-    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.current_supply) + 1 == <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply_post.current_supply);
+    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.current_supply) + 1
+        &lt;= <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">aggregator_v2::spec_get_max_value</a>(supply.current_supply) ==&gt;
+    <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply.current_supply) + 1
+        == <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_spec_get_value">aggregator_v2::spec_get_value</a>(supply_post.current_supply);
 </code></pre>
 
 

@@ -446,14 +446,19 @@ module aptos_token_objects::collection {
         let supply = global<ConcurrentSupply>(collection_addr);
         let post supply_post = global<ConcurrentSupply>(collection_addr);
         aborts_if exists<ConcurrentSupply>(collection_addr) &&
-            aggregator_v2::spec_get_value(supply.current_supply) + 1 > aggregator_v2::spec_get_max_value(supply.current_supply);
+            aggregator_v2::spec_get_value(supply.current_supply) + 1
+                > aggregator_v2::spec_get_max_value(supply.current_supply);
         aborts_if exists<ConcurrentSupply>(collection_addr) &&
-            aggregator_v2::spec_get_value(supply.total_minted) + 1 > aggregator_v2::spec_get_max_value(supply.total_minted);
+            aggregator_v2::spec_get_value(supply.total_minted) + 1
+                > aggregator_v2::spec_get_max_value(supply.total_minted);
         ensures
-            aggregator_v2::spec_get_max_value(supply.current_supply) == aggregator_v2::spec_get_max_value(supply_post.current_supply);
+            aggregator_v2::spec_get_max_value(supply.current_supply)
+                == aggregator_v2::spec_get_max_value(supply_post.current_supply);
         ensures exists<ConcurrentSupply>(collection_addr) &&
-            aggregator_v2::spec_get_value(supply.current_supply) + 1 <= aggregator_v2::spec_get_max_value(supply.current_supply) ==>
-            aggregator_v2::spec_get_value(supply.current_supply) + 1 == aggregator_v2::spec_get_value(supply_post.current_supply);
+            aggregator_v2::spec_get_value(supply.current_supply) + 1
+                <= aggregator_v2::spec_get_max_value(supply.current_supply) ==>
+            aggregator_v2::spec_get_value(supply.current_supply) + 1
+                == aggregator_v2::spec_get_value(supply_post.current_supply);
     }
 
     /// Called by token on burn to decrement supply if there's an appropriate Supply struct.
