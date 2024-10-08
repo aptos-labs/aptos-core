@@ -307,7 +307,11 @@ impl ConsensusNotificationHandler {
         // Notify consensus of the satisfied request
         match consensus_sync_request {
             Some(ConsensusSyncRequest::SyncDuration(_, sync_duration_notification)) => {
-                self.respond_to_sync_duration_notification(sync_duration_notification, Ok(()))?;
+                self.respond_to_sync_duration_notification(
+                    sync_duration_notification,
+                    Ok(()),
+                    Some(latest_synced_ledger_info),
+                )?;
             },
             Some(ConsensusSyncRequest::SyncTarget(sync_target_notification)) => {
                 // Get the sync target version and latest synced version
@@ -342,9 +346,10 @@ impl ConsensusNotificationHandler {
         &self,
         sync_duration_notification: ConsensusSyncDurationNotification,
         result: Result<(), Error>,
+        latest_synced_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
-        let message = result.map_err(|error| {
+        let result = result.map_err(|error| {
             aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
@@ -352,11 +357,15 @@ impl ConsensusNotificationHandler {
         info!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Responding to consensus sync duration notification with message: {:?}",
-                message
+                result
             ))
         );
         self.consensus_listener
-            .respond_to_sync_duration_notification(sync_duration_notification, message)
+            .respond_to_sync_duration_notification(
+                sync_duration_notification,
+                result,
+                latest_synced_ledger_info,
+            )
             .map_err(|error| {
                 Error::CallbackSendFailed(format!(
                     "Consensus sync duration response error: {:?}",
@@ -372,7 +381,7 @@ impl ConsensusNotificationHandler {
         result: Result<(), Error>,
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
-        let message = result.map_err(|error| {
+        let result = result.map_err(|error| {
             aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
@@ -380,11 +389,11 @@ impl ConsensusNotificationHandler {
         info!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Responding to consensus sync target notification with message: {:?}",
-                message
+                result
             ))
         );
         self.consensus_listener
-            .respond_to_sync_target_notification(sync_target_notification, message)
+            .respond_to_sync_target_notification(sync_target_notification, result)
             .map_err(|error| {
                 Error::CallbackSendFailed(format!(
                     "Consensus sync target response error: {:?}",
@@ -400,7 +409,7 @@ impl ConsensusNotificationHandler {
         result: Result<(), Error>,
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
-        let message = result.map_err(|error| {
+        let result = result.map_err(|error| {
             aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
@@ -408,11 +417,11 @@ impl ConsensusNotificationHandler {
         debug!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Responding to consensus commit notification with message: {:?}",
-                message
+                result
             ))
         );
         self.consensus_listener
-            .respond_to_commit_notification(commit_notification, message)
+            .respond_to_commit_notification(commit_notification, result)
             .map_err(|error| {
                 Error::CallbackSendFailed(format!("Consensus commit response error: {:?}", error))
             })

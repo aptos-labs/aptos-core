@@ -10,7 +10,7 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
-// Useful metric labels
+// Useful observer metric labels
 pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
 pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
@@ -20,6 +20,10 @@ pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
+
+// Useful state sync metric labels
+pub const STATE_SYNCING_FOR_FALLBACK: &str = "state_syncing_for_fallback";
+pub const STATE_SYNCING_TO_COMMIT: &str = "state_syncing_to_commit";
 
 /// Counter for tracking created subscriptions for the consensus observer
 pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -145,6 +149,16 @@ pub static OBSERVER_SENT_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         "consensus_observer_sent_requests",
         "Counters related to sent RPC requests by the consensus observer",
         &["request_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking when consensus observer has invoked state sync
+pub static OBSERVER_STATE_SYNC_EXECUTING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_state_sync_executing",
+        "Gauge for tracking when consensus observer has invoked state sync",
+        &["syncing_mode"]
     )
     .unwrap()
 });
