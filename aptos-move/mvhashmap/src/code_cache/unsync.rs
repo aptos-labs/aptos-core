@@ -58,4 +58,20 @@ impl UnsyncCodeCache {
     pub fn fetch_cached_script(&self, hash: &[u8; 32]) -> Option<ScriptCacheEntry> {
         self.script_cache.borrow().get(hash).cloned()
     }
+
+    /// Collects the verified modules that were published and loaded during this block. Should only
+    /// be called at the block end.
+    pub fn collect_verified_entries_into<F, V>(&self, collector: &mut HashMap<ModuleId, V>, f: F)
+    where
+        F: Fn(&ModuleCacheEntry) -> V,
+    {
+        for (id, entry) in self
+            .module_cache
+            .borrow()
+            .iter()
+            .filter(|(_, e)| e.is_verified())
+        {
+            collector.insert(id.clone(), f(entry));
+        }
+    }
 }

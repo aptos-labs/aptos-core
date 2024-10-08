@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_mvhashmap::code_cache::SyncCodeCache;
+use aptos_mvhashmap::code_cache::{SyncCodeCache, UnsyncCodeCache};
 use aptos_types::{
     state_store::{state_value::StateValueMetadata, StateView},
     vm::modules::ModuleCacheEntry,
@@ -11,18 +11,21 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use bytes::Bytes;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
-use move_binary_format::CompiledModule;
+use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    metadata::Metadata,
+    metadata::Metadata, vm_status::VMStatus,
 };
-use move_vm_runtime::Module;
+use move_vm_runtime::{Module, WithRuntimeEnvironment};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+
+const STRUCT_NAME_INDEX_MAP_SIZE: usize = 100_000;
+const CROSS_BLOCK_MODULE_CACHE_SIZE: usize = 100_000;
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -66,7 +69,7 @@ impl CachedAptosEnvironment {
     /// called at the block boundaries.
     pub fn fetch_with_delayed_field_optimization_enabled(
         state_view: &impl StateView,
-    ) -> AptosEnvironment {
+    ) -> Result<AptosEnvironment, VMStatus> {
         // Create a new environment.
         let env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
         let id = EnvironmentID::new(&env);
@@ -75,7 +78,16 @@ impl CachedAptosEnvironment {
         let mut cross_block_environment = CROSS_BLOCK_ENVIRONMENT.lock();
         if let Some(cached_env) = cross_block_environment.as_ref() {
             if id == cached_env.id {
-                return cached_env.env.clone();
+                let runtime_env = cached_env.env.runtime_environment();
+                let struct_name_index_map_size = runtime_env
+                    .struct_name_index_map_size()
+                    .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                if struct_name_index_map_size > STRUCT_NAME_INDEX_MAP_SIZE {
+                    // Cache is too large, flush it. Also flush module cache.
+                    runtime_env.flush_struct_name_and_info_caches();
+                    CrossBlockModuleCache::flush_at_block_start();
+                }
+                return Ok(cached_env.env.clone());
             }
         }
 
@@ -88,15 +100,19 @@ impl CachedAptosEnvironment {
         drop(cross_block_environment);
         CrossBlockModuleCache::flush_at_block_start();
 
-        env
+        Ok(env)
     }
 }
 
 static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<CachedAptosEnvironment>>> =
     Lazy::new(|| Mutex::new(None));
 
+/// An entry into immutable cross-block module cache.
 struct CrossBlockModuleCacheEntry {
+    /// True if this entry is valid within the block execution context. If not, executor needs to
+    /// read the module information from the state instead. Used when modules are published.
     valid: CachePadded<AtomicBool>,
+    /// Cached verified module entry.
     verified_entry: ModuleCacheEntry,
 }
 
@@ -160,21 +176,22 @@ impl CrossBlockModuleCacheEntry {
     }
 }
 
-const CROSS_BLOCK_MODULE_CACHE_SIZE: usize = 100_000;
-
-/// Represents an immutable cross-block cache.
+/// Represents an immutable cross-block cache. The size of the cache is fixed (entries cannot be
+/// added or removed) within a single block, so it is only mutated at block boundaries. At the
+/// same time, entries in this cache can be marked as "invalid" so that block executor can decide
+/// on whether to read the module from cache or from the storage.
 pub(crate) struct CrossBlockModuleCache;
 
 impl CrossBlockModuleCache {
     /// Flushes the module cache. Should only be called at the start of the block.
-    fn flush_at_block_start() {
+    pub(crate) fn flush_at_block_start() {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         cache.clear();
     }
 
     /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
     /// cache if its size is too large. Should only be called at block end.
-    pub(crate) fn populate_cache_at_block_end(code_cache: &SyncCodeCache) {
+    pub(crate) fn populate_from_sync_code_cache_at_block_end(code_cache: &SyncCodeCache) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         if cache.len() > CROSS_BLOCK_MODULE_CACHE_SIZE {
             cache.clear();
@@ -185,6 +202,19 @@ impl CrossBlockModuleCache {
             .collect_verified_entries_into(cache.dereference_mut(), |e| {
                 CrossBlockModuleCacheEntry::new(e.clone())
             });
+    }
+
+    /// Same as [Self::populate_from_sync_code_cache_at_block_end], but only used by sequential
+    /// execution.
+    pub(crate) fn populate_from_unsync_code_cache_at_block_end(code_cache: &UnsyncCodeCache) {
+        let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
+        if cache.len() > CROSS_BLOCK_MODULE_CACHE_SIZE {
+            cache.clear();
+        }
+
+        code_cache.collect_verified_entries_into(cache.dereference_mut(), |e| {
+            CrossBlockModuleCacheEntry::new(e.clone())
+        });
     }
 
     /// Marks the cached entry (if it exists) as invalid. As a result, all subsequent calls to the
