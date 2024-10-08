@@ -4,6 +4,10 @@ spec aptos_framework::aggregator_v2 {
         pragma intrinsic;
     }
 
+    spec max_value<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>): IntElement {
+        pragma intrinsic;
+    }
+
     spec create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement> {
         pragma intrinsic;
     }

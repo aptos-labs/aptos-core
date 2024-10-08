@@ -45,33 +45,43 @@ function {:inline} $IsEqual'$1_aggregator_v2_Aggregator'{{S}}''(s1: $1_aggregato
       && $IsEqual'{{S}}'(s1->$max_value, s2->$max_value)
 }
 
-{% if S == "u64" -%}
-
-procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u64'() returns (res: $1_aggregator_v2_Aggregator'u64')
+procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'{{S}}'() returns (res: $1_aggregator_v2_Aggregator'{{S}}')
 {
-   res := $1_aggregator_v2_Aggregator'{{S}}'(0, $MAX_U64);
+    {% if S == "u64" -%}
+    res := $1_aggregator_v2_Aggregator'{{S}}'(0, $MAX_U64);
+    {% elif S == "u128" -%}
+    res := $1_aggregator_v2_Aggregator'{{S}}'(0, $MAX_U128);
+    {% elif "#" in S -%}
+    if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
+        call $ExecFailureAbort();
+        return;
+    }
+    {% else -%}
+        call $ExecFailureAbort();
+        return;
+    {% endif -%}
 }
 
-{% elif S == "u128" -%}
 
-procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u128'() returns (res: $1_aggregator_v2_Aggregator'u128')
-{
-   res := $1_aggregator_v2_Aggregator'{{S}}'(0, $MAX_U128);
-}
-
-{% endif -%}
-
-
-{% if S == "u64" or S == "u128"  -%}
-
-    procedure {:inline 1} $1_aggregator_v2_create_aggregator'{{S}}'($max_value: int) returns (res: $1_aggregator_v2_Aggregator'{{S}}')
+    procedure {:inline 1} $1_aggregator_v2_create_aggregator'{{S}}'($max_value: {{T}}) returns (res: $1_aggregator_v2_Aggregator'{{S}}')
     {
+        {% if S == "u64" or S == "u128"  -%}
         res := $1_aggregator_v2_Aggregator'{{S}}'(0, $max_value);
+        {% elif "#" in S -%}
+        if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
+            call $ExecFailureAbort();
+            return;
+        }
+        {% else -%}
+        call $ExecFailureAbort();
+        return;
+        {% endif -%}
     }
 
 
-    procedure {:inline 1} $1_aggregator_v2_try_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+    procedure {:inline 1} $1_aggregator_v2_try_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
     {
+        {% if S == "u64" or S == "u128"  -%}
         if ($Dereference(aggregator)->$max_value < value + $Dereference(aggregator)->$value) {
             res := false;
             aggregator_updated:= aggregator;
@@ -79,10 +89,20 @@ procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u128'() retur
             res := true;
             aggregator_updated:= $UpdateMutation(aggregator, $1_aggregator_v2_Aggregator'{{S}}'(value + $Dereference(aggregator)->$value, $Dereference(aggregator)->$max_value));
         }
+        {% elif "#" in S -%}
+              if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
+                  call $ExecFailureAbort();
+                  return;
+              }
+        {% else -%}
+            call $ExecFailureAbort();
+            return;
+        {% endif -%}
     }
 
-    procedure {:inline 1} $1_aggregator_v2_try_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+    procedure {:inline 1} $1_aggregator_v2_try_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
     {
+        {% if S == "u64" or S == "u128"  -%}
         if ($Dereference(aggregator)->$value < value) {
             res := false;
             aggregator_updated:= aggregator;
@@ -92,10 +112,20 @@ procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u128'() retur
             aggregator_updated:= $UpdateMutation(aggregator, $1_aggregator_v2_Aggregator'{{S}}'($Dereference(aggregator)->$value - value, $Dereference(aggregator)->$max_value));
             return;
         }
+        {% elif "#" in S -%}
+         if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
+             call $ExecFailureAbort();
+             return;
+         }
+        {% else -%}
+            call $ExecFailureAbort();
+            return;
+        {% endif -%}
     }
 
-    procedure {:inline 1} $1_aggregator_v2_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+    procedure {:inline 1} $1_aggregator_v2_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
     {
+       {% if S == "u64" or S == "u128"  -%}
        var try_result: bool;
        var try_aggregator: $Mutation $1_aggregator_v2_Aggregator'{{S}}';
        call try_result, try_aggregator := $1_aggregator_v2_try_add'{{S}}'(aggregator, value);
@@ -105,10 +135,20 @@ procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u128'() retur
        }
        aggregator_updated := try_aggregator;
        return;
+       {% elif "#" in S -%}
+          var try_result: bool;
+          var try_aggregator: $Mutation $1_aggregator_v2_Aggregator'{{S}}';
+          call try_result, try_aggregator := $1_aggregator_v2_try_add'{{S}}'(aggregator, value);
+          return;
+       {% else -%}
+        call $ExecFailureAbort();
+        return;
+       {% endif -%}
    }
 
-   procedure {:inline 1} $1_aggregator_v2_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: int) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
+   procedure {:inline 1} $1_aggregator_v2_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'))
    {
+       {% if S == "u64" or S == "u128"  -%}
           var try_result: bool;
           var try_aggregator: $Mutation $1_aggregator_v2_Aggregator'{{S}}';
           call try_result, try_aggregator := $1_aggregator_v2_try_sub'{{S}}'(aggregator, value);
@@ -118,131 +158,60 @@ procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'u128'() retur
           }
           aggregator_updated := try_aggregator;
          return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_read'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}') returns (res: {{T}}) {
-       res := aggregator->$value;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: int) returns (res: bool)
-   {
-          res := aggregator->$value >= min_amount;
-          return;
-   }
-
-   function {:inline} $1_aggregator_v2_$is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: int): bool
-   {
-       aggregator->$value >= min_amount
-   }
-
-
-{% elif "#" in S -%}
-   procedure {:inline 1} $1_aggregator_v2_create_aggregator'{{S}}'($max_value: {{T}}) returns (res: $1_aggregator_v2_Aggregator'{{S}}') {
-      if (!$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec4(117, 49, 50, 56))) {
-          call $ExecFailureAbort();
-          return;
-      }
-      res := $1_aggregator_v2_$create_aggregator'{{S}}'($max_value);
-   }
-
-   function $1_aggregator_v2_$create_aggregator'{{S}}'($max_value: {{T}}) : $1_aggregator_v2_Aggregator'{{S}}';
-
-   procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'{{S}}'() returns (res: $1_aggregator_v2_Aggregator'{{S}}') {
-      if (!$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec4(117, 49, 50, 56))) {
-          call $ExecFailureAbort();
-          return;
-      }
-      res := $1_aggregator_v2_$create_unbound_aggregator'{{S}}'();
-   }
-
-   function $1_aggregator_v2_$create_unbound_aggregator'{{S}}'() : $1_aggregator_v2_Aggregator'{{S}}';
-
-   procedure {:inline 1} $1_aggregator_v2_try_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-         if (!$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec4(117, 49, 50, 56))) {
-             call $ExecFailureAbort();
-             return;
-         }
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_try_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-         if (!$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec4(117, 49, 50, 56))) {
-             call $ExecFailureAbort();
-             return;
-         }
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
+       {% elif "#" in S -%}
           var try_result: bool;
           var try_aggregator: $Mutation $1_aggregator_v2_Aggregator'{{S}}';
           call try_result, try_aggregator := $1_aggregator_v2_try_add'{{S}}'(aggregator, value);
           return;
+       {% else -%}
+        call $ExecFailureAbort();
+        return;
+       {% endif -%}
    }
 
-   procedure {:inline 1} $1_aggregator_v2_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-          var try_result: bool;
-          var try_aggregator: $Mutation $1_aggregator_v2_Aggregator'{{S}}';
-          call try_result, try_aggregator := $1_aggregator_v2_try_sub'{{S}}'(aggregator, value);
+   procedure {:inline 1} $1_aggregator_v2_read'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}') returns (res: {{T}}) {
+       {% if S == "u64" or S == "u128"  -%}
+       res := aggregator->$value;
+       {% elif "#" in S -%}
+         if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
+             call $ExecFailureAbort();
+             return;
+         }
+       {% else -%}
+        call $ExecFailureAbort();
+        return;
+       {% endif -%}
+   }
+
+   procedure {:inline 1} $1_aggregator_v2_max_value'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}') returns (res: {{T}}) {
+       {% if S == "u64" or S == "u128"  -%}
+       res := aggregator->$max_value;
+       {% elif "#" in S -%}
+         if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
+             call $ExecFailureAbort();
+             return;
+         }
+       {% else -%}
+        call $ExecFailureAbort();
+        return;
+       {% endif -%}
+   }
+
+   procedure {:inline 1} $1_aggregator_v2_is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: {{T}}) returns (res: bool)
+   {
+       {% if S == "u64" or S == "u128"  -%}
+          res := aggregator->$value >= min_amount;
           return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: {{T}}) returns (res: bool) {
-         if (!$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec4(117, 49, 50, 56))) {
+       {% elif "#" in S -%}
+         if (!$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($TypeName({{S}}_info), MakeVec4(117, 49, 50, 56))) {
              call $ExecFailureAbort();
              return;
          }
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_read'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}') returns (res: {{T}}) {
-         if (!$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec3(117, 54, 52)) && !$IsEqual'vec'u8''($1_string_String($TypeName({{S}}_info))->$bytes, MakeVec4(117, 49, 50, 56))) {
-             call $ExecFailureAbort();
-             return;
-         }
-         res := aggregator->$value;
-   }
-
-{% else -%}
-   procedure {:inline 1} $1_aggregator_v2_create_aggregator'{{S}}'($max_value: {{T}}) returns (res: $1_aggregator_v2_Aggregator'{{S}}') {
+       {% else -%}
         call $ExecFailureAbort();
         return;
+       {% endif -%}
    }
-
-   procedure {:inline 1} $1_aggregator_v2_create_unbounded_aggregator'{{S}}'() returns (res: $1_aggregator_v2_Aggregator'{{S}}') {
-        call $ExecFailureAbort();
-        return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_try_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-        call $ExecFailureAbort();
-        return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_try_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (res: bool, aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-        call $ExecFailureAbort();
-        return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_add'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-        call $ExecFailureAbort();
-        return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_sub'{{S}}'(aggregator: $Mutation ($1_aggregator_v2_Aggregator'{{S}}'), value: {{T}}) returns (aggregator_updated: $Mutation ($1_aggregator_v2_Aggregator'{{S}}')) {
-        call $ExecFailureAbort();
-        return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: {{T}}) returns (res: bool)  {
-      call $ExecFailureAbort();
-      return;
-   }
-
-   procedure {:inline 1} $1_aggregator_v2_read'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}') returns (res: {{T}}) {
-       call $ExecFailureAbort();
-       return;
-   }
-
-
-{% endif %}
 
 function {:inline} $1_aggregator_v2_spec_get_value'{{S}}'(s: $1_aggregator_v2_Aggregator'{{S}}'): {{T}} {
     s->$value
@@ -253,8 +222,17 @@ function {:inline} $1_aggregator_v2_spec_get_max_value'{{S}}'(s: $1_aggregator_v
 }
 
 function {:inline} $1_aggregator_v2_$read'{{S}}'(s: $1_aggregator_v2_Aggregator'{{S}}'): {{T}} {
-    s -> $value
+    s->$value
 }
+
+{% if S == "u64" or S == "u128" -%}
+   function {:inline} $1_aggregator_v2_$is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: int): bool
+   {
+       aggregator->$value >= min_amount
+   }
+{% else -%}
+   function $1_aggregator_v2_$is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: {{T}}): bool;
+{% endif -%}
 
 {%- endfor %}
 

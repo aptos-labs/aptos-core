@@ -65,6 +65,7 @@ read, read_snapshot, read_derived_string
 -  [Function `verify_aggregator_valid_type`](#0x1_aggregator_v2_verify_aggregator_valid_type)
 -  [Specification](#@Specification_1)
     -  [Struct `Aggregator`](#@Specification_1_Aggregator)
+    -  [Function `max_value`](#@Specification_1_max_value)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
     -  [Function `create_unbounded_aggregator`](#@Specification_1_create_unbounded_aggregator)
     -  [Function `try_add`](#@Specification_1_try_add)
@@ -1238,15 +1239,6 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<a id="0x1_aggregator_v2_spec_get_value"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;
-</code></pre>
-
-
-
-
 <a id="0x1_aggregator_v2_spec_get_max_value"></a>
 
 
@@ -1310,6 +1302,22 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 </dd>
 </dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_max_value"></a>
+
+### Function `max_value`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">max_value</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement
+</code></pre>
+
 
 
 
@@ -1598,6 +1606,15 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>true</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_get_value"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;
 </code></pre>
 
 
