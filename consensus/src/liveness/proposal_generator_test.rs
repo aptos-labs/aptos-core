@@ -8,6 +8,7 @@ use crate::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
         },
+        proposal_status_tracker::TOptQSPullParamsProvider,
         rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
@@ -17,6 +18,7 @@ use crate::{
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
+    payload_pull_params::{self, OptQSPayloadPullParams},
     utils::PayloadTxnsSize,
 };
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_signer::ValidatorSigner};
@@ -25,6 +27,14 @@ use std::{sync::Arc, time::Duration};
 
 fn empty_callback() -> BoxFuture<'static, ()> {
     async move {}.boxed()
+}
+
+struct MockOptQSPayloadProvider {}
+
+impl TOptQSPullParamsProvider for MockOptQSPayloadProvider {
+    fn get_params(&self) -> Option<OptQSPayloadPullParams> {
+        None
+    }
 }
 
 #[tokio::test]
@@ -47,6 +57,7 @@ async fn test_proposal_generation_empty_tree() {
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![signer.author()], 1),
@@ -92,6 +103,7 @@ async fn test_proposal_generation_parent() {
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![inserter.signer().author()], 1),
@@ -167,6 +179,7 @@ async fn test_old_proposal_generation() {
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![inserter.signer().author()], 1),
@@ -207,6 +220,7 @@ async fn test_correct_failed_authors() {
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![author, peer1, peer2], 1),

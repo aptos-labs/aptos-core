@@ -136,3 +136,74 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ExponentialWindowFailureTracker;
+    use crate::liveness::round_state::NewRoundReason;
+    use aptos_bitvec::BitVec;
+    use aptos_consensus_types::round_timeout::RoundTimeoutReason;
+    use aptos_types::validator_verifier::random_validator_verifier;
+
+    #[test]
+    fn test_exponential_window_failure_tracker() {
+        let (signers, verifier) = random_validator_verifier(4, None, false);
+        let mut tracker =
+            ExponentialWindowFailureTracker::new(100, verifier.get_ordered_account_addresses());
+        assert_eq!(tracker.max_window, 100);
+
+        tracker.push(NewRoundReason::QCReady);
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, 1);
+
+        tracker.push(NewRoundReason::QCReady);
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, 2);
+
+        tracker.push(NewRoundReason::QCReady);
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, 3);
+
+        tracker.push(NewRoundReason::Timeout(
+            RoundTimeoutReason::ProposalNotReceived,
+        ));
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, 4);
+
+        tracker.push(NewRoundReason::Timeout(RoundTimeoutReason::NoQC));
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, 5);
+
+        tracker.push(NewRoundReason::Timeout(RoundTimeoutReason::Unknown));
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, 6);
+
+        tracker.push(NewRoundReason::Timeout(
+            RoundTimeoutReason::PayloadUnavailable {
+                missing_authors: BitVec::with_num_bits(4),
+            },
+        ));
+        assert_eq!(tracker.window, 4);
+        assert_eq!(tracker.last_consecutive_success_count, 0);
+
+        tracker.push(NewRoundReason::QCReady);
+        assert_eq!(tracker.window, 4);
+        assert_eq!(tracker.last_consecutive_success_count, 1);
+
+        // Check that the window does not grow beyond max_window
+        for _ in 0..10 {
+            tracker.push(NewRoundReason::Timeout(
+                RoundTimeoutReason::PayloadUnavailable {
+                    missing_authors: BitVec::with_num_bits(4),
+                },
+            ));
+        }
+        assert_eq!(tracker.window, tracker.max_window);
+
+        for _ in 0..tracker.max_window {
+            tracker.push(NewRoundReason::QCReady);
+        }
+        assert_eq!(tracker.window, 2);
+        assert_eq!(tracker.last_consecutive_success_count, tracker.max_window);
+    }
+}

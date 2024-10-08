@@ -76,14 +76,14 @@ pub(super) struct TwoChainTimeoutVotes {
 }
 
 impl TwoChainTimeoutVotes {
-    fn new(timeout: TwoChainTimeout) -> Self {
+    pub(super) fn new(timeout: TwoChainTimeout) -> Self {
         Self {
             partial_2chain_tc: TwoChainTimeoutWithPartialSignatures::new(timeout.clone()),
             timeout_reason: HashMap::new(),
         }
     }
 
-    fn add(
+    pub(super) fn add(
         &mut self,
         author: Author,
         timeout: TwoChainTimeout,
@@ -142,7 +142,6 @@ impl TwoChainTimeoutVotes {
                     // missing by minority peers.
                     if matches!(reason, RoundTimeoutReason::PayloadUnavailable { .. }) {
                         let mut aggregated_bitvec = BitVec::with_num_bits(verifier.len() as u16);
-                        let address_to_index = verifier.address_to_validator_index();
                         for (author_idx, voting_power) in missing_batch_authors {
                             if verifier
                                 .check_aggregated_voting_power(voting_power, false)

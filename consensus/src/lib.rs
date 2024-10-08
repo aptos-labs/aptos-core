@@ -31,6 +31,8 @@ mod network_tests;
 mod payload_client;
 mod pending_order_votes;
 mod pending_votes;
+#[cfg(test)]
+mod pending_votes_test;
 pub mod persistent_liveness_storage;
 mod pipeline;
 pub mod quorum_store;
