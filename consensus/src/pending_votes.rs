@@ -132,32 +132,30 @@ impl TwoChainTimeoutVotes {
         let aggregated_reason = reason_voting_power
             .into_iter()
             .max_by_key(|(_, voting_power)| *voting_power)
-            .and_then(|(reason, voting_power)| {
-                if verifier
-                    .check_aggregated_voting_power(voting_power, false)
+            .filter(|(_, voting_power)| {
+                verifier
+                    .check_aggregated_voting_power(*voting_power, false)
                     .is_ok()
-                {
-                    // If the aggregated reason is due to unavailable payload, we will compute the
-                    // aggregated missing authors bitvec counting batch authors that have been reported
-                    // missing by minority peers.
-                    if matches!(reason, RoundTimeoutReason::PayloadUnavailable { .. }) {
-                        let mut aggregated_bitvec = BitVec::with_num_bits(verifier.len() as u16);
-                        for (author_idx, voting_power) in missing_batch_authors {
-                            if verifier
-                                .check_aggregated_voting_power(voting_power, false)
-                                .is_ok()
-                            {
-                                aggregated_bitvec.set(author_idx as u16);
-                            }
+            })
+            .map(|(reason, _)| {
+                // If the aggregated reason is due to unavailable payload, we will compute the
+                // aggregated missing authors bitvec counting batch authors that have been reported
+                // missing by minority peers.
+                if matches!(reason, RoundTimeoutReason::PayloadUnavailable { .. }) {
+                    let mut aggregated_bitvec = BitVec::with_num_bits(verifier.len() as u16);
+                    for (author_idx, voting_power) in missing_batch_authors {
+                        if verifier
+                            .check_aggregated_voting_power(voting_power, false)
+                            .is_ok()
+                        {
+                            aggregated_bitvec.set(author_idx as u16);
                         }
-                        Some(RoundTimeoutReason::PayloadUnavailable {
-                            missing_authors: aggregated_bitvec,
-                        })
-                    } else {
-                        Some(reason)
+                    }
+                    RoundTimeoutReason::PayloadUnavailable {
+                        missing_authors: aggregated_bitvec,
                     }
                 } else {
-                    None
+                    reason
                 }
             })
             .unwrap_or(RoundTimeoutReason::Unknown);
