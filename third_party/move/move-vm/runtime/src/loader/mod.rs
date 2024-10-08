@@ -171,7 +171,6 @@ impl Loader {
                 *loader.scripts.write() = ScriptCache::new();
                 #[allow(deprecated)]
                 loader.type_cache.flush();
-                #[allow(deprecated)]
                 loader.name_cache.flush();
                 *invalidated = false;
             }
@@ -323,7 +322,7 @@ impl Loader {
             Self::V1(loader) => &loader.name_cache,
             Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
         };
-        let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx);
+        let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx)?;
 
         match self {
             Loader::V1(_) => {
@@ -1267,7 +1266,8 @@ impl<'a> Resolver<'a> {
                     function_name,
                 )
                 .map_err(|_| {
-                    // Note: Loader V1 implementation uses this error.
+                    // TODO(loader_v2):
+                    //   Loader V1 implementation uses this error, but it should be a linker error.
                     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
                         format!(
                             "Module or function do not exist for {}::{}::{}",
@@ -1675,7 +1675,7 @@ impl Loader {
             Self::V1(loader) => &loader.name_cache,
             Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
         };
-        let struct_tag = struct_name_index_map.idx_to_struct_tag(struct_name_idx, type_args);
+        let struct_tag = struct_name_index_map.idx_to_struct_tag(struct_name_idx, type_args)?;
 
         let size =
             (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
@@ -1764,7 +1764,7 @@ impl Loader {
 
                 // Some types can have fields which are lifted at serialization or deserialization
                 // times. Right now these are Aggregator and AggregatorSnapshot.
-                let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx);
+                let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx)?;
                 let maybe_mapping = self.get_identifier_mapping_kind(struct_name.as_ref());
 
                 let field_tys = fields

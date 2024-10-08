@@ -11,7 +11,10 @@ use crate::{
 use bytes::Bytes;
 #[cfg(test)]
 use claims::assert_some;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    errors::{Location, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -20,6 +23,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     code_storage::ModuleBytesStorage, module_cyclic_dependency_error, module_linker_error,
+    panic_error,
 };
 use std::{
     borrow::Borrow,
@@ -29,10 +33,10 @@ use std::{
     sync::Arc,
 };
 
-/// An entry in [UnsyncModuleStorage]. As modules are accessed, entries can be "promoted", e.g., a
-/// deserialized representation can be converted into the verified one.
+/// An entry in [UnsyncModuleStorage]'s module cache. As modules are accessed, entries can change
+/// from deserialized representation into the verified one.
 #[derive(Debug, Clone)]
-pub(crate) enum ModuleStorageEntry {
+pub(crate) enum ModuleCacheEntry {
     Deserialized {
         module: Arc<CompiledModule>,
         module_size: usize,
@@ -43,7 +47,7 @@ pub(crate) enum ModuleStorageEntry {
     },
 }
 
-impl ModuleStorageEntry {
+impl ModuleCacheEntry {
     /// Returns the verified module if the entry is verified, and [None] otherwise.
     fn into_verified(self) -> Option<Arc<Module>> {
         match self {
@@ -57,8 +61,8 @@ impl ModuleStorageEntry {
 pub struct UnsyncModuleStorage<'a, S> {
     /// Environment where this module storage is defined in.
     runtime_environment: &'a RuntimeEnvironment,
-    /// Storage with deserialized modules, i.e., module cache.
-    module_storage: RefCell<BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleStorageEntry>>>,
+    /// Cache with deserialized or verified modules.
+    module_cache: RefCell<BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleCacheEntry>>>,
 
     /// Immutable baseline storage from which one can fetch raw module bytes.
     base_storage: BorrowedOrOwned<'a, S>,
@@ -91,7 +95,7 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
     fn from_borrowed(runtime_environment: &'a RuntimeEnvironment, storage: &'a S) -> Self {
         Self {
             runtime_environment,
-            module_storage: RefCell::new(BTreeMap::new()),
+            module_cache: RefCell::new(BTreeMap::new()),
             base_storage: BorrowedOrOwned::Borrowed(storage),
         }
     }
@@ -101,21 +105,21 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
     fn from_owned(runtime_environment: &'a RuntimeEnvironment, storage: S) -> Self {
         Self {
             runtime_environment,
-            module_storage: RefCell::new(BTreeMap::new()),
+            module_cache: RefCell::new(BTreeMap::new()),
             base_storage: BorrowedOrOwned::Owned(storage),
         }
     }
 
     /// Returns true if the module is cached.
     fn is_module_cached(&self, address: &AccountAddress, module_name: &IdentStr) -> bool {
-        let module_storage = self.module_storage.borrow();
+        let module_storage = self.module_cache.borrow();
         module_storage
             .get(address)
             .is_some_and(|account_module_storage| account_module_storage.contains_key(module_name))
     }
 
     /// If the module does not exist, returns true, and false otherwise. For modules that exist, if
-    /// the module is not yet cached in module storage, fetches it from the baseline storage and
+    /// the module is not yet cached in module cache, fetches it from the baseline storage and
     /// caches as a deserialized entry.
     fn module_does_not_exist(
         &self,
@@ -123,7 +127,7 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         module_name: &IdentStr,
     ) -> VMResult<bool> {
         use btree_map::Entry::*;
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         if !self.is_module_cached(address, module_name) {
             let bytes = match self.fetch_module_bytes(address, module_name)? {
@@ -137,12 +141,12 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
             self.runtime_environment
                 .paranoid_check_module_address_and_name(&module, address, module_name)?;
 
-            let mut module_storage = self.module_storage.borrow_mut();
-            let account_module_storage = match module_storage.entry(*address) {
+            let mut module_cache = self.module_cache.borrow_mut();
+            let account_module_cache = match module_cache.entry(*address) {
                 Occupied(entry) => entry.into_mut(),
                 Vacant(entry) => entry.insert(BTreeMap::new()),
             };
-            account_module_storage.insert(module_name.to_owned(), Deserialized {
+            account_module_cache.insert(module_name.to_owned(), Deserialized {
                 module: Arc::new(module),
                 module_size,
                 module_hash,
@@ -153,23 +157,23 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
 
     /// Returns the entry in module storage (deserialized or verified) and an error if it does not
     /// exist. This API clones the underlying entry pointers.
-    fn fetch_existing_module_storage_entry(
+    fn fetch_existing_module_cache_entry(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<ModuleStorageEntry> {
+    ) -> VMResult<ModuleCacheEntry> {
         if self.module_does_not_exist(address, module_name)? {
             return Err(module_linker_error!(address, module_name));
         }
 
-        // At this point module storage contains a deserialized entry, because the function
-        // above puts it there if it was not cached already.
-        let module_storage = self.module_storage.borrow();
-        Ok(get_module_entry_or_panic(&module_storage, address, module_name).clone())
+        // Module cache must contain a deserialized entry, because the function above puts it there
+        //  if it was not cached already.
+        let module_cache = self.module_cache.borrow();
+        Ok(get_module_entry(&module_cache, address, module_name)?.clone())
     }
 
     /// Visits the dependencies of the given module. If dependencies form a cycle (which should not
-    /// be the case as we check this when modules are added to the module storage), an error is
+    /// be the case as we check this when modules are added to the module cache), an error is
     /// returned.
     ///
     /// Important: this implementation **does not** load transitive friends. While it is possible
@@ -187,10 +191,10 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         module_name: &IdentStr,
         visited: &mut BTreeSet<ModuleId>,
     ) -> VMResult<Arc<Module>> {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         // Get the module, and in case it is verified, return early.
-        let entry = self.fetch_existing_module_storage_entry(address, module_name)?;
+        let entry = self.fetch_existing_module_cache_entry(address, module_name)?;
         let (module, module_size, module_hash) = match entry {
             Deserialized {
                 module,
@@ -211,7 +215,7 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         let mut verified_immediate_dependencies = vec![];
         for (addr, name) in locally_verified_module.immediate_dependencies_iter() {
             // Check if the module has been already visited and verified.
-            let dep_entry = self.fetch_existing_module_storage_entry(addr, name)?;
+            let dep_entry = self.fetch_existing_module_cache_entry(addr, name)?;
             if let Some(dep_module) = dep_entry.into_verified() {
                 verified_immediate_dependencies.push(dep_module);
                 continue;
@@ -236,9 +240,9 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
                 .build_verified_module(locally_verified_module, &verified_immediate_dependencies)?,
         );
 
-        // Step 4: update storage representation to fully verified one.
-        let mut module_storage = self.module_storage.borrow_mut();
-        let entry = get_module_entry_mut_or_panic(&mut module_storage, address, module_name);
+        // Step 4: update cached representation to fully verified one.
+        let mut module_cache = self.module_cache.borrow_mut();
+        let entry = get_module_entry_mut(&mut module_cache, address, module_name)?;
         *entry = Verified {
             module: module.clone(),
         };
@@ -263,8 +267,8 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
-        // Cached modules in module storage are a subset of modules in byte
-        // storage, so it is sufficient to check existence based on it.
+        // Cached modules in module storage are a subset of modules in byte storage, so it is
+        // sufficient to check existence based on it.
         Ok(self
             .base_storage
             .fetch_module_bytes(address, module_name)?
@@ -304,16 +308,16 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         if self.module_does_not_exist(address, module_name)? {
             return Ok(None);
         }
 
-        // At this point module storage contains a deserialized entry, because the function
-        // above puts it there if it existed and was not cached already.
-        let module_storage = self.module_storage.borrow();
-        let entry = get_module_entry_or_panic(&module_storage, address, module_name);
+        // At this point module storage contains a deserialized entry, because the function above
+        // puts it there if it existed and was not cached already.
+        let module_cache = self.module_cache.borrow();
+        let entry = get_module_entry(&module_cache, address, module_name)?;
 
         Ok(Some(match entry {
             Deserialized { module, .. } => module.clone(),
@@ -340,28 +344,38 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
     }
 }
 
-fn get_module_entry_or_panic<'a>(
-    module_storage: &'a BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleStorageEntry>>,
+fn get_module_entry<'a>(
+    module_cache: &'a BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleCacheEntry>>,
     address: &AccountAddress,
     module_name: &IdentStr,
-) -> &'a ModuleStorageEntry {
-    module_storage
+) -> VMResult<&'a ModuleCacheEntry> {
+    let unreachable = || {
+        let msg = format!("Entry for {}::{} is not cached", address, module_name);
+        panic_error!(msg).finish(Location::Undefined)
+    };
+
+    module_cache
         .get(address)
-        .unwrap()
+        .ok_or_else(unreachable)?
         .get(module_name)
-        .unwrap()
+        .ok_or_else(unreachable)
 }
 
-fn get_module_entry_mut_or_panic<'a>(
-    module_storage: &'a mut BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleStorageEntry>>,
+fn get_module_entry_mut<'a>(
+    module_cache: &'a mut BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleCacheEntry>>,
     address: &AccountAddress,
     module_name: &IdentStr,
-) -> &'a mut ModuleStorageEntry {
-    module_storage
+) -> VMResult<&'a mut ModuleCacheEntry> {
+    let unreachable = || {
+        let msg = format!("Entry for {}::{} is not cached", address, module_name);
+        panic_error!(msg).finish(Location::Undefined)
+    };
+
+    module_cache
         .get_mut(address)
-        .unwrap()
+        .ok_or_else(unreachable)?
         .get_mut(module_name)
-        .unwrap()
+        .ok_or_else(unreachable)
 }
 
 /// Represents owned or borrowed types, similar to [std::borrow::Cow] but without enforcing
@@ -386,23 +400,23 @@ impl<'a, T> Deref for BorrowedOrOwned<'a, T> {
 #[cfg(test)]
 impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     pub(crate) fn does_not_have_cached_modules(&self) -> bool {
-        let module_storage = self.module_storage.borrow();
-        module_storage.get(&AccountAddress::ZERO).is_none()
+        let module_cache = self.module_cache.borrow();
+        module_cache.get(&AccountAddress::ZERO).is_none()
     }
 
-    pub(crate) fn matches<P: Fn(&ModuleStorageEntry) -> bool>(
+    pub(crate) fn matches<P: Fn(&ModuleCacheEntry) -> bool>(
         &self,
         module_names: impl IntoIterator<Item = &'e str>,
         predicate: P,
     ) -> bool {
-        let module_storage = self.module_storage.borrow();
-        let module_names_in_storage = assert_some!(module_storage.get(&AccountAddress::ZERO))
+        let module_cache = self.module_cache.borrow();
+        let module_names_in_cache = assert_some!(module_cache.get(&AccountAddress::ZERO))
             .iter()
             .filter_map(|(name, entry)| predicate(entry).then_some(name.as_str()))
             .collect::<BTreeSet<_>>();
         let module_names = module_names.into_iter().collect::<BTreeSet<_>>();
-        module_names.is_subset(&module_names_in_storage)
-            && module_names_in_storage.is_subset(&module_names)
+        module_names.is_subset(&module_names_in_cache)
+            && module_names_in_cache.is_subset(&module_names)
     }
 }
 
@@ -481,7 +495,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_deserialized_caching() {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
@@ -515,7 +529,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_dependency_tree_traversal() {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
@@ -544,7 +558,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_dependency_dag_traversal() {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
@@ -600,7 +614,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_cyclic_friends_are_allowed() {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec![], vec!["b"]);
@@ -620,7 +634,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_transitive_friends_are_allowed_to_be_transitive_dependencies() {
-        use ModuleStorageEntry::*;
+        use ModuleCacheEntry::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b"], vec!["d"]);

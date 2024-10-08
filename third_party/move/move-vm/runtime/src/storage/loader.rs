@@ -118,6 +118,11 @@ impl LoaderV2 {
         Ok(())
     }
 
+    /// Loads the script:
+    ///   1. Fetches it from the cache (or deserializes and verifies it if it is not cached).
+    ///   2. Verifies type arguments (modules that define the type arguments are also loaded).
+    /// If both steps are successful, returns a [LoadedFunction] corresponding to the script's
+    /// entrypoint.
     pub(crate) fn load_script(
         &self,
         code_storage: &impl CodeStorage,
@@ -134,7 +139,9 @@ impl LoaderV2 {
             .iter()
             .map(|ty_tag| self.load_ty(code_storage, ty_tag))
             .collect::<PartialVMResult<Vec<_>>>()
-            // Note: Loader V1 implementation returns undefined here, causing some tests to fail.
+            // TODO(loader_v2):
+            //   Loader V1 implementation returns undefined here, causing some tests to fail. We
+            //   should probably map this to script.
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let main = script.entry_point();
@@ -161,8 +168,8 @@ impl LoaderV2 {
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
-    /// Returns a function definition corresponding to the specified name. The module
-    /// containing the function is loaded.
+    /// Returns the function definition corresponding to the specified name, as well as the module
+    /// where this function is defined.
     pub(crate) fn load_function_without_ty_args(
         &self,
         module_storage: &dyn ModuleStorage,
