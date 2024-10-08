@@ -402,8 +402,8 @@ module supra_framework::coin {
         fungible_asset::mint_internal(metadata, amount)
     }
 
-    /// A public wrapper around `coin_to_fungible_asset_internal` for use by external tests.
     #[test_only]
+    /// A public wrapper around `coin_to_fungible_asset_internal` for use by external tests.
     public fun coin_to_fungible_asset_for_test<CoinType>(
         coin: Coin<CoinType>
     ): FungibleAsset acquires CoinConversionMap, CoinInfo {

@@ -1283,19 +1283,17 @@ Unlock any vested portion of the grant.
     <b>let</b> next_period_to_vest = last_vested_period + 1;
     <b>let</b> last_completed_period = (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() - vesting_schedule.start_timestamp_secs)
         / vesting_schedule.period_duration;
+
     // Index is 0-based <b>while</b> period is 1-based so we need <b>to</b> subtract 1.
-    <b>while</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount
-        &gt; 0) {
+    <b>while</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount &gt; 0) {
         <b>let</b> schedule_index = next_period_to_vest - 1;
         <b>let</b> vesting_fraction = <b>if</b> (schedule_index &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule)) {
             *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, schedule_index)
         } <b>else</b> {
             // Last <a href="vesting.md#0x1_vesting">vesting</a> schedule fraction will repeat until the grant runs out.
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1) };
+            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1)
+        };
         <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record, signer_cap, beneficiary, vesting_fraction);
-        //<b>update</b> last_vested_period for the shareholder
-        vesting_record.last_vested_period = next_period_to_vest;
-        next_period_to_vest = next_period_to_vest + 1;
 
         emit_event(&<b>mut</b> vesting_contract.vest_events,
             <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestEvent">VestEvent</a> {
@@ -1305,7 +1303,11 @@ Unlock any vested portion of the grant.
                 period_vested: next_period_to_vest,
             },
         );
+        next_period_to_vest = next_period_to_vest + 1;
     };
+
+    //<b>update</b> last_vested_period for the shareholder
+    vesting_record.last_vested_period = next_period_to_vest - 1;
 }
 </code></pre>
 
@@ -1743,8 +1745,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_create_vesting_contract_account">create_vesting_contract_account</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,)
-    : (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    SignerCapability) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a> {
+    : (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, SignerCapability) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a> {
     <b>let</b> admin_store = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin));
     <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin));
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&admin_store.nonce));
