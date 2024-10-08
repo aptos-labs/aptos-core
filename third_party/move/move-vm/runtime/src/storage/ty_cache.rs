@@ -80,8 +80,13 @@ impl StructInfoCache {
         Self(RwLock::new(hashbrown::HashMap::new()))
     }
 
-    /// Flushes the cached struct information for V1 loader.
-    #[deprecated]
+    /// Returns the number of cached struct information entries.
+    #[allow(dead_code)]
+    pub(crate) fn len(&self) -> usize {
+        self.0.read().len()
+    }
+
+    /// Flushes the cached struct information.
     pub(crate) fn flush(&self) {
         self.0.write().clear()
     }
@@ -116,7 +121,7 @@ impl StructInfoCache {
 
         if id == prev_id {
             // Same thread has put this entry previously, which means there is a recursion.
-            let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx);
+            let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx)?;
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(

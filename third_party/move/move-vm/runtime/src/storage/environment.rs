@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    compute_code_hash,
     config::VMConfig,
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        verified_module_cache::VERIFIED_MODULES_V2, verifier::VerifierExtension,
+        verified_module_cache::VERIFIED_MODULES_V2,
     },
     Module, Script,
 };
@@ -25,7 +26,6 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -38,8 +38,6 @@ pub struct RuntimeEnvironment {
     /// is constructed, existing native functions are inlined in the module representation, so that
     /// the interpreter can call them directly.
     natives: NativeFunctions,
-    /// Optional verifier extension to run passes on modules and scripts provided externally.
-    verifier_extension: Option<Arc<dyn VerifierExtension>>,
 
     /// Map from struct names to indices, to save on unnecessary cloning and reduce memory
     /// consumption. Used by all struct type creations in the VM and in code cache.
@@ -87,7 +85,6 @@ impl RuntimeEnvironment {
         Self {
             vm_config,
             natives,
-            verifier_extension: None,
             struct_name_index_map: StructNameIndexMap::empty(),
             ty_cache: StructInfoCache::empty(),
         }
@@ -114,9 +111,6 @@ impl RuntimeEnvironment {
             &self.vm_config().verifier_config,
             compiled_script.as_ref(),
         )?;
-        if let Some(verifier) = &self.verifier_extension {
-            verifier.verify_script(compiled_script.as_ref())?;
-        }
         Ok(LocallyVerifiedScript(compiled_script))
     }
 
@@ -154,11 +148,6 @@ impl RuntimeEnvironment {
                 compiled_module.as_ref(),
             )?;
             check_natives(compiled_module.as_ref())?;
-
-            if let Some(verifier) = &self.verifier_extension {
-                verifier.verify_module(compiled_module.as_ref())?;
-            }
-
             VERIFIED_MODULES_V2.put(*module_hash);
         }
 
@@ -201,11 +190,7 @@ impl RuntimeEnvironment {
                     .finish(Location::Undefined)
             })?;
 
-        let mut sha3_256 = Sha3_256::new();
-        sha3_256.update(bytes);
-        let module_hash: [u8; 32] = sha3_256.finalize().into();
-
-        Ok((compiled_module, bytes.len(), module_hash))
+        Ok((compiled_module, bytes.len(), compute_code_hash(bytes)))
     }
 
     /// Deserializes bytes into a compiled script.
@@ -274,7 +259,6 @@ impl Clone for RuntimeEnvironment {
         Self {
             vm_config: self.vm_config.clone(),
             natives: self.natives.clone(),
-            verifier_extension: self.verifier_extension.clone(),
             struct_name_index_map: self.struct_name_index_map.clone(),
             ty_cache: self.ty_cache.clone(),
         }
