@@ -208,7 +208,7 @@ variable "utility_instance_enable_taint" {
 variable "validator_instance_enable_taint" {
   description = "Whether to taint instances in the validator nodegroup"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "gke_enable_node_autoprovisioning" {
