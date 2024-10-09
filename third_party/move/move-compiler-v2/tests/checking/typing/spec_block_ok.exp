@@ -6,3 +6,14 @@ module 0x8675309::M {
 
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    fun specs_in_fun(_x: u64) {
+
+        /* spec {
+        }
+         */
+
+    }
+}

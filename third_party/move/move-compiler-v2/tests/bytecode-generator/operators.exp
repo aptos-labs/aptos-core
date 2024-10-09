@@ -9,16 +9,38 @@ module 0x42::operators {
     private fun bools(x: bool,y: bool): bool {
         Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
     }
-    private fun equality<T>(x: #0,y: #0): bool {
+    private fun equality<T>(x: T,y: T): bool {
         Eq<T>(x, y)
     }
-    private fun inequality<T>(x: #0,y: #0): bool {
+    private fun inequality<T>(x: T,y: T): bool {
         Neq<T>(x, y)
     }
     private fun order(x: u64,y: u64): bool {
         And(And(And(Lt<u64>(x, y), Le<u64>(x, y)), Not(Gt<u64>(x, y))), Not(Ge<u64>(x, y)))
     }
 } // end 0x42::operators
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::operators {
+    fun arithm(x: u64, y: u64): u64 {
+        x + y / (x - y) * y % x
+    }
+    fun bits(x: u64, y: u8): u64 {
+        x << y & x
+    }
+    fun bools(x: bool, y: bool): bool {
+        x && y || x && !y || !x && y || !x && !y
+    }
+    fun equality<T: drop>(x: T, y: T): bool {
+        x == y
+    }
+    fun inequality<T: drop>(x: T, y: T): bool {
+        x != y
+    }
+    fun order(x: u64, y: u64): bool {
+        x < y && x <= y && !(x > y) && !(x >= y)
+    }
+}
 
 ============ initial bytecode ================
 

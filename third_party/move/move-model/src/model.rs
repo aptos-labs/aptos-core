@@ -179,9 +179,9 @@ impl Loc {
 
     /// Creates a location which encloses all the locations in the provided slice,
     /// which must not be empty. All locations are expected to be in the same file.
-    pub fn enclosing(locs: &[&Loc]) -> Loc {
+    pub fn enclosing(locs: &[Loc]) -> Loc {
         assert!(!locs.is_empty());
-        let loc = locs[0];
+        let loc = &locs[0];
         let mut start = loc.span.start();
         let mut end = loc.span.end();
         for l in locs.iter().skip(1) {
@@ -376,6 +376,12 @@ impl NodeId {
 
     pub fn as_usize(self) -> usize {
         self.0
+    }
+}
+
+impl AsRef<NodeId> for NodeId {
+    fn as_ref(&self) -> &NodeId {
+        self
     }
 }
 
@@ -2462,7 +2468,12 @@ impl GlobalEnv {
                     writer,
                     "spec fun {}{}",
                     fun.name.display(spool),
-                    self.get_fun_signature_string(&fun.type_params, &fun.params, &fun.result_type)
+                    self.get_fun_signature_string(
+                        &module.get_type_display_ctx(),
+                        &fun.type_params,
+                        &fun.params,
+                        &fun.result_type
+                    )
                 );
                 if let Some(exp) = &fun.body {
                     emitln!(writer, " {");
@@ -2492,7 +2503,7 @@ impl GlobalEnv {
     }
 
     pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
-        let tctx = &self.get_type_display_ctx();
+        let tctx = &fun.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         self.dump_fun_internal(&writer, tctx, fun);
         writer.extract_result()
@@ -2567,12 +2578,12 @@ impl GlobalEnv {
     /// Helper to create a string for a function signature.
     fn get_fun_signature_string(
         &self,
+        tctx: &TypeDisplayContext,
         type_params: &[TypeParameter],
         params: &[Parameter],
         result_type: &Type,
     ) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let type_params_str = if !type_params.is_empty() {
             format!(
                 "<{}>",
@@ -2591,7 +2602,7 @@ impl GlobalEnv {
         let result_str = if result_type.is_unit() {
             "".to_owned()
         } else {
-            format!(": {}", result_type.display(&self.get_type_display_ctx()))
+            format!(": {}", result_type.display(tctx))
         };
         format!("{}({}){}", type_params_str, params_str, result_str)
     }
@@ -2903,6 +2914,15 @@ impl<'env> ModuleEnv<'env> {
     /// Shortcut for accessing the symbol pool.
     pub fn symbol_pool(&self) -> &SymbolPool {
         &self.env.symbol_pool
+    }
+
+    /// Returns a context to display types for this module.
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+        TypeDisplayContext {
+            module_name: Some(self.get_name().clone()),
+            used_modules: self.get_used_modules(false),
+            ..TypeDisplayContext::new(self.env)
+        }
     }
 
     /// Gets the underlying bytecode module, if one is attached.
@@ -3717,13 +3737,16 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
         let type_param_names = self
             .get_type_parameters()
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            type_param_names: Some(type_param_names),
+            ..self.module_env.get_type_display_ctx()
+        }
     }
 }
 
@@ -3766,6 +3789,17 @@ impl<'env> FieldEnv<'env> {
     /// Gets the id of this field.
     pub fn get_id(&self) -> FieldId {
         FieldId(self.data.name)
+    }
+
+    /// Returns true if this is a positional field. Identified by that the name
+    /// of the field is a number.
+    pub fn is_positional(&self) -> bool {
+        self.data
+            .name
+            .display(self.struct_env.symbol_pool())
+            .to_string()
+            .parse::<u64>()
+            .is_ok()
     }
 
     /// Gets the location of the field declaration.
@@ -3870,6 +3904,15 @@ impl<'env> NamedConstantEnv<'env> {
     /// Returns the value of this constant
     pub fn get_value(&self) -> Value {
         self.data.value.clone()
+    }
+
+    /// Returns a context to display types for this module.
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+        TypeDisplayContext {
+            module_name: Some(self.module_env.get_name().clone()),
+            used_modules: self.module_env.get_used_modules(false),
+            ..TypeDisplayContext::new(self.module_env.env)
+        }
     }
 }
 
@@ -4719,6 +4762,7 @@ impl<'env> FunctionEnv<'env> {
             " fun {}{}",
             self.get_name().display(self.symbol_pool()),
             self.module_env.env.get_fun_signature_string(
+                &self.get_type_display_ctx(),
                 &self.data.type_params,
                 &self.data.params,
                 &self.data.result_type
@@ -4743,10 +4787,9 @@ impl<'env> FunctionEnv<'env> {
     }
 
     fn definition_view(&'env self) -> Option<FunctionDefinitionView<'env, CompiledModule>> {
-        assert!(
-            !self.is_inline(),
-            "attempt to access bytecode info for inline function"
-        );
+        if self.is_inline() {
+            return None;
+        }
         let module = self.module_env.data.compiled_module.as_ref()?;
         Some(FunctionDefinitionView::new(
             module,
@@ -4755,13 +4798,16 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
         let type_param_names = self
             .get_type_parameters()
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            type_param_names: Some(type_param_names),
+            ..self.module_env.get_type_display_ctx()
+        }
     }
 }
 

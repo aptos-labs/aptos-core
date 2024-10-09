@@ -63,6 +63,70 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    fun mod1(r: &mut u64) {
+        {
+            let $t1 = r;
+            *$t1 = *$t1 + 2
+        };
+    }
+    fun mod2(r: &mut u64): u64 {
+        {
+            let $t1 = r;
+            *$t1 = *$t1 + 2
+        };
+        *r
+    }
+    public fun test0(): u64 {
+        let v = 1;
+        {
+            let $t = {
+                {
+                    let $t = {
+                        v = v + 2;
+                        v
+                    };
+                    v = v + $t
+                };
+                v
+            };
+            v = v + $t
+        };
+        v
+    }
+    public fun test1(): u64 {
+        let v = 1;
+        {
+            let $t = {
+                v = v + 2;
+                v
+            };
+            v = v + $t
+        };
+        v
+    }
+    public fun test2(): u64 {
+        let v = 1;
+        {
+            let $t = {
+                mod1(&mut v);
+                v
+            };
+            v = v + $t
+        };
+        v
+    }
+    public fun test3(): u64 {
+        let v = 1;
+        {
+            let $t = mod2(&mut v);
+            v = v + $t
+        };
+        v
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]

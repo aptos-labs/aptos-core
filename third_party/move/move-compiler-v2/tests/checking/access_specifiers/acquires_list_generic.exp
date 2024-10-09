@@ -10,8 +10,23 @@ module 0x42::M {
         dummy_field: bool,
     }
     private fun foo()
-        acquires M::B<M::CupC<M::R>>(*)
+        acquires 0x42::M::B<0x42::M::CupC<0x42::M::R>>(*)
      {
         Abort(0)
     }
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct B<phantom T> {
+    }
+    struct CupC<phantom T> {
+    }
+    struct R {
+    }
+    fun foo()
+        acquires B<CupC<R>>
+    {
+        abort 0
+    }
+}
