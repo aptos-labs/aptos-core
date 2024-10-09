@@ -24,44 +24,14 @@ use std::sync::{
     Arc,
 };
 
-const STRUCT_NAME_INDEX_MAP_SIZE: usize = 100_000;
-const CROSS_BLOCK_MODULE_CACHE_SIZE: usize = 100_000;
+/// The maximum size of struct name index map in runtime environment.
+const MAX_STRUCT_NAME_INDEX_MAP_SIZE: usize = 100_000;
 
-/// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
-/// feature version, and other configs.
-#[derive(Hash, Eq, PartialEq)]
-struct EnvironmentID {
-    bytes: Bytes,
-}
+/// The maximum size of [CrossBlockModuleCache]. Checked at block boundaries.
+const MAX_CROSS_BLOCK_MODULE_CACHE_SIZE: usize = 100_000;
 
-impl EnvironmentID {
-    /// Create a new identifier for the given environment.
-    fn new(env: &AptosEnvironment) -> Self {
-        // These are sufficient to distinguish different environments.
-        let chain_id = env.chain_id();
-        let features = env.features();
-        let timed_features = env.timed_features();
-        let gas_feature_version = env.gas_feature_version();
-        let vm_config = env.vm_config();
-        let bytes = bcs::to_bytes(&(
-            chain_id,
-            features,
-            timed_features,
-            gas_feature_version,
-            vm_config,
-        ))
-        .expect("Should be able to serialize all configs")
-        .into();
-        Self { bytes }
-    }
-}
-
-/// A cached environment that can be persisted across blocks. Used by block executor only. Also
-/// stores an identifier so that we can check when it changes.
-pub struct CachedAptosEnvironment {
-    id: EnvironmentID,
-    env: AptosEnvironment,
-}
+/// A cached environment that can be persisted across blocks. Used by block executor only.
+pub struct CachedAptosEnvironment;
 
 impl CachedAptosEnvironment {
     /// Returns the cached environment if it exists and has the same configuration as if it was
@@ -71,40 +41,36 @@ impl CachedAptosEnvironment {
         state_view: &impl StateView,
     ) -> Result<AptosEnvironment, VMStatus> {
         // Create a new environment.
-        let env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-        let id = EnvironmentID::new(&env);
+        let current_env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
 
         // Lock the cache, and check if the environment is the same.
         let mut cross_block_environment = CROSS_BLOCK_ENVIRONMENT.lock();
-        if let Some(cached_env) = cross_block_environment.as_ref() {
-            if id == cached_env.id {
-                let runtime_env = cached_env.env.runtime_environment();
+        if let Some(previous_env) = cross_block_environment.as_ref() {
+            if &current_env == previous_env {
+                let runtime_env = previous_env.runtime_environment();
                 let struct_name_index_map_size = runtime_env
                     .struct_name_index_map_size()
                     .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                if struct_name_index_map_size > STRUCT_NAME_INDEX_MAP_SIZE {
+                if struct_name_index_map_size > MAX_STRUCT_NAME_INDEX_MAP_SIZE {
                     // Cache is too large, flush it. Also flush module cache.
                     runtime_env.flush_struct_name_and_info_caches();
                     CrossBlockModuleCache::flush_at_block_start();
                 }
-                return Ok(cached_env.env.clone());
+                return Ok(previous_env.clone());
             }
         }
 
         // It is not, so we have to reset it. Also flush the framework cache because we need to
         // re-load all the modules with new configs.
-        *cross_block_environment = Some(CachedAptosEnvironment {
-            id,
-            env: env.clone(),
-        });
+        *cross_block_environment = Some(current_env.clone());
         drop(cross_block_environment);
         CrossBlockModuleCache::flush_at_block_start();
 
-        Ok(env)
+        Ok(current_env)
     }
 }
 
-static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<CachedAptosEnvironment>>> =
+static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<AptosEnvironment>>> =
     Lazy::new(|| Mutex::new(None));
 
 /// An entry into immutable cross-block module cache.
@@ -193,7 +159,7 @@ impl CrossBlockModuleCache {
     /// cache if its size is too large. Should only be called at block end.
     pub(crate) fn populate_from_sync_code_cache_at_block_end(code_cache: &SyncCodeCache) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        if cache.len() > CROSS_BLOCK_MODULE_CACHE_SIZE {
+        if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
             cache.clear();
         }
 
@@ -208,7 +174,7 @@ impl CrossBlockModuleCache {
     /// execution.
     pub(crate) fn populate_from_unsync_code_cache_at_block_end(code_cache: &UnsyncCodeCache) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        if cache.len() > CROSS_BLOCK_MODULE_CACHE_SIZE {
+        if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
             cache.clear();
         }
 
