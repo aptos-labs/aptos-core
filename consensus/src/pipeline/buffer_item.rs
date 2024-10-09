@@ -2,8 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
 use crate::{
     counters, pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType,
 };
@@ -18,15 +16,13 @@ use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
-    aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
-    ledger_info::{
-        LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures,
-    },
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
     validator_verifier::ValidatorVerifier,
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
+use std::collections::HashMap;
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -56,17 +52,6 @@ fn ledger_info_with_unverified_signatures(
         }
     }
     li_with_sig
-}
-
-fn aggregate_commit_proof(
-    commit_ledger_info: &LedgerInfo,
-    verified_signatures: &PartialSignatures,
-    validator: &ValidatorVerifier,
-) -> LedgerInfoWithSignatures {
-    let aggregated_sig = validator
-        .aggregate_signatures(verified_signatures.signatures_iter())
-        .expect("Failed to generate aggregated signature");
-    LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
 
 // we differentiate buffer items at different stages
@@ -471,6 +456,159 @@ impl BufferItem {
         match self {
             BufferItem::Aggregated(item) => *item,
             _ => panic!("Not aggregated item"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_consensus_types::{block::Block, block_data::BlockData};
+    use aptos_crypto::HashValue;
+    use aptos_executor_types::StateComputeResult;
+    use aptos_types::{
+        aggregate_signature::AggregateSignature,
+        ledger_info::LedgerInfo,
+        validator_signer::ValidatorSigner,
+        validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
+    };
+    use std::collections::{BTreeMap, HashMap};
+
+    fn create_validators() -> (Vec<ValidatorSigner>, ValidatorVerifier) {
+        const NUM_SIGNERS: u8 = 7;
+        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+            .map(|i| ValidatorSigner::random([i; 32]))
+            .collect();
+        let mut validator_infos = vec![];
+
+        for validator in validator_signers.iter() {
+            validator_infos.push(ValidatorConsensusInfo::new(
+                validator.author(),
+                validator.public_key(),
+                1,
+            ));
+        }
+
+        let mut validator_verifier =
+            ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
+                .expect("Incorrect quorum size.");
+        validator_verifier.set_optimistic_sig_verification_flag(true);
+        (validator_signers, validator_verifier)
+    }
+
+    fn create_pipelined_block() -> PipelinedBlock {
+        PipelinedBlock::new(
+            Block::new_for_testing(
+                HashValue::random(),
+                BlockData::dummy_with_validator_txns(vec![]),
+                None,
+            ),
+            vec![],
+            StateComputeResult::new_dummy(),
+        )
+    }
+
+    fn create_valid_commit_votes(
+        validator_signers: Vec<ValidatorSigner>,
+        ledger_info: LedgerInfo,
+    ) -> Vec<CommitVote> {
+        let mut commit_votes = vec![];
+        for validator in validator_signers.iter() {
+            let commit_vote =
+                CommitVote::new(validator.author(), ledger_info.clone(), validator).unwrap();
+            commit_votes.push(commit_vote);
+        }
+        commit_votes
+    }
+
+    #[test]
+    fn test_buffer_item_happy_path_1() {
+        let (validator_signers, validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+        let ledger_info = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(ledger_info.clone(), AggregateSignature::empty());
+        let commit_votes =
+            create_valid_commit_votes(validator_signers.clone(), ledger_info.clone());
+        let mut partial_signatures = BTreeMap::new();
+        partial_signatures.insert(
+            validator_signers[0].author(),
+            commit_votes[0].signature().clone(),
+        );
+        partial_signatures.insert(
+            validator_signers[1].author(),
+            commit_votes[1].signature().clone(),
+        );
+        partial_signatures.insert(
+            validator_signers[2].author(),
+            commit_votes[2].signature().clone(),
+        );
+        partial_signatures.insert(
+            validator_signers[3].author(),
+            commit_votes[3].signature().clone(),
+        );
+        partial_signatures.insert(
+            validator_signers[4].author(),
+            commit_votes[4].signature().clone(),
+        );
+        let li_with_sig = validator_verifier
+            .aggregate_signatures(partial_signatures.iter())
+            .unwrap();
+        let commit_proof = LedgerInfoWithSignatures::new(ledger_info.clone(), li_with_sig);
+
+        let mut cached_commit_votes = HashMap::new();
+        cached_commit_votes.insert(commit_votes[0].author(), commit_votes[0].clone());
+        cached_commit_votes.insert(commit_votes[1].author(), commit_votes[1].clone());
+        let mut ordered_item = BufferItem::new_ordered(
+            vec![pipelined_block.clone()],
+            ordered_proof.clone(),
+            Box::new(move |_, _| {}),
+            cached_commit_votes,
+        );
+
+        ordered_item
+            .add_signature_if_matched(commit_votes[2].clone())
+            .unwrap();
+        ordered_item
+            .add_signature_if_matched(commit_votes[3].clone())
+            .unwrap();
+
+        let mut executed_item = ordered_item.advance_to_executed_or_aggregated(
+            vec![pipelined_block.clone()],
+            &validator_verifier,
+            None,
+            true,
+        );
+
+        match executed_item {
+            BufferItem::Executed(ref executed_item_inner) => {
+                assert_eq!(executed_item_inner.executed_blocks, vec![
+                    pipelined_block.clone()
+                ]);
+                assert_eq!(executed_item_inner.commit_info, block_info);
+                assert_eq!(
+                    executed_item_inner
+                        .partial_commit_proof
+                        .all_voters()
+                        .count(),
+                    4
+                );
+                assert_eq!(executed_item_inner.ordered_proof, ordered_proof);
+            },
+            _ => panic!("Expected executed item."),
+        }
+
+        executed_item
+            .add_signature_if_matched(commit_votes[4].clone())
+            .unwrap();
+        let aggregated_item = executed_item.try_advance_to_aggregated(&validator_verifier);
+        match aggregated_item {
+            BufferItem::Aggregated(aggregated_item_inner) => {
+                assert_eq!(aggregated_item_inner.executed_blocks, vec![pipelined_block]);
+                assert_eq!(aggregated_item_inner.commit_proof, commit_proof);
+            },
+            _ => panic!("Expected aggregated item."),
         }
     }
 }
