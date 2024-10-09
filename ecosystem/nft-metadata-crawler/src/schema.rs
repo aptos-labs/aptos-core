@@ -1,6 +1,3 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated automatically by Diesel CLI.
 
 pub mod nft_metadata_crawler {
@@ -13,6 +10,7 @@ pub mod nft_metadata_crawler {
             error_message -> Nullable<Varchar>,
             cdn_image_uri -> Nullable<Varchar>,
             num_failures -> Int8,
+            request_received_at -> Timestamp,
             inserted_at -> Timestamp,
         }
     }

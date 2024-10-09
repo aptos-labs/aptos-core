@@ -6,7 +6,8 @@ CREATE TABLE nft_metadata_crawler.asset_uploader_request_statuses (
   error_message VARCHAR,
   cdn_image_uri VARCHAR,
   num_failures BIGINT NOT NULL DEFAULT 0,
+  request_received_at TIMESTAMP NOT NULL DEFAULT NOW(),
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   PRIMARY KEY (request_id, asset_uri)
 );
-CREATE INDEX IF NOT EXISTS asset_uploader_request_status_code ON nft_metadata_crawler.asset_uploader_request_statuses (status_code);
+CREATE INDEX IF NOT EXISTS asset_uploader_status_code_inserted_at ON nft_metadata_crawler.asset_uploader_request_statuses (status_code, inserted_at);
