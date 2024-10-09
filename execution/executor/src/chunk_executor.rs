@@ -418,7 +418,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         )
     }
 
-    fn commit(&self) -> Result<ExecutedChunk> {
+    fn commit(&self) -> Result<Version> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
 
         self.inner.read().as_ref().expect("not reset").commit()
@@ -484,7 +484,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         Ok(())
     }
 
-    fn commit(&self) -> Result<ExecutedChunk> {
+    fn commit(&self) -> Result<Version> {
         let started = Instant::now();
 
         let chunk = self.commit_chunk_impl()?;
@@ -495,7 +495,11 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
             tps = num_committed as f64 / started.elapsed().as_secs_f64(),
             "TransactionReplayer::commit() OK"
         );
-        Ok(chunk)
+
+        Ok(chunk
+            .result_state
+            .current_version
+            .expect("Version must exist after commit."))
     }
 }
 
