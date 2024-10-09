@@ -9,7 +9,7 @@ pub mod nft_metadata_crawler {
             request_id -> Uuid,
             asset_uri -> Varchar,
             application_id -> Uuid,
-            status_code -> Nullable<Int8>,
+            status_code -> Int8,
             error_message -> Nullable<Varchar>,
             cdn_image_uri -> Nullable<Varchar>,
             num_failures -> Int8,

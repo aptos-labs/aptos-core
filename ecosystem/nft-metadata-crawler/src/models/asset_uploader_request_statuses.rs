@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::schema::nft_metadata_crawler::asset_uploader_request_statuses;
+use axum::http::StatusCode;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ pub struct AssetUploaderRequestStatuses {
     request_id: Uuid,
     asset_uri: String,
     application_id: Uuid,
-    status_code: Option<i64>,
+    status_code: i64,
     error_message: Option<String>,
     cdn_image_uri: Option<String>,
     num_failures: i64,
@@ -26,7 +27,7 @@ impl AssetUploaderRequestStatuses {
             request_id,
             asset_uri: asset_uri.to_string(),
             application_id,
-            status_code: None,
+            status_code: StatusCode::ACCEPTED.as_u16() as i64,
             error_message: None,
             cdn_image_uri: None,
             num_failures: 0,
@@ -43,54 +44,10 @@ impl AssetUploaderRequestStatuses {
             request_id,
             asset_uri: asset_uri.to_string(),
             application_id,
-            status_code: Some(200),
+            status_code: StatusCode::OK.as_u16() as i64,
             error_message: None,
             cdn_image_uri: Some(cdn_image_uri.to_string()),
             num_failures: 0,
         }
-    }
-
-    pub fn get_request_id(&self) -> Uuid {
-        self.request_id
-    }
-
-    pub fn get_asset_uri(&self) -> String {
-        self.asset_uri.clone()
-    }
-
-    pub fn get_application_id(&self) -> Uuid {
-        self.application_id
-    }
-
-    pub fn get_status_code(&self) -> Option<i64> {
-        self.status_code
-    }
-
-    pub fn set_status_code(&mut self, status_code: Option<i64>) {
-        self.status_code = status_code;
-    }
-
-    pub fn get_error_message(&self) -> Option<String> {
-        self.error_message.clone()
-    }
-
-    pub fn set_error_message(&mut self, error_message: Option<String>) {
-        self.error_message = error_message;
-    }
-
-    pub fn get_cdn_image_uri(&self) -> Option<String> {
-        self.cdn_image_uri.clone()
-    }
-
-    pub fn set_cdn_image_uri(&mut self, cdn_image_uri: Option<String>) {
-        self.cdn_image_uri = cdn_image_uri;
-    }
-
-    pub fn get_num_failures(&self) -> i64 {
-        self.num_failures
-    }
-
-    pub fn increment_num_failures(&mut self) {
-        self.num_failures += 1;
     }
 }

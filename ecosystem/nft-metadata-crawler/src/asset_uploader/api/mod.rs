@@ -45,11 +45,11 @@ enum BatchUploadResponse {
 #[serde(untagged)]
 pub enum GetStatusResponseSuccess {
     Success {
-        status_code: Option<u16>,
+        status_code: u16,
         cdn_image_uri: String,
     },
     Error {
-        status_code: Option<u16>,
+        status_code: u16,
         error_message: Option<String>,
     },
 }

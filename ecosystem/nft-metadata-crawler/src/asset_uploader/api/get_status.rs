@@ -6,6 +6,7 @@ use crate::{
     models::asset_uploader_request_statuses_query::AssetUploaderRequestStatusesQuery, schema,
 };
 use ahash::AHashMap;
+use axum::http::StatusCode;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
@@ -23,28 +24,17 @@ pub fn get_status(
     let mut status_response = AHashMap::new();
     let rows = query_status(&mut conn, &request_id)?;
     for row in rows {
-        let status_code = row.status_code.map(|x| x as u16);
-
-        let response = if let Some(status_code) = status_code {
-            if status_code == 200 {
-                GetStatusResponseSuccess::Success {
-                    status_code: Some(status_code),
-                    cdn_image_uri: row.cdn_image_uri.unwrap_or_default(),
-                }
-            } else {
-                GetStatusResponseSuccess::Error {
-                    status_code: Some(status_code),
-                    error_message: row.error_message,
-                }
-            }
+        if row.status_code == StatusCode::OK.as_u16() as i64 {
+            status_response.insert(row.asset_uri, GetStatusResponseSuccess::Success {
+                status_code: StatusCode::OK.as_u16(),
+                cdn_image_uri: row.cdn_image_uri.unwrap_or_default(),
+            });
         } else {
-            GetStatusResponseSuccess::Error {
-                status_code,
+            status_response.insert(row.asset_uri, GetStatusResponseSuccess::Error {
+                status_code: row.status_code as u16,
                 error_message: row.error_message,
-            }
+            });
         };
-
-        status_response.insert(row.asset_uri, response);
     }
 
     Ok(status_response)

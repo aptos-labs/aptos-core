@@ -14,7 +14,7 @@ pub struct AssetUploaderRequestStatusesQuery {
     pub request_id: Uuid,
     pub asset_uri: String,
     pub application_id: Uuid,
-    pub status_code: Option<i64>,
+    pub status_code: i64,
     pub error_message: Option<String>,
     pub cdn_image_uri: Option<String>,
     pub num_failures: i64,
