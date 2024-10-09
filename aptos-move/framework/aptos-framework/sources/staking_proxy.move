@@ -23,7 +23,7 @@ module aptos_framework::staking_proxy {
 
     /// Grant permission to mutate staking on behalf of the master signer.
     public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize(master, permissioned_signer, 1, StakeProxyPermission {})
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, StakeProxyPermission {})
     }
 
     public entry fun set_operator(owner: &signer, old_operator: address, new_operator: address) {

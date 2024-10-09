@@ -61,7 +61,6 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `get_signer`](#0x1_aptos_governance_get_signer)
 -  [Function `create_proposal_metadata`](#0x1_aptos_governance_create_proposal_metadata)
 -  [Function `assert_voting_initialization`](#0x1_aptos_governance_assert_voting_initialization)
--  [Function `initialize_for_verification`](#0x1_aptos_governance_initialize_for_verification)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -96,7 +95,6 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `get_signer`](#@Specification_1_get_signer)
     -  [Function `create_proposal_metadata`](#@Specification_1_create_proposal_metadata)
     -  [Function `assert_voting_initialization`](#@Specification_1_assert_voting_initialization)
-    -  [Function `initialize_for_verification`](#@Specification_1_initialize_for_verification)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -1891,7 +1889,7 @@ Only called in testnet where the core resources account exists and has been gran
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_signer_testnet_only">get_signer_testnet_only</a>(
     core_resources: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, signer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(core_resources);
-    // Core resources <a href="account.md#0x1_account">account</a> only <b>has</b> mint capability in tests/testnets.
+    // Core resources <a href="account.md#0x1_account">account</a> only <b>has</b> mint <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> in tests/testnets.
     <b>assert</b>!(<a href="aptos_coin.md#0x1_aptos_coin_has_mint_capability">aptos_coin::has_mint_capability</a>(core_resources), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="aptos_governance.md#0x1_aptos_governance_EUNAUTHORIZED">EUNAUTHORIZED</a>));
     <a href="aptos_governance.md#0x1_aptos_governance_get_signer">get_signer</a>(signer_address)
 }
@@ -2022,36 +2020,6 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 
 </details>
 
-<a id="0x1_aptos_governance_initialize_for_verification"></a>
-
-## Function `initialize_for_verification`
-
-
-
-<pre><code>#[verify_only]
-<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">initialize_for_verification</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">initialize_for_verification</a>(
-    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    min_voting_threshold: u128,
-    required_proposer_stake: u64,
-    voting_duration_secs: u64,
-) {
-    <a href="aptos_governance.md#0x1_aptos_governance_initialize">initialize</a>(aptos_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -2156,6 +2124,7 @@ Limit addition overflow.
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>let</b> register_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(aptos_framework);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>aborts_if</b> register_account.guid_creation_num + 7 &gt; <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>;
@@ -3240,24 +3209,6 @@ pool_address must exist in StakePool.
 
 
 <pre><code><b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingInitializationAbortIfs">VotingInitializationAbortIfs</a>;
-</code></pre>
-
-
-
-<a id="@Specification_1_initialize_for_verification"></a>
-
-### Function `initialize_for_verification`
-
-
-<pre><code>#[verify_only]
-<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">initialize_for_verification</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)
-</code></pre>
-
-
-verify_only
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

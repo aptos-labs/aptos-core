@@ -359,7 +359,7 @@ module aptos_framework::stake {
 
     /// Grant permission to mutate staking on behalf of the master signer.
     public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize(master, permissioned_signer, 1, StakePermission {})
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, StakePermission {})
     }
 
     #[view]

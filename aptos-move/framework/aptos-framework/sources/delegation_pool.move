@@ -847,7 +847,7 @@ module aptos_framework::delegation_pool {
     }
 
     public fun grant_permission(master: &signer, permissioned_signer: &signer) {
-        permissioned_signer::authorize(master, permissioned_signer, 1, DelegationPermission {})
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, DelegationPermission {})
     }
 
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.

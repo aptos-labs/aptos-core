@@ -40,6 +40,7 @@ module aptos_framework::object_code_deployment {
     use aptos_framework::event;
     use aptos_framework::object;
     use aptos_framework::object::{ExtendRef, Object};
+    use aptos_framework::permissioned_signer;
 
     /// Object code deployment feature not supported.
     const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: u64 = 1;
@@ -84,6 +85,7 @@ module aptos_framework::object_code_deployment {
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
     ) {
+        permissioned_signer::assert_master_signer(publisher);
         assert!(
             features::is_object_code_deployment_enabled(),
             error::unavailable(EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED),
@@ -120,6 +122,7 @@ module aptos_framework::object_code_deployment {
         code: vector<vector<u8>>,
         code_object: Object<PackageRegistry>,
     ) acquires ManagingRefs {
+        permissioned_signer::assert_master_signer(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
             object::is_owner(code_object, publisher_address),
