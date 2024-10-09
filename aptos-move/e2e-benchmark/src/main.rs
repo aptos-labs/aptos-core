@@ -253,6 +253,8 @@ fn main() {
             repeats: 100,
             map_type: MapType::OrderedMap,
         },
+        EntryPoints::APTPermissionedTransfer,
+        EntryPoints::APTTransferWithMasterSigner,
     ];
 
     let mut failures = Vec::new();
