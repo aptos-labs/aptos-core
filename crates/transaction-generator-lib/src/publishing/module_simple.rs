@@ -267,6 +267,7 @@ pub enum EntryPoints {
         num_points_per_txn: usize,
     },
     DeserializeU256,
+    UnmanagedLaunchpadMint,
 }
 
 impl EntryPoints {
@@ -323,6 +324,7 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {"unmanaged_launchpad"}
         }
     }
 
@@ -382,6 +384,7 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {"unmanaged_launchpad"}
         }
     }
 
@@ -722,6 +725,23 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {
+                // Set this to an address with a deployed `unmanaged_launchpad`
+                let module_id = ModuleId::new(
+                    AccountAddress::from_hex_literal("0x6af6b4a2580a8bf5275abd3489e23a159ddfc1ef73a2a62b1bf539dd3cc8fa08").unwrap(),
+                    Identifier::new("unmanaged_launchpad").unwrap()
+                );
+
+                // Set this to a collection addr after creating
+                let collection_addr = "0xeb5f23a679244837a193a66d79cadcc65462722957edea40651a5c15e41ed981";
+                get_payload(
+                    module_id,
+                    ident_str!("mint").to_owned(),
+                    vec![
+                        bcs::to_bytes(&AccountAddress::from_hex_literal(collection_addr).unwrap()).unwrap(),
+                    ],
+                )
+            }
         }
     }
 
@@ -829,6 +849,7 @@ impl EntryPoints {
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
+            EntryPoints::UnmanagedLaunchpadMint { .. } => AutomaticArgs::Signer,
         }
     }
 }
