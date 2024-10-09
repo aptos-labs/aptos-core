@@ -4,7 +4,7 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    components::chunk_output::ChunkOutput,
+    components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk},
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -14,7 +14,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ExecutedChunk, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
+    BlockExecutorTrait, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,

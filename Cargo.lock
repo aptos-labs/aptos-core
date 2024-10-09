@@ -1545,7 +1545,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-drop-helper",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-storage-interface",
