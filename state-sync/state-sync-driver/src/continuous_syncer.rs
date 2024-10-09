@@ -116,7 +116,7 @@ impl<
         let sync_request_target = consensus_sync_request
             .lock()
             .as_ref()
-            .map(|sync_request| sync_request.get_sync_target());
+            .and_then(|sync_request| sync_request.get_sync_target());
 
         // Initialize a new active data stream
         let active_data_stream = match self.get_continuous_syncing_mode() {
@@ -432,7 +432,7 @@ impl<
         let sync_request_target = consensus_sync_request
             .lock()
             .as_ref()
-            .map(|sync_request| sync_request.get_sync_target());
+            .and_then(|sync_request| sync_request.get_sync_target());
         if let Some(sync_request_target) = sync_request_target {
             let sync_request_version = sync_request_target.ledger_info().version();
             let proof_version = ledger_info_with_signatures.ledger_info().version();

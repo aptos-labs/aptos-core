@@ -27,7 +27,10 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
 };
 use futures_channel::oneshot;
-use std::sync::{atomic::AtomicU64, Arc};
+use std::{
+    sync::{atomic::AtomicU64, Arc},
+    time::Duration,
+};
 use tokio::runtime::Handle;
 
 struct DummyStateSyncNotifier {
@@ -53,6 +56,10 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
             .lock()
             .push((transactions, subscribable_events));
         Ok(())
+    }
+
+    async fn sync_for_duration(&self, _duration: Duration) -> Result<(), Error> {
+        unreachable!()
     }
 
     async fn sync_to_target(&self, _target: LedgerInfoWithSignatures) -> Result<(), Error> {

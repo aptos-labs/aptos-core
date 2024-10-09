@@ -516,6 +516,13 @@ async fn test_commit_sync_race() {
             Ok(())
         }
 
+        async fn sync_for_duration(
+            &self,
+            _duration: std::time::Duration,
+        ) -> std::result::Result<(), Error> {
+            Ok(())
+        }
+
         async fn sync_to_target(
             &self,
             target: LedgerInfoWithSignatures,
