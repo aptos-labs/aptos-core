@@ -9,6 +9,7 @@ use crate::{
         apply_chunk_output::{ensure_no_discard, ensure_no_retry, ApplyChunkOutput},
         chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
         chunk_output::ChunkOutput,
+        executed_chunk::ExecutedChunk,
         transaction_chunk::TransactionChunkWithProof,
     },
     logging::{LogEntry, LogSchema},
@@ -18,8 +19,8 @@ use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
-    TransactionReplayer, VerifyExecutionMode,
+    ChunkCommitNotification, ChunkExecutorTrait, ParsedTransactionOutput, TransactionReplayer,
+    VerifyExecutionMode,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
