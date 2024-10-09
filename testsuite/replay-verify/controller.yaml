@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: replay-verify
+  labels:
+    env: test
+    owner: bowu 
+
+spec:
+  containers:
+  - image: aptoslabs/tools:nightly
+    name: controller
+    ports:
+    - containerPort: 80
