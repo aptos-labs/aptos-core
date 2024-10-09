@@ -99,7 +99,7 @@ impl Server for AssetUploaderWorkerContext {
 
 /// Converts a reqwest response to an axum response
 /// Only copies the response status, response body, and Content-Type header
-pub async fn reqwest_response_to_axum_response(
+async fn reqwest_response_to_axum_response(
     response: reqwest::Response,
 ) -> anyhow::Result<impl IntoResponse> {
     let status = response.status();
