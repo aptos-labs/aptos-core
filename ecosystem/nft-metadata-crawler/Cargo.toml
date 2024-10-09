@@ -37,6 +37,7 @@ futures = { workspace = true }
 google-cloud-storage = { workspace = true }
 image = { workspace = true }
 once_cell = { workspace = true }
+parking_lot = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

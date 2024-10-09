@@ -3103,6 +3103,7 @@ dependencies = [
  "google-cloud-storage",
  "image",
  "once_cell",
+ "parking_lot 0.12.1",
  "regex",
  "reqwest 0.11.23",
  "serde",

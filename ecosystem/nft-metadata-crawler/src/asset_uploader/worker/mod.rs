@@ -10,7 +10,7 @@ use axum::{
     body::Body, http::StatusCode, response::IntoResponse, routing::post, Extension, Json, Router,
 };
 use reqwest::{multipart::Form, Client};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tracing::{error, info};
 use url::Url;
@@ -22,9 +22,9 @@ pub struct AssetUploaderWorkerContext {
     config: Arc<AssetUploaderWorkerConfig>,
 }
 
-#[derive(Debug, Deserialize)]
-struct UploadRequest {
-    url: Url,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UploadRequest {
+    pub url: Url,
 }
 
 impl AssetUploaderWorkerContext {

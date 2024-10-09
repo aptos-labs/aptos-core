@@ -7,7 +7,20 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Queryable, Serialize)]
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    FieldCount,
+    Identifiable,
+    Queryable,
+    Serialize,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord, // TODO: Custom Ord implementation for fairness
+)]
 #[diesel(primary_key(request_id, asset_uri))]
 #[diesel(table_name = asset_uploader_request_statuses)]
 pub struct AssetUploaderRequestStatusesQuery {
