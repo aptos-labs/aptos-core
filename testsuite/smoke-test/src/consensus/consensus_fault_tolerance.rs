@@ -244,6 +244,11 @@ async fn test_faulty_votes() {
                         "consensus::create_invalid_order_vote".to_string(),
                         format!("{}%return", 50),
                     ),
+                    (
+                        (cycle + 2) % num_validators,
+                        "consensus::create_invalid_commit_vote".to_string(),
+                        format!("{}%return", 50),
+                    ),
                 ],
                 true,
             )
