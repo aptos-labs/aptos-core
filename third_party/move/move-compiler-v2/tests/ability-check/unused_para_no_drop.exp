@@ -8,7 +8,7 @@ error: local `_x` of type `T` does not have the `drop` ability
 10 │ │     }
    │ ╰─────^ implicitly dropped here since it is no longer used
 
-error: local `_x` of type `m::S` does not have the `drop` ability
+error: local `_x` of type `S` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:15:26
    │
 15 │       public fun f3(_x: S) {
@@ -16,7 +16,7 @@ error: local `_x` of type `m::S` does not have the `drop` ability
 16 │ │     }
    │ ╰─────^ implicitly dropped here since it is no longer used
 
-error: local `_x` of type `vector<m::S>` does not have the `drop` ability
+error: local `_x` of type `vector<S>` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:21:34
    │
 21 │       public fun f5(_x: vector<S>) {
@@ -30,13 +30,13 @@ error: local `_y` of type `T` does not have the `drop` ability
 38 │         x
    │         ^ implicitly dropped here since it is no longer used
 
-error: local `x` of type `m::S` does not have the `drop` ability
+error: local `x` of type `S` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:42:9
    │
 42 │         &x == &y
    │         ^^ still borrowed but will be implicitly dropped later since it is no longer used
 
-error: local `y` of type `m::S` does not have the `drop` ability
+error: local `y` of type `S` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:42:15
    │
 42 │         &x == &y
@@ -54,13 +54,13 @@ error: local `y` of type `T` does not have the `drop` ability
 46 │         &x == &y
    │               ^^ still borrowed but will be implicitly dropped later since it is no longer used
 
-error: local `x` of type `m::S2` does not have the `drop` ability
+error: local `x` of type `S2` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:54:9
    │
 54 │         x.foo == y.foo
    │         ^ still borrowed but will be implicitly dropped later since it is no longer used
 
-error: local `y` of type `m::S2` does not have the `drop` ability
+error: local `y` of type `S2` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:54:18
    │
 54 │         x.foo == y.foo

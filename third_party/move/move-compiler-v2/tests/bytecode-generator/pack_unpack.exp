@@ -5,12 +5,12 @@ module 0x42::pack_unpack {
     }
     struct S {
         f: u64,
-        g: pack_unpack::T,
+        g: 0x42::pack_unpack::T,
     }
-    private fun pack(x: u64,y: u64): pack_unpack::S {
+    private fun pack(x: u64,y: u64): S {
         pack pack_unpack::S(x, pack pack_unpack::T(y))
     }
-    private fun unpack(s: pack_unpack::S): (u64, u64) {
+    private fun unpack(s: S): (u64, u64) {
         {
           let pack_unpack::S{ f, g: pack_unpack::T{ h } } = s;
           Tuple(f, h)
@@ -18,27 +18,45 @@ module 0x42::pack_unpack {
     }
 } // end 0x42::pack_unpack
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::pack_unpack {
+    struct T {
+        h: u64,
+    }
+    struct S {
+        f: u64,
+        g: T,
+    }
+    fun pack(x: u64, y: u64): S {
+        S{f: x,g: T{h: y}}
+    }
+    fun unpack(s: S): (u64, u64) {
+        let S{f: f,g: T{h: h}} = s;
+        (f, h)
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
-fun pack_unpack::pack($t0: u64, $t1: u64): pack_unpack::S {
-     var $t2: pack_unpack::S
-     var $t3: pack_unpack::T
-  0: $t3 := pack pack_unpack::T($t1)
-  1: $t2 := pack pack_unpack::S($t0, $t3)
+fun pack_unpack::pack($t0: u64, $t1: u64): 0x42::pack_unpack::S {
+     var $t2: 0x42::pack_unpack::S
+     var $t3: 0x42::pack_unpack::T
+  0: $t3 := pack 0x42::pack_unpack::T($t1)
+  1: $t2 := pack 0x42::pack_unpack::S($t0, $t3)
   2: return $t2
 }
 
 
 [variant baseline]
-fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
+fun pack_unpack::unpack($t0: 0x42::pack_unpack::S): (u64, u64) {
      var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     var $t5: pack_unpack::T
-  0: ($t3, $t5) := unpack pack_unpack::S($t0)
-  1: $t4 := unpack pack_unpack::T($t5)
+     var $t5: 0x42::pack_unpack::T
+  0: ($t3, $t5) := unpack 0x42::pack_unpack::S($t0)
+  1: $t4 := unpack 0x42::pack_unpack::T($t5)
   2: $t1 := infer($t3)
   3: $t2 := infer($t4)
   4: return ($t1, $t2)

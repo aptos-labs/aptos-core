@@ -19,6 +19,14 @@ module <SELF>_0 {
     }
 } // end <SELF>_0
 
+// -- Sourcified model before bytecode pipeline
+script {
+    fun main() {
+        let x;
+        let y = x;
+    }
+}
+
 
 Diagnostics:
 error: use of unassigned local `x`

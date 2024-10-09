@@ -9,3 +9,14 @@ module 0x8675309::M {
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    fun t() {
+        0x1;
+        0;
+        10000;
+        true;
+        false;
+    }
+}

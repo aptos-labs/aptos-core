@@ -1,8 +1,8 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
-        s1: M::S,
-        s2: M::S,
+        s1: 0x8675309::M::S,
+        s2: 0x8675309::M::S,
     }
     struct S {
         f: u64,
@@ -12,7 +12,7 @@ module 0x8675309::M {
           let M::R{ s1: M::S{ f }, s2 };
           f: u64 = 0;
           f;
-          s2: M::S = pack M::S(0);
+          s2: S = pack M::S(0);
           s2;
           Tuple()
         }
@@ -22,7 +22,7 @@ module 0x8675309::M {
           let M::R{ s1: M::S{ f }, s2 };
           f: &u64 = Borrow(Immutable)(0);
           f;
-          s2: &M::S = Borrow(Immutable)(pack M::S(0));
+          s2: &S = Borrow(Immutable)(pack M::S(0));
           s2;
           Tuple()
         }
@@ -32,9 +32,41 @@ module 0x8675309::M {
           let M::R{ s1: M::S{ f }, s2 };
           f: &mut u64 = Borrow(Mutable)(0);
           f;
-          s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
+          s2: &mut S = Borrow(Mutable)(pack M::S(0));
           s2;
           Tuple()
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        s1: S,
+        s2: S,
+    }
+    struct S has drop {
+        f: u64,
+    }
+    fun t0() {
+        let R{s1: S{f: f},s2: s2};
+        f = 0;
+        f;
+        s2 = S{f: 0};
+        s2;
+    }
+    fun t1() {
+        let R{s1: S{f: f},s2: s2};
+        f = &0;
+        f;
+        s2 = &S{f: 0};
+        s2;
+    }
+    fun t2() {
+        let R{s1: S{f: f},s2: s2};
+        f = &mut 0;
+        f;
+        s2 = &mut S{f: 0};
+        s2;
+    }
+}
