@@ -56,7 +56,7 @@ fn request_for_test(
             num_bytes,
             0,
         ),
-        maybe_payload,
+        maybe_payload.map(Arc::new),
     )
 }
 

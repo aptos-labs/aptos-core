@@ -35,7 +35,7 @@ impl TPayloadManager for MockPayloadManager {
     async fn get_transactions(
         &self,
         _block: &Block,
-    ) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<(Arc<Vec<SignedTransaction>>, u64)>, Option<u64>)> {
         Ok((Vec::new(), None))
     }
 }

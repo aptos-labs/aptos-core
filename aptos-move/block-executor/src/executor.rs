@@ -41,6 +41,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
+    txn_provider::TxnProvider,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -62,22 +63,23 @@ use std::{
     },
 };
 
-pub struct BlockExecutor<T, E, S, L, X> {
+pub struct BlockExecutor<T, E, S, L, X, TP: ?Sized> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, X)>,
+    phantom: PhantomData<(T, E, S, L, X, TP)>,
 }
 
-impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
+impl<T, E, S, L, X, TP> BlockExecutor<T, E, S, L, X, TP>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
+    TP: TxnProvider<T> + Sync + ?Sized,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -102,7 +104,7 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &[T],
+        signature_verified_block: Arc<TP>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
@@ -110,7 +112,19 @@ where
         parallel_state: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let txn = &signature_verified_block[idx_to_execute as usize];
+        // let txn_get_timer = TXN_GET_SECONDS.start_timer();
+        let txn = &signature_verified_block.get_txn(idx_to_execute);
+        // txn_get_timer.observe_duration();
+        // let elapsed = txn_get_timer.stop_and_record();
+        // if idx_to_execute < 10
+        //     || (idx_to_execute < 1000 && idx_to_execute % 10 == 0)
+        //     || idx_to_execute % 1000 == 0
+        // {
+        //     info!(
+        //         "[Execution] At txn {}, get_txn took: {:.2e} s",
+        //         idx_to_execute, elapsed
+        //     )
+        // }
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
@@ -463,7 +477,7 @@ where
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
-        block: &[T],
+        block: Arc<TP>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
@@ -480,7 +494,7 @@ where
                 let _needs_suffix_validation = Self::execute(
                     txn_idx,
                     incarnation + 1,
-                    block,
+                    block.clone(),
                     last_input_output,
                     versioned_cache,
                     executor,
@@ -522,7 +536,7 @@ where
                         .map(|approx_output| {
                             approx_output
                                 + if block_gas_limit_type.include_user_txn_size_in_block_output() {
-                                    block[txn_idx as usize].user_txn_bytes_len()
+                                    block.get_txn(txn_idx).user_txn_bytes_len()
                                 } else {
                                     0
                                 } as u64
@@ -748,7 +762,7 @@ where
     fn worker_loop(
         &self,
         env: &E::Environment,
-        block: &[T],
+        block: Arc<TP>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
@@ -797,7 +811,7 @@ where
                     start_shared_counter,
                     shared_counter,
                     &executor,
-                    block,
+                    block.clone(),
                     num_workers,
                 )?;
                 scheduler.queueing_commits_mark_done();
@@ -826,7 +840,7 @@ where
                     let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
-                        block,
+                        block.clone(),
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -865,7 +879,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         env: &E::Environment,
-        signature_verified_block: &[T],
+        signature_verified_block: Arc<TP>,
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -882,11 +896,11 @@ where
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
-        if signature_verified_block.is_empty() {
+        let num_txns = signature_verified_block.num_txns();
+        if num_txns == 0 {
             return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
-        let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
@@ -914,7 +928,7 @@ where
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         env,
-                        signature_verified_block,
+                        signature_verified_block.clone(),
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
@@ -1039,11 +1053,11 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         env: E::Environment,
-        signature_verified_block: &[T],
+        signature_verified_block: Arc<TP>,
         base_view: &S,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
-        let num_txns = signature_verified_block.len();
+        let num_txns = signature_verified_block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(env, base_view);
         drop(init_timer);
@@ -1060,13 +1074,14 @@ where
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
-        for (idx, txn) in signature_verified_block.iter().enumerate() {
+        for idx in 0..num_txns {
+            let txn = signature_verified_block.get_txn(idx as TxnIndex);
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res = executor.execute_transaction(&latest_view, txn.as_ref(), idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
@@ -1350,12 +1365,15 @@ where
     pub fn execute_block(
         &self,
         env: E::Environment,
-        signature_verified_block: &[T],
+        signature_verified_block: Arc<TP>,
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
-            let parallel_result =
-                self.execute_transactions_parallel(&env, signature_verified_block, base_view);
+            let parallel_result = self.execute_transactions_parallel(
+                &env,
+                signature_verified_block.clone(),
+                base_view,
+            );
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -1368,7 +1386,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            init_speculative_logs(signature_verified_block.num_txns());
 
             info!("parallel execution requiring fallback");
         }
@@ -1376,7 +1394,7 @@ where
         // If we didn't run parallel, or it didn't finish successfully - run sequential
         let sequential_result = self.execute_transactions_sequential(
             env.clone(),
-            signature_verified_block,
+            signature_verified_block.clone(),
             base_view,
             false,
         );
@@ -1395,11 +1413,11 @@ where
                 // and whether clearing them below is needed at all.
                 // All logs from the first pass of sequential execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
-                init_speculative_logs(signature_verified_block.len());
+                init_speculative_logs(signature_verified_block.num_txns());
 
                 let sequential_result = self.execute_transactions_sequential(
                     env,
-                    signature_verified_block,
+                    signature_verified_block.clone(),
                     base_view,
                     true,
                 );
@@ -1432,8 +1450,7 @@ where
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                 },
             };
-            let ret = signature_verified_block
-                .iter()
+            let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
             return Ok(BlockOutput::new(ret, self.empty_block_end_info()));

@@ -81,7 +81,7 @@ impl MockExecutionClient {
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(
             txns.into_iter()
-                .flat_map(|(txns, _)| txns.into_iter())
+                .flat_map(|(txns, _)| txns.as_ref().clone().into_iter())
                 .collect(),
         );
 

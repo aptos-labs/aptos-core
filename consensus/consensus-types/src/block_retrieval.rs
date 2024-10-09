@@ -126,8 +126,10 @@ impl BlockRetrievalResponse {
                         self.blocks.last().unwrap().epoch(),
                         self.blocks.last().unwrap().round()
                     )),
-            "target not found in blocks returned, expect {:?}",
-            retrieval_request.target_epoch_and_round()
+            "target not found in blocks returned, expect {:?}, get ({}, {})",
+            retrieval_request.target_epoch_and_round(),
+            self.blocks.last().unwrap().epoch(),
+            self.blocks.last().unwrap().round(),
         );
         self.blocks
             .iter()

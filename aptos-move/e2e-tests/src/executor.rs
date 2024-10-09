@@ -43,6 +43,7 @@ use aptos_types::{
         BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
         TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
+    txn_provider::default::DefaultTxnProvider,
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType, CoinType,
@@ -612,7 +613,7 @@ impl FakeExecutor {
 
     fn execute_transaction_block_impl_with_state_view(
         &self,
-        txn_block: &[SignatureVerifiedTransaction],
+        txn_block: Vec<SignatureVerifiedTransaction>,
         onchain_config: BlockExecutorConfigFromOnchain,
         sequential: bool,
         state_view: &(impl StateView + Sync),
@@ -629,12 +630,14 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
+        let txn_provider = Arc::new(DefaultTxnProvider::new(txn_block));
         BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
         >(
             self.executor_thread_pool.clone(),
-            txn_block,
+            txn_provider,
             &state_view,
             config,
             None,
@@ -675,7 +678,7 @@ impl FakeExecutor {
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
-                &sig_verified_block,
+                sig_verified_block.clone(),
                 onchain_config.clone(),
                 true,
                 state_view,
@@ -686,7 +689,7 @@ impl FakeExecutor {
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
-                &sig_verified_block,
+                sig_verified_block,
                 onchain_config,
                 false,
                 state_view,
