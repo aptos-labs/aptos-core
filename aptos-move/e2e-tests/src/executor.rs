@@ -22,7 +22,6 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
@@ -61,7 +60,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
-    storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -73,7 +72,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    WithRuntimeEnvironment,
+    ModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
@@ -982,14 +981,16 @@ impl FakeExecutor {
             _ => vec![],
         };
 
-        // TODO(loader_v2): Re-check if this is still correct.
         let env = AptosEnvironment::new(&self.data_store);
         let resolver = self.data_store.as_move_resolver();
         let vm = MoveVmExt::new(env.clone(), &resolver);
 
+        // Create module storage, and ensure the module for the function we want to execute is
+        // cached.
         let module_storage = self
             .data_store
             .as_aptos_code_storage(env.runtime_environment());
+        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -1025,7 +1026,7 @@ impl FakeExecutor {
             let (mut regular, mut unmetered) = match gas_meter_type {
                 GasMeterType::RegularGasMeter => (
                     Some(make_prod_gas_meter(
-                        LATEST_GAS_FEATURE_VERSION,
+                        env.gas_feature_version(),
                         env.gas_params().as_ref().unwrap().vm.clone(),
                         env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
@@ -1120,12 +1121,11 @@ impl FakeExecutor {
                 args,
                 &mut StandardGasMeter::new(CalibrationAlgebra {
                     base: StandardGasAlgebra::new(
-                        //// TODO: fill in these with proper values
-                        LATEST_GAS_FEATURE_VERSION,
-                        InitialGasSchedule::initial(),
-                        StorageGasParameters::latest(),
+                        env.gas_feature_version(),
+                        env.gas_params().as_ref().unwrap().vm.clone(),
+                        env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
-                        10000000000000,
+                        10_000_000_000_000,
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
@@ -1137,7 +1137,12 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            finish_session_assert_no_modules(session, &module_storage)
+            let change_set_configs = &env
+                .storage_gas_params()
+                .as_ref()
+                .unwrap()
+                .change_set_configs;
+            finish_session_assert_no_modules(session, &module_storage, change_set_configs)
         };
         self.data_store.add_write_set(&write_set);
 
@@ -1186,7 +1191,11 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            finish_session_assert_no_modules(session, &module_storage)
+            finish_session_assert_no_modules(
+                session,
+                &module_storage,
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
+            )
         };
         self.data_store.add_write_set(&write_set);
         self.event_store.extend(events);
@@ -1221,7 +1230,11 @@ impl FakeExecutor {
                 &module_storage,
             )
             .map_err(|e| e.into_vm_status())?;
-        Ok(finish_session_assert_no_modules(session, &module_storage))
+        Ok(finish_session_assert_no_modules(
+            session,
+            &module_storage,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
+        ))
     }
 
     pub fn execute_view_function(
@@ -1242,18 +1255,15 @@ impl FakeExecutor {
     }
 }
 
-/// Finishes the session with [ChangeSetConfigs::unlimited_at_gas_feature_version]
-/// configs, and asserts there has been no modules published (publishing is the
-/// responsibility of the adapter, e.g., [AptosVM]).
+/// Finishes the session, and asserts there has been no modules published (publishing is the
+/// responsibility of the adapter, i.e., [AptosVM]).
 fn finish_session_assert_no_modules(
     session: SessionExt,
     module_storage: &impl AptosModuleStorage,
+    change_set_configs: &ChangeSetConfigs,
 ) -> (WriteSet, Vec<ContractEvent>) {
     let (change_set, empty_module_write_set) = session
-        .finish(
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            module_storage,
-        )
+        .finish(change_set_configs, module_storage)
         .expect("Failed to finish the session");
     assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
 
