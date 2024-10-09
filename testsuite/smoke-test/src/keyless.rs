@@ -23,11 +23,11 @@ use aptos_types::{
         get_public_inputs_hash,
         test_utils::{
             self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_aud, get_sample_epk_blinder,
-            get_sample_esk, get_sample_exp_date, get_sample_groth16_sig_and_fed_pk,
-            get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
-            get_sample_iss, get_sample_jwk, get_sample_jwt_header_json, get_sample_jwt_token,
-            get_sample_openid_sig_and_pk, get_sample_pepper, get_sample_tw_sk, get_sample_uid_key,
-            get_sample_uid_val, get_sample_zk_sig, get_upgraded_vk,
+            get_sample_esk, get_sample_exp_date, get_sample_groth16_sig_and_pk,
+            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
+            get_sample_jwt_header_json, get_sample_jwt_token, get_sample_openid_sig_and_pk,
+            get_sample_pepper, get_sample_tw_sk, get_sample_uid_key, get_sample_uid_val,
+            get_sample_zk_sig, get_upgraded_vk,
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
@@ -250,7 +250,7 @@ async fn federated_keyless_scenario(
     install_fed_jwk: bool,
     expect_txn_succeed: bool,
 ) {
-    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net_inner(set_feature_flag).await;
+    let (_tw_sk, _config, _jwk, swarm, mut cli, _) = setup_local_net_inner(set_feature_flag).await;
     let root_addr = swarm.chain_info().root_account().address();
     let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
