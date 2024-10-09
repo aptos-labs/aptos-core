@@ -31,6 +31,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::consensus_config;
+    use aptos_framework::permissioned_signer;
     use aptos_framework::randomness_config;
     use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::timestamp;
@@ -375,6 +376,7 @@ module aptos_framework::aptos_governance {
         metadata_hash: vector<u8>,
         is_multi_step_proposal: bool,
     ): u64 acquires GovernanceConfig, GovernanceEvents {
+        permissioned_signer::assert_master_signer(proposer);
         let proposer_address = signer::address_of(proposer);
         assert!(
             stake::get_delegated_voter(stake_pool) == proposer_address,
@@ -506,6 +508,7 @@ module aptos_framework::aptos_governance {
         voting_power: u64,
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        permissioned_signer::assert_master_signer(voter);
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 

@@ -63,6 +63,7 @@ spec aptos_framework::aptos_governance {
         let addr = signer::address_of(aptos_framework);
         let register_account = global<account::Account>(addr);
 
+        aborts_if permissioned_signer::spec_is_permissioned_signer(aptos_framework);
         aborts_if exists<voting::VotingForum<GovernanceProposal>>(addr);
         aborts_if !exists<account::Account>(addr);
         aborts_if register_account.guid_creation_num + 7 > MAX_U64;

@@ -53,6 +53,7 @@ module aptos_framework::vesting {
     use aptos_framework::staking_contract;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::genesis;
 
@@ -1142,6 +1143,7 @@ module aptos_framework::vesting {
     }
 
     fun verify_admin(admin: &signer, vesting_contract: &VestingContract) {
+        permissioned_signer::assert_master_signer(admin);
         assert!(signer::address_of(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
     }
 
