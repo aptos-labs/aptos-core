@@ -977,6 +977,13 @@ impl TransactionStatus {
         }
     }
 
+    pub fn expect_keep_status(&self) -> &ExecutionStatus {
+        match self {
+            TransactionStatus::Keep(s) => s,
+            _ => panic!("Expected Keep."),
+        }
+    }
+
     pub fn from_vm_status(
         vm_status: VMStatus,
         charge_invariant_violation: bool,
@@ -1202,8 +1209,14 @@ impl TransactionOutput {
         }
     }
 
-    pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
-        (self.write_set, self.events)
+    pub fn empty_success() -> Self {
+        Self {
+            write_set: WriteSet::default(),
+            events: Vec::new(),
+            gas_used: 0,
+            status: TransactionStatus::Keep(ExecutionStatus::Success),
+            auxiliary_data: TransactionAuxiliaryData::default(),
+        }
     }
 
     pub fn write_set(&self) -> &WriteSet {
@@ -2056,6 +2069,13 @@ impl Transaction {
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
         }
+    }
+
+    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V0 {
+            block_id,
+            block_end_info,
+        })
     }
 }
 

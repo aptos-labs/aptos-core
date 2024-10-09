@@ -704,6 +704,7 @@ fn run_transactions_naive(
                 )
                 .unwrap(),
             block_executor_onchain_config.clone(),
+            None, /* append_state_checkpoint_to_block */
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();

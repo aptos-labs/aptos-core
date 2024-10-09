@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
-use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
 use aptos_crypto::{
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
@@ -43,9 +42,10 @@ use std::{
     },
 };
 
+pub mod chunk_output;
+pub mod chunk_to_commit;
 mod error;
 mod executed_chunk;
-pub mod execution_output;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
@@ -143,9 +143,8 @@ pub trait BlockExecutorTrait: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
-        let state_checkpoint_output =
-            self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
-        self.ledger_update(block_id, parent_block_id, state_checkpoint_output)
+        self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
+        self.ledger_update(block_id, parent_block_id)
     }
 
     /// Executes a block and returns the state checkpoint output.
@@ -154,13 +153,12 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput>;
+    ) -> ExecutorResult<()>;
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -520,23 +518,25 @@ impl StateComputeResult {
     }
 }
 
-pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProofExt>,
+pub struct ProofReader<'a> {
+    proofs: Option<&'a HashMap<HashValue, SparseMerkleProofExt>>,
 }
 
-impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
-        ProofReader { proofs }
+impl<'a> ProofReader<'a> {
+    pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
+        ProofReader {
+            proofs: Some(proofs),
+        }
     }
 
     pub fn new_empty() -> Self {
-        Self::new(HashMap::new())
+        ProofReader { proofs: None }
     }
 }
 
-impl ProofRead for ProofReader {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
-        self.proofs.get(&key)
+impl<'a> ProofRead for ProofReader<'a> {
+    fn get_proof(&self, key: HashValue) -> Option<&'a SparseMerkleProofExt> {
+        self.proofs.and_then(|proofs| proofs.get(&key))
     }
 }
 

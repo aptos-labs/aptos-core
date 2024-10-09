@@ -119,11 +119,13 @@ impl TransactionBlockExecutor for PtxBlockExecutor {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> anyhow::Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
             transactions,
             state_view,
             onchain_config,
+            append_state_checkpoint_to_block,
         )
     }
 }

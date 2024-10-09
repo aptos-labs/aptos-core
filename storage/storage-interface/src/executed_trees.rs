@@ -103,7 +103,7 @@ impl ExecutedTrees {
             id,
             reader,
             self.transaction_accumulator.num_leaves(),
-            self.state.current.clone(),
+            &self.state.current,
             proof_fetcher,
         )
     }

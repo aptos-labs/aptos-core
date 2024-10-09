@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::chunk_output::ChunkOutput,
+    components::{chunk_proof::ChunkProof, make_chunk_output::MakeChunkOutput},
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
 };
 use anyhow::Result;
+use aptos_executor_types::chunk_output::ChunkOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
-    ledger_info::LedgerInfo,
-    proof::TransactionInfoListWithProof,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use aptos_vm::VMExecutor;
@@ -43,10 +43,12 @@ pub trait TransactionChunkWithProof {
         self.len() == 0
     }
 
-    fn into_chunk_output<V: VMExecutor>(
+    fn into_output_and_proof<V: VMExecutor>(
         self,
         state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)>;
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<(ChunkOutput, ChunkProof)>;
 }
 
 impl TransactionChunkWithProof for TransactionListWithProof {
@@ -65,10 +67,12 @@ impl TransactionChunkWithProof for TransactionListWithProof {
         self.transactions.len()
     }
 
-    fn into_chunk_output<V: VMExecutor>(
+    fn into_output_and_proof<V: VMExecutor>(
         self,
         state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)> {
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<(ChunkOutput, ChunkProof)> {
         let TransactionListWithProof {
             transactions,
             events: _,
@@ -94,14 +98,20 @@ impl TransactionChunkWithProof for TransactionListWithProof {
         let chunk_out = {
             let _timer = VM_EXECUTE_CHUNK.start_timer();
 
-            ChunkOutput::by_transaction_execution::<V>(
+            MakeChunkOutput::by_transaction_execution::<V>(
                 sig_verified_txns.into(),
                 state_view,
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                None, /* append_state_checkpoint_to_block */
             )?
         };
+        let chunk_proof = ChunkProof {
+            txn_infos_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        };
 
-        Ok((chunk_out, txn_infos_with_proof))
+        Ok((chunk_out, chunk_proof))
     }
 }
 
@@ -119,18 +129,26 @@ impl TransactionChunkWithProof for TransactionOutputListWithProof {
         self.transactions_and_outputs.len()
     }
 
-    fn into_chunk_output<V: VMExecutor>(
+    fn into_output_and_proof<V: VMExecutor>(
         self,
         state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)> {
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<(ChunkOutput, ChunkProof)> {
         let TransactionOutputListWithProof {
             transactions_and_outputs,
             first_transaction_output_version: _,
             proof: txn_infos_with_proof,
         } = self;
 
-        let chunk_out = ChunkOutput::by_transaction_output(transactions_and_outputs, state_view)?;
+        let chunk_out =
+            MakeChunkOutput::by_transaction_output(transactions_and_outputs, state_view)?;
+        let chunk_proof = ChunkProof {
+            txn_infos_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        };
 
-        Ok((chunk_out, txn_infos_with_proof))
+        Ok((chunk_out, chunk_proof))
     }
 }

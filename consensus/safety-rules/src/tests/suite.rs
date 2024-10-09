@@ -333,7 +333,7 @@ fn test_bad_execution_output(safety_rules: &Callback) {
         .unwrap();
 
     let evil_proof = Proof::new(
-        a1_output.frozen_subtree_roots().clone(),
+        a1_output.frozen_subtree_roots().to_vec(),
         a1_output.num_leaves() + 1,
         vec![],
     );

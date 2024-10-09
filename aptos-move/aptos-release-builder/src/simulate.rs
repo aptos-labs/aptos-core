@@ -654,7 +654,7 @@ pub async fn simulate_multistep_proposal(
             },
         }
 
-        let (write_set, _events) = txn_output.into();
+        let (write_set, ..) = txn_output.unpack();
         state_view.apply_write_set(write_set);
     }
 

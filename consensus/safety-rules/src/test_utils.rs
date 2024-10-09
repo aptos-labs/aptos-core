@@ -114,7 +114,7 @@ pub fn make_proposal_with_parent_and_overrides(
         .unwrap();
 
     let proof = Proof::new(
-        parent_output.frozen_subtree_roots().clone(),
+        parent_output.frozen_subtree_roots().to_vec(),
         parent_output.num_leaves(),
         vec![],
     );

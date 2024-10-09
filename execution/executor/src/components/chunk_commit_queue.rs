@@ -4,29 +4,19 @@
 
 #![forbid(unsafe_code)]
 
+use crate::components::chunk_proof::ChunkProof;
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
-use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
-    transaction::Version,
+use aptos_executor_types::{
+    chunk_output::ChunkOutput, state_checkpoint_output::StateCheckpointOutput, ExecutedChunk,
 };
+use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
+use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
 
 pub(crate) struct ChunkToUpdateLedger {
-    pub result_state: StateDelta,
-    /// transactions sorted by status, state roots, state updates
+    pub chunk_output: ChunkOutput,
+    pub chunk_proof: ChunkProof,
     pub state_checkpoint_output: StateCheckpointOutput,
-    /// If set, this is the new epoch info that should be changed to if this is committed.
-    pub next_epoch_state: Option<EpochState>,
-
-    /// the below are from the input -- can be checked / used only after the transaction accumulator
-    /// is updated.
-    pub verified_target_li: LedgerInfoWithSignatures,
-    pub epoch_change_li: Option<LedgerInfoWithSignatures>,
-    pub txn_infos_with_proof: TransactionInfoListWithProof,
 }
 
 /// It's a two stage pipeline:
@@ -85,7 +75,10 @@ impl ChunkCommitQueue {
         &mut self,
         chunk_to_update_ledger: ChunkToUpdateLedger,
     ) -> Result<()> {
-        self.latest_state = chunk_to_update_ledger.result_state.clone();
+        self.latest_state = chunk_to_update_ledger
+            .state_checkpoint_output
+            .result_state
+            .clone();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
         Ok(())
@@ -136,7 +129,7 @@ impl ChunkCommitQueue {
             self.to_update_ledger.is_empty(),
             "Mixed usage of different modes."
         );
-        self.latest_state = chunk.result_state.clone();
+        self.latest_state = chunk.state_checkpoint_output.result_state.clone();
         self.latest_txn_accumulator = chunk.ledger_update_output.transaction_accumulator.clone();
         self.to_commit.push_back(Some(chunk));
         Ok(())

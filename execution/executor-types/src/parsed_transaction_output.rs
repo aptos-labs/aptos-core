@@ -17,7 +17,7 @@ use std::ops::Deref;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,
     reconfig_events: Vec<ContractEvent>,
@@ -89,10 +89,10 @@ impl ParsedTransactionOutput {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TransactionsWithParsedOutput {
-    transactions: Vec<Transaction>,
-    parsed_output: Vec<ParsedTransactionOutput>,
+    pub transactions: Vec<Transaction>,
+    pub parsed_output: Vec<ParsedTransactionOutput>,
 }
 
 impl TransactionsWithParsedOutput {
@@ -131,7 +131,7 @@ impl TransactionsWithParsedOutput {
         &self.transactions
     }
 
-    pub fn parsed_outputs(&self) -> &Vec<ParsedTransactionOutput> {
+    pub fn parsed_outputs(&self) -> &[ParsedTransactionOutput] {
         &self.parsed_output
     }
 
@@ -139,6 +139,12 @@ impl TransactionsWithParsedOutput {
         (0..self.len())
             .rev()
             .find(|&i| Self::need_checkpoint(&self.transactions[i], &self.parsed_output[i]))
+    }
+
+    pub fn ends_with_reconfig(&self) -> bool {
+        self.parsed_output
+            .last()
+            .map_or(false, |output| output.is_reconfig())
     }
 
     pub fn need_checkpoint(txn: &Transaction, txn_output: &ParsedTransactionOutput) -> bool {
@@ -156,12 +162,9 @@ impl TransactionsWithParsedOutput {
         }
     }
 
-    pub fn into_txns(self) -> Vec<Transaction> {
-        self.transactions
-    }
-
-    pub fn into_inner(self) -> (Vec<Transaction>, Vec<ParsedTransactionOutput>) {
-        (self.transactions, self.parsed_output)
+    pub fn ends_with_state_checkpoint(&self) -> bool {
+        self.get_last_checkpoint_index()
+            .map_or(false, |idx| idx + 1 == self.len())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &ParsedTransactionOutput)> {
