@@ -2,7 +2,9 @@ use anyhow::bail;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::types::{AccountKey, EphemeralKeyPair, KeylessAccount, LocalAccount};
+use aptos_sdk::types::{
+    AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
+};
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
 use aptos_types::keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig};
 use async_trait::async_trait;
@@ -133,7 +135,9 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
 
             // Cloning is disabled outside #[cfg(test)]
             let serialized: &[u8] = &(self.ephemeral_secret_key.to_bytes());
-            let esk = Ed25519PrivateKey::try_from(serialized)?;
+            let esk = EphemeralPrivateKey::Ed25519 {
+                inner_private_key: Ed25519PrivateKey::try_from(serialized)?,
+            };
 
             let keyless_account = KeylessAccount::new(
                 &self.iss,
