@@ -69,7 +69,7 @@ jobs:
               echo "Branch: ${{ github.ref_name }}"
               echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
-          elif [ -n "${{ inputs.GIT_SHA }}" ]; then
+          elif [[ -n "${{ inputs.GIT_SHA }}" ]]; then
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
           # if GIT_SHA not provided, use the branch where workflow runs on
           else
