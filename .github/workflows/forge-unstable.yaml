@@ -30,7 +30,7 @@ on:
     - cron: "30 */2 * * *" # Run this on an aggressive cadence to get signal on the tests. They should be fully evaluated (moved to forge stable or removed entirely) after baking
   pull_request:
     paths:
-      - ".github/workflows/forge-stable.yaml"
+      - ".github/workflows/forge-unstable.yaml"
       - "testsuite/find_latest_image.py"
 
 env:
@@ -75,7 +75,7 @@ jobs:
         id: hash-branch
         run: |
           # If BRANCH is empty, default to "main"
-          if [ -z "${{ steps.determine-test-branch.outputs.BRANCH }}" ]; then
+          if [[ -z "${{ steps.determine-test-branch.outputs.BRANCH }}" ]]; then
             BRANCH="main"
           else
             BRANCH="${{ steps.determine-test-branch.outputs.BRANCH }}"
