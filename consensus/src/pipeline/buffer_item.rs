@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
+
 use crate::{
     counters, pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType,
 };
@@ -20,7 +22,6 @@ use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{
         LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures,
-        SignatureWithStatus,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -44,17 +45,14 @@ fn generate_commit_ledger_info(
 }
 
 fn ledger_info_with_unverified_signatures(
-    unverified_votes: Vec<CommitVote>,
+    unverified_votes: HashMap<Author, CommitVote>,
     commit_ledger_info: &LedgerInfo,
 ) -> LedgerInfoWithUnverifiedSignatures {
     let mut li_with_sig = LedgerInfoWithUnverifiedSignatures::new(commit_ledger_info.clone());
-    for vote in unverified_votes {
-        let author = vote.author();
+    for vote in unverified_votes.values() {
         let sig = vote.signature_with_status();
         if vote.ledger_info() == commit_ledger_info {
-            li_with_sig.add_signature(author, sig);
-        } else {
-            li_with_sig.add_signature(author, &SignatureWithStatus::from(sig.signature().clone()));
+            li_with_sig.add_signature(vote.author(), sig);
         }
     }
     li_with_sig
@@ -74,7 +72,7 @@ fn aggregate_commit_proof(
 // we differentiate buffer items at different stages
 // for better code readability
 pub struct OrderedItem {
-    pub unverified_votes: Vec<CommitVote>,
+    pub unverified_votes: HashMap<Author, CommitVote>,
     // This can happen in the fast forward sync path, where we can receive the commit proof
     // from peers.
     pub commit_proof: Option<LedgerInfoWithSignatures>,
@@ -125,7 +123,7 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
-        unverified_votes: Vec<CommitVote>,
+        unverified_votes: HashMap<Author, CommitVote>,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
             unverified_votes,
@@ -410,7 +408,7 @@ impl BufferItem {
                     // when advancing to executed item, we will check if the sigs are valid.
                     // each author at most stores a single sig for each item,
                     // so an adversary will not be able to flood our memory.
-                    ordered.unverified_votes.push(vote);
+                    ordered.unverified_votes.insert(author, vote);
                     return Ok(());
                 }
             },

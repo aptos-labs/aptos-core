@@ -414,12 +414,12 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let mut unverified_votes = vec![];
+        let mut unverified_votes = HashMap::new();
         if let Some(block) = ordered_blocks.last() {
             if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
                 for (_, vote) in votes {
                     if vote.commit_info().id() == block.id() {
-                        unverified_votes.push(vote);
+                        unverified_votes.insert(vote.author(), vote);
                     }
                 }
             }
