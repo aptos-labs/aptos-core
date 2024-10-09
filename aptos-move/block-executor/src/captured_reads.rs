@@ -622,10 +622,12 @@ impl<T: Transaction> CapturedReads<T> {
         }
 
         self.module_cache_reads.iter().all(|(id, previous_read)| {
-            let previous_hash = previous_read.as_ref().map(|e| *e.hash());
+            let previous_hash_and_state_value_metadata = previous_read
+                .as_ref()
+                .map(|e| (e.hash(), e.state_value_metadata()));
             code_cache
                 .module_cache()
-                .check_cached_module_against_previously_read_hash(id, previous_hash)
+                .check_hash_and_state_value_metadata(id, previous_hash_and_state_value_metadata)
         })
     }
 

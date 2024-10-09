@@ -4549,7 +4549,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm-types",
  "bcs 0.1.4",
- "bytes",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
