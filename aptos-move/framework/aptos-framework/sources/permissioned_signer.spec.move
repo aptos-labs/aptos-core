@@ -78,8 +78,8 @@ spec aptos_framework::permissioned_signer {
     perm: PermKey
     ) {
 
-        use aptos_std::type_info;
-        use std::bcs;
+        // use aptos_std::type_info;
+        // use std::bcs;
         pragma aborts_if_is_partial;
         aborts_if !spec_is_permissioned_signer(permissioned);
         aborts_if spec_is_permissioned_signer(master);

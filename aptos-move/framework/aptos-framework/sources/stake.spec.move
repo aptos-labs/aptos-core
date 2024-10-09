@@ -328,7 +328,6 @@ spec aptos_framework::stake {
         include AbortsIfSignerPermissionStake {
             s: owner
         };
-        // aborts_if permissioned_signer::spec_is_permissioned_signer(owner);
         let owner_address = signer::address_of(owner);
         aborts_if exists<OwnerCapability>(owner_address);
         ensures exists<OwnerCapability>(owner_address);
@@ -380,7 +379,6 @@ spec aptos_framework::stake {
         include AbortsIfSignerPermissionStake {
             s: operator
         };
-        // aborts_if permissioned_signer::spec_is_permissioned_signer(operator);
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         modifies global<ValidatorConfig>(pool_address);
@@ -430,7 +428,6 @@ spec aptos_framework::stake {
         include AbortsIfSignerPermissionStake {
             s: operator
         };
-        // aborts_if permissioned_signer::spec_is_permissioned_signer(operator);
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         aborts_if reconfiguration_state::spec_is_in_progress();

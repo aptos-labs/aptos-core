@@ -138,7 +138,6 @@ spec aptos_framework::staking_proxy {
     }
 
     spec schema SetStakePoolOperator {
-        use aptos_framework::permissioned_signer;
 
         owner: &signer;
         new_operator: address;
@@ -196,7 +195,6 @@ spec aptos_framework::staking_proxy {
     }
 
     spec schema SetStakePoolVoterAbortsIf {
-        use aptos_framework::permissioned_signer;
 
         owner: &signer;
         new_voter: address;

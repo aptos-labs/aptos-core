@@ -31,7 +31,7 @@ spec aptos_std::smart_table {
     spec clear<K: drop, V: drop>(self: &mut SmartTable<K, V>) {
         pragma verify = false;
         pragma opaque;
-        aborts_if false;
+        aborts_if [abstract] false;
     }
 
     spec split_one_bucket<K, V>(self: &mut SmartTable<K, V>) {
