@@ -144,6 +144,7 @@ fn main() {
         (401, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
         (467, EntryPoints::LiquidityPoolSwap { is_stable: true }),
         (415, EntryPoints::LiquidityPoolSwap { is_stable: false }),
+        (10000, EntryPoints::APTPermissionedTransfer),
     ];
 
     let mut failures = Vec::new();

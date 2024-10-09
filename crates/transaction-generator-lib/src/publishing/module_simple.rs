@@ -267,6 +267,7 @@ pub enum EntryPoints {
         num_points_per_txn: usize,
     },
     DeserializeU256,
+    APTPermissionedTransfer,
 }
 
 impl EntryPoints {
@@ -309,7 +310,8 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. }
             | EntryPoints::CoinInitAndMint
-            | EntryPoints::FungibleAssetMint => "framework_usecases",
+            | EntryPoints::FungibleAssetMint
+            | EntryPoints::APTPermissionedTransfer => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -381,7 +383,8 @@ impl EntryPoints {
             },
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
-            EntryPoints::DeserializeU256 => "bcs_stream",
+            | EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::APTPermissionedTransfer=> "permissioned_transfer",
         }
     }
 
@@ -722,6 +725,14 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::APTPermissionedTransfer => get_payload(
+                module_id,
+                ident_str!("fungible_transfer_only").to_owned(),
+                vec![
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&1u64).unwrap(),
+                ],
+            )
         }
     }
 
@@ -829,6 +840,7 @@ impl EntryPoints {
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
+            EntryPoints::APTPermissionedTransfer => AutomaticArgs::Signer,
         }
     }
 }
