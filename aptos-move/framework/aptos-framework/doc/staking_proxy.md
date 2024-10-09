@@ -20,6 +20,7 @@
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
+    -  [Function `grant_permission`](#@Specification_1_grant_permission)
     -  [Function `set_operator`](#@Specification_1_set_operator)
     -  [Function `set_voter`](#@Specification_1_set_voter)
     -  [Function `set_vesting_contract_operator`](#@Specification_1_set_vesting_contract_operator)
@@ -436,6 +437,25 @@ Grant permission to mutate staking on behalf of the master signer.
 
 
 
+<a id="@Specification_1_grant_permission"></a>
+
+### Function `grant_permission`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_proxy.md#0x1_staking_proxy_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(master);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+</code></pre>
+
+
+
 <a id="@Specification_1_set_operator"></a>
 
 ### Function `set_operator`
@@ -559,6 +579,12 @@ One of them are not exists
 
 
 <pre><code><b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolOperator">SetStakePoolOperator</a>;
+<b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy">AbortsIfSignerPermissionStakeProxy</a> {
+    s: owner
+};
+<b>include</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)) ==&gt; <a href="stake.md#0x1_stake_AbortsIfSignerPermissionStake">stake::AbortsIfSignerPermissionStake</a> {
+    s:owner
+};
 </code></pre>
 
 
@@ -570,7 +596,9 @@ One of them are not exists
 <pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolOperator">SetStakePoolOperator</a> {
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     new_operator: <b>address</b>;
-    <b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(owner);
+    <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy">AbortsIfSignerPermissionStakeProxy</a> {
+        s: owner
+    };
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>let</b> ownership_cap = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address);
     <b>let</b> pool_address = ownership_cap.pool_address;
@@ -609,6 +637,9 @@ One of them are not exists
 
 
 <pre><code><b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractVoter">SetStakingContractVoter</a>;
+<b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy">AbortsIfSignerPermissionStakeProxy</a> {
+    s: owner
+};
 </code></pre>
 
 
@@ -651,6 +682,12 @@ Then abort if the resource is not exist
 
 
 <pre><code><b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolVoterAbortsIf">SetStakePoolVoterAbortsIf</a>;
+<b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy">AbortsIfSignerPermissionStakeProxy</a> {
+    s: owner
+};
+<b>include</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)) ==&gt; <a href="stake.md#0x1_stake_AbortsIfSignerPermissionStake">stake::AbortsIfSignerPermissionStake</a> {
+    s:owner
+};
 </code></pre>
 
 
@@ -662,12 +699,27 @@ Then abort if the resource is not exist
 <pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolVoterAbortsIf">SetStakePoolVoterAbortsIf</a> {
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     new_voter: <b>address</b>;
-    <b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(owner);
+    <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy">AbortsIfSignerPermissionStakeProxy</a> {
+        s: owner
+    };
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>let</b> ownership_cap = <b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address);
     <b>let</b> pool_address = ownership_cap.pool_address;
     <b>aborts_if</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) && !(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>&gt;(owner_address) && <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(pool_address));
     <b>ensures</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(owner_address) ==&gt; <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).delegated_voter == new_voter;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy"></a>
+
+
+<pre><code><b>schema</b> <a href="staking_proxy.md#0x1_staking_proxy_AbortsIfSignerPermissionStakeProxy">AbortsIfSignerPermissionStakeProxy</a> {
+    s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> perm = <a href="staking_proxy.md#0x1_staking_proxy_StakeProxyPermission">StakeProxyPermission</a> {};
+    <b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">permissioned_signer::spec_check_permission_exists</a>(s, perm);
 }
 </code></pre>
 
