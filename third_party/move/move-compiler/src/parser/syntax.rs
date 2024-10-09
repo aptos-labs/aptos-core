@@ -1402,7 +1402,7 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
         if !matches!(context.tokens.peek(), Tok::While | Tok::Loop) {
             return Err(unexpected_token_error(
                 context.tokens,
-                "one of: 'while' or 'loop'",
+                "one of: `while` or `loop`",
             ));
         }
     };
