@@ -5,7 +5,8 @@ use crate::{
     common::native_coin,
     types::{
         Currency, CurrencyMetadata, FungibleAssetChangeEvent, ObjectCore, OperationType,
-        Transaction, FUNGIBLE_ASSET_MODULE, OBJECT_CORE_RESOURCE, OBJECT_MODULE, STORE_RESOURCE,
+        Transaction, FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE,
+        OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
     },
     RosettaContext,
 };
@@ -13,7 +14,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_rest_client::aptos_api_types::TransactionOnChainData;
+use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData};
 use aptos_types::{
     account_config::fungible_store::FungibleStoreResource,
     chain_id::ChainId,
@@ -92,7 +93,7 @@ fn test_transaction(
     }
 }
 
-fn modification_write_op<T: Serialize>(
+fn resource_group_modification_write_op<T: Serialize>(
     address: &AccountAddress,
     resource: &StructTag,
     input: &T,
@@ -158,28 +159,37 @@ impl FaData {
         };
 
         let store = FungibleStoreResource::new(self.fa_metadata_address, new_balance, false);
+        let mut group = ResourceGroup::new();
+        group.insert(
+            StructTag {
+                address: AccountAddress::ONE,
+                module: ident_str!(OBJECT_MODULE).into(),
+                name: ident_str!(OBJECT_CORE_RESOURCE).into(),
+                type_args: vec![],
+            },
+            bcs::to_bytes(&object_core).unwrap(),
+        );
+        group.insert(
+            StructTag {
+                address: AccountAddress::ONE,
+                module: ident_str!(FUNGIBLE_ASSET_MODULE).into(),
+                name: ident_str!(FUNGIBLE_STORE_RESOURCE).into(),
+                type_args: vec![],
+            },
+            bcs::to_bytes(&store).unwrap(),
+        );
 
         let write_ops = vec![
             // Update sender
-            modification_write_op(
+            resource_group_modification_write_op(
                 &self.store_address,
                 &StructTag {
                     address: AccountAddress::ONE,
                     module: ident_str!(OBJECT_MODULE).into(),
-                    name: ident_str!(OBJECT_CORE_RESOURCE).into(),
+                    name: ident_str!(OBJECT_RESOURCE_GROUP).into(),
                     type_args: vec![],
                 },
-                &object_core,
-            ),
-            modification_write_op(
-                &self.store_address,
-                &StructTag {
-                    address: AccountAddress::ONE,
-                    module: ident_str!(FUNGIBLE_ASSET_MODULE).into(),
-                    name: ident_str!(STORE_RESOURCE).into(),
-                    type_args: vec![],
-                },
-                &store,
+                &group,
             ),
         ];
 
