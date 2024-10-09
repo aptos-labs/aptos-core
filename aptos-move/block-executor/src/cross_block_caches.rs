@@ -146,11 +146,11 @@ impl CrossBlockModuleCacheEntry {
 /// added or removed) within a single block, so it is only mutated at block boundaries. At the
 /// same time, entries in this cache can be marked as "invalid" so that block executor can decide
 /// on whether to read the module from cache or from the storage.
-pub(crate) struct CrossBlockModuleCache;
+pub struct CrossBlockModuleCache;
 
 impl CrossBlockModuleCache {
     /// Flushes the module cache. Should only be called at the start of the block.
-    pub(crate) fn flush_at_block_start() {
+    pub fn flush_at_block_start() {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         cache.clear();
     }

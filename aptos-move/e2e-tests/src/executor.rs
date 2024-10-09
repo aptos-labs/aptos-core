@@ -14,7 +14,9 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    cross_block_caches::CrossBlockModuleCache, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -681,6 +683,12 @@ impl FakeExecutor {
         // TODO fetch values from state?
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
+        // Flush cross-block cache if we are comparing sequential and parallel executions. We do it
+        // twice to make sure that in case modules are published, we start from the empty cache.
+        if mode == ExecutorMode::BothComparison {
+            CrossBlockModuleCache::flush_at_block_start();
+        }
+
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
                 &sig_verified_block,
@@ -691,6 +699,12 @@ impl FakeExecutor {
         } else {
             None
         };
+
+        // Re-flush the cache again because the previous execution may have put new published code
+        // into cross-block module cache.
+        if mode == ExecutorMode::BothComparison {
+            CrossBlockModuleCache::flush_at_block_start();
+        }
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
