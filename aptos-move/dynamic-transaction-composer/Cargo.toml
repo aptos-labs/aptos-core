@@ -1,5 +1,5 @@
 [package]
-name = "aptos-script-builder"
+name = "aptos-dynamic-transaction-composer"
 description = "Generating Move Script from a batched Move calls"
 version = "0.1.0"
 
@@ -35,4 +35,4 @@ aptos-types = { workspace = true }
 e2e-move-tests = { path = "../e2e-move-tests" }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes", "wasm-bindgen-futures"]
+ignored = ["serde_bytes", "wasm-bindgen-futures", "getrandom"]

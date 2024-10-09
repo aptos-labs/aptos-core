@@ -1349,6 +1349,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-dynamic-transaction-composer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "bcs 0.1.4",
+ "e2e-move-tests",
+ "getrandom 0.2.11",
+ "hex",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "reqwest 0.11.23",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "aptos-enum-conversion-derive"
 version = "0.0.3"
 dependencies = [
@@ -3684,27 +3705,6 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "thiserror",
-]
-
-[[package]]
-name = "aptos-script-builder"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-types",
- "bcs 0.1.4",
- "e2e-move-tests",
- "getrandom 0.2.11",
- "hex",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-core-types",
- "reqwest 0.11.23",
- "serde",
- "serde_bytes",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
