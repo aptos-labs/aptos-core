@@ -68,6 +68,14 @@ module aptos_std::ordered_map {
         }
     }
 
+    /// Create a OrderedMap from a vector of keys and values.
+    /// Aborts with EKEY_ALREADY_EXISTS if duplicate keys are passed in.
+    public fun new_from<K, V>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
+        let map = new();
+        add_all(&mut map, keys, values);
+        map
+    }
+
     /// Number of elements in the map.
     public fun length<K, V>(self: &OrderedMap<K, V>): u64 {
         self.entries.length()
@@ -120,7 +128,15 @@ module aptos_std::ordered_map {
 
     /// Returns whether map contains a given key.
     public fun contains<K, V>(self: &OrderedMap<K, V>, key: &K): bool {
-        !self.find(key).iter_is_end()
+        !self.find(key).iter_is_end(self)
+    }
+
+    public fun borrow<K, V>(self: &OrderedMap<K, V>, key: &K): &V {
+        self.find(key).iter_borrow(self)
+    }
+
+    public fun borrow_mut<K, V>(self: &mut OrderedMap<K, V>, key: &K): &mut V {
+        self.find(key).iter_borrow_mut(self)
     }
 
     /// Changes the key, with keeping the same value attached to it
@@ -144,7 +160,16 @@ module aptos_std::ordered_map {
         entry.key = new_key;
     }
 
+    /// Add multiple key/value pairs to the map. The keys must not already exist.
+    /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
+    public fun add_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
+        vector::zip(keys, values, |key, value| {
+            add(self, key, value);
+        });
+    }
+
     /// Takes all elements from `other` and adds them to `self`.
+    /// Aborts with EKEY_ALREADY_EXISTS if `other` has a key already present in `self`.
     public fun append<K, V>(self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>) {
         let OrderedMap::SortedVectorMap {
             entries: other_entries,
@@ -166,20 +191,43 @@ module aptos_std::ordered_map {
             return;
         };
 
-        // TODO: can be implemented more efficiently, as we know both maps are already sorted.
-        while (!other_entries.is_empty()) {
-            let Entry { key, value } = other_entries.pop_back();
-            self.add(key, value);
+        // In O(n), traversing from the back, build reverse sorted result, and then reverse it back
+        let reverse_result = vector::empty();
+        let cur_i = self.entries.length() - 1;
+        let other_i = other_entries.length() - 1;
+
+        // after the end of the loop, entries is empty, and any leftover is in other_entries
+        loop {
+            let ord = cmp::compare(&self.entries[cur_i].key, &other_entries[other_i].key);
+            assert!(!ord.is_eq(), error::invalid_argument(EKEY_ALREADY_EXISTS));
+            if (ord.is_gt()) {
+                reverse_result.push_back(self.entries.pop_back());
+                if (cur_i == 0) {
+                    break;
+                } else {
+                    cur_i = cur_i - 1;
+                }
+            } else {
+                reverse_result.push_back(other_entries.pop_back());
+                if (other_i == 0) {
+                    // make entries empty, and rest in other_entries.
+                    mem::swap(&mut other_entries, &mut self.entries);
+                    break;
+                } else {
+                    other_i = other_i - 1;
+                }
+            };
         };
 
-        other_entries.destroy_empty();
+        reverse_result.reverse_append(other_entries);
+        self.entries.reverse_append(reverse_result);
     }
 
     /// Splits the collection into two, such to leave `self` with `at` number of elements.
     /// Returns a newly allocated map containing the elements in the range [at, len).
     /// After the call, the original map will be left containing the elements [0, at)
     /// with its previous capacity unchanged.
-    public fun split_off<K, V>(self: &mut OrderedMap<K, V>, at: u64): OrderedMap<K, V> {
+    public fun trim<K, V>(self: &mut OrderedMap<K, V>, at: u64): OrderedMap<K, V> {
         let rest = self.entries.trim(at);
 
         OrderedMap::SortedVectorMap {
@@ -205,7 +253,7 @@ module aptos_std::ordered_map {
     /// iterator if the key is not found.
     public fun find<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
         let lower_bound = self.lower_bound(key);
-        if (lower_bound.iter_is_end()) {
+        if (lower_bound.iter_is_end(self)) {
             lower_bound
         } else if (lower_bound.iter_borrow_key(self) == key) {
             lower_bound
@@ -238,7 +286,7 @@ module aptos_std::ordered_map {
     /// Returns the next iterator, or none if already at the end iterator.
     /// Note: Requires that the map is not changed after the input iterator is generated.
     public fun iter_next<K, V>(self: Iterator, map: &OrderedMap<K, V>): Iterator {
-        assert!(!self.iter_is_end(), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let index = self.index + 1;
         if (index < map.entries.length()) {
@@ -283,7 +331,7 @@ module aptos_std::ordered_map {
     }
 
     /// Returns whether the iterator is an end iterator.
-    public fun iter_is_end(self: &Iterator): bool {
+    public fun iter_is_end<K, V>(self: &Iterator, _map: &OrderedMap<K, V>): bool {
         self is Iterator::End
     }
 
@@ -337,12 +385,54 @@ module aptos_std::ordered_map {
         entries.destroy_empty();
     }
 
-    // ========= Section with inline for-loop methods =======
+    // ========= Section with views and inline for-loop methods =======
+
+    /// Return all keys in the map. This requires keys to be copyable.
+    public fun keys<K: copy, V>(self: &OrderedMap<K, V>): vector<K> {
+        vector::map_ref(&self.entries, |e| {
+            let e: &Entry<K, V> = e;
+            e.key
+        })
+    }
+
+    /// Return all values in the map. This requires values to be copyable.
+    public fun values<K, V: copy>(self: &OrderedMap<K, V>): vector<V> {
+        vector::map_ref(&self.entries, |e| {
+            let e: &Entry<K, V> = e;
+            e.value
+        })
+    }
+
+    /// Transform the map into two vectors with the keys and values respectively
+    /// Primarily used to destroy a map
+    public fun to_vec_pair<K, V>(self: OrderedMap<K, V>): (vector<K>, vector<V>) {
+        let keys: vector<K> = vector::empty();
+        let values: vector<V> = vector::empty();
+        let OrderedMap::SortedVectorMap { entries } = self;
+        vector::for_each(entries, |e| {
+            let Entry { key, value } = e;
+            vector::push_back(&mut keys, key);
+            vector::push_back(&mut values, value);
+        });
+        (keys, values)
+    }
+
+    /// For maps that cannot be dropped this is a utility to destroy them
+    /// using lambdas to destroy the individual keys and values.
+    public inline fun destroy<K, V>(
+        self: OrderedMap<K, V>,
+        dk: |K|,
+        dv: |V|
+    ) {
+        let (keys, values) = to_vec_pair(self);
+        vector::destroy(keys, |_k| dk(_k));
+        vector::destroy(values, |_v| dv(_v));
+    }
 
     /// Apply the function to a reference of each key-value pair in the table.
     public inline fun for_each_ref<K, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
         let iter = self.new_begin_iter();
-        while (!iter.iter_is_end()) {
+        while (!iter.iter_is_end(self)) {
             f(iter.iter_borrow_key(self), iter.iter_borrow(self));
             iter = iter.iter_next(self);
         }
@@ -357,7 +447,7 @@ module aptos_std::ordered_map {
     /// Apply the function to a mutable reference of each key-value pair in the table.
     public inline fun for_each_mut<K, V>(self: &mut OrderedMap<K, V>, f: |K, &mut V|) {
         let iter = self.new_begin_iter();
-        while (!iter.iter_is_end()) {
+        while (!iter.iter_is_end(self)) {
             let key = *iter.iter_borrow_key(self);
             f(key, iter.iter_borrow_mut(self));
             iter = iter.iter_next(self);
@@ -420,7 +510,7 @@ module aptos_std::ordered_map {
         let len = self.entries.length();
         let i = 1;
         while (i < len) {
-            assert!(cmp::compare(&self.entries.borrow(i).key, &self.entries.borrow(i - 1).key).is_greater_than(), 1);
+            assert!(cmp::compare(&self.entries.borrow(i).key, &self.entries.borrow(i - 1).key).is_gt(), 1);
             i = i + 1;
         };
     }
@@ -430,7 +520,7 @@ module aptos_std::ordered_map {
         let expected_num_elements = self.length();
         let num_elements = 0;
         let it = self.new_begin_iter();
-        while (!it.iter_is_end()) {
+        while (!it.iter_is_end(self)) {
             num_elements = num_elements + 1;
             it = it.iter_next(self);
         };
@@ -475,6 +565,170 @@ module aptos_std::ordered_map {
         map.destroy_empty();
     }
 
+    #[test]
+    public fun test_add_remove_many() {
+        let map = new<u64, u64>();
+
+        assert!(length(&map) == 0, 0);
+        assert!(!contains(&map, &3), 1);
+        add(&mut map, 3, 1);
+        assert!(length(&map) == 1, 2);
+        assert!(contains(&map, &3), 3);
+        assert!(borrow(&map, &3) == &1, 4);
+        *borrow_mut(&mut map, &3) = 2;
+        assert!(borrow(&map, &3) == &2, 5);
+
+        assert!(!contains(&map, &2), 6);
+        add(&mut map, 2, 5);
+        assert!(length(&map) == 2, 7);
+        assert!(contains(&map, &2), 8);
+        assert!(borrow(&map, &2) == &5, 9);
+        *borrow_mut(&mut map, &2) = 9;
+        assert!(borrow(&map, &2) == &9, 10);
+
+        remove(&mut map, &2);
+        assert!(length(&map) == 1, 11);
+        assert!(!contains(&map, &2), 12);
+        assert!(borrow(&map, &3) == &2, 13);
+
+        remove(&mut map, &3);
+        assert!(length(&map) == 0, 14);
+        assert!(!contains(&map, &3), 15);
+
+        destroy_empty(map);
+    }
+
+    #[test]
+    public fun test_add_all() {
+        let map = new<u64, u64>();
+
+        assert!(length(&map) == 0, 0);
+        add_all(&mut map, vector[1, 2, 3], vector[10, 20, 30]);
+        assert!(length(&map) == 3, 1);
+        assert!(borrow(&map, &1) == &10, 2);
+        assert!(borrow(&map, &2) == &20, 3);
+        assert!(borrow(&map, &3) == &30, 4);
+
+        remove(&mut map, &1);
+        remove(&mut map, &2);
+        remove(&mut map, &3);
+        destroy_empty(map);
+    }
+
+    #[test]
+    public fun test_keys() {
+        let map = new<u64, u64>();
+        assert!(keys(&map) == vector[], 0);
+        add(&mut map, 2, 1);
+        add(&mut map, 3, 1);
+
+        assert!(keys(&map) == vector[2, 3], 0);
+    }
+
+    #[test]
+    public fun test_values() {
+        let map = new<u64, u64>();
+        assert!(values(&map) == vector[], 0);
+        add(&mut map, 2, 1);
+        add(&mut map, 3, 2);
+
+        assert!(values(&map) == vector[1, 2], 0);
+    }
+
+    #[test]
+    #[expected_failure]
+    public fun test_add_twice() {
+        let map = new<u64, u64>();
+        add(&mut map, 3, 1);
+        add(&mut map, 3, 1);
+
+        remove(&mut map, &3);
+        destroy_empty(map);
+    }
+
+    #[test]
+    #[expected_failure]
+    public fun test_remove_twice() {
+        let map = new<u64, u64>();
+        add(&mut map, 3, 1);
+        remove(&mut map, &3);
+        remove(&mut map, &3);
+
+        destroy_empty(map);
+    }
+
+    #[test]
+    public fun test_upsert_test() {
+        let map = new<u64, u64>();
+        // test adding 3 elements using upsert
+        upsert<u64, u64>(&mut map, 1, 1);
+        upsert(&mut map, 2, 2);
+        upsert(&mut map, 3, 3);
+
+        assert!(length(&map) == 3, 0);
+        assert!(contains(&map, &1), 1);
+        assert!(contains(&map, &2), 2);
+        assert!(contains(&map, &3), 3);
+        assert!(borrow(&map, &1) == &1, 4);
+        assert!(borrow(&map, &2) == &2, 5);
+        assert!(borrow(&map, &3) == &3, 6);
+
+        // change mapping 1->1 to 1->4
+        upsert(&mut map, 1, 4);
+
+        assert!(length(&map) == 3, 7);
+        assert!(contains(&map, &1), 8);
+        assert!(borrow(&map, &1) == &4, 9);
+    }
+
+    #[test]
+    fun test_append() {
+        {
+            let map = new<u16, u16>();
+            let other = new();
+            map.append(other);
+            assert!(map.is_empty(), 0);
+        };
+        {
+            let map = new_from(vector[1, 2], vector[10, 20]);
+            let other = new();
+            map.append(other);
+            assert!(map == new_from(vector[1, 2], vector[10, 20]), 1);
+        };
+        {
+            let map = new();
+            let other = new_from(vector[1, 2], vector[10, 20]);
+            map.append(other);
+            assert!(map == new_from(vector[1, 2], vector[10, 20]), 2);
+        };
+        {
+            let map = new_from(vector[1, 2, 3], vector[10, 20, 30]);
+            let other = new_from(vector[4, 5], vector[40, 50]);
+            map.append(other);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 3);
+        };
+        {
+            let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+            let other = new_from(vector[2, 4], vector[20, 40]);
+            map.append(other);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 3);
+        };
+        {
+            let map = new_from(vector[2, 4], vector[20, 40]);
+            let other = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+            map.append(other);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 3);
+        };
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10001 )] /// EKEY_ALREADY_EXISTS
+    fun test_append_abort() {
+        let map = new_from(vector[1], vector[10]);
+        let other = new_from(vector[1], vector[10]);
+        map.append(other);
+    }
+
     #[test_only]
     public fun large_dataset(): vector<u64> {
         vector[383, 886, 777, 915, 793, 335, 386, 492, 649, 421, 362, 27, 690, 59, 763, 926, 540, 426, 172, 736, 211, 368, 567, 429, 782, 530, 862, 123, 67, 135, 929, 802, 22, 58, 69, 167, 393, 456, 11, 42, 229, 373, 421, 919, 784, 537, 198, 324, 315, 370, 413, 526, 91, 980, 956, 873, 862, 170, 996, 281, 305, 925, 84, 327, 336, 505, 846, 729, 313, 857, 124, 895, 582, 545, 814, 367, 434, 364, 43, 750, 87, 808, 276, 178, 788, 584, 403, 651, 754, 399, 932, 60, 676, 368, 739, 12, 226, 586, 94, 539, 795, 570, 434, 378, 467, 601, 97, 902, 317, 492, 652, 756, 301, 280, 286, 441, 865, 689, 444, 619, 440, 729, 31, 117, 97, 771, 481, 675, 709, 927, 567, 856, 497, 353, 586, 965, 306, 683, 219, 624, 528, 871, 732, 829, 503, 19, 270, 368, 708, 715, 340, 149, 796, 723, 618, 245, 846, 451, 921, 555, 379, 488, 764, 228, 841, 350, 193, 500, 34, 764, 124, 914, 987, 856, 743, 491, 227, 365, 859, 936, 432, 551, 437, 228, 275, 407, 474, 121, 858, 395, 29, 237, 235, 793, 818, 428, 143, 11, 928, 529]
@@ -487,8 +741,6 @@ module aptos_std::ordered_map {
 
     #[test]
     fun test_map_large() {
-        use std::string;
-
         let map = new();
         let data = large_dataset();
         let shuffled_data = large_dataset_shuffled();
@@ -503,7 +755,7 @@ module aptos_std::ordered_map {
         for (i in 0..len) {
             let element = shuffled_data.borrow(i);
             let it = map.find(element);
-            assert!(!it.iter_is_end(), 6);
+            assert!(!it.iter_is_end(&map), 6);
             assert!(it.iter_borrow_key(&map) == element, 7);
 
             let it_next = it.iter_next(&map);
