@@ -28,15 +28,17 @@ lexicographical sorting for complex types.
 -  [Enum `Iterator`](#0x1_ordered_map_Iterator)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_ordered_map_new)
+-  [Function `new_from`](#0x1_ordered_map_new_from)
 -  [Function `length`](#0x1_ordered_map_length)
 -  [Function `is_empty`](#0x1_ordered_map_is_empty)
 -  [Function `add`](#0x1_ordered_map_add)
+-  [Function `add_all`](#0x1_ordered_map_add_all)
 -  [Function `upsert`](#0x1_ordered_map_upsert)
 -  [Function `remove`](#0x1_ordered_map_remove)
 -  [Function `contains`](#0x1_ordered_map_contains)
 -  [Function `replace_key_inplace`](#0x1_ordered_map_replace_key_inplace)
 -  [Function `append`](#0x1_ordered_map_append)
--  [Function `split_off`](#0x1_ordered_map_split_off)
+-  [Function `trim`](#0x1_ordered_map_trim)
 -  [Function `lower_bound`](#0x1_ordered_map_lower_bound)
 -  [Function `find`](#0x1_ordered_map_find)
 -  [Function `new_begin_iter`](#0x1_ordered_map_new_begin_iter)
@@ -268,6 +270,34 @@ Creates a new empty OrderedMap, using default (SortedVectorMap) implementation.
 
 </details>
 
+<a id="0x1_ordered_map_new_from"></a>
+
+## Function `new_from`
+
+Create a OrderedMap from a vector of keys and values.
+Aborts with EKEY_ALREADY_EXISTS if duplicate keys are passed in.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_from">new_from</a>&lt;K, V&gt;(keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_from">new_from</a>&lt;K, V&gt;(keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt; {
+    <b>let</b> map = <a href="ordered_map.md#0x1_ordered_map_new">new</a>();
+    <a href="ordered_map.md#0x1_ordered_map_add_all">add_all</a>(&<b>mut</b> map, keys, values);
+    map
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_ordered_map_length"></a>
 
 ## Function `length`
@@ -342,6 +372,34 @@ Aborts with EKEY_ALREADY_EXISTS if key already exist.
     // key must not already be inside.
     <b>assert</b>!(index &gt;= len || &self.entries[index].key != &key, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
     self.entries.insert(index, <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key, value });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_add_all"></a>
+
+## Function `add_all`
+
+Add multiple key/value pairs to the map. The keys must not already exist.
+Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_add_all">add_all</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_add_all">add_all</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_zip">vector::zip</a>(keys, values, |key, value| {
+        <a href="ordered_map.md#0x1_ordered_map_add">add</a>(self, key, value);
+    });
 }
 </code></pre>
 
@@ -435,7 +493,7 @@ Returns whether map contains a given key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_contains">contains</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): bool {
-    !self.<a href="ordered_map.md#0x1_ordered_map_find">find</a>(key).<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>()
+    !self.<a href="ordered_map.md#0x1_ordered_map_find">find</a>(key).<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)
 }
 </code></pre>
 
@@ -489,6 +547,7 @@ Aborts with ENEW_KEY_NOT_IN_ORDER if <code>new_key</code> doesn't keep the order
 ## Function `append`
 
 Takes all elements from <code>other</code> and adds them to <code>self</code>.
+Aborts with EKEY_ALREADY_EXISTS if <code>other</code> has a key already present in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_append">append</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, other: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;)
@@ -521,13 +580,36 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>.
         <b>return</b>;
     };
 
-    // TODO: can be implemented more efficiently, <b>as</b> we know both maps are already sorted.
-    <b>while</b> (!other_entries.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()) {
-        <b>let</b> <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key, value } = other_entries.pop_back();
-        self.<a href="ordered_map.md#0x1_ordered_map_add">add</a>(key, value);
+    // In O(n), traversing from the back, build reverse sorted result, and then reverse it back
+    <b>let</b> reverse_result = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> cur_i = self.entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>() - 1;
+    <b>let</b> other_i = other_entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>() - 1;
+
+    // after the end of the <b>loop</b>, entries is empty, and <a href="any.md#0x1_any">any</a> leftover is in other_entries
+    <b>loop</b> {
+        <b>let</b> ord = <a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&self.entries[cur_i].key, &other_entries[cur_i].key);
+        <b>assert</b>!(!ord.is_equal(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
+        <b>if</b> (ord.is_greater_than()) {
+            reverse_result.push_back(self.entries.pop_back());
+            <b>if</b> (cur_i == 0) {
+                <b>break</b>;
+            } <b>else</b> {
+                cur_i = cur_i - 1;
+            }
+        } <b>else</b> {
+            reverse_result.push_back(other_entries.pop_back());
+            <b>if</b> (other_i == 0) {
+                // make entries empty, and rest in other_entries.
+                <a href="../../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>(&<b>mut</b> other_entries, &<b>mut</b> self.entries);
+                <b>break</b>;
+            } <b>else</b> {
+                other_i = other_i - 1;
+            }
+        };
     };
 
-    other_entries.<a href="ordered_map.md#0x1_ordered_map_destroy_empty">destroy_empty</a>();
+    reverse_result.reverse_append(other_entries);
+    self.entries.reverse_append(reverse_result);
 }
 </code></pre>
 
@@ -535,9 +617,9 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>.
 
 </details>
 
-<a id="0x1_ordered_map_split_off"></a>
+<a id="0x1_ordered_map_trim"></a>
 
-## Function `split_off`
+## Function `trim`
 
 Splits the collection into two, such to leave <code>self</code> with <code>at</code> number of elements.
 Returns a newly allocated map containing the elements in the range [at, len).
@@ -545,7 +627,7 @@ After the call, the original map will be left containing the elements [0, at)
 with its previous capacity unchanged.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_split_off">split_off</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, at: u64): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_trim">trim</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, at: u64): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -554,8 +636,8 @@ with its previous capacity unchanged.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_split_off">split_off</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, at: u64): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt; {
-    <b>let</b> rest = self.entries.<a href="ordered_map.md#0x1_ordered_map_split_off">split_off</a>(at);
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_trim">trim</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, at: u64): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt; {
+    <b>let</b> rest = self.entries.<a href="ordered_map.md#0x1_ordered_map_trim">trim</a>(at);
 
     OrderedMap::SortedVectorMap {
         entries: rest
@@ -620,7 +702,7 @@ iterator if the key is not found.
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_find">find</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
     <b>let</b> lower_bound = self.<a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>(key);
-    <b>if</b> (lower_bound.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>()) {
+    <b>if</b> (lower_bound.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         lower_bound
     } <b>else</b> <b>if</b> (lower_bound.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self) == key) {
         lower_bound
@@ -706,7 +788,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
-    <b>assert</b>!(!self.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
+    <b>assert</b>!(!self.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(map), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
 
     <b>let</b> index = self.index + 1;
     <b>if</b> (index &lt; map.entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>()) {
@@ -822,7 +904,7 @@ This method doesn't require having access to map, unlike iter_is_begin.
 Returns whether the iterator is an end iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -831,7 +913,7 @@ Returns whether the iterator is an end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
     self is Iterator::End
 }
 </code></pre>
@@ -1028,7 +1110,7 @@ Apply the function to a reference of each key-value pair in the table.
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
     <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
-    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>()) {
+    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         f(iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self), iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>(self));
         iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
     }
@@ -1063,7 +1145,7 @@ Apply the function to a mutable reference of each key-value pair in the table.
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, f: |K, &<b>mut</b> V|) {
     <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
-    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>()) {
+    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         <b>let</b> key = *iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self);
         f(key, iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(self));
         iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
