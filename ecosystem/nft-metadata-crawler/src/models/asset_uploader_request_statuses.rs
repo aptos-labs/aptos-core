@@ -11,9 +11,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(
-    Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, AsChangeset,
-)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(request_id, asset_uri))]
 #[diesel(table_name = asset_uploader_request_statuses)]
 pub struct AssetUploaderRequestStatuses {

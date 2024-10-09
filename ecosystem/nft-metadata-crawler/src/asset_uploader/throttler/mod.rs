@@ -16,6 +16,7 @@ use axum::{http::StatusCode as AxumStatusCode, response::IntoResponse, routing::
 use config::AssetUploaderThrottlerConfig;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
+    upsert::excluded,
     ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
 };
 use parking_lot::Mutex;
@@ -115,10 +116,17 @@ impl AssetUploaderThrottlerContext {
             asset.error_message = Some(body.errors.join(", "));
         }
 
-        let query = diesel::update(
-            asset_uploader_request_statuses.find((&asset.request_id, &asset.asset_uri)),
-        )
-        .set(&asset);
+        let query = diesel::insert_into(asset_uploader_request_statuses)
+            .values(asset)
+            .on_conflict((request_id, asset_uri))
+            .do_update()
+            .set((
+                status_code.eq(excluded(status_code)),
+                error_message.eq(excluded(error_message)),
+                cdn_image_uri.eq(excluded(cdn_image_uri)),
+                num_failures.eq(excluded(num_failures)),
+                inserted_at.eq(excluded(inserted_at)),
+            ));
 
         let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
         debug!("Executing Query: {}", debug_query);
