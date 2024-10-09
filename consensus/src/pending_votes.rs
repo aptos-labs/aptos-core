@@ -91,10 +91,6 @@ impl TwoChainTimeoutVotes {
         &mut self.partial_2chain_tc
     }
 
-    pub(super) fn partial_2chain_tc(&self) -> &TwoChainTimeoutWithPartialSignatures {
-        &self.partial_2chain_tc
-    }
-
     fn aggregated_timeout_reason(&self, verifier: &ValidatorVerifier) -> RoundTimeoutReason {
         let mut reason_voting_power: HashMap<RoundTimeoutReason, u128> = HashMap::new();
         let mut missing_batch_authors: HashMap<usize, u128> = HashMap::new();
@@ -112,6 +108,8 @@ impl TwoChainTimeoutVotes {
                             verifier.get_voting_power(author).unwrap_or_default() as u128;
                     }
                     RoundTimeoutReason::PayloadUnavailable {
+                        // Since we care only about the variant type, we replace the bitvec
+                        // with a placeholder.
                         missing_authors: BitVec::with_num_bits(verifier.len() as u16),
                     }
                 },

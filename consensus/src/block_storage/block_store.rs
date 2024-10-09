@@ -473,12 +473,9 @@ impl BlockStore {
         self.pending_blocks.clone()
     }
 
-    pub async fn wait_for_payload(&self, block: &Block) -> anyhow::Result<()> {
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            self.payload_manager.get_transactions(block),
-        )
-        .await??;
+    pub async fn wait_for_payload(&self, block: &Block, deadline: Duration) -> anyhow::Result<()> {
+        let deadline = deadline.saturating_sub(self.time_service.get_current_timestamp());
+        tokio::time::timeout(deadline, self.payload_manager.get_transactions(block)).await??;
         Ok(())
     }
 

@@ -272,7 +272,7 @@ impl RoundState {
                 NewRoundReason::QCReady
             } else {
                 let prev_round_timeout_reason =
-                    prev_round_timeout_reason.expect("TC must be present for timeout round.");
+                    prev_round_timeout_reason.unwrap_or(RoundTimeoutReason::Unknown);
                 NewRoundReason::Timeout(prev_round_timeout_reason)
             };
 
