@@ -270,7 +270,7 @@ pub trait TransactionReplayer: Send {
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 
-    fn commit(&self) -> Result<ExecutedChunk>;
+    fn commit(&self) -> Result<Version>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
