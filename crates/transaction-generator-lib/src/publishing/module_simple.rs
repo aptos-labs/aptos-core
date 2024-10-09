@@ -637,15 +637,11 @@ impl EntryPoints {
                 len,
                 repeats,
                 use_simple_map,
-            } => get_payload(
-                module_id,
-                ident_str!("test_split_off_append").to_owned(),
-                vec![
-                    bcs::to_bytes(len).unwrap(),
-                    bcs::to_bytes(repeats).unwrap(),
-                    bcs::to_bytes(use_simple_map).unwrap(),
-                ],
-            ),
+            } => get_payload(module_id, ident_str!("test_add_remove").to_owned(), vec![
+                bcs::to_bytes(len).unwrap(),
+                bcs::to_bytes(repeats).unwrap(),
+                bcs::to_bytes(use_simple_map).unwrap(),
+            ]),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
                 module_id,
                 ident_str!("token_v1_initialize_collection").to_owned(),
