@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{
-    state_store::state_value::StateValueMetadata,
-    vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
-};
+use aptos_types::vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry};
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use hashbrown::HashMap;
@@ -79,33 +76,9 @@ impl ModuleCache {
     /// same state value metadata as previously, or does not contain the cached entry in case it
     /// did not contain it before. Used to validate module storage reads when there are modules
     /// published.
-    /// Note that [StateValueMetadata] comparison is required because it is currently possible to
-    /// publish modules with the same code (e.g., changing a single module as part of a package,
-    /// but publishing the whole package), and hence the same cache. For those, the state value
-    /// metadata changes, at least because we no longer have a creation but a modification op.
-    pub fn check_hash_and_state_value_metadata(
-        &self,
-        module_id: &ModuleId,
-        previous_hash_and_state_value_metadata: Option<(&[u8; 32], &StateValueMetadata)>,
-    ) -> bool {
-        let current_hash_and_state_value_metadata = self
-            .cache
-            .get(module_id)
-            .map(|e| (*e.hash(), e.state_value_metadata().clone()));
-        match (
-            &current_hash_and_state_value_metadata,
-            previous_hash_and_state_value_metadata,
-        ) {
-            (
-                Some((current_hash, current_state_value_metadata)),
-                Some((previous_hash, previous_state_value_metadata)),
-            ) => {
-                current_hash == previous_hash
-                    && current_state_value_metadata == previous_state_value_metadata
-            },
-            (None, None) => true,
-            (Some(..), None) | (None, Some(..)) => false,
-        }
+    pub fn check_hash(&self, module_id: &ModuleId, previous_hash: Option<&[u8; 32]>) -> bool {
+        let current_hash = self.cache.get(module_id).map(|e| *e.hash());
+        current_hash.as_ref() == previous_hash
     }
 
     /// Return the cached module from the module cache. If it is not cached, use the passed
