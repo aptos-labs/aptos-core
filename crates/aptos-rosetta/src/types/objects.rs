@@ -58,6 +58,11 @@ use std::{
     str::FromStr,
 };
 
+static WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
+static DEPOSIT_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| parse_type_tag("0x1::fungible_asset::Deposit").unwrap());
+
 /// A description of all types used by the Rosetta implementation.
 ///
 /// This is used to verify correctness of the implementation and to check things like
@@ -165,8 +170,9 @@ pub struct CurrencyMetadata {
     pub fa_address: Option<String>,
 }
 
-/// Various signing curves supngit p
-/// ported by Rosetta.  We only use [`CurveType::Edwards25519`]
+/// Various signing curves supported by Rosetta.
+///
+/// We only use [`CurveType::Edwards25519`]
 /// [API Spec](https://www.rosetta-api.org/docs/models/CurveType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -1446,15 +1452,17 @@ fn preprocess_write_set<'a>(
         (AccountAddress::ONE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP) => {
             // Parse the underlying resources in the group
             let maybe_resource_group = bcs::from_bytes::<ResourceGroup>(data);
-            if maybe_resource_group.is_err() {
-                warn!(
-                    "Failed to parse object resource group in version {}",
-                    version
-                );
-                return vec![];
-            }
+            let resource_group = match maybe_resource_group {
+                Ok(resource_group) => resource_group,
+                Err(err) => {
+                    warn!(
+                        "Failed to parse object resource group in version {}: {:#}",
+                        version, err
+                    );
+                    return vec![];
+                },
+            };
 
-            let resource_group = maybe_resource_group.unwrap();
             for (struct_tag, bytes) in resource_group.iter() {
                 match (
                     struct_tag.address,
@@ -2086,11 +2094,6 @@ fn parse_fungible_store_changes(
     let currency = maybe_currency.unwrap();
 
     // If there's a currency, let's fill in operations
-    static WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
-        Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
-    static DEPOSIT_TYPE_TAG: Lazy<TypeTag> =
-        Lazy::new(|| parse_type_tag("0x1::fungible_asset::Deposit").unwrap());
-
     // If we don't have an owner here, there's missing data on the writeset
     let maybe_owner = object_to_owner.get(&address);
     if maybe_owner.is_none() {
