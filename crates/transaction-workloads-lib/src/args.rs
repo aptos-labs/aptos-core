@@ -78,6 +78,8 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
     SimpleScript,
+    PermissionedTransfer,
+    APTTransfer,
 }
 
 impl TransactionTypeArg {
@@ -351,6 +353,10 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
             TransactionTypeArg::SimpleScript => call_custom_module(EntryPoints::SimpleScript),
+            TransactionTypeArg::PermissionedTransfer => {
+                call_custom_module(EntryPoints::APTPermissionedTransfer)
+            },
+            TransactionTypeArg::APTTransfer => call_custom_module(EntryPoints::APTTransfer),
         }
     }
 
