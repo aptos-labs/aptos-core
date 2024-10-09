@@ -4,8 +4,10 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput};
 use aptos_drop_helper::DEFAULT_DROPPER;
+use aptos_executor_types::{
+    should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput,
+};
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 #[cfg(test)]
 use aptos_types::account_config::NewEpochEvent;

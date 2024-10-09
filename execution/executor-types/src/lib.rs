@@ -28,7 +28,6 @@ use aptos_types::{
     write_set::WriteSet,
 };
 pub use error::{ExecutorError, ExecutorResult};
-pub use executed_chunk::ExecutedChunk;
 pub use ledger_update_output::LedgerUpdateOutput;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
@@ -44,7 +43,6 @@ use std::{
 };
 
 mod error;
-mod executed_chunk;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
