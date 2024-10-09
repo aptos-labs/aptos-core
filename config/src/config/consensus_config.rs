@@ -321,7 +321,7 @@ impl Default for ConsensusConfig {
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,
-            optimistic_sig_verification: true,
+            optimistic_sig_verification: false,
             enable_round_timeout_msg: false,
         }
     }

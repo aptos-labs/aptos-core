@@ -698,7 +698,7 @@ impl BufferManager {
         }
     }
 
-    fn get_commit_message(commit_vote: CommitVote) -> CommitMessage {
+    fn generate_commit_message(commit_vote: CommitVote) -> CommitMessage {
         fail_point!("consensus::create_invalid_commit_vote", |_| {
             CommitMessage::Vote(CommitVote::new_with_signature(
                 commit_vote.author(),
@@ -738,7 +738,7 @@ impl BufferManager {
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-                let commit_vote = Self::get_commit_message(commit_vote);
+                let commit_vote = Self::generate_commit_message(commit_vote);
                 signed_item_mut.rb_handle = self
                     .do_reliable_broadcast(commit_vote)
                     .map(|handle| (Instant::now(), handle));
