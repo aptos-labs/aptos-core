@@ -18,7 +18,7 @@ use crate::{
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
-    payload_pull_params::{self, OptQSPayloadPullParams},
+    payload_pull_params::OptQSPayloadPullParams,
     utils::PayloadTxnsSize,
 };
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_signer::ValidatorSigner};

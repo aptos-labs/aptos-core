@@ -43,10 +43,14 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
-        batch_expiry_gap_when_init_usecs: u64, 
+        batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
         Self {
-            batch_proof_queue: BatchProofQueue::new(my_peer_id, batch_store, batch_expiry_gap_when_init_usecs),
+            batch_proof_queue: BatchProofQueue::new(
+                my_peer_id,
+                batch_store,
+                batch_expiry_gap_when_init_usecs,
+            ),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -123,7 +127,7 @@ impl ProofManager {
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-                let (opt_batches, opt_batch_txns_size) = 
+                let (opt_batches, opt_batch_txns_size) =
                     // TODO(ibalajiarun): Support unique txn calculation
                     if let Some(ref params) = request.maybe_optqs_payload_pull_params {
                         let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;

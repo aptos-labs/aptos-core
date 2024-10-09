@@ -9,10 +9,9 @@ use crate::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
         },
-        proposal_status_tracker::{TOptQSPullParamsProvider, TPastProposalStatusTracker},
         proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
-        round_state::{ExponentialTimeInterval, NewRoundReason, RoundState},
+        round_state::{ExponentialTimeInterval, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
@@ -24,8 +23,8 @@ use crate::{
     round_manager::RoundManager,
     test_utils::{
         consensus_runtime, create_vec_signed_transactions,
-        mock_execution_client::MockExecutionClient, timed_block_on, MockPayloadManager,
-        MockStorage, TreeInserter,
+        mock_execution_client::MockExecutionClient, timed_block_on, MockOptQSPayloadProvider,
+        MockPastProposalStatusTracker, MockPayloadManager, MockStorage, TreeInserter,
     },
     util::time_service::{ClockTimeService, TimeService},
 };
@@ -41,7 +40,6 @@ use aptos_consensus_types::{
     },
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
     common::{Author, Payload, Round},
-    payload_pull_params::OptQSPayloadPullParams,
     pipeline::commit_decision::CommitDecision,
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
@@ -100,20 +98,6 @@ use tokio::{
     task::JoinHandle,
     time::timeout,
 };
-
-struct MockOptQSPayloadProvider {}
-
-impl TOptQSPullParamsProvider for MockOptQSPayloadProvider {
-    fn get_params(&self) -> Option<OptQSPayloadPullParams> {
-        None
-    }
-}
-
-struct MockPastProposalStatusTracker {}
-
-impl TPastProposalStatusTracker for MockPastProposalStatusTracker {
-    fn push(&self, _status: NewRoundReason) {}
-}
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {

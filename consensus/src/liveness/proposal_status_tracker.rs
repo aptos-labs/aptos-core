@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use super::round_state::NewRoundReason;
 use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::{
@@ -57,11 +60,12 @@ impl ExponentialWindowFailureTracker {
     }
 
     fn compute_failure_window(&mut self) {
-        self.last_consecutive_success_count =
-            self.last_consecutive_statuses_matching(|reason| match reason {
-                NewRoundReason::Timeout(RoundTimeoutReason::PayloadUnavailable { .. }) => false,
-                _ => true,
-            });
+        self.last_consecutive_success_count = self.last_consecutive_statuses_matching(|reason| {
+            !matches!(
+                reason,
+                NewRoundReason::Timeout(RoundTimeoutReason::PayloadUnavailable { .. })
+            )
+        });
         if self.last_consecutive_success_count == 0 {
             self.window *= 2;
             self.window = self.window.min(self.max_window);
@@ -144,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_exponential_window_failure_tracker() {
-        let (signers, verifier) = random_validator_verifier(4, None, false);
+        let (_signers, verifier) = random_validator_verifier(4, None, false);
         let mut tracker =
             ExponentialWindowFailureTracker::new(100, verifier.get_ordered_account_addresses());
         assert_eq!(tracker.max_window, 100);

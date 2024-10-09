@@ -21,7 +21,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    validator_verifier::{random_validator_verifier, ValidatorVerifier},
+    validator_verifier::random_validator_verifier,
 };
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};

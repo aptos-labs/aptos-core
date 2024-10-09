@@ -16,9 +16,7 @@ use crate::{
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
-        proposal_status_tracker::{
-            self, ExponentialWindowFailureTracker, TPastProposalStatusTracker,
-        },
+        proposal_status_tracker::TPastProposalStatusTracker,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,

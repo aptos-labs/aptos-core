@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    proposal_status_tracker::{self, ExponentialWindowFailureTracker, TOptQSPullParamsProvider},
-    proposer_election::ProposerElection,
-    round_state::NewRoundReason,
+    proposal_status_tracker::TOptQSPullParamsProvider, proposer_election::ProposerElection,
 };
 use crate::{
     block_storage::BlockReader,
@@ -20,7 +18,6 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-use aptos_collections::BoundedVecDeque;
 use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };

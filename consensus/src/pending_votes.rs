@@ -8,9 +8,8 @@
 //! when enough votes (or timeout votes) have been observed.
 //! Votes are automatically dropped when the structure goes out of scope.
 
-use crate::{counters, util::time_service::TimeService};
+use crate::counters;
 use aptos_bitvec::BitVec;
-use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
     common::Author,
     quorum_cert::QuorumCert,
@@ -26,13 +25,7 @@ use aptos_types::{
     ledger_info::{LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use futures_channel::mpsc::UnboundedSender;
-use itertools::Itertools;
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-    sync::Arc,
-};
+use std::{collections::HashMap, fmt, sync::Arc};
 
 /// Result of the vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
@@ -116,7 +109,7 @@ impl TwoChainTimeoutVotes {
                 RoundTimeoutReason::PayloadUnavailable { missing_authors } => {
                     for missing_idx in missing_authors.iter_ones() {
                         *missing_batch_authors.entry(missing_idx).or_default() +=
-                            verifier.get_voting_power(author).unwrap() as u128;
+                            verifier.get_voting_power(author).unwrap_or_default() as u128;
                     }
                     RoundTimeoutReason::PayloadUnavailable {
                         missing_authors: BitVec::with_num_bits(verifier.len() as u16),
@@ -124,12 +117,13 @@ impl TwoChainTimeoutVotes {
                 },
             };
             *reason_voting_power.entry(reason_key).or_default() +=
-                verifier.get_voting_power(&author).unwrap_or_default() as u128;
+                verifier.get_voting_power(author).unwrap_or_default() as u128;
         }
         // The aggregated timeout reason is the reason with the most voting power received from
         // at least f+1 peers by voting power. If such voting power does not exist, then the
         // reason is unknown.
-        let aggregated_reason = reason_voting_power
+
+        reason_voting_power
             .into_iter()
             .max_by_key(|(_, voting_power)| *voting_power)
             .filter(|(_, voting_power)| {
@@ -158,8 +152,7 @@ impl TwoChainTimeoutVotes {
                     reason
                 }
             })
-            .unwrap_or(RoundTimeoutReason::Unknown);
-        aggregated_reason
+            .unwrap_or(RoundTimeoutReason::Unknown)
     }
 
     pub(crate) fn unpack_aggregate(
