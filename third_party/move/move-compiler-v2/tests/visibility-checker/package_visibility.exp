@@ -31,3 +31,37 @@ module 0x42::C {
         B::foo()
     }
 } // end 0x42::C
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::A {
+    friend 0x42::B;
+    friend fun bar() {
+    }
+    fun foo() {
+    }
+}
+module 0x42::B {
+    use 0x42::A;
+    friend 0x42::C;
+    public fun bar() {
+        A::bar()
+    }
+    friend fun foo() {
+        A::bar()
+    }
+    fun baz() {
+        A::bar()
+    }
+}
+module 0x42::C {
+    use 0x42::B;
+    public fun bar() {
+        B::foo()
+    }
+    friend fun foo() {
+        B::foo()
+    }
+    fun baz() {
+        B::foo()
+    }
+}
