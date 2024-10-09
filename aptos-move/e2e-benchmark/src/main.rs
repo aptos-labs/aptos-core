@@ -278,6 +278,8 @@ fn main() {
             repeats: 100,
             use_simple_map: false,
         },
+        EntryPoints::APTPermissionedTransfer,
+        EntryPoints::APTTransfer,
     ];
 
     let mut failures = Vec::new();
