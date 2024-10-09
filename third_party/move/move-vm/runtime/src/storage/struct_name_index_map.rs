@@ -150,7 +150,6 @@ impl StructNameIndexMap {
 
     /// Returns the number of cached entries. Asserts that the number of cached indices is equal to
     /// the number of cached struct names.
-    #[allow(dead_code)]
     pub(crate) fn checked_len(&self) -> PartialVMResult<usize> {
         let index_map = self.0.read();
         let forward_map_len = index_map.forward_map.len();
@@ -179,7 +178,7 @@ impl Clone for StructNameIndexMap {
 #[cfg(test)]
 mod test {
     use super::*;
-    use claims::assert_ok;
+    use claims::{assert_err, assert_ok};
     use move_core_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     };
@@ -193,10 +192,9 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     fn test_index_map_must_contain_idx() {
         let struct_name_idx_map = StructNameIndexMap::empty();
-        let _ = struct_name_idx_map.idx_to_struct_name_ref(StructNameIndex(0));
+        assert_err!(struct_name_idx_map.idx_to_struct_name_ref(StructNameIndex(0)));
     }
 
     #[test]

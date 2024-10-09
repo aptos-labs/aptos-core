@@ -27,7 +27,7 @@ enum TimedFeaturesImpl {
     EnableAll,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum TimedFeatureOverride {
     Replay,
     Testing,
@@ -139,5 +139,18 @@ pub struct TimedFeatures([bool; TimedFeatureFlag::COUNT]);
 impl TimedFeatures {
     pub fn is_enabled(&self, flag: TimedFeatureFlag) -> bool {
         self.0[flag as usize]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use claims::assert_ok;
+
+    #[test]
+    fn timed_features_override_is_serializable() {
+        let replay = assert_ok!(bcs::to_bytes(&TimedFeatureOverride::Replay));
+        let testing = assert_ok!(bcs::to_bytes(&TimedFeatureOverride::Testing));
+        assert_ne!(replay, testing);
     }
 }

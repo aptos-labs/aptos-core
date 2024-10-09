@@ -8,14 +8,25 @@ use aptos_types::{
 };
 use aptos_vm_types::storage::{io_pricing::IoPricing, StorageGasParameters};
 use move_core_types::gas_algebra::NumArgs;
+use sha3::{digest::Update, Sha3_256};
+
+/// Returns the gas feature version stored in [GasScheduleV2]. If the gas schedule does not exist,
+/// returns 0 gas feature version.
+pub fn get_gas_feature_version(state_view: &impl StateView) -> u64 {
+    GasScheduleV2::fetch_config(state_view)
+        .map(|gas_schedule| gas_schedule.feature_version)
+        .unwrap_or(0)
+}
 
 /// Returns the gas parameters and the gas feature version from the state. If no gas parameters are
-/// found, returns an error.
-pub fn get_gas_config_from_storage(
+/// found, returns an error. Also updates the provided sha3 with config bytes.
+fn get_gas_config_from_storage(
+    sha3_256: &mut Sha3_256,
     state_view: &impl StateView,
 ) -> (Result<AptosGasParameters, String>, u64) {
-    match GasScheduleV2::fetch_config(state_view) {
-        Some(gas_schedule) => {
+    match GasScheduleV2::fetch_config_and_bytes(state_view) {
+        Some((gas_schedule, bytes)) => {
+            sha3_256.update(&bytes);
             let feature_version = gas_schedule.feature_version;
             let map = gas_schedule.into_btree_map();
             (
@@ -23,8 +34,9 @@ pub fn get_gas_config_from_storage(
                 feature_version,
             )
         },
-        None => match GasSchedule::fetch_config(state_view) {
-            Some(gas_schedule) => {
+        None => match GasSchedule::fetch_config_and_bytes(state_view) {
+            Some((gas_schedule, bytes)) => {
+                sha3_256.update(&bytes);
                 let map = gas_schedule.into_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
             },
@@ -35,7 +47,8 @@ pub fn get_gas_config_from_storage(
 
 /// Returns gas and storage gas parameters, as well as the gas feature version, from the state. In
 /// case parameters are not found on-chain, errors are returned.
-pub fn get_gas_parameters(
+pub(crate) fn get_gas_parameters(
+    sha3_256: &mut Sha3_256,
     features: &Features,
     state_view: &impl StateView,
 ) -> (
@@ -43,7 +56,7 @@ pub fn get_gas_parameters(
     Result<StorageGasParameters, String>,
     u64,
 ) {
-    let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(state_view);
+    let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(sha3_256, state_view);
 
     let storage_gas_params = match &mut gas_params {
         Ok(gas_params) => {
