@@ -3258,8 +3258,12 @@ pub struct TypeDisplayContext<'a> {
     pub builder_struct_table: Option<&'a BTreeMap<(ModuleId, StructId), QualifiedSymbol>>,
     /// If present, the module name in which context the type is displayed. Used to shorten type names.
     pub module_name: Option<ModuleName>,
-    /// Whether to display type variables. If false, the will be displayed as `_`, otherwise as `_<n>`.
+    /// Whether to display type variables. If false, they will be displayed as `_`, otherwise as `_<n>`.
     pub display_type_vars: bool,
+    /// Modules which are in `use` and do not need address qualification.
+    pub used_modules: BTreeSet<ModuleId>,
+    /// Whether to use `m::T` for representing types, for stable output in docgen
+    pub use_module_qualification: bool,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -3271,6 +3275,8 @@ impl<'a> TypeDisplayContext<'a> {
             builder_struct_table: None,
             module_name: None,
             display_type_vars: false,
+            used_modules: BTreeSet::new(),
+            use_module_qualification: false,
         }
     }
 
@@ -3292,6 +3298,8 @@ impl<'a> TypeDisplayContext<'a> {
             builder_struct_table: None,
             module_name: None,
             display_type_vars: false,
+            used_modules: BTreeSet::new(),
+            use_module_qualification: false,
         }
     }
 
@@ -3433,22 +3441,33 @@ impl<'a> TypeDisplay<'a> {
             qsym.display(self.context.env).to_string()
         } else {
             let struct_env = env.get_module(mid).into_struct(sid);
+            let module_name = struct_env.module_env.get_name();
+            let module_str = if self.context.use_module_qualification
+                || self.context.used_modules.contains(&mid)
+                || Some(module_name) == self.context.module_name.as_ref()
+            {
+                module_name.display(env).to_string()
+            } else {
+                module_name.display_full(env).to_string()
+            };
             format!(
                 "{}::{}",
-                struct_env.module_env.get_name().display(env),
+                module_str,
                 struct_env.get_name().display(env.symbol_pool())
             )
         };
-        if let Some(mname) = &self.context.module_name {
-            let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
-            if let Some(shortcut) = str.strip_prefix(&s) {
-                if let Some(tparams) = &self.context.type_param_names {
-                    // Avoid name clash with type parameter
-                    if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
-                        str = shortcut.to_owned()
+        if !self.context.use_module_qualification {
+            if let Some(mname) = &self.context.module_name {
+                let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
+                if let Some(shortcut) = str.strip_prefix(&s) {
+                    if let Some(tparams) = &self.context.type_param_names {
+                        // Avoid name clash with type parameter
+                        if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
+                            str = shortcut.to_owned()
+                        }
+                    } else {
+                        str = shortcut.to_owned();
                     }
-                } else {
-                    str = shortcut.to_owned();
                 }
             }
         }

@@ -22,7 +22,7 @@ module 0x42::M {
         a: #0,
     }
     struct S2 {
-        a: M::S1<M::HasAbilities<M::NoAbilities, u64>>,
+        a: 0x42::M::S1<0x42::M::HasAbilities<0x42::M::NoAbilities, u64>>,
     }
     struct S3 {
         a: #0,
@@ -31,20 +31,67 @@ module 0x42::M {
         d: #3,
     }
     struct S4 {
-        a: M::S3<M::HasDrop<M::NoAbilities, u64>, M::HasCopy<M::NoAbilities, u64>, M::HasStore<M::NoAbilities, u64>, M::HasKey<M::NoAbilities, u64>>,
+        a: 0x42::M::S3<0x42::M::HasDrop<0x42::M::NoAbilities, u64>, 0x42::M::HasCopy<0x42::M::NoAbilities, u64>, 0x42::M::HasStore<0x42::M::NoAbilities, u64>, 0x42::M::HasKey<0x42::M::NoAbilities, u64>>,
     }
     private fun f1<T>() {
         Tuple()
     }
     private fun f2() {
-        M::f1<M::HasAbilities<M::NoAbilities, u64>>();
+        M::f1<HasAbilities<NoAbilities, u64>>();
         Tuple()
     }
     private fun f3<T1,T2,T3,T4>() {
         Tuple()
     }
     private fun f4() {
-        M::f3<M::HasDrop<M::NoAbilities, u64>, M::HasCopy<M::NoAbilities, u64>, M::HasStore<M::NoAbilities, u64>, M::HasKey<M::NoAbilities, u64>>();
+        M::f3<HasDrop<NoAbilities, u64>, HasCopy<NoAbilities, u64>, HasStore<NoAbilities, u64>, HasKey<NoAbilities, u64>>();
         Tuple()
     }
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct HasAbilities<phantom T1, T2> has copy, drop, store, key {
+        a: T2,
+    }
+    struct HasCopy<phantom T1, T2> has copy {
+        a: T2,
+    }
+    struct HasDrop<phantom T1, T2> has drop {
+        a: T2,
+    }
+    struct HasKey<phantom T1, T2> has key {
+        a: T2,
+    }
+    struct HasStore<phantom T1, T2> has store {
+        a: T2,
+    }
+    struct NoAbilities {
+        a: bool,
+    }
+    struct S1<T: copy + drop + store + key> {
+        a: T,
+    }
+    struct S2 {
+        a: S1<HasAbilities<NoAbilities, u64>>,
+    }
+    struct S3<T1: drop, T2: copy, T3: store, T4: key> {
+        a: T1,
+        b: T2,
+        c: T3,
+        d: T4,
+    }
+    struct S4 {
+        a: S3<HasDrop<NoAbilities, u64>, HasCopy<NoAbilities, u64>, HasStore<NoAbilities, u64>, HasKey<NoAbilities, u64>>,
+    }
+    fun f1<T: copy + drop + store + key>() {
+    }
+    fun f2() {
+        f1<HasAbilities<NoAbilities, u64>>();
+    }
+    fun f3<T1: drop, T2: copy, T3: store, T4: key>() {
+    }
+    fun f4() {
+        f3<HasDrop<NoAbilities, u64>,HasCopy<NoAbilities, u64>,HasStore<NoAbilities, u64>,HasKey<NoAbilities, u64>>();
+    }
+}

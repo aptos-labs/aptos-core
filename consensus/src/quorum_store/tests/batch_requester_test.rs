@@ -89,7 +89,8 @@ async fn test_batch_request_exists() {
         1_000,
         1_000,
         MockBatchRequester::new(batch_response),
-        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key()),
+        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key())
+            .into(),
     );
 
     let (_, subscriber_rx) = oneshot::channel();
@@ -184,7 +185,7 @@ async fn test_batch_request_not_exists_not_expired() {
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        validator_verifier.into(),
     );
 
     let request_start = Instant::now();
@@ -232,7 +233,7 @@ async fn test_batch_request_not_exists_expired() {
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        validator_verifier.into(),
     );
 
     let request_start = Instant::now();

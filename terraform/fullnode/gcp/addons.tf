@@ -85,11 +85,6 @@ resource "helm_release" "pfn-addons" {
         gce_managed_certificate_domains = var.create_google_managed_ssl_certificate ? join(",", distinct(concat([local.domain], var.tls_sans))) : ""
         # loadBalancerSourceRanges = var.client_sources_ipv4 # not supported yet
       }
-      load_test = {
-        config = {
-          numFullnodeGroups = var.num_fullnodes
-        }
-      }
     }),
     jsonencode(var.pfn_helm_values),
   ]

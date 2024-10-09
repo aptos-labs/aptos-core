@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use aptos_vm_types::resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -144,6 +144,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
         <Self::Txn as Transaction>::Value,
+        ResourceGroupSize,
         BTreeMap<
             <Self::Txn as Transaction>::Tag,
             (
@@ -161,7 +162,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     )> {
         self.resource_group_write_set()
             .into_iter()
-            .map(|(key, op, _)| (key, op))
+            .map(|(key, op, _, _)| (key, op))
             .collect()
     }
 

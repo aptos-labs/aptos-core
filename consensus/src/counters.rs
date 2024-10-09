@@ -1311,3 +1311,14 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy:
     )
     .unwrap()
 });
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS: Lazy<IntCounterVec> = Lazy::new(
+    || {
+        register_int_counter_vec!(
+            "aptos_consensus_proposal_payload_batch_availability",
+            "The number of batches in payload that are available and missing locally by batch author",
+            &["author", "is_proof", "state"]
+        )
+        .unwrap()
+    },
+);
