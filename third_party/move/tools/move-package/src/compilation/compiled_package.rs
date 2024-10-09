@@ -820,27 +820,29 @@ impl CompiledPackage {
                 .iter()
                 .flat_map(|package| {
                     let name = package.name.unwrap();
-                    let pkg_path = package.paths.first().unwrap();
-                    // Read the bytecode file
-                    let mut bytecode = Vec::new();
-                    std::fs::File::open(&pkg_path.to_string())
-                        .context(format!("Failed to open bytecode file for {}", pkg_path))
-                        .and_then(|mut file| {
-                            // read contents of the file into bytecode
-                            std::io::Read::read_to_end(&mut file, &mut bytecode).context(format!("Failed to read bytecode file {}", pkg_path))
-                        })
-                        .and_then(|_| {
-                            CompiledModule::deserialize(&bytecode).context(format!(
-                                "Failed to deserialize bytecode file for {}",
-                                name
-                            ))
-                        })
-                        .map(|module| {
-                            (
-                                name,
-                                NumericalAddress::from_account_address(*module.self_addr()),
-                            )
-                        })
+                    package.paths.iter().map(move |pkg_path| {
+                        // Read the bytecode file
+                        let mut bytecode = Vec::new();
+                        std::fs::File::open(&pkg_path.to_string())
+                            .context(format!("Failed to open bytecode file for {}", pkg_path))
+                            .and_then(|mut file| {
+                                // read contents of the file into bytecode
+                                std::io::Read::read_to_end(&mut file, &mut bytecode)
+                                    .context(format!("Failed to read bytecode file {}", pkg_path))
+                            })
+                            .and_then(|_| {
+                                CompiledModule::deserialize(&bytecode).context(format!(
+                                    "Failed to deserialize bytecode file for {}",
+                                    name
+                                ))
+                            })
+                            .map(|module| {
+                                (
+                                    name,
+                                    NumericalAddress::from_account_address(*module.self_addr()),
+                                )
+                            })
+                    })
                 })
                 .try_collect()?,
             compiled_package_info: CompiledPackageInfo {
