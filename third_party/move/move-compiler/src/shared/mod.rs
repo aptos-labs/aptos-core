@@ -713,6 +713,7 @@ pub mod known_attributes {
         Native(NativeAttribute),
         Deprecation(DeprecationAttribute),
         Lint(LintAttribute),
+        Mutation(MutationAttribute),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -750,6 +751,12 @@ pub mod known_attributes {
         Allow,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum MutationAttribute {
+        // Allow the user to skip mutating certain parts of code.
+        Skip,
+    }
+
     impl fmt::Display for AttributePosition {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
@@ -785,6 +792,7 @@ pub mod known_attributes {
                     Self::Deprecation(DeprecationAttribute::Deprecated)
                 },
                 LintAttribute::SKIP => Self::Lint(LintAttribute::Allow),
+                MutationAttribute::SKIP => Self::Mutation(MutationAttribute::Skip),
                 _ => return None,
             })
         }
@@ -806,6 +814,7 @@ pub mod known_attributes {
             NativeAttribute::add_attribute_names(table);
             DeprecationAttribute::add_attribute_names(table);
             LintAttribute::add_attribute_names(table);
+            MutationAttribute::add_attribute_names(table);
         }
 
         fn name(&self) -> &str {
@@ -815,6 +824,7 @@ pub mod known_attributes {
                 Self::Native(a) => a.name(),
                 Self::Deprecation(a) => a.name(),
                 Self::Lint(a) => a.name(),
+                Self::Mutation(a) => a.name(),
             }
         }
 
@@ -825,14 +835,16 @@ pub mod known_attributes {
                 Self::Native(a) => a.expected_positions(),
                 Self::Deprecation(a) => a.expected_positions(),
                 Self::Lint(a) => a.expected_positions(),
+                Self::Mutation(a) => a.expected_positions(),
             }
         }
     }
 
     impl TestingAttribute {
-        pub const ABORT_CODE_NAME: &'static str = "abort_code";
         const ALL_ATTRIBUTE_NAMES: [&'static str; 3] =
             [Self::TEST, Self::TEST_ONLY, Self::EXPECTED_FAILURE];
+
+        pub const ABORT_CODE_NAME: &'static str = "abort_code";
         pub const ARITHMETIC_ERROR_NAME: &'static str = "arithmetic_error";
         pub const ERROR_LOCATION: &'static str = "location";
         pub const EXPECTED_FAILURE: &'static str = "expected_failure";
@@ -1021,6 +1033,35 @@ pub mod known_attributes {
             });
             match self {
                 Self::Allow => &ALLOW_POSITIONS,
+            }
+        }
+    }
+
+    impl MutationAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 1] = [Self::SKIP];
+        pub const SKIP: &'static str = "mutation::skip";
+    }
+
+    impl AttributeKind for MutationAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
+
+        fn name(&self) -> &str {
+            match self {
+                Self::Skip => Self::SKIP,
+            }
+        }
+
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            static ALLOW_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
+                IntoIterator::into_iter([AttributePosition::Module, AttributePosition::Function])
+                    .collect()
+            });
+            match self {
+                Self::Skip => &ALLOW_POSITIONS,
             }
         }
     }
