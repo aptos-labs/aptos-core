@@ -152,14 +152,7 @@ pub async fn fetch_latency_breakdown(
 ) -> anyhow::Result<LatencyBreakdown> {
     // Averaging over 1m, and skipping data points at the start that would take averages outside of the interval.
     let start_time_adjusted = start_time + 60;
-
-    // TODO @hariria remove
-    // let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
     let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
-
-    // TODO @hariria remove
-    // let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
-    // let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
 
     let insertion_to_block_query = r#"sum(
         rate(aptos_core_mempool_txn_commit_latency_sum{
@@ -191,16 +184,6 @@ pub async fn fetch_latency_breakdown(
 
     let swarm = swarm.read().await;
 
-    // TODO @hariria remove
-    // let consensus_proposal_to_ordered_samples = swarm
-    //     .query_range_metrics(
-    //         consensus_proposal_to_ordered_query,
-    //         start_time_adjusted as i64,
-    //         end_time as i64,
-    //         None,
-    //     )
-    //     .await?;
-
     let consensus_proposal_to_commit_samples = swarm
         .query_range_metrics(
             consensus_proposal_to_commit_query,
@@ -209,37 +192,6 @@ pub async fn fetch_latency_breakdown(
             None,
         )
         .await?;
-
-    // TODO @hariria remove
-    // let consensus_ordered_to_commit_samples = swarm
-    //     .query_range_metrics(
-    //         &format!(
-    //             "{} - {}",
-    //             consensus_proposal_to_commit_query, consensus_proposal_to_ordered_query
-    //         ),
-    //         start_time_adjusted as i64,
-    //         end_time as i64,
-    //         None,
-    //     )
-    //     .await?;
-    //
-    // let qs_batch_to_pos_samples = swarm
-    //     .query_range_metrics(
-    //         qs_batch_to_pos_query,
-    //         start_time_adjusted as i64,
-    //         end_time as i64,
-    //         None,
-    //     )
-    //     .await?;
-    //
-    // let qs_pos_to_proposal_samples = swarm
-    //     .query_range_metrics(
-    //         qs_pos_to_proposal_query,
-    //         start_time_adjusted as i64,
-    //         end_time as i64,
-    //         None,
-    //     )
-    //     .await?;
 
     let insertion_to_block_samples = swarm
         .query_range_metrics(
@@ -268,22 +220,6 @@ pub async fn fetch_latency_breakdown(
         LatencyBreakdownSlice::BlockCreationToCommit,
         MetricSamples::new(block_creation_to_commit_samples),
     );
-    // samples.insert(
-    //     LatencyBreakdownSlice::QsBatchToPos,
-    //     MetricSamples::new(qs_batch_to_pos_samples),
-    // );
-    // samples.insert(
-    //     LatencyBreakdownSlice::QsPosToProposal,
-    //     MetricSamples::new(qs_pos_to_proposal_samples),
-    // );
-    // samples.insert(
-    //     LatencyBreakdownSlice::ConsensusProposalToOrdered,
-    //     MetricSamples::new(consensus_proposal_to_ordered_samples),
-    // );
-    // samples.insert(
-    //     LatencyBreakdownSlice::ConsensusOrderedToCommit,
-    //     MetricSamples::new(consensus_ordered_to_commit_samples),
-    // );
     samples.insert(
         LatencyBreakdownSlice::ConsensusProposalToCommit,
         MetricSamples::new(consensus_proposal_to_commit_samples),
