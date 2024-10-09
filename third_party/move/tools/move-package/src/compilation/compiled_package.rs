@@ -11,7 +11,7 @@ use crate::{
     },
     Architecture, BuildConfig, CompilerConfig, CompilerVersion,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, ensure, Context, Result};
 use colored::Colorize;
 use itertools::{Either, Itertools};
 use move_abigen::{Abigen, AbigenOptions};
@@ -102,6 +102,7 @@ pub struct OnDiskPackage {
     pub compiled_package_info: CompiledPackageInfo,
     /// Dependency names for this package.
     pub dependencies: Vec<PackageName>,
+    pub bytecode_deps: Vec<PackageName>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +156,21 @@ impl OnDiskCompiledPackage {
                 deps_compiled_units.push((dep_name, self.decode_unit(dep_name, &bytecode_path)?))
             }
         }
+        let mut bytecode_deps = vec![];
+        for dep_name in self.package.bytecode_deps.iter().copied() {
+            let addr = self
+                .package
+                .compiled_package_info
+                .address_alias_instantiation
+                .get(&dep_name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Dependency {} not found in address alias instantiation",
+                        dep_name
+                    )
+                })?;
+            bytecode_deps.push((dep_name, NumericalAddress::from_account_address(*addr)));
+        }
 
         let docs_path = self
             .root_path
@@ -200,7 +216,7 @@ impl OnDiskCompiledPackage {
             compiled_package_info: self.package.compiled_package_info.clone(),
             root_compiled_units,
             deps_compiled_units,
-            bytecode_deps: Vec::new(), // TODO
+            bytecode_deps,
             compiled_docs,
             compiled_abis,
         })
@@ -644,7 +660,7 @@ impl CompiledPackage {
                     );
                     compiler_driver_v1(compiler)?
                 },
-                CompilerVersion::V2_0 => {
+                CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
                     let to_str_vec = |ps: &[Symbol]| {
                         ps.iter()
                             .map(move |s| s.as_str().to_owned())
@@ -798,29 +814,41 @@ impl CompiledPackage {
         };
 
         let compiled_package = CompiledPackage {
+            root_compiled_units,
+            deps_compiled_units,
+            bytecode_deps: bytecode_deps
+                .iter()
+                .flat_map(|package| {
+                    let name = package.name.unwrap();
+                    let pkg_path = package.paths.first().unwrap();
+                    // Read the bytecode file
+                    let mut bytecode = Vec::new();
+                    std::fs::File::open(&pkg_path.to_string())
+                        .context(format!("Failed to open bytecode file for {}", pkg_path))
+                        .and_then(|mut file| {
+                            // read contents of the file into bytecode
+                            std::io::Read::read_to_end(&mut file, &mut bytecode).context(format!("Failed to read bytecode file {}", pkg_path))
+                        })
+                        .and_then(|_| {
+                            CompiledModule::deserialize(&bytecode).context(format!(
+                                "Failed to deserialize bytecode file for {}",
+                                name
+                            ))
+                        })
+                        .map(|module| {
+                            (
+                                name,
+                                NumericalAddress::from_account_address(*module.self_addr()),
+                            )
+                        })
+                })
+                .try_collect()?,
             compiled_package_info: CompiledPackageInfo {
                 package_name: resolved_package.source_package.package.name,
                 address_alias_instantiation: resolved_package.resolution_table,
                 source_digest: Some(resolved_package.source_digest),
                 build_flags: resolution_graph.build_options.clone(),
             },
-            root_compiled_units,
-            deps_compiled_units,
-            bytecode_deps: bytecode_deps
-                .iter()
-                .map(|package| {
-                    let name = package.name.unwrap();
-                    // Package address of the bytecode dep is required for publication.
-                    let address = package.named_address_map.get(&name).ok_or(anyhow::anyhow!(
-                        "address unknown for bytecode dependency {}. It must be provided as a named \
-                        address in the dependency's Move.toml or through CLI arg --named-addresses, \
-                        with name {0}",
-                        name
-                    ));
-
-                    address.map(|&a| (name, a))
-                })
-                .try_collect()?,
             compiled_docs,
             compiled_abis,
         };
@@ -900,9 +928,15 @@ impl CompiledPackage {
             root_path: under_path.join(root_package.as_str()),
             package: OnDiskPackage {
                 compiled_package_info: self.compiled_package_info.clone(),
-                // TODO - bytecode deps
                 dependencies: self
                     .deps_compiled_units
+                    .iter()
+                    .map(|(package_name, _)| *package_name)
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect(),
+                bytecode_deps: self
+                    .bytecode_deps
                     .iter()
                     .map(|(package_name, _)| *package_name)
                     .collect::<BTreeSet<_>>()
