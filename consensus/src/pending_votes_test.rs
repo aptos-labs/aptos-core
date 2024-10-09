@@ -1,15 +1,15 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::pending_votes::TwoChainTimeoutVotes;
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
-    common::Round, quorum_cert::QuorumCert, round_timeout::RoundTimeoutReason,
-    timeout_2chain::TwoChainTimeout,
+    quorum_cert::QuorumCert, round_timeout::RoundTimeoutReason, timeout_2chain::TwoChainTimeout,
 };
-use aptos_types::{
-    validator_info::ValidatorInfo,
-    validator_verifier::{random_validator_verifier, random_validator_verifier_with_voting_power},
+use aptos_types::validator_verifier::{
+    random_validator_verifier, random_validator_verifier_with_voting_power,
 };
 use itertools::Itertools;
-use sha3::digest::generic_array::typenum::Bit;
 
 #[test]
 fn test_two_chain_timeout_votes_aggregation() {
@@ -69,7 +69,7 @@ fn test_two_chain_timeout_aggregate_missing_authors() {
 
     let permutations = [true, true, false, false]
         .iter()
-        .map(|i| *i)
+        .copied()
         .permutations(4)
         .unique();
 

@@ -21,7 +21,7 @@ use aptos_types::{
 };
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
-    collections::{vec_deque::VecDeque, BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{vec_deque::VecDeque, BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
