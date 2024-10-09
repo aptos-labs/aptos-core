@@ -6,7 +6,7 @@ module 0xABCD::maps_example {
     const OFFSET: u64 = 270001;
     const MOD: u64 = 1000000;
 
-    public entry fun test_split_off_append(len: u64, repeats: u64, use_simple_map: bool) {
+    public entry fun test_add_remove(len: u64, repeats: u64, use_simple_map: bool) {
         // y is same sequence of values as x, just lagging len behind
         // so that map always has len elements.
         let x = 1234;
