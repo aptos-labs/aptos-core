@@ -104,15 +104,6 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let max_txns_with_proof =
-                    if let Some(ref params) = request.maybe_optqs_payload_pull_params {
-                        request
-                            .max_txns
-                            .compute_pct(100 - params.opt_batch_txns_pct)
-                    } else {
-                        request.max_txns
-                    };
-
                 let (
                     proof_block,
                     txns_with_proof_size,
@@ -120,7 +111,7 @@ impl ProofManager {
                     proof_queue_fully_utilized,
                 ) = self.batch_proof_queue.pull_proofs(
                     &excluded_batches,
-                    max_txns_with_proof,
+                    request.max_txns,
                     request.max_txns_after_filtering,
                     request.soft_max_txns_after_filtering,
                     request.return_non_full,

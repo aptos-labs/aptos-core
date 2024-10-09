@@ -122,15 +122,12 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
 
         let tracker = self.failure_tracker.lock();
 
-        let opt_batch_txns_pct = if tracker.last_consecutive_success_count < tracker.window {
-            0
-        } else {
-            50
-        };
-        let exclude_authors = tracker.get_exclude_authors();
+        if tracker.last_consecutive_success_count < tracker.window {
+            return None;
+        }
 
+        let exclude_authors = tracker.get_exclude_authors();
         Some(OptQSPayloadPullParams {
-            opt_batch_txns_pct,
             exclude_authors,
             minimum_batch_age_usecs: 50_000_000,
         })

@@ -545,6 +545,8 @@ impl BatchProofQueue {
                     let batch_create_ts_usecs =
                         item.info.expiration() - self.batch_expiry_gap_when_init_usecs;
 
+                    // Ensure that the batch was created at least `min_batch_age_usecs` ago to
+                    // reduce the chance of inline fetches.
                     if max_batch_ts_usecs
                         .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
                     {

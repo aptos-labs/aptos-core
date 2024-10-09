@@ -261,8 +261,8 @@ impl BlockTree {
             assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
             // Note: the assumption is that we have/enforce unequivocal proposer election.
             if let Some(old_block_id) = self.round_to_ids.get(&arc_block.round()) {
-                error!(
-                    "multiple blocks received for round {}. Previous block id: {}",
+                warn!(
+                    "Multiple blocks received for round {}. Previous block id: {}",
                     arc_block.round(),
                     old_block_id
                 );
