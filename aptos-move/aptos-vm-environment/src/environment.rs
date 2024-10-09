@@ -24,6 +24,7 @@ use aptos_vm_types::storage::StorageGasParameters;
 use move_vm_runtime::{
     config::VMConfig, use_loader_v1_based_on_env, RuntimeEnvironment, WithRuntimeEnvironment,
 };
+use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
 /// A runtime environment which can be used for VM initialization and more. Contains features
@@ -125,6 +126,14 @@ impl Clone for AptosEnvironment {
     }
 }
 
+impl PartialEq for AptosEnvironment {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.hash == other.0.hash
+    }
+}
+
+impl Eq for AptosEnvironment {}
+
 impl WithRuntimeEnvironment for AptosEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         &self.0.runtime_environment
@@ -149,12 +158,16 @@ struct Environment {
     /// found on-chain.
     storage_gas_params: Result<StorageGasParameters, String>,
 
+    /// The runtime environment, containing global struct type and name caches, and VM configs.
     runtime_environment: RuntimeEnvironment,
 
     /// True if we need to inject create signer native for government proposal simulation.
     /// Deprecated, and will be removed in the future.
     #[deprecated]
     inject_create_signer_for_gov_sim: bool,
+
+    /// Hash of configs used in this environment. Used to be able to compare environments.
+    hash: [u8; 32],
 }
 
 impl Environment {
@@ -163,7 +176,10 @@ impl Environment {
         inject_create_signer_for_gov_sim: bool,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
     ) -> Self {
-        let mut features = Features::fetch_config(state_view).unwrap_or_default();
+        // We compute and store a hash of configs in order to distinguish different environments.
+        let mut sha3_256 = Sha3_256::new();
+        let mut features =
+            fetch_config_and_update_hash::<Features>(&mut sha3_256, state_view).unwrap_or_default();
 
         // TODO(loader_v2): Remove before rolling out. This allows us to replay with V2.
         if use_loader_v1_based_on_env() {
@@ -173,13 +189,20 @@ impl Environment {
         }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
-        let chain_id = ChainId::fetch_config(state_view).unwrap_or_else(ChainId::test);
-        let timestamp = ConfigurationResource::fetch_config(state_view)
-            .map(|config| config.last_reconfiguration_time())
-            .unwrap_or(0);
+        let chain_id = fetch_config_and_update_hash::<ChainId>(&mut sha3_256, state_view)
+            .unwrap_or_else(ChainId::test);
+        let timestamp =
+            fetch_config_and_update_hash::<ConfigurationResource>(&mut sha3_256, state_view)
+                .map(|config| config.last_reconfiguration_time())
+                .unwrap_or(0);
 
         let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
         if let Some(profile) = get_timed_feature_override() {
+            // We need to ensure the override is taken into account for the hash.
+            let profile_bytes = bcs::to_bytes(&profile)
+                .expect("Timed features override should always be serializable");
+            sha3_256.update(&profile_bytes);
+
             timed_features_builder = timed_features_builder.with_override_profile(profile)
         }
         let timed_features = timed_features_builder.build();
@@ -190,7 +213,7 @@ impl Environment {
         //   transactions or genesis, which logically speaking, shouldn't be handled by the VM at
         //   all. We should clean up the logic here once we get that refactored.
         let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(&features, state_view);
+            get_gas_parameters(&mut sha3_256, &features, state_view);
         let (native_gas_params, misc_gas_params, ty_builder) = match &gas_params {
             Ok(gas_params) => {
                 let ty_builder = aptos_prod_ty_builder(gas_feature_version, gas_params);
@@ -222,6 +245,8 @@ impl Environment {
         let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
+        let hash = sha3_256.finalize().into();
+
         #[allow(deprecated)]
         Self {
             chain_id,
@@ -232,6 +257,7 @@ impl Environment {
             storage_gas_params,
             runtime_environment,
             inject_create_signer_for_gov_sim,
+            hash,
         }
     }
 
@@ -241,6 +267,16 @@ impl Environment {
         }
         self
     }
+}
+
+/// Fetches config from storage and updates the hash if it exists. Returns the fetched config.
+fn fetch_config_and_update_hash<T: OnChainConfig>(
+    sha3_256: &mut Sha3_256,
+    state_view: &impl StateView,
+) -> Option<T> {
+    let (config, bytes) = T::fetch_config_and_bytes(state_view)?;
+    sha3_256.update(&bytes);
+    Some(config)
 }
 
 #[cfg(test)]
@@ -270,4 +306,6 @@ pub mod test {
                 .delayed_field_optimization_enabled
         );
     }
+
+    // TODO(loader_v2): Add equality tests.
 }

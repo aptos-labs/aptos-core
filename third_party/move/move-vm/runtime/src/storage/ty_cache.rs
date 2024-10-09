@@ -80,12 +80,6 @@ impl StructInfoCache {
         Self(RwLock::new(hashbrown::HashMap::new()))
     }
 
-    /// Returns the number of cached struct information entries.
-    #[allow(dead_code)]
-    pub(crate) fn len(&self) -> usize {
-        self.0.read().len()
-    }
-
     /// Flushes the cached struct information.
     pub(crate) fn flush(&self) {
         self.0.write().clear()

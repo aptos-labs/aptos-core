@@ -4544,12 +4544,15 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
+ "bcs 0.1.4",
+ "bytes",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "sha3 0.9.1",
 ]
 
 [[package]]
