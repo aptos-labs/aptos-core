@@ -5,9 +5,8 @@
 
 
 
--  [Struct `Ordering`](#0x1_cmp_Ordering)
+-  [Enum `Ordering`](#0x1_cmp_Ordering)
 -  [Constants](#@Constants_0)
--  [Function `compare_impl`](#0x1_cmp_compare_impl)
 -  [Function `compare`](#0x1_cmp_compare)
 -  [Function `is_equal`](#0x1_cmp_is_equal)
 -  [Function `is_less_than`](#0x1_cmp_is_less_than)
@@ -22,13 +21,21 @@
 
 <a id="0x1_cmp_Ordering"></a>
 
-## Struct `Ordering`
+## Enum `Ordering`
 
 
 
-<pre><code><b>struct</b> <a href="cmp.md#0x1_cmp_Ordering">Ordering</a> <b>has</b> <b>copy</b>, drop
+<pre><code>enum <a href="cmp.md#0x1_cmp_Ordering">Ordering</a> <b>has</b> <b>copy</b>, drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>LessThan</summary>
 
 
 <details>
@@ -36,14 +43,44 @@
 
 
 <dl>
-<dt>
-<code>value: u8</code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
+
+</details>
+
+</details>
+
+<details>
+<summary>Equal</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>GreaterThan</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
 
 </details>
 
@@ -79,33 +116,6 @@
 
 
 
-<a id="0x1_cmp_compare_impl"></a>
-
-## Function `compare_impl`
-
-As there are no signed values in move, all values are shifted by 1 up.
-An int value:
-1   iff both values are the same
-0   iff first value is smaller than the second
-2   iff first value is larger than the second
-
-
-<pre><code><b>fun</b> <a href="cmp.md#0x1_cmp_compare_impl">compare_impl</a>&lt;T&gt;(first: &T, second: &T): u8
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="cmp.md#0x1_cmp_compare_impl">compare_impl</a>&lt;T&gt;(first: &T, second: &T): u8;
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_cmp_compare"></a>
 
 ## Function `compare`
@@ -121,11 +131,7 @@ An int value:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">Ordering</a> {
-    <a href="cmp.md#0x1_cmp_Ordering">Ordering</a> {
-        value: <a href="cmp.md#0x1_cmp_compare_impl">compare_impl</a>(first, second),
-    }
-}
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">Ordering</a>;
 </code></pre>
 
 
@@ -148,7 +154,7 @@ An int value:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_equal">is_equal</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">Ordering</a>): bool {
-    self.value == <a href="cmp.md#0x1_cmp_EQUAL">EQUAL</a>
+    self is Ordering::Equal
 }
 </code></pre>
 
@@ -172,7 +178,7 @@ An int value:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_less_than">is_less_than</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">Ordering</a>): bool {
-    self.value == <a href="cmp.md#0x1_cmp_LESS_THAN">LESS_THAN</a>
+    self is Ordering::LessThan
 }
 </code></pre>
 
@@ -196,7 +202,7 @@ An int value:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_less_or_equal">is_less_or_equal</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">Ordering</a>): bool {
-    self.value != <a href="cmp.md#0x1_cmp_GREATER_THAN">GREATER_THAN</a>
+    !(self is Ordering::GreaterThan)
 }
 </code></pre>
 
@@ -220,7 +226,7 @@ An int value:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_greater_than">is_greater_than</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">Ordering</a>): bool {
-    self.value == <a href="cmp.md#0x1_cmp_GREATER_THAN">GREATER_THAN</a>
+    self is Ordering::GreaterThan
 }
 </code></pre>
 
@@ -244,7 +250,7 @@ An int value:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is__greater_or_equal">is__greater_or_equal</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">Ordering</a>): bool {
-    self.value != <a href="cmp.md#0x1_cmp_LESS_THAN">LESS_THAN</a>
+    !(self is Ordering::LessThan)
 }
 </code></pre>
 

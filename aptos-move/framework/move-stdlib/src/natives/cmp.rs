@@ -16,7 +16,7 @@ use aptos_native_interface::{
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
+    loaded_data::runtime_types::Type, natives::function::PartialVMError, values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -29,13 +29,17 @@ use std::collections::VecDeque;
 // create a `&str` view on the bytes without a copy. Once we have this
 // view, we can call ut8 functions like length, substring, etc.
 
+const ORDERING_LESS_THAN_VARIANT: u16 = 0;
+const ORDERING_EQUAL_VARIANT: u16 = 1;
+const ORDERING_GREATER_THAN_VARIANT: u16 = 2;
+
 /***************************************************************************************************
  * native fun internal_check_utf8
  *
  *   gas cost: base_cost + unit_cost * length_in_bytes
  *
  **************************************************************************************************/
-fn native_compare_impl(
+fn native_compare(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     args: VecDeque<Value>,
@@ -54,13 +58,13 @@ fn native_compare_impl(
     context.charge(cost)?;
 
     let ordering = args[0].compare(&args[1])?;
-    let result = match ordering {
-        std::cmp::Ordering::Less => 0,
-        std::cmp::Ordering::Equal => 1,
-        std::cmp::Ordering::Greater => 2,
+    let ordering_move_variant = match ordering {
+        std::cmp::Ordering::Less => ORDERING_LESS_THAN_VARIANT,
+        std::cmp::Ordering::Equal => ORDERING_EQUAL_VARIANT,
+        std::cmp::Ordering::Greater => ORDERING_GREATER_THAN_VARIANT,
     };
 
-    Ok(smallvec![Value::u8(result)])
+    Ok(smallvec![Value::struct_(Struct::pack(vec![Value::u16(ordering_move_variant)]))])
 }
 
 /***************************************************************************************************
@@ -69,7 +73,7 @@ fn native_compare_impl(
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
-    let natives = [("compare_impl", native_compare_impl as RawSafeNative)];
+    let natives = [("compare", native_compare as RawSafeNative)];
 
     builder.make_named_natives(natives)
 }
