@@ -13,18 +13,11 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
-use std::{cmp::max, collections::HashSet, time::Duration};
+use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(
-        PeerId::random(),
-        10,
-        10,
-        batch_store,
-        true,
-        Duration::from_secs(60).as_micros() as u64,
-    )
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {

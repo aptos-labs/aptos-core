@@ -991,9 +991,10 @@ impl RoundManager {
                 .with_label_values(&["missing"])
                 .inc();
             let start_time = Instant::now();
+            let deadline = self.round_state.current_round_deadline();
             let future = async move {
                 (
-                    block_store.wait_for_payload(&proposal).await,
+                    block_store.wait_for_payload(&proposal, deadline).await,
                     proposal,
                     start_time,
                 )

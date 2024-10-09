@@ -532,7 +532,7 @@ impl BatchProofQueue {
             }
         }
 
-        let max_batch_ts_usecs = min_batch_age_usecs
+        let max_batch_creation_ts_usecs = min_batch_age_usecs
             .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
         let mut iters = vec![];
         for (_, batches) in self
@@ -547,7 +547,7 @@ impl BatchProofQueue {
 
                     // Ensure that the batch was created at least `min_batch_age_usecs` ago to
                     // reduce the chance of inline fetches.
-                    if max_batch_ts_usecs
+                    if max_batch_creation_ts_usecs
                         .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
                     {
                         return None;
