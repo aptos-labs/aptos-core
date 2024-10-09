@@ -27,8 +27,8 @@ pub struct PayloadPullParameters {
 impl std::fmt::Debug for OptQSPayloadPullParams {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OptQSPayloadPullParams")
-            .field("opt_batch_txns_pct", &self.opt_batch_txns_pct)
             .field("exclude_authors", &self.exclude_authors)
+            .field("minimum_batch_age_useds", &self.minimum_batch_age_usecs)
             .finish()
     }
 }
@@ -82,6 +82,7 @@ impl std::fmt::Debug for PayloadPullParameters {
             )
             .field("recent_max_fill_fraction", &self.recent_max_fill_fraction)
             .field("block_timestamp", &self.block_timestamp)
+            .field("optqs_params", &self.maybe_optqs_payload_pull_params)
             .finish()
     }
 }
