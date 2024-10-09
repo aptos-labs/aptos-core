@@ -4320,7 +4320,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
+<pre><code><b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(admin);
+// This enforces <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 </code></pre>
 
@@ -4501,6 +4502,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a> {
     contract_address: <b>address</b>;
     admin: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(admin);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;

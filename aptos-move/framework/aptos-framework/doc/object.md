@@ -2512,24 +2512,6 @@ to determine the identity of the starting point of ownership.
 
 
 
-
-<a id="0x1_object_spec_exists_at"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_guid_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_address_to_object"></a>
 
 ### Function `address_to_object`
@@ -3469,6 +3451,43 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_guid_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_grant_permission"></a>
+
+### Function `grant_permission`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(master);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_exists_at"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
 </code></pre>
 
 

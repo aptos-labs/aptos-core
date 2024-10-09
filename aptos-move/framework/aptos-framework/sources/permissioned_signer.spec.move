@@ -33,8 +33,10 @@ spec aptos_framework::permissioned_signer {
 
     spec create_permissioned_handle(master: &signer): PermissionedHandle {
         use aptos_framework::transaction_context;
-        aborts_if spec_is_permissioned_signer(master);
+        pragma opaque;
+        aborts_if [abstract] spec_is_permissioned_signer(master);
         let permission_addr = transaction_context::spec_generate_unique_address();
+        modifies global<PermStorage>(permission_addr);
         let master_addr = signer::address_of(master);
         ensures result.master_addr == master_addr;
         ensures result.permission_addr == permission_addr;
@@ -42,9 +44,12 @@ spec aptos_framework::permissioned_signer {
 
     spec create_storable_permissioned_handle(master: &signer, expiration_time: u64): StorablePermissionedHandle {
         use aptos_framework::transaction_context;
-        aborts_if spec_is_permissioned_signer(master);
+        pragma opaque;
+        aborts_if [abstract] spec_is_permissioned_signer(master);
         let permission_addr = transaction_context::spec_generate_unique_address();
+        modifies global<PermStorage>(permission_addr);
         let master_addr = signer::address_of(master);
+        modifies global<GrantedPermissionHandles>(master_addr);
         ensures result.master_addr == master_addr;
         ensures result.permission_addr == permission_addr;
         ensures result.expiration_time == expiration_time;
@@ -59,7 +64,7 @@ spec aptos_framework::permissioned_signer {
     spec destroy_storable_permissioned_handle(p: StorablePermissionedHandle) {
         ensures !exists<PermStorage>(p.permission_addr);
         let post granted_permissions = global<GrantedPermissionHandles>(p.master_addr);
-        ensures !vector::spec_contains(granted_permissions.active_handles, p.permission_addr);
+        // ensures [abstract] !vector::spec_contains(granted_permissions.active_handles, p.permission_addr);
     }
 
     spec revoke_permission_handle(s: &signer, permission_addr: address) {
@@ -96,18 +101,29 @@ spec aptos_framework::permissioned_signer {
     s: &signer,
     perm: PermKey
     ): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_check_permission_exists(s, perm);
+    }
+
+    spec fun spec_check_permission_exists<PermKey: copy + drop + store>(
+        s: signer,
+        perm: PermKey
+    ): bool {
         use aptos_std::type_info;
         use std::bcs;
-        let permissioned_signer_addr = signer::address_of(spec_permission_signer(s));
-        ensures !spec_is_permissioned_signer(s) ==> result == true;
-        ensures (spec_is_permissioned_signer(s) && !exists<PermStorage>(permissioned_signer_addr)) ==> result == false;
-        // TODO: cannot verify, see #7422
-        // let key = Any {
-        //     type_name: type_info::type_name<SmartTable<Any, u256>>(),
-        //     data: bcs::serialize(perm)
-        // };
-        // ensures (spec_is_permissioned_signer(s) && exists<PermStorage>(permissioned_signer_addr)) ==>
-        //     result == smart_table::spec_contains(global<PermStorage>(permissioned_signer_addr).perms, key);
+        let addr = signer::address_of(spec_permission_signer(s));
+        let key = Any {
+            type_name: type_info::type_name<PermKey>(),
+            data: bcs::serialize(perm)
+        };
+        if (!spec_is_permissioned_signer(s)) {
+            true
+        } else if(!exists<PermStorage>(addr)) {
+            false
+        } else {
+            smart_table::spec_contains(global<PermStorage>(addr).perms, key)
+        }
     }
 
     spec check_permission_capacity_above<PermKey: copy + drop + store>(

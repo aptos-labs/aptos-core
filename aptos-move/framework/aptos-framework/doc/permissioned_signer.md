@@ -29,9 +29,12 @@ for blind signing.
 -  [Function `create_storable_permissioned_handle`](#0x1_permissioned_signer_create_storable_permissioned_handle)
 -  [Function `destroy_permissioned_handle`](#0x1_permissioned_signer_destroy_permissioned_handle)
 -  [Function `destroy_storable_permissioned_handle`](#0x1_permissioned_signer_destroy_storable_permissioned_handle)
+-  [Function `destroy_permission_address`](#0x1_permissioned_signer_destroy_permission_address)
+-  [Function `remove_permission_address`](#0x1_permissioned_signer_remove_permission_address)
 -  [Function `signer_from_permissioned`](#0x1_permissioned_signer_signer_from_permissioned)
 -  [Function `signer_from_storable_permissioned`](#0x1_permissioned_signer_signer_from_storable_permissioned)
 -  [Function `revoke_permission_handle`](#0x1_permissioned_signer_revoke_permission_handle)
+-  [Function `revoke_all_handles`](#0x1_permissioned_signer_revoke_all_handles)
 -  [Function `permission_address`](#0x1_permissioned_signer_permission_address)
 -  [Function `assert_master_signer`](#0x1_permissioned_signer_assert_master_signer)
 -  [Function `authorize`](#0x1_permissioned_signer_authorize)
@@ -66,6 +69,7 @@ for blind signing.
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
+<b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -95,12 +99,6 @@ for blind signing.
 <dl>
 <dt>
 <code>active_handles: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>revoked_handles: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -343,6 +341,8 @@ permission handle has been revoked by the original signer.
     <b>let</b> permission_addr = generate_auid_address();
     <b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
 
+    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(permission_addr), <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> { perms: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>()});
+
     <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionedHandle">PermissionedHandle</a> {
         master_addr,
         permission_addr,
@@ -377,7 +377,6 @@ permission handle has been revoked by the original signer.
     <b>if</b>(!<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr)) {
         <b>move_to</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master, <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
             active_handles: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
-            revoked_handles: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
         });
     };
 
@@ -385,6 +384,8 @@ permission handle has been revoked by the original signer.
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr).active_handles,
         permission_addr
     );
+
+    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(permission_addr), <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> { perms: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>()});
 
     // Do we need <b>to</b> <b>move</b> sth similar <b>to</b> ObjectCore <b>to</b> register this <b>address</b> <b>as</b> permission <b>address</b>?
     <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> {
@@ -416,10 +417,7 @@ permission handle has been revoked by the original signer.
 
 <pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permissioned_handle">destroy_permissioned_handle</a>(p: <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionedHandle">PermissionedHandle</a>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> {
     <b>let</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionedHandle">PermissionedHandle</a> { master_addr: _, permission_addr } = p;
-    <b>if</b>(<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_addr)) {
-        <b>let</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> { perms } = <b>move_from</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_addr);
-        <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_destroy">smart_table::destroy</a>(perms);
-    };
+    <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permission_address">destroy_permission_address</a>(permission_addr);
 }
 </code></pre>
 
@@ -444,18 +442,64 @@ permission handle has been revoked by the original signer.
 
 <pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_storable_permissioned_handle">destroy_storable_permissioned_handle</a>(p: <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>, <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
     <b>let</b> <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> { master_addr, permission_addr, expiration_time: _ } = p;
+    <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permission_address">destroy_permission_address</a>(permission_addr);
+    <a href="permissioned_signer.md#0x1_permissioned_signer_remove_permission_address">remove_permission_address</a>(master_addr, permission_addr);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_permissioned_signer_destroy_permission_address"></a>
+
+## Function `destroy_permission_address`
+
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permission_address">destroy_permission_address</a>(permission_addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permission_address">destroy_permission_address</a>(permission_addr: <b>address</b>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> {
     <b>if</b>(<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_addr)) {
         <b>let</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> { perms } = <b>move_from</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_addr);
         <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_destroy">smart_table::destroy</a>(perms);
-    };
-    <b>let</b> granted_permissions = <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr);
-    <b>let</b> (found, idx) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&granted_permissions.active_handles, &permission_addr);
-    <b>if</b>(found) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> granted_permissions.active_handles, idx);
-    };
-    <b>let</b> (found, idx) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&granted_permissions.revoked_handles, &permission_addr);
-    <b>if</b>(found) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> granted_permissions.revoked_handles, idx);
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_permissioned_signer_remove_permission_address"></a>
+
+## Function `remove_permission_address`
+
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_remove_permission_address">remove_permission_address</a>(master_addr: <b>address</b>, permission_addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_remove_permission_address">remove_permission_address</a>(master_addr: <b>address</b>, permission_addr: <b>address</b>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
+    <b>if</b>(<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr)) {
+       <b>let</b> granted_permissions = <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr);
+        <b>let</b> (found, idx) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&granted_permissions.active_handles, &permission_addr);
+        <b>if</b>(found) {
+            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> granted_permissions.active_handles, idx);
+        };
     };
 }
 </code></pre>
@@ -503,13 +547,13 @@ permission handle has been revoked by the original signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_signer_from_storable_permissioned">signer_from_storable_permissioned</a>(p: &<a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
-    <b>assert</b>!(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt; p.expiration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_E_PERMISSION_EXPIRED">E_PERMISSION_EXPIRED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_signer_from_storable_permissioned">signer_from_storable_permissioned</a>(p: &<a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>assert</b>!(
-        !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(
-            &<b>borrow_global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(p.master_addr).revoked_handles,
-            &p.permission_addr
-        ),
+        <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt; p.expiration_time,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_E_PERMISSION_EXPIRED">E_PERMISSION_EXPIRED</a>)
+    );
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(p.permission_addr),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_E_PERMISSION_REVOKED">E_PERMISSION_REVOKED</a>)
     );
     <a href="permissioned_signer.md#0x1_permissioned_signer_signer_from_permissioned_impl">signer_from_permissioned_impl</a>(p.master_addr, p.permission_addr)
@@ -535,16 +579,45 @@ permission handle has been revoked by the original signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission_handle">revoke_permission_handle</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permission_addr: <b>address</b>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission_handle">revoke_permission_handle</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permission_addr: <b>address</b>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>, <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> {
+    <b>assert</b>!(!<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(s), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
+    <b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(s);
+    <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permission_address">destroy_permission_address</a>(permission_addr);
+    <a href="permissioned_signer.md#0x1_permissioned_signer_remove_permission_address">remove_permission_address</a>(master_addr, permission_addr);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_permissioned_signer_revoke_all_handles"></a>
+
+## Function `revoke_all_handles`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_all_handles">revoke_all_handles</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_all_handles">revoke_all_handles</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>, <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> {
     <b>assert</b>!(!<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(s), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(s);
     <b>if</b>(!<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr)) {
         <b>return</b>
     };
+
     <b>let</b> granted_permissions = <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr);
-    <b>if</b>(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&granted_permissions.revoked_handles, &permission_addr)) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> granted_permissions.revoked_handles, permission_addr)
-    }
+    <b>let</b> delete_list = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_trim_reverse">vector::trim_reverse</a>(&<b>mut</b> granted_permissions.active_handles, 0);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_destroy">vector::destroy</a>(delete_list, |<b>address</b>| {
+        <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permission_address">destroy_permission_address</a>(<b>address</b>);
+    })
 }
 </code></pre>
 
@@ -634,9 +707,6 @@ signer.
     );
     <b>let</b> permission_signer = <a href="permissioned_signer.md#0x1_permissioned_signer_permission_signer">permission_signer</a>(permissioned);
     <b>let</b> permission_signer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&permission_signer);
-    <b>if</b>(!<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_signer_addr)) {
-        <b>move_to</b>(&permission_signer, <a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a> { perms: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>()});
-    };
     <b>let</b> perms = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_signer_addr).perms;
     <b>let</b> key = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(perm);
     <b>if</b>(<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(perms, key)) {
@@ -1096,11 +1166,6 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
         <b>forall</b> j in 0..len(a.active_handles):
             i != j ==&gt; a.active_handles[i] != a.active_handles[j]
     );
-<b>axiom</b> <b>forall</b> a: <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>:
-    (<b>forall</b> i in 0..len(a.revoked_handles):
-        <b>forall</b> j in 0..len(a.revoked_handles):
-            i != j ==&gt; a.revoked_handles[i] != a.revoked_handles[j]
-    );
 </code></pre>
 
 
@@ -1125,8 +1190,10 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
 
 
 
-<pre><code><b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(master);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(master);
 <b>let</b> permission_addr = <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>();
+<b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_addr);
 <b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
 <b>ensures</b> result.master_addr == master_addr;
 <b>ensures</b> result.permission_addr == permission_addr;
@@ -1145,9 +1212,12 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
 
 
 
-<pre><code><b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(master);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(master);
 <b>let</b> permission_addr = <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">transaction_context::spec_generate_unique_address</a>();
+<b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permission_addr);
 <b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
+<b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr);
 <b>ensures</b> result.master_addr == master_addr;
 <b>ensures</b> result.permission_addr == permission_addr;
 <b>ensures</b> result.expiration_time == expiration_time;
@@ -1186,8 +1256,6 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
 
 <pre><code><b>ensures</b> !<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(p.permission_addr);
 <b>let</b> <b>post</b> granted_permissions = <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(p.master_addr);
-<b>ensures</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(granted_permissions.active_handles, p.permission_addr);
-<b>ensures</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(granted_permissions.revoked_handles, p.permission_addr);
 </code></pre>
 
 
@@ -1204,10 +1272,6 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
 
 
 <pre><code><b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s);
-<b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(s);
-<b>let</b> <b>post</b> granted_permissions = <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr);
-<b>ensures</b> <b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_addr) ==&gt;
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(granted_permissions.revoked_handles, permission_addr);
 </code></pre>
 
 
@@ -1243,9 +1307,36 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
 
 
 
-<pre><code><b>let</b> permissioned_signer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_signer">spec_permission_signer</a>(s));
-<b>ensures</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s) ==&gt; result == <b>true</b>;
-<b>ensures</b> (<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s) && !<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(permissioned_signer_addr)) ==&gt; result == <b>false</b>;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">spec_check_permission_exists</a>(s, perm);
+</code></pre>
+
+
+
+
+<a id="0x1_permissioned_signer_spec_check_permission_exists"></a>
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">spec_check_permission_exists</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(
+   s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+   perm: PermKey
+): bool {
+   <b>use</b> aptos_std::type_info;
+   <b>use</b> std::bcs;
+   <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_signer">spec_permission_signer</a>(s));
+   <b>let</b> key = Any {
+       type_name: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;PermKey&gt;(),
+       data: <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(perm)
+   };
+   <b>if</b> (!<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s)) {
+       <b>true</b>
+   } <b>else</b> <b>if</b>(!<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(addr)) {
+       <b>false</b>
+   } <b>else</b> {
+       <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_spec_contains">smart_table::spec_contains</a>(<b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermStorage">PermStorage</a>&gt;(addr).perms, key)
+   }
+}
 </code></pre>
 
 
