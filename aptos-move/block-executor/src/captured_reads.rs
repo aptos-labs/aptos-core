@@ -621,13 +621,12 @@ impl<T: Transaction> CapturedReads<T> {
             return false;
         }
 
+        // TODO(loader_v2):
+        //   Should we also check state value metadata? If so, using transaction indices to decide
+        //   the result of validations might be easier.
         self.module_cache_reads.iter().all(|(id, previous_read)| {
-            let previous_hash_and_state_value_metadata = previous_read
-                .as_ref()
-                .map(|e| (e.hash(), e.state_value_metadata()));
-            code_cache
-                .module_cache()
-                .check_hash_and_state_value_metadata(id, previous_hash_and_state_value_metadata)
+            let previous_hash = previous_read.as_ref().map(|e| e.hash());
+            code_cache.module_cache().check_hash(id, previous_hash)
         })
     }
 
