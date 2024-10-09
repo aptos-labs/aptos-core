@@ -20,6 +20,7 @@ use aptos_forge::{
     ForgeConfig, Options, *,
 };
 use aptos_logger::{info, Level};
+use aptos_push_metrics::MetricsPusher;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -495,6 +496,15 @@ pub fn run_forge<F: Factory>(
     logs: Option<Vec<String>>,
 ) -> Result<()> {
     let forge = Forge::new(options, tests, global_duration, factory);
+
+    // try to create a metrics_pusher if all envs are set
+    if env::var("PUSH_METRICS_NAMESPACE").is_ok()
+        && env::var("PUSH_METRICS_ENDPOINT").is_ok()
+        && env::var("PUSH_METRICS_API_TOKEN").is_ok()
+    {
+        aptos_node_resource_metrics::register_node_metrics_collector();
+        let _mp = MetricsPusher::start_for_local_run("forge"); // NOTE: using a chain name
+    }
 
     if options.list {
         forge.list()?;
