@@ -9,7 +9,8 @@ use anyhow::{ensure, Context};
 use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
-    ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
+    ledger_info::{LedgerInfo, SignatureWithStatus},
+    validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
@@ -21,14 +22,14 @@ use std::fmt::{Debug, Display, Formatter};
 /// is gathers QuorumCertificate (see the detailed explanation in the comments of `LedgerInfo`).
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Vote {
-    /// The data of the vote
+    /// The data of the vote.
     vote_data: VoteData,
     /// The identity of the voter.
     author: Author,
     /// LedgerInfo of a block that is going to be committed in case this vote gathers QC.
     ledger_info: LedgerInfo,
-    /// Signature of the LedgerInfo
-    signature: bls12381::Signature,
+    /// Signature on the LedgerInfo along with a status on whether the signature is verified.
+    signature: SignatureWithStatus,
     /// The 2-chain timeout and corresponding signature.
     two_chain_timeout: Option<(TwoChainTimeout, bls12381::Signature)>,
 }
@@ -83,7 +84,7 @@ impl Vote {
             vote_data,
             author,
             ledger_info,
-            signature,
+            signature: SignatureWithStatus::from(signature),
             two_chain_timeout: None,
         }
     }
@@ -109,7 +110,23 @@ impl Vote {
 
     /// Return the signature of the vote
     pub fn signature(&self) -> &bls12381::Signature {
+        self.signature.signature()
+    }
+
+    pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
+    }
+
+    /// Returns whether the signature is verified
+    pub fn is_verified(&self) -> bool {
+        self.signature.is_verified()
+    }
+
+    /// Only the verify method in validator verifier can set the signature status verified.
+    /// This method additionally lets the tests to set the status to verified.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_verified(&self) {
+        self.signature.set_verified();
     }
 
     /// Returns the 2-chain timeout.
@@ -140,12 +157,14 @@ impl Vote {
     /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
     /// and then verifies the signature.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        // TODO(ibalajiarun): Ensure timeout is None if RoundTimeoutMsg is enabled.
+
         ensure!(
             self.ledger_info.consensus_data_hash() == self.vote_data.hash(),
             "Vote's hash mismatch with LedgerInfo"
         );
         validator
-            .verify(self.author(), &self.ledger_info, &self.signature)
+            .optimistic_verify(self.author(), &self.ledger_info, &self.signature)
             .context("Failed to verify Vote")?;
         if let Some((timeout, signature)) = &self.two_chain_timeout {
             ensure!(

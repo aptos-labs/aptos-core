@@ -14,16 +14,19 @@ use crate::{
 };
 use aptos_crypto::{bls12381, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use derivative::Derivative;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
     mem,
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 /// This structure serves a dual purpose.
@@ -376,9 +379,54 @@ impl LedgerInfoWithVerifiedSignatures {
     }
 }
 
-pub enum SignatureWithStatus {
-    Verified(bls12381::Signature),
-    Unverified(bls12381::Signature),
+#[derive(Clone, Debug, Derivative)]
+#[derivative(PartialEq, Eq)]
+pub struct SignatureWithStatus {
+    signature: bls12381::Signature,
+    #[derivative(PartialEq = "ignore")]
+    // false if the signature not verified.
+    // true if the signature is verified.
+    verification_status: Arc<AtomicBool>,
+}
+
+impl SignatureWithStatus {
+    pub fn set_verified(&self) {
+        self.verification_status.store(true, Ordering::SeqCst);
+    }
+
+    pub fn signature(&self) -> &bls12381::Signature {
+        &self.signature
+    }
+
+    pub fn from(signature: bls12381::Signature) -> Self {
+        Self {
+            signature,
+            verification_status: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn is_verified(&self) -> bool {
+        self.verification_status.load(Ordering::SeqCst)
+    }
+}
+
+impl Serialize for SignatureWithStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.signature.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SignatureWithStatus {
+    fn deserialize<D>(deserializer: D) -> Result<SignatureWithStatus, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let signature = bls12381::Signature::deserialize(deserializer)?;
+        Ok(SignatureWithStatus::from(signature))
+    }
 }
 
 /// This data structure is used to support the optimistic signature verification feature.
@@ -390,10 +438,7 @@ pub enum SignatureWithStatus {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LedgerInfoWithUnverifiedSignatures {
     ledger_info: LedgerInfo,
-    // These signatures are not yet verified. For efficiency, once enough unverified signatures are collected,
-    // they will be aggregated and verified.
-    unverified_signatures: PartialSignatures,
-    verified_signatures: PartialSignatures,
+    signatures: BTreeMap<AccountAddress, SignatureWithStatus>,
 }
 
 impl Display for LedgerInfoWithUnverifiedSignatures {
@@ -406,8 +451,7 @@ impl LedgerInfoWithUnverifiedSignatures {
     pub fn new(ledger_info: LedgerInfo) -> Self {
         Self {
             ledger_info,
-            unverified_signatures: PartialSignatures::empty(),
-            verified_signatures: PartialSignatures::empty(),
+            signatures: BTreeMap::default(),
         }
     }
 
@@ -415,53 +459,32 @@ impl LedgerInfoWithUnverifiedSignatures {
         self.ledger_info.commit_info()
     }
 
-    fn add_verified_signature(
-        &mut self,
-        validator: AccountAddress,
-        signature: bls12381::Signature,
-    ) {
-        self.verified_signatures.add_signature(validator, signature);
-        self.unverified_signatures.remove_signature(validator);
-    }
-
-    fn add_unverified_signature(
-        &mut self,
-        validator: AccountAddress,
-        signature: bls12381::Signature,
-    ) {
-        if self.verified_signatures.contains_voter(&validator) {
-            return;
-        }
-        self.unverified_signatures
-            .add_signature(validator, signature);
-    }
-
-    pub fn add_signature(
-        &mut self,
-        validator: AccountAddress,
-        signature_with_status: SignatureWithStatus,
-    ) {
-        match signature_with_status {
-            SignatureWithStatus::Verified(signature) => {
-                self.add_verified_signature(validator, signature)
-            },
-            SignatureWithStatus::Unverified(signature) => {
-                self.add_unverified_signature(validator, signature)
-            },
-        };
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: &SignatureWithStatus) {
+        self.signatures.insert(validator, signature.clone());
     }
 
     pub fn verified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.verified_signatures.signatures().keys()
+        self.signatures.iter().filter_map(|(voter, signature)| {
+            if signature.is_verified() {
+                Some(voter)
+            } else {
+                None
+            }
+        })
     }
 
     pub fn unverified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.unverified_signatures.signatures().keys()
+        self.signatures.iter().filter_map(|(voter, signature)| {
+            if signature.is_verified() {
+                None
+            } else {
+                Some(voter)
+            }
+        })
     }
 
-    // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
     pub fn all_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.verified_voters().chain(self.unverified_voters())
+        self.signatures.keys()
     }
 
     pub fn check_voting_power(
@@ -475,66 +498,43 @@ impl LedgerInfoWithUnverifiedSignatures {
 
     fn try_aggregate(
         &mut self,
-        epoch_state: &EpochState,
+        verifier: &ValidatorVerifier,
     ) -> Result<AggregateSignature, VerifyError> {
-        self.check_voting_power(&epoch_state.verifier, true)?;
+        self.check_voting_power(verifier, true)?;
 
         let all_signatures = self
-            .verified_signatures
-            .signatures_iter()
-            .chain(self.unverified_signatures.signatures_iter());
-
-        epoch_state.verifier.aggregate_signatures(all_signatures)
+            .signatures
+            .iter()
+            .map(|(voter, sig)| (voter, sig.signature()));
+        verifier.aggregate_signatures(all_signatures)
     }
 
-    /// Merge unverified signatures into verified signatures if they are valid.
-    fn merge_signatures(&mut self, verifier: &ValidatorVerifier, need_verify: bool) {
-        let unverified_signatures =
-            mem::replace(&mut self.unverified_signatures, PartialSignatures::empty()).unpack();
-        let valid_signatures: Vec<_> = unverified_signatures
-            .into_par_iter()
-            .flat_map(|(account_address, signature)| {
-                if !need_verify
-                    || verifier
-                        .verify(account_address, self.ledger_info(), &signature)
-                        .is_ok()
-                {
-                    Some((account_address, signature))
-                } else {
-                    verifier.add_pessimistic_verify_set(account_address);
-                    None
-                }
-            })
-            .collect();
-        for (account_address, signature) in valid_signatures {
-            self.verified_signatures
-                .add_signature(account_address, signature);
-        }
+    fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier) {
+        let signatures = mem::take(&mut self.signatures);
+        self.signatures = verifier.filter_invalid_signatures(self.ledger_info(), signatures);
     }
 
     /// Try to aggregate all signatures if the voting power is enough. If the aggregated signature is
     /// valid, return the LedgerInfoWithSignatures. Also merge valid unverified signatures into verified.
     pub fn aggregate_and_verify(
         &mut self,
-        epoch_state: Arc<EpochState>,
+        verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        let aggregated_sig = self.try_aggregate(&epoch_state)?;
+        let aggregated_sig = self.try_aggregate(verifier)?;
 
-        match epoch_state
-            .verifier
-            .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
-        {
+        match verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig) {
             Ok(_) => {
-                self.merge_signatures(&epoch_state.verifier, false);
+                // We are not marking all the signatures as "verified" here, as two malicious
+                // voters can collude and create a valid aggregated signature.
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregated_sig,
                 ))
             },
             Err(_) => {
-                self.merge_signatures(&epoch_state.verifier, true);
+                self.filter_invalid_signatures(verifier);
 
-                let aggregate_sig = self.try_aggregate(&epoch_state)?;
+                let aggregate_sig = self.try_aggregate(verifier)?;
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregate_sig,
@@ -593,6 +593,54 @@ impl Arbitrary for LedgerInfoWithV0 {
 mod tests {
     use super::*;
     use crate::{validator_signer::ValidatorSigner, validator_verifier::ValidatorConsensusInfo};
+    // Write a test case to serialize and deserialize SignatureWithStatus
+    #[test]
+    fn test_signature_with_status_bcs() {
+        let signature = bls12381::Signature::dummy_signature();
+        let signature_with_status_1 = SignatureWithStatus {
+            signature: signature.clone(),
+            verification_status: Arc::new(AtomicBool::new(true)),
+        };
+        let signature_with_status_2 = SignatureWithStatus {
+            signature: signature.clone(),
+            verification_status: Arc::new(AtomicBool::new(false)),
+        };
+        let serialized_signature_with_status_1 =
+            bcs::to_bytes(&signature_with_status_1).expect("Failed to serialize signature");
+        let serialized_signature_with_status_2 =
+            bcs::to_bytes(&signature_with_status_2).expect("Failed to serialize signature");
+        assert!(serialized_signature_with_status_1 == serialized_signature_with_status_2);
+
+        let deserialized_signature_with_status: SignatureWithStatus =
+            bcs::from_bytes(&serialized_signature_with_status_1)
+                .expect("Failed to deserialize signature");
+        assert_eq!(*deserialized_signature_with_status.signature(), signature);
+        assert!(!deserialized_signature_with_status.is_verified());
+    }
+
+    #[test]
+    fn test_signature_with_status_serde() {
+        let signature = bls12381::Signature::dummy_signature();
+        let signature_with_status_1 = SignatureWithStatus {
+            signature: signature.clone(),
+            verification_status: Arc::new(AtomicBool::new(true)),
+        };
+        let signature_with_status_2 = SignatureWithStatus {
+            signature: signature.clone(),
+            verification_status: Arc::new(AtomicBool::new(false)),
+        };
+        let serialized_signature_with_status_1 =
+            serde_json::to_string(&signature_with_status_1).expect("Failed to serialize signature");
+        let serialized_signature_with_status_2 =
+            serde_json::to_string(&signature_with_status_2).expect("Failed to serialize signature");
+        assert!(serialized_signature_with_status_1 == serialized_signature_with_status_2);
+
+        let deserialized_signature_with_status: SignatureWithStatus =
+            serde_json::from_str(&serialized_signature_with_status_1)
+                .expect("Failed to deserialize signature");
+        assert_eq!(*deserialized_signature_with_status.signature(), signature);
+        assert!(!deserialized_signature_with_status.is_verified());
+    }
 
     #[test]
     fn test_signatures_hash() {
@@ -653,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ledger_info_with_mixed_signatures() {
+    fn test_ledger_info_with_unverified_signatures() {
         let ledger_info = LedgerInfo::new(BlockInfo::empty(), HashValue::random());
         const NUM_SIGNERS: u8 = 7;
         // Generate NUM_SIGNERS random signers.
@@ -673,148 +721,150 @@ mod tests {
         let validator_verifier =
             ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
-        let epoch_state = Arc::new(EpochState::new(10, validator_verifier.clone()));
 
-        let mut ledger_info_with_mixed_signatures =
+        let mut ledger_info_with_unverified_signatures =
             LedgerInfoWithUnverifiedSignatures::new(ledger_info.clone());
 
         let mut partial_sig = PartialSignatures::empty();
 
-        ledger_info_with_mixed_signatures.add_signature(
-            validator_signers[0].author(),
-            SignatureWithStatus::Verified(validator_signers[0].sign(&ledger_info).unwrap()),
-        );
+        let sig = SignatureWithStatus::from(validator_signers[0].sign(&ledger_info).unwrap());
+        sig.set_verified();
+        ledger_info_with_unverified_signatures.add_signature(validator_signers[0].author(), &sig);
+
         partial_sig.add_signature(
             validator_signers[0].author(),
             validator_signers[0].sign(&ledger_info).unwrap(),
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[1].author(),
-            SignatureWithStatus::Unverified(validator_signers[1].sign(&ledger_info).unwrap()),
+            &SignatureWithStatus::from(validator_signers[1].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[1].author(),
             validator_signers[1].sign(&ledger_info).unwrap(),
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
-            validator_signers[2].author(),
-            SignatureWithStatus::Verified(validator_signers[2].sign(&ledger_info).unwrap()),
-        );
+        let sig2 = SignatureWithStatus::from(validator_signers[2].sign(&ledger_info).unwrap());
+        sig2.set_verified();
+        ledger_info_with_unverified_signatures.add_signature(validator_signers[2].author(), &sig2);
         partial_sig.add_signature(
             validator_signers[2].author(),
             validator_signers[2].sign(&ledger_info).unwrap(),
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[3].author(),
-            SignatureWithStatus::Unverified(validator_signers[3].sign(&ledger_info).unwrap()),
+            &SignatureWithStatus::from(validator_signers[3].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[3].author(),
             validator_signers[3].sign(&ledger_info).unwrap(),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            4
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
+                .unverified_voters()
+                .count(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier, true),
+            ledger_info_with_unverified_signatures.check_voting_power(&validator_verifier, true),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
             })
         );
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[4].author(),
-            SignatureWithStatus::Unverified(bls12381::Signature::dummy_signature()),
+            &SignatureWithStatus::from(bls12381::Signature::dummy_signature()),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            5
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
+                .unverified_voters()
+                .count(),
             3
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.aggregate_and_verify(epoch_state.clone()),
+            ledger_info_with_unverified_signatures.aggregate_and_verify(&validator_verifier),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
             })
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .unverified_voters()
+                .count(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             4
         );
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            4
+        );
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[5].author(),
-            SignatureWithStatus::Unverified(validator_signers[5].sign(&ledger_info).unwrap()),
+            &SignatureWithStatus::from(validator_signers[5].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[5].author(),
             validator_signers[5].sign(&ledger_info).unwrap(),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            5
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
+                .unverified_voters()
+                .count(),
             1
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             4
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures
                 .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
@@ -826,60 +876,62 @@ mod tests {
                 .unwrap(),
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .aggregate_and_verify(epoch_state.clone())
+            ledger_info_with_unverified_signatures
+                .aggregate_and_verify(&validator_verifier)
                 .unwrap(),
             aggregate_sig
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_signatures
-                .signatures()
-                .len(),
-            0
+            ledger_info_with_unverified_signatures
+                .unverified_voters()
+                .count(),
+            1
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
-            5
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
+            4
         );
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
 
-        ledger_info_with_mixed_signatures.add_signature(
+        ledger_info_with_unverified_signatures.add_signature(
             validator_signers[6].author(),
-            SignatureWithStatus::Unverified(bls12381::Signature::dummy_signature()),
+            &SignatureWithStatus::from(bls12381::Signature::dummy_signature()),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
         assert_eq!(
-            ledger_info_with_mixed_signatures
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            6
+        );
+        assert_eq!(
+            ledger_info_with_unverified_signatures
                 .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             6
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .aggregate_and_verify(epoch_state.clone())
+            ledger_info_with_unverified_signatures
+                .aggregate_and_verify(&validator_verifier)
                 .unwrap(),
             aggregate_sig
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .unverified_voters()
+                .count(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_unverified_signatures
+                .verified_voters()
+                .count(),
             5
         );
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 2);
+        assert_eq!(
+            ledger_info_with_unverified_signatures.all_voters().count(),
+            5
+        );
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 2);
     }
 }

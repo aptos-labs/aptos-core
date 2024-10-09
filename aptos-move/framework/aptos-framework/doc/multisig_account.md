@@ -82,7 +82,9 @@ and implement the governance voting logic on top.
 -  [Function `next_sequence_number`](#0x1_multisig_account_next_sequence_number)
 -  [Function `vote`](#0x1_multisig_account_vote)
 -  [Function `available_transaction_queue_capacity`](#0x1_multisig_account_available_transaction_queue_capacity)
+-  [Function `create_with_existing_account_call`](#0x1_multisig_account_create_with_existing_account_call)
 -  [Function `create_with_existing_account`](#0x1_multisig_account_create_with_existing_account)
+-  [Function `create_with_existing_account_and_revoke_auth_key_call`](#0x1_multisig_account_create_with_existing_account_and_revoke_auth_key_call)
 -  [Function `create_with_existing_account_and_revoke_auth_key`](#0x1_multisig_account_create_with_existing_account_and_revoke_auth_key)
 -  [Function `create`](#0x1_multisig_account_create)
 -  [Function `create_with_owners`](#0x1_multisig_account_create_with_owners)
@@ -1934,6 +1936,50 @@ Return a bool tuple indicating whether an owner has voted and if so, whether the
 
 </details>
 
+<a id="0x1_multisig_account_create_with_existing_account_call"></a>
+
+## Function `create_with_existing_account_call`
+
+Private entry function that creates a new multisig account on top of an existing account.
+
+This offers a migration path for an existing account with any type of auth key.
+
+Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+key after they are fully migrated to the new multisig account. Alternatively, they can call
+create_with_existing_account_and_revoke_auth_key_call instead.
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account_call">create_with_existing_account_call</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account_call">create_with_existing_account_call</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    num_signatures_required: u64,
+    metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_create_with_owners_internal">create_with_owners_internal</a>(
+        <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+        owners,
+        num_signatures_required,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;SignerCapability&gt;(),
+        metadata_keys,
+        metadata_values,
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_multisig_account_create_with_existing_account"></a>
 
 ## Function `create_with_existing_account`
@@ -1997,6 +2043,61 @@ create_with_existing_account_and_revoke_auth_key instead.
         metadata_keys,
         metadata_values,
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_create_with_existing_account_and_revoke_auth_key_call"></a>
+
+## Function `create_with_existing_account_and_revoke_auth_key_call`
+
+Private entry function that creates a new multisig account on top of an existing account and immediately rotate
+the origin auth key to 0x0.
+
+Note: If the original account is a resource account, this does not revoke all control over it as if any
+SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+account.
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account_and_revoke_auth_key_call">create_with_existing_account_and_revoke_auth_key_call</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account_and_revoke_auth_key_call">create_with_existing_account_and_revoke_auth_key_call</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    num_signatures_required: u64,
+    metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    metadata_values:<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_create_with_owners_internal">create_with_owners_internal</a>(
+        <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+        owners,
+        num_signatures_required,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;SignerCapability&gt;(),
+        metadata_keys,
+        metadata_values,
+    );
+
+    // Rotate the <a href="account.md#0x1_account">account</a>'s auth key <b>to</b> 0x0, which effectively revokes control via auth key.
+    <b>let</b> multisig_address = address_of(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="multisig_account.md#0x1_multisig_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
+    // This also needs <b>to</b> revoke <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability or rotation capability that <b>exists</b> for the <a href="account.md#0x1_account">account</a> <b>to</b>
+    // completely remove all access <b>to</b> the <a href="account.md#0x1_account">account</a>.
+    <b>if</b> (<a href="account.md#0x1_account_is_signer_capability_offered">account::is_signer_capability_offered</a>(multisig_address)) {
+        <a href="account.md#0x1_account_revoke_any_signer_capability">account::revoke_any_signer_capability</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    };
+    <b>if</b> (<a href="account.md#0x1_account_is_rotation_capability_offered">account::is_rotation_capability_offered</a>(multisig_address)) {
+        <a href="account.md#0x1_account_revoke_any_rotation_capability">account::revoke_any_rotation_capability</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    };
 }
 </code></pre>
 

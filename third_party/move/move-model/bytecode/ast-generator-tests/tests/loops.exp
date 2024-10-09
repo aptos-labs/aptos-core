@@ -1,0 +1,499 @@
+
+=== Processing m::loop_1 =====================================================
+--- Source
+fun loop_1(c: u64): u64 {
+        loop {
+            c = c + 1;
+            if (c % 2 == 0) continue;
+            c = c + 3;
+            if (c % 2 == 1) break;
+        };
+        c
+    }
+
+--- Stackless Bytecode
+fun m::loop_1($t0|c: u64): u64 {
+     var $t1|$t3: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: bool
+     var $t18: u64
+  0: label L2
+  1: $t2 := move($t0)
+  2: $t3 := 1
+  3: $t4 := +($t2, $t3)
+  4: $t0 := $t4
+  5: $t5 := copy($t0)
+  6: $t6 := 2
+  7: $t7 := %($t5, $t6)
+  8: $t8 := 0
+  9: $t9 := ==($t7, $t8)
+ 10: if ($t9) goto 11 else goto 13
+ 11: label L1
+ 12: goto 0
+ 13: label L0
+ 14: $t10 := move($t0)
+ 15: $t11 := 3
+ 16: $t12 := +($t10, $t11)
+ 17: $t0 := $t12
+ 18: $t13 := copy($t0)
+ 19: $t14 := 2
+ 20: $t15 := %($t13, $t14)
+ 21: $t16 := 1
+ 22: $t17 := ==($t15, $t16)
+ 23: if ($t17) goto 24 else goto 26
+ 24: label L4
+ 25: goto 28
+ 26: label L3
+ 27: goto 0
+ 28: label L5
+ 29: $t18 := move($t0)
+ 30: return $t18
+}
+
+--- Raw Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 1;
+  _t4: u64 = Add(_t2, _t3);
+  c: u64 = _t4;
+  _t5: u64 = c;
+  _t6: u64 = 2;
+  _t7: u64 = Mod(_t5, _t6);
+  _t8: u64 = 0;
+  _t9: bool = Eq(_t7, _t8);
+  if (_t9) continue;
+  _t10: u64 = c;
+  _t11: u64 = 3;
+  _t12: u64 = Add(_t10, _t11);
+  c: u64 = _t12;
+  _t13: u64 = c;
+  _t14: u64 = 2;
+  _t15: u64 = Mod(_t13, _t14);
+  _t16: u64 = 1;
+  _t17: bool = Eq(_t15, _t16);
+  if (Not(_t17)) continue;
+  break
+};
+_t18: u64 = c;
+return _t18
+
+--- If-Transformed Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 1;
+  _t4: u64 = Add(_t2, _t3);
+  c: u64 = _t4;
+  _t5: u64 = c;
+  _t6: u64 = 2;
+  _t7: u64 = Mod(_t5, _t6);
+  _t8: u64 = 0;
+  _t9: bool = Eq(_t7, _t8);
+  if (_t9) continue;
+  _t10: u64 = c;
+  _t11: u64 = 3;
+  _t12: u64 = Add(_t10, _t11);
+  c: u64 = _t12;
+  _t13: u64 = c;
+  _t14: u64 = 2;
+  _t15: u64 = Mod(_t13, _t14);
+  _t16: u64 = 1;
+  _t17: bool = Eq(_t15, _t16);
+  if (Not(_t17)) continue;
+  break
+};
+_t18: u64 = c;
+return _t18
+
+--- Assign-Transformed Generated AST
+loop {
+  c: u64 = Add(c, 1);
+  if (Eq(Mod(c, 2), 0)) continue;
+  c: u64 = Add(c, 3);
+  if (Not(Eq(Mod(c, 2), 1))) continue;
+  break
+};
+return c
+
+
+=== Processing m::while_1 =====================================================
+--- Source
+fun while_1(c: u64) {
+        while (c > 0) c = c - 1
+    }
+
+--- Stackless Bytecode
+fun m::while_1($t0|c: u64) {
+     var $t1|$t2: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: label L4
+  1: $t2 := copy($t0)
+  2: $t3 := 0
+  3: $t4 := >($t2, $t3)
+  4: if ($t4) goto 5 else goto 11
+  5: label L1
+  6: $t5 := move($t0)
+  7: $t6 := 1
+  8: $t7 := -($t5, $t6)
+  9: $t0 := $t7
+ 10: goto 13
+ 11: label L0
+ 12: goto 15
+ 13: label L2
+ 14: goto 0
+ 15: label L3
+ 16: return ()
+}
+
+--- Raw Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  loop {
+    if (Not(_t4)) break;
+    _t5: u64 = c;
+    _t6: u64 = 1;
+    _t7: u64 = Sub(_t5, _t6);
+    c: u64 = _t7;
+    continue[1]
+  };
+  break
+};
+return Tuple()
+
+--- If-Transformed Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  if _t4 {
+    _t5: u64 = c;
+    _t6: u64 = 1;
+    _t7: u64 = Sub(_t5, _t6);
+    c: u64 = _t7;
+    continue
+  };
+  break
+};
+return Tuple()
+
+--- Assign-Transformed Generated AST
+loop {
+  if Gt(c, 0) {
+    {
+      let c: u64 = Sub(c, 1);
+      continue
+    }
+  };
+  break
+};
+return Tuple()
+
+
+=== Processing m::while_2 =====================================================
+--- Source
+fun while_2(c: u64): u64 {
+        while (c > 0) {
+            if (c >= 10) {
+                c = c - 10
+            }
+        };
+        c = c + 1;
+        c
+    }
+
+--- Stackless Bytecode
+fun m::while_2($t0|c: u64): u64 {
+     var $t1|$t3: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+  0: label L6
+  1: $t2 := copy($t0)
+  2: $t3 := 0
+  3: $t4 := >($t2, $t3)
+  4: if ($t4) goto 5 else goto 18
+  5: label L1
+  6: $t5 := copy($t0)
+  7: $t6 := 10
+  8: $t7 := >=($t5, $t6)
+  9: if ($t7) goto 10 else goto 16
+ 10: label L3
+ 11: $t8 := move($t0)
+ 12: $t9 := 10
+ 13: $t10 := -($t8, $t9)
+ 14: $t0 := $t10
+ 15: goto 16
+ 16: label L2
+ 17: goto 20
+ 18: label L0
+ 19: goto 22
+ 20: label L4
+ 21: goto 0
+ 22: label L5
+ 23: $t11 := move($t0)
+ 24: $t12 := 1
+ 25: $t13 := +($t11, $t12)
+ 26: return $t13
+}
+
+--- Raw Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  loop {
+    if (Not(_t4)) break;
+    _t5: u64 = c;
+    _t6: u64 = 10;
+    _t7: bool = Ge(_t5, _t6);
+    if (Not(_t7)) continue[1];
+    _t8: u64 = c;
+    _t9: u64 = 10;
+    _t10: u64 = Sub(_t8, _t9);
+    c: u64 = _t10;
+    continue[1]
+  };
+  break
+};
+_t11: u64 = c;
+_t12: u64 = 1;
+_t13: u64 = Add(_t11, _t12);
+return _t13
+
+--- If-Transformed Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  if _t4 {
+    _t5: u64 = c;
+    _t6: u64 = 10;
+    _t7: bool = Ge(_t5, _t6);
+    if (Not(_t7)) continue;
+    _t8: u64 = c;
+    _t9: u64 = 10;
+    _t10: u64 = Sub(_t8, _t9);
+    c: u64 = _t10;
+    continue
+  };
+  break
+};
+_t11: u64 = c;
+_t12: u64 = 1;
+_t13: u64 = Add(_t11, _t12);
+return _t13
+
+--- Assign-Transformed Generated AST
+loop {
+  if Gt(c, 0) {
+    if (Not(Ge(c, 10))) continue;
+    c: u64 = Sub(c, 10);
+    continue
+  };
+  break
+};
+return Add(c, 1)
+
+
+=== Processing m::while_3 =====================================================
+--- Source
+fun while_3(c: u64): u64 {
+        while (c > 0) {
+            while (c > 10) c = c - 10;
+            c = c - 1;
+        };
+        c
+    }
+
+--- Stackless Bytecode
+fun m::while_3($t0|c: u64): u64 {
+     var $t1|$t3: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: label L8
+  1: $t2 := copy($t0)
+  2: $t3 := 0
+  3: $t4 := >($t2, $t3)
+  4: if ($t4) goto 5 else goto 26
+  5: label L1
+  6: $t5 := copy($t0)
+  7: $t6 := 10
+  8: $t7 := >($t5, $t6)
+  9: if ($t7) goto 10 else goto 16
+ 10: label L3
+ 11: $t8 := move($t0)
+ 12: $t9 := 10
+ 13: $t10 := -($t8, $t9)
+ 14: $t0 := $t10
+ 15: goto 18
+ 16: label L2
+ 17: goto 20
+ 18: label L4
+ 19: goto 5
+ 20: label L5
+ 21: $t11 := move($t0)
+ 22: $t12 := 1
+ 23: $t13 := -($t11, $t12)
+ 24: $t0 := $t13
+ 25: goto 28
+ 26: label L0
+ 27: goto 30
+ 28: label L6
+ 29: goto 0
+ 30: label L7
+ 31: $t14 := move($t0)
+ 32: return $t14
+}
+
+--- Raw Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  loop {
+    if (Not(_t4)) break;
+    loop {
+      _t5: u64 = c;
+      _t6: u64 = 10;
+      _t7: bool = Gt(_t5, _t6);
+      loop {
+        if (Not(_t7)) break;
+        _t8: u64 = c;
+        _t9: u64 = 10;
+        _t10: u64 = Sub(_t8, _t9);
+        c: u64 = _t10;
+        continue[1]
+      };
+      break
+    };
+    _t11: u64 = c;
+    _t12: u64 = 1;
+    _t13: u64 = Sub(_t11, _t12);
+    c: u64 = _t13;
+    continue[1]
+  };
+  break
+};
+_t14: u64 = c;
+return _t14
+
+--- If-Transformed Generated AST
+loop {
+  _t2: u64 = c;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  if _t4 {
+    loop {
+      _t5: u64 = c;
+      _t6: u64 = 10;
+      _t7: bool = Gt(_t5, _t6);
+      if _t7 {
+        _t8: u64 = c;
+        _t9: u64 = 10;
+        _t10: u64 = Sub(_t8, _t9);
+        c: u64 = _t10;
+        continue
+      };
+      break
+    };
+    _t11: u64 = c;
+    _t12: u64 = 1;
+    _t13: u64 = Sub(_t11, _t12);
+    c: u64 = _t13;
+    continue
+  };
+  break
+};
+_t14: u64 = c;
+return _t14
+
+--- Assign-Transformed Generated AST
+loop {
+  if Gt(c, 0) {
+    loop {
+      if Gt(c, 10) {
+        c: u64 = Sub(c, 10);
+        continue
+      };
+      break
+    };
+    c: u64 = Sub(c, 1);
+    continue
+  };
+  break
+};
+return c
+
+=== Sourcified Output ============================================
+module 0x815::m {
+    fun loop_1(c: u64): u64 {
+        loop {
+            c = c + 1;
+            if (c % 2 == 0) continue;
+            c = c + 3;
+            if (!(c % 2 == 1)) continue;
+            break
+        };
+        c
+    }
+    fun while_1(c: u64) {
+        while (c > 0) {
+            let c = c - 1;
+            continue
+        };
+    }
+    fun while_2(c: u64): u64 {
+        while (c > 0) {
+            if (!(c >= 10)) continue;
+            c = c - 10
+        };
+        c + 1
+    }
+    fun while_3(c: u64): u64 {
+        while (c > 0) {
+            while (c > 10) c = c - 10;
+            c = c - 1
+        };
+        c
+    }
+}

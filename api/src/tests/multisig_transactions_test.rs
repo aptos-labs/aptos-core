@@ -51,6 +51,66 @@ async fn test_multisig_transaction_with_payload_succeeds() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_multisig_transaction_with_existing_account() {
+    let mut context = new_test_context(current_function_name!());
+    let multisig_account = &mut context.create_account().await;
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let owners = vec![
+        owner_account_1.address(),
+        owner_account_2.address(),
+        owner_account_3.address(),
+    ];
+    context
+        .create_multisig_account_with_existing_account(multisig_account, owners.clone(), 2, 1000)
+        .await;
+    assert_owners(&context, multisig_account.address(), owners).await;
+    assert_signature_threshold(&context, multisig_account.address(), 2).await;
+
+    let multisig_payload = construct_multisig_txn_transfer_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(
+            owner_account_1,
+            multisig_account.address(),
+            multisig_payload.clone(),
+        )
+        .await;
+    // Owner 2 approves and owner 3 rejects. There are still 2 approvals total (owners 1 and 2) so
+    // the transaction can still be executed.
+    context
+        .approve_multisig_transaction(owner_account_2, multisig_account.address(), 1)
+        .await;
+    context
+        .reject_multisig_transaction(owner_account_3, multisig_account.address(), 1)
+        .await;
+
+    let org_multisig_balance = context.get_apt_balance(multisig_account.address()).await;
+    let org_owner_1_balance = context.get_apt_balance(owner_account_1.address()).await;
+
+    context
+        .execute_multisig_transaction(owner_account_2, multisig_account.address(), 202)
+        .await;
+
+    // The multisig tx that transfers away 1000 APT should have succeeded.
+    assert_multisig_tx_executed(
+        &mut context,
+        multisig_account.address(),
+        multisig_payload,
+        1,
+    )
+    .await;
+    assert_eq!(
+        org_multisig_balance - 1000,
+        context.get_apt_balance(multisig_account.address()).await
+    );
+    assert_eq!(
+        org_owner_1_balance + 1000,
+        context.get_apt_balance(owner_account_1.address()).await
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_to_update_owners() {
     let mut context = new_test_context(current_function_name!());
     let owner_account_1 = &mut context.create_account().await;

@@ -2,8 +2,8 @@
 
 [variant baseline]
 public fun Module0::function0() {
-     var $t0: &Module0::S
-     var $t1: Module0::S
+     var $t0: &0xcafe::Module0::S
+     var $t1: 0xcafe::Module0::S
   0: $t1 := read_ref($t0)
   1: return ()
 }
@@ -20,8 +20,8 @@ error: use of unassigned local `y`
 
 [variant baseline]
 public fun Module0::function0() {
-     var $t0: &Module0::S
-     var $t1: Module0::S
+     var $t0: &0xcafe::Module0::S
+     var $t1: 0xcafe::Module0::S
      # before: { no: $t0, $t1 }, after: { no: $t0 }
   0: $t1 := read_ref($t0)
      # before: { no: $t0 }, after: { no: $t0 }

@@ -11,7 +11,10 @@ use crate::{
 };
 use move_binary_format::file_format::CodeOffset;
 use petgraph::{dot::Dot, graph::Graph};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Range,
+};
 
 type Map<K, V> = BTreeMap<K, V>;
 type Set<V> = BTreeSet<V>;
@@ -52,6 +55,8 @@ impl StacklessControlFlowGraph {
 
     /// If from_all_blocks is false, perform backward analysis only from blocks that may exit.
     /// If from_all_blocks is true, perform backward analysis from all blocks.
+    /// Notice that it is guaranteed that forward and backward graphs use the
+    /// same block numbering.
     pub fn new_backward(code: &[Bytecode], from_all_blocks: bool) -> Self {
         let blocks = Self::collect_blocks(code);
         let mut block_id_to_predecessors: Map<BlockId, Vec<BlockId>> =
@@ -216,8 +221,34 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].content
     }
 
+    pub fn code_range(&self, block_id: BlockId) -> Range<usize> {
+        match self.content(block_id) {
+            BlockContent::Basic { lower, upper } => *lower as usize..(*upper as usize + 1),
+            BlockContent::Dummy => 0..0,
+        }
+    }
+
     pub fn blocks(&self) -> Vec<BlockId> {
         self.blocks.keys().cloned().collect()
+    }
+
+    pub fn reachable_blocks(
+        &self,
+        from: BlockId,
+        mut edge_filter: impl FnMut(BlockId, BlockId) -> bool,
+    ) -> BTreeSet<BlockId> {
+        let mut result = BTreeSet::new();
+        let mut todo = vec![from];
+        while let Some(blk_id) = todo.pop() {
+            if result.insert(blk_id) {
+                for succ in self.successors(blk_id) {
+                    if edge_filter(blk_id, *succ) {
+                        todo.push(*succ)
+                    }
+                }
+            }
+        }
+        result
     }
 
     pub fn entry_block(&self) -> BlockId {
@@ -230,6 +261,15 @@ impl StacklessControlFlowGraph {
         } else {
             DUMMY_EXIT
         }
+    }
+
+    pub fn enclosing_block(&self, code_offset: CodeOffset) -> BlockId {
+        for blk_id in self.blocks.keys() {
+            if self.code_range(*blk_id).contains(&(code_offset as usize)) {
+                return *blk_id;
+            }
+        }
+        panic!("code offset not in the control flow graph")
     }
 
     pub fn instr_indexes(

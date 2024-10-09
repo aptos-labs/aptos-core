@@ -24,6 +24,7 @@ log = { workspace = true }
 num = { workspace = true }
 paste = { workspace = true }
 petgraph = { workspace = true }
+topological-sort = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
