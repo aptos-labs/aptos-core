@@ -25,7 +25,7 @@ use aptos_types::{
     },
 };
 use aptos_vm_environment::{
-    gas::get_gas_config_from_storage, prod_configs::aptos_prod_deserializer_config,
+    gas::get_gas_feature_version, prod_configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
     resolver::{
@@ -300,7 +300,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let features = Features::fetch_config(self).unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features);
 
-        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+        let gas_feature_version = get_gas_feature_version(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
