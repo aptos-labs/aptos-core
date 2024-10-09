@@ -4,6 +4,7 @@
 use crate::{
     asset_uploader::{
         api::AssetUploaderApiContext,
+        throttler::{config::AssetUploaderThrottlerConfig, AssetUploaderThrottlerContext},
         worker::{config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext},
     },
     parser::{config::ParserConfig, ParserContext},
@@ -32,6 +33,7 @@ pub enum ServerConfig {
     Parser(ParserConfig),
     AssetUploaderWorker(AssetUploaderWorkerConfig),
     AssetUploaderApi,
+    AssetUploaderThrottler(AssetUploaderThrottlerConfig),
 }
 
 /// Structs to hold config from YAML
@@ -49,6 +51,7 @@ pub enum ServerContext {
     Parser(ParserContext),
     AssetUploaderWorker(AssetUploaderWorkerContext),
     AssetUploaderApi(AssetUploaderApiContext),
+    AssetUploaderThrottler(AssetUploaderThrottlerContext),
 }
 
 impl ServerConfig {
@@ -67,6 +70,12 @@ impl ServerConfig {
             },
             ServerConfig::AssetUploaderApi => {
                 ServerContext::AssetUploaderApi(AssetUploaderApiContext::new(pool))
+            },
+            ServerConfig::AssetUploaderThrottler(asset_uploader_throttler_config) => {
+                ServerContext::AssetUploaderThrottler(AssetUploaderThrottlerContext::new(
+                    asset_uploader_throttler_config.clone(),
+                    pool,
+                ))
             },
         }
     }
@@ -99,6 +108,7 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
             ServerConfig::Parser(_) => "parser",
             ServerConfig::AssetUploaderWorker(_) => "asset_uploader_worker",
             ServerConfig::AssetUploaderApi => "asset_uploader_api",
+            ServerConfig::AssetUploaderThrottler(_) => "asset_uploader_throttler",
         }
         .to_string()
     }

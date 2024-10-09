@@ -10,7 +10,7 @@ use axum::{
     body::Body, http::StatusCode, response::IntoResponse, routing::post, Extension, Json, Router,
 };
 use reqwest::{multipart::Form, Client};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tracing::{error, info};
 use url::Url;
@@ -22,9 +22,9 @@ pub struct AssetUploaderWorkerContext {
     config: Arc<AssetUploaderWorkerConfig>,
 }
 
-#[derive(Debug, Deserialize)]
-struct UploadRequest {
-    url: Url,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UploadRequest {
+    pub url: Url,
 }
 
 impl AssetUploaderWorkerContext {
@@ -99,7 +99,7 @@ impl Server for AssetUploaderWorkerContext {
 
 /// Converts a reqwest response to an axum response
 /// Only copies the response status, response body, and Content-Type header
-async fn reqwest_response_to_axum_response(
+pub async fn reqwest_response_to_axum_response(
     response: reqwest::Response,
 ) -> anyhow::Result<impl IntoResponse> {
     let status = response.status();
