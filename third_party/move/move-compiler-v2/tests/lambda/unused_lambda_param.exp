@@ -25,5 +25,21 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    inline fun test(p: u64, f: |u64|u64): u64 {
+        f(p)
+    }
+    fun unused_lambda() {
+        1;
+    }
+    fun unused_lambda_suppressed1() {
+        1;
+    }
+    fun unused_lambda_suppressed2() {
+        1;
+    }
+}
+
 
 ============ bytecode verification succeeded ========

@@ -13,7 +13,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -81,7 +81,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -149,7 +149,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -217,7 +217,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -285,7 +285,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -353,7 +353,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -421,7 +421,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -489,7 +489,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -557,7 +557,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -625,7 +625,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {
@@ -693,7 +693,7 @@ module 0x42::LambdaTest1 {
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
     use std::vector;
-    public fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<T>(v: &vector<T>,action: |&T|) {
         {
           let i: u64 = 0;
           loop {

@@ -4,4 +4,4 @@ error: Only inline functions may have function-typed parameters, but non-inline 
     ┌─ tests/lambda/inline-parity/dotdot_valid.move:175:9
     │
 175 │     fun lambda_param(f: |S2| bool): bool {
-    │         ^^^^^^^^^^^^ - Parameter `f` has function-valued type `|test::S2|bool`.
+    │         ^^^^^^^^^^^^ - Parameter `f` has function-valued type `|S2|bool`.

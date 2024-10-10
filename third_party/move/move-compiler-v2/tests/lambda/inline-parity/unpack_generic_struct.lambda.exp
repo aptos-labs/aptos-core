@@ -7,7 +7,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -18,28 +18,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -53,7 +53,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -64,28 +64,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -99,7 +99,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -110,28 +110,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -145,7 +145,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -156,28 +156,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -191,7 +191,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -202,28 +202,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -237,7 +237,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -248,28 +248,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -283,7 +283,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -294,28 +294,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -329,7 +329,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -340,28 +340,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -375,7 +375,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -386,28 +386,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -421,7 +421,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -432,28 +432,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -467,7 +467,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -478,28 +478,28 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
-          m::g<Key>(f, |e: m::E<Key>| {
-            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let f: E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
             v = key;
             Tuple()
           });
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
 } // end 0x42::m
 
@@ -513,7 +513,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -524,31 +524,31 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
+          let f: E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
           m::g<Key>(f, closure m::foo$lambda$2(v));
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
-    private fun foo$lambda$1<Key>(e: #0): m::E<#0> {
+    private fun foo$lambda$1<Key>(e: Key): E<Key> {
         pack m::E<Key>(e)
     }
-    private fun foo$lambda$2<Key>(v: &mut #0,e: m::E<#0>) {
+    private fun foo$lambda$2<Key>(v: &mut Key,e: E<Key>) {
         {
-          let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
           v = key;
           Tuple()
         }
@@ -565,7 +565,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -576,31 +576,31 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
+          let f: E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
           m::g<Key>(f, closure m::foo$lambda$2(v));
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
-    private fun foo$lambda$1<Key>(e: #0): m::E<#0> {
+    private fun foo$lambda$1<Key>(e: Key): E<Key> {
         pack m::E<Key>(e)
     }
-    private fun foo$lambda$2<Key>(v: &mut #0,e: m::E<#0>) {
+    private fun foo$lambda$2<Key>(v: &mut Key,e: E<Key>) {
         {
-          let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
           v = key;
           Tuple()
         }
@@ -617,7 +617,7 @@ module 0x42::m {
     struct Option<Element> {
         vec: vector<Element>,
     }
-    public fun destroy_none<Element>(t: m::Option<#0>) {
+    public fun destroy_none<Element>(t: Option<Element>) {
         if m::is_none<Element>(Borrow(Immutable)(t)) {
           Tuple()
         } else {
@@ -628,31 +628,31 @@ module 0x42::m {
           vector::destroy_empty<Element>(vec)
         }
     }
-    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+    public fun foo<Key>(data: E<Key>,v: &mut Key) {
         {
-          let f: m::E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
+          let f: E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
           m::g<Key>(f, closure m::foo$lambda$2(v));
           Tuple()
         }
     }
-    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+    public fun g<Key>(x: E<Key>,v: |E<Key>|) {
         (v)(x)
     }
-    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+    public fun h<Key>(x: E<Key>,v: |Key|E<Key>): E<Key> {
         {
           let m::E<Key>{ key } = x;
           (v)(key)
         }
     }
-    public fun is_none<Element>(t: &m::Option<#0>): bool {
-        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&Option<Element>>(t)))
     }
-    private fun foo$lambda$1<Key>(e: #0): m::E<#0> {
+    private fun foo$lambda$1<Key>(e: Key): E<Key> {
         pack m::E<Key>(e)
     }
-    private fun foo$lambda$2<Key>(v: &mut #0,e: m::E<#0>) {
+    private fun foo$lambda$2<Key>(v: &mut Key,e: E<Key>) {
         {
-          let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          let (m::E<Key>{ key }, _x: u64): (E<Key>, u64) = Tuple(e, 3);
           v = key;
           Tuple()
         }

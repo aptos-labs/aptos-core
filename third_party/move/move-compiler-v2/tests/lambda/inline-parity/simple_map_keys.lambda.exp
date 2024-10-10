@@ -6,9 +6,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -24,13 +24,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -39,11 +39,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -68,9 +68,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -86,13 +86,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -101,11 +101,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -130,9 +130,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -148,13 +148,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -163,11 +163,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -192,9 +192,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -210,13 +210,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -225,11 +225,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -254,9 +254,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -272,13 +272,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -287,11 +287,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -316,9 +316,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -334,13 +334,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -349,11 +349,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -378,9 +378,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -396,13 +396,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -411,11 +411,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -440,9 +440,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -458,13 +458,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -473,11 +473,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -502,9 +502,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -520,13 +520,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -535,11 +535,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -564,9 +564,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -582,13 +582,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -597,11 +597,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, Vector<u64>(1, 1, 1)) {
@@ -626,9 +626,9 @@ module 0x42::simple_map {
         value: Value,
     }
     struct SimpleMap<Key,Value> {
-        data: vector<simple_map::Element<Key, Value>>,
+        data: vector<Element<Key, Value>>,
     }
-    public fun for_each_ref<Element>(v: &vector<#0>,f: |&#0|) {
+    public fun for_each_ref<Element>(v: &vector<Element>,f: |&Element|) {
         {
           let i: u64 = 0;
           {
@@ -644,13 +644,13 @@ module 0x42::simple_map {
           }
         }
     }
-    public fun keys<Key,Value>(map: &simple_map::SimpleMap<#0, #1>): vector<#0> {
-        simple_map::map_ref<simple_map::Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&simple_map::SimpleMap<Key, Value>>(map)), |e: &simple_map::Element<Key, Value>| {
-          let e: &simple_map::Element<Key, Value> = e;
-          select simple_map::Element.key<&simple_map::Element<Key, Value>>(e)
+    public fun keys<Key,Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        simple_map::map_ref<Element<Key, Value>, Key>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)), |e: &Element<Key, Value>| {
+          let e: &Element<Key, Value> = e;
+          select simple_map::Element.key<&Element<Key, Value>>(e)
         })
     }
-    public fun map_ref<Element,NewElement>(v: &vector<#0>,f: |&#0|#1): vector<#1> {
+    public fun map_ref<Element,NewElement>(v: &vector<Element>,f: |&Element|NewElement): vector<NewElement> {
         {
           let result: vector<NewElement> = Vector<NewElement>();
           simple_map::for_each_ref<Element>(v, |elem: &Element| vector::push_back<NewElement>(Borrow(Mutable)(result), (f)(elem)));
@@ -659,11 +659,11 @@ module 0x42::simple_map {
     }
     public fun run() {
         {
-          let entry: simple_map::Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
+          let entry: Element<u64, u64> = pack simple_map::Element<u64, u64>(1, 2);
           {
-            let data: vector<simple_map::Element<u64, u64>> = Vector<simple_map::Element<u64, u64>>(entry, entry, entry);
+            let data: vector<Element<u64, u64>> = Vector<Element<u64, u64>>(entry, entry, entry);
             {
-              let map: simple_map::SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
+              let map: SimpleMap<u64, u64> = pack simple_map::SimpleMap<u64, u64>(data);
               {
                 let keys: vector<u64> = simple_map::keys<u64, u64>(Borrow(Immutable)(map));
                 if Eq<vector<u64>>(keys, [Number(1), Number(1), Number(1)]) {
