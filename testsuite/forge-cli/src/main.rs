@@ -1061,7 +1061,6 @@ fn realistic_env_sweep_wrap(
         .with_initial_fullnode_count(num_fullnodes)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
-            config.consensus.chain_health_backoff = vec![];
         }))
         .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
@@ -1149,6 +1148,23 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         )
         .collect(),
         background_traffic: None, //background_traffic_for_sweep(5),
+    })
+    .with_validator_override_node_config_fn(Arc::new(|config, _| {
+        config.execution.concurrency_level = 48;
+        config.consensus.chain_health_backoff = vec![];
+    }))
+    .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+        config.execution.concurrency_level = 48;
+    }))
+    .with_validator_resource_override(NodeResourceOverride {
+        cpu_cores: Some(58),
+        memory_gib: Some(200),
+        storage_gib: Some(500), // assuming we're using these large marchines for long-running or expensive tests which need more disk
+    })
+    .with_fullnode_resource_override(NodeResourceOverride {
+        cpu_cores: Some(58),
+        memory_gib: Some(200),
+        storage_gib: Some(500),
     })
 }
 
