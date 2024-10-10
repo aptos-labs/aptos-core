@@ -5,7 +5,7 @@ proposals:
   - name: proposal_1_upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework, version TBD"
-      description: "This includes changes in (TBA: URL to changes)"
+      description: "Description of what is the proposal (can be taken from AIP Summary), What will happen if this proposal is passed (can be taken from AIP Impact)"
     execution_mode: MultiStep
     update_sequence:
       - Gas:
