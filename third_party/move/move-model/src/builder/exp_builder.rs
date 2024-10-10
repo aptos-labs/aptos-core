@@ -417,13 +417,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         };
         ty.visit(&mut visitor);
         if incomplete {
-            self.error(
-                &loc,
-                &format!(
-                    "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
-                    ty.display(&self.type_display_context())
-                ),
-            );
+            let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
+            // Skip displaying the error message if there is already an error in the type; we must have another message about it already.
+            if !displayed_ty.contains("*error*") {
+                self.error(
+                    &loc,
+                    &format!(
+                        "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
+                        displayed_ty
+                    ),
+                );
+            }
         }
         ty
     }

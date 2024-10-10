@@ -3311,6 +3311,8 @@ pub struct TypeDisplayContext<'a> {
     pub used_modules: BTreeSet<ModuleId>,
     /// Whether to use `m::T` for representing types, for stable output in docgen
     pub use_module_qualification: bool,
+    /// Var types that are recursive and should appear as `..` in display
+    pub recursive_vars: Option<BTreeSet<u32>>,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -3324,6 +3326,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -3347,6 +3350,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -3354,6 +3358,19 @@ impl<'a> TypeDisplayContext<'a> {
         Self {
             subs_opt: Some(subs),
             ..self
+        }
+    }
+
+    pub fn map_var_to_self(&self, idx: u32) -> Self {
+        Self {
+            recursive_vars: if let Some(existing_set) = &self.recursive_vars {
+                let mut new_set = existing_set.clone();
+                new_set.insert(idx);
+                Some(new_set)
+            } else {
+                Some(BTreeSet::from([idx]))
+            },
+            ..self.clone()
         }
     }
 }
@@ -3447,6 +3464,11 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
             },
             Var(idx) => {
+                if let Some(recursive_vars) = &self.context.recursive_vars {
+                    if recursive_vars.contains(idx) {
+                        return f.write_str("..");
+                    }
+                }
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
                     write!(f, "{}", ty.display(self.context))
                 } else if let Some(ctrs) =
@@ -3456,9 +3478,10 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                     if ctrs.is_empty() {
                         f.write_str(&self.type_var_str(*idx))
                     } else {
+                        let recursive_context = self.context.map_var_to_self(*idx);
                         let out = ctrs
                             .iter()
-                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .map(|(_, _, c)| c.display(&recursive_context).to_string())
                             .join(" + ");
                         f.write_str(&out)
                     }
