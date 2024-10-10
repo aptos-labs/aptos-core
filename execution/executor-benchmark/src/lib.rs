@@ -113,6 +113,7 @@ pub fn run_benchmark<V>(
 ) where
     V: TransactionBlockExecutor + 'static,
 {
+    // println!("run_benchmark");
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
@@ -126,6 +127,7 @@ pub fn run_benchmark<V>(
     let (db, executor) = init_db_and_executor::<V>(&config);
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
+    // println!("Transaction mix: {:?}", transaction_mix);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
@@ -151,6 +153,7 @@ pub fn run_benchmark<V>(
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
+        // println!("init_workload, main_signer_accounts: {:?}, burner_accounts {:?}", main_signer_accounts.len(), burner_accounts.len());
         let (transaction_generator_creator, phase) = init_workload::<V>(
             transaction_mix,
             root_account.clone(),
@@ -167,9 +170,11 @@ pub fn run_benchmark<V>(
 
     let version = db.reader.expect_synced_version();
 
+    // println!("Starting pipeline in run benchmark");
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
 
+    // println!("Created pipeline");
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
         for (transaction_type, _) in mix {
@@ -188,6 +193,7 @@ pub fn run_benchmark<V>(
             }
         }
     }
+    // println!("Created transaction generators");
     let root_account = Arc::into_inner(root_account).unwrap();
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -197,7 +203,7 @@ pub fn run_benchmark<V>(
         Some(num_accounts_to_load),
         pipeline_config.num_generator_workers,
     );
-
+    // println!("Overall measuring start");
     let mut overall_measuring = OverallMeasuring::start();
 
     let num_blocks_created = if let Some((transaction_generators, phase)) = transaction_generators {
@@ -259,6 +265,7 @@ fn init_workload<V>(
 where
     V: TransactionBlockExecutor + 'static,
 {
+    // println!("init_workload, transaction_mix {:?}", transaction_mix);
     let version = db.reader.expect_synced_version();
     let (pipeline, block_sender) = Pipeline::<V>::new(
         BlockExecutor::new(db.clone()),
