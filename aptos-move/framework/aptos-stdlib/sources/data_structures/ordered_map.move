@@ -17,7 +17,6 @@
 /// Uses cmp::compare for ordering, which compares primitive types natively, and uses common
 /// lexicographical sorting for complex types.
 module aptos_std::ordered_map {
-    friend aptos_std::big_ordered_map;
 
     use std::vector;
 
@@ -70,7 +69,7 @@ module aptos_std::ordered_map {
 
     /// Create a OrderedMap from a vector of keys and values.
     /// Aborts with EKEY_ALREADY_EXISTS if duplicate keys are passed in.
-    public fun new_from<K, V>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
+    public fun new_from<K: drop, V: drop>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
         let map = new();
         add_all(&mut map, keys, values);
         map
@@ -87,14 +86,17 @@ module aptos_std::ordered_map {
     }
 
     /// Add a key/value pair to the map.
-    /// Aborts with EKEY_ALREADY_EXISTS if key already exist.
-    public fun add<K, V>(self: &mut OrderedMap<K, V>, key: K, value: V) {
+    /// Returns true if the key was added, false if it already existed.
+    public fun add<K: drop, V: drop>(self: &mut OrderedMap<K, V>, key: K, value: V): bool {
         let len = self.entries.length();
         let index = binary_search(&key, &self.entries, 0, len);
 
         // key must not already be inside.
-        assert!(index >= len || &self.entries[index].key != &key, error::invalid_argument(EKEY_ALREADY_EXISTS));
+        if (index < len && &self.entries[index].key == &key) {
+            return false;
+        };
         self.entries.insert(index, Entry { key, value });
+        true
     }
 
     /// If the key doesn't exist in the map, inserts the key/value, and returns none.
@@ -162,7 +164,7 @@ module aptos_std::ordered_map {
 
     /// Add multiple key/value pairs to the map. The keys must not already exist.
     /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
-    public fun add_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
+    public fun add_all<K: drop, V: drop>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         vector::zip(keys, values, |key, value| {
             add(self, key, value);
         });

@@ -13,7 +13,8 @@ module aptos_framework::transaction_validation {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-
+    use aptos_framework::nonce_validation;
+    use aptos_framework::transaction_context;
     friend aptos_framework::genesis;
 
     /// This holds information that will be picked up by the VM to call the
@@ -47,6 +48,7 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
     const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
+    const PROLOGUE_NONCE_ALREADY_EXISTS: u64 = 1012;
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -104,21 +106,27 @@ module aptos_framework::transaction_validation {
                 )
             };
 
-            let account_sequence_number = account::get_sequence_number(transaction_sender);
-            assert!(
-                txn_sequence_number < (1u64 << 63),
-                error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
-            );
+            // let account_sequence_number = account::get_sequence_number(transaction_sender);
+            // assert!(
+            //     txn_sequence_number < (1u64 << 63),
+            //     error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
+            // );
 
-            assert!(
-                txn_sequence_number >= account_sequence_number,
-                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
-            );
+            // assert!(
+            //     txn_sequence_number >= account_sequence_number,
+            //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
+            // );
 
-            assert!(
-                txn_sequence_number == account_sequence_number,
-                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
-            );
+            // assert!(
+            //     txn_sequence_number == account_sequence_number,
+            //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            // );
+
+            assert!(!nonce_validation::insert_nonce(transaction_sender, txn_sequence_number, txn_expiration_time),
+                error::invalid_argument(PROLOGUE_NONCE_ALREADY_EXISTS));
+            
+            // nonce_validation::insert_nonce(transaction_sender, txn_sequence_number, txn_expiration_time);
+
         } else {
             // In this case, the transaction is sponsored and the account does not exist, so ensure
             // the default values match.
@@ -487,8 +495,8 @@ module aptos_framework::transaction_validation {
         };
 
         // Increment sequence number
-        let addr = signer::address_of(&account);
-        account::increment_sequence_number(addr);
+        // let addr = signer::address_of(&account);
+        // account::increment_sequence_number(addr);
     }
 
     inline fun skip_auth_key_check(is_simulation: bool, auth_key: &vector<u8>): bool {

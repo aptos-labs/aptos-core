@@ -37,6 +37,7 @@ pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
 pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
 // Insufficient balance to cover the required deposit.
 pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
+pub const ENONCE_EXISTS : u64 = 1012;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -133,6 +134,9 @@ pub fn convert_prologue_error(
                 },
                 (INVALID_STATE, EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT) => {
                     StatusCode::INSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT
+                },
+                (INVALID_ARGUMENT, ENONCE_EXISTS) => {
+                    StatusCode::NONCE_EXISTS
                 },
                 (category, reason) => {
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",

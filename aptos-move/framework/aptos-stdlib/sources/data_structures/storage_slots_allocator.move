@@ -16,7 +16,6 @@
 /// * having one slot embeded into the struct itself
 /// * having a fee-payer for any storage creation operations
 module aptos_std::storage_slots_allocator {
-    friend aptos_std::big_ordered_map;
 
     use aptos_std::table::{Self, Table};
 
