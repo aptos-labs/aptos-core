@@ -482,11 +482,6 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         "p50 lat",
         "p90 lat",
         "p99 lat",
-        // TODO @hariria delete
-        // "batch->pos",
-        // "pos->prop",
-        // "prop->order",
-        // "order->commit",
         "insertion->block",
         "block->commit",
         "actual dur",
@@ -511,11 +506,6 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
                 rate.p50_latency as f64 / 1000.0,
                 rate.p90_latency as f64 / 1000.0,
                 rate.p99_latency as f64 / 1000.0,
-                // TODO @hariria delete
-                // result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).unwrap_or(&MetricSamples::default()).max_sample(),
-                // result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).unwrap_or(&MetricSamples::default()).max_sample(),
-                // result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).unwrap_or(&MetricSamples::default()).max_sample(),
-                // result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::InsertionToBlock).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::BlockCreationToCommit).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.actual_duration.as_secs(),
