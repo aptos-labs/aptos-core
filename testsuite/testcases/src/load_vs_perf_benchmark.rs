@@ -471,7 +471,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
 
     let mut table = Vec::new();
     table.push(format!(
-        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <16} | {: <13} | {: <12} | {: <12} | {: <12} | {: <12}",
         type_name,
         "submitted/s",
         "committed/s",
@@ -495,7 +495,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         for result in run_results {
             let rate = result.stats.rate();
             table.push(format!(
-                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12} | {: <12.3} | {: <12.3} | {: <12.3}",
+                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <16.3} | {: <13.3} | {: <12} | {: <12.3} | {: <12.3} | {: <12.3}",
                 result.name,
                 rate.submitted,
                 rate.committed,
