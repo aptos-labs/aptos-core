@@ -11,7 +11,7 @@ module aptos_std::ordered_map {
             entries: vector<Entry<K, V>>,
         }
     }
-    
+
     enum Iterator has copy, drop {
         End,
         Position {
@@ -24,7 +24,7 @@ module aptos_std::ordered_map {
 
         &map.entries.borrow(self.index).key
     }
-    
+
     public fun find<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
         let lower_bound = self.lower_bound(key);
         if (lower_bound.iter_is_end(self)) {
