@@ -74,7 +74,7 @@ CODE_PERF_VERSION = "v6"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=1)
 )
 
 if os.environ.get("DETAILED"):

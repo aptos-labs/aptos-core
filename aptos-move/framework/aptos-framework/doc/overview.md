@@ -43,6 +43,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::keyless_account`](keyless_account.md#0x1_keyless_account)
 -  [`0x1::managed_coin`](managed_coin.md#0x1_managed_coin)
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
+-  [`0x1::nonce_validation`](nonce_validation.md#0x1_nonce_validation)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::object_code_deployment`](object_code_deployment.md#0x1_object_code_deployment)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
