@@ -18,14 +18,24 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
 async-trait = { workspace = true }
+build_html = { workspace = true }
 clap = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
+prost = { workspace = true }
+rand = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-scoped = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
 tracing = { workspace = true }
+warp = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
