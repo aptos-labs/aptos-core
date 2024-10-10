@@ -113,7 +113,7 @@ impl ReleaseTarget {
                     output_format: None,
                 }),
                 skip_fetch_latest_git_deps: true,
-                ..BuildOptions::default()
+                ..BuildOptions::move_2()
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages
