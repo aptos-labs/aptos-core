@@ -52,8 +52,12 @@ on:
         - benchmark-t2d-32
         - benchmark-t2d-60
         - benchmark-c3d-30
+        - benchmark-c3d-60
+        - benchmark-c3d-180
         - benchmark-n4-32
         - benchmark-c4-32
+        - benchmark-c4-48
+        - benchmark-c4-96
         description: The name of the runner to use for the test. (which decides machine specs)
       NUMBER_OF_EXECUTION_THREADS:
         required: false
