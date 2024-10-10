@@ -992,12 +992,24 @@ impl IndexedRef {
         use Container::*;
 
         macro_rules! swap {
-            ($r1:ident, $r2:ident) => {
-                mem::swap(
-                    &mut $r1.borrow_mut()[self.idx],
-                    &mut $r2.borrow_mut()[other.idx],
-                )
-            };
+            ($r1:ident, $r2:ident) => {{
+                if Rc::ptr_eq($r1, $r2) {
+                    if self.idx == other.idx {
+                        return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                            .with_message(format!(
+                                "cannot swap references to the same item {:?}",
+                                self
+                            )));
+                    }
+
+                    $r1.borrow_mut().swap(self.idx, other.idx);
+                } else {
+                    mem::swap(
+                        &mut $r1.borrow_mut()[self.idx],
+                        &mut $r2.borrow_mut()[other.idx],
+                    )
+                }
+            }};
         }
 
         macro_rules! swap_g_s {

@@ -22,7 +22,6 @@ module std::mem_tests {
         assert!(vector::borrow(&v, 2) == &3, 1);
     }
 
-
     #[test]
     fun test_replace_ints() {
         let a = 1;
@@ -33,7 +32,7 @@ module std::mem_tests {
     }
 
     #[test_only]
-    struct SomeStruct has drop {
+    struct SomeStruct has drop, key {
         f: u64,
         v: vector<u64>,
     }
@@ -41,10 +40,10 @@ module std::mem_tests {
     #[test]
     fun test_swap_struct() {
         let a = 1;
+        let v = vector[20, 21];
         let s1 = SomeStruct { f: 2, v: vector[3, 4]};
         let s2 = SomeStruct { f: 5, v: vector[6, 7]};
         let vs = vector[SomeStruct { f: 8, v: vector[9, 10]}, SomeStruct { f: 11, v: vector[12, 13]}];
-
 
         swap(&mut s1, &mut s2);
         assert!(&s1 == &SomeStruct { f: 5, v: vector[6, 7]}, 0);
@@ -61,5 +60,38 @@ module std::mem_tests {
         swap(&mut s2, vector::borrow_mut(&mut vs, 0));
         assert!(&s2 == &SomeStruct { f: 8, v: vector[9, 10]}, 6);
         assert!(vector::borrow(&vs, 0) == &SomeStruct { f: 2, v: vector[3, 4]}, 7);
+
+        swap(&mut s1.f, vector::borrow_mut(&mut v, 0));
+        assert!(&s1.f == &20, 8);
+        assert!(vector::borrow(&v, 0) == &6, 9);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_swap_resource(creator: &signer) acquires SomeStruct {
+        use std::signer;
+        {
+            move_to(creator, SomeStruct { f: 5, v: vector[6, 7]});
+        };
+
+        {
+            let value = borrow_global_mut<SomeStruct>(signer::address_of(creator));
+            let s1 = SomeStruct { f: 2, v: vector[3, 4]};
+            let vs = vector[SomeStruct { f: 8, v: vector[9, 10]}, SomeStruct { f: 11, v: vector[12, 13]}];
+
+            swap(&mut s1, value);
+            assert!(&s1 == &SomeStruct { f: 5, v: vector[6, 7]}, 0);
+            assert!(value == &SomeStruct { f: 2, v: vector[3, 4]}, 1);
+
+            swap(value, vector::borrow_mut(&mut vs, 0));
+            assert!(value == &SomeStruct { f: 8, v: vector[9, 10]}, 2);
+            assert!(vector::borrow(&vs, 0) == &SomeStruct { f: 2, v: vector[3, 4]}, 3);
+
+            let v_ref = &mut value.v;
+            let other_v = vector[11,12];
+            swap(v_ref, &mut other_v);
+
+            assert!(v_ref == &vector[11, 12], 4);
+            assert!(&other_v == &vector[9, 10], 5);
+        }
     }
 }

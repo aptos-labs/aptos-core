@@ -7,7 +7,7 @@ use crate::{
     gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_23},
     gas_schedule::NativeGasParameters,
 };
-use aptos_gas_algebra::{InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerByte};
+use aptos_gas_algebra::{InternalGas, InternalGasPerByte};
 
 crate::gas_schedule::macros::define_gas_parameters!(
     MoveStdlibGasParameters,
