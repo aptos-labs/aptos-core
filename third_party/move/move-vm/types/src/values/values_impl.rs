@@ -24,7 +24,7 @@ use move_core_types::{
 use std::{
     cell::RefCell,
     fmt::{self, Debug, Display, Formatter},
-    iter,
+    iter, mem,
     rc::Rc,
 };
 
@@ -905,76 +905,211 @@ impl Reference {
 
 /**************************************************************************************
  *
+ * Helpers: from primitive
+ *
+ *************************************************************************************/
+trait VMValueFromPrimitive<T> {
+    fn from_primitive(val: T) -> Self;
+}
+
+macro_rules! impl_vm_value_from_primitive {
+    ($ty:ty, $tc:ident) => {
+        impl VMValueFromPrimitive<$ty> for ValueImpl {
+            fn from_primitive(val: $ty) -> Self {
+                Self::$tc(val)
+            }
+        }
+    };
+}
+
+impl_vm_value_from_primitive!(u8, U8);
+impl_vm_value_from_primitive!(u16, U16);
+impl_vm_value_from_primitive!(u32, U32);
+impl_vm_value_from_primitive!(u64, U64);
+impl_vm_value_from_primitive!(u128, U128);
+impl_vm_value_from_primitive!(u256::U256, U256);
+impl_vm_value_from_primitive!(bool, Bool);
+impl_vm_value_from_primitive!(AccountAddress, Address);
+
+/**************************************************************************************
+ *
  * Swap reference (Move)
  *
  *   Implementation of the Move operation to swap contents of a reference.
  *
  *************************************************************************************/
+impl Container {
+    fn swap_contents(&self, other: &Self) -> PartialVMResult<()> {
+        use Container::*;
+
+        // TODO: check if unique ownership?
+
+        match (self, other) {
+            (Vec(l), Vec(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (Struct(l), Struct(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+
+            (VecBool(l), VecBool(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecAddress(l), VecAddress(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+
+            (VecU8(l), VecU8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU16(l), VecU16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU32(l), VecU32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU64(l), VecU64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU128(l), VecU128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU256(l), VecU256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+
+            (
+                Locals(_) | Vec(_) | Struct(_) | VecBool(_) | VecAddress(_) | VecU8(_) | VecU16(_)
+                | VecU32(_) | VecU64(_) | VecU128(_) | VecU256(_),
+                _,
+            ) => {
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "cannot swap container values: {:?}, {:?}",
+                        self, other
+                    )),
+                )
+            },
+        }
+
+        Ok(())
+    }
+}
 
 impl ContainerRef {
-    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(Value) -> PartialVMResult<Value>,
-    {
-        // same as read_ref, but without consuming self.
-        // But safe because even though we copy here, and temporarily leave a duplicate inside,
-        // we replace it in write_ref below.
-        let old_value = Value(ValueImpl::Container(self.container().copy_value()?));
-        self.write_ref(swap_with(old_value)?)?;
+    fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        self.container().swap_contents(other.container())?;
+
+        self.mark_dirty();
+        other.mark_dirty();
 
         Ok(())
     }
 }
 
 impl IndexedRef {
-    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(Value) -> PartialVMResult<Value>,
-    {
+    fn swap_values(self, other: Self) -> PartialVMResult<()> {
         use Container::*;
 
-        // same as read_ref, but without consuming self.
-        // But safe because even though we copy here, and temporarily leave a duplicate inside,
-        // we replace it in write_ref below.
-        let old_value = Value(match self.container_ref.container() {
-            Vec(r) => r.borrow()[self.idx].copy_value()?,
-            Struct(r) => r.borrow()[self.idx].copy_value()?,
+        macro_rules! swap {
+            ($r1:ident, $r2:ident) => {
+                mem::swap(
+                    &mut $r1.borrow_mut()[self.idx],
+                    &mut $r2.borrow_mut()[other.idx],
+                )
+            };
+        }
 
-            VecU8(r) => ValueImpl::U8(r.borrow()[self.idx]),
-            VecU16(r) => ValueImpl::U16(r.borrow()[self.idx]),
-            VecU32(r) => ValueImpl::U32(r.borrow()[self.idx]),
-            VecU64(r) => ValueImpl::U64(r.borrow()[self.idx]),
-            VecU128(r) => ValueImpl::U128(r.borrow()[self.idx]),
-            VecU256(r) => ValueImpl::U256(r.borrow()[self.idx]),
-            VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
-            VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
+        macro_rules! swap_g_s {
+            ($r1:ident, $r2:ident) => {{
+                let mut r1 = $r1.borrow_mut();
+                let mut r2 = $r2.borrow_mut();
 
-            Locals(r) => r.borrow()[self.idx].copy_value()?,
-        });
+                let v1 = *r1[self.idx].as_value_ref()?;
+                r1[self.idx] = ValueImpl::from_primitive(r2[other.idx]);
+                r2[other.idx] = v1;
+            }};
+        }
 
-        self.write_ref(swap_with(old_value)?)?;
+        macro_rules! swap_s_g {
+            ($r1:ident, $r2:ident) => {{
+                let mut r1 = $r1.borrow_mut();
+                let mut r2 = $r2.borrow_mut();
+
+                let v2 = *r2[other.idx].as_value_ref()?;
+                r2[other.idx] = ValueImpl::from_primitive(r1[self.idx]);
+                r1[self.idx] = v2;
+            }};
+        }
+
+        match (
+            self.container_ref.container(),
+            other.container_ref.container(),
+        ) {
+            // Case 1: (generic, generic)
+            (Vec(r1), Vec(r2))
+            | (Vec(r1), Struct(r2))
+            | (Vec(r1), Locals(r2))
+            | (Struct(r1), Vec(r2))
+            | (Struct(r1), Struct(r2))
+            | (Struct(r1), Locals(r2))
+            | (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2))
+            | (Locals(r1), Locals(r2)) => swap!(r1, r2),
+
+            // Case 2: (specialized, specialized)
+            (VecU8(r1), VecU8(r2)) => swap!(r1, r2),
+            (VecU16(r1), VecU16(r2)) => swap!(r1, r2),
+            (VecU32(r1), VecU32(r2)) => swap!(r1, r2),
+            (VecU64(r1), VecU64(r2)) => swap!(r1, r2),
+            (VecU128(r1), VecU128(r2)) => swap!(r1, r2),
+            (VecU256(r1), VecU256(r2)) => swap!(r1, r2),
+            (VecBool(r1), VecBool(r2)) => swap!(r1, r2),
+            (VecAddress(r1), VecAddress(r2)) => swap!(r1, r2),
+
+            // Case 3: (generic, specialized) or (specialized, generic)
+            (Locals(r1) | Struct(r1), VecU8(r2)) => swap_g_s!(r1, r2),
+            (VecU8(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU16(r2)) => swap_g_s!(r1, r2),
+            (VecU16(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU32(r2)) => swap_g_s!(r1, r2),
+            (VecU32(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU64(r2)) => swap_g_s!(r1, r2),
+            (VecU64(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU128(r2)) => swap_g_s!(r1, r2),
+            (VecU128(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU256(r2)) => swap_g_s!(r1, r2),
+            (VecU256(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecBool(r2)) => swap_g_s!(r1, r2),
+            (VecBool(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecAddress(r2)) => swap_g_s!(r1, r2),
+            (VecAddress(r1), Locals(r2) | Struct(r2)) => swap_s_g!(r1, r2),
+
+            // All other combinations are illegal.
+            (Vec(_), _)
+            | (VecU8(_), _)
+            | (VecU16(_), _)
+            | (VecU32(_), _)
+            | (VecU64(_), _)
+            | (VecU128(_), _)
+            | (VecU256(_), _)
+            | (VecBool(_), _)
+            | (VecAddress(_), _) => {
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("cannot swap references {:?}, {:?}", self, other)))
+            },
+        }
+
         Ok(())
     }
 }
 
 impl ReferenceImpl {
-    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(Value) -> PartialVMResult<Value>,
-    {
-        match self {
-            Self::ContainerRef(r) => r.swap_ref(swap_with),
-            Self::IndexedRef(r) => r.swap_ref(swap_with),
+    fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        use ReferenceImpl::*;
+
+        match (self, other) {
+            (ContainerRef(r1), ContainerRef(r2)) => r1.swap_values(r2),
+            (IndexedRef(r1), IndexedRef(r2)) => r1.swap_values(r2),
+
+            (ContainerRef(_), IndexedRef(_)) | (IndexedRef(_), ContainerRef(_)) => {
+                Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message("cannot swap references: reference type mismatch".to_string()))
+            },
         }
     }
 }
 
 impl Reference {
-    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(Value) -> PartialVMResult<Value>,
-    {
-        self.0.swap_ref(swap_with)
+    pub fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        self.0.swap_values(other.0)
     }
 }
 
