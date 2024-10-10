@@ -44,5 +44,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         [vector_range_move_base: InternalGas, { RELEASE_V1_22.. => "vector.range_move.base" }, 4000],
         [vector_range_move_per_index_moved: InternalGasPerArg, { RELEASE_V1_22.. => "vector.range_move.per_index_moved" }, 10],
+
+        [cmp_compare_base: InternalGas, { RELEASE_V1_22.. => "cmp.compare.base" }, 367],
+        [cmp_compare_per_abs_val_unit: InternalGasPerAbstractValueUnit, { RELEASE_V1_22.. => "cmp.cper_abs_val_unit"}, 14],
     ]
 );
