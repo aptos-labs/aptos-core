@@ -70,6 +70,7 @@ impl SafetyRules {
         proposed_block
             .validate_signature(&self.epoch_state()?.verifier)
             .map_err(|error| Error::InvalidProposal(error.to_string()))?;
+
         proposed_block
             .verify_well_formed()
             .map_err(|error| Error::InvalidProposal(error.to_string()))?;
@@ -255,6 +256,26 @@ impl SafetyRules {
         ))
     }
 
+    // unguarded_* are only used in the fuzzer
+    #[cfg(loki_fuzzer)]
+    fn unguarded_consensus_state(&mut self) -> Result<ConsensusState, Error> {
+        let waypoint = self.persistent_storage.waypoint()?;
+        let safety_data = self.persistent_storage.safety_data()?;
+
+        trace!(SafetyLogSchema::new(LogEntry::State, LogEvent::Update)
+            .author(self.persistent_storage.author()?)
+            .epoch(safety_data.epoch)
+            .last_voted_round(safety_data.last_voted_round)
+            .preferred_round(safety_data.preferred_round)
+            .waypoint(waypoint));
+
+        Ok(ConsensusState::new(
+            self.persistent_storage.safety_data()?,
+            self.persistent_storage.waypoint()?,
+            self.signer().is_ok(),
+        ))
+    }
+
     fn guarded_initialize(&mut self, proof: &EpochChangeProof) -> Result<(), Error> {
         let waypoint = self.persistent_storage.waypoint()?;
         let last_li = proof
@@ -339,6 +360,92 @@ impl SafetyRules {
         })
     }
 
+    #[cfg(loki_fuzzer)]
+    fn unguarded_initialize(&mut self, proof: &EpochChangeProof) -> Result<(), Error> {
+        let waypoint = self.persistent_storage.waypoint()?;
+        let last_li = proof
+            .verify(&waypoint)
+            .map_err(|e| Error::InvalidEpochChangeProof(format!("{}", e)))?;
+        let ledger_info = last_li.ledger_info();
+        let epoch_state = ledger_info
+            .next_epoch_state()
+            .cloned()
+            .ok_or(Error::InvalidLedgerInfo)?;
+
+        // Update the waypoint to a newer value, this might still be older than the current epoch.
+        let new_waypoint = &Waypoint::new_epoch_boundary(ledger_info)
+            .map_err(|error| Error::InternalError(error.to_string()))?;
+        if new_waypoint.version() > waypoint.version() {
+            self.persistent_storage.set_waypoint(new_waypoint)?;
+        }
+
+        let current_epoch = self.persistent_storage.safety_data()?.epoch;
+        match current_epoch.cmp(&epoch_state.epoch) {
+            Ordering::Greater => {
+                // waypoint is not up to the current epoch.
+                return Err(Error::WaypointOutOfDate(
+                    waypoint.version(),
+                    new_waypoint.version(),
+                    current_epoch,
+                    epoch_state.epoch,
+                ));
+            },
+            Ordering::Less => {
+                // start new epoch
+                self.persistent_storage.set_safety_data(SafetyData::new(
+                    epoch_state.epoch,
+                    0,
+                    0,
+                    0,
+                    None,
+                    0,
+                ))?;
+
+                info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)
+                    .epoch(epoch_state.epoch));
+            },
+            Ordering::Equal => (),
+        };
+        self.epoch_state = Some(epoch_state.clone());
+
+        let author = self.persistent_storage.author()?;
+        let expected_key = epoch_state.verifier.get_public_key(&author);
+        let initialize_result = match expected_key {
+            None => Err(Error::ValidatorNotInSet(author.to_string())),
+            Some(expected_key) => {
+                let current_key = self.signer().ok().map(|s| s.public_key());
+                if current_key == Some(expected_key.clone()) {
+                    info!(
+                        SafetyLogSchema::new(LogEntry::KeyReconciliation, LogEvent::Success),
+                        "in set",
+                    );
+                    Ok(())
+                } else {
+                    // Try to export the consensus key directly from storage.
+                    match self.persistent_storage.consensus_sk_by_pk(expected_key) {
+                        Ok(consensus_key) => {
+                            self.validator_signer =
+                                Some(ValidatorSigner::new(author, Arc::new(consensus_key)));
+                            Ok(())
+                        },
+                        Err(Error::SecureStorageMissingDataError(error)) => {
+                            Err(Error::ValidatorKeyNotFound(error))
+                        },
+                        Err(error) => Err(error),
+                    }
+                }
+            },
+        };
+        initialize_result.map_err(|error| {
+            info!(
+                SafetyLogSchema::new(LogEntry::KeyReconciliation, LogEvent::Error).error(&error),
+            );
+            self.validator_signer = None;
+            error
+        })
+    }
+
+
     fn guarded_sign_proposal(
         &mut self,
         block_data: &BlockData,
@@ -357,7 +464,35 @@ impl SafetyRules {
             )));
         }
 
-        self.verify_qc(block_data.quorum_cert())?;
+        //self.verify_qc(block_data.quorum_cert())?;
+        self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
+        // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
+
+        let signature = self.sign(block_data)?;
+        Ok(signature)
+    }
+
+    #[cfg(loki_fuzzer)]
+    fn unguarded_sign_proposal(
+        &mut self,
+        block_data: &BlockData,
+    ) -> Result<bls12381::Signature, Error> {
+        self.signer()?;
+        //self.verify_author(block_data.author())?;
+
+        let mut safety_data = self.persistent_storage.safety_data()?;
+        //self.verify_epoch(block_data.epoch(), &safety_data)?;
+
+        if block_data.round() <= safety_data.last_voted_round {
+            //return Err(Error::InvalidProposal(format!(
+            //    "Proposed round {} is not higher than last voted round {}",
+            //    block_data.round(),
+            //    safety_data.last_voted_round
+            //)));
+            info!("InvalidProposal");
+        }
+
+        //self.verify_qc(block_data.quorum_cert())?;
         self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
         // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
 
@@ -410,22 +545,86 @@ impl SafetyRules {
 
         Ok(signature)
     }
+
+    #[cfg(loki_fuzzer)]
+    fn unguarded_sign_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfoWithSignatures,
+        new_ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error> {
+        self.signer()?;
+
+        let old_ledger_info = ledger_info.ledger_info();
+
+        if !old_ledger_info.commit_info().is_ordered_only()
+            // When doing fast forward sync, we pull the latest blocks and quorum certs from peers
+            // and store them in storage. We then compute the root ordered cert and root commit cert
+            // from storage and start the consensus from there. But given that we are not storing the
+            // ordered cert obtained from order votes in storage, instead of obtaining the root ordered cert
+            // from storage, we set root ordered cert to commit certificate.
+            // This means, the root ordered cert will not have a dummy executed_state_id in this case.
+            // To handle this, we do not raise error if the old_ledger_info.commit_info() matches with
+            // new_ledger_info.commit_info().
+            && old_ledger_info.commit_info() != new_ledger_info.commit_info()
+        {
+            //return Err(Error::InvalidOrderedLedgerInfo(old_ledger_info.to_string()));
+            info!("InvalidOrderedLedgerInfo");
+        }
+
+        if !old_ledger_info
+            .commit_info()
+            .match_ordered_only(new_ledger_info.commit_info())
+        {
+            //return Err(Error::InconsistentExecutionResult(
+            //    old_ledger_info.commit_info().to_string(),
+            //    new_ledger_info.commit_info().to_string(),
+            //));
+            info!("InconsistentExecutionResult");
+        }
+
+        // Verify that ledger_info contains at least 2f + 1 dostinct signatures
+        //ledger_info
+        //    .verify_signatures(&self.epoch_state()?.verifier)
+        //    .map_err(|error| Error::InvalidQuorumCertificate(error.to_string()))?;
+
+        // TODO: add guarding rules in unhappy path
+        // TODO: add extension check
+
+        let signature = self.sign(&new_ledger_info)?;
+
+        Ok(signature)
+    }
 }
 
 impl TSafetyRules for SafetyRules {
     fn consensus_state(&mut self) -> Result<ConsensusState, Error> {
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_consensus_state();
+        
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_consensus_state();
+        
         run_and_log(cb, |log| log, LogEntry::ConsensusState)
     }
 
     fn initialize(&mut self, proof: &EpochChangeProof) -> Result<(), Error> {
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_initialize(proof);
+        
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_initialize(proof);
+
         run_and_log(cb, |log| log, LogEntry::Initialize)
     }
 
     fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         let round = block_data.round();
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_sign_proposal(block_data);
+
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_sign_proposal(block_data);
+        
         run_and_log(cb, |log| log.round(round), LogEntry::SignProposal)
     }
 
@@ -434,7 +633,12 @@ impl TSafetyRules for SafetyRules {
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<bls12381::Signature, Error> {
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_sign_timeout_with_qc(timeout, timeout_cert);
+
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_sign_timeout_with_qc(timeout, timeout_cert);
+        
         run_and_log(
             cb,
             |log| log.round(timeout.round()),
@@ -448,7 +652,12 @@ impl TSafetyRules for SafetyRules {
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error> {
         let round = vote_proposal.block().round();
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_construct_and_sign_vote_two_chain(vote_proposal, timeout_cert);
+        
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_construct_and_sign_vote_two_chain(vote_proposal, timeout_cert);
+        
         run_and_log(
             cb,
             |log| log.round(round),
@@ -460,7 +669,12 @@ impl TSafetyRules for SafetyRules {
         &mut self,
         order_vote_proposal: &OrderVoteProposal,
     ) -> Result<OrderVote, Error> {
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_construct_and_sign_order_vote(order_vote_proposal);
+        
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_construct_and_sign_order_vote(order_vote_proposal);
+        
         run_and_log(cb, |log| log, LogEntry::ConstructAndSignOrderVote)
     }
 
@@ -469,7 +683,12 @@ impl TSafetyRules for SafetyRules {
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
     ) -> Result<bls12381::Signature, Error> {
+        #[cfg(not(loki_fuzzer))]
         let cb = || self.guarded_sign_commit_vote(ledger_info, new_ledger_info);
+        
+        #[cfg(loki_fuzzer)]
+        let cb = || self.unguarded_sign_commit_vote(ledger_info, new_ledger_info);
+        
         run_and_log(cb, |log| log, LogEntry::SignCommitVote)
     }
 }
