@@ -70,10 +70,12 @@ it tolerates collisions.
 
 
 <pre><code><b>use</b> <a href="hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
+<b>use</b> <a href="debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="simple_map.md#0x1_simple_map">0x1::simple_map</a>;
+<b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 <b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
 <b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -732,6 +734,8 @@ Decide which is the next bucket to split and split it into two with the elements
         <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(self.level, self.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>) != new_bucket_index
     });
     <b>let</b> new_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim_reverse">vector::trim_reverse</a>(old_bucket, p);
+    <a href="debug.md#0x1_debug_print">debug::print</a>(&<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"The new bucket index is: "));
+    <a href="debug.md#0x1_debug_print">debug::print</a>(&new_bucket_index);
     <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.buckets, new_bucket_index, new_bucket);
 }
 </code></pre>
