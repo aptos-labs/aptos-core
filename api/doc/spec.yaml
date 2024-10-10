@@ -1416,6 +1416,21 @@ paths:
               schema:
                 type: string
       operationId: spec
+  /info:
+    get:
+      tags:
+      - General
+      summary: Show some basic info of the node.
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+      operationId: info
   /-/healthy:
     get:
       tags:
