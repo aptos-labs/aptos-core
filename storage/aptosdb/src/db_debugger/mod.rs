@@ -8,6 +8,7 @@ pub mod ledger;
 pub mod state_kv;
 pub mod state_tree;
 pub mod truncate;
+pub mod validation;
 
 use aptos_storage_interface::Result;
 use clap::Parser;
