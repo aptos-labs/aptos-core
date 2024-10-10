@@ -26,6 +26,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::ed25519`](ed25519.md#0x1_ed25519)
 -  [`0x1::fixed_point64`](fixed_point64.md#0x1_fixed_point64)
 -  [`0x1::from_bcs`](from_bcs.md#0x1_from_bcs)
+-  [`0x1::hot_potato_any`](hot_potato_any.md#0x1_hot_potato_any)
 -  [`0x1::math128`](math128.md#0x1_math128)
 -  [`0x1::math64`](math64.md#0x1_math64)
 -  [`0x1::math_fixed`](math_fixed.md#0x1_math_fixed)
