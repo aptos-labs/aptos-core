@@ -450,7 +450,7 @@ fn apply_transaction_by_writeset(
 ) {
     let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
-    let transactions_and_outputs = transactions_and_writesets
+    let (txns, txn_outs) = transactions_and_writesets
         .iter()
         .map(|(txn, write_set)| {
             (
@@ -474,7 +474,7 @@ fn apply_transaction_by_writeset(
                 TransactionAuxiliaryData::default(),
             ),
         )))
-        .collect();
+        .unzip();
 
     let state_view = ledger_view
         .verified_state_view(
@@ -484,8 +484,7 @@ fn apply_transaction_by_writeset(
         )
         .unwrap();
 
-    let chunk_output =
-        ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
+    let chunk_output = ChunkOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
     let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
     let ExecutedChunk {
