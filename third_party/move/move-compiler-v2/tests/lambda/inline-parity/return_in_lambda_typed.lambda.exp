@@ -1,0 +1,131 @@
+// -- Model dump before env processor pipeline:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::Test {
+    private inline fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private inline fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100);
+        Test::apply(|(x: u64, y: u64): (u64, u64)| return Test::adder(x, y), 10, 100)
+    }
+} // end 0x42::Test
+
+
+
+Diagnostics:
+error: Return not currently supported in function-typed arguments (lambda expressions)
+   ┌─ tests/lambda/inline-parity/return_in_lambda_typed.move:13:13
+   │
+13 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^
+
+error: Return not currently supported in function-typed arguments (lambda expressions)
+   ┌─ tests/lambda/inline-parity/return_in_lambda_typed.move:16:13
+   │
+16 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^
+
+error: Return not currently supported in function-typed arguments (lambda expressions)
+   ┌─ tests/lambda/inline-parity/return_in_lambda_typed.move:19:13
+   │
+19 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,586 @@
+// -- Model dump before env processor pipeline:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::Test {
+    public fun foo(f: |u64|,x: u64) {
+        (f)(x);
+        Tuple()
+    }
+    public fun foo2(f: |u64|,x: u64) {
+        {
+          let x: u64 = x;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing(x: u64) {
+        Test::foo(|y: u64| x: u64 = y, 3);
+        if Eq<u64>(x, 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Test::foo2(|y: u64| x: u64 = y, 5);
+        if Eq<u64>(x, 5) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+    public fun test_shadowing2(q: u64) {
+        {
+          let x: u64 = q;
+          Test::foo(|y: u64| x: u64 = y, 3);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Test::foo2(|y: u64| x: u64 = y, 5);
+          if Eq<u64>(x, 5) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    private fun test_shadowing_entry() {
+        Test::test_shadowing(1);
+        Test::test_shadowing2(1)
+    }
+} // end 0x42::Test
+
+
+
+Diagnostics:
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:15:13
+   │
+15 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:21:13
+   │
+21 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:30:13
+   │
+30 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
+
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:36:13
+   │
+36 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^

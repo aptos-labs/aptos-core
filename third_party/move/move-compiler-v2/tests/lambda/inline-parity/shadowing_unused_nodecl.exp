@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::quux` has a function parameter:
+  ┌─ tests/lambda/inline-parity/shadowing_unused_nodecl.move:6:16
+  │
+6 │     public fun quux(f:|u64, u64|, z: u64) {
+  │                ^^^^ - Parameter `f` has function-valued type `|(u64, u64)|`.
+
+warning: Unused parameter `z`. Consider removing or prefixing with an underscore: `_z`
+  ┌─ tests/lambda/inline-parity/shadowing_unused_nodecl.move:6:35
+  │
+6 │     public fun quux(f:|u64, u64|, z: u64) {
+  │                                   ^
+
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::foo` has a function parameter:
+   ┌─ tests/lambda/inline-parity/shadowing_unused_nodecl.move:12:16
+   │
+12 │     public fun foo(f:|u64, u64|, z: u64) {
+   │                ^^^ - Parameter `f` has function-valued type `|(u64, u64)|`.
