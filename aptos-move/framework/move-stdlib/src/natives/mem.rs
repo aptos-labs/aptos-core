@@ -7,9 +7,7 @@
 
 //! Implementation of native functions for utf8 strings.
 
-use aptos_gas_schedule::gas_params::natives::move_stdlib::{
-    MEM_SWAP_BASE, MEM_SWAP_PER_ABS_VAL_UNIT,
-};
+use aptos_gas_schedule::gas_params::natives::move_stdlib::MEM_SWAP_BASE;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
@@ -43,22 +41,12 @@ fn native_swap(
         )));
     }
 
-    let cost = MEM_SWAP_BASE
-        + MEM_SWAP_PER_ABS_VAL_UNIT
-            * (context.abs_val_size(&args[0]) + context.abs_val_size(&args[1]));
-    context.charge(cost)?;
+    context.charge(MEM_SWAP_BASE)?;
 
     let ref1 = safely_pop_arg!(args, Reference);
     let ref0 = safely_pop_arg!(args, Reference);
 
-    ref0.swap_ref(|value0| {
-        let mut value1_opt = Option::None;
-        ref1.swap_ref(|value1| {
-            value1_opt = Option::Some(value1);
-            Ok(value0)
-        })?;
-        Ok(value1_opt.unwrap())
-    })?;
+    ref0.swap_values(ref1)?;
 
     Ok(smallvec![])
 }
