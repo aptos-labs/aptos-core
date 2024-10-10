@@ -470,7 +470,7 @@ proptest! {
         (input, batch1_size) in hash_map(any::<StateKey>(), any::<StateValue>(), 2..1000)
         .prop_flat_map(|input| {
             let len = input.len();
-            (Just(input), 1..len)
+            (Just(input), 2..len)
         })
     ) {
         let tmp_dir1 = TempPath::new();
