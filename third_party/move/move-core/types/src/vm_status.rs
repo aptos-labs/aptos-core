@@ -596,6 +596,8 @@ pub enum StatusCode {
     RESERVED_VALIDATION_ERROR_8 = 43,
     RESERVED_VALIDATION_ERROR_9 = 44,
 
+    NONCE_EXISTS = 45,
+
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
     // Verification Errors: 1000-1999
