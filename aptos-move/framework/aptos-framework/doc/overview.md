@@ -46,6 +46,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::object_code_deployment`](object_code_deployment.md#0x1_object_code_deployment)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
+-  [`0x1::permissioned_signer`](permissioned_signer.md#0x1_permissioned_signer)
 -  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)
 -  [`0x1::randomness`](randomness.md#0x1_randomness)
 -  [`0x1::randomness_api_v0_config`](randomness_api_v0_config.md#0x1_randomness_api_v0_config)
