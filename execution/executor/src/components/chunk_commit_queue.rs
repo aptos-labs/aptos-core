@@ -66,18 +66,7 @@ impl ChunkCommitQueue {
     }
 
     pub(crate) fn expecting_version(&self) -> Version {
-        self.latest_txn_accumulator.num_leaves()
-    }
-
-    pub(crate) fn expect_latest_view(&self) -> Result<ExecutedTrees> {
-        ensure!(
-            self.to_update_ledger.is_empty(),
-            "Pending chunk to update_ledger, can't construct latest ExecutedTrees."
-        );
-        Ok(ExecutedTrees::new(
-            self.latest_state.clone(),
-            self.latest_txn_accumulator.clone(),
-        ))
+        self.latest_state.next_version()
     }
 
     pub(crate) fn enqueue_for_ledger_update(
@@ -130,17 +119,6 @@ impl ChunkCommitQueue {
         Ok((self.persisted_state.clone(), chunk))
     }
 
-    pub(crate) fn enqueue_chunk_to_commit_directly(&mut self, chunk: ExecutedChunk) -> Result<()> {
-        ensure!(
-            self.to_update_ledger.is_empty(),
-            "Mixed usage of different modes."
-        );
-        self.latest_state = chunk.result_state.clone();
-        self.latest_txn_accumulator = chunk.ledger_update_output.transaction_accumulator.clone();
-        self.to_commit.push_back(Some(chunk));
-        Ok(())
-    }
-
     pub(crate) fn dequeue_committed(&mut self, latest_state: StateDelta) -> Result<()> {
         ensure!(!self.to_commit.is_empty(), "to_commit is empty.");
         ensure!(
@@ -153,5 +131,9 @@ impl ChunkCommitQueue {
             .current
             .log_generation("commit_queue_base");
         Ok(())
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.to_commit.is_empty() && self.to_update_ledger.is_empty()
     }
 }
