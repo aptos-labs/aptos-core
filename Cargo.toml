@@ -498,7 +498,7 @@ base64 = "0.13.0"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
-bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
+bcs = { git = "https://github.com/msmouse/bcs.git", rev = "f49288482e23e84a5cf078c8c29d77ab3d2d4378" }
 better_any = "0.1.1"
 bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
