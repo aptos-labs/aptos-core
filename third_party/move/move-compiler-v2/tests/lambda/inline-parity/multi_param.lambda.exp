@@ -5,18 +5,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -30,7 +30,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -46,18 +46,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -71,7 +71,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -87,18 +87,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -112,7 +112,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -128,18 +128,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -153,7 +153,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -169,18 +169,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -194,7 +194,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -210,18 +210,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -235,7 +235,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -251,18 +251,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -276,7 +276,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -292,18 +292,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -317,7 +317,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -333,18 +333,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -358,7 +358,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -374,18 +374,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -399,7 +399,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)
@@ -415,18 +415,18 @@ module 0x42::Test {
         k: K,
         v: V,
     }
-    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K, V>>,f: |(&K, &mut V)|u64): u64 {
         {
           let result: u64 = 0;
-          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
-            let elem: &mut Test::Elem<K, V> = elem;
-            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+          Test::for_each_ref_mut<Elem<K, V>>(v, |elem: &mut Elem<K, V>| {
+            let elem: &mut Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Elem<K, V>>(elem))));
             Tuple()
           });
           result
         }
     }
-    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+    public fun for_each_ref_mut<Element>(v: &mut vector<Element>,f: |&mut Element|) {
         {
           let i: u64 = 0;
           loop {
@@ -440,7 +440,7 @@ module 0x42::Test {
         }
     }
     public fun test() {
-        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
           Tuple()
         } else {
           Abort(0)

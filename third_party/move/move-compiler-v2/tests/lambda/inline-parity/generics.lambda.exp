@@ -1,7 +1,7 @@
 // -- Model dump before env processor pipeline:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -31,7 +31,7 @@ module 0x42::Test {
 // -- Model dump after env processor unused checks:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -61,7 +61,7 @@ module 0x42::Test {
 // -- Model dump after env processor type parameter check:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -91,7 +91,7 @@ module 0x42::Test {
 // -- Model dump after env processor check recursive struct definition:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -121,7 +121,7 @@ module 0x42::Test {
 // -- Model dump after env processor check cyclic type instantiation:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -151,7 +151,7 @@ module 0x42::Test {
 // -- Model dump after env processor unused struct params check:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -181,7 +181,7 @@ module 0x42::Test {
 // -- Model dump after env processor access and use check before inlining:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -211,7 +211,7 @@ module 0x42::Test {
 // -- Model dump after env processor inlining:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -241,7 +241,7 @@ module 0x42::Test {
 // -- Model dump after env processor access and use check after inlining:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -271,7 +271,7 @@ module 0x42::Test {
 // -- Model dump after env processor acquires check:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {
@@ -301,7 +301,7 @@ module 0x42::Test {
 // -- Model dump after env processor simplifier:
 module 0x42::Test {
     use std::vector;
-    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+    public fun foreach<X>(v: &vector<X>,action: |&X|) {
         {
           let i: u64 = 0;
           loop {

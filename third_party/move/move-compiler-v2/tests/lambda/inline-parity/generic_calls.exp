@@ -4,4 +4,4 @@ error: Only inline functions may have function-typed parameters, but non-inline 
    ┌─ tests/lambda/inline-parity/generic_calls.move:35:9
    │
 35 │     fun inlined<T>(f: |S<T>|S<T>, s: S<T>) {
-   │         ^^^^^^^    - Parameter `f` has function-valued type `|m::S<T>|m::S<T>`.
+   │         ^^^^^^^    - Parameter `f` has function-valued type `|S<T>|S<T>`.

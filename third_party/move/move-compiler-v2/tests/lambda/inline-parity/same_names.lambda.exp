@@ -3,16 +3,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -36,16 +36,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -69,16 +69,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -102,16 +102,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -135,16 +135,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -168,16 +168,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -201,16 +201,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -234,16 +234,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -267,16 +267,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -300,16 +300,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -333,16 +333,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -366,16 +366,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -402,16 +402,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {
@@ -438,16 +438,16 @@ module 0x42::b {
     struct MyOtherList {
         len: u64,
     }
-    public fun len(self: &b::MyOtherList): u64 {
-        select b::MyOtherList.len<&b::MyOtherList>(self)
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
     }
 } // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
     }
-    public fun len(self: &a::MyList): u64 {
-        select a::MyList.len<&a::MyList>(self)
+    public fun len(self: &MyList): u64 {
+        select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
 module 0x42::c {

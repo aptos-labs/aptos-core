@@ -6,7 +6,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -133,7 +133,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -260,7 +260,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -387,7 +387,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -514,7 +514,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -641,7 +641,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -768,7 +768,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -895,7 +895,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -1022,7 +1022,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -1149,7 +1149,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -1276,7 +1276,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -1403,7 +1403,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -1533,7 +1533,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {
@@ -1663,7 +1663,7 @@ module 0xc0ffee::m {
     private fun bar() {
         Tuple()
     }
-    private fun foo<T>(x: #0): #0 {
+    private fun foo<T>(x: T): T {
         x
     }
     public fun test1(x: u8) {

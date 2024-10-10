@@ -8,6 +8,13 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    public fun lambda_not_allowed() {
+        let _x = |i| i + 1;
+    }
+}
+
 
 Diagnostics:
 error: Function-typed values not yet supported except as parameters to calls to inline functions

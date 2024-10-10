@@ -4,10 +4,10 @@ error: Only inline functions may have function-typed parameters, but non-inline 
    ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:22:16
    │
 22 │     public fun h<Key: store + drop>(x: E<Key>, v: |Key| E<Key>): E<Key> {
-   │                ^                               - Parameter `v` has function-valued type `|Key|m::E<Key>`.
+   │                ^                               - Parameter `v` has function-valued type `|Key|E<Key>`.
 
 error: Only inline functions may have function-typed parameters, but non-inline function `m::g` has a function parameter:
    ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:27:16
    │
 27 │     public fun g<Key: store + drop>(x: E<Key>, v: |E<Key>|) {
-   │                ^                               - Parameter `v` has function-valued type `|m::E<Key>|`.
+   │                ^                               - Parameter `v` has function-valued type `|E<Key>|`.
