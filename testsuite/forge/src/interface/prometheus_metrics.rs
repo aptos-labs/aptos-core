@@ -115,7 +115,7 @@ pub enum LatencyBreakdownSlice {
     IndexerFullnodeProcessedBatch,
     IndexerCacheWorkerProcessedBatch,
     IndexerDataServiceAllChunksSent,
-    // TODO: add processor insertion into DB latency
+    IndexerProcessorLatency,
 }
 
 #[derive(Clone, Debug)]
@@ -236,6 +236,11 @@ pub async fn fetch_latency_breakdown(
         let indexer_data_service_all_chunks_sent_query =
             r#"max(indexer_grpc_duration_in_secs{step="4", service_type="data_service"})"#;
 
+        // These are the non-SDK core indexer processors
+        let indexer_processor_latency_query =
+            r#"max by (processor_name) indexer_processor_data_processed_latency_in_secs"#;
+        // These are the SDK processor latencies TODO
+
         let indexer_fullnode_processed_batch_samples = swarm
             .query_range_metrics(
                 indexer_fullnode_processed_batch_query,
@@ -263,6 +268,15 @@ pub async fn fetch_latency_breakdown(
             )
             .await?;
 
+        let indexer_processor_latency_samples = swarm
+            .query_range_metrics(
+                indexer_processor_latency_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
         samples.insert(
             LatencyBreakdownSlice::IndexerFullnodeProcessedBatch,
             MetricSamples::new(indexer_fullnode_processed_batch_samples),
@@ -274,6 +288,10 @@ pub async fn fetch_latency_breakdown(
         samples.insert(
             LatencyBreakdownSlice::IndexerDataServiceAllChunksSent,
             MetricSamples::new(indexer_data_service_all_chunks_sent_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerProcessorLatency,
+            MetricSamples::new(indexer_processor_latency_samples),
         );
     }
     Ok(LatencyBreakdown::new(samples))

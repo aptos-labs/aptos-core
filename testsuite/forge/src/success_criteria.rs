@@ -79,7 +79,7 @@ impl MetricsThreshold {
         }
 
         if metrics.is_empty() {
-            bail!("Empty metrics provided");
+            bail!("Empty metrics provided for {}", metrics_name);
         }
         let breach_count = metrics
             .iter()

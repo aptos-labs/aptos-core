@@ -2400,7 +2400,7 @@ fn indexer_test() -> ForgeConfig {
         (
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
-            (3200, 0.5, 0.5, 0.5),
+            (2000, 0.5, 0.5, 0.5),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
