@@ -178,11 +178,7 @@ fn run_benchmark(
                     "../../../../../aptos-move/framework/src/aptos-natives.bpl"
                 )
                 .to_vec(),
-                module_instance_names: vec![(
-                    "0x1::object".to_string(),
-                    "object_instances".to_string(),
-                    true,
-                )],
+                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
             });
     }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
