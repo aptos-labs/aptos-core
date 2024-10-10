@@ -34,6 +34,7 @@ hex = { workspace = true }
 itertools = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
+thiserror.workspace = true
 tokio = { workspace = true }
 tokio-scoped = { workspace = true }
 
