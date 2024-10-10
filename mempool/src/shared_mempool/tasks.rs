@@ -398,7 +398,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             ranking_score,
-                            sequence_info,
+                            // sequence_info,
                             timeline_state,
                             client_submitted,
                             ready_time_at_sender,

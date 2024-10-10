@@ -276,7 +276,7 @@ impl Mempool {
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,
-        db_sequence_number: u64,
+        // db_sequence_number: u64,
         timeline_state: TimelineState,
         client_submitted: bool,
         // The time at which the transaction was inserted into the mempool of the
@@ -285,13 +285,13 @@ impl Mempool {
         // The prority of this node for the peer that sent the transaction
         priority: Option<BroadcastPeerPriority>,
     ) -> MempoolStatus {
-        trace!(
-            LogSchema::new(LogEntry::AddTxn)
-                .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
-            committed_seq_number = db_sequence_number
-        );
+        // trace!(
+        //     LogSchema::new(LogEntry::AddTxn)
+        //         .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
+        //     committed_seq_number = db_sequence_number
+        // );
 
-        info!("Add mempool transaction: {:?}, txn seq number: {:?}, db seq number: {:?}", txn.sender(), txn.sequence_number(), db_sequence_number);
+        info!("Add mempool transaction: {:?}, txn seq number: {:?}", txn.sender(), txn.sequence_number());
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
         // if txn.sequence_number() < db_sequence_number {
         //     return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
@@ -311,7 +311,7 @@ impl Mempool {
             expiration_time,
             ranking_score,
             timeline_state,
-            db_sequence_number,
+            // db_sequence_number,
             now,
             client_submitted,
             priority.clone(),

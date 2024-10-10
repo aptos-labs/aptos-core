@@ -224,7 +224,7 @@ impl TransactionStore {
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
-        let acc_seq_num = txn.sequence_info.account_sequence_number;
+        // let acc_seq_num = txn.sequence_info.account_sequence_number;
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -268,15 +268,15 @@ impl TransactionStore {
             }
         }
 
-        if self.check_is_full_after_eviction(&txn, acc_seq_num) {
-            return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
-                "Mempool is full. Mempool size: {}, Capacity: {}",
-                self.system_ttl_index.size(),
-                self.capacity,
-            ));
-        }
+        // if self.check_is_full_after_eviction(&txn, acc_seq_num) {
+        //     return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
+        //         "Mempool is full. Mempool size: {}, Capacity: {}",
+        //         self.system_ttl_index.size(),
+        //         self.capacity,
+        //     ));
+        // }
 
-        self.clean_committed_transactions(&address, acc_seq_num);
+        // self.clean_committed_transactions(&address, acc_seq_num);
 
         self.transactions.entry(address).or_default();
 

@@ -35,7 +35,7 @@ impl MempoolTransaction {
         expiration_time: Duration,
         ranking_score: u64,
         timeline_state: TimelineState,
-        seqno: u64,
+        // seqno: u64,
         insertion_time: SystemTime,
         client_submitted: bool,
         priority_of_sender: Option<BroadcastPeerPriority>,
@@ -43,7 +43,7 @@ impl MempoolTransaction {
         Self {
             sequence_info: SequenceInfo {
                 transaction_sequence_number: txn.sequence_number(),
-                account_sequence_number: seqno,
+                // account_sequence_number: seqno,
             },
             txn,
             expiration_time,
@@ -87,7 +87,7 @@ pub enum TimelineState {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SequenceInfo {
     pub transaction_sequence_number: u64,
-    pub account_sequence_number: u64,
+    // pub account_sequence_number: u64,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -182,7 +182,7 @@ mod test {
             Duration::from_secs(1),
             1,
             TimelineState::NotReady,
-            0,
+            // 0,
             SystemTime::now(),
             false,
             Some(BroadcastPeerPriority::Primary),
