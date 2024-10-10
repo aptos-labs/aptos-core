@@ -821,27 +821,7 @@ impl CompiledPackage {
                 .flat_map(|package| {
                     let name = package.name.unwrap();
                     package.paths.iter().map(move |pkg_path| {
-                        // Read the bytecode file
-                        let mut bytecode = Vec::new();
-                        std::fs::File::open(&pkg_path.to_string())
-                            .context(format!("Failed to open bytecode file for {}", pkg_path))
-                            .and_then(|mut file| {
-                                // read contents of the file into bytecode
-                                std::io::Read::read_to_end(&mut file, &mut bytecode)
-                                    .context(format!("Failed to read bytecode file {}", pkg_path))
-                            })
-                            .and_then(|_| {
-                                CompiledModule::deserialize(&bytecode).context(format!(
-                                    "Failed to deserialize bytecode file for {}",
-                                    name
-                                ))
-                            })
-                            .map(|module| {
-                                (
-                                    name,
-                                    NumericalAddress::from_account_address(*module.self_addr()),
-                                )
-                            })
+                        get_module_addr(name, pkg_path.as_str()).map(|addr| (name, addr))
                     })
                 })
                 .try_collect()?,
@@ -1193,4 +1173,24 @@ pub fn build_and_report_no_exit_v2_driver(
         units,
         Some(env),
     ))
+}
+
+/// Returns the address of the module
+fn get_module_addr(pkg_name: Symbol, pkg_path: &str) -> Result<NumericalAddress> {
+    // Read the bytecode file
+    let mut bytecode = Vec::new();
+    std::fs::File::open(&pkg_path.to_string())
+        .context(format!("Failed to open bytecode file for {}", pkg_path))
+        .and_then(|mut file| {
+            // read contents of the file into bytecode
+            std::io::Read::read_to_end(&mut file, &mut bytecode)
+                .context(format!("Failed to read bytecode file {}", pkg_path))
+        })
+        .and_then(|_| {
+            CompiledModule::deserialize(&bytecode).context(format!(
+                "Failed to deserialize bytecode file for {}",
+                pkg_name
+            ))
+        })
+        .map(|module| NumericalAddress::from_account_address(*module.self_addr()))
 }
