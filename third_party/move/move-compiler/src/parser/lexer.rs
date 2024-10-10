@@ -92,6 +92,7 @@ pub enum Tok {
     NumSign,
     AtSign,
     Inline,
+    Label,
 }
 
 impl fmt::Display for Tok {
@@ -178,6 +179,7 @@ impl fmt::Display for Tok {
             Friend => "friend",
             NumSign => "#",
             AtSign => "@",
+            Label => "[Label]",
         };
         fmt::Display::fmt(s, formatter)
     }
@@ -504,6 +506,10 @@ fn find_token(
                 let len = get_name_len(text);
                 (get_name_token(&text[..len]), len)
             }
+        },
+        '\'' => {
+            let len = get_name_len(&text[1..]);
+            (Tok::Label, 1 + len)
         },
         '"' => {
             let line = &text.lines().next().unwrap()[1..];
