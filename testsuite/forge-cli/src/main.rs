@@ -1136,16 +1136,19 @@ fn realistic_env_sweep_wrap(
         )
 }
 
-fn background_emit_request() -> EmitJobRequest {
-    EmitJobRequest::default()
+fn background_emit_request(high_gas_price: bool) -> EmitJobRequest {
+    let mut result = EmitJobRequest::default()
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-        .mode(EmitJobMode::ConstTps { tps: 10 })
-        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+        .mode(EmitJobMode::ConstTps { tps: 10 });
+    if high_gas_price {
+        result = result.gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE);
+    }
+    result
 }
 
 fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(true),
         criteria: std::iter::repeat(9.5)
             .take(num_cases)
             .map(|min_tps| {
@@ -1157,9 +1160,9 @@ fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
     })
 }
 
-fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<BackgroundTraffic> {
+fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)], high_gas_price: bool) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(high_gas_price),
         criteria: criteria
             .iter()
             .map(|(p50, p90)| {
@@ -1275,7 +1278,7 @@ fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
             (3.0, 8.0),
             (3.0, 8.0),
             (3.0, 4.0),
-        ]),
+        ], false),
     })
 }
 
@@ -1314,7 +1317,7 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             (3.5, 5.0),
             // TODO - p50 and p90 is set to high, until it is calibrated/understood.
             (3.0, 10.0),
-        ]),
+        ], true),
     })
     .with_emit_job(
         EmitJobRequest::default()
