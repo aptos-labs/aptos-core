@@ -45,10 +45,12 @@ if SOURCE not in ["ADHOC", "CI", "LOCAL"]:
     print(f"Unrecogznied source {SOURCE}")
     exit(1)
 
+RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
+
 DEFAULT_NUM_INIT_ACCOUNTS = (
     "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
 )
-DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
+DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
@@ -62,11 +64,14 @@ NUM_ACCOUNTS = max(
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
-NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
+NOISE_LOWER_LIMIT_WARN = 0.9
 # If you want to calibrate the upper limit for perf improvement, you can
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
-NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
+NOISE_UPPER_LIMIT = 1.15
+NOISE_UPPER_LIMIT_WARN = 1.05
+
+SKIP_WARNS = IS_MAINNET
+SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
@@ -122,8 +127,6 @@ class RunGroupKeyExtra:
     transaction_type_override: Optional[str] = field(default=None)
     transaction_weights_override: Optional[str] = field(default=None)
     sharding_traffic_flags: Optional[str] = field(default=None)
-
-    smaller_working_set: bool = field(default=False)
 
 
 @dataclass
@@ -206,14 +209,14 @@ DEFAULT_MODULE_WORKING_SET_SIZE = 100
 TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
         transaction_type_override="publish-package apt-fa-transfer",
         transaction_weights_override="1 500",
@@ -265,7 +268,7 @@ TESTS = [
 
     RunGroupConfig(key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
@@ -284,10 +287,10 @@ TESTS = [
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
     # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=26000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("apt-fa-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=20000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=140 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=15400 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=20000, key=RunGroupKey("apt-fa-transfer"), included_in=Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET_LARGE_DB),
     # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
@@ -665,11 +668,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             raise Exception(f"executor type not supported {test.key.executor_type}")
         txn_emitter_prefix_str = "" if NUM_BLOCKS > 200 else " --generate-then-execute"
 
-        ADDITIONAL_DST_POOL_ACCOUNTS = (
-            2
-            * MAX_BLOCK_SIZE
-            * (1 if test.key_extra.smaller_working_set else NUM_BLOCKS)
-        )
+        ADDITIONAL_DST_POOL_ACCOUNTS = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
 
         common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
@@ -726,18 +725,15 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         print(
             json.dumps(
                 {
-                    "grep": "grep_json_single_node_perf"
-                    if SOURCE == "CI"
-                    else (
-                        "grep_json_single_node_perf_adhoc"
-                        if SOURCE == "ADHOC"
-                        else "grep_json_single_node_perf_local"
-                    ),
+                    "grep": "grep_json_single_node_perf",
+                    "source": SOURCE,
+                    "runner_name": RUNNER_NAME,
                     "transaction_type": test.key.transaction_type,
                     "module_working_set_size": test.key.module_working_set_size,
                     "executor_type": test.key.executor_type,
                     "block_size": cur_block_size,
                     "execution_threads": NUMBER_OF_EXECUTION_THREADS,
+                    "warmup_num_accounts": NUM_ACCOUNTS,
                     "expected_tps": criteria.expected_tps,
                     "expected_min_tps": criteria.min_tps,
                     "expected_max_tps": criteria.max_tps,
@@ -791,20 +787,18 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
             print_table(results, by_levels=False, single_field=None)
 
-        if NOISE_LOWER_LIMIT is not None and single_node_result.tps < criteria.min_tps:
+        if single_node_result.tps < criteria.min_tps:
             text = f"regression detected {single_node_result.tps} < {criteria.min_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
-        elif (
-            NOISE_LOWER_LIMIT_WARN is not None
-            and single_node_result.tps < criteria.min_warn_tps
-        ):
+        elif single_node_result.tps < criteria.min_warn_tps:
             text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {criteria.min_warn_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
             warnings.append(text)
         elif (
-            NOISE_UPPER_LIMIT is not None and single_node_result.tps > criteria.max_tps
+            not SKIP_PERF_IMPROVEMENT_NOTICE
+            and single_node_result.tps > criteria.max_tps
         ):
             text = f"perf improvement detected {single_node_result.tps} > {criteria.max_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if not test.waived:
@@ -812,7 +806,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             else:
                 warnings.append(text)
         elif (
-            NOISE_UPPER_LIMIT_WARN is not None
+            not SKIP_PERF_IMPROVEMENT_NOTICE
             and single_node_result.tps > criteria.max_warn_tps
         ):
             text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {criteria.max_warn_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
@@ -824,6 +818,7 @@ if HIDE_OUTPUT:
 if warnings:
     print("Warnings: ")
     print("\n".join(warnings))
+    print("You can run again to see if it is noise, or consistent.")
 
 if errors:
     print("Errors: ")

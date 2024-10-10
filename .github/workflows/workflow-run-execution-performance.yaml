@@ -98,7 +98,7 @@ jobs:
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW=${{ inputs.FLOW }} SOURCE=${{ inputs.SOURCE }} testsuite/single_node_performance.py
+        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" testsuite/single_node_performance.py
         if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
 
       - run: echo "Skipping single node execution performance! Unrelated changes detected."
