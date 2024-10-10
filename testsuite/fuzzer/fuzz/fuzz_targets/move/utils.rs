@@ -10,7 +10,7 @@ use aptos_framework::natives::code::{
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{
     keyless::{AnyKeylessPublicKey, EphemeralCertificate},
-    transaction::{authenticator::{EphemeralPublicKey, EphemeralSignature}, ExecutionStatus, TransactionPayload, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
 };
 use arbitrary::Arbitrary;
 use libfuzzer_sys::Corpus;
@@ -24,7 +24,6 @@ use move_core_types::{
     vm_status::{StatusType, VMStatus},
 };
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 #[macro_export]

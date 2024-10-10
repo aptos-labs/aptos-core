@@ -13,8 +13,8 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     chain_id::ChainId, keyless::{
-        AnyKeylessPublicKey, EphemeralCertificate, IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, Pepper, TransactionAndProof
-    }, move_any::Any, transaction::{
+        AnyKeylessPublicKey, KeylessSignature, TransactionAndProof
+    }, transaction::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, EphemeralPublicKey,
             EphemeralSignature, SingleKeyAuthenticator, TransactionAuthenticator,
