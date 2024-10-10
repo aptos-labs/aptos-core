@@ -79,14 +79,18 @@ module aptos_std::ordered_map {
     }
 
     /// Add a key/value pair to the map.
-    /// Aborts with EKEY_ALREADY_EXISTS if key already exist.
-    public fun add<K, V>(self: &mut OrderedMap<K, V>, key: K, value: V) {
+    /// Return false if the key already exists.
+    /// Retrun true if the key doesn't already exist and is successfully added.
+    public fun add<K, V>(self: &mut OrderedMap<K, V>, key: K, value: V): bool {
         let len = self.entries.length();
         let index = binary_search(&key, &self.entries, 0, len);
 
         // key must not already be inside.
-        assert!(index >= len || &self.entries[index].key != &key, error::invalid_argument(EKEY_ALREADY_EXISTS));
+        if index < len && &self.entries[index].key == &key {
+            return false;
+        }
         self.entries.insert(index, Entry { key, value });
+        true
     }
 
     /// If the key doesn't exist in the map, inserts the key/value, and returns none.
