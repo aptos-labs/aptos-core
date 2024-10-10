@@ -9,11 +9,11 @@ cargo-fuzz = true
 
 [dependencies]
 aptos-cached-packages = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-language-e2e-tests = { workspace = true, features = ["fuzzing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 aptos-vm = { workspace = true }
-aptos-crypto = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"] }
 bcs = { workspace = true }
 libfuzzer-sys = "0.4"
@@ -23,8 +23,8 @@ move-core-types = { workspace = true, features = ["fuzzing"] }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 rayon = { workspace = true }
-serde_json = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 
 [features]
 disabled = []

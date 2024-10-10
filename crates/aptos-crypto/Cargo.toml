@@ -62,7 +62,7 @@ typenum = { workspace = true }
 x25519-dalek = { workspace = true }
 
 [dev-dependencies]
-arbitrary = { workspace = true, features = ["derive"]}
+arbitrary = { workspace = true, features = ["derive"] }
 ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-serialize = { workspace = true }
