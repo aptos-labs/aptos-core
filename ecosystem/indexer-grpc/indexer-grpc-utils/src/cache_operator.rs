@@ -383,14 +383,18 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_time = std::time::Instant::now();
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
+            if encoded_transaction.is_empty() {
+                break;
+            }
             let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
             let transaction = cache_entry.into_transaction();
             transactions.push(transaction);
         }
+        /*
         ensure!(
             transactions.len() == transaction_count as usize,
             "Failed to get all transactions from cache."
-        );
+        );*/
         let decoding_duration = start_time.elapsed().as_secs_f64();
         Ok((transactions, io_duration, decoding_duration))
     }

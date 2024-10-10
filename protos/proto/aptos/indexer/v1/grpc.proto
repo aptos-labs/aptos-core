@@ -1,0 +1,108 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.indexer.v1;
+
+import "aptos/indexer/v1/raw_data.proto";
+import "aptos/transaction/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
+
+message StreamProgressSampleProto {
+  optional aptos.util.timestamp.Timestamp timestamp = 1;
+  uint64 version = 2;
+  uint64 size_bytes = 3;
+}
+
+message StreamProgress {
+  repeated StreamProgressSampleProto samples = 1;
+}
+
+message ActiveStream {
+  optional string id = 1;
+  optional aptos.util.timestamp.Timestamp start_time = 2;
+  uint64 start_version = 3;
+  optional uint64 end_version = 4;
+
+  optional StreamProgress progress = 5;
+}
+
+message StreamInfo {
+  repeated ActiveStream active_streams = 1;
+}
+
+message LiveDataServiceInfo {
+  optional aptos.util.timestamp.Timestamp timestamp = 1;
+  optional uint64 known_latest_version = 2;
+  optional StreamInfo stream_info = 3;
+  // If not present, it means the data service is not available to serve anything yet.
+  optional uint64 min_servable_version = 4;
+}
+
+message HistoricalDataServiceInfo {
+  optional aptos.util.timestamp.Timestamp timestamp = 1;
+  optional uint64 known_latest_version = 2;
+  optional StreamInfo stream_info = 3;
+}
+
+message FullnodeInfo {
+  optional aptos.util.timestamp.Timestamp timestamp = 1;
+  optional uint64 known_latest_version = 2;
+}
+
+message GrpcManagerInfo {
+  optional aptos.util.timestamp.Timestamp timestamp = 1;
+  optional uint64 known_latest_version = 2;
+  optional string master_address = 3;
+}
+
+message ServiceInfo {
+  optional string address = 1;
+  oneof info {
+      LiveDataServiceInfo live_data_service_info = 2;
+      HistoricalDataServiceInfo historical_data_service_info = 3;
+      FullnodeInfo fullnode_info = 4;
+      GrpcManagerInfo grpc_manager_info = 5;
+  }
+}
+
+message HeartbeatRequest {
+  optional ServiceInfo service_info = 1;
+}
+
+message HeartbeatResponse {
+  optional uint64 known_latest_version = 1;
+}
+
+message PingDataServiceRequest {
+  optional uint64 known_latest_version = 1;
+  // `true` for live data service, `false` for historical data service.
+  bool ping_live_data_service = 2;
+}
+
+message PingDataServiceResponse {
+  oneof info {
+    LiveDataServiceInfo live_data_service_info = 1;
+    HistoricalDataServiceInfo historical_data_service_info = 2;
+  }
+}
+
+message GetDataServiceForRequestRequest {
+  optional GetTransactionsRequest user_request = 1;
+}
+
+message GetDataServiceForRequestResponse {
+  optional string data_service_address = 1;
+}
+
+service GrpcManager {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetTransactions(GetTransactionsRequest) returns (TransactionsResponse);
+  rpc GetDataServiceForRequest(GetDataServiceForRequestRequest) returns (GetDataServiceForRequestResponse);
+}
+
+service DataService {
+  rpc Ping(PingDataServiceRequest) returns (PingDataServiceResponse);
+  rpc GetTransactions(GetTransactionsRequest) returns (stream TransactionsResponse);
+}
