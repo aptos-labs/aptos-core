@@ -32,7 +32,8 @@ A clear and concise description of what you expected to happen.
 ## System information
 
 **Please complete the following information:**
-- Aptos Core Version
+- Aptos Binary Version or a specific commit hash (e.g. aptos-node-v1.16.3)
+- Aptos CLI Version
 - Rust Version
 - Computer OS
 
