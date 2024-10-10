@@ -233,7 +233,10 @@ impl FuzzerTransactionAuthenticator {
     }
 
     pub fn get_jwt_header_json(&self) -> Option<String> {
-        if let FuzzerTransactionAuthenticator::Keyless { keyless_signature, .. } = self {
+        if let FuzzerTransactionAuthenticator::Keyless {
+            keyless_signature, ..
+        } = self
+        {
             serde_json::to_string(&keyless_signature.jwt_header).ok()
         } else {
             None

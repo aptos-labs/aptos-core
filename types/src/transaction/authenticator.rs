@@ -1225,8 +1225,6 @@ pub enum EphemeralPublicKey {
     },
 }
 
-
-
 impl EphemeralPublicKey {
     pub fn ed25519(public_key: Ed25519PublicKey) -> Self {
         Self::Ed25519 { public_key }
