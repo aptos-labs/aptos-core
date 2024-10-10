@@ -271,6 +271,7 @@ impl<'env> ModelBuilder<'env> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            opt_self_var: None,
         }
     }
 
@@ -464,6 +465,9 @@ impl<'env> ModelBuilder<'env> {
                             self.vector_receiver_functions
                                 .insert(name.symbol, name.clone());
                         }
+                    },
+                    Type::Error => {
+                        // Ignore this, there will be a message where the error type is generated.
                     },
                     _ => diag(
                         "is not suitable for receiver functions. \
