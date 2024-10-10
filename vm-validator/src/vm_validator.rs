@@ -104,21 +104,21 @@ impl TransactionValidation for VMValidator {
 }
 
 /// returns account's sequence number from storage
-pub fn get_account_sequence_number(
-    state_view: &DbStateView,
-    address: AccountAddress,
-) -> Result<u64> {
-    fail_point!("vm_validator::get_account_sequence_number", |_| {
-        Err(anyhow::anyhow!(
-            "Injected error in get_account_sequence_number"
-        ))
-    });
+// pub fn get_account_sequence_number(
+//     state_view: &DbStateView,
+//     address: AccountAddress,
+// ) -> Result<u64> {
+//     fail_point!("vm_validator::get_account_sequence_number", |_| {
+//         Err(anyhow::anyhow!(
+//             "Injected error in get_account_sequence_number"
+//         ))
+//     });
 
-    match AccountResource::fetch_move_resource(state_view, &address)? {
-        Some(account_resource) => Ok(account_resource.sequence_number()),
-        None => Ok(0),
-    }
-}
+//     match AccountResource::fetch_move_resource(state_view, &address)? {
+//         Some(account_resource) => Ok(account_resource.sequence_number()),
+//         None => Ok(0),
+//     }
+// }
 
 // A pool of VMValidators that can be used to validate transactions concurrently. This is done because
 // the VM is not thread safe today. This is a temporary solution until the VM is made thread safe.

@@ -74,7 +74,7 @@ fn test_transaction_metrics() {
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        0,
+        // 0,
         TimelineState::NotReady,
         false,
         None,
@@ -84,7 +84,7 @@ fn test_transaction_metrics() {
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        0,
+        // 0,
         TimelineState::NonQualified,
         false,
         None,
@@ -94,7 +94,7 @@ fn test_transaction_metrics() {
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        0,
+        // 0,
         TimelineState::NotReady,
         true,
         None,
@@ -989,7 +989,7 @@ fn test_gc_ready_transaction() {
     pool.add_txn(
         txn,
         1,
-        0,
+        // 0,
         TimelineState::NotReady,
         false,
         None,
@@ -1049,12 +1049,12 @@ fn test_clean_stuck_transactions() {
     for seq in 0..5 {
         add_txn(&mut pool, TestTransaction::new(0, seq, 1)).unwrap();
     }
-    let db_sequence_number = 10;
-    let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
+    // let db_sequence_number = 10;
+    let txn = TestTransaction::new(0, 1, 1).make_signed_transaction();
     pool.add_txn(
         txn,
         1,
-        db_sequence_number,
+        // db_sequence_number,
         TimelineState::NotReady,
         false,
         None,
@@ -1068,12 +1068,12 @@ fn test_clean_stuck_transactions() {
 #[test]
 fn test_get_transaction_by_hash() {
     let mut pool = setup_mempool().0;
-    let db_sequence_number = 10;
-    let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
+    // let db_sequence_number = 10;
+    let txn = TestTransaction::new(0, 1,1).make_signed_transaction();
     pool.add_txn(
         txn.clone(),
         1,
-        db_sequence_number,
+        // db_sequence_number,
         TimelineState::NotReady,
         false,
         None,
@@ -1095,7 +1095,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     pool.add_txn(
         txn.clone(),
         1,
-        db_sequence_number,
+        // db_sequence_number,
         TimelineState::NotReady,
         false,
         None,
@@ -1108,7 +1108,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     pool.add_txn(
         new_txn.clone(),
         1,
-        db_sequence_number,
+        // db_sequence_number,
         TimelineState::NotReady,
         false,
         None,

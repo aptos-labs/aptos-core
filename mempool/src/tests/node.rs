@@ -379,7 +379,7 @@ impl Node {
             mempool.add_txn(
                 transaction.clone(),
                 transaction.gas_unit_price(),
-                0,
+                // 0,
                 TimelineState::NotReady,
                 false,
                 None,

@@ -16,7 +16,7 @@ use crate::{
         },
         use_case_history::UseCaseHistory,
     },
-    thread_pool::IO_POOL,
+    // thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -35,7 +35,7 @@ use aptos_types::{
     transaction::SignedTransaction,
     vm_status::{DiscardedVMStatus, StatusCode},
 };
-use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use rayon::prelude::*;
 use std::{
@@ -292,18 +292,18 @@ where
         .expect("Failed to get latest state checkpoint view.");
 
     // Track latency: fetching seq number
-    let seq_numbers = IO_POOL.install(|| {
-        transactions
-            .par_iter()
-            .map(|(t, _, _)| {
-                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
-                    error!(LogSchema::new(LogEntry::DBError).error(&e));
-                    counters::DB_ERROR.inc();
-                    e
-                })
-            })
-            .collect::<Vec<_>>()
-    });
+    // let seq_numbers = IO_POOL.install(|| {
+    //     transactions
+    //         .par_iter()
+    //         .map(|(t, _, _)| {
+    //             get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
+    //                 error!(LogSchema::new(LogEntry::DBError).error(&e));
+    //                 counters::DB_ERROR.inc();
+    //                 e
+    //             })
+    //         })
+    //         .collect::<Vec<_>>()
+    // });
     // Track latency for storage read fetching sequence number
     let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY
@@ -314,29 +314,29 @@ where
         .into_iter()
         .enumerate()
         .filter_map(|(idx, (t, ready_time_at_sender, priority))| {
-            if let Ok(sequence_num) = seq_numbers[idx] {
-                if t.sequence_number() >= sequence_num {
-                    return Some((t, sequence_num, ready_time_at_sender, priority));
-                } else {
-                    statuses.push((
-                        t,
-                        (
-                            MempoolStatus::new(MempoolStatusCode::VmError),
-                            Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
-                        ),
-                    ));
-                }
-            } else {
-                // Failed to get transaction
-                statuses.push((
-                    t,
-                    (
-                        MempoolStatus::new(MempoolStatusCode::VmError),
-                        Some(DiscardedVMStatus::RESOURCE_DOES_NOT_EXIST),
-                    ),
-                ));
-            }
-            None
+            // if let Ok(sequence_num) = seq_numbers[idx] {
+                // if t.sequence_number() >= sequence_num {
+                    return Some((t, ready_time_at_sender, priority));
+            //     } else {
+            //         statuses.push((
+            //             t,
+            //             (
+            //                 MempoolStatus::new(MempoolStatusCode::VmError),
+            //                 Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
+            //             ),
+            //         ));
+            //     }
+            // } else {
+            //     // Failed to get transaction
+            //     statuses.push((
+            //         t,
+            //         (
+            //             MempoolStatus::new(MempoolStatusCode::VmError),
+            //             Some(DiscardedVMStatus::RESOURCE_DOES_NOT_EXIST),
+            //         ),
+            //     ));
+            // }
+            // None
         })
         .collect();
 
@@ -357,7 +357,7 @@ where
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     transactions: Vec<(
         SignedTransaction,
-        u64,
+        // u64,
         Option<u64>,
         Option<BroadcastPeerPriority>,
     )>,
@@ -388,7 +388,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
-        for (idx, (transaction, sequence_info, ready_time_at_sender, priority)) in
+        for (idx, (transaction, ready_time_at_sender, priority)) in
             transactions.into_iter().enumerate()
         {
             if let Ok(validation_result) = &validation_results[idx] {

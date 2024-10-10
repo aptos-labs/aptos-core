@@ -182,7 +182,7 @@ impl MockSharedMempool {
                     .add_txn(
                         txn.clone(),
                         txn.gas_unit_price(),
-                        0,
+                        // 0,
                         TimelineState::NotReady,
                         false,
                         None,
