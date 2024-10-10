@@ -341,18 +341,27 @@ impl FanoutPartitioner {
     }
 
     fn optimize_probabilistic_fanout(&self, mut sender_shard: Vec<u16>, graph: &CompressedGraph, num_shards: u16) -> Vec<u16> {
+        let mut shard_weights = Self::compute_shard_weights(graph, num_shards, &sender_shard);
         let mut access_shards = Self::compute_access_shards(graph, num_shards, &sender_shard);
-
         let mut sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards);
 
         self.print_fanout_stats(&access_shards, graph, "init");
-
+        self.print_weight_stats(&shard_weights);
         for iter in 0..self.num_iterations {
-            self.optimize_probabilistic_fanout_iteration(&mut sender_shard, &mut access_shards, &mut sender_shard_weights, graph, num_shards);
+            self.optimize_probabilistic_fanout_iteration(&mut sender_shard, &mut shard_weights, &mut access_shards, &mut sender_shard_weights, graph, num_shards);
             self.print_fanout_stats(&access_shards, graph, format!("iter {}", iter).as_str());
+            self.print_weight_stats(&shard_weights);
         }
 
         sender_shard
+    }
+
+    fn compute_shard_weights(graph: &CompressedGraph, num_shards: u16, sender_shard: &Vec<u16>) -> Vec<u32> {
+        let mut shard_weights = vec![0; num_shards as usize];
+        for sender_id in graph.sender_range() {
+            shard_weights[sender_shard[sender_id as usize] as usize] += graph.sender_weights[sender_id as usize]
+        }
+        shard_weights
     }
 
     fn compute_access_shards(graph: &CompressedGraph, num_shards: u16, sender_shard: &Vec<u16>) -> Vec<Vec<u32>> {
@@ -383,6 +392,14 @@ impl FanoutPartitioner {
         sender_shard_weights
     }
 
+    fn print_weight_stats(&self, shard_weights: &[u32]) {
+        let max = *shard_weights.iter().max().unwrap();
+        let min = *shard_weights.iter().min().unwrap();
+        let sum = shard_weights.iter().sum::<u32>();
+        let avg = sum / shard_weights.len() as u32;
+        println!("Shard weights: avg={}, min={}, max={}, min_ratio={}, max_ratio={} ", avg, min, max, min as f32 / avg as f32, max as f32 / avg as f32);
+    }
+
     fn print_fanout_stats(&self, access_shards: &[Vec<u32>], graph: &CompressedGraph, desc: &str) {
         let mut fanout = 0;
         let mut prob_fanout = 0.0f32;
@@ -398,7 +415,10 @@ impl FanoutPartitioner {
         println!("{}: fanuot: {}, prob fanout: {}", desc, fanout as f32 / num_accesses as f32, prob_fanout / num_accesses as f32);
     }
 
-    fn optimize_probabilistic_fanout_iteration(&self, sender_shard: &mut Vec<u16>, access_shards: &mut Vec<Vec<u32>>, sender_shard_weights: &mut Vec<Vec<f32>>, graph: &CompressedGraph, num_shards: u16) {
+    fn optimize_probabilistic_fanout_iteration(&self, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>, access_shards: &mut Vec<Vec<u32>>, sender_shard_weights: &mut Vec<Vec<f32>>, graph: &CompressedGraph, num_shards: u16) {
+        let target_shard_weight = shard_weights.iter().sum::<u32>() / shard_weights.len() as u32;
+        let max_shard_weight = 1 + target_shard_weight * 102 / 100;
+
         let mut overall_queue: BinaryHeap<(NotNan<f32>, u32, u16, u16)> = BinaryHeap::new();
         let mut best_queue: Vec<Vec<BinaryHeap<(NotNan<f32>, u32)>>> = vec![vec![BinaryHeap::new(); num_shards as usize]; num_shards as usize];
 
@@ -431,12 +451,39 @@ impl FanoutPartitioner {
         let mut moved = vec![false; graph.num_senders() as usize];
         let mut num_moves = 0;
 
-        let mut best_gain = 0.0;
+        let mut best_gain: f32 = 0.0;
         let mut rng = rand::thread_rng();
+
+        let mut move_sender = |sender: u32, sender_weight: u32, to_shard: u16, moved: &mut Vec<bool>, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>| {
+            let sender = sender as usize;
+            moved[sender] = true;
+            let from_shard = sender_shard[sender];
+            shard_weights[from_shard as usize] -= sender_weight;
+            shard_weights[to_shard as usize] += sender_weight;
+
+            sender_shard[sender] = to_shard;
+        };
 
         while !overall_queue.is_empty() {
             let (gain, sender, from_shard, to_shard) = overall_queue.pop().unwrap();
             if moved[sender as usize] {
+                continue;
+            }
+            let sender_weight = graph.sender_weights[sender as usize];
+            let from_shard_weight = shard_weights[from_shard as usize];
+            let to_shard_weight = shard_weights[to_shard as usize];
+
+            let alone_gain: f32 = gain.clone().into_inner();
+            if alone_gain > 0.0 && from_shard_weight.max(to_shard_weight) >= (from_shard_weight - sender_weight).max(to_shard_weight + sender_weight) {
+
+                if self.print_detailed_debug_stats && num_moves == 0 {
+                    println!("matched alone: {} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
+                        graph.edges.get_edges(sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
+                    );
+                }
+                move_sender(sender, sender_weight, to_shard, &mut moved, sender_shard, shard_weights);
+                num_moves += 1;
+                best_gain = best_gain.max(alone_gain);
                 continue;
             }
 
@@ -452,14 +499,13 @@ impl FanoutPartitioner {
             }
 
             if let Some((other_gain, other_sender)) = cur_best_queue.peek() {
+                let other_weight = graph.sender_weights[*other_sender as usize];
+                let pass_weight_check = from_shard_weight.max(to_shard_weight).max(max_shard_weight) >=
+                    (from_shard_weight - sender_weight + other_weight).max(to_shard_weight + sender_weight - other_weight);
+
                 let total_gain = (gain + other_gain).into_inner();
-                if !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
-                    moved[sender as usize] = true;
-                    moved[*other_sender as usize] = true;
 
-                    sender_shard[sender as usize] = to_shard;
-                    sender_shard[*other_sender as usize] = from_shard;
-
+                if pass_weight_check && !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
                     if self.print_detailed_debug_stats && num_moves == 0 {
                         println!("{} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
                             graph.edges.get_edges(sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
@@ -469,6 +515,8 @@ impl FanoutPartitioner {
                             graph.edges.get_edges(*other_sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                         );
                     }
+                    move_sender(sender, sender_weight, to_shard, &mut moved, sender_shard, shard_weights);
+                    move_sender(*other_sender, other_weight, from_shard, &mut moved, sender_shard, shard_weights);
                     num_moves += 2;
                     best_gain = best_gain.max(total_gain);
                     cur_best_queue.pop();
@@ -488,15 +536,13 @@ impl FanoutPartitioner {
             }
 
             if let Some((other_gain_lower_limit, other_sender)) = cur_least_worst_queue.peek() {
+                let other_weight = graph.sender_weights[*other_sender as usize];
+                let pass_weight_check = from_shard_weight.max(to_shard_weight).max(max_shard_weight) >=
+                    (from_shard_weight - sender_weight + other_weight).max(to_shard_weight + sender_weight - other_weight);
+
                 let other_gain = self.fanout_formula.calc_gain(&sender_shard_weights[*other_sender as usize], to_shard, from_shard);
                 let total_gain = (gain + other_gain).into_inner();
-                if !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
-                    moved[sender as usize] = true;
-                    moved[*other_sender as usize] = true;
-
-                    sender_shard[sender as usize] = to_shard;
-                    sender_shard[*other_sender as usize] = from_shard;
-
+                if pass_weight_check && !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
                     if self.print_detailed_debug_stats && num_moves == 0 {
                         println!("{} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
                             graph.edges.get_edges(sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
@@ -506,9 +552,10 @@ impl FanoutPartitioner {
                             graph.edges.get_edges(*other_sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                         );
                     }
+                    move_sender(sender, sender_weight, to_shard, &mut moved, sender_shard, shard_weights);
+                    move_sender(*other_sender, other_weight, from_shard, &mut moved, sender_shard, shard_weights);
                     num_moves += 2;
                     best_gain = best_gain.max(total_gain);
-
                     cur_least_worst_queue.pop();
                     continue;
                 }
@@ -520,6 +567,7 @@ impl FanoutPartitioner {
         }
 
         // this can be done incrementally.
+        // *shard_weights = Self::compute_shard_weights(graph, num_shards, &sender_shard);
         *access_shards = Self::compute_access_shards(graph, num_shards, sender_shard);
         *sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards);
     }
