@@ -291,15 +291,15 @@ impl Mempool {
             committed_seq_number = db_sequence_number
         );
 
-        info!("Add mempool transaction: {:?} {:?}", txn.sender(), txn.sequence_number());
+        info!("Add mempool transaction: {:?}, txn seq number: {:?}, db seq number: {:?}", txn.sender(), txn.sequence_number(), db_sequence_number);
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
-        if txn.sequence_number() < db_sequence_number {
-            return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
-                "transaction sequence number is {}, current sequence number is  {}",
-                txn.sequence_number(),
-                db_sequence_number,
-            ));
-        }
+        // if txn.sequence_number() < db_sequence_number {
+        //     return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
+        //         "transaction sequence number is {}, current sequence number is  {}",
+        //         txn.sequence_number(),
+        //         db_sequence_number,
+        //     ));
+        // }
 
         let now = SystemTime::now();
         let expiration_time =
@@ -420,12 +420,13 @@ impl Mempool {
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
-            let txn_in_sequence = tx_seq > 0
-                && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
-            let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
+            // let txn_in_sequence = tx_seq > 0
+            //     && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
+            // let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
-            if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
+            // if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
+            if true {
                 inserted.insert((txn.address, tx_seq));
                 result.push((txn.address, tx_seq));
                 if (result.len() as u64) == max_txns {

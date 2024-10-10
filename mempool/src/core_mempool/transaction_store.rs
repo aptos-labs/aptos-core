@@ -212,9 +212,9 @@ impl TransactionStore {
         format!("{}_{}", sender_bucket, bucket)
     }
 
-    pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
-        self.sequence_numbers.get(address)
-    }
+    // pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
+    //     self.sequence_numbers.get(address)
+    // }
 
     pub(crate) fn num_sender_buckets(&self) -> MempoolSenderBucket {
         self.num_sender_buckets
@@ -297,12 +297,13 @@ impl TransactionStore {
             self.expiration_time_index.insert(&txn);
             self.hash_index
                 .insert(txn.get_committed_hash(), (txn.get_sender(), txn_seq_num));
-            self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
+            // self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
             self.size_bytes += txn.get_estimated_bytes();
+            self.priority_index.insert(&txn);
             txns.insert(txn_seq_num, txn);
             self.track_indices();
         }
-        self.process_ready_transactions(&address, acc_seq_num);
+        // self.process_ready_transactions(&address, acc_seq_num);
         MempoolStatus::new(MempoolStatusCode::Accepted)
     }
 
@@ -553,28 +554,30 @@ impl TransactionStore {
         // nodes has sent the transaction to consensus but this node still has the
         // transaction sitting in mempool.
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut active = txns.split_off(&sequence_number);
-            let txns_for_removal = txns.clone();
-            txns.clear();
-            txns.append(&mut active);
+            txns.remove(&sequence_number);
+            info!("Transaction removed from mempool: {}:{}.", address, sequence_number);
+            // let mut active = txns.split_off(&sequence_number);
+            // let txns_for_removal = txns.clone();
+            // txns.clear();
+            // txns.append(&mut active);
 
-            let mut rm_txns = match aptos_logger::enabled!(Level::Trace) {
-                true => TxnsLog::new(),
-                false => TxnsLog::new_with_max(10),
-            };
-            for transaction in txns_for_removal.values() {
-                rm_txns.add(
-                    transaction.get_sender(),
-                    transaction.sequence_info.transaction_sequence_number,
-                );
-                self.index_remove(transaction);
-            }
-            trace!(
-                LogSchema::new(LogEntry::CleanCommittedTxn).txns(rm_txns),
-                "txns cleaned with committing tx {}:{}",
-                address,
-                sequence_number
-            );
+            // let mut rm_txns = match aptos_logger::enabled!(Level::Trace) {
+            //     true => TxnsLog::new(),
+            //     false => TxnsLog::new_with_max(10),
+            // };
+            // for transaction in txns_for_removal.values() {
+            //     rm_txns.add(
+            //         transaction.get_sender(),
+            //         transaction.sequence_info.transaction_sequence_number,
+            //     );
+            //     self.index_remove(transaction);
+            // }
+            // trace!(
+            //     LogSchema::new(LogEntry::CleanCommittedTxn).txns(rm_txns),
+            //     "txns cleaned with committing tx {}:{}",
+            //     address,
+            //     sequence_number
+            // );
         }
     }
 
@@ -582,11 +585,11 @@ impl TransactionStore {
     /// It includes deletion of all transactions with sequence number <= `account_sequence_number`
     /// and potential promotion of sequential txns to PriorityIndex/TimelineIndex.
     pub fn commit_transaction(&mut self, account: &AccountAddress, sequence_number: u64) {
-        let current_seq_number = self.get_sequence_number(account).map_or(0, |v| *v);
-        let new_seq_number = max(current_seq_number, sequence_number + 1);
-        self.sequence_numbers.insert(*account, new_seq_number);
-        self.clean_committed_transactions(account, new_seq_number);
-        self.process_ready_transactions(account, new_seq_number);
+        // let current_seq_number = self.get_sequence_number(account).map_or(0, |v| *v);
+        // let new_seq_number = max(current_seq_number, sequence_number + 1);
+        // self.sequence_numbers.insert(*account, new_seq_number);
+        self.clean_committed_transactions(account, sequence_number);
+        // self.process_ready_transactions(account, new_seq_number);
     }
 
     pub fn reject_transaction(
