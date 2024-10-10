@@ -116,6 +116,8 @@ pub enum LatencyBreakdownSlice {
     IndexerCacheWorkerProcessedBatch,
     IndexerDataServiceAllChunksSent,
     // TODO: add processor insertion into DB latency
+    InsertionToBlock,
+    BlockCreationToCommit,
 }
 
 #[derive(Clone, Debug)]
@@ -150,21 +152,37 @@ pub async fn fetch_latency_breakdown(
 ) -> anyhow::Result<LatencyBreakdown> {
     // Averaging over 1m, and skipping data points at the start that would take averages outside of the interval.
     let start_time_adjusted = start_time + 60;
-    let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
     let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
 
-    let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
-    let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
+    let insertion_to_block_query = r#"sum(
+        rate(aptos_core_mempool_txn_commit_latency_sum{
+            role=~"validator",
+            stage="commit_accepted_block"
+        }[1m])
+    ) / sum(
+        rate(aptos_core_mempool_txn_commit_latency_count{
+            role=~"validator",
+            stage="commit_accepted_block"
+        }[1m])
+    )"#;
+
+    let block_creation_to_commit_query = r#"quantile(
+        0.67,
+        rate(
+            aptos_consensus_block_tracing_sum{
+                role=~"validator",
+                stage="committed"
+            }[1m]
+        ) /
+        rate(
+            aptos_consensus_block_tracing_count{
+                role=~"validator",
+                stage="committed"
+            }[1m]
+        )
+    ) < 1000000"#;
 
     let swarm = swarm.read().await;
-    let consensus_proposal_to_ordered_samples = swarm
-        .query_range_metrics(
-            consensus_proposal_to_ordered_query,
-            start_time_adjusted as i64,
-            end_time as i64,
-            None,
-        )
-        .await?;
 
     let consensus_proposal_to_commit_samples = swarm
         .query_range_metrics(
@@ -175,30 +193,18 @@ pub async fn fetch_latency_breakdown(
         )
         .await?;
 
-    let consensus_ordered_to_commit_samples = swarm
+    let insertion_to_block_samples = swarm
         .query_range_metrics(
-            &format!(
-                "{} - {}",
-                consensus_proposal_to_commit_query, consensus_proposal_to_ordered_query
-            ),
+            insertion_to_block_query,
             start_time_adjusted as i64,
             end_time as i64,
             None,
         )
         .await?;
 
-    let qs_batch_to_pos_samples = swarm
+    let block_creation_to_commit_samples = swarm
         .query_range_metrics(
-            qs_batch_to_pos_query,
-            start_time_adjusted as i64,
-            end_time as i64,
-            None,
-        )
-        .await?;
-
-    let qs_pos_to_proposal_samples = swarm
-        .query_range_metrics(
-            qs_pos_to_proposal_query,
+            block_creation_to_commit_query,
             start_time_adjusted as i64,
             end_time as i64,
             None,
@@ -207,20 +213,12 @@ pub async fn fetch_latency_breakdown(
 
     let mut samples = BTreeMap::new();
     samples.insert(
-        LatencyBreakdownSlice::QsBatchToPos,
-        MetricSamples::new(qs_batch_to_pos_samples),
+        LatencyBreakdownSlice::InsertionToBlock,
+        MetricSamples::new(insertion_to_block_samples),
     );
     samples.insert(
-        LatencyBreakdownSlice::QsPosToProposal,
-        MetricSamples::new(qs_pos_to_proposal_samples),
-    );
-    samples.insert(
-        LatencyBreakdownSlice::ConsensusProposalToOrdered,
-        MetricSamples::new(consensus_proposal_to_ordered_samples),
-    );
-    samples.insert(
-        LatencyBreakdownSlice::ConsensusOrderedToCommit,
-        MetricSamples::new(consensus_ordered_to_commit_samples),
+        LatencyBreakdownSlice::BlockCreationToCommit,
+        MetricSamples::new(block_creation_to_commit_samples),
     );
     samples.insert(
         LatencyBreakdownSlice::ConsensusProposalToCommit,
