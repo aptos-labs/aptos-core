@@ -291,6 +291,7 @@ impl Mempool {
             committed_seq_number = db_sequence_number
         );
 
+        info!("Add mempool transaction: {:?} {:?}", txn.sender(), txn.sequence_number());
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
         if txn.sequence_number() < db_sequence_number {
             return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
