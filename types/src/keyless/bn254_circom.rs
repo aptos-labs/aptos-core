@@ -61,6 +61,7 @@ pub fn parse_fr_element(s: &str) -> Result<Fr, CryptoMaterialError> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct G1Bytes(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
 impl G1Bytes {
@@ -150,6 +151,7 @@ impl TryInto<G1Affine> for &G1Bytes {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct G2Bytes(pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
 impl G2Bytes {
