@@ -215,6 +215,8 @@ impl ClusteredTxnsGenerator {
 
         let start_time = Instant::now();
         let txn_indices = self.generate_txn_indices(num_txns);
+        //let txn_indices = [(13, (1, 0)), (4, (1, 1)), (7, (0, 0)), (10, (0, 0)), (3, (0, 1)), (0, (0, 1)), (12, (1, 1)), (1, (0, 1)), (5, (0, 1)), (11, (0, 0)), (14, (0, 0)), (13, (1, 0)), (10, (1, 0)), (9, (1, 0)), (13, (1, 1)), (12, (1, 1)), (12, (1, 1)), (13, (0, 0)), (3, (0, 0)), (3, (1, 1)), (10, (1, 0)), (9, (1, 1)), (8, (1, 1)), (9, (1, 1)), (2, (0, 0)), (3, (0, 1)), (3, (0, 0)), (6, (0, 1)), (3, (0, 1)), (2, (1, 1))];
+        //println!("txn_indices: {:?}", txn_indices);
         let duration = start_time.elapsed();
         info!("Time taken to generate txn_indices: {:?}", duration);
 

@@ -14,6 +14,7 @@ use rand::Rng;
 use std::{cmp::Reverse, collections::{BinaryHeap, HashMap}, mem, ops::Range};
 use aptos_block_partitioner::v3::build_partitioning_result;
 use itertools::Itertools;
+use aptos_logger::info;
 use aptos_types::account_address::AccountAddress;
 
 #[derive(Clone, Debug)]
@@ -71,6 +72,8 @@ impl BlockPartitioner for FanoutPartitioner {
         let sender_to_shard_idxs = self.optimize_probabilistic_fanout(sender_to_shard_idxs, &compressed_graph, num_shards as u16);
 
         self.optimize_transaction_order(&mut transactions, &sender_to_shard_idxs, &compressed_graph, num_shards as u16);
+        //transactions.sort_by_key(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize]);
+        //transactions = Self::optimize_order(transactions, &sender_to_shard_idxs, &compressed_graph, num_shards);
 
         let shard_idxs = transactions.iter().map(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize] as usize).collect();
 
@@ -386,6 +389,198 @@ impl FanoutPartitioner {
             }
         }
         access_shards
+    }
+
+    fn optimize_order(mut transactions: Vec<AnalyzedTransaction>, sender_to_shard_idxs: &Vec<u16>, graph: &CompressedGraph, num_shards: usize) -> Vec<AnalyzedTransaction> {
+        if num_shards == 1 {
+            return transactions;
+        }
+        // assumes that transactions are sorted by shard_idx
+        let num_txns = transactions.len();
+        let mut shard_st_idx: Vec<usize> = vec![0; num_shards + 1];
+        let mut last_shard = 0;
+        let mut dependency_info: Vec<bool> = vec![false; num_txns];
+        let mut owner_info: Vec<bool> = vec![false; num_txns];
+        let mut txn_index_to_shard: Vec<u16> = vec![0; num_txns];
+        // sender -> {txn_idxs}
+        let mut sender_idx_to_txn_idxs: Vec<Vec<usize>> = vec![vec![]; graph.num_senders() as usize];
+
+        for (txn_idx, txn) in transactions.iter().enumerate() {
+            let sender_idx = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap();
+            sender_idx_to_txn_idxs[sender_idx as usize].push(txn_idx);
+            let curr_shard = sender_to_shard_idxs[sender_idx as usize];
+            txn_index_to_shard[txn_idx] = curr_shard;
+            assert!(curr_shard >= last_shard);
+            if curr_shard > last_shard {
+                shard_st_idx[curr_shard as usize] = txn_idx;
+                last_shard = curr_shard;
+            }
+        }
+        assert_eq!(num_txns, sender_idx_to_txn_idxs.iter().map(|v| v.len()).sum::<usize>());
+        // Fill all the trailing zeros with num_txns
+        for i in (1..num_shards + 1).rev() {
+            if shard_st_idx[i] == 0 {
+                shard_st_idx[i] = num_txns;
+            }
+        }
+
+        // access_idx -> [all_txns_shard_0, all_txns_shard_1, ...]
+        //let empty_vec: Vec<usize> = vec![];
+        let mut access_idx_to_txn_idxs: Vec<Vec<Vec<usize>>> = vec![vec![vec![]; num_shards]; graph.num_accesses() as usize];
+        for access_idx in graph.access_range() {
+            let access_vec_idx = graph.access_to_vec_index(access_idx);
+            for sender_idx in graph.edges.get_edges(access_idx) {
+                let mut txn_idxs = sender_idx_to_txn_idxs[*sender_idx as usize].clone(); // todo avoid clone
+                let shard_num = sender_to_shard_idxs[*sender_idx as usize] as usize;
+                assert_eq!(shard_num, txn_index_to_shard[txn_idxs[0]] as usize);
+                //access_idx_to_txn_idxs[access_vec_idx][shard_num] = txn_idxs;
+                access_idx_to_txn_idxs[access_vec_idx][shard_num].append(&mut txn_idxs);
+            }
+
+            let mut potential_owner_txns = &access_idx_to_txn_idxs[access_vec_idx][0];
+            let mut potential_owner_txns_shard_num = 0;
+            for shard_num in 1..num_shards {
+                let dependent_txns = &access_idx_to_txn_idxs[access_vec_idx][shard_num];
+                if dependent_txns.is_empty() {
+                    continue;
+                } else if !potential_owner_txns.is_empty() {
+                    for txn_idx in potential_owner_txns {
+                        assert_eq!(txn_index_to_shard[*txn_idx] as usize, potential_owner_txns_shard_num);
+                        owner_info[*txn_idx] = true;
+                    }
+                    for txn_idx in dependent_txns {
+                        assert_eq!(txn_index_to_shard[*txn_idx] as usize, shard_num);
+                        dependency_info[*txn_idx] = true;
+                    }
+                }
+                potential_owner_txns = dependent_txns;
+                potential_owner_txns_shard_num = shard_num;
+            }
+        }
+
+
+
+        let mut shard_rank_marker: Vec<usize> = vec![0; num_shards];
+        info!("Shard start indices: {:?}", shard_st_idx);
+        for shard_num in 0..num_shards {
+            let shard_size = shard_st_idx[shard_num + 1] - shard_st_idx[shard_num];
+            shard_rank_marker[shard_num] = shard_st_idx[shard_num] + (shard_size * shard_num) / num_shards;
+        }
+
+        let mut last_shard: isize = -1;
+
+        let (num_owner_txns_by_shard, num_dependent_txns_by_shard, both_owner_dependent_txns_by_shard): (Vec<usize>, Vec<usize>, Vec<usize>) = {
+            let mut num_owner_txns_by_shard = Vec::with_capacity(num_shards);
+            let mut num_dependent_txns_by_shard = Vec::with_capacity(num_shards);
+            let mut both_owner_dependent_txns_by_shard = Vec::with_capacity(num_shards);
+
+            for shard_num in 0..num_shards {
+                let shard_start_idx = shard_st_idx[shard_num];
+                let shard_end_idx = shard_st_idx[shard_num + 1];
+                let (num_owner_txns, num_dependent_txns, num_both_txns) = (shard_start_idx..shard_end_idx).fold((0, 0, 0), |(owner_count, dep_count, both_count), i| {
+                    (
+                        owner_count + owner_info[i] as usize,
+                        dep_count + dependency_info[i] as usize,
+                        both_count + (owner_info[i] && dependency_info[i]) as usize,
+                    )
+                });
+                num_owner_txns_by_shard.push(num_owner_txns);
+                num_dependent_txns_by_shard.push(num_dependent_txns);
+                both_owner_dependent_txns_by_shard.push(num_both_txns);
+            }
+
+            (num_owner_txns_by_shard, num_dependent_txns_by_shard, both_owner_dependent_txns_by_shard)
+        };
+
+        let num_owner_txns = owner_info.iter().filter(|&&x| x).count();
+        let num_dependent_txns = dependency_info.iter().filter(|&&x| x).count();
+        info!("Owner txns: {}, Dependent txns: {}", num_owner_txns, num_dependent_txns);
+        //info!("Pre swap: Dependency info: {:?}, Owner info: {:?}", dependency_info, owner_info);
+
+        let mut num_owner_swaps = 0;
+        let mut num_dependency_swaps = 0;
+        let mut num_both_swaps = 0;
+        let mut num_owner_swaps_by_shard: Vec<usize> = vec![0; num_shards];
+        let mut num_dependency_swaps_by_shard: Vec<usize> = vec![0; num_shards];
+        let mut num_both_swaps_by_shard: Vec<usize> = vec![0; num_shards];
+
+        // Case 1: if dependency_info[idx] && owner_info[idx]
+        for idx in 0..num_txns {
+            let curr_shard = txn_index_to_shard[idx] as usize;
+            let shard_start_idx = shard_st_idx[curr_shard];
+            let shard_end_idx = shard_st_idx[curr_shard + 1];
+            let shard_size = shard_end_idx - shard_start_idx;
+
+            if curr_shard as isize > last_shard {
+                info!("Re-ordering txns: shard_num {}, shard_start_idx {}, shard_rank_marker {}, shard_end_idx {}, shard_size {}, num_owner_txns_by_shard {}, num_dependent_txns_by_shard {}, both_owner_dependent_txns_by_shard {}",
+                    curr_shard, shard_start_idx, shard_rank_marker[curr_shard], shard_end_idx, shard_size, num_owner_txns_by_shard[curr_shard], num_dependent_txns_by_shard[curr_shard], both_owner_dependent_txns_by_shard[curr_shard]);
+                last_shard = curr_shard as isize;
+            }
+
+            if dependency_info[idx] && owner_info[idx] {
+                let shard_size_ten_percent = shard_size / 10;
+                let shard_rank_marker_end = shard_rank_marker[curr_shard] + shard_size_ten_percent + 1;
+                if let Some(swap_idx) = (shard_rank_marker[curr_shard]..shard_rank_marker_end).find(|&i| !dependency_info[i] && !owner_info[i]) {
+                    num_both_swaps += 1;
+                    num_both_swaps_by_shard[curr_shard] += 1;
+                    assert_eq!(txn_index_to_shard[idx], txn_index_to_shard[swap_idx]);
+                    transactions.swap(idx, swap_idx);
+                    dependency_info.swap(idx, swap_idx);
+                    owner_info.swap(idx, swap_idx);
+                    txn_index_to_shard.swap(idx, swap_idx);
+                }
+            }
+        }
+
+        // Case 2: if dependency_info[idx]
+        for idx in 0..num_txns {
+            if dependency_info[idx] && !owner_info[idx] {
+                let curr_shard = txn_index_to_shard[idx] as usize;
+                let shard_start_idx = shard_st_idx[curr_shard];
+                let shard_end_idx = shard_st_idx[curr_shard + 1];
+                if let Some(swap_idx) = (shard_start_idx..shard_end_idx).rfind(|&i| !dependency_info[i]) {
+                    if swap_idx <= idx {
+                        continue;
+                    }
+                    num_dependency_swaps += 1;
+                    num_dependency_swaps_by_shard[curr_shard] += 1;
+                    assert_eq!(txn_index_to_shard[idx], txn_index_to_shard[swap_idx]);
+                    transactions.swap(idx, swap_idx);
+                    dependency_info.swap(idx, swap_idx);
+                    owner_info.swap(idx, swap_idx);
+                    txn_index_to_shard.swap(idx, swap_idx);
+                }
+            }
+        }
+
+        // Case 3: if owner_info[idx]
+        for idx in 0..num_txns {
+            if owner_info[idx] && !dependency_info[idx] {
+                let curr_shard = txn_index_to_shard[idx] as usize;
+                let shard_start_idx = shard_st_idx[curr_shard];
+                let shard_end_idx = shard_st_idx[curr_shard + 1];
+                if let Some(swap_idx) = (shard_start_idx..shard_end_idx).find(|&i| !owner_info[i]) {
+                    if swap_idx >= idx {
+                        continue;
+                    }
+                    num_owner_swaps += 1;
+                    num_owner_swaps_by_shard[curr_shard] += 1;
+                    assert_eq!(txn_index_to_shard[idx], txn_index_to_shard[swap_idx]);
+                    transactions.swap(idx, swap_idx);
+                    dependency_info.swap(idx, swap_idx);
+                    owner_info.swap(idx, swap_idx);
+                    txn_index_to_shard.swap(idx, swap_idx);
+                }
+            }
+        }
+
+        info!("Owner swaps: {}, Dependency swaps: {}, Both swaps: {}", num_owner_swaps, num_dependency_swaps, num_both_swaps);
+        //info!("Post swap: Dependency info: {:?}, Owner info: {:?}", dependency_info, owner_info);
+        for shard_num in 0..num_shards {
+            info!("Shard {}: Owner swaps: {}, Dependency swaps: {}, Both swaps: {}", shard_num, num_owner_swaps_by_shard[shard_num], num_dependency_swaps_by_shard[shard_num], num_both_swaps_by_shard[shard_num]);
+        }
+
+        transactions
     }
 
     fn compute_sender_shard_weights(&self, graph: &CompressedGraph, num_shards: u16, access_shards: &Vec<Vec<u32>>, fanout_formula: &FanoutFormula) -> Vec<Vec<f32>> {

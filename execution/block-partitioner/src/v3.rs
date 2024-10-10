@@ -117,6 +117,8 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
                 if print_debug_stats {
                     let current_txn_local_idx = partitions[cur_shard_idx].num_txns();
                     let owner_txn_local_idx = partitions[owner_shard_idx].local_idx_by_global.get(owner_txn_idx).unwrap();
+                    //info!("Shard {}; txn local_idx {}; txn global_idx {} -> Shard {}; txn local_idx {}; txn global_idx {}",
+                      //  owner_shard_idx, owner_txn_local_idx, owner_txn_idx, cur_shard_idx, current_txn_local_idx, cur_txn_idx);
                     remote_dependency_positions[cur_shard_idx].entry(current_txn_local_idx).or_insert(HashSet::new()).insert((*owner_txn_local_idx, owner_shard_idx));
 
                     if print_detailed_debug_stats {
