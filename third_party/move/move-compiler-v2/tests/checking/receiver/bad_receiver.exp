@@ -23,9 +23,3 @@ error: undeclared `0x1::ordered_map::OrderedMao`
    │
 39 │     public fun borrow<K, V>(self: &OrderedMao<K, V>, key: &K): &V {
    │                                    ^^^^^^^^^^
-
-error: unable to infer instantiation of type `fun self.iter_borrow(Self,&*error*):&V` (consider providing type arguments or annotating the type)
-   ┌─ tests/checking/receiver/bad_receiver.move:40:9
-   │
-40 │         self.find(key).iter_borrow(self)
-   │         ^^^^^^^^^^^^^^

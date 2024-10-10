@@ -3311,8 +3311,8 @@ pub struct TypeDisplayContext<'a> {
     pub used_modules: BTreeSet<ModuleId>,
     /// Whether to use `m::T` for representing types, for stable output in docgen
     pub use_module_qualification: bool,
-    /// Var type that should appear as Self in display
-    pub opt_self_var: Option<u32>,
+    /// Var types that are recursive and should appear as `..` in display
+    pub recursive_vars: Option<BTreeSet<u32>>,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -3326,7 +3326,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
-            opt_self_var: None,
+            recursive_vars: None,
         }
     }
 
@@ -3350,7 +3350,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
-            opt_self_var: None,
+            recursive_vars: None,
         }
     }
 
@@ -3363,7 +3363,13 @@ impl<'a> TypeDisplayContext<'a> {
 
     pub fn map_var_to_self(&self, idx: u32) -> Self {
         Self {
-            opt_self_var: Some(idx),
+            recursive_vars: if let Some(existing_set) = &self.recursive_vars {
+                let mut new_set = existing_set.clone();
+                new_set.insert(idx);
+                Some(new_set)
+            } else {
+                Some(BTreeSet::from([idx]))
+            },
             ..self.clone()
         }
     }
@@ -3458,9 +3464,9 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
             },
             Var(idx) => {
-                if let Some(idx2) = self.context.opt_self_var {
-                    if *idx == idx2 {
-                        return f.write_str("Self");
+                if let Some(recursive_vars) = &self.context.recursive_vars {
+                    if recursive_vars.contains(idx) {
+                        return f.write_str("..");
                     }
                 }
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
