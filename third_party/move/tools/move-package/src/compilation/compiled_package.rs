@@ -158,18 +158,15 @@ impl OnDiskCompiledPackage {
         }
         let mut bytecode_deps = vec![];
         for dep_name in self.package.bytecode_deps.iter().copied() {
-            let addr = self
-                .package
-                .compiled_package_info
-                .address_alias_instantiation
-                .get(&dep_name)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Dependency {} not found in address alias instantiation",
-                        dep_name
-                    )
-                })?;
-            bytecode_deps.push((dep_name, NumericalAddress::from_account_address(*addr)));
+            let bytecode_paths = self.get_compiled_units_paths(dep_name)?;
+            let mut addrs = BTreeSet::new();
+            for bytecode_path in bytecode_paths {
+                let addr = get_module_addr(dep_name, bytecode_path.as_str())?;
+                addrs.insert(addr);
+            }
+            for addr in addrs {
+                bytecode_deps.push((dep_name, addr));
+            }
         }
 
         let docs_path = self
