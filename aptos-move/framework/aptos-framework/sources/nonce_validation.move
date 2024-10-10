@@ -53,7 +53,7 @@ module aptos_framework::nonce_validation {
             txn_expiration_time,
         };
         let hash = sip_hash_from_value(&nonce_key);
-        let index = hash % 100000;
+        let index = hash % 200000;
         if (!table::contains(&nonce_history.table_1, index)) {
             table::add(&mut nonce_history.table_1, index, vector::empty());
         };
@@ -71,7 +71,7 @@ module aptos_framework::nonce_validation {
             txn_expiration_time,
         };
         let hash = sip_hash_from_value(&nonce_key);
-        let index = hash % 100000;
+        let index = hash % 200000;
         let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
         if (table::contains(&nonce_history.table_1, index)) {
             if (vector::contains(table::borrow(&nonce_history.table_1, index), &nonce_key)) {
