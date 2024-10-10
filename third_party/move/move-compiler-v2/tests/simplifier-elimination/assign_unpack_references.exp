@@ -1,8 +1,8 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
-        s1: 0x8675309::M::S,
-        s2: 0x8675309::M::S,
+        s1: S,
+        s2: S,
     }
     struct S {
         f: u64,

@@ -3,12 +3,12 @@ module 0x42::fields {
     struct T {
         h: u64,
     }
-    struct G {
-        f: #0,
+    struct G<X> {
+        f: X,
     }
     struct S {
         f: u64,
-        g: 0x42::fields::T,
+        g: T,
     }
     private fun read_generic_val(x: G<u64>): u64 {
         select fields::G.f<G<u64>>(x)

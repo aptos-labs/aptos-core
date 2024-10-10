@@ -9,9 +9,9 @@ module 0x815::m {
         Red,
         Blue,
     }
-    enum Generic {
+    enum Generic<T> {
         Foo {
-            0: #0,
+            0: T,
         }
         Bar {
             0: u64,

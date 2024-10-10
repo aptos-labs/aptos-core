@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct Cup {
-        f1: #0,
+    struct Cup<T> {
+        f1: T,
     }
     struct R {
         dummy_field: bool,

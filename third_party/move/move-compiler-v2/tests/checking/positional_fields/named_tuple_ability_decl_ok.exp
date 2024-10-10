@@ -6,23 +6,23 @@ module 0x42::test {
     struct S1 {
         0: u8,
     }
-    struct S2 {
-        0: #0,
+    struct S2<T> {
+        0: T,
         1: u8,
     }
-    struct S3 {
-        0: #0,
+    struct S3<T> {
+        0: T,
         1: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: u8,
-        y: #0,
+        y: T,
     }
-    struct S5 {
-        0: #0,
-        1: 0x42::test::S3<#0>,
+    struct S5<T> {
+        0: T,
+        1: S3<T>,
     }
-    struct S6 {
+    struct S6<T> {
         dummy_field: bool,
     }
 } // end 0x42::test
