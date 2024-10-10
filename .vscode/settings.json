@@ -2,5 +2,17 @@
     "rust-analyzer.rustfmt.extraArgs": [
         "+nightly"
     ],
-    "rust-analyzer.showUnlinkedFileNotification": false
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.check.extraArgs": [
+        "--",
+        "-Wclippy:all",
+        "-Aclippy::upper_case_acronyms",
+        "-Aclippy::enum-variant-names",
+        "-Aclippy::result-large-err",
+        "-Aclippy::mutable-key-type",
+        "-Aclippy::map_identity",
+        "-Dwarnings"
+    ],
+    "rust-analyzer.check.workspace": false
 }

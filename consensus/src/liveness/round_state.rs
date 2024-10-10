@@ -8,8 +8,11 @@ use crate::{
     util::time_service::{SendTask, TimeService},
 };
 use aptos_consensus_types::{
-    common::Round, round_timeout::RoundTimeout, sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote,
+    common::Round,
+    round_timeout::{RoundTimeout, RoundTimeoutReason},
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutWithPartialSignatures,
+    vote::Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
@@ -19,17 +22,17 @@ use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
 
 /// A reason for starting a new round: introduced for monitoring / debug purposes.
-#[derive(Serialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub enum NewRoundReason {
     QCReady,
-    Timeout,
+    Timeout(RoundTimeoutReason),
 }
 
 impl fmt::Display for NewRoundReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             NewRoundReason::QCReady => write!(f, "QCReady"),
-            NewRoundReason::Timeout => write!(f, "TCReady"),
+            NewRoundReason::Timeout(_) => write!(f, "TCReady"),
         }
     }
 }
@@ -240,7 +243,11 @@ impl RoundState {
 
     /// Notify the RoundState about the potentially new QC, TC, and highest ordered round.
     /// Note that some of these values might not be available by the caller.
-    pub fn process_certificates(&mut self, sync_info: SyncInfo) -> Option<NewRoundEvent> {
+    pub fn process_certificates(
+        &mut self,
+        sync_info: SyncInfo,
+        verifier: &ValidatorVerifier,
+    ) -> Option<NewRoundEvent> {
         if sync_info.highest_ordered_round() > self.highest_ordered_round {
             self.highest_ordered_round = sync_info.highest_ordered_round();
         }
@@ -254,13 +261,21 @@ impl RoundState {
             self.vote_sent = None;
             self.timeout_sent = None;
             let timeout = self.setup_timeout(1);
+
+            let (prev_round_timeout_votes, prev_round_timeout_reason) = prev_round_timeout_votes
+                .map(|votes| votes.unpack_aggregate(verifier))
+                .unzip();
+
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
             let new_round_reason = if sync_info.highest_certified_round() + 1 == new_round {
                 NewRoundReason::QCReady
             } else {
-                NewRoundReason::Timeout
+                let prev_round_timeout_reason =
+                    prev_round_timeout_reason.unwrap_or(RoundTimeoutReason::Unknown);
+                NewRoundReason::Timeout(prev_round_timeout_reason)
             };
+
             let new_round_event = NewRoundEvent {
                 round: self.current_round,
                 reason: new_round_reason,
