@@ -76,15 +76,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         resolver: &'r R,
     ) -> Self {
         let mut extensions = NativeContextExtensions::default();
-        let sender = session_id.sender();
-        let sequence_number = session_id.sequence_number();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
             .to_vec()
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
 
-        extensions.add(NativeTableContext::new(txn_hash, resolver, sender, sequence_number));
+        extensions.add(NativeTableContext::new(txn_hash, resolver));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(
@@ -99,8 +97,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             session_id.into_script_hash(),
             chain_id.id(),
             maybe_user_transaction_context,
-            sender,
-            sequence_number,
         ));
         extensions.add(NativeCodeContext::default());
         extensions.add(NativeStateStorageContext::new(resolver));
