@@ -4,14 +4,17 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
+use crate::{
+    components::{apply_chunk_output::ApplyChunkOutput, executed_chunk::ExecutedChunk},
+    metrics,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},

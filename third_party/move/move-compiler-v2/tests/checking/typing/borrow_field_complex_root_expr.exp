@@ -3,36 +3,54 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(cond: bool,s: &M::S,s_mut: &mut M::S) {
-        Borrow(Immutable)(select M::S.f<&M::S>(if cond {
+    private fun t0(cond: bool,s: &S,s_mut: &mut S) {
+        Borrow(Immutable)(select M::S.f<&S>(if cond {
           s
         } else {
           s
         }));
-        Borrow(Immutable)(select M::S.f<&M::S>(if cond {
+        Borrow(Immutable)(select M::S.f<&S>(if cond {
           Freeze(false)(s_mut)
         } else {
           s
         }));
-        Borrow(Immutable)(select M::S.f<&M::S>(if cond {
+        Borrow(Immutable)(select M::S.f<&S>(if cond {
           s
         } else {
           Freeze(false)(s_mut)
         }));
-        Borrow(Immutable)(select M::S.f<&mut M::S>(if cond {
+        Borrow(Immutable)(select M::S.f<&mut S>(if cond {
           s_mut
         } else {
           s_mut
         }));
-        Borrow(Mutable)(select M::S.f<&mut M::S>(if cond {
+        Borrow(Mutable)(select M::S.f<&mut S>(if cond {
           s_mut
         } else {
           s_mut
         }));
-        Borrow(Immutable)(select M::S.f<&M::S>({
-          let s: M::S = pack M::S(0);
+        Borrow(Immutable)(select M::S.f<&S>({
+          let s: S = pack M::S(0);
           Borrow(Immutable)(s)
         }));
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S has drop {
+        f: u64,
+    }
+    fun t0(cond: bool, s: &S, s_mut: &mut S) {
+        &(if (cond) s else s).f;
+        &(if (cond) /*freeze*/s_mut else s).f;
+        &(if (cond) s else /*freeze*/s_mut).f;
+        &(if (cond) s_mut else s_mut).f;
+        &mut (if (cond) s_mut else s_mut).f;
+        &{
+            let s = S{f: 0};
+            &s
+        }.f;
+    }
+}

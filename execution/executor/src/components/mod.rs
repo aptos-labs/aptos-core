@@ -10,4 +10,5 @@ pub mod chunk_commit_queue;
 pub mod chunk_output;
 pub mod in_memory_state_calculator_v2;
 
+pub mod executed_chunk;
 pub mod transaction_chunk;

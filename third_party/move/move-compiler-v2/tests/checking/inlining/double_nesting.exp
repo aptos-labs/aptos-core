@@ -22,5 +22,24 @@ module 0x42::test {
     }
 } // end 0x42::test
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::mathtest2 {
+    public inline fun fun2(a: u64, b: u64, c: u64): u64 {
+        7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+    }
+}
+module 0x42::mathtest {
+    public inline fun fun1(a: u64, b: u64, c: u64): u64 {
+        2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+    }
+}
+module 0x42::test {
+    use 0x42::mathtest2;
+    use 0x42::mathtest;
+    fun test_nested_fun1() {
+        if (true) () else abort 0;
+    }
+}
+
 
 ============ bytecode verification succeeded ========

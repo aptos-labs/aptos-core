@@ -9,6 +9,7 @@ use crate::{
         apply_chunk_output::{ensure_no_discard, ensure_no_retry, ApplyChunkOutput},
         chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
         chunk_output::ChunkOutput,
+        executed_chunk::ExecutedChunk,
         transaction_chunk::TransactionChunkWithProof,
     },
     logging::{LogEntry, LogSchema},
@@ -18,8 +19,8 @@ use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
-    TransactionReplayer, VerifyExecutionMode,
+    ChunkCommitNotification, ChunkExecutorTrait, ParsedTransactionOutput, TransactionReplayer,
+    VerifyExecutionMode,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
@@ -418,7 +419,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         )
     }
 
-    fn commit(&self) -> Result<ExecutedChunk> {
+    fn commit(&self) -> Result<Version> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
 
         self.inner.read().as_ref().expect("not reset").commit()
@@ -484,7 +485,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         Ok(())
     }
 
-    fn commit(&self) -> Result<ExecutedChunk> {
+    fn commit(&self) -> Result<Version> {
         let started = Instant::now();
 
         let chunk = self.commit_chunk_impl()?;
@@ -495,7 +496,11 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
             tps = num_committed as f64 / started.elapsed().as_secs_f64(),
             "TransactionReplayer::commit() OK"
         );
-        Ok(chunk)
+
+        Ok(chunk
+            .result_state
+            .current_version
+            .expect("Version must exist after commit."))
     }
 }
 

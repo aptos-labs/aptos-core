@@ -68,11 +68,11 @@ validator:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
     requests:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
   storage:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
@@ -87,9 +87,13 @@ validator:
   affinity: {}
   # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config: {}
-
+  # -- DEPRECATED: it's broken with Cillium a.k.a. GKE DataplaneV2.
+  # -- templates/networkpolicy.yaml kept around for reference in case we want to resurrect it.
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
-  enableNetworkPolicy: true
+  enableNetworkPolicy: false
+  podAnnotations:
+    # Determines which log levels are retained by the Vector pipeline
+    # aptos.dev/min-log-level-to-retain: warn
 
 fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`
@@ -99,11 +103,11 @@ fullnode:
       replicas: 1
   resources:
     limits:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
     requests:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
   storage:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
@@ -124,7 +128,9 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        seeds: {}
+  podAnnotations:
+    # Determines which log levels are retained by the Vector pipeline
+    # aptos.dev/min-log-level-to-retain: warn
 
 service:
   # -- If set, the base domain name to use for External DNS
