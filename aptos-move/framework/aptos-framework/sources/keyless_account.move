@@ -12,6 +12,7 @@ module aptos_framework::keyless_account {
     use aptos_std::ed25519;
     use aptos_framework::chain_status;
     use aptos_framework::system_addresses;
+    friend aptos_framework::async_reconfig;
 
     // The `aptos_framework::reconfiguration_with_dkg` module needs to be able to call `on_new_epoch`.
     friend aptos_framework::reconfiguration_with_dkg;

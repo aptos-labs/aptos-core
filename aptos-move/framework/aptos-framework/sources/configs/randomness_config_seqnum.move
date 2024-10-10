@@ -12,6 +12,7 @@ module aptos_framework::randomness_config_seqnum {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     /// If this seqnum is smaller than a validator local override, the on-chain `RandomnessConfig` will be ignored.
     /// Useful in a chain recovery from randomness stall.
