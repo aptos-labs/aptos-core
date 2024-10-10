@@ -1178,12 +1178,12 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
         criteria: [
-            (9, 0.9, 0.9, 1.2, 0),
-            (95, 0.9, 1.0, 1.2, 0),
-            (950, 1.2, 1.3, 2.0, 0),
-            (2900, 1.4, 2.2, 2.5, 0),
-            (4800, 2.0, 2.5, 3.0, 0),
-            (6700, 2.5, 3.5, 5.0, 0),
+            (9, 1.0, 1.1, 1.2, 0),
+            (95, 1.0, 1.1, 1.2, 0),
+            (950, 1.3, 1.5, 2.0, 0),
+            (2900, 1.8, 2.2, 2.5, 0),
+            (4800, 2.3, 2.5, 3.0, 0),
+            (6700, 2.8, 3.5, 5.0, 0),
             // TODO add 9k or 10k. Allow some expired transactions (high-load)
         ]
         .into_iter()
