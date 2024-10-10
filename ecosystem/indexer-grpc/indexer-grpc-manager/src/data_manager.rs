@@ -308,4 +308,17 @@ impl DataManager {
     pub(crate) async fn get_file_store_version(&self) -> u64 {
         self.file_store_reader.get_latest_version().await.unwrap()
     }
+
+    pub(crate) async fn cache_stats(&self) -> String {
+        let cache = self.cache.read().await;
+        let len = cache.transactions.len() as u64;
+        format!(
+            "cache version: [{}, {}), # of txns: {}, file store version: {}, cache size: {}",
+            cache.start_version,
+            cache.start_version + len,
+            len,
+            cache.file_store_version.load(Ordering::SeqCst),
+            cache.cache_size
+        )
+    }
 }

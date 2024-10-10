@@ -85,6 +85,10 @@ impl HistoricalDataService {
         });
     }
 
+    pub(crate) fn get_connection_manager(&self) -> &ConnectionManager {
+        &self.connection_manager
+    }
+
     async fn start_streaming(
         &self,
         id: String,
