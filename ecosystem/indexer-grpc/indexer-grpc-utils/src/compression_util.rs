@@ -65,6 +65,7 @@ impl FileStoreMetadata {
     }
 }
 
+#[derive(Debug)]
 pub enum CacheEntry {
     Lz4CompressionProto(Vec<u8>),
     // Only used for legacy cache entry.
@@ -147,7 +148,9 @@ impl CacheEntry {
                 decompressor
                     .read_to_end(&mut decompressed)
                     .expect("Lz4 decompression failed.");
-                Transaction::decode(decompressed.as_slice()).expect("proto deserialization failed.")
+                let res = Transaction::decode(decompressed.as_slice())
+                    .expect("proto deserialization failed.");
+                res
             },
             CacheEntry::Base64UncompressedProto(bytes) => {
                 let bytes: Vec<u8> = base64::decode(bytes).expect("base64 decoding failed.");

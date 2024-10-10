@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{data_service::DataService, service::RawDataServerWrapper};
+use crate::service::RawDataServerWrapper;
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
-    cache_operator::CacheOperator, compression_util::StorageFormat,
-    config::IndexerGrpcFileStoreConfig, in_memory_cache::InMemoryCacheConfig, types::RedisUrl,
+    compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig,
+    in_memory_cache::InMemoryCacheConfig, types::RedisUrl,
 };
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
@@ -14,9 +14,8 @@ use aptos_protos::{
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use aptos_transaction_filter::BooleanTransactionFilter;
-use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use tonic::{codec::CompressionEncoding, transport::Server};
 
 pub const SERVER_NAME: &str = "idxdatasvc";
@@ -29,8 +28,6 @@ const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
 // tonic server: https://docs.rs/tonic/latest/tonic/transport/server/struct.Server.html#method.http2_keepalive_interval
 const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::from_secs(60);
 const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
-
-static DATA_SERVICE: OnceCell<DataService<'static>> = OnceCell::new();
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -68,6 +65,9 @@ pub struct IndexerGrpcDataServiceConfig {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     /// Redis read replica address.
     pub redis_read_replica_address: RedisUrl,
+    /// Support compressed cache data.
+    #[serde(default = "IndexerGrpcDataServiceConfig::default_enable_cache_compression")]
+    pub enable_cache_compression: bool,
     #[serde(default)]
     pub in_memory_cache_config: InMemoryCacheConfig,
     /// Any transaction that matches this filter will be stripped. This means we remove
@@ -105,6 +105,7 @@ impl IndexerGrpcDataServiceConfig {
             disable_auth_check,
             file_store_config,
             redis_read_replica_address,
+            enable_cache_compression,
             in_memory_cache_config,
             txns_to_strip_filter,
         }
@@ -152,14 +153,43 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);
 
-        let (handler_tx, handler_rx) = tokio::sync::mpsc::channel(100);
+        let cache_storage_format: StorageFormat = if self.enable_cache_compression {
+            StorageFormat::Lz4CompressedProto
+        } else {
+            StorageFormat::Base64UncompressedProto
+        };
+
+        println!(
+            ">>>> Starting Redis connection: {:?}",
+            &self.redis_read_replica_address.0
+        );
+        let redis_conn = redis::Client::open(self.redis_read_replica_address.0.clone())?
+            .get_tokio_connection_manager()
+            .await?;
+        println!(">>>> Redis connection established");
+        // InMemoryCache.
+        let in_memory_cache =
+            aptos_indexer_grpc_utils::in_memory_cache::InMemoryCache::new_with_redis_connection(
+                self.in_memory_cache_config.clone(),
+                redis_conn,
+                cache_storage_format,
+            )
+            .await?;
+        println!(">>>> InMemoryCache established");
         // Add authentication interceptor.
-        let raw_data_server =
-            RawDataServerWrapper::new(handler_tx, self.data_service_response_channel_size)?;
-        let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(raw_data_server)
+        let server = RawDataServerWrapper::new(
+            self.redis_read_replica_address.clone(),
+            self.file_store_config.clone(),
+            self.data_service_response_channel_size,
+            self.txns_to_strip_filter.clone(),
+            cache_storage_format,
+            Arc::new(in_memory_cache),
+        )?;
+        let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);
+        println!(">>>> Starting gRPC server: {:?}", &svc);
 
         let svc_clone = svc.clone();
         let reflection_service_clone = reflection_service.clone();
@@ -203,18 +233,6 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                     .map_err(|e| anyhow::anyhow!(e))
             }));
         }
-
-        let redis_client = redis::Client::open(self.redis_read_replica_address.0.clone()).unwrap();
-        let conn =
-            futures::executor::block_on(redis_client.get_tokio_connection_manager()).unwrap();
-        let cache_operator = CacheOperator::new(conn, StorageFormat::Lz4CompressedProto);
-
-        tasks.push(tokio::task::spawn_blocking(move || {
-            DATA_SERVICE
-                .get_or_init(|| DataService::new(cache_operator))
-                .run(handler_rx);
-            Ok(())
-        }));
 
         futures::future::try_join_all(tasks).await?;
         Ok(())
