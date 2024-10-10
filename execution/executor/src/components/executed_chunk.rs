@@ -15,7 +15,7 @@ use aptos_types::account_config::NewEpochEvent;
 use aptos_types::contract_event::ContractEvent;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
+    transaction::TransactionToCommit,
 };
 
 #[derive(Debug)]
@@ -28,53 +28,12 @@ pub struct ExecutedChunk {
 }
 
 impl ExecutedChunk {
-    pub fn reconfig_suffix(&self) -> Self {
-        assert!(self.next_epoch_state.is_some());
-        Self {
-            result_state: self.result_state.clone(),
-            ledger_info: None,
-            next_epoch_state: self.next_epoch_state.clone(),
-            ledger_update_output: self.ledger_update_output.reconfig_suffix(),
-        }
-    }
-
     pub fn transactions_to_commit(&self) -> &Vec<TransactionToCommit> {
         &self.ledger_update_output.to_commit
     }
 
     pub fn has_reconfiguration(&self) -> bool {
         self.next_epoch_state.is_some()
-    }
-
-    pub fn combine(&mut self, rhs: Self) {
-        assert_eq!(
-            self.ledger_update_output.next_version(),
-            rhs.ledger_update_output.first_version(),
-            "Chunks to be combined are not consecutive.",
-        );
-        let Self {
-            result_state,
-            ledger_info,
-            next_epoch_state,
-            ledger_update_output,
-        } = rhs;
-
-        let old_result_state = self.result_state.replace_with(result_state);
-        // TODO(aldenhu): This is very unfortunate. Will revisit soon by remodeling the state diff.
-        if self.result_state.base_version > old_result_state.base_version
-            && old_result_state.base_version != old_result_state.current_version
-        {
-            combine_or_add_sharded_state_updates(
-                &mut self
-                    .ledger_update_output
-                    .state_updates_until_last_checkpoint,
-                old_result_state.updates_since_base,
-            )
-        }
-
-        self.ledger_info = ledger_info;
-        self.next_epoch_state = next_epoch_state;
-        self.ledger_update_output.combine(ledger_update_output)
     }
 
     pub fn result_view(&self) -> ExecutedTrees {

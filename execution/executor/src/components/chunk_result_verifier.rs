@@ -133,3 +133,29 @@ impl ChunkResultVerifier for StateSyncChunkVerifier {
         }
     }
 }
+
+pub struct ReplayChunkVerifier {
+    pub transaction_infos: Vec<TransactionInfo>,
+}
+
+impl ChunkResultVerifier for ReplayChunkVerifier {
+    fn verify_chunk_result(
+        &self,
+        _parent_accumulator: &InMemoryTransactionAccumulator,
+        ledger_update_output: &LedgerUpdateOutput,
+    ) -> Result<()> {
+        ledger_update_output.ensure_transaction_infos_match(&self.transaction_infos)
+    }
+
+    fn transaction_infos(&self) -> &[TransactionInfo] {
+        &self.transaction_infos
+    }
+
+    fn maybe_select_chunk_ending_ledger_info(
+        &self,
+        _ledger_update_output: &LedgerUpdateOutput,
+        _next_epoch_state: Option<&EpochState>,
+    ) -> Result<Option<LedgerInfoWithSignatures>> {
+        Ok(None)
+    }
+}
