@@ -114,6 +114,7 @@ jobs:
             echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
           fi
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
+          echo "To cancel this job, do `pnpm infra ci cancel-workflow ${{ github.run_id }}` from internal-ops" >> $GITHUB_STEP_SUMMARY
 
 # Test definitions start below
 # To add a new Forge test, add a new job definition below. Copy all fields and change only the:
