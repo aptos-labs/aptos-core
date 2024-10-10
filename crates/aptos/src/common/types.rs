@@ -1899,7 +1899,7 @@ impl TransactionOptions {
         let sequence_number = account.sequence_number;
 
         let balance = client
-            .get_account_balance_at_version(sender_address, version)
+            .view_apt_account_balance_at_version(sender_address, version)
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?
             .into_inner();
@@ -1908,7 +1908,7 @@ impl TransactionOptions {
             if gas_unit_price == 0 {
                 DEFAULT_MAX_GAS
             } else {
-                std::cmp::min(balance.coin.value.0 / gas_unit_price, DEFAULT_MAX_GAS)
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
             }
         });
 
