@@ -2243,10 +2243,11 @@ fn type_(context: &mut Context, sp!(loc, pt_): P::Type) -> E::Type {
             }
         },
         PT::Ref(mut_, inner) => ET::Ref(mut_, Box::new(type_(context, *inner))),
-        PT::Fun(args, result) => {
+        PT::Fun(args, result, abilities_vec) => {
             let args = types(context, args);
             let result = type_(context, *result);
-            ET::Fun(args, Box::new(result))
+            let abilities = ability_set(context, "modifier", abilities_vec);
+            ET::Fun(args, Box::new(result), abilities)
         },
     };
     sp(loc, t_)
@@ -2536,7 +2537,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 },
             }
         },
-        PE::Call(pn, kind, ptys_opt, sp!(rloc, prs)) => {
+        PE::Call(pn, kind, ptys_opt, sp!(rloc, prs), ends_in_dotdot) => {
             let tys_opt = optional_types(context, ptys_opt);
             let ers = sp(rloc, exps(context, prs));
             let en_opt = if kind != CallKind::Receiver {
@@ -2554,12 +2555,17 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 Some(E::ModuleAccess::new(pn.loc, E::ModuleAccess_::Name(name)))
             };
             match en_opt {
-                Some(en) => EE::Call(en, kind, tys_opt, ers),
+                Some(en) => EE::Call(en, kind, tys_opt, ers, ends_in_dotdot),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
                 },
             }
+        },
+        PE::ExpCall(boxed_fexp, sp!(rloc, args), ends_in_dotdot) => {
+            let e_fexp = exp(context, *boxed_fexp);
+            let e_args = sp(rloc, exps(context, args));
+            EE::ExpCall(e_fexp, e_args, ends_in_dotdot)
         },
         PE::Pack(pn, ptys_opt, pfields) => {
             let en_opt = name_access_chain(
@@ -2614,11 +2620,12 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::While(pb, ploop) => EE::While(exp(context, *pb), exp(context, *ploop)),
         PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
-        PE::Lambda(pbs, pe) => {
+        PE::Lambda(pbs, pe, capture_kind, abilities_vec) => {
             let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
+            let abilities = ability_set(context, "lambda expression", abilities_vec);
             match tbs_opt {
-                Some(tbs) => EE::Lambda(tbs, Box::new(e)),
+                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind, abilities),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -3305,7 +3312,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Name(sp!(_, E::ModuleAccess_::Name(n)), _) => {
             unbound.vars.insert(*n);
         },
-        EE::Call(sp!(_, ma_), _, _, sp!(_, es_)) => {
+        EE::Call(sp!(_, ma_), _, _, sp!(_, es_), _ends_in_dotdot) => {
             match ma_ {
                 // capture the case of calling a lambda / function pointer
                 // NOTE: this also captures calls to built-in move and spec functions
@@ -3315,6 +3322,10 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
                 },
                 E::ModuleAccess_::ModuleAccess(..) => (),
             }
+            unbound_names_exps(unbound, es_);
+        },
+        EE::ExpCall(fexp, sp!(_, es_), _ends_in_dotdot) => {
+            unbound_names_exp(unbound, &fexp);
             unbound_names_exps(unbound, es_);
         },
         EE::Vector(_, _, sp!(_, es_)) => unbound_names_exps(unbound, es_),
@@ -3341,7 +3352,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Loop(eloop) => unbound_names_exp(unbound, eloop),
 
         EE::Block(seq) => unbound_names_sequence(unbound, seq),
-        EE::Lambda(ls, er) => {
+        EE::Lambda(ls, er, _capture_kind, _abilities) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
             unbound_names_typed_binds(unbound, ls);

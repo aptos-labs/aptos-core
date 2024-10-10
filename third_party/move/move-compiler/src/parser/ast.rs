@@ -488,7 +488,7 @@ pub enum Type_ {
     // &mut t
     Ref(bool, Box<Type>),
     // (t1,...,tn):t
-    Fun(Vec<Type>, Box<Type>),
+    Fun(Vec<Type>, Box<Type>, Vec<Ability>),
     // ()
     Unit,
     // (t1, t2, ... , tn)
@@ -644,6 +644,34 @@ pub enum CallKind {
     Receiver,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Default)]
+pub enum LambdaCaptureKind {
+    /// Direct use (e.g., inlining)
+    #[default]
+    Default,
+    /// Copy
+    Copy,
+    /// Move
+    Move,
+    /// Borrow (`&`)
+    Borrow,
+}
+
+impl fmt::Display for LambdaCaptureKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &LambdaCaptureKind::Default => {
+                write!(f, "")
+            },
+            &LambdaCaptureKind::Copy => {
+                write!(f, "copy")
+            },
+            &LambdaCaptureKind::Move => write!(f, "move"),
+            &LambdaCaptureKind::Borrow => write!(f, "&"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Exp_ {
@@ -663,6 +691,14 @@ pub enum Exp_ {
         CallKind,
         Option<Vec<Type>>,
         Spanned<Vec<Exp>>,
+        bool, // ends in ".."
+    ),
+
+    // e(earg,* [..]?)
+    ExpCall(
+        Box<Exp>,
+        Spanned<Vec<Exp>>,
+        bool, // ends in ".."
     ),
 
     // tn {f1: e1, ... , f_n: e_n }
@@ -688,7 +724,7 @@ pub enum Exp_ {
     // { seq }
     Block(Sequence),
     // | x1 [: t1], ..., xn [: tn] | e
-    Lambda(TypedBindList, Box<Exp>),
+    Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind, Vec<Ability>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -1732,11 +1768,12 @@ impl AstDebug for Type_ {
                 }
                 s.ast_debug(w)
             },
-            Type_::Fun(args, result) => {
+            Type_::Fun(args, result, abilities) => {
                 w.write("(");
                 w.comma(args, |w, ty| ty.ast_debug(w));
                 w.write("):");
                 result.ast_debug(w);
+                ability_constraints_ast_debug(w, &abilities);
             },
         }
     }
@@ -1821,7 +1858,7 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             },
-            E::Call(ma, kind, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, kind, tys_opt, sp!(_, rhs), ends_in_dotdot) => {
                 ma.ast_debug(w);
                 w.write(kind.to_string());
                 if let Some(ss) = tys_opt {
@@ -1831,6 +1868,18 @@ impl AstDebug for Exp_ {
                 }
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
+                if ends_in_dotdot {
+                    w.write("..");
+                }
+                w.write(")");
+            },
+            E::ExpCall(arg, sp!(_, rhs), ends_in_dotdot) => {
+                arg.ast_debug(w);
+                w.write("(");
+                w.comma(rhs, |w, e| e.ast_debug(w));
+                if ends_in_dotdot {
+                    w.write("..")
+                }
                 w.write(")");
             },
             E::Pack(ma, tys_opt, fields) => {
@@ -1893,11 +1942,21 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, tbs), e) => {
+            E::Lambda(sp!(_, tbs), e, capture_kind, abilities) => {
+                if *capture_kind != LambdaCaptureKind::Default {
+                    w.write(format!("{} ", capture_kind));
+                }
                 w.write("|");
                 tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
+                if !abilities.is_empty() {
+                    w.write(" has ");
+                    w.list(abilities, ", ", |w, ab_mod| {
+                        ab_mod.ast_debug(w);
+                        false
+                    });
+                }
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);

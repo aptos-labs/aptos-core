@@ -877,7 +877,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+    pub fn check_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
         if !self.parent.env.language_version().is_at_least(version_min) {
             self.parent.env.error(
                 loc,
@@ -885,7 +890,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     "not supported before language version `{}`: {}",
                     version_min, feature
                 ),
-            )
+            );
+            false
+        } else {
+            true
         }
     }
 
@@ -971,11 +979,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                self.check_language_version(
+                if !self.check_language_version(
                     &loc,
                     "constant definitions referring to other constants",
                     LanguageVersion::V2_0,
-                );
+                ) {
+                    continue;
+                }
                 if visited.contains(&const_name) {
                     continue;
                 }

@@ -528,7 +528,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Struct(_, _, _)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -1443,7 +1443,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -1606,7 +1606,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::Error
                 | Type::Var(_) => panic!("unexpected type"),
             }
