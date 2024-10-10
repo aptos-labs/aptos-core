@@ -4,8 +4,9 @@
 
 #![forbid(unsafe_code)]
 
+use crate::components::executed_chunk::ExecutedChunk;
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
 use aptos_types::{
     epoch_state::EpochState,

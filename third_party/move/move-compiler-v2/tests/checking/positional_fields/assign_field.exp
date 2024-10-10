@@ -6,7 +6,7 @@ module 0x42::test {
             1: bool,
         }
         V2 {
-            0: test::S3,
+            0: 0x42::test::S3,
         }
     }
     struct S0 {
@@ -17,20 +17,20 @@ module 0x42::test {
         1: bool,
     }
     struct S2 {
-        0: test::S0,
+        0: 0x42::test::S0,
         1: u8,
     }
     struct S3 {
-        0: test::S2,
-        1: test::S0,
-        2: test::S2,
+        0: 0x42::test::S2,
+        1: 0x42::test::S0,
+        2: 0x42::test::S2,
     }
     private fun assign0(a: u64,b: bool) {
         {
-          let x: test::S1 = pack test::S1(a, b);
+          let x: S1 = pack test::S1(a, b);
           loop {
-            if select test::S1.1<test::S1>(x) {
-              x: test::S1 = pack test::S1(Sub<u64>(select test::S1.0<test::S1>(x), 1), Ge<u64>(select test::S1.0<test::S1>(x), 1));
+            if select test::S1.1<S1>(x) {
+              x: S1 = pack test::S1(Sub<u64>(select test::S1.0<S1>(x), 1), Ge<u64>(select test::S1.0<S1>(x), 1));
               Tuple()
             } else {
               break
@@ -38,18 +38,18 @@ module 0x42::test {
           }
         }
     }
-    private fun assign1(x: test::S1): u64 {
+    private fun assign1(x: S1): u64 {
         {
           let count: u64 = 0;
           loop {
-            if select test::S1.1<test::S1>(x) {
+            if select test::S1.1<S1>(x) {
               {
-                let y: u64 = if Gt<u64>(select test::S1.0<test::S1>(x), 0) {
-                  Sub<u64>(select test::S1.0<test::S1>(x), 1)
+                let y: u64 = if Gt<u64>(select test::S1.0<S1>(x), 0) {
+                  Sub<u64>(select test::S1.0<S1>(x), 1)
                 } else {
                   0
                 };
-                x: test::S1 = pack test::S1(y, Ge<u64>(y, 1));
+                x: S1 = pack test::S1(y, Ge<u64>(y, 1));
                 count: u64 = Add<u64>(count, 1);
                 Tuple()
               }
@@ -60,14 +60,14 @@ module 0x42::test {
           count
         }
     }
-    private fun assign_chained(x: test::S3) {
-        Add<u8>(Add<u8>(select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.0<test::S3>(x))), select test::S0.x<test::S0>(select test::S3.1<test::S3>(x))), select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.2<test::S3>(x))));
-        select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.0<test::S3>(x))) = 0;
-        select test::S0.x<test::S0>(select test::S3.1<test::S3>(x)) = 1;
-        select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.2<test::S3>(x))) = 2;
+    private fun assign_chained(x: S3) {
+        Add<u8>(Add<u8>(select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.0<S3>(x))), select test::S0.x<S0>(select test::S3.1<S3>(x))), select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.2<S3>(x))));
+        select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.0<S3>(x))) = 0;
+        select test::S0.x<S0>(select test::S3.1<S3>(x)) = 1;
+        select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.2<S3>(x))) = 2;
         Tuple()
     }
-    private fun assign_enum(x: &mut test::E) {
+    private fun assign_enum(x: &mut E) {
         match (x) {
           test::E::V1{ 0: x, 1: y } => {
             x = 42;
@@ -75,22 +75,93 @@ module 0x42::test {
             Tuple()
           }
           test::E::V2{ 0: x } => {
-            select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.0<&mut test::S3>(x))) = 0;
-            select test::S0.x<test::S0>(select test::S3.1<&mut test::S3>(x)) = 1;
-            select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.2<&mut test::S3>(x))) = 2;
+            select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.0<&mut S3>(x))) = 0;
+            select test::S0.x<S0>(select test::S3.1<&mut S3>(x)) = 1;
+            select test::S0.x<S0>(select test::S2.0<S2>(select test::S3.2<&mut S3>(x))) = 2;
             Tuple()
           }
         }
 
     }
-    private fun simple(x: test::S1) {
-        select test::S1.0<test::S1>(x) = 42;
-        select test::S1.1<test::S1>(x) = true;
+    private fun simple(x: S1) {
+        select test::S1.0<S1>(x) = 42;
+        select test::S1.1<S1>(x) = true;
         Tuple()
     }
-    private fun simple_ref(x: &mut test::S1) {
-        select test::S1.0<&mut test::S1>(x) = 42;
-        select test::S1.1<&mut test::S1>(x) = true;
+    private fun simple_ref(x: &mut S1) {
+        select test::S1.0<&mut S1>(x) = 42;
+        select test::S1.1<&mut S1>(x) = true;
         Tuple()
     }
 } // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    enum E {
+        V1 {
+            0: u8,
+            1: bool,
+        }
+        V2 {
+            0: S3,
+        }
+    }
+    struct S0 {
+        x: u8,
+    }
+    struct S1 {
+        0: u64,
+        1: bool,
+    }
+    struct S2 {
+        0: S0,
+        1: u8,
+    }
+    struct S3 {
+        0: S2,
+        1: S0,
+        2: S2,
+    }
+    fun assign0(a: u64, b: bool) {
+        let x = S1(a,b);
+        while (x.1) {
+            x = S1(x.0 - 1,x.0 >= 1);
+        }
+    }
+    fun assign1(x: S1): u64 {
+        let count = 0;
+        while (x.1) {
+            let y = if (x.0 > 0) x.0 - 1 else 0;
+            x = S1(y,y >= 1);
+            count = count + 1;
+        };
+        count
+    }
+    fun assign_chained(x: S3) {
+        x.0.0.x + x.1.x + x.2.0.x;
+        x.0.0.x = 0u8;
+        x.1.x = 1u8;
+        x.2.0.x = 2u8;
+    }
+    fun assign_enum(x: &mut E) {
+        match (x) {
+            E::V1(x,y) => {
+                *x = 42u8;
+                *y = true;
+            },
+            E::V2(x) => {
+                x.0.0.x = 0u8;
+                x.1.x = 1u8;
+                x.2.0.x = 2u8;
+            },
+        }
+    }
+    fun simple(x: S1) {
+        x.0 = 42;
+        x.1 = true;
+    }
+    fun simple_ref(x: &mut S1) {
+        x.0 = 42;
+        x.1 = true;
+    }
+}

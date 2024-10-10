@@ -4,18 +4,18 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun t(account: &signer)
-        acquires M::R(*)
+        acquires 0x8675309::M::R(*)
      {
         {
-          let _: bool = exists<M::R>(0x0);
+          let _: bool = exists<R>(0x0);
           {
-            let (): () = MoveTo<M::R>(account, pack M::R(false));
+            let (): () = MoveTo<R>(account, pack M::R(false));
             {
-              let _: &M::R = BorrowGlobal(Immutable)<M::R>(0x0);
+              let _: &R = BorrowGlobal(Immutable)<R>(0x0);
               {
-                let _: &mut M::R = BorrowGlobal(Mutable)<M::R>(0x0);
+                let _: &mut R = BorrowGlobal(Mutable)<R>(0x0);
                 {
-                  let M::R{ dummy_field: _ } = MoveFrom<M::R>(0x0);
+                  let M::R{ dummy_field: _ } = MoveFrom<R>(0x0);
                   Tuple()
                 }
               }
@@ -24,3 +24,18 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R has key {
+    }
+    fun t(account: &signer)
+        acquires R
+    {
+        let _ = exists<R>(0x0);
+        let () = move_to<R>(account, R{});
+        let _ = borrow_global<R>(0x0);
+        let _ = borrow_global_mut<R>(0x0);
+        let R{} = move_from<R>(0x0);
+    }
+}

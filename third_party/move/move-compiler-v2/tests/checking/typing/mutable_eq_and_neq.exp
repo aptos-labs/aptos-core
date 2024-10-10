@@ -4,14 +4,14 @@ module 0x8675309::M {
         f: bool,
     }
     struct P {
-        b1: M::B,
-        b2: M::B,
+        b1: 0x8675309::M::B,
+        b2: 0x8675309::M::B,
     }
     struct S {
         f: u64,
         g: u64,
     }
-    private fun t(r1: &mut u64,r2: &mut u64,s: &mut M::S) {
+    private fun t(r1: &mut u64,r2: &mut u64,s: &mut S) {
         Eq<u64>(Freeze(false)(r1), Freeze(false)(r1));
         Eq<u64>(Freeze(false)(r1), Freeze(false)(r2));
         Eq<u64>(Freeze(false)(r2), Freeze(false)(r2));
@@ -20,26 +20,67 @@ module 0x8675309::M {
         Neq<u64>(Freeze(false)(r1), Freeze(false)(r2));
         Neq<u64>(Freeze(false)(r2), Freeze(false)(r2));
         Neq<u64>(Freeze(false)(r2), Freeze(false)(r2));
-        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
-        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
-        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
-        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
-        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
-        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
-        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
-        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut S>(s))));
         Tuple()
     }
-    private fun t1(p: &mut M::P) {
+    private fun t1(p: &mut P) {
         {
-          let comp: bool = Eq<M::B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut M::P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut M::P>(p))));
-          select M::B.f<M::B>(select M::P.b1<&mut M::P>(p)) = comp
+          let comp: bool = Eq<B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut P>(p))));
+          select M::B.f<B>(select M::P.b1<&mut P>(p)) = comp
         }
     }
-    private fun t2(p: &mut M::P) {
+    private fun t2(p: &mut P) {
         {
-          let comp: bool = Neq<M::B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut M::P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut M::P>(p))));
-          select M::B.f<M::B>(select M::P.b1<&mut M::P>(p)) = comp
+          let comp: bool = Neq<B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut P>(p))));
+          select M::B.f<B>(select M::P.b1<&mut P>(p)) = comp
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct B {
+        f: bool,
+    }
+    struct P {
+        b1: B,
+        b2: B,
+    }
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    fun t(r1: &mut u64, r2: &mut u64, s: &mut S) {
+        /*freeze*/r1 == /*freeze*/r1;
+        /*freeze*/r1 == /*freeze*/r2;
+        /*freeze*/r2 == /*freeze*/r2;
+        /*freeze*/r2 == /*freeze*/r2;
+        /*freeze*/r1 != /*freeze*/r1;
+        /*freeze*/r1 != /*freeze*/r2;
+        /*freeze*/r2 != /*freeze*/r2;
+        /*freeze*/r2 != /*freeze*/r2;
+        /*freeze*/&mut s.f == /*freeze*/&mut s.f;
+        /*freeze*/&mut s.f == /*freeze*/&mut s.g;
+        /*freeze*/&mut s.g == /*freeze*/&mut s.f;
+        /*freeze*/&mut s.g == /*freeze*/&mut s.g;
+        /*freeze*/&mut s.f != /*freeze*/&mut s.f;
+        /*freeze*/&mut s.f != /*freeze*/&mut s.g;
+        /*freeze*/&mut s.g != /*freeze*/&mut s.f;
+        /*freeze*/&mut s.g != /*freeze*/&mut s.g;
+    }
+    fun t1(p: &mut P) {
+        let comp = /*freeze*/&mut p.b1 == /*freeze*/&mut p.b2;
+        p.b1.f = comp
+    }
+    fun t2(p: &mut P) {
+        let comp = /*freeze*/&mut p.b1 != /*freeze*/&mut p.b2;
+        p.b1.f = comp
+    }
+}

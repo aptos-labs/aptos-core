@@ -221,6 +221,7 @@ members = [
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
     "third_party/move/move-model/bytecode-test-utils",
+    "third_party/move/move-model/bytecode/ast-generator-tests",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
@@ -791,6 +792,7 @@ tonic = { version = "0.11.0", features = [
     "zstd",
 ] }
 tonic-reflection = "0.11.0"
+topological-sort = "0.2.2"
 triomphe = "0.1.9"
 tui = "0.19.0"
 typed-arena = "2.0.2"
