@@ -256,9 +256,9 @@ impl SafetyRules {
         ))
     }
 
-    // unguarded_* are only used in the fuzzer
+    // fuzzer_guarded* are only used in the loki fuzzer
     #[cfg(loki_fuzzer)]
-    fn unguarded_consensus_state(&mut self) -> Result<ConsensusState, Error> {
+    fn fuzzer_guarded_consensus_state(&mut self) -> Result<ConsensusState, Error> {
         let waypoint = self.persistent_storage.waypoint()?;
         let safety_data = self.persistent_storage.safety_data()?;
 
@@ -361,7 +361,7 @@ impl SafetyRules {
     }
 
     #[cfg(loki_fuzzer)]
-    fn unguarded_initialize(&mut self, proof: &EpochChangeProof) -> Result<(), Error> {
+    fn fuzzer_guarded_initialize(&mut self, proof: &EpochChangeProof) -> Result<(), Error> {
         let waypoint = self.persistent_storage.waypoint()?;
         let last_li = proof
             .verify(&waypoint)
@@ -464,7 +464,7 @@ impl SafetyRules {
             )));
         }
 
-        //self.verify_qc(block_data.quorum_cert())?;
+        self.verify_qc(block_data.quorum_cert())?;
         self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
         // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
 
@@ -473,7 +473,7 @@ impl SafetyRules {
     }
 
     #[cfg(loki_fuzzer)]
-    fn unguarded_sign_proposal(
+    fn fuzzer_guarded_sign_proposal(
         &mut self,
         block_data: &BlockData,
     ) -> Result<bls12381::Signature, Error> {
@@ -547,7 +547,7 @@ impl SafetyRules {
     }
 
     #[cfg(loki_fuzzer)]
-    fn unguarded_sign_commit_vote(
+    fn fuzzer_guarded_sign_commit_vote(
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
@@ -602,7 +602,7 @@ impl TSafetyRules for SafetyRules {
         let cb = || self.guarded_consensus_state();
         
         #[cfg(loki_fuzzer)]
-        let cb = || self.unguarded_consensus_state();
+        let cb = || self.fuzzer_guarded_consensus_state();
         
         run_and_log(cb, |log| log, LogEntry::ConsensusState)
     }
@@ -612,7 +612,7 @@ impl TSafetyRules for SafetyRules {
         let cb = || self.guarded_initialize(proof);
         
         #[cfg(loki_fuzzer)]
-        let cb = || self.unguarded_initialize(proof);
+        let cb = || self.fuzzer_guarded_initialize(proof);
 
         run_and_log(cb, |log| log, LogEntry::Initialize)
     }
@@ -623,7 +623,7 @@ impl TSafetyRules for SafetyRules {
         let cb = || self.guarded_sign_proposal(block_data);
 
         #[cfg(loki_fuzzer)]
-        let cb = || self.unguarded_sign_proposal(block_data);
+        let cb = || self.fuzzer_guarded_sign_proposal(block_data);
         
         run_and_log(cb, |log| log.round(round), LogEntry::SignProposal)
     }
@@ -687,7 +687,7 @@ impl TSafetyRules for SafetyRules {
         let cb = || self.guarded_sign_commit_vote(ledger_info, new_ledger_info);
         
         #[cfg(loki_fuzzer)]
-        let cb = || self.unguarded_sign_commit_vote(ledger_info, new_ledger_info);
+        let cb = || self.fuzzer_guarded_sign_commit_vote(ledger_info, new_ledger_info);
         
         run_and_log(cb, |log| log, LogEntry::SignCommitVote)
     }
