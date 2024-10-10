@@ -434,6 +434,10 @@ impl StateComputeResult {
         input_txns: Vec<Transaction>,
         block_id: HashValue,
     ) -> Vec<Transaction> {
+        if self.is_reconfiguration_suffix() {
+            return vec![];
+        }
+
         assert_eq!(
             input_txns.len(),
             self.compute_status_for_input_txns().len(),
@@ -517,6 +521,10 @@ impl StateComputeResult {
 
     pub fn subscribable_events(&self) -> &[ContractEvent] {
         &self.subscribable_events
+    }
+
+    pub fn is_reconfiguration_suffix(&self) -> bool {
+        self.has_reconfiguration() && self.compute_status_for_input_txns().is_empty()
     }
 }
 
