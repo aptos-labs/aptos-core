@@ -657,7 +657,7 @@ impl CompiledPackage {
                     );
                     compiler_driver_v1(compiler)?
                 },
-                CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
+                version @ CompilerVersion::V2_0 | version @ CompilerVersion::V2_1 => {
                     let to_str_vec = |ps: &[Symbol]| {
                         ps.iter()
                             .map(move |s| s.as_str().to_owned())
@@ -704,12 +704,11 @@ impl CompiledPackage {
                         skip_attribute_checks,
                         known_attributes: known_attributes.clone(),
                         language_version: Some(effective_language_version),
+                        compiler_version: Some(version),
                         compile_test_code: flags.keep_testing_functions(),
+                        experiments: config.experiments.clone(),
                         ..Default::default()
                     };
-                    for experiment in &config.experiments {
-                        options = options.set_experiment(experiment, true)
-                    }
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                     compiler_driver_v2(options)?
                 },
@@ -1176,7 +1175,7 @@ pub fn build_and_report_no_exit_v2_driver(
 fn get_module_addr(pkg_name: Symbol, pkg_path: &str) -> Result<NumericalAddress> {
     // Read the bytecode file
     let mut bytecode = Vec::new();
-    std::fs::File::open(&pkg_path.to_string())
+    std::fs::File::open(pkg_path)
         .context(format!("Failed to open bytecode file for {}", pkg_path))
         .and_then(|mut file| {
             // read contents of the file into bytecode
