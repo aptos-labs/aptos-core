@@ -3444,6 +3444,34 @@ pub fn basic_test_module() -> CompiledModule {
     m
 }
 
+/// Creates an empty compiled module with specified dependencies and friends. All
+/// modules (including itself) are assumed to be stored at 0x0.
+pub fn empty_module_with_dependencies_and_friends<'a>(
+    module_name: &'a str,
+    dependencies: impl IntoIterator<Item = &'a str>,
+    friends: impl IntoIterator<Item = &'a str>,
+) -> CompiledModule {
+    // Rename this empty module.
+    let mut module = empty_module();
+    module.identifiers[0] = Identifier::new(module_name).unwrap();
+
+    for name in dependencies {
+        module.identifiers.push(Identifier::new(name).unwrap());
+        module.module_handles.push(ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
+        });
+    }
+    for name in friends {
+        module.identifiers.push(Identifier::new(name).unwrap());
+        module.friend_decls.push(ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
+        });
+    }
+    module
+}
+
 /// Return a simple script that contains only a return in the main()
 pub fn empty_script() -> CompiledScript {
     CompiledScript {
@@ -3468,6 +3496,25 @@ pub fn empty_script() -> CompiledScript {
             code: vec![Bytecode::Ret],
         },
     }
+}
+
+/// Creates an empty compiled script with specified dependencies. All dependency
+/// modules are assumed to be stored at 0x0.
+pub fn empty_script_with_dependencies<'a>(
+    dependencies: impl IntoIterator<Item = &'a str>,
+) -> CompiledScript {
+    let mut script = empty_script();
+
+    script.address_identifiers.push(AccountAddress::ZERO);
+    for name in dependencies {
+        script.identifiers.push(Identifier::new(name).unwrap());
+        script.module_handles.push(ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex((script.identifiers.len() - 1) as TableIndex),
+        });
+    }
+
+    script
 }
 
 pub fn basic_test_script() -> CompiledScript {

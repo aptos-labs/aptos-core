@@ -1,13 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
+use crate::{
+    counters::TASK_VALIDATE_MODULES_SECONDS, types::InputOutputKey,
+    value_exchange::filter_value_for_exchange,
+};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_mvhashmap::{
+    code_cache::SyncCodeCache,
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
         ValueWithLayout, Version,
@@ -18,13 +22,18 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
+    executable::ModulePath,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::ModuleCacheEntry,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    value::MoveTypeLayout,
+};
 use std::{
     collections::{
         hash_map::{
@@ -297,11 +306,13 @@ impl DelayedFieldRead {
 pub(crate) struct CapturedReads<T: Transaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
-    // Currently, we record paths for triggering module R/W fallback.
-    // TODO: implement a general functionality once the fallback is removed.
-    pub(crate) module_reads: Vec<T::Key>,
-
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
+
+    /// Captured module reads if V1 loader is used.
+    #[deprecated]
+    pub(crate) module_reads: Vec<T::Key>,
+    /// Captured read modules if V2 loader is used.
+    module_cache_reads: hashbrown::HashMap<ModuleId, Option<Arc<ModuleCacheEntry>>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -475,6 +486,24 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
+    /// Returns the captured read of a module storage entry if it exists, and [None] otherwise.
+    pub(crate) fn get_captured_module_read(
+        &self,
+        address: &AccountAddress,
+        module_id: &IdentStr,
+    ) -> Option<&Option<Arc<ModuleCacheEntry>>> {
+        self.module_cache_reads.get(&(address, module_id))
+    }
+
+    /// Captures the read of a module storage entry.
+    pub(crate) fn capture_module_read(
+        &mut self,
+        module_id: ModuleId,
+        read: Option<Arc<ModuleCacheEntry>>,
+    ) {
+        self.module_cache_reads.insert(module_id, read);
+    }
+
     pub(crate) fn capture_delayed_field_read(
         &mut self,
         id: T::Identifier,
@@ -580,6 +609,24 @@ impl<T: Transaction> CapturedReads<T> {
                 | Err(DeltaApplicationFailure)
                 | Err(Uninitialized) => false,
             }
+        })
+    }
+
+    /// Re-reads the captured modules, and checks if the reads are still the same:
+    ///   1. All modules that did not exist, still do not exist.
+    ///   2. All modules that existed, have the same hash (i.e., has not changed).
+    pub(crate) fn validate_module_reads(&self, code_cache: &SyncCodeCache) -> bool {
+        let _timer = TASK_VALIDATE_MODULES_SECONDS.start_timer();
+        if self.non_delayed_field_speculative_failure {
+            return false;
+        }
+
+        // TODO(loader_v2):
+        //   Should we also check state value metadata? If so, using transaction indices to decide
+        //   the result of validations might be easier.
+        self.module_cache_reads.iter().all(|(id, previous_read)| {
+            let previous_hash = previous_read.as_ref().map(|e| e.hash());
+            code_cache.module_cache().check_hash(id, previous_hash)
         })
     }
 
@@ -691,8 +738,14 @@ impl<T: Transaction> CapturedReads<T> {
             }
         }
 
+        // TODO(loader_v2): Test summaries are the same.
+        #[allow(deprecated)]
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+        for id in self.module_cache_reads.keys() {
+            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+            ret.insert(InputOutputKey::Resource(key));
         }
 
         for (key, read) in &self.delayed_field_reads {
@@ -721,9 +774,13 @@ impl<T: Transaction> CapturedReads<T> {
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct UnsyncReadSet<T: Transaction> {
     pub(crate) resource_reads: HashSet<T::Key>,
-    pub(crate) module_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<T::Identifier>,
+
+    // Module reads: legacy V1 and new V2 sets.
+    #[deprecated]
+    pub(crate) module_reads: HashSet<T::Key>,
+    pub(crate) module_storage_reads: HashSet<ModuleId>,
 }
 
 impl<T: Transaction> UnsyncReadSet<T> {
@@ -741,8 +798,14 @@ impl<T: Transaction> UnsyncReadSet<T> {
             }
         }
 
+        // TODO(loader_v2): Test summaries are the same if we switch.
+        #[allow(deprecated)]
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+        for id in &self.module_storage_reads {
+            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+            ret.insert(InputOutputKey::Resource(key));
         }
 
         for key in &self.delayed_field_reads {

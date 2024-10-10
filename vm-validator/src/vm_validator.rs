@@ -16,6 +16,7 @@ use aptos_types::{
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use rand::{thread_rng, Rng};
@@ -56,7 +57,8 @@ impl VMValidator {
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
         );
-        AptosVM::new(state_view)
+        let env = AptosEnvironment::new(state_view);
+        AptosVM::new(env, state_view)
     }
 
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {

@@ -140,7 +140,9 @@ subsequent incarnation to finish.
 extern crate scopeguard;
 
 mod captured_reads;
+mod code_cache;
 pub mod counters;
+pub mod cross_block_caches;
 pub mod errors;
 pub mod executor;
 mod executor_utilities;

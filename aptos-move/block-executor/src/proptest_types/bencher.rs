@@ -7,8 +7,8 @@ use crate::{
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
-            TransactionGenParams,
+            EmptyDataView, KeyType, MockEnvironment, MockOutput, MockTask, MockTransaction,
+            TransactionGen, TransactionGenParams,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -129,6 +129,7 @@ where
         );
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
+        let env = MockEnvironment::new();
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
@@ -136,7 +137,7 @@ where
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(config, executor_thread_pool, None)
-        .execute_transactions_parallel(&(), &self.transactions, &data_view);
+        .execute_transactions_parallel(&env, &self.transactions, &data_view);
 
         self.baseline_output.assert_parallel_output(&output);
     }
