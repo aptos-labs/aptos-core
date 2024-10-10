@@ -1781,6 +1781,8 @@ dependencies = [
  "aptos-forge",
  "aptos-global-constants",
  "aptos-logger",
+ "aptos-node-resource-metrics",
+ "aptos-push-metrics",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-testcases",
