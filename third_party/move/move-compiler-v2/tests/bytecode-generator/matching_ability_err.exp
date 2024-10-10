@@ -15,11 +15,11 @@ module 0xc0ffee::m {
     enum Outer {
         None,
         One {
-            i: 0xc0ffee::m::Inner,
+            i: Inner,
         }
         Two {
-            i: 0xc0ffee::m::Inner,
-            b: 0xc0ffee::m::Box,
+            i: Inner,
+            b: Box,
         }
     }
     public fun condition_requires_copy(o: Outer): Outer {

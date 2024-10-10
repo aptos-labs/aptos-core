@@ -3,12 +3,12 @@ module 0x42::M {
     struct T {
         x: u64,
     }
-    struct G {
-        x: #0,
+    struct G<T> {
+        x: T,
         y: bool,
     }
     struct R {
-        s: 0x42::M::S,
+        s: S,
     }
     struct S {
         x: u64,

@@ -18,15 +18,15 @@ module 0x42::test {
         0: u8,
         1: bool,
     }
-    struct S3 {
-        0: #0,
+    struct S3<T> {
+        0: T,
         1: u8,
     }
     struct S4 {
         dummy_field: bool,
     }
-    struct S5 {
-        x: #0,
+    struct S5<T> {
+        x: T,
         y: u8,
     }
     private fun S0_inhabited(): S0 {

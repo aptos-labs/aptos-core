@@ -3,8 +3,8 @@ module 0x42::test {
     struct Coin {
         0: u256,
     }
-    struct Wrapper {
-        0: #0,
+    struct Wrapper<T> {
+        0: T,
     }
     private fun add1_new(x: u256): u256 {
         x: u256 = Add<u256>(x, 1);
@@ -40,7 +40,7 @@ module 0x42::test {
         }
     }
     private fun inc_coin_at(addr: address)
-        acquires 0x42::test::Coin(*)
+        acquires Coin(*)
      {
         {
           let coin: &mut Coin = BorrowGlobal(Mutable)<Coin>(addr);
