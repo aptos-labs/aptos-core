@@ -122,7 +122,7 @@ module aptos_framework::transaction_validation {
             //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
             // );
 
-            assert!(!nonce_validation::insert_nonce(transaction_sender, txn_sequence_number, txn_expiration_time),
+            assert!(nonce_validation::insert_nonce(transaction_sender, txn_sequence_number, txn_expiration_time),
                 error::invalid_argument(PROLOGUE_NONCE_ALREADY_EXISTS));
             
             // nonce_validation::insert_nonce(transaction_sender, txn_sequence_number, txn_expiration_time);
