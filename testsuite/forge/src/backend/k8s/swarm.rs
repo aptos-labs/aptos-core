@@ -735,8 +735,8 @@ trait ChaosExperimentOps {
     async fn list_stress_chaos(&self) -> Result<Vec<StressChaos>>;
 
     async fn ensure_chaos_experiments_active(&self) -> Result<()> {
-        let timeout_duration = Duration::from_secs(300); // 5 minutes
-        let polling_interval = Duration::from_secs(5);
+        let timeout_duration = Duration::from_secs(600); // 10 minutes
+        let polling_interval = Duration::from_secs(10);
 
         tokio::time::timeout(timeout_duration, async {
             loop {
