@@ -148,7 +148,7 @@ use std::collections::HashMap;"#,
 fn write_package(file: &mut File, package_path: PathBuf, package_name: &str) -> String {
     println!("Building package {}", package_name);
     // build package
-    let package = BuiltPackage::build(package_path, BuildOptions::default())
+    let package = BuiltPackage::build(package_path, BuildOptions::move_2())
         .expect("building package must succeed");
     let code = package.extract_code();
     let package_metadata = package.extract_metadata().expect("Metadata must exist");
