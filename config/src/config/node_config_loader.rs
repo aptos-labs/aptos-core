@@ -159,9 +159,9 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
     // TODO: can we make this less hacky?
 
     // Load the genesis transaction from disk
-    let genesis_txn = get_genesis_txn(node_config).ok_or(Error::InvariantViolation(
-        "The genesis transaction was not found!".to_string(),
-    ))?;
+    let genesis_txn = get_genesis_txn(node_config).ok_or_else(|| {
+        Error::InvariantViolation("The genesis transaction was not found!".to_string())
+    })?;
 
     // Extract the chain ID from the genesis transaction
     match genesis_txn {

@@ -259,10 +259,10 @@ impl fmt::Display for BackupStorageState {
         write!(
             f,
             "latest_epoch_ending_epoch: {}, latest_state_snapshot_epoch: {}, latest_state_snapshot_version: {}, latest_transaction_version: {}",
-            self.latest_epoch_ending_epoch.as_ref().map_or("none".to_string(), u64::to_string),
-            self.latest_state_snapshot_epoch.as_ref().map_or("none".to_string(), u64::to_string),
-            self.latest_state_snapshot_version.as_ref().map_or("none".to_string(), Version::to_string),
-            self.latest_transaction_version.as_ref().map_or("none".to_string(), Version::to_string),
+            self.latest_epoch_ending_epoch.as_ref().map_or_else(|| "none".to_string(), u64::to_string),
+            self.latest_state_snapshot_epoch.as_ref().map_or_else(|| "none".to_string(), u64::to_string),
+            self.latest_state_snapshot_version.as_ref().map_or_else(|| "none".to_string(), Version::to_string),
+            self.latest_transaction_version.as_ref().map_or_else(|| "none".to_string(), Version::to_string),
         )
     }
 }

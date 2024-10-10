@@ -1117,7 +1117,7 @@ mod tests {
         let signed_transaction = transaction_with_proof
             .transaction
             .try_as_signed_user_txn()
-            .ok_or(anyhow!("not user transaction"))?;
+            .ok_or_else(|| anyhow!("not user transaction"))?;
 
         ensure!(
             transaction_with_proof.version == version,
