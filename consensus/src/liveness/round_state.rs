@@ -376,7 +376,7 @@ impl RoundState {
             round = self.current_round,
             "{:?} passed since the previous deadline.",
             now.checked_sub(self.current_round_deadline)
-                .map_or("0 ms".to_string(), |v| format!("{:?}", v))
+                .map_or_else(|| "0 ms".to_string(), |v| format!("{:?}", v))
         );
         debug!(
             round = self.current_round,
