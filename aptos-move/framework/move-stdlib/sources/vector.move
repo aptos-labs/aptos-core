@@ -41,6 +41,10 @@ module std::vector {
     /// Add element `e` to the end of the vector `self`.
     native public fun push_back<Element>(self: &mut vector<Element>, e: Element);
 
+    // #[bytecode_instruction]
+    // /// Add element `e` to the end of the vector `self` if not already present
+    // native public fun insert<Element>(self: &mut vector<Element>, e: Element): bool;
+
     #[bytecode_instruction]
     /// Return a mutable reference to the `i`th element in the vector `self`.
     /// Aborts if `i` is out of bounds.

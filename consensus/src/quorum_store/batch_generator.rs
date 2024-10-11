@@ -341,7 +341,7 @@ impl BatchGenerator {
             )
             .await
             .unwrap_or_default();
-
+        info!("Pulled {} txns from mempool", pulled_txns.len());
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
         if pulled_txns.is_empty() {

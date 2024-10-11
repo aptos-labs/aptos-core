@@ -411,44 +411,50 @@ impl Mempool {
         let mut total_bytes = 0;
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
-        'main: for txn in self.transactions.iter_queue() {
-            txn_walked += 1;
-            let txn_ptr = TxnPointer::from(txn);
+        let txns = self.transactions.get_transactions();
+        'main: for (_author, author_txns) in txns { 
+            for (_, txn) in author_txns {
 
-            // TODO: removed gas upgraded logic. double check if it's needed
-            if exclude_transactions.contains_key(&txn_ptr) {
-                continue;
-            }
-            let tx_seq = txn.sequence_number.transaction_sequence_number;
-            // let txn_in_sequence = tx_seq > 0
-            //     && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
-            // let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
-            // include transaction if it's "next" for given account or
-            // we've already sent its ancestor to Consensus.
-            // if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
-            if true {
-                inserted.insert((txn.address, tx_seq));
-                result.push((txn.address, tx_seq));
-                if (result.len() as u64) == max_txns {
-                    break;
+
+                txn_walked += 1;
+                let txn_ptr = TxnPointer::from(txn);
+
+                // TODO: removed gas upgraded logic. double check if it's needed
+                if exclude_transactions.contains_key(&txn_ptr) {
+                    continue;
                 }
-
-                // check if we can now include some transactions
-                // that were skipped before for given account
-                let mut skipped_txn = (txn.address, tx_seq + 1);
-                while skipped.remove(&skipped_txn) {
-                    inserted.insert(skipped_txn);
-                    result.push(skipped_txn);
+                let tx_seq = txn.sequence_info.transaction_sequence_number;
+                // let txn_in_sequence = tx_seq > 0
+                //     && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
+                // let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
+                // include transaction if it's "next" for given account or
+                // we've already sent its ancestor to Consensus.
+                // if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
+                if true {
+                    inserted.insert((txn.get_sender(), tx_seq));
+                    result.push((txn.get_sender(), tx_seq));
                     if (result.len() as u64) == max_txns {
-                        break 'main;
+                        break;
                     }
-                    skipped_txn = (skipped_txn.0, skipped_txn.1 + 1);
+
+                    // check if we can now include some transactions
+                    // that were skipped before for given account
+                    let mut skipped_txn = (txn.get_sender(), tx_seq + 1);
+                    while skipped.remove(&skipped_txn) {
+                        inserted.insert(skipped_txn);
+                        result.push(skipped_txn);
+                        if (result.len() as u64) == max_txns {
+                            break 'main;
+                        }
+                        skipped_txn = (skipped_txn.0, skipped_txn.1 + 1);
+                    }
+                } else {
+                    skipped.insert((txn.get_sender(), tx_seq));
                 }
-            } else {
-                skipped.insert((txn.address, tx_seq));
             }
         }
         let result_size = result.len();
+        info!("txns_walked: {:?}, result size: {:?}", txn_walked, result_size);
         let result_end_time = start_time.elapsed();
         let result_time = result_end_time.saturating_sub(gas_end_time);
 

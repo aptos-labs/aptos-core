@@ -353,6 +353,7 @@ impl NativeFunctions {
         self.define(ctx, vector, "borrow", crate::vectors::define_borrow_fun);
         self.define(ctx, vector, "borrow_mut", crate::vectors::define_borrow_fun);
         self.define(ctx, vector, "swap", crate::vectors::define_swap_fun);
+        self.define(ctx, vector, "insert", crate::vectors::define_insert_fun);
         self.define(
             ctx,
             vector,
@@ -677,6 +678,14 @@ fn define_pop_back_fun(
 
     ctx.writer.unindent();
     emitln!(ctx.writer, "}");
+}
+
+fn define_insert_fun(
+    _gen: &mut FunctionGenerator,
+    _ctx: &Context,
+    _fun_id: &QualifiedInstId<FunId>,
+) {
+
 }
 
 fn define_push_back_fun(
