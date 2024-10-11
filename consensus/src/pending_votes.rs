@@ -364,6 +364,7 @@ impl PendingVotes {
                 return VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
                     vote.vote_data().clone(),
                     li_with_sig.clone(),
+                    true,
                 )));
             },
             VoteStatus::NotEnoughVotes(li_with_sig) => {
@@ -389,7 +390,7 @@ impl PendingVotes {
                             Ok(ledger_info_with_sig) => {
                                 *status = VoteStatus::EnoughVotes(ledger_info_with_sig.clone());
                                 return VoteReceptionResult::NewQuorumCertificate(Arc::new(
-                                    QuorumCert::new(vote.vote_data().clone(), ledger_info_with_sig),
+                                    QuorumCert::new(vote.vote_data().clone(), ledger_info_with_sig, true),
                                 ));
                             },
                             Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {

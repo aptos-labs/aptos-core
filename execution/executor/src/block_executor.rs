@@ -309,7 +309,7 @@ where
         // 2. We must have the ledger update output of the parent block.
         let parent_output = parent_block.output.get_ledger_update();
         let parent_accumulator = parent_output.txn_accumulator();
-        let current_output = block_vec.pop().expect("Must exist").unwrap();
+        let current_output = block_vec.pop().expect("Must exist").ok_or(ExecutorError::BlockNotFound(block_id))?;
         parent_block.ensure_has_child(block_id)?;
         if current_output.output.has_ledger_update() {
             info!(

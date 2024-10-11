@@ -208,6 +208,7 @@ impl BlockData {
                 LedgerInfo::new(ancestor, HashValue::zero()),
                 AggregateSignature::empty(),
             ),
+            true,
         );
 
         BlockData::new_genesis(ledger_info.timestamp_usecs(), genesis_quorum_cert)
@@ -297,6 +298,7 @@ impl BlockData {
                     LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                     AggregateSignature::new(BitVec::default(), None),
                 ),
+                true,
             ),
             block_type: BlockType::DAGBlock {
                 author,

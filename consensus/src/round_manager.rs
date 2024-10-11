@@ -41,7 +41,7 @@ use fail::fail_point;
 use futures::{channel::oneshot, pin_mut, stream::FuturesUnordered, task::noop_waker, Future, FutureExt, StreamExt};
 use lru::LruCache;
 use serde::Serialize;
-use std::{borrow::Borrow, mem::Discriminant, pin::Pin, sync::Arc, task::{self, Poll}, time::Duration};
+use std::{borrow::Borrow, mem::Discriminant, ops::Deref, pin::Pin, sync::Arc, task::{self, Poll}, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -1094,14 +1094,18 @@ impl RoundManager {
         {
             let vote_data = vote.vote_data().clone();
             let ledger_info = vote.ledger_info().clone();
-            let num_validators = self.epoch_state.verifier.len() as u16;
-            let mut all_ones = BitVec::with_num_bits(num_validators);
-            (0..num_validators).for_each(|i| all_ones.set(i));
-            let fake_aggregate_signature = AggregateSignature::new(all_ones, None);
+            // let num_validators = self.epoch_state.verifier.len() as u16;
+            // let mut all_ones = BitVec::with_num_bits(num_validators);
+            // (0..num_validators).for_each(|i| all_ones.set(i));
+            // let fake_aggregate_signature = AggregateSignature::new(all_ones, None);
+
+            let highest_oc = self.block_store.highest_ordered_cert();
+            let fake_aggregate_signature = highest_oc.ledger_info().deref().signatures().clone();
+
             let signed_ledger_info = LedgerInfoWithSignatures::new(ledger_info, fake_aggregate_signature);
-            let fake_quorum_cert = QuorumCert::new(vote_data, signed_ledger_info);
+            let fake_quorum_cert = QuorumCert::new(vote_data, signed_ledger_info, false);
             let result = VoteReceptionResult::NewQuorumCertificate(Arc::new(fake_quorum_cert));
-            self.process_vote_reception_result(&vote, result)
+            self.process_vote_reception_result(&vote, result, true)
                 .await?;
         }
 
@@ -1441,7 +1445,7 @@ impl RoundManager {
         let vote_reception_result = self
             .round_state
             .insert_vote(vote, &self.epoch_state.verifier);
-        self.process_vote_reception_result(vote, vote_reception_result)
+        self.process_vote_reception_result(vote, vote_reception_result, false)
             .await
     }
 
@@ -1449,6 +1453,7 @@ impl RoundManager {
         &mut self,
         vote: &Vote,
         result: VoteReceptionResult,
+        fast_proposal: bool,
     ) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
         match result {
@@ -1460,7 +1465,7 @@ impl RoundManager {
                     );
                 }
                 QC_AGGREGATED_FROM_VOTES.inc();
-                self.new_qc_aggregated(qc.clone(), vote.author())
+                self.new_qc_aggregated(qc.clone(), vote.author(), fast_proposal)
                     .await
                     .context(format!(
                         "[RoundManager] Unable to process the created QC {:?}",
@@ -1610,10 +1615,11 @@ impl RoundManager {
         &mut self,
         qc: Arc<QuorumCert>,
         preferred_peer: Author,
+        fast_proposal: bool,
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer), fast_proposal)
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
@@ -1637,6 +1643,7 @@ impl RoundManager {
                     .insert_quorum_cert(
                         verified_qc.as_ref(),
                         &mut self.create_block_retriever(preferred_peer),
+                        false,
                     )
                     .await
                     .context("[RoundManager] Failed to process the QC from order vote msg");

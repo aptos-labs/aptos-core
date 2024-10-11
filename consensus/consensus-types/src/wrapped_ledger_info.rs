@@ -130,6 +130,7 @@ impl WrappedLedgerInfo {
         Ok(QuorumCert::new(
             self.vote_data.clone(),
             self.signed_ledger_info.clone(),
+            true,
         ))
     }
 }
