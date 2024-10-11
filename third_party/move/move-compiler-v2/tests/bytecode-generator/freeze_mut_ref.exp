@@ -7,20 +7,20 @@ module 0x42::freeze_mut_ref {
     struct S {
         dummy_field: bool,
     }
-    public fun borrow_mut<Element>(map: &mut vector<#0>): &#0 {
+    public fun borrow_mut<Element>(map: &mut vector<Element>): &Element {
         Freeze(false)(vector::borrow_mut<Element>(map, 0))
     }
-    public fun borrow_mut2<Element>(v: &mut #0): &#0 {
+    public fun borrow_mut2<Element>(v: &mut Element): &Element {
         Freeze(false)(v)
     }
-    public fun borrow_mut3<Element>(v1: &mut #0,v2: &#0): &#0 {
+    public fun borrow_mut3<Element>(v1: &mut Element,v2: &Element): &Element {
         if true {
           Freeze(false)(v1)
         } else {
           v2
         }
     }
-    public fun borrow_mut4<Element>(v: &mut #0): &#0 {
+    public fun borrow_mut4<Element>(v: &mut Element): &Element {
         return Freeze(false)(v)
     }
     private fun t0() {
@@ -30,7 +30,7 @@ module 0x42::freeze_mut_ref {
           Tuple()
         }
     }
-    private fun t1(s: &mut freeze_mut_ref::S): &freeze_mut_ref::S {
+    private fun t1(s: &mut S): &S {
         Freeze(false)(s)
     }
     private fun t2(u1: &mut u64,u2: &mut u64): (&u64, &mut u64) {
@@ -46,14 +46,14 @@ module 0x42::freeze_mut_ref {
           }
         }
     }
-    public fun t5(s: &mut freeze_mut_ref::G) {
+    public fun t5(s: &mut G) {
         {
           let x: u64 = 0;
           {
-            let f: &mut u64 = Borrow(Mutable)(select freeze_mut_ref::G.f<&mut freeze_mut_ref::G>(x: u64 = Add<u64>(x, 1);
+            let f: &mut u64 = Borrow(Mutable)(select freeze_mut_ref::G.f<&mut G>(x: u64 = Add<u64>(x, 1);
             s));
             {
-              let g: &mut u64 = Borrow(Mutable)(select freeze_mut_ref::G.f<&mut freeze_mut_ref::G>(x: u64 = Add<u64>(x, 1);
+              let g: &mut u64 = Borrow(Mutable)(select freeze_mut_ref::G.f<&mut G>(x: u64 = Add<u64>(x, 1);
               s));
               {
                 let y: &mut u64 = Borrow(Mutable)(2);
@@ -69,21 +69,21 @@ module 0x42::freeze_mut_ref {
           }
         }
     }
-    private fun t6(cond: bool,s: &mut freeze_mut_ref::S,other: &freeze_mut_ref::S) {
+    private fun t6(cond: bool,s: &mut S,other: &S) {
         {
-          let x: &freeze_mut_ref::S;
+          let x: &S;
           if cond {
-            x: &freeze_mut_ref::S = Freeze(false)(Copy(s))
+            x: &S = Freeze(false)(Copy(s))
           } else {
-            x: &freeze_mut_ref::S = other
+            x: &S = other
           };
           Tuple()
         }
     }
-    private fun t7(cond: bool,s: &mut freeze_mut_ref::S,other: &freeze_mut_ref::S) {
+    private fun t7(cond: bool,s: &mut S,other: &S) {
         {
-          let _x: &freeze_mut_ref::S;
-          _x: &freeze_mut_ref::S = if cond {
+          let _x: &S;
+          _x: &S = if cond {
             Freeze(false)(s)
           } else {
             other
@@ -91,9 +91,9 @@ module 0x42::freeze_mut_ref {
           Tuple()
         }
     }
-    private fun t8(cond: bool,s: &mut freeze_mut_ref::S,other: &freeze_mut_ref::S) {
+    private fun t8(cond: bool,s: &mut S,other: &S) {
         {
-          let _x: &freeze_mut_ref::S = if cond {
+          let _x: &S = if cond {
             Freeze(false)(s)
           } else {
             other
@@ -102,6 +102,71 @@ module 0x42::freeze_mut_ref {
         }
     }
 } // end 0x42::freeze_mut_ref
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::freeze_mut_ref {
+    struct G {
+        f: u64,
+    }
+    struct S has drop {
+    }
+    public fun borrow_mut<Element>(map: &mut vector<Element>): &Element {
+        /*freeze*/0x1::vector::borrow_mut<Element>(map, 0)
+    }
+    public fun borrow_mut2<Element>(v: &mut Element): &Element {
+        /*freeze*/v
+    }
+    public fun borrow_mut3<Element>(v1: &mut Element, v2: &Element): &Element {
+        if (true) /*freeze*/v1 else v2
+    }
+    public fun borrow_mut4<Element>(v: &mut Element): &Element {
+        /*freeze*/v
+    }
+    fun t0() {
+        let x = /*freeze*/&mut 0;
+        x;
+    }
+    fun t1(s: &mut S): &S {
+        /*freeze*/s
+    }
+    fun t2(u1: &mut u64, u2: &mut u64): (&u64, &mut u64) {
+        (/*freeze*/u1, u2)
+    }
+    public fun t4() {
+        let x;
+        let y;
+        (x,y) = (/*freeze*/&mut 0, /*freeze*/&mut 0);
+    }
+    public fun t5(s: &mut G) {
+        let x = 0;
+        let f = &mut {
+            x = x + 1;
+            s
+        }.f;
+        let g = &mut {
+            x = x + 1;
+            s
+        }.f;
+        let y = &mut 2;
+        let z;
+        *{
+            *f = 0;
+            z = /*freeze*/y;
+            g
+        } = 2;
+    }
+    fun t6(cond: bool, s: &mut S, other: &S) {
+        let x;
+        if (cond) x = /*freeze*/copy s else x = other;
+    }
+    fun t7(cond: bool, s: &mut S, other: &S) {
+        let _x;
+        _x = if (cond) /*freeze*/s else other;
+    }
+    fun t8(cond: bool, s: &mut S, other: &S) {
+        let _x = if (cond) /*freeze*/s else other;
+    }
+}
 
 ============ initial bytecode ================
 
@@ -165,8 +230,8 @@ fun freeze_mut_ref::t0() {
 
 
 [variant baseline]
-fun freeze_mut_ref::t1($t0: &mut freeze_mut_ref::S): &freeze_mut_ref::S {
-     var $t1: &freeze_mut_ref::S
+fun freeze_mut_ref::t1($t0: &mut 0x42::freeze_mut_ref::S): &0x42::freeze_mut_ref::S {
+     var $t1: &0x42::freeze_mut_ref::S
   0: $t1 := freeze_ref(implicit)($t0)
   1: return $t1
 }
@@ -205,14 +270,14 @@ public fun freeze_mut_ref::t4() {
 
 
 [variant baseline]
-public fun freeze_mut_ref::t5($t0: &mut freeze_mut_ref::G) {
+public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
      var $t1: u64
      var $t2: &mut u64
-     var $t3: &mut freeze_mut_ref::G
+     var $t3: &mut 0x42::freeze_mut_ref::G
      var $t4: u64
      var $t5: u64
      var $t6: &mut u64
-     var $t7: &mut freeze_mut_ref::G
+     var $t7: &mut 0x42::freeze_mut_ref::G
      var $t8: u64
      var $t9: u64
      var $t10: &mut u64
@@ -227,12 +292,12 @@ public fun freeze_mut_ref::t5($t0: &mut freeze_mut_ref::G) {
   2: $t4 := +($t1, $t5)
   3: $t1 := infer($t4)
   4: $t3 := infer($t0)
-  5: $t2 := borrow_field<freeze_mut_ref::G>.f($t3)
+  5: $t2 := borrow_field<0x42::freeze_mut_ref::G>.f($t3)
   6: $t9 := 1
   7: $t8 := +($t1, $t9)
   8: $t1 := infer($t8)
   9: $t7 := infer($t0)
- 10: $t6 := borrow_field<freeze_mut_ref::G>.f($t7)
+ 10: $t6 := borrow_field<0x42::freeze_mut_ref::G>.f($t7)
  11: $t11 := 2
  12: $t10 := borrow_local($t11)
  13: $t13 := 2
@@ -247,10 +312,10 @@ public fun freeze_mut_ref::t5($t0: &mut freeze_mut_ref::G) {
 
 
 [variant baseline]
-fun freeze_mut_ref::t6($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_ref::S) {
-     var $t3: &freeze_mut_ref::S
-     var $t4: &freeze_mut_ref::S
-     var $t5: &mut freeze_mut_ref::S
+fun freeze_mut_ref::t6($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
+     var $t3: &0x42::freeze_mut_ref::S
+     var $t4: &0x42::freeze_mut_ref::S
+     var $t5: &mut 0x42::freeze_mut_ref::S
   0: if ($t0) goto 1 else goto 6
   1: label L0
   2: $t5 := copy($t1)
@@ -265,9 +330,9 @@ fun freeze_mut_ref::t6($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
 
 
 [variant baseline]
-fun freeze_mut_ref::t7($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_ref::S) {
-     var $t3: &freeze_mut_ref::S
-     var $t4: &freeze_mut_ref::S
+fun freeze_mut_ref::t7($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
+     var $t3: &0x42::freeze_mut_ref::S
+     var $t4: &0x42::freeze_mut_ref::S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t4 := freeze_ref(implicit)($t1)
@@ -281,8 +346,8 @@ fun freeze_mut_ref::t7($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
 
 
 [variant baseline]
-fun freeze_mut_ref::t8($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_ref::S) {
-     var $t3: &freeze_mut_ref::S
+fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
+     var $t3: &0x42::freeze_mut_ref::S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t3 := freeze_ref(implicit)($t1)

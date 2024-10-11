@@ -45,7 +45,7 @@ module 0x8675309::M {
         } else {
           Tuple(1, true)
         };
-        (_: u64, _: u64, _: &u64, M::R{ dummy_field: _ }): (u64, u64, &u64, M::R) = if cond {
+        (_: u64, _: u64, _: &u64, M::R{ dummy_field: _ }): (u64, u64, &u64, R) = if cond {
           Tuple(0, 0, Borrow(Immutable)(0), pack M::R(false))
         } else {
           Tuple(1, 1, Borrow(Immutable)(1), pack M::R(false))
@@ -53,3 +53,23 @@ module 0x8675309::M {
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+    }
+    fun t0(cond: bool) {
+        if (cond) ();
+    }
+    fun t1(cond: bool) {
+        if (cond) 0 else 0;
+        if (cond) false else false;
+        R{} = if (cond) R{} else R{};
+        if (cond) &0 else &1;
+        if (cond) &mut 0 else &mut 1;
+    }
+    fun t2(cond: bool) {
+        if (cond) (0, false) else (1, true);
+        (_,_,_,R{}) = if (cond) (0, 0, &0, R{}) else (1, 1, &1, R{});
+    }
+}

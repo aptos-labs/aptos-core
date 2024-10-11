@@ -151,8 +151,9 @@ pub(crate) struct StructVariant {
 /// A declaration of a function.
 #[derive(Debug, Clone)]
 pub(crate) struct FunEntry {
-    pub loc: Loc,      // location of the entire function span
-    pub name_loc: Loc, // location of just the function name
+    pub loc: Loc,             // location of the entire function span
+    pub name_loc: Loc,        // location of just the function name
+    pub result_type_loc: Loc, // location of the result type declaration
     pub module_id: ModuleId,
     pub fun_id: FunId,
     pub visibility: Visibility,
@@ -268,6 +269,8 @@ impl<'env> ModelBuilder<'env> {
             builder_struct_table: Some(&self.reverse_struct_table),
             module_name: None,
             display_type_vars: false,
+            used_modules: BTreeSet::new(),
+            use_module_qualification: false,
         }
     }
 

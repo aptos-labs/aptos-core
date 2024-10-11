@@ -10,6 +10,11 @@ on:
         required: false
         type: string
         description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+        description: If true, run the workflow without actually pushing images
   workflow_dispatch:
     inputs:
       image_tag_prefix:
@@ -21,6 +26,11 @@ on:
         required: false
         type: string
         description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+        description: If true, run the workflow without actually pushing images
 
 permissions:
   contents: read
@@ -29,7 +39,7 @@ permissions:
 jobs:
   copy-images:
     # Run on a machine with more local storage for large docker images
-    runs-on: medium-perf-docker-with-local-ssd
+    runs-on: runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,4 +71,5 @@ jobs:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
-        run: ./docker/release-images.mjs --wait-for-image-seconds=3600
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: ./docker/release-images.mjs --wait-for-image-seconds=3600 ${{ inputs.dry_run && '--dry-run' || '' }}

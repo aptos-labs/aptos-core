@@ -179,9 +179,9 @@ impl Loc {
 
     /// Creates a location which encloses all the locations in the provided slice,
     /// which must not be empty. All locations are expected to be in the same file.
-    pub fn enclosing(locs: &[&Loc]) -> Loc {
+    pub fn enclosing(locs: &[Loc]) -> Loc {
         assert!(!locs.is_empty());
-        let loc = locs[0];
+        let loc = &locs[0];
         let mut start = loc.span.start();
         let mut end = loc.span.end();
         for l in locs.iter().skip(1) {
@@ -376,6 +376,12 @@ impl NodeId {
 
     pub fn as_usize(self) -> usize {
         self.0
+    }
+}
+
+impl AsRef<NodeId> for NodeId {
+    fn as_ref(&self) -> &NodeId {
+        self
     }
 }
 
@@ -1869,8 +1875,11 @@ impl GlobalEnv {
         let called_funs = def.called_funs();
         let data = FunctionData {
             name,
-            loc: loc.clone(),
-            id_loc: loc,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
             def_idx: None,
             handle_idx: None,
             visibility,
@@ -2368,7 +2377,6 @@ impl GlobalEnv {
 
     pub fn internal_dump_env(&self, all: bool) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         for module in self.get_modules() {
             if !all && !module.is_target() {
@@ -2422,8 +2430,26 @@ impl GlobalEnv {
                 emitln!(writer, "{}", self.display(&*module_spec));
             }
             for str in module.get_structs() {
+                let tctx = str.get_type_display_ctx();
+                let type_params = str.get_type_parameters();
+                let type_params_str = if !type_params.is_empty() {
+                    format!(
+                        "<{}>",
+                        type_params
+                            .iter()
+                            .map(|p| p.0.display(spool).to_string())
+                            .join(",")
+                    )
+                } else {
+                    "".to_owned()
+                };
                 if str.has_variants() {
-                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "enum {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for variant in str.get_variants() {
                         emit!(writer, "{}", variant.display(spool));
@@ -2432,7 +2458,7 @@ impl GlobalEnv {
                             emitln!(writer, " {");
                             writer.indent();
                             for fld in fields {
-                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                                emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                             }
                             writer.unindent();
                             emitln!(writer, "}")
@@ -2441,10 +2467,15 @@ impl GlobalEnv {
                         }
                     }
                 } else {
-                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "struct {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for fld in str.get_fields() {
-                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                        emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                     }
                 }
                 writer.unindent();
@@ -2455,14 +2486,20 @@ impl GlobalEnv {
                 }
             }
             for fun in module.get_functions() {
-                self.dump_fun_internal(&writer, tctx, &fun);
+                let tctx = fun.get_type_display_ctx();
+                self.dump_fun_internal(&writer, &tctx, &fun);
             }
             for (_, fun) in module.get_spec_funs() {
                 emit!(
                     writer,
                     "spec fun {}{}",
                     fun.name.display(spool),
-                    self.get_fun_signature_string(&fun.type_params, &fun.params, &fun.result_type)
+                    self.get_fun_signature_string(
+                        &module.get_type_display_ctx(),
+                        &fun.type_params,
+                        &fun.params,
+                        &fun.result_type
+                    )
                 );
                 if let Some(exp) = &fun.body {
                     emitln!(writer, " {");
@@ -2492,7 +2529,7 @@ impl GlobalEnv {
     }
 
     pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
-        let tctx = &self.get_type_display_ctx();
+        let tctx = &fun.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         self.dump_fun_internal(&writer, tctx, fun);
         writer.extract_result()
@@ -2567,12 +2604,12 @@ impl GlobalEnv {
     /// Helper to create a string for a function signature.
     fn get_fun_signature_string(
         &self,
+        tctx: &TypeDisplayContext,
         type_params: &[TypeParameter],
         params: &[Parameter],
         result_type: &Type,
     ) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let type_params_str = if !type_params.is_empty() {
             format!(
                 "<{}>",
@@ -2591,7 +2628,7 @@ impl GlobalEnv {
         let result_str = if result_type.is_unit() {
             "".to_owned()
         } else {
-            format!(": {}", result_type.display(&self.get_type_display_ctx()))
+            format!(": {}", result_type.display(tctx))
         };
         format!("{}({}){}", type_params_str, params_str, result_str)
     }
@@ -2903,6 +2940,15 @@ impl<'env> ModuleEnv<'env> {
     /// Shortcut for accessing the symbol pool.
     pub fn symbol_pool(&self) -> &SymbolPool {
         &self.env.symbol_pool
+    }
+
+    /// Returns a context to display types for this module.
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+        TypeDisplayContext {
+            module_name: Some(self.get_name().clone()),
+            used_modules: self.get_used_modules(false),
+            ..TypeDisplayContext::new(self.env)
+        }
     }
 
     /// Gets the underlying bytecode module, if one is attached.
@@ -3717,13 +3763,16 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
         let type_param_names = self
             .get_type_parameters()
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            type_param_names: Some(type_param_names),
+            ..self.module_env.get_type_display_ctx()
+        }
     }
 }
 
@@ -3766,6 +3815,17 @@ impl<'env> FieldEnv<'env> {
     /// Gets the id of this field.
     pub fn get_id(&self) -> FieldId {
         FieldId(self.data.name)
+    }
+
+    /// Returns true if this is a positional field. Identified by that the name
+    /// of the field is a number.
+    pub fn is_positional(&self) -> bool {
+        self.data
+            .name
+            .display(self.struct_env.symbol_pool())
+            .to_string()
+            .parse::<u64>()
+            .is_ok()
     }
 
     /// Gets the location of the field declaration.
@@ -3871,6 +3931,15 @@ impl<'env> NamedConstantEnv<'env> {
     pub fn get_value(&self) -> Value {
         self.data.value.clone()
     }
+
+    /// Returns a context to display types for this module.
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+        TypeDisplayContext {
+            module_name: Some(self.module_env.get_name().clone()),
+            used_modules: self.module_env.get_used_modules(false),
+            ..TypeDisplayContext::new(self.module_env.env)
+        }
+    }
 }
 
 // =================================================================================================
@@ -3966,16 +4035,26 @@ impl EqIgnoringLoc for Parameter {
     }
 }
 
+/// Represents source code locations associated with a function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionLoc {
+    /// Location of this function.
+    pub(crate) full: Loc,
+
+    /// Location of the function identifier, suitable for error messages alluding to the function.
+    pub(crate) id_loc: Loc,
+
+    /// Location of the function result type, suitable for error messages alluding to the result type.
+    pub(crate) result_type_loc: Loc,
+}
+
 #[derive(Debug)]
 pub struct FunctionData {
     /// Name of this function.
     pub(crate) name: Symbol,
 
-    /// Location of this function.
-    pub(crate) loc: Loc,
-
-    /// Location of the function identifier, suitable for error messages alluding to the function.
-    pub(crate) id_loc: Loc,
+    /// Locations of this function.
+    pub(crate) loc: FunctionLoc,
 
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
@@ -4096,7 +4175,7 @@ impl<'env> FunctionEnv<'env> {
 
     /// Get documentation associated with this function.
     pub fn get_doc(&self) -> &str {
-        self.module_env.env.get_doc(&self.data.loc)
+        self.module_env.env.get_doc(&self.data.loc.full)
     }
 
     /// Gets the definition index of this function.
@@ -4111,12 +4190,17 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
-        self.data.loc.clone()
+        self.data.loc.full.clone()
     }
 
     /// Returns the location of the function identifier.
     pub fn get_id_loc(&self) -> Loc {
-        self.data.id_loc.clone()
+        self.data.loc.id_loc.clone()
+    }
+
+    /// Returns the location of the function identifier.
+    pub fn get_result_type_loc(&self) -> Loc {
+        self.data.loc.result_type_loc.clone()
     }
 
     /// Returns the attributes of this function.
@@ -4719,6 +4803,7 @@ impl<'env> FunctionEnv<'env> {
             " fun {}{}",
             self.get_name().display(self.symbol_pool()),
             self.module_env.env.get_fun_signature_string(
+                &self.get_type_display_ctx(),
                 &self.data.type_params,
                 &self.data.params,
                 &self.data.result_type
@@ -4743,10 +4828,9 @@ impl<'env> FunctionEnv<'env> {
     }
 
     fn definition_view(&'env self) -> Option<FunctionDefinitionView<'env, CompiledModule>> {
-        assert!(
-            !self.is_inline(),
-            "attempt to access bytecode info for inline function"
-        );
+        if self.is_inline() {
+            return None;
+        }
         let module = self.module_env.data.compiled_module.as_ref()?;
         Some(FunctionDefinitionView::new(
             module,
@@ -4755,13 +4839,16 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
         let type_param_names = self
             .get_type_parameters()
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            type_param_names: Some(type_param_names),
+            ..self.module_env.get_type_display_ctx()
+        }
     }
 }
 

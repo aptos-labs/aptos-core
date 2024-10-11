@@ -101,7 +101,7 @@ impl<'a> RecursiveStructChecker<'a> {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
                 },
-                Type::Primitive(_) | Type::TypeParameter(_) => {},
+                Type::Primitive(_) | Type::TypeParameter(_) | Type::Fun(..) => {},
                 _ => unreachable!("invalid field type"),
             }
             path.pop();
@@ -195,7 +195,7 @@ impl<'a> RecursiveStructChecker<'a> {
                     .iter()
                     .any(|ty| self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked))
             },
-            Type::Primitive(_) | Type::TypeParameter(_) => false,
+            Type::Primitive(_) | Type::TypeParameter(_) | Type::Fun(..) => false,
             _ => panic!("ICE: {:?} used as a type parameter", ty),
         }
     }

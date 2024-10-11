@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod block_output;
 #[cfg(test)]
 mod test;
 
@@ -12,11 +13,12 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, LedgerUpdateOutput};
+use aptos_executor_types::{ExecutorError, LedgerUpdateOutput};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
+use block_output::BlockOutput;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{mpsc::Receiver, Arc, Weak},
@@ -24,7 +26,7 @@ use std::{
 
 pub struct Block {
     pub id: HashValue,
-    pub output: ExecutionOutput,
+    pub output: BlockOutput,
     children: Mutex<Vec<Arc<Block>>>,
     block_lookup: Arc<BlockLookup>,
 }
@@ -92,7 +94,7 @@ impl BlockLookupInner {
     fn fetch_or_add_block(
         &mut self,
         id: HashValue,
-        output: ExecutionOutput,
+        output: BlockOutput,
         parent_id: Option<HashValue>,
         block_lookup: &Arc<BlockLookup>,
     ) -> Result<(Arc<Block>, bool, Option<Arc<Block>>)> {
@@ -148,7 +150,7 @@ impl BlockLookup {
     fn fetch_or_add_block(
         self: &Arc<Self>,
         id: HashValue,
-        output: ExecutionOutput,
+        output: BlockOutput,
         parent_id: Option<HashValue>,
     ) -> Result<Arc<Block>> {
         let (block, existing, parent_block) = self
@@ -224,7 +226,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let output = ExecutionOutput::new_with_ledger_update(
+        let output = BlockOutput::new_with_ledger_update(
             ledger_view.state().clone(),
             None,
             LedgerUpdateOutput::new_empty(ledger_view.txn_accumulator().clone()),
@@ -250,7 +252,7 @@ impl BlockTree {
                     .original_reconfiguration_block_id(committed_block_id),
                 "Updated with a new root block as a virtual block of reconfiguration block"
             );
-            let output = ExecutionOutput::new_with_ledger_update(
+            let output = BlockOutput::new_with_ledger_update(
                 last_committed_block.output.state().clone(),
                 None,
                 LedgerUpdateOutput::new_empty(
@@ -289,7 +291,7 @@ impl BlockTree {
         &self,
         parent_block_id: HashValue,
         id: HashValue,
-        output: ExecutionOutput,
+        output: BlockOutput,
     ) -> Result<Arc<Block>> {
         self.block_lookup
             .fetch_or_add_block(id, output, Some(parent_block_id))

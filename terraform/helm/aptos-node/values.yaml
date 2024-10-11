@@ -68,11 +68,11 @@ validator:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
     requests:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
   storage:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
@@ -103,11 +103,11 @@ fullnode:
       replicas: 1
   resources:
     limits:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
     requests:
-      cpu: 14
-      memory: 56Gi
+      cpu: 30
+      memory: 60Gi
   storage:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:

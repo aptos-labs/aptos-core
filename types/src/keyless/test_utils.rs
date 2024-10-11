@@ -7,9 +7,9 @@ use crate::{
     keyless::{
         base64url_encode_str,
         circuit_testcases::{
-            SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
-            SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
-            SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
+            sample_jwt_payload_json, SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE,
+            SAMPLE_EXP_HORIZON_SECS, SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD,
+            SAMPLE_JWT_HEADER_B64, SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_PEPPER,
             SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_FOR_UPGRADED_VK, SAMPLE_PROOF_NO_EXTRA_FIELD,
             SAMPLE_UID_KEY, SAMPLE_UID_VAL, SAMPLE_UPGRADED_VK,
         },
@@ -272,8 +272,12 @@ pub fn get_sample_groth16_sig_and_pk_no_extra_field() -> (KeylessSignature, Keyl
 }
 
 pub fn get_sample_jwt_token() -> String {
+    get_sample_jwt_token_from_payload(sample_jwt_payload_json().as_str())
+}
+
+pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
-    let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
+    let jwt_payload_b64 = base64url_encode_str(payload);
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = &*SAMPLE_JWK_SK;
@@ -296,7 +300,7 @@ pub fn get_sample_jwt_token() -> String {
 /// desired TXN.
 pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
-    let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
+    let jwt_payload_b64 = base64url_encode_str(sample_jwt_payload_json().as_str());
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = *SAMPLE_JWK_SK;
@@ -312,7 +316,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let openid_sig = OpenIdSig {
         jwt_sig,
-        jwt_payload_json: SAMPLE_JWT_PAYLOAD_JSON.to_string(),
+        jwt_payload_json: sample_jwt_payload_json().to_string(),
         uid_key: SAMPLE_UID_KEY.to_owned(),
         epk_blinder: SAMPLE_EPK_BLINDER.clone(),
         pepper: SAMPLE_PEPPER.clone(),

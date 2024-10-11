@@ -1,50 +1,96 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct HasCopy {
-        a: #1,
+    struct HasCopy<T1,T2> {
+        a: T2,
     }
-    struct HasDrop {
-        a: #1,
+    struct HasDrop<T1,T2> {
+        a: T2,
     }
-    struct HasKey {
-        a: #1,
+    struct HasKey<T1,T2> {
+        a: T2,
     }
-    struct HasStore {
-        a: #1,
+    struct HasStore<T1,T2> {
+        a: T2,
     }
     struct NoAbilities {
         dummy_field: bool,
     }
-    struct RequireStore {
-        a: #0,
+    struct RequireStore<T> {
+        a: T,
     }
-    private fun f1(ref: &mut M::HasDrop<M::NoAbilities, u64>) {
-        ref = pack M::HasDrop<M::NoAbilities, u64>(1);
+    private fun f1(ref: &mut HasDrop<NoAbilities, u64>) {
+        ref = pack M::HasDrop<NoAbilities, u64>(1);
         Tuple()
     }
     private fun f2() {
-        _: M::HasDrop<M::NoAbilities, u64> = pack M::HasDrop<M::NoAbilities, u64>(1);
+        _: HasDrop<NoAbilities, u64> = pack M::HasDrop<NoAbilities, u64>(1);
         Tuple()
     }
-    private fun f3(_x: M::HasDrop<M::NoAbilities, u64>) {
+    private fun f3(_x: HasDrop<NoAbilities, u64>) {
         Tuple()
     }
-    private fun f4(x: M::HasCopy<M::NoAbilities, u64>): (M::HasCopy<M::NoAbilities, u64>, M::HasCopy<M::NoAbilities, u64>) {
+    private fun f4(x: HasCopy<NoAbilities, u64>): (HasCopy<NoAbilities, u64>, HasCopy<NoAbilities, u64>) {
         Tuple(Copy(x), x)
     }
-    private fun f5(s: &signer,x: M::HasKey<M::NoAbilities, u64>) {
-        MoveTo<M::HasKey<M::NoAbilities, u64>>(s, x);
+    private fun f5(s: &signer,x: HasKey<NoAbilities, u64>) {
+        MoveTo<HasKey<NoAbilities, u64>>(s, x);
         Tuple()
     }
-    private fun f6(): M::HasKey<M::NoAbilities, u64>
-        acquires M::HasKey(*)
+    private fun f6(): HasKey<NoAbilities, u64>
+        acquires HasKey(*)
      {
-        MoveFrom<M::HasKey<M::NoAbilities, u64>>(0x0)
+        MoveFrom<HasKey<NoAbilities, u64>>(0x0)
     }
     private fun f7(): bool {
-        exists<M::HasKey<M::NoAbilities, u64>>(0x0)
+        exists<HasKey<NoAbilities, u64>>(0x0)
     }
-    private fun f8(): M::RequireStore<M::HasStore<M::NoAbilities, u64>> {
-        pack M::RequireStore<M::HasStore<M::NoAbilities, u64>>(pack M::HasStore<M::NoAbilities, u64>(1))
+    private fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
+        pack M::RequireStore<HasStore<NoAbilities, u64>>(pack M::HasStore<NoAbilities, u64>(1))
     }
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct HasCopy<phantom T1, T2> has copy {
+        a: T2,
+    }
+    struct HasDrop<phantom T1, T2> has drop {
+        a: T2,
+    }
+    struct HasKey<phantom T1, T2> has key {
+        a: T2,
+    }
+    struct HasStore<phantom T1, T2> has store {
+        a: T2,
+    }
+    struct NoAbilities {
+    }
+    struct RequireStore<T: store> {
+        a: T,
+    }
+    fun f1(ref: &mut HasDrop<NoAbilities, u64>) {
+        *ref = HasDrop<NoAbilities,u64>{a: 1};
+    }
+    fun f2() {
+        _ = HasDrop<NoAbilities,u64>{a: 1};
+    }
+    fun f3(_x: HasDrop<NoAbilities, u64>) {
+    }
+    fun f4(x: HasCopy<NoAbilities, u64>): (HasCopy<NoAbilities, u64>, HasCopy<NoAbilities, u64>) {
+        (copy x, x)
+    }
+    fun f5(s: &signer, x: HasKey<NoAbilities, u64>) {
+        move_to<HasKey<NoAbilities, u64>>(s, x);
+    }
+    fun f6(): HasKey<NoAbilities, u64>
+        acquires HasKey
+    {
+        move_from<HasKey<NoAbilities, u64>>(0x0)
+    }
+    fun f7(): bool {
+        exists<HasKey<NoAbilities, u64>>(0x0)
+    }
+    fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
+        RequireStore<HasStore<NoAbilities, u64>>{a: HasStore<NoAbilities,u64>{a: 1}}
+    }
+}

@@ -6,12 +6,14 @@ use aptos_sdk::types::{AccountKey, EphemeralKeyPair, KeylessAccount, LocalAccoun
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
 use aptos_types::keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig};
 use async_trait::async_trait;
-use futures::future::try_join_all;
+use futures::StreamExt;
 use rand::rngs::StdRng;
 use std::{
     fs::File,
     io::{self, BufRead},
 };
+
+const QUERY_PARALLELISM: usize = 300;
 
 #[async_trait]
 pub trait LocalAccountGenerator: Send + Sync {
@@ -73,7 +75,13 @@ impl LocalAccountGenerator for PrivateKeyAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = account_keys
             .into_iter()
@@ -166,7 +174,13 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = keyless_accounts
             .into_iter()
