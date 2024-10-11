@@ -45,7 +45,7 @@ pub fn create_keyless_account_generator(
 ) -> anyhow::Result<Box<dyn LocalAccountGenerator>> {
     let jwt_header_json = extract_header_json_from_jwt(jwt)?;
     let claims: Claims = extract_claims_from_jwt(jwt)?;
-    let generator = KeylessAccountGenerator {
+    let generator = BaseKeylessAccountGenerator {
         proof_file_path: proof_file_path.map(|s| s.to_string()),
         ephemeral_secret_key,
         epk_expiry_date_secs,
@@ -61,7 +61,7 @@ pub fn create_keyless_account_generator(
             jwk_addr,
         }))
     } else {
-        Ok(Box::new(NormalKeylessAccountGenerator { generator }))
+        Ok(Box::new(KeylessAccountGenerator { generator }))
     }
 }
 
@@ -111,12 +111,12 @@ impl LocalAccountGenerator for PrivateKeyAccountGenerator {
     }
 }
 
-pub struct NormalKeylessAccountGenerator {
-    generator: KeylessAccountGenerator,
+pub struct KeylessAccountGenerator {
+    generator: BaseKeylessAccountGenerator,
 }
 
 #[async_trait]
-impl LocalAccountGenerator for NormalKeylessAccountGenerator {
+impl LocalAccountGenerator for KeylessAccountGenerator {
     async fn gen_local_accounts(
         &self,
         txn_executor: &dyn ReliableTransactionSubmitter,
@@ -152,7 +152,7 @@ impl LocalAccountGenerator for NormalKeylessAccountGenerator {
 }
 
 pub struct FederatedKeylessAccountGenerator {
-    generator: KeylessAccountGenerator,
+    generator: BaseKeylessAccountGenerator,
     jwk_addr: AccountAddress,
 }
 
@@ -193,7 +193,7 @@ impl LocalAccountGenerator for FederatedKeylessAccountGenerator {
     }
 }
 
-pub struct KeylessAccountGenerator {
+pub struct BaseKeylessAccountGenerator {
     proof_file_path: Option<String>,
     ephemeral_secret_key: Ed25519PrivateKey,
     epk_expiry_date_secs: u64,
@@ -204,7 +204,7 @@ pub struct KeylessAccountGenerator {
     jwt_header_json: String,
 }
 
-impl KeylessAccountGenerator {
+impl BaseKeylessAccountGenerator {
     fn load_lines(&self) -> Box<dyn Iterator<Item = Result<String, io::Error>>> {
         match &self.proof_file_path {
             None => {
@@ -234,7 +234,13 @@ impl KeylessAccountGenerator {
             .iter()
             .map(|account| txn_executor.query_sequence_number(account.address()))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(accounts
             .into_iter()
@@ -283,29 +289,6 @@ impl KeylessAccountGenerator {
             bail!("not enough proofs - {num_accounts} num_accounts, {i} found")
         }
 
-        let result_futures = addresses
-            .iter()
-            .map(|address| txn_executor.query_sequence_number(*address))
-            .collect::<Vec<_>>();
-
-        let seq_nums = futures::stream::iter(result_futures)
-            .buffered(QUERY_PARALLELISM)
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let accounts = keyless_accounts
-            .into_iter()
-            .zip(seq_nums)
-            .map(|(keyless_account, sequence_number)| {
-                LocalAccount::new_keyless(
-                    keyless_account.authentication_key().account_address(),
-                    keyless_account,
-                    sequence_number,
-                )
-            })
-            .collect();
-        Ok(accounts)
+        BaseKeylessAccountGenerator::set_sequence_numbers(txn_executor, accounts).await
     }
 }
