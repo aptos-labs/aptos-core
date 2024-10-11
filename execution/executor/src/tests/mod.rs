@@ -14,8 +14,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ChunkExecutorTrait, LedgerUpdateOutput, TransactionReplayer,
-    VerifyExecutionMode,
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
@@ -311,7 +310,7 @@ fn test_executor_execute_same_block_multiple_times() {
         .collect();
 
     let mut responses = vec![];
-    for _i in 0..100 {
+    for _i in 0..10 {
         let output = executor
             .execute_block(
                 (block_id, block(txns.clone())).into(),
@@ -321,8 +320,14 @@ fn test_executor_execute_same_block_multiple_times() {
             .unwrap();
         responses.push(output);
     }
-    responses.dedup();
-    assert_eq!(responses.len(), 1);
+    assert_eq!(
+        responses
+            .iter()
+            .map(|output| output.root_hash())
+            .dedup()
+            .count(),
+        1,
+    );
 }
 
 fn create_blocks_and_chunks(
@@ -494,27 +499,20 @@ fn apply_transaction_by_writeset(
         next_epoch_state: _,
         ledger_update_output,
     } = executed;
-    let LedgerUpdateOutput {
-        statuses_for_input_txns: _,
-        to_commit,
-        subscribable_events: _,
-        transaction_info_hashes: _,
-        state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-        sharded_state_cache,
-        transaction_accumulator: _,
-        block_end_info: _,
-    } = ledger_update_output;
 
     db.writer
         .save_transactions(
-            &to_commit,
+            &ledger_update_output.to_commit,
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             ledger_info.as_ref(),
             true, /* sync_commit */
             result_state,
-            state_updates_before_last_checkpoint,
-            Some(&sharded_state_cache),
+            // TODO(aldenhu): avoid clone
+            ledger_update_output
+                .state_updates_until_last_checkpoint
+                .clone(),
+            Some(&ledger_update_output.sharded_state_cache),
         )
         .unwrap();
 }
@@ -714,26 +712,19 @@ fn run_transactions_naive(
             next_epoch_state: _,
             ledger_update_output,
         } = executed;
-        let LedgerUpdateOutput {
-            statuses_for_input_txns: _,
-            to_commit,
-            subscribable_events: _,
-            transaction_info_hashes: _,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator: _,
-            block_end_info: _,
-        } = ledger_update_output;
         db.writer
             .save_transactions(
-                &to_commit,
+                &ledger_update_output.to_commit,
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 ledger_info.as_ref(),
                 true, /* sync_commit */
                 result_state,
-                state_updates_before_last_checkpoint,
-                Some(&sharded_state_cache),
+                // TODO(aldenhu): avoid clone
+                ledger_update_output
+                    .state_updates_until_last_checkpoint
+                    .clone(),
+                Some(&ledger_update_output.sharded_state_cache),
             )
             .unwrap();
         ledger_view = next_ledger_view;

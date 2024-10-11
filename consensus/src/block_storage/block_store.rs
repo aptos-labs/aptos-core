@@ -32,7 +32,9 @@ use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
+};
 use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
@@ -175,18 +177,14 @@ impl BlockStore {
             root_metadata.accu_hash,
         );
 
-        let result = StateComputeResult::new(
-            root_metadata.accu_hash,
-            root_metadata.frozen_root_hashes,
-            root_metadata.num_leaves, /* num_leaves */
-            vec![],                   /* parent_root_hashes */
-            0,                        /* parent_num_leaves */
-            None,                     /* epoch_state */
-            vec![],                   /* compute_status */
-            vec![],                   /* txn_infos */
-            vec![],                   /* reconfig_events */
-            None,                     // block end info
-        );
+        let result = StateComputeResult::new_empty(Arc::new(
+            InMemoryTransactionAccumulator::new(
+                root_metadata.frozen_root_hashes,
+                root_metadata.num_leaves,
+            )
+            .expect("Failed to recover accumulator."),
+        ));
+        assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
         let pipelined_root_block = PipelinedBlock::new(
             *root_block,

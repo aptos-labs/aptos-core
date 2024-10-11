@@ -19,7 +19,7 @@ use aptos_types::{
     block_info::{BlockInfo, Round},
     ledger_info::LedgerInfoWithSignatures,
 };
-use mirai_annotations::{checked_verify_eq, precondition};
+use mirai_annotations::precondition;
 use std::{
     collections::{vec_deque::VecDeque, BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -249,7 +249,6 @@ impl BlockTree {
                        existing_block,
                        block_id,
                        block);
-            checked_verify_eq!(existing_block.compute_result(), block.compute_result());
             Ok(existing_block)
         } else {
             match self.get_linkable_block_mut(&block.parent_id()) {

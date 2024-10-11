@@ -1553,6 +1553,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "criterion",
+ "derive_more",
  "itertools 0.13.0",
  "once_cell",
  "serde",
