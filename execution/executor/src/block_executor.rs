@@ -6,21 +6,21 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+        apply_chunk_output::ApplyChunkOutput,
+        block_tree::{block_output::BlockOutput, BlockTree},
+        chunk_output::ChunkOutput,
     },
     logging::{LogEntry, LogSchema},
     metrics::{
-        APTOS_CHUNK_EXECUTOR_OTHER_SECONDS, APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS,
-        APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS, APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS,
-        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
-        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-        CONCURRENCY_GAUGE,
+        COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
+        TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
     },
 };
 use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult
+    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
+    ExecutorResult, StateComputeResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -215,7 +215,7 @@ where
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
-        let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+        let _timer = EXECUTE_BLOCK.start_timer();
         let ExecutableBlock {
             block_id,
             transactions,
@@ -247,9 +247,8 @@ where
                 )
             } else {
                 let state_view = {
-                    let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                        .with_label_values(&["verified_state_view"])
-                        .start_timer();
+                    let _timer = OTHER_TIMERS.timer_with(&["verified_state_view"]);
+
                     info!("next_version: {}", parent_output.next_version());
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
@@ -261,7 +260,7 @@ where
                 };
 
                 let chunk_output = {
-                    let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                    let _timer = VM_EXECUTE_BLOCK.start_timer();
                     fail_point!("executor::vm_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
                             "Injected error in vm_execute_block"
@@ -271,9 +270,7 @@ where
                 };
                 debug!("chunk_output: block_id {:?}", block_id);
 
-                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&["state_checkpoint"])
-                    .start_timer();
+                let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
                     chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
@@ -283,7 +280,7 @@ where
         let _ = self.block_tree.add_block(
             parent_block_id,
             block_id,
-            ExecutionOutput::new(state, epoch_state),
+            BlockOutput::new(state, epoch_state),
         )?;
         Ok(state_checkpoint_output)
     }
@@ -294,7 +291,7 @@ where
         parent_block_id: HashValue,
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
-        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
+        let _timer = UPDATE_LEDGER.start_timer();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "ledger_update"
@@ -362,7 +359,7 @@ where
         block_id: HashValue,
         parent_block_id: HashValue,
     ) -> ExecutorResult<()> {
-        let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+        let _timer = COMMIT_BLOCKS.start_timer();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "pre_commit_block",
@@ -380,7 +377,7 @@ where
 
         let ledger_update = block.output.get_ledger_update();
         if !ledger_update.transactions_to_commit().is_empty() {
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+            let _timer = SAVE_TRANSACTIONS.start_timer();
             self.db.writer.pre_commit_ledger(
                 ledger_update.transactions_to_commit(),
                 ledger_update.first_version(),
@@ -391,14 +388,14 @@ where
                 ledger_update.state_updates_until_last_checkpoint.clone(),
                 Some(&ledger_update.sharded_state_cache),
             )?;
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(ledger_update.num_txns() as f64);
+            TRANSACTIONS_SAVED.observe(ledger_update.num_txns() as f64);
         }
 
         Ok(())
     }
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
-        let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["commit_ledger"]);
+        let _timer = OTHER_TIMERS.timer_with(&["commit_ledger"]);
 
         let block_id = ledger_info_with_sigs.ledger_info().consensus_block_id();
         info!(

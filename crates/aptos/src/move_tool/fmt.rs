@@ -125,6 +125,14 @@ impl FmtCommand {
             if scripts_path.exists() {
                 path_vec.push(scripts_path.clone());
             }
+            let tests_path = root_package_path.join(SourcePackageLayout::Tests.path());
+            if tests_path.exists() {
+                path_vec.push(tests_path.clone());
+            }
+            let examples_path = root_package_path.join(SourcePackageLayout::Examples.path());
+            if examples_path.exists() {
+                path_vec.push(examples_path.clone());
+            }
             if let Ok(move_sources) = find_move_filenames(&path_vec, false) {
                 for source in &move_sources {
                     let mut cur_cmd = create_cmd();

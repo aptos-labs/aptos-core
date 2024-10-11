@@ -793,32 +793,38 @@ impl TransactionsApi {
             let context = self.context.clone();
             let accept_type = accept_type.clone();
 
-            let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
-
+            let (internal_ledger_info_opt, storage_ledger_info) =
+                api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info())
+                    .await?;
+            let storage_version = storage_ledger_info.ledger_version.into();
+            let internal_ledger_version = internal_ledger_info_opt
+                .as_ref()
+                .map(|info| info.ledger_version.into());
+            let latest_ledger_info = internal_ledger_info_opt.unwrap_or(storage_ledger_info);
             let txn_data = self
-                .get_by_hash(hash.into(), &ledger_info)
+                .get_by_hash(hash.into(), storage_version, internal_ledger_version)
                 .await
                 .context(format!("Failed to get transaction by hash {}", hash))
                 .map_err(|err| {
                     BasicErrorWith404::internal_with_code(
                         err,
                         AptosErrorCode::InternalError,
-                        &ledger_info,
+                        &latest_ledger_info,
                     )
                 })?
                 .context(format!("Failed to find transaction with hash: {}", hash))
-                .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+                .map_err(|_| transaction_not_found_by_hash(hash, &latest_ledger_info))?;
 
-            if let TransactionData::Pending(_) = txn_data {
-                if (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms {
-                    tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
-                    continue;
-                }
+            if matches!(txn_data, TransactionData::Pending(_))
+                && (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms
+            {
+                tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
+                continue;
             }
 
             let api = self.clone();
             return api_spawn_blocking(move || {
-                api.get_transaction_inner(&accept_type, txn_data, &ledger_info)
+                api.get_transaction_inner(&accept_type, txn_data, &latest_ledger_info)
             })
             .await;
         }
@@ -832,25 +838,34 @@ impl TransactionsApi {
         let context = self.context.clone();
         let accept_type = accept_type.clone();
 
-        let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+        let (internal_ledger_info_opt, storage_ledger_info) =
+            api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info())
+                .await?;
+        let storage_version = storage_ledger_info.ledger_version.into();
+        let internal_indexer_version = internal_ledger_info_opt
+            .as_ref()
+            .map(|info| info.ledger_version.into());
+        let latest_ledger_info = internal_ledger_info_opt.unwrap_or(storage_ledger_info);
 
         let txn_data = self
-            .get_by_hash(hash.into(), &ledger_info)
+            .get_by_hash(hash.into(), storage_version, internal_indexer_version)
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
                     AptosErrorCode::InternalError,
-                    &ledger_info,
+                    &latest_ledger_info,
                 )
             })?
             .context(format!("Failed to find transaction with hash: {}", hash))
-            .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+            .map_err(|_| transaction_not_found_by_hash(hash, &latest_ledger_info))?;
 
         let api = self.clone();
-        api_spawn_blocking(move || api.get_transaction_inner(&accept_type, txn_data, &ledger_info))
-            .await
+        api_spawn_blocking(move || {
+            api.get_transaction_inner(&accept_type, txn_data, &latest_ledger_info)
+        })
+        .await
     }
 
     fn get_transaction_by_version_inner(
@@ -946,9 +961,11 @@ impl TransactionsApi {
             return Ok(GetByVersionResponse::VersionTooOld);
         }
         Ok(GetByVersionResponse::Found(
-            self.context
-                .get_transaction_by_version(version, ledger_info.version())?
-                .into(),
+            TransactionData::from_transaction_onchain_data(
+                self.context
+                    .get_transaction_by_version(version, ledger_info.version())?,
+                ledger_info.version(),
+            )?,
         ))
     }
 
@@ -959,23 +976,30 @@ impl TransactionsApi {
     async fn get_by_hash(
         &self,
         hash: aptos_crypto::HashValue,
-        ledger_info: &LedgerInfo,
+        storage_ledger_version: u64,
+        internal_ledger_version: Option<u64>,
     ) -> anyhow::Result<Option<TransactionData>> {
-        let context = self.context.clone();
-        let version = ledger_info.version();
-        let from_db =
-            tokio::task::spawn_blocking(move || context.get_transaction_by_hash(hash, version))
-                .await
-                .context("Failed to join task to read transaction by hash")?
-                .context("Failed to read transaction by hash from DB")?;
-        Ok(match from_db {
-            None => self
-                .context
-                .get_pending_transaction_by_hash(hash)
-                .await?
-                .map(|t| t.into()),
-            _ => from_db.map(|t| t.into()),
-        })
+        Ok(
+            match self.context.get_pending_transaction_by_hash(hash).await? {
+                None => {
+                    let context_clone = self.context.clone();
+                    tokio::task::spawn_blocking(move || {
+                        context_clone.get_transaction_by_hash(hash, storage_ledger_version)
+                    })
+                    .await
+                    .context("Failed to join task to read transaction by hash")?
+                    .context("Failed to read transaction by hash from DB")?
+                    .map(|t| {
+                        TransactionData::from_transaction_onchain_data(
+                            t,
+                            internal_ledger_version.unwrap_or(storage_ledger_version),
+                        )
+                    })
+                    .transpose()?
+                },
+                Some(t) => Some(t.into()),
+            },
+        )
     }
 
     /// List all transactions for an account

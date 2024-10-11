@@ -1,0 +1,1 @@
+This folder hosts all the example move scripts.

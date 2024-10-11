@@ -15,14 +15,17 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
-    txn_last_input_output::{KeyKind, TxnLastInputOutput},
+    txn_last_input_output::{
+        KeyKind,
+        KeyKind::{Group, Module, Resource},
+        TxnLastInputOutput,
+    },
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
-    types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
@@ -34,7 +37,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
@@ -44,7 +47,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::change_set::randomly_check_layout_matches;
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -117,7 +120,7 @@ where
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
-            .modified_keys(idx_to_execute)
+            .modified_keys::<true>(idx_to_execute)
             .map_or(HashMap::new(), |keys| keys.collect());
 
         let mut prev_modified_delayed_fields = last_input_output
@@ -125,23 +128,52 @@ where
             .map_or(HashSet::new(), |keys| keys.collect());
 
         let mut read_set = sync_view.take_parallel_reads();
+        if read_set.is_incorrect_use() {
+            return Err(PanicOr::from(code_invariant_error(format!(
+                "Incorrect use detected in CapturedReads after executing txn = {} incarnation = {}",
+                idx_to_execute, incarnation
+            ))));
+        }
 
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
+        let mut group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = vec![];
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
         > {
-            for (group_key, group_metadata_op, group_ops) in
-                output.resource_group_write_set().into_iter()
-            {
-                if prev_modified_keys.remove(&group_key).is_none() {
-                    // Previously no write to the group at all.
-                    needs_suffix_validation = true;
-                }
+            let group_output = output.resource_group_write_set();
+            group_keys_and_tags = group_output
+                .iter()
+                .map(|(key, _, _, ops)| {
+                    let tags = ops.iter().map(|(tag, _)| tag.clone()).collect();
+                    (key.clone(), tags)
+                })
+                .collect();
+            for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
+                let prev_tags = match prev_modified_keys.remove(&group_key) {
+                    Some(Group(tags)) => tags,
+                    Some(Resource) => {
+                        return Err(code_invariant_error(format!(
+                            "Group key {:?} recorded as resource KeyKind",
+                            group_key,
+                        )));
+                    },
+                    Some(Module) => {
+                        return Err(code_invariant_error(format!(
+                            "Group key {:?} recorded as module KeyKind",
+                            group_key,
+                        )));
+                    },
+                    None => {
+                        // Previously no write to the group at all.
+                        needs_suffix_validation = true;
+                        HashSet::new()
+                    },
+                };
 
                 if versioned_cache.data().write_metadata(
                     group_key.clone(),
@@ -151,12 +183,15 @@ where
                 ) {
                     needs_suffix_validation = true;
                 }
+
                 if versioned_cache.group_data().write(
                     group_key,
                     idx_to_execute,
                     incarnation,
                     group_ops.into_iter(),
-                ) {
+                    group_size,
+                    prev_tags,
+                )? {
                     needs_suffix_validation = true;
                 }
             }
@@ -282,7 +317,7 @@ where
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => versioned_cache.modules().remove(&k, idx_to_execute),
-                Group => {
+                Group(tags) => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
                     // re-validation is needed. For resources where speculative
@@ -297,7 +332,9 @@ where
                     needs_suffix_validation = true;
 
                     versioned_cache.data().remove(&k, idx_to_execute);
-                    versioned_cache.group_data().remove(&k, idx_to_execute);
+                    versioned_cache
+                        .group_data()
+                        .remove(&k, idx_to_execute, tags);
                 },
             };
         }
@@ -306,7 +343,13 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
+        if !last_input_output.record(
+            idx_to_execute,
+            read_set,
+            result,
+            resource_write_set,
+            group_keys_and_tags,
+        ) {
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
 
@@ -321,17 +364,16 @@ where
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    ) -> Result<bool, PanicError> {
+    ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
-        if read_set.is_incorrect_use() {
-            return Err(code_invariant_error(
-                "Incorrect use detected in CapturedReads",
-            ));
-        }
+        assert!(
+            !read_set.is_incorrect_use(),
+            "Incorrect use must be handled after execution"
+        );
 
         // Note: we validate delayed field reads only at try_commit.
         // TODO[agg_v2](optimize): potentially add some basic validation.
@@ -341,10 +383,8 @@ where
         // until commit, but mark as estimates).
 
         // TODO: validate modules when there is no r/w fallback.
-        Ok(
-            read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
-                && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate),
-        )
+        read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
+            && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
     }
 
     fn update_transaction_on_abort(
@@ -358,16 +398,18 @@ where
         clear_speculative_txn_logs(txn_idx as usize);
 
         // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-        if let Some(keys) = last_input_output.modified_keys(txn_idx) {
+        if let Some(keys) = last_input_output.modified_keys::<false>(txn_idx) {
             for (k, kind) in keys {
                 use KeyKind::*;
                 match kind {
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
                     Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
-                    Group => {
+                    Group(tags) => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.
-                        versioned_cache.group_data().mark_estimate(&k, txn_idx);
+                        versioned_cache
+                            .group_data()
+                            .mark_estimate(&k, txn_idx, tags);
 
                         // Group metadata lives in same versioned cache as data / resources.
                         // We are not marking metadata change as estimate, but after
@@ -495,8 +537,7 @@ where
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
 
-                let validation_result =
-                    Self::validate(txn_idx, last_input_output, versioned_cache)?;
+                let validation_result = Self::validate(txn_idx, last_input_output, versioned_cache);
                 if !validation_result
                     || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
                         .unwrap_or(false)
@@ -543,33 +584,10 @@ where
                     && block_limit_processor.should_end_block_parallel()
                 {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
-                    last_input_output.update_to_skip_rest(txn_idx);
+                    last_input_output.update_to_skip_rest(txn_idx)?;
                 }
             }
 
-            let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
-                .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                    // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
-                    // TODO[agg_v2]: have a test that fails if we don't do the if.
-                    let finalized_result = if is_read_needing_exchange {
-                        versioned_cache
-                            .group_data()
-                            .get_last_committed_group(&group_key)
-                    } else {
-                        versioned_cache
-                            .group_data()
-                            .finalize_group(&group_key, txn_idx)
-                    };
-                    map_finalized_group::<T>(
-                        group_key,
-                        finalized_result,
-                        metadata_op,
-                        is_read_needing_exchange,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-
-            last_input_output.record_finalized_group(txn_idx, finalized_groups);
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
             }
@@ -679,7 +697,21 @@ where
             shared_counter,
         );
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
-        let finalized_groups = last_input_output.take_finalized_group(txn_idx);
+
+        let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
+            .map(|((group_key, metadata_op), is_read_needing_exchange)| {
+                let finalize_group = versioned_cache
+                    .group_data()
+                    .finalize_group(&group_key, txn_idx);
+
+                map_finalized_group::<T>(
+                    group_key,
+                    finalize_group,
+                    metadata_op,
+                    is_read_needing_exchange,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
 
@@ -732,7 +764,7 @@ where
         }
 
         let mut final_results = final_results.acquire();
-        match last_input_output.take_output(txn_idx) {
+        match last_input_output.take_output(txn_idx)? {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
             },
@@ -761,6 +793,7 @@ where
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
+        let num_txns = block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(env.clone(), base_view);
         drop(init_timer);
@@ -785,6 +818,16 @@ where
         };
 
         loop {
+            if let SchedulerTask::ValidationTask(txn_idx, incarnation, _) = &scheduler_task {
+                if *incarnation as usize > num_workers.pow(2) + num_txns + 10 {
+                    // Something is wrong if we observe high incarnations (e.g. a bug
+                    // might manifest as an execution-invalidation cycle). Break out
+                    // to fallback to sequential execution.
+                    error!("Observed incarnation {} of txn {txn_idx}", *incarnation);
+                    return Err(PanicOr::Or(ParallelBlockExecutionError::IncarnationTooHigh));
+                }
+            }
+
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
                     &self.config.onchain.block_gas_limit_type,
@@ -807,7 +850,7 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
-                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache)?;
+                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache);
                     Self::update_on_validation(
                         txn_idx,
                         incarnation,
@@ -941,6 +984,15 @@ where
         });
         drop(timer);
 
+        if !shared_maybe_error.load(Ordering::SeqCst) && scheduler.pop_from_commit_queue().is_ok() {
+            // No error is recorded, parallel execution workers are done, but there is
+            // still a commit task remaining. Commit tasks must be drained before workers
+            // exit, hence we log an error and fallback to sequential execution.
+            alert!("[BlockSTM] error: commit tasks not drained after parallel execution");
+
+            shared_maybe_error.store(true, Ordering::Relaxed);
+        }
+
         counters::update_state_counters(versioned_cache.stats(), true);
 
         // Explicit async drops.
@@ -971,10 +1023,10 @@ where
             unsync_map.write(key, write_op, layout);
         }
 
-        for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
-            for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
-                unsync_map.insert_group_op(&group_key, value_tag, group_op, maybe_layout)?;
-            }
+        for (group_key, metadata_op, group_size, group_ops) in
+            output.resource_group_write_set().into_iter()
+        {
+            unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
             unsync_map.write(group_key, Arc::new(metadata_op), None);
         }
 
@@ -1161,22 +1213,26 @@ where
                         // previously failed in bcs serialization for preparing final transaction outputs.
                         // TODO: remove this fallback when txn errors can be created from block executor.
 
-                        let finalize = |group_key| -> BTreeMap<_, _> {
-                            unsync_map
-                                .finalize_group(&group_key)
-                                .map(|(resource_tag, value_with_layout)| {
-                                    let value = match value_with_layout {
-                                        ValueWithLayout::RawFromStorage(value)
-                                        | ValueWithLayout::Exchanged(value, _) => value,
-                                    };
-                                    (
-                                        resource_tag,
-                                        value
-                                            .extract_raw_bytes()
-                                            .expect("Deletions should already be applied"),
-                                    )
-                                })
-                                .collect()
+                        let finalize = |group_key| -> (BTreeMap<_, _>, ResourceGroupSize) {
+                            let (group, size) = unsync_map.finalize_group(&group_key);
+
+                            (
+                                group
+                                    .map(|(resource_tag, value_with_layout)| {
+                                        let value = match value_with_layout {
+                                            ValueWithLayout::RawFromStorage(value)
+                                            | ValueWithLayout::Exchanged(value, _) => value,
+                                        };
+                                        (
+                                            resource_tag,
+                                            value
+                                                .extract_raw_bytes()
+                                                .expect("Deletions should already be applied"),
+                                        )
+                                    })
+                                    .collect(),
+                                size,
+                            )
                         };
 
                         // The IDs are not exchanged but it doesn't change the types (Bytes) or size.
@@ -1188,16 +1244,25 @@ where
                                     true
                                 });
 
-                                let finalized_group = finalize(group_key.clone());
-                                bcs::to_bytes(&finalized_group).is_err()
+                                let (finalized_group, group_size) = finalize(group_key.clone());
+                                match bcs::to_bytes(&finalized_group) {
+                                    Ok(group) => {
+                                        (!finalized_group.is_empty() || group_size.get() != 0)
+                                            && group.len() as u64 != group_size.get()
+                                    },
+                                    Err(_) => true,
+                                }
                             })
                             || output.resource_group_write_set().into_iter().any(
-                                |(group_key, _, group_ops)| {
+                                |(group_key, _, output_group_size, group_ops)| {
                                     fail_point!("fail-point-resource-group-serialization", |_| {
                                         true
                                     });
 
-                                    let mut finalized_group = finalize(group_key);
+                                    let (mut finalized_group, group_size) = finalize(group_key);
+                                    if output_group_size.get() != group_size.get() {
+                                        return false;
+                                    }
                                     for (value_tag, (group_op, _)) in group_ops {
                                         if group_op.is_deletion() {
                                             finalized_group.remove(&value_tag);
@@ -1210,7 +1275,13 @@ where
                                             );
                                         }
                                     }
-                                    bcs::to_bytes(&finalized_group).is_err()
+                                    match bcs::to_bytes(&finalized_group) {
+                                        Ok(group) => {
+                                            (!finalized_group.is_empty() || group_size.get() != 0)
+                                                && group.len() as u64 != group_size.get()
+                                        },
+                                        Err(_) => true,
+                                    }
                                 },
                             );
 
@@ -1219,7 +1290,7 @@ where
                             // fallback is to just skip any transactions that would cause such serialization errors.
                             alert!("Discarding transaction because serialization failed in bcs fallback");
                             ret.push(E::Output::discard_output(
-                                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                                StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                             ));
                             continue;
                         }
@@ -1237,8 +1308,9 @@ where
                     {
                         let finalized_groups = groups_to_finalize!(output,)
                             .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                                let finalized_group =
-                                    Ok(unsync_map.finalize_group(&group_key).collect());
+                                let (group_ops_iter, group_size) =
+                                    unsync_map.finalize_group(&group_key);
+                                let finalized_group = Ok((group_ops_iter.collect(), group_size));
                                 map_finalized_group::<T>(
                                     group_key,
                                     finalized_group,
@@ -1426,7 +1498,7 @@ where
             // StateCheckpoint will be added afterwards.
             let error_code = match sequential_error {
                 BlockExecutionError::FatalBlockExecutorError(_) => {
-                    StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+                    StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
                 },
                 BlockExecutionError::FatalVMError(_) => {
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR

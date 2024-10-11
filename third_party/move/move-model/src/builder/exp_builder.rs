@@ -176,15 +176,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
-        if !self.env().language_version().is_at_least(version_min) {
-            self.env().error(
-                loc,
-                &format!(
-                    "not supported before language version `{}`: {}",
-                    version_min, feature
-                ),
-            )
-        }
+        self.parent
+            .check_language_version(loc, feature, version_min);
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
@@ -1563,7 +1556,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         id,
                         cond.into_exp(),
                         body.into_exp(),
-                        ExpData::LoopCont(id, false).into_exp(),
+                        ExpData::LoopCont(id, 0, false).into_exp(),
                     )
                     .into_exp(),
                 )
@@ -1583,12 +1576,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Break => {
                 // Type of `break` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, false)
+                ExpData::LoopCont(id, 0, false)
             },
             EA::Exp_::Continue => {
                 // Type of `continue` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, true)
+                ExpData::LoopCont(id, 0, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
             EA::Exp_::Lambda(bindings, exp) => {

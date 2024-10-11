@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: local `r` of type `M::R` does not have the `drop` ability
+error: local `r` of type `R` does not have the `drop` ability
   ┌─ tests/ability-check/typing/mutate_resource.move:5:9
   │
 5 │         *r = R {};

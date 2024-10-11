@@ -7,13 +7,14 @@ use crate::{
     keyless::{
         base64url_encode_str,
         circuit_testcases::{
-            SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
-            SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
-            SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
+            sample_jwt_payload_json, SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE,
+            SAMPLE_EXP_HORIZON_SECS, SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD,
+            SAMPLE_JWT_HEADER_B64, SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_PEPPER,
             SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_FOR_UPGRADED_VK, SAMPLE_PROOF_NO_EXTRA_FIELD,
-            SAMPLE_UID_KEY, SAMPLE_UPGRADED_VK,
+            SAMPLE_UID_KEY, SAMPLE_UID_VAL, SAMPLE_UPGRADED_VK,
         },
         get_public_inputs_hash,
+        proof_simulation::Groth16SimulatorBn254,
         zkp_sig::ZKP,
         Configuration, EphemeralCertificate, FederatedKeylessPublicKey, Groth16Proof,
         KeylessPublicKey, KeylessSignature, OpenIdSig, ZeroKnowledgeSig,
@@ -24,7 +25,7 @@ use aptos_crypto::{
     ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, SigningKey, Uniform,
 };
 use ark_bn254::Bn254;
-use ark_groth16::PreparedVerifyingKey;
+use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -42,8 +43,18 @@ pub fn get_sample_esk() -> Ed25519PrivateKey {
     Ed25519PrivateKey::try_from(serialized).unwrap()
 }
 
+pub fn get_sample_tw_sk() -> Ed25519PrivateKey {
+    let sk_bytes =
+        hex::decode("1111111111111111111111111111111111111111111111111111111111111111").unwrap();
+    Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap()
+}
+
 pub fn get_sample_iss() -> String {
     SAMPLE_JWT_PARSED.oidc_claims.iss.clone()
+}
+
+pub fn get_sample_aud() -> String {
+    SAMPLE_JWT_PARSED.oidc_claims.aud.clone()
 }
 
 pub fn get_sample_jwk() -> RSA_JWK {
@@ -70,6 +81,10 @@ pub fn get_sample_uid_key() -> String {
     SAMPLE_UID_KEY.to_string()
 }
 
+pub fn get_sample_uid_val() -> String {
+    SAMPLE_UID_VAL.to_string()
+}
+
 pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
     let config = Configuration::new_for_testing();
     let (sig, pk) = get_sample_groth16_sig_and_pk();
@@ -93,6 +108,62 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
         },
         public_inputs_hash,
     }
+}
+
+pub fn get_sample_zk_sig() -> ZeroKnowledgeSig {
+    let proof = *SAMPLE_PROOF;
+
+    ZeroKnowledgeSig {
+        proof: proof.into(),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    }
+}
+
+/// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
+/// desired TXN.
+pub fn get_random_simulated_groth16_sig_and_pk() -> (
+    KeylessSignature,
+    KeylessPublicKey,
+    PreparedVerifyingKey<Bn254>,
+) {
+    // We need a ZeroKnowledgeSig inside of a KeylessSignature to derive a public input hash. The Groth16 proof
+    // is not used to actually derive the hash so we can temporarily give a dummy
+    // proof before later replacing it with a simulated proof
+    let dummy_proof = *SAMPLE_PROOF;
+    let mut zks = ZeroKnowledgeSig {
+        proof: ZKP::Groth16(dummy_proof),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    };
+    let mut sig = KeylessSignature {
+        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
+        jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
+        exp_date_secs: SAMPLE_EXP_DATE,
+        ephemeral_pubkey: SAMPLE_EPK.clone(),
+        ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
+    };
+    let pk = SAMPLE_PK.clone();
+    let rsa_jwk = get_sample_jwk();
+    let config = Configuration::new_for_testing();
+    let pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
+
+    let mut rng = rand::thread_rng();
+    let (sim_pk, vk) =
+        Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[pih], &sim_pk, &mut rng)
+        .unwrap();
+    let pvk = prepare_verifying_key(&vk);
+
+    // Replace dummy proof with the simulated proof
+    zks.proof = ZKP::Groth16(proof);
+    sig.cert = EphemeralCertificate::ZeroKnowledgeSig(zks.clone());
+
+    (sig, pk, pvk)
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
@@ -201,11 +272,15 @@ pub fn get_sample_groth16_sig_and_pk_no_extra_field() -> (KeylessSignature, Keyl
 }
 
 pub fn get_sample_jwt_token() -> String {
+    get_sample_jwt_token_from_payload(sample_jwt_payload_json().as_str())
+}
+
+pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
-    let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
+    let jwt_payload_b64 = base64url_encode_str(payload);
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
-    let sk = *SAMPLE_JWK_SK;
+    let sk = &*SAMPLE_JWK_SK;
     let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
 
     sk.sign(
@@ -225,7 +300,7 @@ pub fn get_sample_jwt_token() -> String {
 /// desired TXN.
 pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
-    let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
+    let jwt_payload_b64 = base64url_encode_str(sample_jwt_payload_json().as_str());
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = *SAMPLE_JWK_SK;
@@ -241,7 +316,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let openid_sig = OpenIdSig {
         jwt_sig,
-        jwt_payload_json: SAMPLE_JWT_PAYLOAD_JSON.to_string(),
+        jwt_payload_json: sample_jwt_payload_json().to_string(),
         uid_key: SAMPLE_UID_KEY.to_owned(),
         epk_blinder: SAMPLE_EPK_BLINDER.clone(),
         pepper: SAMPLE_PEPPER.clone(),
@@ -359,7 +434,8 @@ mod test {
             "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
             "pepper": hex::encode(get_sample_pepper().to_bytes()),
             "uid_key": "sub",
-            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY
+            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY,
+            "use_insecure_test_jwk": true,
         });
         make_prover_request(&client, body, "SAMPLE_PROOF").await;
 
@@ -370,7 +446,8 @@ mod test {
             "exp_date_secs": get_sample_exp_date(),
             "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
             "pepper": hex::encode(get_sample_pepper().to_bytes()),
-            "uid_key": "sub"
+            "uid_key": "sub",
+            "use_insecure_test_jwk": true,
         });
         make_prover_request(&client, body, "SAMPLE_PROOF_NO_EXTRA_FIELD").await;
     }
@@ -380,7 +457,7 @@ mod test {
         body: Value,
         test_proof_name: &str,
     ) -> ProverResponse {
-        let url = "http://localhost:8080/v0/prove";
+        let url = "http://localhost:8083/v0/prove";
 
         // Send the POST request and await the response
         let response = client.post(url).json(&body).send().await.unwrap();

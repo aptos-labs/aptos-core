@@ -18,10 +18,27 @@ module 0xc0ffee::dummy2 {
     struct State {
         value: u64,
     }
-    private fun tuple_assignments(s: &signer,state: dummy2::State) {
+    private fun tuple_assignments(s: &signer,state: State) {
         {
-          let (): () = MoveTo<dummy2::State>(s, state);
+          let (): () = MoveTo<State>(s, state);
           Tuple()
         }
     }
 } // end 0xc0ffee::dummy2
+
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::dummy1 {
+    fun bar(b: bool) {
+        let () = if (b) baz();
+    }
+    fun baz() {
+    }
+}
+module 0xc0ffee::dummy2 {
+    struct State has key {
+        value: u64,
+    }
+    fun tuple_assignments(s: &signer, state: State) {
+        let () = move_to<State>(s, state);
+    }
+}

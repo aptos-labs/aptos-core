@@ -65,7 +65,7 @@ pub fn prepare_buffer_manager(
     HashValue,
     Vec<ValidatorSigner>,
     Receiver<OrderedBlocks>,
-    ValidatorVerifier,
+    Arc<ValidatorVerifier>,
 ) {
     let num_nodes = 1;
     let channel_size = 30;
@@ -107,6 +107,7 @@ pub fn prepare_buffer_manager(
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
     let (self_loop_tx, self_loop_rx) = aptos_channels::new_unbounded_test();
+    let validators = Arc::new(validators);
     let network = NetworkSender::new(
         author,
         consensus_network_client,
@@ -188,7 +189,7 @@ pub fn launch_buffer_manager() -> (
     Runtime,
     Vec<ValidatorSigner>,
     Receiver<OrderedBlocks>,
-    ValidatorVerifier,
+    Arc<ValidatorVerifier>,
 ) {
     let runtime = consensus_runtime();
 

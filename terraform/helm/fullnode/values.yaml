@@ -34,7 +34,6 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        seeds: {}
         identity: {}
         inbound_rate_limit_config:
         outbound_rate_limit_config:
@@ -52,11 +51,11 @@ image:
 
 resources:
   limits:
-    cpu: 14
-    memory: 56Gi
+    cpu: 30
+    memory: 60Gi
   requests:
-    cpu: 14
-    memory: 56Gi
+    cpu: 30
+    memory: 60Gi
 
 nodeSelector: {}
 tolerations: []
@@ -67,6 +66,8 @@ storage:
   class:
   # -- Size of fullnode persistent storage
   size: 1000Gi
+  # -- The name of a VolumeSnapshot to restore from. In unset, the fullnode will start from scratch.
+  snapshotRefForRestore:
 
 service:
   # -- The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally
@@ -117,7 +118,7 @@ backup:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 4
+      cpu: 8
       memory: 8Gi
     requests:
       cpu: 4

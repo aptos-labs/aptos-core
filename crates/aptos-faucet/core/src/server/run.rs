@@ -12,7 +12,7 @@ use crate::{
     funder::{ApiConnectionConfig, FunderConfig, MintFunderConfig, TransactionSubmissionConfig},
     middleware::middleware_log,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_faucet_metrics_server::{run_metrics_server, MetricsServerConfig};
 use aptos_logger::info;
@@ -21,12 +21,12 @@ use aptos_sdk::{
     types::{account_config::aptos_test_root_address, chain_id::ChainId},
 };
 use clap::Parser;
-use futures::lock::Mutex;
-use poem::{http::Method, listener::TcpListener, middleware::Cors, EndpointExt, Route, Server};
+use futures::{channel::oneshot::Sender as OneShotSender, lock::Mutex};
+use poem::{http::Method, listener::TcpAcceptor, middleware::Cors, EndpointExt, Route, Server};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
-use tokio::{sync::Semaphore, task::JoinSet};
+use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HandlerConfig {
@@ -68,6 +68,14 @@ pub struct RunConfig {
 
 impl RunConfig {
     pub async fn run(self) -> Result<()> {
+        self.run_impl(None).await
+    }
+
+    pub async fn run_and_report_port(self, port_tx: OneShotSender<u16>) -> Result<()> {
+        self.run_impl(Some(port_tx)).await
+    }
+
+    async fn run_impl(self, port_tx: Option<OneShotSender<u16>>) -> Result<()> {
         info!("Running with config: {:#?}", self);
 
         // Set whether we should use useful errors.
@@ -177,12 +185,19 @@ impl RunConfig {
             }));
         }
 
-        // Create a future for the API server.
-        let api_server_future = Server::new(TcpListener::bind((
+        let listener = TcpListener::bind((
             self.server_config.listen_address.clone(),
             self.server_config.listen_port,
-        )))
-        .run(
+        ))
+        .await?;
+        let port = listener.local_addr()?.port();
+
+        if let Some(tx) = port_tx {
+            tx.send(port).map_err(|_| anyhow!("failed to send port"))?;
+        }
+
+        // Create a future for the API server.
+        let api_server_future = Server::new_with_acceptor(TcpAcceptor::from_tokio(listener)?).run(
             Route::new()
                 .nest(
                     &self.server_config.api_path_base,
@@ -821,10 +836,10 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
+            .view_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
-        assert_eq!(response.into_inner().get(), 10);
+        assert_eq!(response.into_inner(), 10);
 
         Ok(())
     }
@@ -879,10 +894,12 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
+            .view_apt_account_balance(
+                AccountAddress::from_str(&fund_request.address.unwrap()).unwrap(),
+            )
             .await?;
 
-        assert_eq!(response.into_inner().get(), 10);
+        assert_eq!(response.into_inner(), 10);
 
         Ok(())
     }
@@ -927,10 +944,12 @@ mod test {
 
         // Confirm that the account was given the full 1000 OCTA as requested.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
+            .view_apt_account_balance(
+                AccountAddress::from_str(&fund_request.address.unwrap()).unwrap(),
+            )
             .await?;
 
-        assert_eq!(response.into_inner().get(), 1000);
+        assert_eq!(response.into_inner(), 1000);
 
         // This time, don't include the auth token. We request more than maximum_amount,
         // but later we'll see that the faucet will only give us maximum_amount, not
@@ -945,10 +964,12 @@ mod test {
 
         // Confirm that the account was only given 100 OCTA (maximum_amount), not 1000.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
+            .view_apt_account_balance(
+                AccountAddress::from_str(&fund_request.address.unwrap()).unwrap(),
+            )
             .await?;
 
-        assert_eq!(response.into_inner().get(), 100);
+        assert_eq!(response.into_inner(), 100);
 
         Ok(())
     }

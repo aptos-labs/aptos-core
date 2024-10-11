@@ -1,8 +1,8 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
-        s1: M::S,
-        s2: M::S,
+        s1: S,
+        s2: S,
     }
     struct S {
         f: u64,
@@ -11,12 +11,12 @@ module 0x8675309::M {
         {
           let f: u64;
           {
-            let s2: M::S;
+            let s2: S;
             M::R{ s1: M::S{ f }, s2 } = pack M::R(pack M::S(0), pack M::S(1));
             f;
             s2;
             f: u64 = 0;
-            s2: M::S = pack M::S(0);
+            s2: S = pack M::S(0);
             f;
             s2;
             Tuple()
@@ -27,12 +27,12 @@ module 0x8675309::M {
         {
           let f: &u64;
           {
-            let s2: &M::S;
+            let s2: &S;
             M::R{ s1: M::S{ f }, s2 } = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
             f;
             s2;
             f: &u64 = Borrow(Immutable)(0);
-            s2: &M::S = Borrow(Immutable)(pack M::S(0));
+            s2: &S = Borrow(Immutable)(pack M::S(0));
             f;
             s2;
             Tuple()
@@ -43,12 +43,12 @@ module 0x8675309::M {
         {
           let f: &mut u64;
           {
-            let s2: &mut M::S;
+            let s2: &mut S;
             M::R{ s1: M::S{ f }, s2 } = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
             f;
             s2;
             f: &mut u64 = Borrow(Mutable)(0);
-            s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
+            s2: &mut S = Borrow(Mutable)(pack M::S(0));
             f;
             s2;
             Tuple()
@@ -57,15 +57,59 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        s1: S,
+        s2: S,
+    }
+    struct S has drop {
+        f: u64,
+    }
+    fun t0() {
+        let f;
+        let s2;
+        R{s1: S{f: f},s2: s2} = R{s1: S{f: 0},s2: S{f: 1}};
+        f;
+        s2;
+        f = 0;
+        s2 = S{f: 0};
+        f;
+        s2;
+    }
+    fun t1() {
+        let f;
+        let s2;
+        R{s1: S{f: f},s2: s2} = &R{s1: S{f: 0},s2: S{f: 1}};
+        f;
+        s2;
+        f = &0;
+        s2 = &S{f: 0};
+        f;
+        s2;
+    }
+    fun t2() {
+        let f;
+        let s2;
+        R{s1: S{f: f},s2: s2} = &mut R{s1: S{f: 0},s2: S{f: 1}};
+        f;
+        s2;
+        f = &mut 0;
+        s2 = &mut S{f: 0};
+        f;
+        s2;
+    }
+}
+
 
 Diagnostics:
-error: value of type `M::R` does not have the `drop` ability
+error: value of type `R` does not have the `drop` ability
    ┌─ tests/simplifier-elimination/assign_unpack_references.move:17:33
    │
 17 │         R { s1: S { f }, s2 } = &R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
    │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
 
-error: value of type `M::R` does not have the `drop` ability
+error: value of type `R` does not have the `drop` ability
    ┌─ tests/simplifier-elimination/assign_unpack_references.move:27:33
    │
 27 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
