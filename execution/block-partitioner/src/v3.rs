@@ -118,6 +118,8 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
                     let current_txn_local_idx = partitions[cur_shard_idx].num_txns();
                     let owner_txn_local_idx = partitions[owner_shard_idx].local_idx_by_global.get(owner_txn_idx).unwrap();
                     remote_dependency_positions[cur_shard_idx].entry(current_txn_local_idx).or_insert(HashSet::new()).insert((*owner_txn_local_idx, owner_shard_idx));
+
+                    // println!("Remote dependency: diff {}, Last written to by {} [locally={}, shard={}], and now needed by {} [locally={}, shard={}]", (current_txn_local_idx as i32 - (*owner_txn_local_idx as i32)), owner_txn_idx, owner_txn_local_idx, owner_shard_idx, cur_txn_idx, current_txn_local_idx, cur_shard_idx);
                 }
             }
         }

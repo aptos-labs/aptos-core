@@ -70,7 +70,7 @@ impl BlockPartitioner for FanoutPartitioner {
 
         let sender_to_shard_idxs = self.optimize_probabilistic_fanout(sender_to_shard_idxs, &compressed_graph, num_shards as u16);
 
-        transactions.sort_by_key(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize]);
+        self.optimize_transaction_order(&mut transactions, &sender_to_shard_idxs, &compressed_graph, num_shards as u16);
 
         let shard_idxs = transactions.iter().map(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize] as usize).collect();
 
@@ -296,7 +296,7 @@ impl FanoutPartitioner {
         for (sender_idx, _) in start_vertex_to_degree {
             if assigned[sender_idx as usize] == UNASSIGNED_SHARD {
                 let mut current_to_visit = vec![sender_idx];
-                let mut next_to_visit = HashMap::new();
+                let mut next_to_visit: HashMap<u32, u32> = HashMap::new();
 
                 while !current_to_visit.is_empty()  {
                     for cur in &current_to_visit {
@@ -324,12 +324,15 @@ impl FanoutPartitioner {
 
                     let mut to_sort = HashMap::new();
                     mem::swap(&mut to_sort, &mut next_to_visit);
-                    let mut new_to_visit = to_sort.into_iter().sorted_by_key(|(_idx, connections)| Reverse(*connections)).map(|(idx, _connections)| idx).collect::<Vec<_>>();
+                    let threshold = to_sort.iter().map(|(_idx, connections)| connections).max().map_or(0, |max| f64::sqrt((*max / 5) as f64) as u32);
+                    let mut new_to_visit = to_sort.into_iter().filter(|(_idx, connections)| *connections >= threshold).sorted_by_key(|(_idx, connections)| Reverse(*connections)).map(|(idx, _connections)| idx).collect::<Vec<_>>();
                     mem::swap(&mut current_to_visit, &mut new_to_visit);
                 }
 
-                if bucket_weights[cur_bucket_idx as usize] >= max_shard_weight {
-                    cur_bucket_idx += 1;
+                cur_bucket_idx = (cur_bucket_idx + 1) % num_shards;
+
+                while bucket_weights[cur_bucket_idx as usize] >= max_shard_weight {
+                    cur_bucket_idx = (cur_bucket_idx + 1) % num_shards;
                 }
             }
         }
@@ -403,7 +406,9 @@ impl FanoutPartitioner {
     fn print_fanout_stats(&self, access_shards: &[Vec<u32>], graph: &CompressedGraph, desc: &str) {
         let mut fanout = 0;
         let mut prob_fanout = 0.0f32;
-        let num_accesses = graph.access_end_idx - graph.access_start_idx;
+        let mut in_max = 0;
+        let mut in_total = 0;
+        let num_accesses = (graph.access_end_idx - graph.access_start_idx) as f32;
         for access_idx in graph.access_range() {
             for count in &access_shards[graph.access_to_vec_index(access_idx)] {
                 if *count > 0 {
@@ -411,8 +416,12 @@ impl FanoutPartitioner {
                     prob_fanout += self.fanout_formula.calc_prob_fanout(*count);
                 }
             }
+            let max = *access_shards[graph.access_to_vec_index(access_idx)].iter().max().unwrap();
+            let total = access_shards[graph.access_to_vec_index(access_idx)].iter().sum::<u32>();
+            in_max += max;
+            in_total += total;
         }
-        println!("{}: fanuot: {}, prob fanout: {}", desc, fanout as f32 / num_accesses as f32, prob_fanout / num_accesses as f32);
+        println!("{}: fanuot: {}, prob fanout: {}, avg degree in max: {}, avg degree in rest {}", desc, fanout as f32 / num_accesses, prob_fanout / num_accesses, in_max as f32 / num_accesses, (in_total - in_max) as f32 / num_accesses);
     }
 
     fn optimize_probabilistic_fanout_iteration(&self, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>, access_shards: &mut Vec<Vec<u32>>, sender_shard_weights: &mut Vec<Vec<f32>>, graph: &CompressedGraph, num_shards: u16) {
@@ -571,4 +580,70 @@ impl FanoutPartitioner {
         *access_shards = Self::compute_access_shards(graph, num_shards, sender_shard);
         *sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards);
     }
+
+    fn optimize_transaction_order(&self, transactions: &mut Vec<AnalyzedTransaction>, sender_shard: &Vec<u16>, graph: &CompressedGraph, num_shards: u16) {
+        let access_shards = Self::compute_access_shards(graph, num_shards, sender_shard);
+
+        let mut sender_to_positions = vec![(0.0, 0usize); graph.num_senders() as usize];
+
+        for access_idx in graph.access_range() {
+            let sorted = access_shards[graph.access_to_vec_index(access_idx)]
+                .iter()
+                .cloned()
+                .enumerate()
+                .filter(|(_idx, count)| *count > 0)
+                .sorted_by_key(|(_idx, count)| Reverse(*count))
+                .enumerate()
+                .collect::<Vec<_>>();
+
+            let chain_len = sorted.len();
+            if chain_len > 1 {
+                let mut shard_position = vec![num_shards as usize; num_shards as usize];
+                for (position, (shard_idx, _count)) in &sorted {
+                    shard_position[*shard_idx] = *position;
+                }
+
+                for sender in graph.edges.get_edges(access_idx) {
+                    let (sum, count) = sender_to_positions.get_mut(*sender as usize).unwrap();
+                    let position = shard_position[sender_shard[*sender as usize] as usize];
+                    assert!(position < num_shards as usize, "{:?}, sorted: {:?}, shard_position: {:?}, sender_shard: {:?}", access_shards[graph.access_to_vec_index(access_idx)], sorted, shard_position, sender_shard[*sender as usize]);
+                    let position = position as f32 / (chain_len - 1) as f32;
+                    *sum += position;
+                    *count += 1;
+                }
+            }
+        }
+
+        transactions.sort_by_key(|txn| {
+            let sender = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize;
+            let (sum, count) = sender_to_positions[sender];
+            Reverse((NotNan::new(if count > 0 { sum / (count as f32) } else { 0.5 }).unwrap(), sender_shard[sender]))
+        });
+
+        if self.print_debug_stats {
+            let mut prev = 1.0;
+            let mut shard_fill = vec![0; num_shards as usize];
+            for (txn_idx, txn) in transactions.iter().enumerate() {
+                let sender = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize;
+
+                let (sum, count) = sender_to_positions[sender];
+
+                let cur = if count > 0 { sum / (count as f32) } else { 0.5 };
+                if prev > cur {
+                    println!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, txn_idx, cur, sum, count, shard_fill);
+                    prev = cur;
+                }
+                if txn_idx % 10000 == 0 {
+                    println!("running value {} at {}, cur {}={}/{}. shard fill: {:?}", prev, txn_idx, cur, sum, count, shard_fill);
+                }
+
+                shard_fill[sender_shard[sender] as usize] += 1;
+            }
+            println!("Ending {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
+        }
+
+        // transactions.sort_by_key(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize]);
+
+    }
+
 }
