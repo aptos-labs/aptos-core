@@ -8,7 +8,7 @@ pub mod submission_worker;
 pub mod transaction_executor;
 
 use crate::emitter::{
-    account_minter::{bulk_create_accounts, SourceAccountManager},
+    account_minter::{bulk_create_accounts, create_and_fund_account_request, SourceAccountManager},
     local_account_generator::{
         create_keyless_account_generator, create_private_key_account_generator,
     },
@@ -23,14 +23,28 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
-    move_types::account_address::AccountAddress,
-    transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, AccountKey, LocalAccount},
+    move_types::{
+        account_address::AccountAddress,
+        ident_str,
+        language_storage::ModuleId,
+        value::{serialize_values, MoveValue},
+    },
+    transaction_builder::{aptos_stdlib, TransactionBuilder, TransactionFactory},
+    types::{
+        account_config::CORE_CODE_ADDRESS,
+        extract_claims_from_jwt,
+        transaction::{EntryFunction, SignedTransaction},
+        AccountKey, LocalAccount,
+    },
 };
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
+    create_txn_generator_creator, AccountType, ReliableTransactionSubmitter, TransactionType,
+    SEND_AMOUNT,
 };
-use aptos_types::account_config::aptos_test_root_address;
+use aptos_types::{
+    account_config::aptos_test_root_address, jwks::{insecure_test_rsa_jwk, secure_test_rsa_jwk},
+    transaction::TransactionPayload,
+};
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
 use rand::{
@@ -47,7 +61,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
@@ -201,6 +215,10 @@ pub struct EmitJobRequest {
     epk_expiry_date_secs: Option<u64>,
 
     keyless_jwt: Option<String>,
+
+    federated_jwk_addr: Option<AccountAddress>,
+
+    federated_jwk_owner_secret_key: Option<[u8; 32]>,
 }
 
 impl Default for EmitJobRequest {
@@ -236,6 +254,8 @@ impl Default for EmitJobRequest {
             proof_file_path: None,
             epk_expiry_date_secs: None,
             keyless_jwt: None,
+            federated_jwk_addr: None,
+            federated_jwk_owner_secret_key: None,
         }
     }
 }
@@ -345,6 +365,16 @@ impl EmitJobRequest {
 
     pub fn keyless_jwt(mut self, keyless_jwt: &str) -> Self {
         self.keyless_jwt = Some(keyless_jwt.to_owned());
+        self
+    }
+
+    pub fn federated_jwk_addr(mut self, federated_jwk_addr: AccountAddress) -> Self {
+        self.federated_jwk_addr = Some(federated_jwk_addr);
+        self
+    }
+
+    pub fn federated_jwk_owner_secret_key(mut self, sk: Ed25519PrivateKey) -> Self {
+        self.federated_jwk_owner_secret_key = Some(sk.to_bytes());
         self
     }
 
@@ -783,9 +813,54 @@ impl TxnEmitter {
                         .as_deref()
                         .expect("keyless_jwt to not be None"),
                     req.proof_file_path.as_deref(),
+                    req.federated_jwk_addr,
                 )?
             },
         };
+        let txn_executor = RestApiReliableTransactionSubmitter::new(
+            req.rest_clients.clone(),
+            init_retries,
+            req.init_retry_interval,
+        );
+        if let Some(key) = req.federated_jwk_owner_secret_key {
+            let accnt = LocalAccount::from_private_key(&hex::encode(key), 0)?;
+            let seq_num = txn_executor.query_sequence_number(accnt.address()).await?;
+            accnt.set_sequence_number(seq_num);
+
+            let jwk = secure_test_rsa_jwk();
+            let txn = txn_factory.entry_function(EntryFunction::new(
+                ModuleId::new(CORE_CODE_ADDRESS, ident_str!("jwks").to_owned()),
+                ident_str!("update_federated_jwk_set").to_owned(),
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::vector_u8(
+                        extract_claims_from_jwt(&req.keyless_jwt.clone().unwrap())?
+                            .oidc_claims
+                            .iss
+                            .into_bytes(),
+                    ),
+                    MoveValue::Vector(vec![MoveValue::vector_u8(jwk.kid.into_bytes())]),
+                    MoveValue::Vector(vec![MoveValue::vector_u8(jwk.alg.into_bytes())]),
+                    MoveValue::Vector(vec![MoveValue::vector_u8(jwk.e.into_bytes())]),
+                    MoveValue::Vector(vec![MoveValue::vector_u8(jwk.n.into_bytes())]),
+                ]),
+            ));
+
+            let signed_txn = accnt.sign_with_transaction_builder(txn);
+
+            let hi = create_and_fund_account_request(
+                root_account.clone(),
+                get_needed_balance_per_account_from_req(&req, num_accounts),
+                accnt.address(),
+                &txn_factory,
+            );
+            info!("Minting accnt");
+            let res = txn_executor.execute_transactions(&[hi]).await;
+
+            info!("Submitting jwk update txn at {:?}", accnt.address());
+            let res = txn_executor.execute_transactions(&[signed_txn]).await;
+            info!("result {:?}", res);
+        }
 
         let mut all_accounts = bulk_create_accounts(
             root_account.clone(),

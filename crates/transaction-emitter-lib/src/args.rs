@@ -6,6 +6,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
+use aptos_types::account_address::AccountAddress;
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -13,6 +14,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
+    str::FromStr,
 };
 use url::Url;
 
@@ -236,6 +238,12 @@ pub struct AccountTypeArgs {
 
     #[clap(long)]
     pub keyless_jwt: Option<String>,
+
+    #[clap(long, value_parser = AccountAddress::from_str)]
+    pub federated_jwk_addr: Option<AccountAddress>,
+
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, conflicts_with = "federated_jwk_addr")]
+    pub federated_jwk_owner_secret_key: Option<ConfigKey<Ed25519PrivateKey>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
@@ -258,6 +266,12 @@ pub struct CreateAccountsArgs {
 
     #[clap(long)]
     pub proof_file_path: Option<String>,
+
+    #[clap(long, value_parser = AccountAddress::from_str)]
+    pub federated_jwk_addr: Option<AccountAddress>,
+
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, conflicts_with = "federated_jwk_addr")]
+    pub federated_jwk_owner_secret_key: Option<ConfigKey<Ed25519PrivateKey>>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
