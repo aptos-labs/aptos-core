@@ -18,6 +18,7 @@ use serde_with::skip_serializing_none;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct OpenIdSig {
     /// The decoded bytes of the JWS signature in the JWT (<https://datatracker.ietf.org/doc/html/rfc7515#section-3>)
     #[serde(with = "serde_bytes")]
