@@ -1094,7 +1094,7 @@ impl RoundManager {
         {
             let vote_data = vote.vote_data().clone();
             let ledger_info = vote.ledger_info().clone();
-            let num_validators = self.epoch_state().verifier.len() as u16;
+            let num_validators = self.epoch_state.verifier.len() as u16;
             let mut all_ones = BitVec::with_num_bits(num_validators);
             (0..num_validators).for_each(|i| all_ones.set(i));
             let fake_aggregate_signature = AggregateSignature::new(all_ones, None);
