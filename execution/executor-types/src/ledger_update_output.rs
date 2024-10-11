@@ -11,7 +11,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     proof::accumulator::InMemoryTransactionAccumulator,
-    state_store::{combine_or_add_sharded_state_updates, ShardedStateUpdates},
+    state_store::ShardedStateUpdates,
     transaction::{
         block_epilogue::BlockEndInfo, TransactionInfo, TransactionStatus, TransactionToCommit,
         Version,
@@ -117,35 +117,6 @@ impl LedgerUpdateOutput {
             self.subscribable_events.clone(),
             self.block_end_info.clone(),
         )
-    }
-
-    pub fn combine(&mut self, rhs: Self) {
-        assert!(self.block_end_info.is_none());
-        assert!(rhs.block_end_info.is_none());
-        let Self {
-            statuses_for_input_txns,
-            to_commit,
-            subscribable_events,
-            transaction_info_hashes,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator,
-            block_end_info: _block_end_info,
-        } = rhs;
-
-        if let Some(updates) = state_updates_before_last_checkpoint {
-            combine_or_add_sharded_state_updates(
-                &mut self.state_updates_until_last_checkpoint,
-                updates,
-            );
-        }
-
-        self.statuses_for_input_txns.extend(statuses_for_input_txns);
-        self.to_commit.extend(to_commit);
-        self.subscribable_events.extend(subscribable_events);
-        self.transaction_info_hashes.extend(transaction_info_hashes);
-        self.sharded_state_cache.combine(sharded_state_cache);
-        self.transaction_accumulator = transaction_accumulator;
     }
 
     pub fn next_version(&self) -> Version {
