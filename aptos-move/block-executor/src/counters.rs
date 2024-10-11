@@ -321,27 +321,3 @@ pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_paral
         .with_label_values(&[mode_str, "delayed_field"])
         .observe(block_state_stats.base_delayed_fields_size as f64);
 }
-
-// Loader V1 and V2 counters.
-
-pub static TASK_VALIDATE_MODULES_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_execution_task_validate_modules_seconds",
-        // metric description
-        "The time spent in module validation in Block STM",
-        time_buckets(),
-    )
-    .unwrap()
-});
-
-pub static FETCH_NOT_CACHED_VERIFIED_MODULE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_fetch_not_cached_verified_module",
-        // metric description
-        "The time spent in seconds when fetching a module from mutable module cache",
-        time_buckets(),
-    )
-    .unwrap()
-});

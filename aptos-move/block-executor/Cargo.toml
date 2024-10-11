@@ -50,6 +50,7 @@ scopeguard = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
+aptos-types = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 fail = { workspace = true, features = ["failpoints"] }
 itertools = { workspace = true }

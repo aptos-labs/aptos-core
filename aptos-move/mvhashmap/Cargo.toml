@@ -21,11 +21,12 @@ aptos-vm-types = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
-dashmap = { workspace = true }
+dashmap = { workspace = true, features = ["raw-api"] }
 hashbrown = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
+parking_lot = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
