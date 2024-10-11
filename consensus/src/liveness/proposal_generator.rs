@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::proposer_election::ProposerElection;
+use super::{
+    proposal_status_tracker::TOptQSPullParamsProvider, proposer_election::ProposerElection,
+};
 use crate::{
     block_storage::{tracing::{observe_block, BlockStage}, BlockReader}, counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
@@ -10,14 +12,14 @@ use crate::{
         PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    }, payload_client::{PayloadClient, PayloadPullParameters}, util::time_service::TimeService
+    }, payload_client::PayloadClient, util::time_service::TimeService
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };
 use aptos_consensus_types::{
-    block::Block, block_data::BlockData, common::{Author, Payload, PayloadFilter, Round}, pipelined_block::ExecutionSummary, quorum_cert::QuorumCert, request_response::PayloadTxns, utils::PayloadTxnsSize
+    block::Block, block_data::BlockData, common::{Author, Payload, PayloadFilter, Round}, payload_pull_params::PayloadPullParameters, pipelined_block::ExecutionSummary, quorum_cert::QuorumCert, request_response::PayloadTxns, utils::PayloadTxnsSize
 };
 use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
@@ -266,6 +268,7 @@ pub struct ProposalGenerator {
     onchain_randomness_config: OnChainRandomnessConfig,
 
     allow_batches_without_pos_in_proposal: bool,
+    opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
 
     // For checking randomness
     validator: Arc<RwLock<PooledVMValidator>>,
@@ -290,6 +293,7 @@ impl ProposalGenerator {
         vtxn_config: ValidatorTxnConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         allow_batches_without_pos_in_proposal: bool,
+        opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
         validator: Arc<RwLock<PooledVMValidator>>,
     ) -> Self {
         Self {
@@ -310,6 +314,7 @@ impl ProposalGenerator {
             vtxn_config,
             onchain_randomness_config,
             allow_batches_without_pos_in_proposal,
+            opt_qs_payload_param_provider,
             validator,
         }
     }
@@ -359,6 +364,7 @@ impl ProposalGenerator {
                 bail!("Already proposed in the round {}", round);
             }
         }
+        let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
@@ -465,7 +471,7 @@ impl ProposalGenerator {
                         soft_max_txns_after_filtering: max_txns_from_block_to_execute
                             .unwrap_or(max_block_txns_after_filtering),
                         max_inline_txns: self.max_inline_txns,
-                        opt_batch_txns_pct: 0,
+                        maybe_optqs_payload_pull_params,
                         user_txn_filter: payload_filter,
                         pending_ordering,
                         pending_uncommitted_blocks: pending_blocks.len(),
