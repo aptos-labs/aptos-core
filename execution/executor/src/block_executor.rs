@@ -314,10 +314,7 @@ where
             return Ok(current_output
                 .output
                 .get_ledger_update()
-                .as_state_compute_result(
-                    parent_accumulator,
-                    current_output.output.epoch_state().clone(),
-                ));
+                .as_state_compute_result(current_output.output.epoch_state().clone()));
         }
 
         let output =
@@ -341,10 +338,8 @@ where
             output.ensure_ends_with_state_checkpoint()?;
         }
 
-        let state_compute_result = output.as_state_compute_result(
-            parent_accumulator,
-            current_output.output.epoch_state().clone(),
-        );
+        let state_compute_result =
+            output.as_state_compute_result(current_output.output.epoch_state().clone());
         current_output.output.set_ledger_update(output);
         Ok(state_compute_result)
     }

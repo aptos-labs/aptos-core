@@ -30,8 +30,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
-    block_metadata_ext::BlockMetadataExt, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::SignedTransaction,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -132,44 +131,36 @@ impl ExecutionProxy {
     fn pre_commit_hook(
         &self,
         block: &Block,
-        metadata: BlockMetadataExt,
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> PreCommitHook {
         let mut pre_commit_notifier = self.pre_commit_notifier.clone();
         let state_sync_notifier = self.state_sync_notifier.clone();
         let payload = block.payload().cloned();
         let timestamp = block.timestamp_usecs();
-        let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let block_id = block.id();
-        Box::new(
-            move |user_txns: &[SignedTransaction], state_compute_result: &StateComputeResult| {
-                let input_txns = Block::combine_to_input_transactions(
-                    validator_txns,
-                    user_txns.to_vec(),
-                    metadata,
-                );
-                let txns = state_compute_result.transactions_to_commit(input_txns, block_id);
-                let subscribable_events = state_compute_result.subscribable_events().to_vec();
-                Box::pin(async move {
-                    pre_commit_notifier
-                        .send(Box::pin(async move {
-                            if let Err(e) = monitor!(
-                                "notify_state_sync",
-                                state_sync_notifier
-                                    .notify_new_commit(txns, subscribable_events)
-                                    .await
-                            ) {
-                                error!(error = ?e, "Failed to notify state synchronizer");
-                            }
+        Box::new(move |state_compute_result: &StateComputeResult| {
+            let state_compute_result = state_compute_result.clone();
+            Box::pin(async move {
+                pre_commit_notifier
+                    .send(Box::pin(async move {
+                        let txns = state_compute_result.transactions_to_commit();
+                        let subscribable_events =
+                            state_compute_result.subscribable_events().to_vec();
+                        if let Err(e) = monitor!(
+                            "notify_state_sync",
+                            state_sync_notifier
+                                .notify_new_commit(txns, subscribable_events)
+                                .await
+                        ) {
+                            error!(error = ?e, "Failed to notify state synchronizer");
+                        }
 
-                            let payload_vec = payload.into_iter().collect();
-                            payload_manager.notify_commit(timestamp, payload_vec);
-                        }))
-                        .await
-                        .expect("Failed to send pre-commit notification");
-                })
-            },
-        )
+                        let payload_vec = payload.into_iter().collect();
+                        payload_manager.notify_commit(timestamp, payload_vec);
+                    }))
+                    .await
+                    .expect("Failed to send pre-commit notification");
+            })
+        })
     }
 }
 
@@ -230,7 +221,7 @@ impl StateComputer for ExecutionProxy {
                 parent_block_id,
                 transaction_generator,
                 block_executor_onchain_config,
-                self.pre_commit_hook(block, metadata, payload_manager),
+                self.pre_commit_hook(block, payload_manager),
                 lifetime_guard,
             )
             .await;

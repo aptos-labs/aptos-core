@@ -21,7 +21,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
+    transaction::{SignedTransaction, Transaction, TransactionStatus},
     validator_txn::ValidatorTransaction,
 };
 use std::{
@@ -129,18 +129,19 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         _parent_block_id: HashValue,
         _state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
-        let num_txns = self
+        let txns = self
             .blocks_received
             .lock()
             .last()
             .unwrap()
             .transactions
-            .num_transactions();
+            .clone()
+            .into_txns()
+            .into_iter()
+            .map(|t| t.into_inner())
+            .collect();
 
-        Ok(StateComputeResult::new_dummy_with_compute_status(vec![
-            TransactionStatus::Keep(ExecutionStatus::Success);
-            num_txns
-        ]))
+        Ok(StateComputeResult::new_dummy_with_input_txns(txns))
     }
 
     fn pre_commit_block(

@@ -21,6 +21,7 @@ aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 criterion = { workspace = true }
+derive_more = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }

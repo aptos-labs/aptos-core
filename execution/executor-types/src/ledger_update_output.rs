@@ -17,11 +17,79 @@ use aptos_types::{
         Version,
     },
 };
+use derive_more::Deref;
 use itertools::zip_eq;
 use std::sync::Arc;
 
-#[derive(Default, Debug)]
+#[derive(Clone, Debug, Default, Deref)]
 pub struct LedgerUpdateOutput {
+    #[deref]
+    inner: Arc<Inner>,
+}
+
+impl LedgerUpdateOutput {
+    pub fn new_empty(transaction_accumulator: Arc<InMemoryTransactionAccumulator>) -> Self {
+        Self::new_impl(Inner::new_empty(transaction_accumulator))
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
+        Self::new_impl(Inner::new_dummy_with_input_txns(txns))
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
+        Self::new_impl(Inner::new_dummy_with_txns_to_commit(txns))
+    }
+
+    pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
+        Self::new_impl(Inner::new_dummy_with_root_hash(root_hash))
+    }
+
+    pub fn reconfig_suffix(&self) -> Self {
+        Self::new_impl(Inner::new_empty(self.transaction_accumulator.clone()))
+    }
+
+    pub fn new(
+        statuses_for_input_txns: Vec<TransactionStatus>,
+        to_commit: Vec<TransactionToCommit>,
+        subscribable_events: Vec<ContractEvent>,
+        transaction_info_hashes: Vec<HashValue>,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: ShardedStateCache,
+        transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
+        parent_accumulator: Arc<InMemoryTransactionAccumulator>,
+        block_end_info: Option<BlockEndInfo>,
+    ) -> Self {
+        Self::new_impl(Inner {
+            statuses_for_input_txns,
+            to_commit,
+            subscribable_events,
+            transaction_info_hashes,
+            state_updates_until_last_checkpoint,
+            sharded_state_cache,
+            transaction_accumulator,
+            parent_accumulator,
+            block_end_info,
+        })
+    }
+
+    fn new_impl(inner: Inner) -> Self {
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+
+    pub fn as_state_compute_result(
+        &self,
+        next_epoch_state: Option<EpochState>,
+    ) -> StateComputeResult {
+        StateComputeResult::new(self.clone(), next_epoch_state)
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct Inner {
     pub statuses_for_input_txns: Vec<TransactionStatus>,
     pub to_commit: Vec<TransactionToCommit>,
     pub subscribable_events: Vec<ContractEvent>,
@@ -31,20 +99,56 @@ pub struct LedgerUpdateOutput {
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
+    pub parent_accumulator: Arc<InMemoryTransactionAccumulator>,
     pub block_end_info: Option<BlockEndInfo>,
 }
 
-impl LedgerUpdateOutput {
+impl Inner {
     pub fn new_empty(transaction_accumulator: Arc<InMemoryTransactionAccumulator>) -> Self {
         Self {
+            parent_accumulator: transaction_accumulator.clone(),
             transaction_accumulator,
             ..Default::default()
         }
     }
 
-    pub fn reconfig_suffix(&self) -> Self {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
+        let num_txns = txns.len();
+        let to_commit = txns
+            .into_iter()
+            .chain(std::iter::once(
+                aptos_types::transaction::Transaction::StateCheckpoint(HashValue::zero()),
+            ))
+            .map(TransactionToCommit::dummy_with_transaction)
+            .collect();
         Self {
-            transaction_accumulator: Arc::clone(&self.transaction_accumulator),
+            to_commit,
+            statuses_for_input_txns: vec![
+                TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::Success
+                );
+                num_txns
+            ],
+            ..Default::default()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
+        Self {
+            to_commit: txns,
+            ..Default::default()
+        }
+    }
+
+    pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
+        let transaction_accumulator = Arc::new(
+            InMemoryTransactionAccumulator::new_empty_with_root_hash(root_hash),
+        );
+        Self {
+            parent_accumulator: transaction_accumulator.clone(),
+            transaction_accumulator,
             ..Default::default()
         }
     }
@@ -96,27 +200,6 @@ impl LedgerUpdateOutput {
             version += 1;
         }
         Ok(())
-    }
-
-    pub fn as_state_compute_result(
-        &self,
-        parent_accumulator: &Arc<InMemoryTransactionAccumulator>,
-        next_epoch_state: Option<EpochState>,
-    ) -> StateComputeResult {
-        let txn_accu = self.txn_accumulator();
-
-        StateComputeResult::new(
-            txn_accu.root_hash(),
-            txn_accu.frozen_subtree_roots().clone(),
-            txn_accu.num_leaves(),
-            parent_accumulator.frozen_subtree_roots().clone(),
-            parent_accumulator.num_leaves(),
-            next_epoch_state,
-            self.statuses_for_input_txns.clone(),
-            self.transaction_info_hashes.clone(),
-            self.subscribable_events.clone(),
-            self.block_end_info.clone(),
-        )
     }
 
     pub fn next_version(&self) -> Version {
