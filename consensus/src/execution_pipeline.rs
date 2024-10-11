@@ -60,6 +60,11 @@ lazy_static! {
     static ref PREPARED_BLOCKS: Mutex<lru::LruCache<HashValue, (Vec<SignedTransaction>, Vec<SignatureVerifiedTransaction>)>> =
         Mutex::new(lru::LruCache::new(CACHE_SIZE));
 }
+
+lazy_static! {
+    static ref PRECOMMIT_HOOKS: Mutex<lru::LruCache<HashValue, BoxFuture<'static, ()>>> =
+        Mutex::new(lru::LruCache::new(CACHE_SIZE));
+}
 pub struct ExecutionPipeline {
     prepare_block_tx: mpsc::UnboundedSender<PrepareBlockCommand>,
     pre_commit_tx: mpsc::UnboundedSender<PreCommitCommand>,
@@ -143,26 +148,38 @@ impl ExecutionPipeline {
         parent_block_id: HashValue,
         lifetime_guard: CountedRequest<()>,
     ) -> SyncPreCommitResultFut {
-        let (result_tx, result_rx) = oneshot::channel();
-        self.pre_commit_tx
-        .send(PreCommitCommand {
-            block_id,
-            parent_block_id,
-            pre_commit_hook_fut: None,
-            result_tx,
-            lifetime_guard,
-        })
-        .expect("Failed to send block to pre_commit stage.");
-        async move {
-            result_rx
-                .await
-                .map_err(|err| ExecutorError::InternalError {
+        if PRECOMMIT_HOOKS.lock().contains(&block_id) {
+            let pre_commit_hook_fut = PRECOMMIT_HOOKS.lock().pop(&block_id).unwrap();
+            let (result_tx, result_rx) = oneshot::channel();
+            self.pre_commit_tx
+            .send(PreCommitCommand {
+                block_id,
+                parent_block_id,
+                pre_commit_hook_fut,
+                result_tx,
+                lifetime_guard,
+            })
+            .expect("Failed to send block to pre_commit stage.");
+            async move {
+                result_rx
+                    .await
+                    .map_err(|err| ExecutorError::InternalError {
+                        error: format!(
+                            "Failed to receive execution result for block {}: {:?}.",
+                            block_id, err
+                        ),
+                    })?
+            }.boxed().shared()
+        } else {
+            async move {
+                Err(ExecutorError::InternalError {
                     error: format!(
-                        "Failed to receive execution result for block {}: {:?}.",
-                        block_id, err
+                        "Failed to find pre_commit_hook for block {}.",
+                        block_id
                     ),
-                })?
-        }.boxed().shared()
+                })
+            }.boxed().shared()
+        }
     }
 
     async fn prepare_block(
@@ -377,7 +394,7 @@ impl ExecutionPipeline {
                                 .send(PreCommitCommand {
                                     block_id,
                                     parent_block_id,
-                                    pre_commit_hook_fut: Some(pre_commit_hook_fut),
+                                    pre_commit_hook_fut,
                                     result_tx: pre_commit_result_tx,
                                     lifetime_guard,
                                 })
@@ -392,6 +409,7 @@ impl ExecutionPipeline {
                     ExecutionType::PreExecution => {
                         // The block should not be pre-committed during pre-execution.
                         // Only pre-commit after ordering.
+                        PRECOMMIT_HOOKS.lock().put(block_id, pre_commit_hook_fut);
                         None
                     },
                 };
@@ -428,9 +446,7 @@ impl ExecutionPipeline {
                 )
                 .await
                 .expect("Failed to spawn_blocking().")?;
-                if let Some(pre_commit_hook_fut) = pre_commit_hook_fut {
-                    pre_commit_hook_fut.await;
-                }
+                pre_commit_hook_fut.await;
                 Ok(())
             }
             .await;
@@ -484,8 +500,7 @@ struct LedgerApplyCommand {
 struct PreCommitCommand {
     block_id: HashValue,
     parent_block_id: HashValue,
-    // daniel todo: hack
-    pre_commit_hook_fut: Option<BoxFuture<'static, ()>>,
+    pre_commit_hook_fut: BoxFuture<'static, ()>,
     result_tx: oneshot::Sender<ExecutorResult<()>>,
     lifetime_guard: CountedRequest<()>,
 }
