@@ -461,7 +461,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    // TODO: Actually fill in the logic to record fetched executables, etc.
+    #[deprecated]
     fn fetch_module(
         &self,
         key: &T::Key,
@@ -471,7 +471,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         #[allow(deprecated)]
         self.captured_reads
             .borrow_mut()
-            .module_reads
+            .deprecated_module_reads
             .push(key.clone());
 
         self.versioned_map.modules().fetch_module(key, txn_idx)
@@ -1564,6 +1564,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                 use MVModulesError::*;
                 use MVModulesOutput::*;
 
+                #[allow(deprecated)]
                 match state.fetch_module(state_key, self.txn_idx) {
                     Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
                     Ok(Module((v, _))) => Ok(v.as_state_value()),
@@ -1580,7 +1581,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                 state
                     .read_set
                     .borrow_mut()
-                    .module_reads
+                    .deprecated_module_reads
                     .insert(state_key.clone());
                 #[allow(deprecated)]
                 state

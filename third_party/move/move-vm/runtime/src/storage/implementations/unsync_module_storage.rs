@@ -321,7 +321,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
 
         Ok(Some(match entry {
             Deserialized { module, .. } => module.clone(),
-            Verified { module } => module.as_compiled_module(),
+            Verified { module } => module.compiled_module().clone(),
         }))
     }
 
