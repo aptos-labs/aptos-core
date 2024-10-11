@@ -12,16 +12,29 @@ on:
         required: false
         default: executor-benchmark-runner 
         type: string
-      IS_FULL_RUN:
+      FLOW:
         required: false
-        default: false
-        type: boolean
-        description: Run complete version of the tests
+        default: CONTINUOUS
+        type: string
+        description: Which set of tests to run.
       IGNORE_TARGET_DETERMINATION:
         required: false
         default: false
         type: boolean
         description: Ignore target determination and run the tests
+      SKIP_MOVE_E2E:
+        required: false
+        default: false
+        type: boolean
+        description: Whether to run or skip move-only e2e tests at the beginning.
+      SOURCE:
+        required: false
+        default: CI
+        type: string
+      NUMBER_OF_EXECUTION_THREADS:
+        required: false
+        default: "32"
+        type: string
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
   workflow_dispatch:
@@ -36,18 +49,47 @@ on:
         type: choice
         options:
         - executor-benchmark-runner
-        description: The name of the runner to use for the test.
-      IS_FULL_RUN:
+        - benchmark-t2d-32
+        - benchmark-t2d-60
+        - benchmark-c3d-30
+        - benchmark-c3d-60
+        - benchmark-c3d-180
+        - benchmark-n4-32
+        - benchmark-c4-32
+        - benchmark-c4-48
+        - benchmark-c4-96
+        description: The name of the runner to use for the test. (which decides machine specs)
+      NUMBER_OF_EXECUTION_THREADS:
+        required: false
+        default: "32"
+        type: string
+      FLOW:
+        required: false
+        default: LAND_BLOCKING
+        options:
+        - LAND_BLOCKING
+        - CONTINUOUS
+        - MAINNET
+        - MAINNET_LARGE_DB
+        type: choice
+        description: Which set of tests to run. MAINNET/MAINNET_LARGE_DB are for performance validation of mainnet nodes.
+      SKIP_MOVE_E2E:
         required: false
         default: false
         type: boolean
-        description: Run complete version of the tests
+        description: Whether to skip move-only e2e tests at the beginning.
       IGNORE_TARGET_DETERMINATION:
         required: false
-        default: false
+        default: true
         type: boolean
         description: Ignore target determination and run the tests
-
+      SOURCE:
+        required: false
+        default: ADHOC
+        options:
+        - ADHOC
+        type: choice
+        description: Test source (always adhoc from here)
 jobs:
   # This job determines which tests to run
   test-target-determinator:
@@ -63,7 +105,7 @@ jobs:
   # Run single node execution performance tests
   single-node-performance:
     needs: test-target-determinator
-    timeout-minutes: 60
+    timeout-minutes: 120
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@v4
@@ -78,13 +120,8 @@ jobs:
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && testsuite/single_node_performance.py
-        if: ${{ !inputs.IS_FULL_RUN && (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
-
-      - name: Run full version of the single node execution benchmark in performance build mode
-        shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW=CONTINUOUS testsuite/single_node_performance.py
-        if: ${{ inputs.IS_FULL_RUN && (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
+        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
+        if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
 
       - run: echo "Skipping single node execution performance! Unrelated changes detected."
         if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && needs.test-target-determinator.outputs.run_execution_performance_test != 'true' }}

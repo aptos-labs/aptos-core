@@ -955,6 +955,14 @@ pub static PENDING_STATE_SYNC_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PENDING_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_pending_commit_notification",
+        "Count of the pending commit notification"
+    )
+    .unwrap()
+});
+
 /// Count of the pending quorum store commit notification.
 pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

@@ -13,12 +13,14 @@ use aptos_types::{
     keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig},
 };
 use async_trait::async_trait;
-use futures::future::try_join_all;
+use futures::StreamExt;
 use rand::rngs::StdRng;
 use std::{
     fs::File,
     io::{self, BufRead},
 };
+
+const QUERY_PARALLELISM: usize = 300;
 
 #[async_trait]
 pub trait LocalAccountGenerator: Send + Sync {
@@ -86,7 +88,13 @@ impl LocalAccountGenerator for PrivateKeyAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = account_keys
             .into_iter()
@@ -275,6 +283,29 @@ impl KeylessAccountGenerator {
             bail!("not enough proofs - {num_accounts} num_accounts, {i} found")
         }
 
-        KeylessAccountGenerator::set_sequence_numbers(txn_executor, accounts).await
+        let result_futures = addresses
+            .iter()
+            .map(|address| txn_executor.query_sequence_number(*address))
+            .collect::<Vec<_>>();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let accounts = keyless_accounts
+            .into_iter()
+            .zip(seq_nums)
+            .map(|(keyless_account, sequence_number)| {
+                LocalAccount::new_keyless(
+                    keyless_account.authentication_key().account_address(),
+                    keyless_account,
+                    sequence_number,
+                )
+            })
+            .collect();
+        Ok(accounts)
     }
 }

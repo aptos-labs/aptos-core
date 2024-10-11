@@ -1,10 +1,10 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
-    struct Box {
-        f1: #0,
-        f2: #0,
+    struct Box<T> {
+        f1: T,
+        f2: T,
     }
-    private fun new<T>(): M::Box<#0> {
+    private fun new<T>(): Box<T> {
         Abort(0)
     }
     private fun t0() {
@@ -16,10 +16,10 @@ module 0x8675309::M {
             f1;
             f2;
             {
-              let f1: M::Box<u64>;
+              let f1: Box<u64>;
               {
-                let f2: M::Box<u64>;
-                M::Box<M::Box<u64>>{ f1, f2 } = M::new<M::Box<u64>>();
+                let f2: Box<u64>;
+                M::Box<Box<u64>>{ f1, f2 } = M::new<Box<u64>>();
                 f1;
                 f2;
                 Tuple()
@@ -29,3 +29,26 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct Box<T> has drop {
+        f1: T,
+        f2: T,
+    }
+    fun new<T>(): Box<T> {
+        abort 0
+    }
+    fun t0() {
+        let f1;
+        let f2;
+        Box<u64>{f1: f1,f2: f2} = new<u64>();
+        f1;
+        f2;
+        let f1;
+        let f2;
+        Box<Box<u64>>{f1: f1,f2: f2} = new<Box<u64>>();
+        f1;
+        f2;
+    }
+}
