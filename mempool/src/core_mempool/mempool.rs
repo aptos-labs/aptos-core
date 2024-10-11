@@ -290,8 +290,7 @@ impl Mempool {
         //         .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
         //     committed_seq_number = db_sequence_number
         // );
-
-        info!("Add mempool transaction: {:?}, txn seq number: {:?}", txn.sender(), txn.sequence_number());
+        
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
         // if txn.sequence_number() < db_sequence_number {
         //     return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
@@ -318,7 +317,11 @@ impl Mempool {
         );
 
         let submitted_by_label = txn_info.insertion_info.submitted_by_label();
+        let before_size = self.transactions.get_transactions().iter().map(|(_, txns)| txns.len()).sum::<usize>();
         let status = self.transactions.insert(txn_info);
+        let after_size = self.transactions.get_transactions().iter().map(|(_, txns)| txns.len()).sum::<usize>();
+        info!("Add mempool transaction: {:?}, txn seq number: {:?}. before insertion: {:?}, after insertion: {:?}, status: {:?}", txn.sender(), txn.sequence_number(), before_size, after_size, status);
+        
         let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
 
         if status.code == MempoolStatusCode::Accepted {
@@ -414,8 +417,6 @@ impl Mempool {
         let txns = self.transactions.get_transactions();
         'main: for (_author, author_txns) in txns { 
             for (_, txn) in author_txns {
-
-
                 txn_walked += 1;
                 let txn_ptr = TxnPointer::from(txn);
 
