@@ -684,7 +684,8 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            // realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            realistic_env_load_sweep_test()
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -1174,7 +1175,7 @@ fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 20, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10000]),
         criteria: [
