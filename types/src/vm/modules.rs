@@ -7,9 +7,18 @@ use crate::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{Location, VMResult},
+    CompiledModule,
+};
+#[cfg(any(test, feature = "testing"))]
+use move_binary_format::{
+    file_format::empty_module_with_dependencies_and_friends, file_format_common::VERSION_MAX,
+};
 use move_core_types::metadata::Metadata;
 use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_types::panic_error;
 use std::{fmt::Debug, sync::Arc};
 
 /// Different kinds of representation a module can be in. The code cache can implement different
@@ -111,11 +120,28 @@ impl ModuleCacheEntry {
     }
 
     /// Returns the deserialized (i.e., a [CompiledModule]) representation of the current entry.
-    pub fn as_compiled_module(&self) -> Arc<CompiledModule> {
+    pub fn compiled_module(&self) -> &Arc<CompiledModule> {
         use Representation::*;
         match &self.representation {
-            Deserialized(m) => m.clone(),
-            Verified(m) => m.as_compiled_module(),
+            Deserialized(compiled_module) => compiled_module,
+            Verified(module) => module.compiled_module(),
+        }
+    }
+
+    /// Returns the verified (i.e., a [Module]) representation of the current entry. If the entry
+    /// is not verified, returns a panic error.
+    pub fn verified_module(&self) -> VMResult<&Arc<Module>> {
+        use Representation::*;
+        match &self.representation {
+            Verified(module) => Ok(module),
+            Deserialized(compiled_module) => {
+                let msg = format!(
+                    "Module entry for {}::{} is not verified",
+                    compiled_module.address(),
+                    compiled_module.name()
+                );
+                Err(panic_error!(msg).finish(Location::Undefined))
+            },
         }
     }
 
@@ -146,5 +172,53 @@ impl ModuleCacheEntry {
             state_value_metadata: self.state_value_metadata.clone(),
             representation: Representation::Verified(module),
         }
+    }
+
+    /// Creates new deserialized entry based on the provided [RuntimeEnvironment]. Used for tests
+    /// only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn deserialized_for_test<'a>(
+        module_name: &'a str,
+        dependencies: impl IntoIterator<Item = &'a str>,
+        runtime_environment: &RuntimeEnvironment,
+    ) -> Self {
+        let module = empty_module_with_dependencies_and_friends(module_name, dependencies, vec![]);
+
+        let mut module_bytes = vec![];
+        module
+            .serialize_for_version(Some(VERSION_MAX), &mut module_bytes)
+            .unwrap();
+
+        ModuleCacheEntry::from_state_value(
+            runtime_environment,
+            StateValue::new_legacy(module_bytes.into()),
+        )
+        .unwrap()
+    }
+
+    /// Creates new verified entry based on verified dependencies and the [RuntimeEnvironment].
+    /// Used for tests only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn verified_for_test(
+        module_name: &str,
+        dependencies: &[Arc<Module>],
+        runtime_environment: &RuntimeEnvironment,
+    ) -> Self {
+        let dep_names = dependencies
+            .iter()
+            .map(|d| d.compiled_module().self_name().as_str());
+        let entry = Self::deserialized_for_test(module_name, dep_names, runtime_environment);
+        let locally_verified_module = runtime_environment
+            .build_locally_verified_module(
+                entry.compiled_module().clone(),
+                entry.size_in_bytes(),
+                entry.hash(),
+            )
+            .unwrap();
+        let module = runtime_environment
+            .build_verified_module(locally_verified_module, dependencies)
+            .map(Arc::new)
+            .unwrap();
+        entry.make_verified(module)
     }
 }

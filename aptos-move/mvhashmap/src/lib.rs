@@ -9,8 +9,10 @@ use crate::{
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
+    vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
     write_set::TransactionWrite,
 };
+use move_core_types::language_storage::ModuleId;
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
 
@@ -40,7 +42,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 
-    code_cache: SyncCodeCache,
+    code_cache: SyncCodeCache<ModuleId, ModuleCacheEntry, ScriptCacheEntry>,
 }
 
 impl<
@@ -95,7 +97,7 @@ impl<
         &self.modules
     }
 
-    pub fn code_cache(&self) -> &SyncCodeCache {
+    pub fn code_cache(&self) -> &SyncCodeCache<ModuleId, ModuleCacheEntry, ScriptCacheEntry> {
         &self.code_cache
     }
 }

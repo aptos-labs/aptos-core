@@ -135,7 +135,7 @@ impl MoveVM {
                     ),
                     &ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
                 )?;
-                Ok(module.as_compiled_module())
+                Ok(module.compiled_module().clone())
             },
             Loader::V2(_) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
