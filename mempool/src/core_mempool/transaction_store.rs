@@ -233,6 +233,7 @@ impl TransactionStore {
         // since the raw transaction is the same
         if let Some(txns) = self.transactions.get_mut(&address) {
             if let Some(current_version) = txns.get_mut(&txn_seq_num) {
+                info!("Found transaction already in mempool: {}:{}.", address, txn_seq_num);
                 if current_version.txn.payload() != txn.txn.payload() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
                         "Transaction already in mempool with a different payload".to_string(),
@@ -281,9 +282,12 @@ impl TransactionStore {
 
         self.transactions.entry(address).or_default();
 
+        info!("First check passed for account: {:?}. sequence_number: {}", address, txn_seq_num);
+
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
             if txns.len() >= self.capacity_per_user {
+                info!("Mempool over capacity for account: {:?}. sequence_number: {}, capacity: {}", address, txn_seq_num, self.capacity_per_user);
                 return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
                     format!(
                         "Mempool over capacity for account. Number of transactions from account: {} Capacity per account: {}",
@@ -292,6 +296,7 @@ impl TransactionStore {
                     ),
                 );
             }
+            info!("Transaction going to be added to mempool: {}:{}.", address, txn_seq_num);
 
             // insert into storage and other indexes
             self.system_ttl_index.insert(&txn);
