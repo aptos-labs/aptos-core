@@ -508,6 +508,15 @@ fn find_token(
             }
         },
         '\'' => {
+            if text.len() <= 1
+                || !matches!(text.chars().nth(1).unwrap(), 'A'..='Z' | 'a'..='z' | '_')
+            {
+                let loc = make_loc(file_hash, start_offset + 1, start_offset + 2);
+                return Err(Box::new(diag!(
+                    Syntax::InvalidCharacter,
+                    (loc, "Label quote must be followed by 'A-Z', `a-z', or '_'")
+                )));
+            }
             let len = get_name_len(&text[1..]);
             (Tok::Label, 1 + len)
         },

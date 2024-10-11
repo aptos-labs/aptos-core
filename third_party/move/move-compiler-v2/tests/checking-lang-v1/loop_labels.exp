@@ -4,28 +4,28 @@ error: unsupported language construct
   ┌─ tests/checking-lang-v1/loop_labels.move:3:9
   │
 3 │         'outer: loop {
-  │         ^^^^^^ Move language construct `'outer` is not enabled until version 2.1
+  │         ^^^^^^ loop labels are not enabled before version 2.1
 
 error: unsupported language construct
   ┌─ tests/checking-lang-v1/loop_labels.move:6:17
   │
 6 │                 'inner: loop if (true) loop {
-  │                 ^^^^^^ Move language construct `'inner` is not enabled until version 2.1
+  │                 ^^^^^^ loop labels are not enabled before version 2.1
 
 error: unsupported language construct
   ┌─ tests/checking-lang-v1/loop_labels.move:7:41
   │
 7 │                     if (false) continue 'outer else break 'inner;
-  │                                         ^^^^^^ Move language construct `'outer` is not enabled until version 2.1
+  │                                         ^^^^^^ loop labels are not enabled before version 2.1
 
 error: unsupported language construct
   ┌─ tests/checking-lang-v1/loop_labels.move:7:59
   │
 7 │                     if (false) continue 'outer else break 'inner;
-  │                                                           ^^^^^^ Move language construct `'inner` is not enabled until version 2.1
+  │                                                           ^^^^^^ loop labels are not enabled before version 2.1
 
 error: unsupported language construct
   ┌─ tests/checking-lang-v1/loop_labels.move:9:33
   │
 9 │                 } else continue 'outer
-  │                                 ^^^^^^ Move language construct `'outer` is not enabled until version 2.1
+  │                                 ^^^^^^ loop labels are not enabled before version 2.1

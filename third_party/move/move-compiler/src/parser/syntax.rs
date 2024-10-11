@@ -101,7 +101,7 @@ fn require_language_version(
         loc,
         min_language_version,
         &format!(
-            "Move language construct `{}` is not enabled until version {}",
+            "{} not enabled before version {}",
             description, min_language_version
         ),
     )
@@ -1466,7 +1466,7 @@ fn parse_optional_label(context: &mut Context) -> Result<Option<Label>, Box<Diag
             context,
             current_token_loc(context.tokens),
             LanguageVersion::V2_1,
-            context.tokens.content(),
+            "loop labels are",
         );
         let label = Label(Name::new(
             current_token_loc(context.tokens),
@@ -1950,7 +1950,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         context,
                         current_token_loc(context.tokens),
                         LanguageVersion::V2_1,
-                        &current_token.to_string(),
+                        "op-equal operators are",
                     );
                     let op_loc = context.tokens.advance_with_loc()?; // consume the "op="
                     let rhs = Box::new(parse_exp(context)?);
