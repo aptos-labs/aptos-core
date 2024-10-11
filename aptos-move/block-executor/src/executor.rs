@@ -586,6 +586,7 @@ where
                         if !module_write_set.is_empty() {
                             executed_at_commit = true;
                             Self::publish_module_writes(
+                                txn_idx,
                                 module_write_set,
                                 versioned_cache,
                                 runtime_environment,
@@ -616,6 +617,7 @@ where
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                     if !module_write_set.is_empty() {
                         Self::publish_module_writes(
+                            txn_idx,
                             module_write_set,
                             versioned_cache,
                             runtime_environment,
@@ -703,6 +705,7 @@ where
     }
 
     fn publish_module_writes(
+        txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         runtime_environment: &RuntimeEnvironment,
@@ -715,7 +718,7 @@ where
             versioned_cache
                 .code_cache()
                 .module_cache()
-                .cache_module(id, Arc::new(entry));
+                .store_committed_module(id, entry, txn_idx);
         }
         Ok(())
     }
@@ -1151,7 +1154,7 @@ where
                     ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
 
                 CrossBlockModuleCache::mark_invalid(&id);
-                unsync_map.code_cache().cache_module(id, Arc::new(entry));
+                unsync_map.code_cache().store_module(id, entry);
             } else {
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());
@@ -1316,7 +1319,7 @@ where
                     if !runtime_environment.vm_config().use_loader_v2 {
                         #[allow(deprecated)]
                         if last_input_output.check_and_append_module_rw_conflict(
-                            sequential_reads.module_reads.iter(),
+                            sequential_reads.deprecated_module_reads.iter(),
                             output.module_write_set().keys(),
                         ) {
                             block_limit_processor.process_module_rw_conflict();

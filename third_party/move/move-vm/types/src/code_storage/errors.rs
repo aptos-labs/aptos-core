@@ -31,7 +31,7 @@ macro_rules! module_storage_error {
 //   the same way, but ideally we should use proper formatting here.
 #[macro_export]
 macro_rules! module_linker_error {
-    ($addr:ident, $name:ident) => {
+    ($addr:expr, $name:expr) => {
         move_binary_format::errors::PartialVMError::new(
             move_core_types::vm_status::StatusCode::LINKER_ERROR,
         )
@@ -46,7 +46,7 @@ macro_rules! module_linker_error {
 
 #[macro_export]
 macro_rules! module_cyclic_dependency_error {
-    ($addr:ident, $name:ident) => {
+    ($addr:expr, $name:expr) => {
         move_binary_format::errors::PartialVMError::new(
             move_core_types::vm_status::StatusCode::CYCLIC_MODULE_DEPENDENCY,
         )

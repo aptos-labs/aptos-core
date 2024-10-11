@@ -671,8 +671,8 @@ impl Module {
         &self.module
     }
 
-    pub fn as_compiled_module(&self) -> Arc<CompiledModule> {
-        self.module.clone()
+    pub fn compiled_module(&self) -> &Arc<CompiledModule> {
+        &self.module
     }
 
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {

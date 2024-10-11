@@ -3,9 +3,8 @@
 
 use aptos_types::vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry};
 use hashbrown::HashMap;
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-};
+use move_binary_format::errors::VMResult;
+use move_core_types::language_storage::ModuleId;
 use std::{cell::RefCell, sync::Arc};
 
 /// A per-block code cache to be used for sequential transaction execution. Modules and scripts
@@ -33,29 +32,45 @@ impl UnsyncCodeCache {
     }
 
     /// Stores the module to the code cache.
-    pub fn cache_module(&self, module_id: ModuleId, entry: Arc<ModuleCacheEntry>) {
-        self.module_cache.borrow_mut().insert(module_id, entry);
+    pub fn store_module(&self, module_id: ModuleId, entry: ModuleCacheEntry) {
+        self.module_cache
+            .borrow_mut()
+            .insert(module_id, Arc::new(entry));
     }
 
-    /// Fetches the module from the code cache, if it exists there. Otherwise, returns [None].
-    pub fn fetch_cached_module(
+    /// Fetches the module from the code cache, if it exists there. If not, uses the provided
+    /// initialization function to initialize and cache it.
+    pub fn fetch_or_initialize_module<F>(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<Arc<ModuleCacheEntry>> {
-        self.module_cache
-            .borrow()
-            .get(&(address, module_name))
-            .cloned()
+        module_id: &ModuleId,
+        init_func: &F,
+    ) -> VMResult<Option<Arc<ModuleCacheEntry>>>
+    where
+        F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
+    {
+        if let Some(e) = self.module_cache.borrow().get(module_id) {
+            return Ok(Some(e.clone()));
+        }
+
+        Ok(match init_func(module_id)? {
+            Some(v) => {
+                let e = Arc::new(v);
+                self.module_cache
+                    .borrow_mut()
+                    .insert(module_id.clone(), e.clone());
+                Some(e)
+            },
+            None => None,
+        })
     }
 
     /// Stores the script to the code cache.
-    pub fn cache_script(&self, hash: [u8; 32], entry: ScriptCacheEntry) {
+    pub fn store_script(&self, hash: [u8; 32], entry: ScriptCacheEntry) {
         self.script_cache.borrow_mut().insert(hash, entry);
     }
 
     /// Returns the script if it has been cached before, or [None] otherwise.
-    pub fn fetch_cached_script(&self, hash: &[u8; 32]) -> Option<ScriptCacheEntry> {
+    pub fn fetch_script(&self, hash: &[u8; 32]) -> Option<ScriptCacheEntry> {
         self.script_cache.borrow().get(hash).cloned()
     }
 

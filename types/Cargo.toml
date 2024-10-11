@@ -95,6 +95,7 @@ url = { workspace = true }
 
 [features]
 default = []
+testing = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing", "arbitrary"]
 
 [[bench]]
