@@ -113,6 +113,7 @@ async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        HashSet::new(),
     )
     .await
     .unwrap();
@@ -2143,6 +2144,7 @@ async fn transfer_and_wait(
                 sequence_number,
                 max_gas,
                 gas_unit_price,
+                native_coin(),
             )
         },
     )
