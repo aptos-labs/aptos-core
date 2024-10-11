@@ -35,5 +35,26 @@ module 0xcafe::vectors {
     }
 } // end 0xcafe::vectors
 
+// -- Sourcified model before bytecode pipeline
+module 0xcafe::vectors {
+    fun test_for_each_mut() {
+        let v = vector[1, 2, 3];
+        let s = 2;
+        {
+            let (v) = (&mut v);
+            let i = 0;
+            while (i < 0x1::vector::length<u64>(/*freeze*/v)) {
+                {
+                    let (e) = (0x1::vector::borrow_mut<u64>(v, i));
+                    *e = s;
+                    s = s + 1
+                };
+                i = i + 1
+            }
+        };
+        if (v == vector[2, 3, 4]) () else abort 0;
+    }
+}
+
 
 ============ bytecode verification succeeded ========

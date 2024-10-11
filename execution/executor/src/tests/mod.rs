@@ -4,7 +4,7 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    components::chunk_output::ChunkOutput,
+    components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk},
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -14,7 +14,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ExecutedChunk, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
+    BlockExecutorTrait, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
@@ -450,7 +450,7 @@ fn apply_transaction_by_writeset(
 ) {
     let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
-    let transactions_and_outputs = transactions_and_writesets
+    let (txns, txn_outs) = transactions_and_writesets
         .iter()
         .map(|(txn, write_set)| {
             (
@@ -474,7 +474,7 @@ fn apply_transaction_by_writeset(
                 TransactionAuxiliaryData::default(),
             ),
         )))
-        .collect();
+        .unzip();
 
     let state_view = ledger_view
         .verified_state_view(
@@ -484,8 +484,7 @@ fn apply_transaction_by_writeset(
         )
         .unwrap();
 
-    let chunk_output =
-        ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
+    let chunk_output = ChunkOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
     let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
     let ExecutedChunk {

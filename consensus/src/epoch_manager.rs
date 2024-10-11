@@ -1078,9 +1078,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
+        let mut verifier: ValidatorVerifier = (&validator_set).into();
+        verifier.set_optimistic_sig_verification_flag(self.config.optimistic_sig_verification);
+
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
+            verifier: verifier.into(),
         });
 
         self.epoch_state = Some(epoch_state.clone());
@@ -1095,15 +1098,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dkg_state = payload.get::<DKGState>();
 
         if let Err(error) = &onchain_consensus_config {
-            error!("Failed to read on-chain consensus config {}", error);
+            warn!("Failed to read on-chain consensus config {}", error);
         }
 
         if let Err(error) = &onchain_execution_config {
-            error!("Failed to read on-chain execution config {}", error);
+            warn!("Failed to read on-chain execution config {}", error);
         }
 
         if let Err(error) = &randomness_config_move_struct {
-            error!("Failed to read on-chain randomness config {}", error);
+            warn!("Failed to read on-chain randomness config {}", error);
         }
 
         self.epoch_state = Some(epoch_state.clone());
@@ -1508,6 +1511,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::RoundTimeoutMsg(_)
             | ConsensusMsg::OrderVoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)

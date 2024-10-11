@@ -14,7 +14,7 @@ use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExe
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::{self, StateCheckpointOutput}, BlockExecutorTrait, ExecutorError,
-    ExecutorResult,
+    ExecutorResult, StateComputeResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
@@ -35,6 +35,12 @@ use std::{
     collections::HashMap, sync::Arc, time::{Duration, Instant}
 };
 use tokio::sync::{mpsc, oneshot};
+
+pub type PreCommitHook = Box<
+    dyn 'static
+        + FnOnce(&[SignedTransaction], &StateComputeResult) -> BoxFuture<'static, ()>
+        + Send,
+>;
 use lazy_static::lazy_static;
 
 #[allow(clippy::unwrap_used)]
@@ -52,6 +58,11 @@ const CACHE_SIZE: usize = 1_000;
 
 lazy_static! {
     static ref PREPARED_BLOCKS: Mutex<lru::LruCache<HashValue, (Vec<SignedTransaction>, Vec<SignatureVerifiedTransaction>)>> =
+        Mutex::new(lru::LruCache::new(CACHE_SIZE));
+}
+
+lazy_static! {
+    static ref PRECOMMIT_HOOKS: Mutex<lru::LruCache<HashValue, BoxFuture<'static, ()>>> =
         Mutex::new(lru::LruCache::new(CACHE_SIZE));
 }
 pub struct ExecutionPipeline {
@@ -97,6 +108,7 @@ impl ExecutionPipeline {
         parent_block_id: HashValue,
         txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
+        pre_commit_hook: PreCommitHook,
         lifetime_guard: CountedRequest<()>,
         execution_type: ExecutionType,
     ) -> SyncStateComputeResultFut {
@@ -111,6 +123,7 @@ impl ExecutionPipeline {
                 block_preparer: txn_generator,
                 result_tx,
                 command_creation_time: Instant::now(),
+                pre_commit_hook,
                 lifetime_guard,
                 execution_type,
             })
@@ -135,25 +148,38 @@ impl ExecutionPipeline {
         parent_block_id: HashValue,
         lifetime_guard: CountedRequest<()>,
     ) -> SyncPreCommitResultFut {
-        let (result_tx, result_rx) = oneshot::channel();
-        self.pre_commit_tx
-        .send(PreCommitCommand {
-            block_id,
-            parent_block_id,
-            result_tx,
-            lifetime_guard,
-        })
-        .expect("Failed to send block to pre_commit stage.");
-        async move {
-            result_rx
-                .await
-                .map_err(|err| ExecutorError::InternalError {
+        if PRECOMMIT_HOOKS.lock().contains(&block_id) {
+            let pre_commit_hook_fut = PRECOMMIT_HOOKS.lock().pop(&block_id).unwrap();
+            let (result_tx, result_rx) = oneshot::channel();
+            self.pre_commit_tx
+            .send(PreCommitCommand {
+                block_id,
+                parent_block_id,
+                pre_commit_hook_fut,
+                result_tx,
+                lifetime_guard,
+            })
+            .expect("Failed to send block to pre_commit stage.");
+            async move {
+                result_rx
+                    .await
+                    .map_err(|err| ExecutorError::InternalError {
+                        error: format!(
+                            "Failed to receive execution result for block {}: {:?}.",
+                            block_id, err
+                        ),
+                    })?
+            }.boxed().shared()
+        } else {
+            async move {
+                Err(ExecutorError::InternalError {
                     error: format!(
-                        "Failed to receive execution result for block {}: {:?}.",
-                        block_id, err
+                        "Failed to find pre_commit_hook for block {}.",
+                        block_id
                     ),
-                })?
-        }.boxed().shared()
+                })
+            }.boxed().shared()
+        }
     }
 
     async fn prepare_block(
@@ -166,6 +192,7 @@ impl ExecutionPipeline {
             block_executor_onchain_config,
             parent_block_id,
             block_preparer,
+            pre_commit_hook,
             result_tx,
             command_creation_time,
             lifetime_guard,
@@ -182,6 +209,7 @@ impl ExecutionPipeline {
                     block: (block.id(), sig_verified_txns).into(),
                     parent_block_id,
                     block_executor_onchain_config,
+                    pre_commit_hook,
                     result_tx,
                     command_creation_time,
                     lifetime_guard,
@@ -220,6 +248,7 @@ impl ExecutionPipeline {
                         block: (block.id(), sig_verified_txns).into(),
                         parent_block_id,
                         block_executor_onchain_config,
+                        pre_commit_hook,
                         result_tx,
                         command_creation_time: Instant::now(),
                         lifetime_guard,
@@ -255,6 +284,7 @@ impl ExecutionPipeline {
             block,
             parent_block_id,
             block_executor_onchain_config,
+            pre_commit_hook,
             result_tx,
             command_creation_time,
             lifetime_guard,
@@ -292,6 +322,7 @@ impl ExecutionPipeline {
                     block_id,
                     parent_block_id,
                     state_checkpoint_output,
+                    pre_commit_hook,
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
@@ -313,6 +344,7 @@ impl ExecutionPipeline {
             block_id,
             parent_block_id,
             state_checkpoint_output,
+            pre_commit_hook,
             result_tx,
             command_creation_time,
             lifetime_guard,
@@ -337,6 +369,7 @@ impl ExecutionPipeline {
             .await;
 
             let pipeline_res = res.map(|(output, execution_duration)| {
+                let pre_commit_hook_fut = pre_commit_hook(&input_txns, &output);
                 let maybe_pre_commit_fut: Option<SyncPreCommitResultFut> = match execution_type {
                     ExecutionType::Execution => {
                         if output.epoch_state().is_some() || !enable_pre_commit {
@@ -349,7 +382,9 @@ impl ExecutionPipeline {
                                     executor.pre_commit_block(block_id, parent_block_id)
                                 })
                                 .await
-                                .expect("failed to spawn_blocking")
+                                .expect("failed to spawn_blocking")?;
+                            pre_commit_hook_fut.await;
+                            Ok(())
                             }.boxed().shared())
                         } else {
                             // kick off pre-commit right away
@@ -359,6 +394,7 @@ impl ExecutionPipeline {
                                 .send(PreCommitCommand {
                                     block_id,
                                     parent_block_id,
+                                    pre_commit_hook_fut,
                                     result_tx: pre_commit_result_tx,
                                     lifetime_guard,
                                 })
@@ -373,6 +409,7 @@ impl ExecutionPipeline {
                     ExecutionType::PreExecution => {
                         // The block should not be pre-committed during pre-execution.
                         // Only pre-commit after ordering.
+                        PRECOMMIT_HOOKS.lock().put(block_id, pre_commit_hook_fut);
                         None
                     },
                 };
@@ -393,6 +430,7 @@ impl ExecutionPipeline {
         while let Some(PreCommitCommand {
             block_id,
             parent_block_id,
+            pre_commit_hook_fut,
             result_tx,
             lifetime_guard,
         }) = block_rx.recv().await
@@ -407,7 +445,9 @@ impl ExecutionPipeline {
                     })
                 )
                 .await
-                .expect("Failed to spawn_blocking().")
+                .expect("Failed to spawn_blocking().")?;
+                pre_commit_hook_fut.await;
+                Ok(())
             }
             .await;
             result_tx
@@ -426,6 +466,7 @@ struct PrepareBlockCommand {
     // The parent block id.
     parent_block_id: HashValue,
     block_preparer: BlockPreparer,
+    pre_commit_hook: PreCommitHook,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
@@ -437,6 +478,7 @@ struct ExecuteBlockCommand {
     block: ExecutableBlock,
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
+    pre_commit_hook: PreCommitHook,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
@@ -448,6 +490,7 @@ struct LedgerApplyCommand {
     block_id: HashValue,
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
+    pre_commit_hook: PreCommitHook,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
@@ -457,6 +500,7 @@ struct LedgerApplyCommand {
 struct PreCommitCommand {
     block_id: HashValue,
     parent_block_id: HashValue,
+    pre_commit_hook_fut: BoxFuture<'static, ()>,
     result_tx: oneshot::Sender<ExecutorResult<()>>,
     lifetime_guard: CountedRequest<()>,
 }

@@ -11,7 +11,7 @@ use move_compiler_v2::{
     logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
     Options,
 };
-use move_model::{metadata::LanguageVersion, model::GlobalEnv};
+use move_model::{metadata::LanguageVersion, model::GlobalEnv, sourcifier::Sourcifier};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use once_cell::unsync::Lazy;
@@ -127,9 +127,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
-            stop_after: StopAfter::BytecodeGen,
+            stop_after: StopAfter::BytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::None, // EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for checking v2 language features only supported if v2
@@ -169,15 +169,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
-                // Need to turn off usage checks because they complain about
-                // lambda parameters outside of inline functions. Other checks
-                // also turned off for now since they mess up baseline.
-                .set_experiment(Experiment::CHECKS, false)
-                .set_experiment(Experiment::OPTIMIZE, false)
-                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
-                .set_experiment(Experiment::INLINING, false)
-                .set_experiment(Experiment::RECURSIVE_TYPE_CHECK, false)
-                .set_experiment(Experiment::SPEC_REWRITE, false)
+                .set_experiment(Experiment::LAMBDA_FIELDS, true)
+                .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
+                .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
+                .set_experiment(Experiment::LAMBDA_VALUES, true)
                 .set_experiment(Experiment::LAMBDA_LIFTING, true),
             stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::AllStages,
@@ -717,6 +712,19 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         },
+        TestConfig {
+            name: "op-equal",
+            runner: |p| run_test(p, get_config_by_name("op-equal")),
+            include: vec!["/op-equal/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_language_version(LanguageVersion::V2_1),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -785,6 +793,16 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 test_output.borrow_mut().push_str(&format!(
                     "// -- Model dump before bytecode pipeline\n{}\n",
                     env.dump_env()
+                ));
+                let sourcifier = Sourcifier::new(&env);
+                for module in env.get_modules() {
+                    if module.is_primary_target() {
+                        sourcifier.print_module(module.get_id())
+                    }
+                }
+                test_output.borrow_mut().push_str(&format!(
+                    "// -- Sourcified model before bytecode pipeline\n{}\n",
+                    sourcifier.result()
                 ));
             }
         }

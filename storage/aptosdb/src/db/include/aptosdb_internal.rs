@@ -63,6 +63,7 @@ impl AptosDB {
             commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
+            update_subscriber: None,
         }
     }
 

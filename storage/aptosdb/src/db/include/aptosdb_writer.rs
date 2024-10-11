@@ -669,6 +669,13 @@ impl AptosDB {
 
             COMMITTED_TXNS.inc_by(num_txns);
             LATEST_TXN_VERSION.set(version as i64);
+            if let Some(update_sender) = &self.update_subscriber {
+                update_sender.send(
+                    version
+                ).map_err(| err | {
+                        AptosDbError::Other(format!("Failed to send update to subscriber: {}", err))
+                    })?;
+            }
             // Activate the ledger pruner and state kv pruner.
             // Note the state merkle pruner is activated when state snapshots are persisted
             // in their async thread.

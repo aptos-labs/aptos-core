@@ -4,13 +4,14 @@
 
 #![forbid(unsafe_code)]
 
+use crate::components::{
+    chunk_result_verifier::ChunkResultVerifier, executed_chunk::ExecutedChunk,
+};
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
 use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    epoch_state::EpochState, proof::accumulator::InMemoryTransactionAccumulator,
     transaction::Version,
 };
 use std::{collections::VecDeque, sync::Arc};
@@ -21,11 +22,10 @@ pub(crate) struct ChunkToUpdateLedger {
     pub state_checkpoint_output: StateCheckpointOutput,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
-    /// the below are from the input -- can be checked / used only after the transaction accumulator
+
+    /// from the input -- can be checked / used only after the transaction accumulator
     /// is updated.
-    pub verified_target_li: LedgerInfoWithSignatures,
-    pub epoch_change_li: Option<LedgerInfoWithSignatures>,
-    pub txn_infos_with_proof: TransactionInfoListWithProof,
+    pub chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
 }
 
 /// It's a two stage pipeline:

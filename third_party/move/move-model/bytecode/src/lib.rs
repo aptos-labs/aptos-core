@@ -9,11 +9,13 @@ use move_model::model::GlobalEnv;
 use std::fmt::Write;
 
 pub mod annotations;
+pub mod astifier;
 pub mod borrow_analysis;
 pub mod compositional_analysis;
 pub mod dataflow_analysis;
 pub mod dataflow_domains;
 pub mod debug_instrumentation;
+pub mod fat_loop;
 pub mod function_data_builder;
 pub mod function_target;
 pub mod function_target_pipeline;

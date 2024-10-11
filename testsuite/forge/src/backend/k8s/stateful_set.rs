@@ -314,7 +314,7 @@ pub async fn check_for_container_restart(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MockPodApi, MockStatefulSetApi};
+    use crate::MockK8sResourceApi;
     use k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec, StatefulSetStatus},
@@ -327,7 +327,7 @@ mod tests {
     async fn test_check_stateful_set_status() {
         // mock a StatefulSet with 0/1 replicas
         // this should then mean we check the underlying pod to see what's up
-        let stateful_set_api = Arc::new(MockStatefulSetApi::from_stateful_set(StatefulSet {
+        let stateful_set_api = Arc::new(MockK8sResourceApi::from_resource(StatefulSet {
             metadata: ObjectMeta {
                 name: Some("test-stateful-set".to_string()),
                 ..ObjectMeta::default()
@@ -344,8 +344,12 @@ mod tests {
         }));
 
         // we should retry if the pod status is not explicitly bad
-        let pod_default_api = Arc::new(MockPodApi::from_pod(Pod {
+        let pod_default_api = Arc::new(MockK8sResourceApi::from_resource(Pod {
             status: Some(PodStatus::default()),
+            metadata: ObjectMeta {
+                name: Some("test-stateful-set-0".to_string()),
+                ..ObjectMeta::default()
+            },
             ..Pod::default()
         }));
         let ret = check_stateful_set_status(
@@ -361,7 +365,7 @@ mod tests {
         ));
 
         // the pod explicitly has a bad status, so we should fail fast
-        let pod_default_api = Arc::new(MockPodApi::from_pod(Pod {
+        let pod_default_api = Arc::new(MockK8sResourceApi::from_resource(Pod {
             metadata: ObjectMeta {
                 name: Some("test-stateful-set-0".to_string()),
                 ..ObjectMeta::default()

@@ -23,11 +23,12 @@ use std::{
 
 mod bn254_circom;
 mod circuit_constants;
-mod circuit_testcases;
+pub mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
+pub mod proof_simulation;
 pub mod test_utils;
 mod zkp_sig;
 
@@ -141,8 +142,9 @@ impl KeylessSignature {
     }
 
     pub fn verify_expiry(&self, current_time_microseconds: u64) -> anyhow::Result<()> {
-        let block_time = UNIX_EPOCH + Duration::from_micros(current_time_microseconds);
-        let expiry_time = seconds_from_epoch(self.exp_date_secs);
+        let block_time = UNIX_EPOCH.checked_add(Duration::from_micros(current_time_microseconds))
+            .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + current_time_microseconds when checking exp_date_secs"))?;
+        let expiry_time = seconds_from_epoch(self.exp_date_secs)?;
 
         if block_time > expiry_time {
             bail!("Keyless signature is expired");
@@ -428,8 +430,10 @@ fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
     Ok(str)
 }
 
-fn seconds_from_epoch(secs: u64) -> SystemTime {
-    UNIX_EPOCH + Duration::from_secs(secs)
+fn seconds_from_epoch(secs: u64) -> anyhow::Result<SystemTime> {
+    UNIX_EPOCH
+        .checked_add(Duration::from_secs(secs))
+        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))
 }
 
 #[cfg(test)]

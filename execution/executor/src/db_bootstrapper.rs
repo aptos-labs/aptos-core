@@ -4,10 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::chunk_output::ChunkOutput;
+use crate::components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,

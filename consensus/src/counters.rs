@@ -955,6 +955,14 @@ pub static PENDING_STATE_SYNC_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PENDING_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_pending_commit_notification",
+        "Count of the pending commit notification"
+    )
+    .unwrap()
+});
+
 /// Count of the pending quorum store commit notification.
 pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -1311,6 +1319,17 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy:
     )
     .unwrap()
 });
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS: Lazy<IntCounterVec> = Lazy::new(
+    || {
+        register_int_counter_vec!(
+            "aptos_consensus_proposal_payload_batch_availability",
+            "The number of batches in payload that are available and missing locally by batch author",
+            &["author", "is_proof", "state"]
+        )
+        .unwrap()
+    },
+);
 
 /// Count of the number of preexecuted blocks.
 pub static NUM_PREEXECUTED_BLOCKS: Lazy<IntCounter> = Lazy::new(|| {

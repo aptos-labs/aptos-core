@@ -24,17 +24,18 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, aggregate_signature::PartialSignatures,
-    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
+use fail::fail_point;
 use dashmap::DashMap;
 use futures::{
     channel::{
@@ -214,7 +215,6 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
 
         let (tx, rx) = unbounded();
-
         Self {
             author,
 
@@ -267,7 +267,6 @@ impl BufferManager {
             back_pressure_enabled,
             highest_committed_round,
             latest_round: highest_committed_round,
-
             consensus_observer_config,
             consensus_publisher,
 
@@ -438,23 +437,18 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let mut unverified_signatures = PartialSignatures::empty();
+        let mut unverified_votes = HashMap::new();
         if let Some(block) = ordered_blocks.last() {
             if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
-                votes
-                    .values()
-                    .filter(|vote| vote.commit_info().id() == block.id())
-                    .for_each(|vote| {
-                        unverified_signatures.add_signature(vote.author(), vote.signature().clone())
-                    });
+                for (_, vote) in votes {
+                    if vote.commit_info().id() == block.id() {
+                        unverified_votes.insert(vote.author(), vote);
+                    }
+                }
             }
         }
-        let item = BufferItem::new_ordered(
-            ordered_blocks,
-            ordered_proof,
-            callback,
-            unverified_signatures,
-        );
+        let item =
+            BufferItem::new_ordered(ordered_blocks, ordered_proof, callback, unverified_votes);
         self.buffer.push_back(item);
     }
 
@@ -727,6 +721,17 @@ impl BufferManager {
         }
     }
 
+    fn generate_commit_message(commit_vote: CommitVote) -> CommitMessage {
+        fail_point!("consensus::create_invalid_commit_vote", |_| {
+            CommitMessage::Vote(CommitVote::new_with_signature(
+                commit_vote.author(),
+                commit_vote.ledger_info().clone(),
+                bls12381::Signature::dummy_signature(),
+            ))
+        });
+        CommitMessage::Vote(commit_vote)
+    }
+
     /// If the signing response is successful, advance the item to Signed and broadcast commit votes.
     async fn process_signing_response(&mut self, response: SigningResponse) {
         let SigningResponse {
@@ -756,7 +761,7 @@ impl BufferManager {
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-                let commit_vote = CommitMessage::Vote(commit_vote);
+                let commit_vote = Self::generate_commit_message(commit_vote);
                 signed_item_mut.rb_handle = self
                     .do_reliable_broadcast(commit_vote)
                     .map(|handle| (Instant::now(), handle));
