@@ -62,6 +62,7 @@ pub struct K8sSwarm {
     era: Option<String>,
     use_port_forward: bool,
     chaos_experiment_ops: Box<dyn ChaosExperimentOps + Send + Sync>,
+    has_indexer: bool,
 }
 
 impl K8sSwarm {
@@ -75,6 +76,7 @@ impl K8sSwarm {
         keep: bool,
         era: Option<String>,
         use_port_forward: bool,
+        has_indexer: bool,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await?;
 
@@ -123,6 +125,7 @@ impl K8sSwarm {
                 kube_client: kube_client.clone(),
                 kube_namespace: kube_namespace.to_string(),
             }),
+            has_indexer,
         };
 
         // test hitting the configured prometheus endpoint
@@ -446,6 +449,10 @@ impl Swarm for K8sSwarm {
     fn get_default_pfn_node_config(&self) -> NodeConfig {
         get_default_pfn_node_config()
     }
+
+    fn has_indexer(&self) -> bool {
+        self.has_indexer
+    }
 }
 
 /// Amount of time to wait for genesis to complete
@@ -467,12 +474,30 @@ async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<V
     Ok(stateful_sets)
 }
 
-fn stateful_set_name_matches(sts: &StatefulSet, suffix: &str) -> bool {
-    if let Some(s) = sts.metadata.name.as_ref() {
-        s.contains(suffix)
-    } else {
-        false
+/// Check if the stateful set labels match the given labels
+fn stateful_set_labels_matches(sts: &StatefulSet, labels: &BTreeMap<String, String>) -> bool {
+    if sts.metadata.labels.is_none() {
+        return false;
     }
+    let sts_labels = sts
+        .metadata
+        .labels
+        .as_ref()
+        .expect("Failed to get StatefulSet labels");
+    labels.iter().all(|(k, v)| {
+        let truncated_k = k.chars().take(63).collect::<String>();
+        let truncated_v = v.chars().take(63).collect::<String>();
+        // warn if the label is truncated
+        if truncated_k != *k || truncated_v != *v {
+            warn!(
+                "Label truncated during search: {} -> {}, {} -> {}",
+                k, truncated_k, v, truncated_v
+            );
+        }
+        sts_labels
+            .get(&truncated_k)
+            .map_or(false, |val| val == &truncated_v)
+    })
 }
 
 fn parse_service_name_from_stateful_set_name(
@@ -562,7 +587,21 @@ pub(crate) async fn get_validators(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let validators = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_name_matches(sts, "validator"))
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    (
+                        "app.kubernetes.io/name".to_string(),
+                        "validator".to_string(),
+                    ),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-node".to_string(),
+                    ),
+                ]),
+            )
+        })
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -572,7 +611,7 @@ pub(crate) async fn get_validators(
     Ok(validators)
 }
 
-pub(crate) async fn get_fullnodes(
+pub(crate) async fn get_validator_fullnodes(
     client: K8sClient,
     kube_namespace: &str,
     use_port_forward: bool,
@@ -581,7 +620,18 @@ pub(crate) async fn get_fullnodes(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let fullnodes = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_name_matches(sts, "fullnode"))
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-node".to_string(),
+                    ),
+                ]),
+            )
+        })
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -791,6 +841,7 @@ impl ChaosExperimentOps for RealChaosExperimentOps {
 mod tests {
     use super::*;
     use crate::chaos_schema::ChaosCondition;
+    use kube::api::ObjectMeta;
 
     #[test]
     fn test_parse_service_name_from_stateful_set_name() {
@@ -864,5 +915,98 @@ mod tests {
             stress_chaos,
         };
         assert!(chaos_ops.are_chaos_experiments_active().await.unwrap());
+    }
+
+    #[test]
+    fn test_stateful_set_labels_matches() {
+        // Create a StatefulSet with some labels
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "validator".to_string());
+        labels.insert("component".to_string(), "blockchain".to_string());
+
+        let sts = StatefulSet {
+            metadata: ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // All labels match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "blockchain".to_string());
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // Subset of labels match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // One label doesn't match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "database".to_string());
+        assert!(!stateful_set_labels_matches(&sts, &match_labels));
+
+        // Extra label in match_labels
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "blockchain".to_string());
+        match_labels.insert("extra".to_string(), "label".to_string());
+        assert!(!stateful_set_labels_matches(&sts, &match_labels));
+
+        // Empty match_labels
+        let match_labels = BTreeMap::new();
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // StatefulSet with no labels
+        let sts_no_labels = StatefulSet {
+            metadata: ObjectMeta {
+                labels: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        assert!(!stateful_set_labels_matches(&sts_no_labels, &match_labels));
+
+        // StatefulSet with truncated labels
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "validator".to_string());
+        // component label is truncated to 63 characters
+        labels.insert(
+            "component".to_string(),
+            "blockchain"
+                .to_string()
+                .repeat(10)
+                .chars()
+                .take(63)
+                .collect::<String>(),
+        );
+
+        let sts_truncated_labels = StatefulSet {
+            metadata: ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut match_labels = BTreeMap::new();
+        // we try to match with the full label, which we dont know if it's truncated or not
+        match_labels.insert(
+            "component".to_string(),
+            "blockchain"
+                .to_string()
+                .repeat(10)
+                .chars()
+                .collect::<String>(),
+        );
+        // it should match because the labels are the same when truncated
+        assert!(stateful_set_labels_matches(
+            &sts_truncated_labels,
+            &match_labels
+        ));
     }
 }

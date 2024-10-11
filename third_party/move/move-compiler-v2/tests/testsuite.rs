@@ -11,7 +11,7 @@ use move_compiler_v2::{
     logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
     Options,
 };
-use move_model::{metadata::LanguageVersion, model::GlobalEnv};
+use move_model::{metadata::LanguageVersion, model::GlobalEnv, sourcifier::Sourcifier};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use once_cell::unsync::Lazy;
@@ -717,6 +717,19 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         },
+        TestConfig {
+            name: "op-equal",
+            runner: |p| run_test(p, get_config_by_name("op-equal")),
+            include: vec!["/op-equal/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_language_version(LanguageVersion::V2_1),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -785,6 +798,16 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 test_output.borrow_mut().push_str(&format!(
                     "// -- Model dump before bytecode pipeline\n{}\n",
                     env.dump_env()
+                ));
+                let sourcifier = Sourcifier::new(&env);
+                for module in env.get_modules() {
+                    if module.is_primary_target() {
+                        sourcifier.print_module(module.get_id())
+                    }
+                }
+                test_output.borrow_mut().push_str(&format!(
+                    "// -- Sourcified model before bytecode pipeline\n{}\n",
+                    sourcifier.result()
                 ));
             }
         }

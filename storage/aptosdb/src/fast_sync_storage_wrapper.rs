@@ -18,6 +18,7 @@ use aptos_types::{
 };
 use either::Either;
 use std::sync::Arc;
+use tokio::sync::watch::Sender;
 
 pub const SECONDARY_DB_DIR: &str = "fast_sync_secondary";
 
@@ -44,8 +45,9 @@ impl FastSyncStorageWrapper {
     pub fn initialize_dbs(
         config: &NodeConfig,
         internal_indexer_db: Option<InternalIndexerDB>,
+        update_sender: Option<Sender<Version>>,
     ) -> Result<Either<AptosDB, Self>> {
-        let db_main = AptosDB::open(
+        let mut db_main = AptosDB::open(
             config.storage.get_dir_paths(),
             /*readonly=*/ false,
             config.storage.storage_pruner_config,
@@ -56,6 +58,9 @@ impl FastSyncStorageWrapper {
             internal_indexer_db,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
+        if let Some(sender) = update_sender {
+            db_main.add_version_update_subscriber(sender)?;
+        }
 
         let mut db_dir = config.storage.dir();
         // when the db is empty and configured to do fast sync, we will create a second DB

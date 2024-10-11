@@ -22,7 +22,7 @@ use fixed::types::U64F64;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, time::Instant};
+use std::{collections::BTreeSet, sync::Arc, time::Instant};
 
 pub mod rounding;
 
@@ -143,7 +143,7 @@ pub struct RealDKG {}
 pub struct RealDKGPublicParams {
     pub session_metadata: DKGSessionMetadata,
     pub pvss_config: DKGPvssConfig,
-    pub verifier: ValidatorVerifier,
+    pub verifier: Arc<ValidatorVerifier>,
 }
 
 impl MayHaveRoundingSummary for RealDKGPublicParams {
@@ -209,7 +209,7 @@ impl DKGTrait for RealDKG {
         RealDKGPublicParams {
             session_metadata: dkg_session_metadata.clone(),
             pvss_config,
-            verifier,
+            verifier: verifier.into(),
         }
     }
 

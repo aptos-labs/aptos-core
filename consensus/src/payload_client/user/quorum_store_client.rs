@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED,
-    error::QuorumStoreError,
-    monitor,
-    payload_client::{user::UserPayloadClient, PayloadPullParameters},
+    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
+    payload_client::user::UserPayloadClient,
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
+    payload_pull_params::{OptQSPayloadPullParams, PayloadPullParameters},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse, PayloadTxns},
     utils::PayloadTxnsSize,
 };
@@ -53,7 +52,7 @@ impl QuorumStoreClient {
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
         max_inline_txns: PayloadTxnsSize,
-        txns_with_proofs_pct: u8,
+        maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
         block_timestamp: Duration,
@@ -64,7 +63,7 @@ impl QuorumStoreClient {
             max_txns,
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
-            opt_batch_txns_pct: txns_with_proofs_pct,
+            maybe_optqs_payload_pull_params,
             max_inline_txns,
             filter: exclude_payloads,
             return_non_full,
@@ -122,7 +121,7 @@ impl UserPayloadClient for QuorumStoreClient {
                     params.max_txns_after_filtering,
                     params.soft_max_txns_after_filtering,
                     params.max_inline_txns,
-                    params.opt_batch_txns_pct,
+                    params.maybe_optqs_payload_pull_params.clone(),
                     return_non_full || return_empty || done,
                     params.user_txn_filter.clone(),
                     params.block_timestamp,

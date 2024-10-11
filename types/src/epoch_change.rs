@@ -140,6 +140,7 @@ mod tests {
         epoch_state::EpochState,
         waypoint::Waypoint,
     };
+    use std::sync::Arc;
 
     #[test]
     fn verify_epoch_change_proof() {
@@ -152,12 +153,14 @@ mod tests {
 
         // We generate end-epoch ledger info for epoch 1 to 10, each signed by the current
         // validator set and carrying the next epoch info.
-        let (mut current_signers, mut current_verifier) = random_validator_verifier(1, None, true);
+        let (mut current_signers, current_verifier) = random_validator_verifier(1, None, true);
+        let mut current_verifier = Arc::new(current_verifier);
         let mut current_version = 123;
         for epoch in &all_epoch {
             validator_verifier.push(current_verifier.clone());
             let (next_signers, next_verifier) =
                 random_validator_verifier((*epoch + 1) as usize, None, true);
+            let next_verifier = Arc::new(next_verifier);
             let epoch_state = EpochState {
                 epoch: *epoch + 1,
                 verifier: next_verifier.clone(),
@@ -182,7 +185,7 @@ mod tests {
             );
 
             let aggregated_signature = current_verifier
-                .aggregate_signatures(&partial_signatures)
+                .aggregate_signatures(partial_signatures.signatures_iter())
                 .unwrap();
 
             valid_ledger_info.push(LedgerInfoWithSignatures::new(
@@ -208,7 +211,7 @@ mod tests {
         assert!(proof_2
             .verify(&EpochState {
                 epoch: all_epoch[2],
-                verifier: validator_verifier[2].clone()
+                verifier: validator_verifier[2].clone(),
             })
             .is_ok());
 
@@ -216,7 +219,7 @@ mod tests {
         assert!(proof_1
             .verify(&EpochState {
                 epoch: all_epoch[4],
-                verifier: validator_verifier[4].clone()
+                verifier: validator_verifier[4].clone(),
             })
             .is_ok());
 
@@ -225,7 +228,7 @@ mod tests {
         assert!(proof_3
             .verify(&EpochState {
                 epoch: all_epoch[0],
-                verifier: validator_verifier[0].clone()
+                verifier: validator_verifier[0].clone(),
             })
             .is_err());
 
@@ -236,7 +239,7 @@ mod tests {
         assert!(proof_4
             .verify(&EpochState {
                 epoch: all_epoch[3],
-                verifier: validator_verifier[3].clone()
+                verifier: validator_verifier[3].clone(),
             })
             .is_err());
 
@@ -247,7 +250,7 @@ mod tests {
         assert!(proof_5
             .verify(&EpochState {
                 epoch: all_epoch[9],
-                verifier: validator_verifier[9].clone()
+                verifier: validator_verifier[9].clone(),
             })
             .is_err());
 
@@ -262,7 +265,7 @@ mod tests {
         assert!(proof_6
             .verify(&EpochState {
                 epoch: all_epoch[0],
-                verifier: validator_verifier[0].clone()
+                verifier: validator_verifier[0].clone(),
             })
             .is_err());
 

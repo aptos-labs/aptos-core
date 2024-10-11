@@ -5,13 +5,12 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    poseidon_bn254::keyless::fr_to_bytes_le,
-    SigningKey, Uniform,
+    ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, PrivateKey, SigningKey,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
+use aptos_sdk::types::{EphemeralKeyPair, KeylessAccount, LocalAccount};
 use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
@@ -21,10 +20,12 @@ use aptos_types::{
     keyless::{
         get_public_inputs_hash,
         test_utils::{
-            self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk,
-            get_sample_groth16_sig_and_fed_pk, get_sample_groth16_sig_and_pk,
-            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
-            get_sample_openid_sig_and_pk, get_upgraded_vk,
+            self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_aud, get_sample_epk_blinder,
+            get_sample_esk, get_sample_exp_date, get_sample_groth16_sig_and_fed_pk,
+            get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
+            get_sample_iss, get_sample_jwk, get_sample_jwt_header_json, get_sample_jwt_token,
+            get_sample_openid_sig_and_pk, get_sample_pepper, get_sample_tw_sk, get_sample_uid_key,
+            get_sample_uid_val, get_sample_zk_sig, get_upgraded_vk,
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
@@ -40,7 +41,6 @@ use aptos_types::{
     },
 };
 use move_core_types::account_address::AccountAddress;
-use rand::thread_rng;
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, sync::Arc, time::Duration};
 // TODO(keyless): Test the override aud_val path
@@ -381,6 +381,122 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 }
 
 #[tokio::test]
+async fn test_keyless_groth16_verifies_using_rust_sdk() {
+    let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
+
+    let blinder = get_sample_epk_blinder();
+    let exp_date = get_sample_exp_date();
+    let esk = get_sample_esk();
+    let ephemeral_key_pair = EphemeralKeyPair::new(esk, exp_date, blinder).unwrap();
+
+    let mut info = swarm.aptos_public_info();
+    let keyless_account = KeylessAccount::new(
+        &get_sample_iss(),
+        &get_sample_aud(),
+        &get_sample_uid_key(),
+        &get_sample_uid_val(),
+        &get_sample_jwt_header_json(),
+        ephemeral_key_pair,
+        get_sample_pepper(),
+        get_sample_zk_sig(),
+    )
+    .unwrap();
+    let addr = info
+        .create_user_account_with_any_key(&AnyPublicKey::keyless(
+            keyless_account.public_key().clone(),
+        ))
+        .await
+        .unwrap();
+    info.mint(addr, 10_000_000_000).await.unwrap();
+
+    let account = LocalAccount::new_keyless(
+        keyless_account.authentication_key().account_address(),
+        keyless_account,
+        0,
+    );
+
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let builder = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100));
+    let signed_txn = account.sign_with_transaction_builder(builder);
+
+    remove_training_wheels(&mut cli, &mut info, root_idx).await;
+
+    info!("Submit keyless Groth16 transaction");
+    let result = swarm
+        .aptos_public_info()
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+
+    if let Err(e) = result {
+        panic!("Error with keyless Groth16 TXN verification: {:?}", e)
+    }
+}
+
+#[tokio::test]
+async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
+    let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
+
+    let jwt = get_sample_jwt_token();
+    let blinder = get_sample_epk_blinder();
+    let exp_date = get_sample_exp_date();
+    let esk = get_sample_esk();
+    let ephemeral_key_pair = EphemeralKeyPair::new(esk, exp_date, blinder).unwrap();
+
+    let mut info = swarm.aptos_public_info();
+    let keyless_account = KeylessAccount::new_from_jwt(
+        &jwt,
+        ephemeral_key_pair,
+        None,
+        Some(get_sample_pepper()),
+        Some(get_sample_zk_sig()),
+    )
+    .unwrap();
+    let addr = info
+        .create_user_account_with_any_key(&AnyPublicKey::keyless(
+            keyless_account.public_key().clone(),
+        ))
+        .await
+        .unwrap();
+    info.mint(addr, 10_000_000_000).await.unwrap();
+
+    let account = LocalAccount::new_keyless(
+        keyless_account.authentication_key().account_address(),
+        keyless_account,
+        0,
+    );
+
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let builder = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100));
+    let signed_txn = account.sign_with_transaction_builder(builder);
+
+    remove_training_wheels(&mut cli, &mut info, root_idx).await;
+
+    info!("Submit keyless Groth16 transaction");
+    let result = swarm
+        .aptos_public_info()
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+
+    if let Err(e) = result {
+        panic!("Error with keyless Groth16 TXN verification: {:?}", e)
+    }
+}
+
+#[tokio::test]
 async fn test_keyless_groth16_with_mauled_proof() {
     let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
@@ -647,7 +763,7 @@ async fn setup_local_net_inner(
     (tw_sk, config, jwk, swarm, cli, root_idx)
 }
 
-async fn remove_training_wheels<'a>(
+pub(crate) async fn remove_training_wheels<'a>(
     cli: &mut CliTestFramework,
     info: &mut AptosPublicInfo,
     root_idx: usize,
@@ -691,7 +807,7 @@ fun main(core_resources: &signer) {{
     .await;
 }
 
-async fn spawn_network_and_execute_gov_proposals(
+pub(crate) async fn spawn_network_and_execute_gov_proposals(
     swarm: &mut LocalSwarm,
     cli: &mut CliTestFramework,
 ) -> (Ed25519PrivateKey, Configuration, RSA_JWK, usize) {
@@ -731,8 +847,8 @@ async fn spawn_network_and_execute_gov_proposals(
     let iss = get_sample_iss();
     let jwk = get_sample_jwk();
 
-    let training_wheels_sk = Ed25519PrivateKey::generate(&mut thread_rng());
-    let training_wheels_pk = Ed25519PublicKey::from(&training_wheels_sk);
+    let training_wheels_sk = get_sample_tw_sk();
+    let training_wheels_pk = training_wheels_sk.public_key();
 
     info!("Insert JWK and update keyless configuration.");
     let max_exp_horizon_secs = Configuration::new_for_testing().max_exp_horizon_secs;

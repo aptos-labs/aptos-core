@@ -21,6 +21,7 @@ use crate::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
         },
+        proposal_status_tracker::{ExponentialWindowFailureTracker, OptQSPullParamsProvider},
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
@@ -837,6 +838,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config.skip_non_rand_blocks(),
         ));
 
+        let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
+            100,
+            epoch_state.verifier.get_ordered_account_addresses(),
+        )));
+        let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
+            self.config.quorum_store.enable_opt_quorum_store,
+            failures_tracker.clone(),
+        ));
+
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
         // and by event processor (to update their status).
@@ -866,6 +876,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
+            opt_qs_payload_param_provider,
             validator,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -900,6 +911,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             fast_rand_config,
+            failures_tracker,
             execution_futures,
             consensus_publisher,
         );
@@ -1078,9 +1090,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
+        let mut verifier: ValidatorVerifier = (&validator_set).into();
+        verifier.set_optimistic_sig_verification_flag(self.config.optimistic_sig_verification);
+
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
+            verifier: verifier.into(),
         });
 
         self.epoch_state = Some(epoch_state.clone());
@@ -1095,15 +1110,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dkg_state = payload.get::<DKGState>();
 
         if let Err(error) = &onchain_consensus_config {
-            error!("Failed to read on-chain consensus config {}", error);
+            warn!("Failed to read on-chain consensus config {}", error);
         }
 
         if let Err(error) = &onchain_execution_config {
-            error!("Failed to read on-chain execution config {}", error);
+            warn!("Failed to read on-chain execution config {}", error);
         }
 
         if let Err(error) = &randomness_config_move_struct {
-            error!("Failed to read on-chain randomness config {}", error);
+            warn!("Failed to read on-chain randomness config {}", error);
         }
 
         self.epoch_state = Some(epoch_state.clone());
@@ -1508,6 +1523,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::RoundTimeoutMsg(_)
             | ConsensusMsg::OrderVoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)

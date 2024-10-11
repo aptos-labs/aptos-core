@@ -3,6 +3,7 @@
 
 use crate::{
     common::{Payload, PayloadFilter},
+    payload_pull_params::OptQSPayloadPullParams,
     utils::PayloadTxnsSize,
 };
 use anyhow::Result;
@@ -17,8 +18,8 @@ pub struct GetPayloadRequest {
     pub max_txns_after_filtering: u64,
     // soft max number of transactions after filtering in the block (i.e. include one that crosses it)
     pub soft_max_txns_after_filtering: u64,
-    // target txns with opt batches in max_txns as pct
-    pub opt_batch_txns_pct: u8,
+    // opt payload pull params
+    pub maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
     // max number of inline transactions (transactions without a proof of store)
     pub max_inline_txns: PayloadTxnsSize,
     // return non full

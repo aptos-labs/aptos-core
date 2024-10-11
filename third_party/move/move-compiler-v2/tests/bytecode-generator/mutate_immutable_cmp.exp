@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct T {
-        s: M::S,
+        s: 0x8675309::M::S,
     }
     struct G {
         dummy_field: bool,
@@ -9,7 +9,7 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(s: &mut M::S) {
+    private fun t0(s: &mut S) {
         s = pack M::S(2);
         s = pack M::S(0);
         Borrow(Immutable)(0) = 1;
@@ -21,20 +21,20 @@ module 0x8675309::M {
               let x_ref: &u64 = Freeze(false)(x_ref);
               x_ref = 0;
               {
-                let g: M::S = pack M::S(0);
+                let g: S = pack M::S(0);
                 {
-                  let g_ref: &mut M::S = Borrow(Mutable)(g);
+                  let g_ref: &mut S = Borrow(Mutable)(g);
                   g_ref = pack M::S(2);
                   {
-                    let t: M::T = pack M::T(g);
+                    let t: T = pack M::T(g);
                     {
-                      let t_ref: &mut M::T = Borrow(Mutable)(t);
+                      let t_ref: &mut T = Borrow(Mutable)(t);
                       {
-                        let g: M::S = pack M::S(2);
-                        select M::T.s<&mut M::T>(t_ref) = g;
+                        let g: S = pack M::S(2);
+                        select M::T.s<&mut T>(t_ref) = g;
                         {
-                          let g: M::S = pack M::S(3);
-                          select M::T.s<&M::T>(t_ref) = g;
+                          let g: S = pack M::S(3);
+                          select M::T.s<&T>(t_ref) = g;
                           Tuple()
                         }
                       }
@@ -55,9 +55,43 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct T has drop {
+        s: S,
+    }
+    struct G has drop, key {
+    }
+    struct S has drop {
+        f: u64,
+    }
+    fun t0(s: &mut S) {
+        *s = S{f: 2};
+        *s = S{f: 0};
+        *&0 = 1;
+        let x = 0;
+        let x_ref = &mut x;
+        let x_ref = /*freeze*/x_ref;
+        *x_ref = 0;
+        let g = S{f: 0};
+        let g_ref = &mut g;
+        *g_ref = S{f: 2};
+        let t = T{s: g};
+        let t_ref = &mut t;
+        let g = S{f: 2};
+        t_ref.s = g;
+        let g = S{f: 3};
+        t_ref.s = g;
+    }
+    fun t1() {
+        let x = 3;
+        *&mut x = 5;
+    }
+}
+
 
 Diagnostics:
-error: expected `&mut` but found `&M::S`
+error: expected `&mut` but found `&S`
   ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:7:11
   │
 7 │         *(s: &S) = S { f: 0 }; // this is not OK
@@ -75,13 +109,13 @@ error: expected `&mut` but found `&u64`
 12 │         *x_ref = 0;
    │          ^^^^^
 
-error: expected `&mut` but found `&M::S`
+error: expected `&mut` but found `&S`
    ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:15:11
    │
 15 │         *(g_ref: &S) = S {f : 2};
    │           ^^^^^
 
-error: expected `&mut` but found `&M::T`
+error: expected `&mut` but found `&T`
    ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:21:10
    │
 21 │         (t_ref: &T).s = g; // this is not OK

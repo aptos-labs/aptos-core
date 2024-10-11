@@ -18,7 +18,7 @@ module 0x42::test {
         dummy_field: bool,
     }
     struct S2 {
-        f: test::S3<#1>,
+        f: 0x42::test::S3<#1>,
     }
     struct S3 {
         dummy_field: bool,
@@ -31,3 +31,7 @@ module 0x42::test {
         g: vector<#1>,
     }
 } // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::dependency {
+}

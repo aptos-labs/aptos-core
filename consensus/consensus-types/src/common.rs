@@ -6,7 +6,6 @@ use crate::{
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
-use anyhow::bail;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -519,7 +518,8 @@ impl Payload {
             },
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
-                Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)
+                Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
+                Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",

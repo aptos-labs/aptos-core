@@ -4,34 +4,35 @@
 
 use crate::{
     counters,
-    pending_votes::{PendingVotes, VoteReceptionResult},
+    pending_votes::{PendingVotes, VoteReceptionResult, VoteStatus},
     util::time_service::{SendTask, TimeService},
 };
 use aptos_consensus_types::{
-    common::Round, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutWithPartialSignatures,
+    common::Round,
+    round_timeout::{RoundTimeout, RoundTimeoutReason},
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutWithPartialSignatures,
     vote::Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
-use aptos_types::{
-    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
-};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
 
 /// A reason for starting a new round: introduced for monitoring / debug purposes.
-#[derive(Serialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub enum NewRoundReason {
     QCReady,
-    Timeout,
+    Timeout(RoundTimeoutReason),
 }
 
 impl fmt::Display for NewRoundReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             NewRoundReason::QCReady => write!(f, "QCReady"),
-            NewRoundReason::Timeout => write!(f, "TCReady"),
+            NewRoundReason::Timeout(_) => write!(f, "TCReady"),
         }
     }
 }
@@ -45,7 +46,7 @@ pub struct NewRoundEvent {
     pub round: Round,
     pub reason: NewRoundReason,
     pub timeout: Duration,
-    pub prev_round_votes: Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+    pub prev_round_votes: Vec<(HashValue, VoteStatus)>,
     pub prev_round_timeout_votes: Option<TwoChainTimeoutWithPartialSignatures>,
 }
 
@@ -159,6 +160,8 @@ pub struct RoundState {
     pending_votes: PendingVotes,
     // Vote sent locally for the current round.
     vote_sent: Option<Vote>,
+    // Timeout sent locally for the current round.
+    timeout_sent: Option<RoundTimeout>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
 }
@@ -206,13 +209,14 @@ impl RoundState {
             timeout_sender,
             pending_votes,
             vote_sent: None,
+            timeout_sent: None,
             abort_handle: None,
         }
     }
 
     /// Return if already voted for timeout
-    pub fn is_vote_timeout(&self) -> bool {
-        self.vote_sent.as_ref().map_or(false, |v| v.is_timeout())
+    pub fn is_timeout_sent(&self) -> bool {
+        self.vote_sent.as_ref().map_or(false, |v| v.is_timeout()) || self.timeout_sent.is_some()
     }
 
     /// Return the current round.
@@ -239,7 +243,11 @@ impl RoundState {
 
     /// Notify the RoundState about the potentially new QC, TC, and highest ordered round.
     /// Note that some of these values might not be available by the caller.
-    pub fn process_certificates(&mut self, sync_info: SyncInfo) -> Option<NewRoundEvent> {
+    pub fn process_certificates(
+        &mut self,
+        sync_info: SyncInfo,
+        verifier: &ValidatorVerifier,
+    ) -> Option<NewRoundEvent> {
         if sync_info.highest_ordered_round() > self.highest_ordered_round {
             self.highest_ordered_round = sync_info.highest_ordered_round();
         }
@@ -251,14 +259,23 @@ impl RoundState {
             self.current_round = new_round;
             self.pending_votes = PendingVotes::new();
             self.vote_sent = None;
+            self.timeout_sent = None;
             let timeout = self.setup_timeout(1);
+
+            let (prev_round_timeout_votes, prev_round_timeout_reason) = prev_round_timeout_votes
+                .map(|votes| votes.unpack_aggregate(verifier))
+                .unzip();
+
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
             let new_round_reason = if sync_info.highest_certified_round() + 1 == new_round {
                 NewRoundReason::QCReady
             } else {
-                NewRoundReason::Timeout
+                let prev_round_timeout_reason =
+                    prev_round_timeout_reason.unwrap_or(RoundTimeoutReason::Unknown);
+                NewRoundReason::Timeout(prev_round_timeout_reason)
             };
+
             let new_round_event = NewRoundEvent {
                 round: self.current_round,
                 reason: new_round_reason,
@@ -275,15 +292,27 @@ impl RoundState {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        verifier: &ValidatorVerifier,
+        validator_verifier: &ValidatorVerifier,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.pending_votes.insert_vote(vote, verifier)
+            self.pending_votes.insert_vote(vote, validator_verifier)
         } else {
             VoteReceptionResult::UnexpectedRound(
                 vote.vote_data().proposed().round(),
                 self.current_round,
             )
+        }
+    }
+
+    pub fn insert_round_timeout(
+        &mut self,
+        timeout: &RoundTimeout,
+        verifier: &ValidatorVerifier,
+    ) -> VoteReceptionResult {
+        if timeout.round() == self.current_round {
+            self.pending_votes.insert_round_timeout(timeout, verifier)
+        } else {
+            VoteReceptionResult::UnexpectedRound(timeout.round(), self.current_round)
         }
     }
 
@@ -293,8 +322,18 @@ impl RoundState {
         }
     }
 
+    pub fn record_round_timeout(&mut self, timeout: RoundTimeout) {
+        if timeout.round() == self.current_round {
+            self.timeout_sent = Some(timeout)
+        }
+    }
+
     pub fn vote_sent(&self) -> Option<Vote> {
         self.vote_sent.clone()
+    }
+
+    pub fn timeout_sent(&self) -> Option<RoundTimeout> {
+        self.timeout_sent.clone()
     }
 
     /// Setup the timeout task and return the duration of the current timeout
