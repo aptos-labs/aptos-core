@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::PayloadPullParameters;
 use crate::error::QuorumStoreError;
-use aptos_consensus_types::common::Payload;
+use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};
 use aptos_consensus_types::request_response::PayloadTxns;
 use aptos_types::transaction::SignedTransaction;
 use futures::future::BoxFuture;

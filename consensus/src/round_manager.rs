@@ -10,6 +10,7 @@ use crate::{
         self, NUM_PRE_COMMIT_VOTED_BLOCKS, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS, PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT
     }, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
+        proposal_status_tracker::TPastProposalStatusTracker,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
@@ -233,6 +234,7 @@ pub struct RoundManager {
     futures: FuturesUnordered<
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
+    proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
@@ -254,6 +256,7 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
+        proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
@@ -286,6 +289,7 @@ impl RoundManager {
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
+            proposal_status_tracker,
             execution_futures,
             consensus_publisher,
         }
@@ -328,7 +332,7 @@ impl RoundManager {
             NewRoundReason::QCReady => {
                 counters::QC_ROUNDS_COUNT.inc();
             },
-            NewRoundReason::Timeout => {
+            NewRoundReason::Timeout(_) => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
             },
         };
@@ -338,6 +342,9 @@ impl RoundManager {
         );
         self.pending_order_votes
             .garbage_collect(self.block_store.sync_info().highest_ordered_round());
+
+        self.proposal_status_tracker
+            .push(new_round_event.reason.clone());
 
         if self
             .proposer_election
@@ -377,10 +384,9 @@ impl RoundManager {
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) -> anyhow::Result<()> {
-        let epoch = epoch_state.epoch;
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
         let proposal_msg = Self::generate_proposal(
-            epoch,
+            epoch_state.clone(),
             new_round_event,
             sync_info,
             network.clone(),
@@ -486,9 +492,8 @@ impl RoundManager {
         &self,
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<ProposalMsg> {
-        let epoch = self.epoch_state.epoch;
         Self::generate_proposal(
-            epoch,
+            self.epoch_state.clone(),
             new_round_event,
             self.block_store.sync_info(),
             self.network.clone(),
@@ -500,7 +505,7 @@ impl RoundManager {
     }
 
     async fn generate_proposal(
-        epoch: u64,
+        epoch_state: Arc<EpochState>,
         new_round_event: NewRoundEvent,
         sync_info: SyncInfo,
         network: Arc<NetworkSender>,
@@ -526,7 +531,11 @@ impl RoundManager {
         info!("[ProposalGeneration] In total took: {:?}, round {}", duration_since_epoch().checked_sub(Duration::from_micros(signed_proposal.timestamp_usecs())).unwrap(), signed_proposal.round());
 
         info!(
-            Self::new_log_with_round_epoch(LogEvent::Propose, new_round_event.round, epoch),
+            Self::new_log_with_round_epoch(
+                LogEvent::Propose,
+                new_round_event.round,
+                epoch_state.epoch
+            ),
             "{}", signed_proposal
         );
         Ok(ProposalMsg::new(signed_proposal, sync_info))
@@ -679,6 +688,23 @@ impl RoundManager {
         sync_or_not
     }
 
+    fn compute_timeout_reason(&self, round: Round) -> RoundTimeoutReason {
+        if self.round_state().vote_sent().is_some() {
+            return RoundTimeoutReason::NoQC;
+        }
+
+        match self.block_store.get_block_for_round(round) {
+            None => RoundTimeoutReason::ProposalNotReceived,
+            Some(block) => {
+                if let Err(missing_authors) = self.block_store.check_payload(block.block()) {
+                    RoundTimeoutReason::PayloadUnavailable { missing_authors }
+                } else {
+                    RoundTimeoutReason::Unknown
+                }
+            },
+        }
+    }
+
     /// The replica broadcasts a "timeout vote message", which includes the round signature, which
     /// can be aggregated to a TimeoutCertificate.
     /// The timeout vote message can be one of the following three options:
@@ -717,8 +743,8 @@ impl RoundManager {
                     )
                     .context("[RoundManager] SafetyRules signs 2-chain timeout")?;
 
-                // TODO(ibalajiarun): placeholder, update with proper reason.
-                let timeout_reason = RoundTimeoutReason::Unknown;
+                let timeout_reason = self.compute_timeout_reason(round);
+
                 RoundTimeout::new(
                     timeout,
                     self.proposal_generator.author(),
@@ -789,7 +815,11 @@ impl RoundManager {
     /// This function is called only after all the dependencies of the given QC have been retrieved.
     async fn process_certificates(&mut self) -> anyhow::Result<()> {
         let sync_info = self.block_store.sync_info();
-        if let Some(new_round_event) = self.round_state.process_certificates(sync_info) {
+        let epoch_state = self.epoch_state.clone();
+        if let Some(new_round_event) = self
+            .round_state
+            .process_certificates(sync_info, &epoch_state.verifier)
+        {
             self.process_new_round_event(new_round_event).await?;
         }
         Ok(())
@@ -916,16 +946,30 @@ impl RoundManager {
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
 
+        // Since processing proposal is delayed due to backpressure or payload availability, we add
+        // the block to the block store so that we don't need to fetch it from remote once we
+        // are out of the backpressure. Please note that delayed processing of proposal is not
+        // guaranteed to add the block to the block store if we don't get out of the backpressure
+        // before the timeout, so this is needed to ensure that the proposed block is added to
+        // the block store irrespective. Also, it is possible that delayed processing of proposal
+        // tries to add the same block again, which is okay as `execute_and_insert_block` call
+        // is idempotent.
+        self.block_store
+            .insert_block(proposal.clone())
+            .await
+            .context("[RoundManager] Failed to insert the block into BlockStore")?;
+
         let block_store = self.block_store.clone();
-        if !block_store.check_payload(&proposal) {
+        if block_store.check_payload(&proposal).is_err() {
             debug!("Payload not available locally for block: {}", proposal.id());
             counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
                 .with_label_values(&["missing"])
                 .inc();
             let start_time = Instant::now();
+            let deadline = self.round_state.current_round_deadline();
             let future = async move {
                 (
-                    block_store.wait_for_payload(&proposal).await,
+                    block_store.wait_for_payload(&proposal, deadline).await,
                     proposal,
                     start_time,
                 )
@@ -953,18 +997,7 @@ impl RoundManager {
         if self.block_store.vote_back_pressure() {
             counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(1.0);
             // In case of back pressure, we delay processing proposal. This is done by resending the
-            // same proposal to self after some time. Even if processing proposal is delayed, we add
-            // the block to the block store so that we don't need to fetch it from remote once we
-            // are out of the backpressure. Please note that delayed processing of proposal is not
-            // guaranteed to add the block to the block store if we don't get out of the backpressure
-            // before the timeout, so this is needed to ensure that the proposed block is added to
-            // the block store irrespective. Also, it is possible that delayed processing of proposal
-            // tries to add the same block again, which is okay as `execute_and_insert_block` call
-            // is idempotent.
-            self.block_store
-                .insert_block(proposal.clone())
-                .await
-                .context("[RoundManager] Failed to execute_and_insert the block")?;
+            // same proposal to self after some time.
             Self::resend_verified_proposal_to_self(
                 self.block_store.clone(),
                 self.buffered_proposal_tx.clone(),
@@ -1667,9 +1700,10 @@ impl RoundManager {
 
     /// To jump start new round with the current certificates we have.
     pub async fn init(&mut self, last_vote_sent: Option<Vote>) {
+        let epoch_state = self.epoch_state.clone();
         let new_round_event = self
             .round_state
-            .process_certificates(self.block_store.sync_info())
+            .process_certificates(self.block_store.sync_info(), &epoch_state.verifier)
             .expect("Can not jump start a round_state from existing certificates.");
         if let Some(vote) = last_vote_sent {
             self.round_state.record_vote(vote);
