@@ -21,8 +21,6 @@ pub struct QuorumCert {
     vote_data: VoteData,
     /// The signed LedgerInfo of a committed block that carries the data about the certified block.
     signed_ledger_info: LedgerInfoWithSignatures,
-    /// For fast proposal hack
-    is_real: bool,
 }
 
 impl Display for QuorumCert {
@@ -36,11 +34,10 @@ impl Display for QuorumCert {
 }
 
 impl QuorumCert {
-    pub fn new(vote_data: VoteData, signed_ledger_info: LedgerInfoWithSignatures, is_real: bool) -> Self {
+    pub fn new(vote_data: VoteData, signed_ledger_info: LedgerInfoWithSignatures) -> Self {
         QuorumCert {
             vote_data,
             signed_ledger_info,
-            is_real,
         }
     }
 
@@ -52,12 +49,7 @@ impl QuorumCert {
                 LedgerInfo::dummy(),
                 AggregateSignature::empty(),
             ),
-            is_real: true,
         }
-    }
-
-    pub fn is_real(&self) -> bool {
-        self.is_real
     }
 
     pub fn vote_data(&self) -> &VoteData {
@@ -122,7 +114,6 @@ impl QuorumCert {
                 li,
                 AggregateSignature::new(BitVec::with_num_bits(validator_set_size as u16), None),
             ),
-            true,
         )
     }
 
@@ -169,7 +160,7 @@ impl QuorumCert {
             self_commit_info,
             executed_commit_info
         );
-        Ok(Self::new(self.vote_data.clone(), executed_ledger_info, self.is_real))
+        Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
     }
 
     pub fn into_wrapped_ledger_info(&self) -> WrappedLedgerInfo {

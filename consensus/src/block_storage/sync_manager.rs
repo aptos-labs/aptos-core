@@ -119,7 +119,7 @@ impl BlockStore {
         // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).
         // This call will ensure that the highest ceritified block along with all its ancestors are inserted
         // into the block store.
-        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever, false)
+        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
 
         // Even though we inserted the highest_quorum_cert (and its ancestors) in the above step,
@@ -140,7 +140,6 @@ impl BlockStore {
                     .clone()
                     .into_quorum_cert(self.order_vote_enabled)?,
                 &mut retriever,
-                false,
             )
             .await?;
         }
@@ -155,11 +154,7 @@ impl BlockStore {
         &self,
         qc: &QuorumCert,
         retriever: &mut BlockRetriever,
-        fast_proposal: bool,
     ) -> anyhow::Result<()> {
-        if !qc.is_real() && !fast_proposal {
-            return Ok(());
-        }
         match self.need_fetch_for_quorum_cert(qc) {
             NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
