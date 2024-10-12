@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::PayloadPullParameters;
 use crate::{
     error::QuorumStoreError,
     payload_client::{user::UserPayloadClient, PayloadClient},
 };
-use aptos_consensus_types::{common::Payload, utils::PayloadTxnsSize};
+use aptos_consensus_types::{
+    common::Payload, payload_pull_params::PayloadPullParameters, utils::PayloadTxnsSize,
+};
 use aptos_logger::debug;
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool::TransactionFilter;
@@ -112,9 +113,11 @@ impl PayloadClient for MixedPayloadClient {
 mod tests {
     use crate::payload_client::{
         mixed::MixedPayloadClient, user, validator::DummyValidatorTxnClient, PayloadClient,
-        PayloadPullParameters,
     };
-    use aptos_consensus_types::common::{Payload, PayloadFilter};
+    use aptos_consensus_types::{
+        common::{Payload, PayloadFilter},
+        payload_pull_params::PayloadPullParameters,
+    };
     use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
     use aptos_validator_transaction_pool as vtxn_pool;
     use std::{collections::HashSet, sync::Arc, time::Duration};

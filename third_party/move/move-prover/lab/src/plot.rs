@@ -70,7 +70,7 @@ pub fn plot_svg(args: &[String]) -> anyhow::Result<()> {
     };
     let out_file = matches
         .get_one::<String>("out")
-        .map_or("plot.svg".to_owned(), |s| s.clone());
+        .map_or_else(|| "plot.svg".to_owned(), |s| s.clone());
     let sort = matches.contains_id("sort");
     let top = matches.get_one::<usize>("top");
     let data_files = get_vec("data-files");

@@ -1150,6 +1150,7 @@ impl TryFrom<&[u8]> for AnyPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralSignature {
     Ed25519 {
         signature: Ed25519Signature,
@@ -1218,6 +1219,7 @@ impl TryFrom<&[u8]> for EphemeralSignature {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralPublicKey {
     Ed25519 {
         public_key: Ed25519PublicKey,

@@ -35,7 +35,7 @@ macro_rules! forward_on_success_or_skip_rest {
         $self.outputs[$txn_idx as usize]
             .load()
             .as_ref()
-            .map_or(vec![], |txn_output| match txn_output.as_ref() {
+            .map_or_else(Vec::new, |txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.$f(),
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
@@ -273,15 +273,15 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     // Extracts a set of paths (keys) written or updated during execution from transaction
-    // output, .1 for each item is false for non-module paths and true for module paths.
-    // If TAKE_GROUP_TAGS is set, the final HashSet of tags is moved for the group key -
-    // should be called once for each incarnation / record due to 'take'. if TAKE_GROUP_TAGS
-    // is false, stored modified group resource tags in the group are cloned out.
-    pub(crate) fn modified_keys<const TAKE_GROUP_TAGS: bool>(
+    // output, with corresponding KeyKind. If take_group_tags is true, the final HashSet
+    // of tags is moved for the group key - should be called once for each incarnation / record
+    // due to 'take'. if false, stored modified group resource tags in the group are cloned out.
+    pub(crate) fn modified_keys(
         &self,
         txn_idx: TxnIndex,
+        take_group_tags: bool,
     ) -> Option<impl Iterator<Item = (T::Key, KeyKind<T::Tag>)>> {
-        let group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = if TAKE_GROUP_TAGS {
+        let group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = if take_group_tags {
             std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
         } else {
             self.resource_group_keys_and_tags[txn_idx as usize]
@@ -367,9 +367,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
-            Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
-            |txn_output| match txn_output.as_ref() {
+        match self.outputs[txn_idx as usize].load().as_ref() {
+            None => Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
+            Some(txn_output) => match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
@@ -380,7 +380,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
                 },
             },
-        )
+        }
     }
 
     pub(crate) fn take_resource_write_set(

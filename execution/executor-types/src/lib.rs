@@ -259,14 +259,14 @@ impl VerifyExecutionMode {
 }
 
 pub trait TransactionReplayer: Send {
-    fn replay(
+    fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
-    ) -> Result<()>;
+    ) -> Result<usize>;
 
     fn commit(&self) -> Result<Version>;
 }

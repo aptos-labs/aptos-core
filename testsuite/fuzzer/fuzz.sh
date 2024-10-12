@@ -39,6 +39,12 @@ function usage() {
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
             ;;
+        "coverage")
+            echo "Usage: $0 coverage <fuzz_target>"
+            ;;
+        "clean-coverage")
+            echo "Usage: $0 clean-coverage <fuzz_target>"
+            ;;        
         "debug")
             echo "Usage: $0 debug <fuzz_target> <testcase>"
             ;;
@@ -55,10 +61,11 @@ function usage() {
             echo "Usage: $0 test"
             ;;
         *)
-            echo "Usage: $0 <build|build-oss-fuzz|list|run|debug|test>"
+            echo "Usage: $0 <build|build-oss-fuzz|coverage|clean-coverage|flamegraph|list|run|debug|test>"
             echo "    add               adds a new fuzz target"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
+            echo "    coverage          generates coverage for a fuzz target"
             echo "    debug             debugs a fuzz target with a testcase"
             echo "    flamegraph        generates a flamegraph for a fuzz target with a testcase"
             echo "    list              lists existing fuzz targets"
@@ -125,6 +132,49 @@ function build-oss-fuzz() {
     done
 }
 
+function coverage() {
+    if [ -z "$1" ]; then
+        usage coverage
+    fi
+    fuzz_target=$1
+    local corpus_dir="fuzz/corpus/$fuzz_target"
+    local coverage_dir="./fuzz/coverage/$fuzz_target/report"
+    mkdir -p $coverage_dir
+    
+    if [ ! -d "fuzz/coverage/$fuzz_target" ]; then
+        cargo_fuzz coverage $fuzz_target $corpus_dir
+    fi
+    
+    info "Generating coverage for $fuzz_target"
+
+    fuzz_target_bin=$(find ./target -name $fuzz_target -type f -perm /111) #$(find target/*/coverage -name $fuzz_target -type f)
+    echo "Found fuzz target binary: $fuzz_target_bin"
+    # Generate the coverage report
+    cargo +nightly cov -- show $fuzz_target_bin \
+        --format=html \
+        --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
+        --show-directory-coverage \
+        --output-dir=$coverage_dir \
+        -Xdemangler=rustfilt \
+        --show-branches=count \
+        --ignore-filename-regex='rustc/.*/library|\.cargo'
+}
+
+function clean-coverage() {
+    if [ "$#" -ne 1 ]; then
+        usage clean
+    fi
+
+    local fuzz_target="$1"
+    local target_dir="coverage/$fuzz_target"
+
+    if [ "$fuzz_target" == "all" ]; then
+        rm -rf coverage
+    else
+        rm -rf $target_dir
+    fi
+}
+
 # use rust-gdb to debug a fuzz target with a testcase
 function debug() {
     if [ -z "$2" ]; then
@@ -182,7 +232,7 @@ function run() {
         fi
     fi
     info "Running $fuzz_target"
-    cargo_fuzz run --sanitizer none $fuzz_target $testcase
+    cargo_fuzz run --sanitizer none -O $fuzz_target $testcase -- -fork=10
 }
 
 function test() {
@@ -246,6 +296,14 @@ case "$1" in
   "build-oss-fuzz")
     shift
     build-oss-fuzz "$@"
+    ;;
+  "coverage")
+    shift
+    coverage "$@"
+    ;;
+  "clean-coverage")
+    shift
+    clean-coverage "$@"
     ;;
   "debug")
     shift

@@ -222,13 +222,13 @@ async fn is_partial_governance_voting_enabled_for_delegation_pool(
             None,
         )
         .await?;
-    response.inner()[0]
-        .as_bool()
-        .ok_or(CliError::UnexpectedError(
+    response.inner()[0].as_bool().ok_or_else(|| {
+        CliError::UnexpectedError(
             "Unexpected response from node when checking if partial governance_voting is \
         enabled for delegation pool"
                 .to_string(),
-        ))
+        )
+    })
 }
 
 async fn get_remaining_voting_power(
@@ -255,14 +255,13 @@ async fn get_remaining_voting_power(
             None,
         )
         .await?;
-    let remaining_voting_power_str =
-        response.inner()[0]
-            .as_str()
-            .ok_or(CliError::UnexpectedError(format!(
-                "Unexpected response from node when getting remaining voting power of {}\
+    let remaining_voting_power_str = response.inner()[0].as_str().ok_or_else(|| {
+        CliError::UnexpectedError(format!(
+            "Unexpected response from node when getting remaining voting power of {}\
         in delegation pool {}",
-                pool_address, voter_address
-            )))?;
+            pool_address, voter_address
+        ))
+    })?;
     remaining_voting_power_str.parse().map_err(|err| {
         CliError::UnexpectedError(format!(
             "Unexpected response from node when getting remaining voting power of {}\
