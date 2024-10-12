@@ -171,6 +171,11 @@ impl ExecutionProxy {
             },
         )
     }
+
+    /// Resets the executor
+    pub fn reset_executor(&self) -> Result<()> {
+        self.executor.reset()
+    }
 }
 
 #[async_trait::async_trait]
@@ -328,7 +333,9 @@ impl StateComputer for ExecutionProxy {
         Ok(())
     }
 
-    /// Best effort state synchronization for the specified duration
+    /// Best effort state synchronization for the specified duration.
+    /// If the result is successful, the caller must also reset the block
+    /// executor manually, after the rand and buffer managers are reset.
     async fn sync_for_duration(
         &self,
         duration: Duration,
@@ -355,16 +362,17 @@ impl StateComputer for ExecutionProxy {
             self.state_sync_notifier.sync_for_duration(duration).await
         );
 
+        info!(
+            "State sync for duration in StateComputer (ExecutionProxy) completed with result: {:?}",
+            result
+        );
+
         // Update the latest logical time
         if let Ok(latest_synced_ledger_info) = &result {
             let ledger_info = latest_synced_ledger_info.ledger_info();
             let synced_logical_time = LogicalTime::new(ledger_info.epoch(), ledger_info.round());
             *latest_logical_time = synced_logical_time;
         }
-
-        // Similarly, after state synchronization, we have to reset the cache of
-        // the BlockExecutor to guarantee the latest committed state is up to date.
-        self.executor.reset()?;
 
         // Return the result
         result.map_err(|error| {
@@ -423,7 +431,7 @@ impl StateComputer for ExecutionProxy {
 
         // Similarly, after state synchronization, we have to reset the cache of
         // the BlockExecutor to guarantee the latest committed state is up to date.
-        self.executor.reset()?;
+        self.reset_executor()?;
 
         // Return the result
         result.map_err(|error| {

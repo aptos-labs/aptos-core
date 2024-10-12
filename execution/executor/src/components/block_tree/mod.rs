@@ -187,11 +187,6 @@ impl BlockTree {
         Ok(Self { root, block_lookup })
     }
 
-    pub fn reset(&self, db: &Arc<dyn DbReader>) -> Result<()> {
-        *self.root.lock() = Self::root_from_db(&self.block_lookup, db)?;
-        Ok(())
-    }
-
     pub fn get_block(&self, id: HashValue) -> Result<Arc<Block>> {
         Ok(self.get_blocks(&[id])?.pop().expect("Must exist."))
     }
@@ -212,6 +207,17 @@ impl BlockTree {
         let ledger_info_with_sigs = db.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sigs.ledger_info();
         let ledger_view = db.get_latest_executed_trees()?;
+
+        info!(
+            "Ledger info version: {:?}, ledger info: {:?}",
+            ledger_info.version(),
+            ledger_info
+        );
+        info!(
+            "Ledger view version: {:?}, ledger view: {:?}",
+            ledger_view.version(),
+            ledger_view
+        );
 
         ensure!(
             ledger_view.version() == Some(ledger_info.version()),

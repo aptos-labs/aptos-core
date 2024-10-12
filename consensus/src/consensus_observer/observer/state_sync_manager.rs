@@ -118,7 +118,7 @@ impl StateSyncManager {
         // Log that we're starting to sync in fallback mode
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Started syncing in fallback mode! Syncing duration: {:?}!",
+                "Started syncing in fallback mode! Syncing duration: {:?} secs!",
                 self.consensus_observer_config
                     .observer_fallback_duration_secs
             ))

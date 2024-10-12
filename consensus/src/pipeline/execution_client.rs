@@ -417,9 +417,24 @@ impl TExecutionClient for ExecutionProxyClient {
         // Sync for the specified duration
         let result = self.execution_proxy.sync_for_duration(duration).await;
 
-        // Reset the rand and buffer managers to the new synced round
+        info!("sync_for_duration result in TExecutionClient: {:?}", result);
+
+        // If the sync was successful, reset any pending state!
         if let Ok(latest_synced_ledger_info) = &result {
+            info!(
+                "Resetting to the latest synced round: {:?}",
+                latest_synced_ledger_info
+            );
+
+            // Reset the rand and buffer managers to the new synced round
             self.reset(latest_synced_ledger_info).await?;
+
+            info!("Resetting the execution proxy executor to the new synced round");
+
+            // Reset the execution proxy executor to the new synced round
+            self.execution_proxy.reset_executor()?;
+
+            info!("Finished resetting the execution proxy executor to the new synced round");
         }
 
         result
