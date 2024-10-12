@@ -17,6 +17,7 @@ use crate::{
     }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes}, pending_votes::{VoteReceptionResult, VoteStatus}, persistent_liveness_storage::PersistentLivenessStorage, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, state_computer::SyncStateComputeResultFut, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
+use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
@@ -30,7 +31,7 @@ use aptos_logger::prelude::*;
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo, on_chain_config::{
+    aggregate_signature::{AggregateSignature, PartialSignatures}, block_info::BlockInfo, epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
     }, randomness::RandMetadata, validator_verifier::ValidatorVerifier, PeerId
@@ -1085,6 +1086,24 @@ impl RoundManager {
         let (vote, pipelined_block) = self.create_vote(proposal.clone()).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        // fast proposal hack
+        if self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), proposal_round + 1)
+        {
+            let vote_data = vote.vote_data().clone();
+            let ledger_info = vote.ledger_info().clone();
+
+            let highest_oc = self.block_store.highest_ordered_cert();
+            let fake_aggregate_signature = highest_oc.ledger_info().signatures().clone();
+
+            let signed_ledger_info = LedgerInfoWithSignatures::new(ledger_info, fake_aggregate_signature);
+            let fake_quorum_cert = QuorumCert::new(vote_data, signed_ledger_info);
+            let result = VoteReceptionResult::NewQuorumCertificate(Arc::new(fake_quorum_cert));
+            self.process_vote_reception_result(&vote, result)
+                .await?;
+        }
 
         if self.randomness_config.skip_non_rand_blocks() && !require_randomness {
             self.block_store

@@ -49,6 +49,7 @@ impl Block {
     pub fn num_persisted_transactions(&self) -> LeafCount {
         self.output
             .get_ledger_update()
+            .unwrap()
             .txn_accumulator()
             .num_leaves()
     }
@@ -259,6 +260,7 @@ impl BlockTree {
                     last_committed_block
                         .output
                         .get_ledger_update()
+                        .unwrap()
                         .txn_accumulator()
                         .clone(),
                 ),
