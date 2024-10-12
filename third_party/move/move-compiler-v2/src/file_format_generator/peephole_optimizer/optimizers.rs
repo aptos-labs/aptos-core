@@ -11,22 +11,20 @@ pub trait BasicBlockOptimizer {
     fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode>;
 }
 
-/// An optimizer for a fixed window of bytecode.
-/// The fixed window can be assumed to be within a basic block.
-pub trait FixedWindowOptimizer {
-    /// The fixed window size for this optimizer.
-    fn fixed_window_size(&self) -> usize;
-
-    /// Given a fixed `window` of bytecode of size `self.fixed_window_size()`,
-    /// optionally return its optimized version.
+/// An optimizer for a window of bytecode within a basic block.
+/// The window is always a suffix of a basic block.
+pub trait WindowOptimizer {
+    /// Given a `window` of bytecode, return a tuple containing:
+    ///   1. an optimized version of a non-empty prefix of the `window`.
+    ///   2. size of this prefix (should be non-zero).
     /// If `None` is returned, the `window` is not optimized.
-    fn optimize_fixed_window(&self, window: &[Bytecode]) -> Option<Vec<Bytecode>>;
+    fn optimize_window(&self, window: &[Bytecode]) -> Option<(Vec<Bytecode>, usize)>;
 }
 
-/// A processor to perform fixed window optimizations of a particular style on a basic block.
-pub struct FixedWindowProcessor<T: FixedWindowOptimizer>(T);
+/// A processor to perform window optimizations of a particular style on a basic block.
+pub struct WindowProcessor<T: WindowOptimizer>(T);
 
-impl<T: FixedWindowOptimizer> BasicBlockOptimizer for FixedWindowProcessor<T> {
+impl<T: WindowOptimizer> BasicBlockOptimizer for WindowProcessor<T> {
     fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode> {
         let mut old_block = block.to_vec();
         // Run single passes until code stops changing.
@@ -37,30 +35,24 @@ impl<T: FixedWindowOptimizer> BasicBlockOptimizer for FixedWindowProcessor<T> {
     }
 }
 
-impl<T: FixedWindowOptimizer> FixedWindowProcessor<T> {
-    /// Create a new `FixedWindowProcessor` with the given `optimizer`.
+impl<T: WindowOptimizer> WindowProcessor<T> {
+    /// Create a new `WindowProcessor` with the given `optimizer`.
     pub fn new(optimizer: T) -> Self {
         Self(optimizer)
     }
 
-    /// Run a single pass of fixed window peephole optimization on the given basic `block`.
+    /// Run a single pass of the window peephole optimization on the given basic `block`.
     /// If the block cannot be optimized further, return `None`.
     fn optimize_single_pass(&self, block: &[Bytecode]) -> Option<Vec<Bytecode>> {
-        let window_size = self.0.fixed_window_size();
         let mut changed = false;
         let mut new_block: Vec<Bytecode> = vec![];
         let mut left = 0;
         while left < block.len() {
-            let right = left + window_size;
-            if right > block.len() {
-                // At the end, not enough instructions to form a fixed window.
-                new_block.extend(block[left..].to_vec());
-                break;
-            }
-            let window = &block[left..right];
-            if let Some(optimized_window) = self.0.optimize_fixed_window(window) {
+            let window = &block[left..];
+            if let Some((optimized_window, consumed)) = self.0.optimize_window(window) {
+                debug_assert!(consumed != 0);
                 new_block.extend(optimized_window);
-                left = right;
+                left += consumed;
                 changed = true;
             } else {
                 new_block.push(block[left].clone());
