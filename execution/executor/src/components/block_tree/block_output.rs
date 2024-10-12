@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_executor_types::LedgerUpdateOutput;
+use aptos_executor_types::{ExecutorError, ExecutorResult, LedgerUpdateOutput};
 use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::epoch_state::EpochState;
 use once_cell::sync::OnceCell;
@@ -50,8 +50,12 @@ impl BlockOutput {
         self.ledger_update_output.get().is_some()
     }
 
-    pub fn get_ledger_update(&self) -> &LedgerUpdateOutput {
-        self.ledger_update_output.get().unwrap()
+    pub fn get_ledger_update(&self) -> ExecutorResult<&LedgerUpdateOutput> {
+        self.ledger_update_output.get().ok_or_else(|| {
+            ExecutorError::InternalError {
+                error: "LedgerUpdateOutput not set".to_string(),
+            }
+        })
     }
 
     pub fn set_ledger_update(&self, ledger_update_output: LedgerUpdateOutput) {
