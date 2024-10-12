@@ -52,6 +52,7 @@ pub mod ast;
 mod builder;
 pub mod code_writer;
 pub mod constant_folder;
+pub mod exp_builder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
@@ -60,6 +61,7 @@ pub mod model;
 pub mod options;
 pub mod pragmas;
 pub mod pureness_checker;
+pub mod sourcifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -118,7 +120,7 @@ pub fn run_model_builder_in_compiler_mode(
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
-            .set_lang_v2(language_version != LanguageVersion::V1)
+            .set_language_version(language_version.into())
             .set_compiler_v2(true),
         known_attributes,
     )
@@ -1167,14 +1169,15 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             downgrade_exp_inlining_to_expansion(else_case).into(),
         ),
         UnannotatedExp_::While(cond, body) => Exp_::While(
+            None, // note that labels cannot be downgraded as they are not supported in v1
             downgrade_exp_inlining_to_expansion(cond).into(),
             downgrade_exp_inlining_to_expansion(body).into(),
         ),
         UnannotatedExp_::Loop { has_break: _, body } => {
-            Exp_::Loop(downgrade_exp_inlining_to_expansion(body).into())
+            Exp_::Loop(None, downgrade_exp_inlining_to_expansion(body).into())
         },
-        UnannotatedExp_::Break => Exp_::Break,
-        UnannotatedExp_::Continue => Exp_::Continue,
+        UnannotatedExp_::Break => Exp_::Break(None),
+        UnannotatedExp_::Continue => Exp_::Continue(None),
 
         UnannotatedExp_::Block(seq) => Exp_::Block(downgrade_sequence_inlining_to_expansion(seq)),
         UnannotatedExp_::Lambda(..) => {

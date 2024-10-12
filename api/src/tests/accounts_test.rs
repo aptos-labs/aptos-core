@@ -144,6 +144,9 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
 async fn test_get_account_resources_by_ledger_version() {
     let context = new_test_context(current_function_name!());
     test_account_resources_by_ledger_version_with_context(context).await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_resources_by_ledger_version_with_shard_context() {
     let shard_context =
         new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
     test_account_resources_by_ledger_version_with_context(shard_context).await;

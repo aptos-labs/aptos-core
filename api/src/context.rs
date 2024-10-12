@@ -267,6 +267,20 @@ impl Context {
         self.get_latest_storage_ledger_info()
     }
 
+    pub fn get_latest_internal_and_storage_ledger_info<E: ServiceUnavailableError>(
+        &self,
+    ) -> Result<(Option<LedgerInfo>, LedgerInfo), E> {
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if indexer_reader.is_internal_indexer_enabled() {
+                return Ok((
+                    Some(self.get_latest_internal_indexer_ledger_info()?),
+                    self.get_latest_storage_ledger_info()?,
+                ));
+            }
+        }
+        Ok((None, self.get_latest_storage_ledger_info()?))
+    }
+
     pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
         &self,
         requested_ledger_version: Option<Version>,
@@ -844,7 +858,7 @@ impl Context {
         } else {
             self.indexer_reader
                 .as_ref()
-                .ok_or(anyhow!("Indexer reader is None"))
+                .ok_or_else(|| anyhow!("Indexer reader is None"))
                 .map_err(|err| {
                     E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
                 })?
@@ -943,7 +957,7 @@ impl Context {
         } else {
             self.indexer_reader
                 .as_ref()
-                .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                .ok_or_else(|| anyhow!("Internal indexer reader doesn't exist"))?
                 .get_events(event_key, start, order, limit as u64, ledger_version)?
         };
         if order == Order::Descending {
@@ -952,6 +966,10 @@ impl Context {
         } else {
             Ok(res)
         }
+    }
+
+    pub fn get_indexer_reader(&self) -> Option<&Arc<dyn IndexerReader>> {
+        self.indexer_reader.as_ref()
     }
 
     fn next_bucket(&self, gas_unit_price: u64) -> u64 {

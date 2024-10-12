@@ -68,26 +68,19 @@ jobs:
           elif [[ "${{ github.event_name }}" == "push" ]]; then
               echo "Branch: ${{ github.ref_name }}"
               echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "Using GIT_SHA"
-            # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
-            # on pull_request, this will default to null and the following "checkout" step will use the PR's base branch
+          # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
+          elif [[ -n "${{ inputs.GIT_SHA }}" ]]; then
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
+          # if GIT_SHA not provided, use the branch where workflow runs on
+          else
+            echo "BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
           fi
-
       # Use the branch hash instead of the full branch name to stay under kubernetes namespace length limit
       - name: Hash the branch
         id: hash-branch
         run: |
-          # If BRANCH is empty, default to "main"
-          if [ -z "${{ steps.determine-test-branch.outputs.BRANCH }}" ]; then
-            BRANCH="main"
-          else
-            BRANCH="${{ steps.determine-test-branch.outputs.BRANCH }}"
-          fi
-
           # Hashing the branch name
-          echo "BRANCH_HASH=$(echo -n "$BRANCH" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
+          echo "BRANCH_HASH=$(echo -n "${{ steps.determine-test-branch.outputs.BRANCH }}" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
 
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
@@ -111,7 +104,7 @@ jobs:
           branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
           variants: "failpoints performance"
 
-      - uses: ./.github/actions/determine-or-use-target-branch-and-get-last-released-image
+      - uses: aptos-labs/aptos-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
         id: get-last-released-image-tag-for-compat-test
         with:
           base-branch: ${{ steps.determine-test-branch.outputs.BRANCH }}

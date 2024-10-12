@@ -1068,9 +1068,10 @@ impl BlockInfoGen {
                     )
                 })
                 .collect();
+            let verifier: ValidatorVerifier = (&ValidatorSet::new(next_validator_infos)).into();
             let next_epoch_state = EpochState {
                 epoch: current_epoch + 1,
-                verifier: (&ValidatorSet::new(next_validator_infos)).into(),
+                verifier: verifier.into(),
             };
 
             universe.get_and_bump_epoch();

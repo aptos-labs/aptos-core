@@ -168,6 +168,15 @@ impl MempoolNode {
         }
     }
 
+    pub async fn get_parking_lot_txns_via_client(&mut self) -> Vec<(AccountAddress, u64)> {
+        let (sender, receiver) = oneshot::channel();
+        self.mempool_client_sender
+            .send(MempoolClientRequest::GetAddressesFromParkingLot(sender))
+            .await
+            .unwrap();
+        receiver.await.unwrap()
+    }
+
     /// Asynchronously waits for up to 1 second for txns to appear in mempool
     pub async fn wait_on_txns_in_mempool(&self, txns: &[TestTransaction]) {
         for _ in 0..10 {

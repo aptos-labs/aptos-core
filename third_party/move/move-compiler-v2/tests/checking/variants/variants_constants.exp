@@ -11,29 +11,29 @@ module 0x815::m {
     }
     private fun t0(): bool {
         {
-          let c: m::Color = pack m::Color::Red();
-          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+          let c: Color = pack m::Color::Red();
+          Eq<u64>(select_variants m::Color.RGB.red<Color>(c), 1)
         }
     }
     private fun t1(): bool {
         {
-          let c: m::Color = pack m::Color::Red();
-          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+          let c: Color = pack m::Color::Red();
+          Eq<u64>(select_variants m::Color.RGB.red<Color>(c), 1)
         }
     }
     private fun t2(): bool {
         {
-          let c: m::Color = pack m::Color::Blue();
-          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+          let c: Color = pack m::Color::Blue();
+          Eq<u64>(select_variants m::Color.RGB.red<Color>(c), 1)
         }
     }
     private fun t3(): bool {
         {
-          let c: m::Color = pack m::Color::Blue();
-          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+          let c: Color = pack m::Color::Blue();
+          Eq<u64>(select_variants m::Color.RGB.red<Color>(c), 1)
         }
     }
-    private fun t4(c: &m::Color) {
+    private fun t4(c: &Color) {
         match (c) {
           m::Color::Red => {
             Abort(1)
@@ -45,6 +45,41 @@ module 0x815::m {
 
     }
 } // end 0x815::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    fun t0(): bool {
+        let c = Color::Red{};
+        c.RGB.red == 1
+    }
+    fun t1(): bool {
+        let c = Color::Red{};
+        c.RGB.red == 1
+    }
+    fun t2(): bool {
+        let c = Color::Blue{};
+        c.RGB.red == 1
+    }
+    fun t3(): bool {
+        let c = Color::Blue{};
+        c.RGB.red == 1
+    }
+    fun t4(c: &Color) {
+        match (c) {
+            Color::Red{} => abort 1,
+            Color::Blue{} => abort 2,
+        }
+    }
+}
 
 
 Diagnostics:

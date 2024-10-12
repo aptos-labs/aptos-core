@@ -6,13 +6,13 @@ public fun S::publish_u64_bool($t0|account: signer, $t1|x: u64, $t2|y: bool) {
      var $t4: u64
      var $t5: bool
      var $t6: u8
-     var $t7: S::Storage<u64, bool>
+     var $t7: 0x2::S::Storage<u64, bool>
   0: $t3 := borrow_local($t0)
   1: $t4 := move($t1)
   2: $t5 := move($t2)
   3: $t6 := 0
-  4: $t7 := pack S::Storage<u64, bool>($t4, $t5, $t6)
-  5: move_to<S::Storage<u64, bool>>($t7, $t3)
+  4: $t7 := pack 0x2::S::Storage<u64, bool>($t4, $t5, $t6)
+  5: move_to<0x2::S::Storage<u64, bool>>($t7, $t3)
   6: return ()
 }
 
@@ -23,13 +23,13 @@ public fun S::publish_u64_y<#0>($t0|account: signer, $t1|x: u64, $t2|y: #0) {
      var $t4: u64
      var $t5: #0
      var $t6: u8
-     var $t7: S::Storage<u64, #0>
+     var $t7: 0x2::S::Storage<u64, #0>
   0: $t3 := borrow_local($t0)
   1: $t4 := move($t1)
   2: $t5 := move($t2)
   3: $t6 := 1
-  4: $t7 := pack S::Storage<u64, #0>($t4, $t5, $t6)
-  5: move_to<S::Storage<u64, #0>>($t7, $t3)
+  4: $t7 := pack 0x2::S::Storage<u64, #0>($t4, $t5, $t6)
+  5: move_to<0x2::S::Storage<u64, #0>>($t7, $t3)
   6: return ()
 }
 
@@ -40,13 +40,13 @@ public fun S::publish_x_bool<#0>($t0|account: signer, $t1|x: #0, $t2|y: bool) {
      var $t4: #0
      var $t5: bool
      var $t6: u8
-     var $t7: S::Storage<#0, bool>
+     var $t7: 0x2::S::Storage<#0, bool>
   0: $t3 := borrow_local($t0)
   1: $t4 := move($t1)
   2: $t5 := move($t2)
   3: $t6 := 2
-  4: $t7 := pack S::Storage<#0, bool>($t4, $t5, $t6)
-  5: move_to<S::Storage<#0, bool>>($t7, $t3)
+  4: $t7 := pack 0x2::S::Storage<#0, bool>($t4, $t5, $t6)
+  5: move_to<0x2::S::Storage<#0, bool>>($t7, $t3)
   6: return ()
 }
 
@@ -57,13 +57,13 @@ public fun S::publish_x_y<#0, #1>($t0|account: signer, $t1|x: #0, $t2|y: #1) {
      var $t4: #0
      var $t5: #1
      var $t6: u8
-     var $t7: S::Storage<#0, #1>
+     var $t7: 0x2::S::Storage<#0, #1>
   0: $t3 := borrow_local($t0)
   1: $t4 := move($t1)
   2: $t5 := move($t2)
   3: $t6 := 3
-  4: $t7 := pack S::Storage<#0, #1>($t4, $t5, $t6)
-  5: move_to<S::Storage<#0, #1>>($t7, $t3)
+  4: $t7 := pack 0x2::S::Storage<#0, #1>($t4, $t5, $t6)
+  5: move_to<0x2::S::Storage<#0, #1>>($t7, $t3)
   6: return ()
 }
 
@@ -92,11 +92,11 @@ public fun A::good($t0|account1: signer, $t1|account2: signer) {
 [variant verification]
 public fun S::publish_u64_bool($t0|account: signer, $t1|x: u64, $t2|y: bool) {
      var $t3: u8
-     var $t4: S::Storage<u64, bool>
+     var $t4: 0x2::S::Storage<u64, bool>
      var $t5: num
   0: $t3 := 0
-  1: $t4 := pack S::Storage<u64, bool>($t1, $t2, $t3)
-  2: move_to<S::Storage<u64, bool>>($t4, $t0) on_abort goto 5 with $t5
+  1: $t4 := pack 0x2::S::Storage<u64, bool>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<u64, bool>>($t4, $t0) on_abort goto 5 with $t5
   3: label L1
   4: return ()
   5: label L2
@@ -107,11 +107,11 @@ public fun S::publish_u64_bool($t0|account: signer, $t1|x: u64, $t2|y: bool) {
 [variant verification]
 public fun S::publish_u64_y<#0>($t0|account: signer, $t1|x: u64, $t2|y: #0) {
      var $t3: u8
-     var $t4: S::Storage<u64, #0>
+     var $t4: 0x2::S::Storage<u64, #0>
      var $t5: num
   0: $t3 := 1
-  1: $t4 := pack S::Storage<u64, #0>($t1, $t2, $t3)
-  2: move_to<S::Storage<u64, #0>>($t4, $t0) on_abort goto 5 with $t5
+  1: $t4 := pack 0x2::S::Storage<u64, #0>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<u64, #0>>($t4, $t0) on_abort goto 5 with $t5
   3: label L1
   4: return ()
   5: label L2
@@ -122,11 +122,11 @@ public fun S::publish_u64_y<#0>($t0|account: signer, $t1|x: u64, $t2|y: #0) {
 [variant verification]
 public fun S::publish_x_bool<#0>($t0|account: signer, $t1|x: #0, $t2|y: bool) {
      var $t3: u8
-     var $t4: S::Storage<#0, bool>
+     var $t4: 0x2::S::Storage<#0, bool>
      var $t5: num
   0: $t3 := 2
-  1: $t4 := pack S::Storage<#0, bool>($t1, $t2, $t3)
-  2: move_to<S::Storage<#0, bool>>($t4, $t0) on_abort goto 5 with $t5
+  1: $t4 := pack 0x2::S::Storage<#0, bool>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<#0, bool>>($t4, $t0) on_abort goto 5 with $t5
   3: label L1
   4: return ()
   5: label L2
@@ -137,11 +137,11 @@ public fun S::publish_x_bool<#0>($t0|account: signer, $t1|x: #0, $t2|y: bool) {
 [variant baseline]
 public fun S::publish_x_y<#0, #1>($t0|account: signer, $t1|x: #0, $t2|y: #1) {
      var $t3: u8
-     var $t4: S::Storage<#0, #1>
+     var $t4: 0x2::S::Storage<#0, #1>
      var $t5: num
   0: $t3 := 3
-  1: $t4 := pack S::Storage<#0, #1>($t1, $t2, $t3)
-  2: move_to<S::Storage<#0, #1>>($t4, $t0) on_abort goto 5 with $t5
+  1: $t4 := pack 0x2::S::Storage<#0, #1>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<#0, #1>>($t4, $t0) on_abort goto 5 with $t5
   3: label L1
   4: return ()
   5: label L2
@@ -152,11 +152,11 @@ public fun S::publish_x_y<#0, #1>($t0|account: signer, $t1|x: #0, $t2|y: #1) {
 [variant verification]
 public fun S::publish_x_y<#0, #1>($t0|account: signer, $t1|x: #0, $t2|y: #1) {
      var $t3: u8
-     var $t4: S::Storage<#0, #1>
+     var $t4: 0x2::S::Storage<#0, #1>
      var $t5: num
   0: $t3 := 3
-  1: $t4 := pack S::Storage<#0, #1>($t1, $t2, $t3)
-  2: move_to<S::Storage<#0, #1>>($t4, $t0) on_abort goto 5 with $t5
+  1: $t4 := pack 0x2::S::Storage<#0, #1>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<#0, #1>>($t4, $t0) on_abort goto 5 with $t5
   3: label L1
   4: return ()
   5: label L2
@@ -209,7 +209,7 @@ S::publish_u64_bool: [
       ]
     ]
   }
-  2: move_to<S::Storage<u64, bool>>($t4, $t0) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<u64, bool>>($t4, $t0) on_abort goto L2 with $t5 {
     assert @0 = [
       <> -> [
         <>
@@ -256,7 +256,7 @@ S::publish_u64_y: [
       ]
     ]
   }
-  2: move_to<S::Storage<u64, #0>>($t4, $t0) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<u64, #0>>($t4, $t0) on_abort goto L2 with $t5 {
     assert @0 = [
       <bool> -> [
         <>
@@ -303,7 +303,7 @@ S::publish_x_bool: [
       ]
     ]
   }
-  2: move_to<S::Storage<#0, bool>>($t4, $t0) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<#0, bool>>($t4, $t0) on_abort goto L2 with $t5 {
     assert @0 = [
       <u64> -> [
         <>
@@ -350,7 +350,7 @@ S::publish_x_y: [
       ]
     ]
   }
-  2: move_to<S::Storage<#0, #1>>($t4, $t0) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<#0, #1>>($t4, $t0) on_abort goto L2 with $t5 {
     assert @0 = [
       <u64, bool> -> [
         <>

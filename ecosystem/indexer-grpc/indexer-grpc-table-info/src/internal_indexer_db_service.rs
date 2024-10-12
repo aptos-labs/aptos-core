@@ -174,6 +174,27 @@ impl InternalIndexerDBService {
             start_version = next_version;
         }
     }
+
+    // For internal testing
+    pub async fn run_with_end_version(
+        &mut self,
+        node_config: &NodeConfig,
+        end_version: Option<Version>,
+    ) -> Result<()> {
+        let mut start_version = self.get_start_version(node_config).await?;
+        while start_version <= end_version.unwrap_or(std::u64::MAX) {
+            let next_version = self.db_indexer.process_a_batch(start_version)?;
+            if next_version == start_version {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                continue;
+            }
+            start_version = next_version;
+        }
+        // We should never stop the internal indexer
+        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
+
+        Ok(())
+    }
 }
 
 pub struct MockInternalIndexerDBService {
@@ -186,6 +207,7 @@ impl MockInternalIndexerDBService {
         db_reader: Arc<dyn DbReader>,
         node_config: &NodeConfig,
         update_receiver: WatchReceiver<Version>,
+        end_version: Option<Version>,
     ) -> Self {
         if !node_config
             .indexer_db_config
@@ -205,7 +227,7 @@ impl MockInternalIndexerDBService {
         let config_clone = node_config.to_owned();
         handle.spawn(async move {
             internal_indexer_db_service
-                .run(&config_clone)
+                .run_with_end_version(&config_clone, end_version)
                 .await
                 .unwrap();
         });

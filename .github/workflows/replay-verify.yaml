@@ -32,7 +32,6 @@ on:
     paths:
       - ".github/workflows/replay-verify.yaml"
       - ".github/workflows/workflow-run-replay-verify.yaml"
-      - "testsuite/replay_verify.py"
   schedule:
     - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
 

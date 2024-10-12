@@ -6,7 +6,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t3: &vector<u64>
      var $t4: bool
      var $t5: u8
-     var $t6: &m::R
+     var $t6: &0x42::m::R
      var $t7: address
      var $t8: &u64
      var $t9: u64
@@ -15,8 +15,8 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
   2: if ($t4) goto 3 else goto 8
   3: label L0
   4: $t7 := 0x1
-  5: $t6 := borrow_global<m::R>($t7)
-  6: $t3 := borrow_field<m::R>.data($t6)
+  5: $t6 := borrow_global<0x42::m::R>($t7)
+  6: $t3 := borrow_field<0x42::m::R>.data($t6)
   7: goto 10
   8: label L1
   9: $t3 := infer($t1)
@@ -35,7 +35,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t3: &vector<u64>
      var $t4: bool
      var $t5: u8
-     var $t6: &m::R
+     var $t6: &0x42::m::R
      var $t7: address
      var $t8: &u64
      var $t9: u64
@@ -50,9 +50,9 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars:
   4: $t7 := 0x1
      # live vars: $t7
-  5: $t6 := borrow_global<m::R>($t7)
+  5: $t6 := borrow_global<0x42::m::R>($t7)
      # live vars: $t6
-  6: $t3 := borrow_field<m::R>.data($t6)
+  6: $t3 := borrow_field<0x42::m::R>.data($t6)
      # live vars: $t3
   7: goto 10
      # live vars: $t1
@@ -79,7 +79,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t3: &vector<u64>
      var $t4: bool
      var $t5: u8
-     var $t6: &m::R
+     var $t6: &0x42::m::R
      var $t7: address
      var $t8: &u64
      var $t9: u64
@@ -94,9 +94,9 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars:
   4: $t7 := 0x1
      # live vars: $t7
-  5: $t6 := borrow_global<m::R>($t7)
+  5: $t6 := borrow_global<0x42::m::R>($t7)
      # live vars: $t6
-  6: $t3 := borrow_field<m::R>.data($t6)
+  6: $t3 := borrow_field<0x42::m::R>.data($t6)
      # live vars: $t3
   7: goto 10
      # live vars: $t1
@@ -123,7 +123,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t3: &vector<u64>
      var $t4: bool
      var $t5: u8
-     var $t6: &m::R
+     var $t6: &0x42::m::R
      var $t7: address
      var $t8: &u64
      var $t9: u64
@@ -166,7 +166,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars: $t7
      # refs: []
      #
-  5: $t6 := borrow_global<m::R>($t7)
+  5: $t6 := borrow_global<0x42::m::R>($t7)
      # live vars: $t6
      # refs: [$t6 => #6]
      # #6
@@ -174,7 +174,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   -> #6 via [struct `m::R`] at line 12
      #
-  6: $t3 := borrow_field<m::R>.data($t6)
+  6: $t3 := borrow_field<0x42::m::R>.data($t6)
      # live vars: $t3
      # refs: [$t3 => #3]
      # #3
@@ -245,7 +245,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t3: &vector<u64>
      var $t4: bool
      var $t5: u8
-     var $t6: &m::R
+     var $t6: &0x42::m::R
      var $t7: address
      var $t8: &u64
      var $t9: u64
@@ -294,7 +294,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars: $t7
      # refs: []
      #
-  5: $t6 := borrow_global<m::R>($t7)
+  5: $t6 := borrow_global<0x42::m::R>($t7)
      # abort state: {returns,aborts}
      # live vars: $t6
      # refs: [$t6 => #6]
@@ -303,7 +303,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   -> #6 via [struct `m::R`] at line 12
      #
-  6: $t3 := borrow_field<m::R>.data($t6)
+  6: $t3 := borrow_field<0x42::m::R>.data($t6)
      # abort state: {returns,aborts}
      # live vars: $t3
      # refs: [$t3 => #3]
@@ -382,7 +382,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t3: &vector<u64>
      var $t4: bool
      var $t5: u8
-     var $t6: &m::R
+     var $t6: &0x42::m::R
      var $t7: address
      var $t8: &u64
      var $t9: u64
@@ -392,8 +392,8 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
   3: label L0
   4: drop($t1)
   5: $t7 := 0x1
-  6: $t6 := borrow_global<m::R>($t7)
-  7: $t3 := borrow_field<m::R>.data($t6)
+  6: $t6 := borrow_global<0x42::m::R>($t7)
+  7: $t3 := borrow_field<0x42::m::R>.data($t6)
   8: goto 11
   9: label L1
  10: $t3 := move($t1)
