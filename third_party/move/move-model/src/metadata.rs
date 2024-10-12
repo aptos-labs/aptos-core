@@ -19,6 +19,10 @@ use std::{
 const UNSTABLE_MARKER: &str = "-unstable";
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
+pub static DEFAULT_COMPILER_VERSION_FOR_V1: CompilerVersion = CompilerVersion::V1;
+pub static DEFAULT_COMPILER_VERSION_FOR_V2: CompilerVersion = CompilerVersion::V2_0;
+pub static DEFAULT_LANG_VERSION_FOR_V1: LanguageVersion = LanguageVersion::V1;
+pub static DEFAULT_LANG_VERSION_FOR_V2: LanguageVersion = LanguageVersion::V2_0;
 
 // ================================================================================'
 // Metadata for compilation result (WORK IN PROGRESS)

@@ -62,7 +62,9 @@ use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, DEFAULT_COMPILER_VERSION_FOR_V2, DEFAULT_LANG_VERSION_FOR_V2,
+};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
@@ -644,14 +646,26 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
+        let compiler_version = if move_options.compiler_version.is_none() {
+            Some(DEFAULT_COMPILER_VERSION_FOR_V2)
+        } else {
+            move_options.compiler_version
+        };
+
+        let language_version = if move_options.language_version.is_none() {
+            Some(DEFAULT_LANG_VERSION_FOR_V2)
+        } else {
+            move_options.language_version
+        };
+
         let result = task::spawn_blocking(move || {
             prover_options.prove(
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
-                move_options.compiler_version,
-                move_options.language_version,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],

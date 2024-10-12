@@ -6,8 +6,9 @@ use anyhow::bail;
 use clap::Parser;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use colored::Colorize;
+use move_model::metadata::{DEFAULT_COMPILER_VERSION_FOR_V2, DEFAULT_LANG_VERSION_FOR_V2};
 use move_package::{BuildConfig, ModelConfig};
-use move_prover::run_move_prover_with_model;
+use move_prover::run_move_prover_with_model_v2;
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -127,7 +128,10 @@ impl ProverTest {
             for_test: true,
             options: Some(ProverOptions::Options(std::mem::take(&mut self.options))),
         };
-        let res = cmd.execute(Some(pkg_path), move_package::BuildConfig::default());
+        let mut build_config = BuildConfig::default();
+        build_config.compiler_config.language_version = Some(DEFAULT_LANG_VERSION_FOR_V2);
+        build_config.compiler_config.compiler_version = Some(DEFAULT_COMPILER_VERSION_FOR_V2);
+        let res = cmd.execute(Some(pkg_path), build_config);
         std::env::set_current_dir(saved_cd).expect("restore current directory");
         res.unwrap()
     }
@@ -212,7 +216,7 @@ pub fn run_move_prover(
     } else {
         None
     };
-    let res = run_move_prover_with_model(&mut model, &mut error_writer, options, Some(now));
+    let res = run_move_prover_with_model_v2(&mut model, &mut error_writer, options, now);
     if for_test {
         let basedir = path
             .file_name()
