@@ -822,6 +822,20 @@ module aptos_framework::atomic_bridge_store {
         keccak256(combined_bytes)
     }
 
+    #[view]
+    public fun get_bridge_transfer_details(
+        bridge_transfer_id: vector<u8>
+    ): BridgeTransferDetails<address, EthereumAddress> acquires SmartTableWrapper {
+        let table = borrow_global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<address, EthereumAddress>>>(@aptos_framework);
+
+        let details_ref = smart_table::borrow(
+            &table.inner,
+            bridge_transfer_id
+        );
+
+        *details_ref
+    }
+
     #[test_only]
     public fun valid_bridge_transfer_id() : vector<u8> {
         sha3_256(b"atomic bridge")
@@ -836,6 +850,58 @@ module aptos_framework::atomic_bridge_store {
     public fun valid_hash_lock() : vector<u8> {
         keccak256(plain_secret())
     }
+
+//#[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
+//public fun test_get_bridge_transfer_details(
+//    sender: &signer,
+//    aptos_framework: &signer
+//) acquires SmartTableWrapper {
+//    let sender_address = signer::address_of(sender);
+//    
+//    let recipient_bytes = b"32Be343B94f860124dC4fEe278FDCBD38C102D88";
+//    let recipient = aptos_framework::ethereum::ethereum_address(recipient_bytes);
+//
+//    let amount = 1000;
+//    let hash_lock = aptos_framework::atomic_bridge_store::create_hashlock(b"hash_secret");
+//    let time_lock = aptos_framework::atomic_bridge_store::create_time_lock(1000);
+//    let bridge_transfer_id = b"12345678901234567890123456789012";
+//
+//    let details = aptos_framework::atomic_bridge_store::BridgeTransferDetails {
+//        addresses: aptos_framework::atomic_bridge_store::AddressPair {
+//            initiator: sender_address,
+//            recipient
+//        },
+//        amount,
+//        hash_lock,
+//        time_lock,
+//        state: PENDING_TRANSACTION
+//    };
+//
+//    add(bridge_transfer_id, details);
+//
+//    let retrieved_details = get_bridge_transfer_details(bridge_transfer_id);
+//
+//    // Fully destructure to consume all fields
+//    let aptos_framework::atomic_bridge_store::BridgeTransferDetails {
+//        addresses: aptos_framework::atomic_bridge_store::AddressPair {
+//            initiator: retrieved_initiator,
+//            recipient: retrieved_recipient,
+//        },
+//        amount: retrieved_amount,
+//        hash_lock: retrieved_hash_lock,
+//        time_lock: retrieved_time_lock,
+//        state: retrieved_state
+//    } = retrieved_details;
+//
+//    assert!(retrieved_initiator == sender_address, 0);
+//    assert!(retrieved_recipient == recipient, 0);
+//    assert!(retrieved_amount == amount, 0);
+//    assert!(retrieved_hash_lock == hash_lock, 0);
+//    assert!(retrieved_time_lock == time_lock, 0);
+//    assert!(retrieved_state == PENDING_TRANSACTION, 0);
+//
+//}
+
 }
 
 module aptos_framework::atomic_bridge_configuration {
