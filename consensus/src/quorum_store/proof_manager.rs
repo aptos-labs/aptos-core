@@ -127,6 +127,7 @@ impl ProofManager {
             // TODO(ibalajiarun): Support unique txn calculation
             if let Some(ref params) = request.maybe_optqs_payload_pull_params {
                 let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
+                let max_opt_batch_txns_after_filtering = request.max_txns_after_filtering - cur_unique_txns;
                 let (opt_batches, opt_payload_size, _) =
                     self.batch_proof_queue.pull_batches(
                         &excluded_batches
@@ -136,7 +137,7 @@ impl ProofManager {
                             .collect(),
                         &params.exclude_authors,
                         max_opt_batch_txns_size,
-                        request.max_txns_after_filtering,
+                        max_opt_batch_txns_after_filtering,
                         request.soft_max_txns_after_filtering,
                         request.return_non_full,
                         request.block_timestamp,
@@ -166,6 +167,7 @@ impl ProofManager {
                             .iter()
                             .cloned()
                             .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                            .chain(opt_batches.clone())
                             .collect(),
                         max_inline_txns_to_pull,
                         request.max_txns_after_filtering,
