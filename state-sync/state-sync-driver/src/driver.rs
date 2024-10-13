@@ -22,7 +22,7 @@ use crate::{
 };
 use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
-    ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
+    ConsensusCommitNotification, ConsensusNotification, ConsensusSyncTargetNotification,
 };
 use aptos_data_client::interface::AptosDataClientInterface;
 use aptos_data_streaming_service::streaming_client::{
@@ -270,8 +270,13 @@ impl<
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     let _ = self
                         .consensus_notification_handler
-                        .respond_to_sync_notification(sync_notification, Err(error.clone()))
+                        .respond_to_sync_target_notification(sync_notification, Err(error.clone()))
                         .await;
+                },
+                ConsensusNotification::SyncForDuration(_) => {
+                    warn!(LogSchema::new(LogEntry::ConsensusNotification)
+                        .error(&error)
+                        .message("Received an invalid sync for duration notification!"));
                 },
             }
             warn!(LogSchema::new(LogEntry::ConsensusNotification)
@@ -287,8 +292,14 @@ impl<
                     .await
             },
             ConsensusNotification::SyncToTarget(sync_notification) => {
-                self.handle_consensus_sync_notification(sync_notification)
+                self.handle_consensus_sync_target_notification(sync_notification)
                     .await
+            },
+            ConsensusNotification::SyncForDuration(sync_notification) => {
+                Err(Error::UnexpectedError(format!(
+                    "Received an unexpected sync for duration notification: {:?}",
+                    sync_notification
+                )))
             },
         };
 
@@ -303,21 +314,21 @@ impl<
     /// Handles a commit notification sent by consensus or consensus observer
     async fn handle_consensus_commit_notification(
         &mut self,
-        consensus_commit_notification: ConsensusCommitNotification,
+        commit_notification: ConsensusCommitNotification,
     ) -> Result<(), Error> {
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
                 "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
-                consensus_commit_notification.transactions.len(),
-                consensus_commit_notification.subscribable_events.len()
+                commit_notification.get_transactions().len(),
+                commit_notification.get_subscribable_events().len()
             ))
         );
-        self.update_consensus_commit_metrics(&consensus_commit_notification);
+        self.update_consensus_commit_metrics(&commit_notification);
 
         // Handle the commit notification
         let committed_transactions = CommittedTransactions {
-            events: consensus_commit_notification.subscribable_events.clone(),
-            transactions: consensus_commit_notification.transactions.clone(),
+            events: commit_notification.get_subscribable_events().clone(),
+            transactions: commit_notification.get_transactions().clone(),
         };
         utils::handle_committed_transactions(
             committed_transactions,
@@ -330,7 +341,7 @@ impl<
 
         // Respond successfully
         self.consensus_notification_handler
-            .respond_to_commit_notification(consensus_commit_notification, Ok(()))
+            .respond_to_commit_notification(commit_notification, Ok(()))
             .await?;
 
         // Check the progress of any sync requests. We need this here because
@@ -359,13 +370,13 @@ impl<
             metrics::increment_gauge(
                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                 operation.get_label(),
-                consensus_commit_notification.transactions.len() as u64,
+                consensus_commit_notification.get_transactions().len() as u64,
             );
         }
 
         // Update the synced epoch
         if consensus_commit_notification
-            .subscribable_events
+            .get_subscribable_events()
             .iter()
             .any(ContractEvent::is_new_epoch_event)
         {
@@ -374,15 +385,15 @@ impl<
     }
 
     /// Handles a consensus or consensus observer request to sync to a specified target
-    async fn handle_consensus_sync_notification(
+    async fn handle_consensus_sync_target_notification(
         &mut self,
-        sync_notification: ConsensusSyncNotification,
+        sync_target_notification: ConsensusSyncTargetNotification,
     ) -> Result<(), Error> {
         let latest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
-            "Received a consensus sync notification! Target version: {:?}. Latest synced version: {:?}",
-            sync_notification.target, latest_synced_version,
+                "Received a consensus sync target notification! Target version: {:?}. Latest synced version: {:?}",
+                sync_target_notification.get_target(), latest_synced_version,
             ))
         );
         metrics::increment_counter(
@@ -394,7 +405,7 @@ impl<
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         self.consensus_notification_handler
-            .initialize_sync_request(sync_notification, latest_synced_ledger_info)
+            .initialize_sync_target_request(sync_target_notification, latest_synced_ledger_info)
             .await
     }
 

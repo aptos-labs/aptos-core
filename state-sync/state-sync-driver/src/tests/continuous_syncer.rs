@@ -19,7 +19,7 @@ use crate::{
     utils::OutputFallbackHandler,
 };
 use aptos_config::config::ContinuousSyncingMode;
-use aptos_consensus_notifications::ConsensusSyncNotification;
+use aptos_consensus_notifications::ConsensusSyncTargetNotification;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
@@ -164,9 +164,9 @@ async fn test_data_stream_transactions_with_target() {
     );
 
     // Drive progress to initialize the transaction output stream
-    let (consensus_sync_notification, _) = ConsensusSyncNotification::new(target_ledger_info);
+    let (sync_target_notification, _) = ConsensusSyncTargetNotification::new(target_ledger_info);
     let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new(
-        consensus_sync_notification,
+        sync_target_notification,
     ))));
     drive_progress(&mut continuous_syncer, &sync_request).await;
 
@@ -324,9 +324,9 @@ async fn test_data_stream_transactions_or_outputs_with_target() {
     );
 
     // Drive progress to initialize the transaction output stream
-    let (consensus_sync_notification, _) = ConsensusSyncNotification::new(target_ledger_info);
+    let (sync_target_notification, _) = ConsensusSyncTargetNotification::new(target_ledger_info);
     let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new(
-        consensus_sync_notification,
+        sync_target_notification,
     ))));
     drive_progress(&mut continuous_syncer, &sync_request).await;
 
@@ -444,9 +444,9 @@ async fn test_data_stream_transactions_or_outputs_with_target_fallback() {
     assert!(!output_fallback_handler.in_fallback_mode());
 
     // Drive progress to initialize the transactions or output stream
-    let (consensus_sync_notification, _) = ConsensusSyncNotification::new(target_ledger_info);
+    let (sync_target_notification, _) = ConsensusSyncTargetNotification::new(target_ledger_info);
     let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new(
-        consensus_sync_notification,
+        sync_target_notification,
     ))));
     drive_progress(&mut continuous_syncer, &sync_request).await;
 

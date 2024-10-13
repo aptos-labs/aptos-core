@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
-    ConsensusSyncNotification,
+    ConsensusSyncTargetNotification,
 };
 use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
@@ -146,23 +146,23 @@ impl FusedStream for CommitNotificationListener {
 
 /// A consensus sync request for a specified target ledger info
 pub struct ConsensusSyncRequest {
-    consensus_sync_notification: ConsensusSyncNotification,
+    sync_target_notification: ConsensusSyncTargetNotification,
 }
 
 impl ConsensusSyncRequest {
-    pub fn new(consensus_sync_notification: ConsensusSyncNotification) -> Self {
+    pub fn new(sync_target_notification: ConsensusSyncTargetNotification) -> Self {
         Self {
-            consensus_sync_notification,
+            sync_target_notification,
         }
     }
 
     pub fn get_sync_target(&self) -> LedgerInfoWithSignatures {
-        self.consensus_sync_notification.target.clone()
+        self.sync_target_notification.get_target().clone()
     }
 
     pub fn get_sync_target_version(&self) -> Version {
-        self.consensus_sync_notification
-            .target
+        self.sync_target_notification
+            .get_target()
             .ledger_info()
             .version()
     }
@@ -196,13 +196,16 @@ impl ConsensusNotificationHandler {
     }
 
     /// Initializes the sync request received from consensus
-    pub async fn initialize_sync_request(
+    pub async fn initialize_sync_target_request(
         &mut self,
-        sync_notification: ConsensusSyncNotification,
+        sync_target_notification: ConsensusSyncTargetNotification,
         latest_synced_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         // Get the latest committed version and the target sync version
-        let sync_target_version = sync_notification.target.ledger_info().version();
+        let sync_target_version = sync_target_notification
+            .get_target()
+            .ledger_info()
+            .version();
         let latest_committed_version = latest_synced_ledger_info.ledger_info().version();
 
         // If the target version is old, return an error to consensus (something is wrong!)
@@ -211,7 +214,7 @@ impl ConsensusNotificationHandler {
                 sync_target_version,
                 latest_committed_version,
             ));
-            self.respond_to_sync_notification(sync_notification, error.clone())
+            self.respond_to_sync_target_notification(sync_target_notification, error.clone())
                 .await?;
             return error;
         }
@@ -221,13 +224,13 @@ impl ConsensusNotificationHandler {
             info!(LogSchema::new(LogEntry::NotificationHandler)
                 .message("We're already at the requested sync target version! Returning early"));
             let result = Ok(());
-            self.respond_to_sync_notification(sync_notification, result.clone())
+            self.respond_to_sync_target_notification(sync_target_notification, result.clone())
                 .await?;
             return result;
         }
 
         // Save the request so we can notify consensus once we've hit the target
-        let consensus_sync_request = ConsensusSyncRequest::new(sync_notification);
+        let consensus_sync_request = ConsensusSyncRequest::new(sync_target_notification);
         self.consensus_sync_request = Arc::new(Mutex::new(Some(consensus_sync_request)));
 
         Ok(())
@@ -242,8 +245,8 @@ impl ConsensusNotificationHandler {
         let consensus_sync_request = self.get_sync_request();
         let sync_target_version = consensus_sync_request.lock().as_ref().map(|sync_request| {
             sync_request
-                .consensus_sync_notification
-                .target
+                .sync_target_notification
+                .get_target()
                 .ledger_info()
                 .version()
         });
@@ -264,8 +267,8 @@ impl ConsensusNotificationHandler {
             if latest_committed_version == sync_target_version {
                 let consensus_sync_request = self.get_sync_request().lock().take();
                 if let Some(consensus_sync_request) = consensus_sync_request {
-                    self.respond_to_sync_notification(
-                        consensus_sync_request.consensus_sync_notification,
+                    self.respond_to_sync_target_notification(
+                        consensus_sync_request.sync_target_notification,
                         Ok(()),
                     )
                     .await?;
@@ -278,9 +281,9 @@ impl ConsensusNotificationHandler {
     }
 
     /// Responds to consensus for a sync notification using the specified result
-    pub async fn respond_to_sync_notification(
+    pub async fn respond_to_sync_target_notification(
         &mut self,
-        sync_notification: ConsensusSyncNotification,
+        sync_target_notification: ConsensusSyncTargetNotification,
         result: Result<(), Error>,
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
@@ -297,7 +300,7 @@ impl ConsensusNotificationHandler {
 
         // Send the result
         self.consensus_listener
-            .respond_to_sync_notification(sync_notification, message)
+            .respond_to_sync_target_notification(sync_target_notification, message)
             .await
             .map_err(|error| {
                 Error::CallbackSendFailed(format!(
