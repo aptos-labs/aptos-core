@@ -43,10 +43,13 @@ pub trait ConsensusNotificationSender: Send + Sync {
         subscribable_events: Vec<ContractEvent>,
     ) -> Result<(), Error>;
 
-    /// Notifies state sync to synchronize storage for at least the specified duration.
-    /// Note that state sync may synchronize for much longer than the specified duration,
-    /// e.g., if the node is very far behind and needs to catch up.
-    async fn sync_for_duration(&self, duration: Duration) -> Result<(), Error>;
+    /// Notifies state sync to synchronize storage for at least the specified duration,
+    /// and returns the latest synced ledger info. Note that state sync may synchronize
+    /// for much longer than the specified duration, e.g., if the node is very far behind.
+    async fn sync_for_duration(
+        &self,
+        duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, Error>;
 
     /// Notify state sync to synchronize storage to the specified target.
     async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), Error>;
@@ -124,7 +127,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
         .await
         {
             match response {
-                Ok(consensus_notification_response) => consensus_notification_response.result,
+                Ok(consensus_notification_response) => consensus_notification_response.get_result(),
                 Err(error) => Err(Error::UnexpectedErrorEncountered(format!(
                     "Consensus commit notification failure: {:?}",
                     error
@@ -135,7 +138,10 @@ impl ConsensusNotificationSender for ConsensusNotifier {
         }
     }
 
-    async fn sync_for_duration(&self, duration: Duration) -> Result<(), Error> {
+    async fn sync_for_duration(
+        &self,
+        duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, Error> {
         // Create a consensus sync duration notification
         let (notification, callback_receiver) = ConsensusSyncDurationNotification::new(duration);
         let sync_duration_notification = ConsensusNotification::SyncForDuration(notification);
@@ -155,7 +161,17 @@ impl ConsensusNotificationSender for ConsensusNotifier {
 
         // Process the response
         match callback_receiver.await {
-            Ok(response) => response.result,
+            Ok(response) => match response.get_result() {
+                Ok(_) => response.get_latest_synced_ledger_info().ok_or_else(|| {
+                    Error::UnexpectedErrorEncountered(
+                        "Sync for duration returned an empty latest synced ledger info!".into(),
+                    )
+                }),
+                Err(error) => Err(Error::UnexpectedErrorEncountered(format!(
+                    "Sync for duration returned an error: {:?}",
+                    error
+                ))),
+            },
             Err(error) => Err(Error::UnexpectedErrorEncountered(format!(
                 "Sync for duration failure: {:?}",
                 error
@@ -183,7 +199,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
 
         // Process the response
         match callback_receiver.await {
-            Ok(response) => response.result,
+            Ok(response) => response.get_result(),
             Err(error) => Err(Error::UnexpectedErrorEncountered(format!(
                 "Sync to target failure: {:?}",
                 error
@@ -212,7 +228,7 @@ impl ConsensusNotificationListener {
         result: Result<(), Error>,
     ) -> Result<(), Error> {
         callback
-            .send(ConsensusNotificationResponse { result })
+            .send(ConsensusNotificationResponse::new(result))
             .map_err(|error| Error::UnexpectedErrorEncountered(format!("{:?}", error)))
     }
 
@@ -230,8 +246,17 @@ impl ConsensusNotificationListener {
         &self,
         sync_duration_notification: ConsensusSyncDurationNotification,
         result: Result<(), Error>,
+        latest_synced_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
-        self.send_result_to_callback(sync_duration_notification.callback, result)
+        // Create a new response with the result and latest synced ledger info
+        let response =
+            ConsensusNotificationResponse::new_with_ledger_info(result, latest_synced_ledger_info);
+
+        // Send the response to the callback
+        sync_duration_notification
+            .callback
+            .send(response)
+            .map_err(|error| Error::UnexpectedErrorEncountered(format!("{:?}", error)))
     }
 
     /// Respond to the sync target notification
@@ -299,10 +324,38 @@ impl ConsensusCommitNotification {
     }
 }
 
-/// The result returned by state sync for a consensus or consensus observer notification
+/// The response returned by state sync for a consensus or consensus observer notification
 #[derive(Debug)]
 pub struct ConsensusNotificationResponse {
-    pub result: Result<(), Error>,
+    result: Result<(), Error>,
+    latest_synced_ledger_info: Option<LedgerInfoWithSignatures>,
+}
+
+impl ConsensusNotificationResponse {
+    pub fn new(result: Result<(), Error>) -> Self {
+        Self::new_with_ledger_info(result, None)
+    }
+
+    /// Returns a new response with the given result and latest synced ledger info
+    pub fn new_with_ledger_info(
+        result: Result<(), Error>,
+        latest_synced_ledger_info: Option<LedgerInfoWithSignatures>,
+    ) -> Self {
+        Self {
+            result,
+            latest_synced_ledger_info,
+        }
+    }
+
+    /// Returns a copy of the result
+    pub fn get_result(&self) -> Result<(), Error> {
+        self.result.clone()
+    }
+
+    /// Returns a copy of the latest synced ledger info
+    pub fn get_latest_synced_ledger_info(&self) -> Option<LedgerInfoWithSignatures> {
+        self.latest_synced_ledger_info.clone()
+    }
 }
 
 /// A notification for state sync to synchronize for the specified duration
@@ -512,6 +565,7 @@ mod tests {
                         Err(Error::UnexpectedErrorEncountered(
                             "Oops! Sync for duration failed!".into(),
                         )),
+                        None,
                     );
                 },
                 _ => { /* Do nothing */ },

@@ -65,7 +65,10 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
         Ok(())
     }
 
-    async fn sync_for_duration(&self, _duration: Duration) -> Result<(), Error> {
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, Error> {
         unreachable!()
     }
 
