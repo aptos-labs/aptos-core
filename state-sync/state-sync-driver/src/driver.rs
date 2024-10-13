@@ -46,6 +46,7 @@ use tokio::{
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver
+const DRIVER_INFO_LOG_FREQ_SECS: u64 = 2;
 const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// The configuration of the state sync driver
@@ -557,15 +558,28 @@ impl<
         }
 
         // If the request was to sync for a specified duration, we should only
-        // stop syncing when the synced version and synced ledger info match.
+        // stop syncing when the synced version and synced ledger info version match.
         // Otherwise, the DB will be left in an inconsistent state on handover.
         if let Some(sync_request) = consensus_sync_request.lock().as_ref() {
             if sync_request.is_sync_duration_request() {
+                // Get the latest synced version and ledger info version
                 let latest_synced_version =
                     utils::fetch_pre_committed_version(self.storage.clone())?;
                 let latest_synced_ledger_info =
                     utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
-                if latest_synced_version != latest_synced_ledger_info.ledger_info().version() {
+                let latest_ledger_info_version = latest_synced_ledger_info.ledger_info().version();
+
+                // Check if the latest synced version matches the latest ledger info version
+                if latest_synced_version != latest_ledger_info_version {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(DRIVER_INFO_LOG_FREQ_SECS)),
+                        info!(
+                            "Waiting for state sync to sync to a ledger info! \
+                            Latest synced version: {:?}, latest ledger info version: {:?}",
+                            latest_synced_version, latest_ledger_info_version
+                        )
+                    );
+
                     return Ok(()); // State sync should continue to run
                 }
             }
