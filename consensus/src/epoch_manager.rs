@@ -541,7 +541,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // make sure storage is on this ledger_info too, it should be no-op if it's already committed
         // panic if this doesn't succeed since the current processors are already shutdown.
         self.execution_client
-            .sync_to(ledger_info.clone())
+            .sync_to_target(ledger_info.clone())
             .await
             .context(format!(
                 "[EpochManager] State sync to new epoch {}",

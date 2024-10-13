@@ -162,7 +162,7 @@ impl TExecutionClient for MockExecutionClient {
         Ok(())
     }
 
-    async fn sync_to(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_to_target(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         debug!(
             "Fake sync to block id {}",
             commit.ledger_info().consensus_block_id()
