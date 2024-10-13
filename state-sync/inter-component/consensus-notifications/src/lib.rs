@@ -217,7 +217,7 @@ impl ConsensusNotificationListener {
     }
 
     /// Respond to the commit notification
-    pub async fn respond_to_commit_notification(
+    pub fn respond_to_commit_notification(
         &self,
         consensus_commit_notification: ConsensusCommitNotification,
         result: Result<(), Error>,
@@ -226,7 +226,7 @@ impl ConsensusNotificationListener {
     }
 
     /// Respond to the sync duration notification
-    pub async fn respond_to_sync_duration_notification(
+    pub fn respond_to_sync_duration_notification(
         &self,
         sync_duration_notification: ConsensusSyncDurationNotification,
         result: Result<(), Error>,
@@ -235,7 +235,7 @@ impl ConsensusNotificationListener {
     }
 
     /// Respond to the sync target notification
-    pub async fn respond_to_sync_target_notification(
+    pub fn respond_to_sync_target_notification(
         &self,
         sync_target_notification: ConsensusSyncTargetNotification,
         result: Result<(), Error>,
@@ -495,27 +495,24 @@ mod tests {
         let _handler = std::thread::spawn(move || loop {
             match consensus_listener.select_next_some().now_or_never() {
                 Some(ConsensusNotification::NotifyCommit(commit_notification)) => {
-                    let _result = block_on(
-                        consensus_listener
-                            .respond_to_commit_notification(commit_notification, Ok(())),
-                    );
+                    let _result = consensus_listener
+                        .respond_to_commit_notification(commit_notification, Ok(()));
                 },
                 Some(ConsensusNotification::SyncToTarget(sync_notification)) => {
-                    let _result = block_on(consensus_listener.respond_to_sync_target_notification(
+                    let _result = consensus_listener.respond_to_sync_target_notification(
                         sync_notification,
                         Err(Error::UnexpectedErrorEncountered(
                             "Oops! Sync to target failed!".into(),
                         )),
-                    ));
+                    );
                 },
                 Some(ConsensusNotification::SyncForDuration(sync_notification)) => {
-                    let _result =
-                        block_on(consensus_listener.respond_to_sync_duration_notification(
-                            sync_notification,
-                            Err(Error::UnexpectedErrorEncountered(
-                                "Oops! Sync for duration failed!".into(),
-                            )),
-                        ));
+                    let _result = consensus_listener.respond_to_sync_duration_notification(
+                        sync_notification,
+                        Err(Error::UnexpectedErrorEncountered(
+                            "Oops! Sync for duration failed!".into(),
+                        )),
+                    );
                 },
                 _ => { /* Do nothing */ },
             }
