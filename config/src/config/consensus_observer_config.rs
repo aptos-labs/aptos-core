@@ -64,16 +64,16 @@ impl Default for ConsensusObserverConfig {
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
-            max_num_pending_blocks: 100,                       // 100 blocks
+            max_num_pending_blocks: 10,                        // 10 blocks only
             progress_check_interval_ms: 5_000,                 // 5 seconds
             max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
-            max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
-            max_subscription_timeout_ms: 15_000,               // 15 seconds
+            max_subscription_sync_timeout_ms: 10_000,          // 10 seconds
+            max_subscription_timeout_ms: 10_000,               // 10 seconds
             subscription_peer_change_interval_ms: 60_000,      // 1 minute
             subscription_refresh_interval_ms: 300_000,         // 5 minutes
-            observer_fallback_duration_ms: 600_000,            // 10 minutes
+            observer_fallback_duration_ms: 20_000,             // 20 seconds
             observer_fallback_startup_period_ms: 90_000,       // 90 seconds
-            observer_fallback_sync_threshold_ms: 30_000,       // 30 seconds
+            observer_fallback_sync_threshold_ms: 20_000,       // 20 seconds
         }
     }
 }
