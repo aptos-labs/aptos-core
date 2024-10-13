@@ -11,7 +11,7 @@ use crate::{
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_consensus_types::{
     block::Block, pipeline_execution_result::PipelineExecutionResult,
     pipelined_block::PipelinedBlock,
@@ -65,6 +65,15 @@ impl StateComputer for EmptyStateComputer {
         }
 
         Ok(())
+    }
+
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the EmptyStateComputer!"
+        )))
     }
 
     async fn sync_to_target(
@@ -142,6 +151,15 @@ impl StateComputer for RandomComputeResultStateComputer {
         _call_back: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         Ok(())
+    }
+
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the RandomComputeResultStateComputer!"
+        )))
     }
 
     async fn sync_to_target(
