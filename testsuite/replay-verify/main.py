@@ -1,47 +1,35 @@
+import yaml
 from kubernetes import client, config
+from kubernetes.client.rest import ApiException
+import copy
 
-def init():
-    print("Initializing the cluster ...")
-    config.load_kube_config()
+NUM_OF_WORKERS = 2
 
-def list_nodes():
-    v1 = client.CoreV1Api()
-    print("Listing nodes:")
-    ret = v1.list_node(watch=False)
-    for node in ret.items:
-        print(f"Node Name: {node.metadata.name}")
+# Load Kubernetes configuration
+config.load_kube_config()  # If you're using a kubeconfig file for authentication (e.g., on your local machine)
 
-def create_pod(pod_name, image_name, namespace="default"):
-    v1 = client.CoreV1Api()
+# If running inside a Kubernetes cluster, use this instead:
+# config.load_incluster_config()
+
+# Load the worker YAML from the file
+with open("replay-verify-worker-template.yaml", "r") as f:
+    pod_manifest = yaml.safe_load(f)
+
+# Create the Kubernetes API client
+api_instance = client.CoreV1Api()
+
+try:
+    # Create a PVC in the default namespace
     
-    # Define the pod spec
-    pod = client.V1Pod(
-        metadata=client.V1ObjectMeta(name=pod_name),
-        spec=client.V1PodSpec(
-            containers=[client.V1Container(
-                name=pod_name,
-                image=image_name,
-                )],
-            restart_policy="Never"
+    # Create Pods in the default namespace
+    for i in range(NUM_OF_WORKERS):
+        pod_copy = copy.deepcopy(pod_manifest)  # Create a deep copy for each pod
+        pod_copy["metadata"]["name"] = f"replay-verify-worker-{i}"  # Unique name for each pod
+        pod_copy["spec"]["containers"][0]["name"] = f"replay-verify-worker-{i}"
+        
+        response = api_instance.create_namespaced_pod(
+            namespace="default", body=pod_copy
         )
-    )
-    
-    try:
-        # Create the pod
-        response = v1.create_namespaced_pod(namespace=namespace, body=pod)
-        print(f"Pod {pod_name} created. Status: {response.status.phase}")
-    except client.exceptions.ApiException as e:
-        print(f"Exception when creating pod {pod_name}: {e}")
-
-def create_pods(image_name, count=2, namespace="default"):
-    for i in range(count):
-        pod_name = f"pod-{i+1}"
-        create_pod(pod_name, image_name, namespace)
-
-if __name__ == '__main__':
-    print("Starting the script...")
-    init()
-    list_nodes()
-    
-    # Create 10 pods using the aptoslabs/tools:nightly image
-    create_pods("aptoslabs/tools:nightly", count=2, namespace="default")
+        print(f"Pod {i} created. Status: {response.metadata.name}")
+except ApiException as e:
+    print(f"Error creating pod: {e}")

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker
+spec:
+  serviceAccountName: default
+  restartPolicy: OnFailure  # Do not restart the pod after the command finishes
+  containers:
+  - name: replay-verify-worker
+    image: aptoslabs/tools:nightly
+    volumeMounts:
+    - mountPath: /mnt/testnet_archive
+      name: testnet-archive
+      readOnly: true  # Mount the volume as read-only
+    command: ["/bin/sh", "-c"]
+    args: ["echo 'Hello, World!'"]
+  volumes:
+  - name: testnet-archive
+    persistentVolumeClaim:
+      claimName: testnet-archive-claim
