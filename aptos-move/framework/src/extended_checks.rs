@@ -40,6 +40,7 @@ const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
 const EVENT_STRUCT_ATTRIBUTE: &str = "event";
+const MUTATION_SKIP_ATTRIBUTE: &str = "mutation::skip";
 const RANDOMNESS_ATTRIBUTE: &str = "randomness";
 const RANDOMNESS_MAX_GAS_CLAIM: &str = "max_gas";
 const RESOURCE_GROUP: &str = "resource_group";
@@ -52,10 +53,11 @@ const RANDOMNESS_MODULE_NAME: &str = "randomness";
 
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 8] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 9] = [
         ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE,
         FMT_SKIP_ATTRIBUTE,
         LEGACY_ENTRY_FUN_ATTRIBUTE,
+        MUTATION_SKIP_ATTRIBUTE,
         RESOURCE_GROUP,
         RESOURCE_GROUP_MEMBER,
         VIEW_FUN_ATTRIBUTE,
