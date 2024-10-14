@@ -257,11 +257,17 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.checked_len()
     }
 
+    /// Flushes the struct information (type) cache. Flushing this cache does not invalidate struct
+    /// name index map or module cache.
+    pub fn flush_struct_info_cache(&self) {
+        self.ty_cache.flush();
+    }
+
     /// Flushes the global caches with struct name indices and the struct information. Note that
     /// when calling this function, modules that still store indices into struct name cache must
     /// also be invalidated.
     pub fn flush_struct_name_and_info_caches(&self) {
-        self.ty_cache.flush();
+        self.flush_struct_info_cache();
         self.struct_name_index_map.flush();
     }
 }
