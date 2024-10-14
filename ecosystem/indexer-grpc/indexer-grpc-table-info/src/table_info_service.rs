@@ -66,6 +66,7 @@ impl TableInfoService {
                 let context = self.context.clone();
                 let _task = tokio::spawn(async move {
                     loop {
+                        aptos_logger::info!("[Table Info] Checking for snapshots to backup.");
                         Self::backup_snapshot_if_present(
                             context.clone(),
                             backup_restore_operator.clone(),
@@ -416,10 +417,20 @@ impl TableInfoService {
         }
         // If nothing to backup, return.
         if epochs_to_backup.is_empty() {
+            // No snapshot to backup.
+            aptos_logger::info!("[Table Info] No snapshot to backup. Skipping the backup.");
             return;
         }
+        aptos_logger::info!(
+            epochs_to_backup = format!("{:?}", epochs_to_backup),
+            "[Table Info] Found snapshots to backup."
+        );
         // Sort the epochs to backup.
         epochs_to_backup.sort();
+        aptos_logger::info!(
+            epochs_to_backup = format!("{:?}", epochs_to_backup),
+            "[Table Info] Sorted snapshots to backup."
+        );
         // Backup the existing snapshots and cleanup.
         for epoch in epochs_to_backup {
             backup_the_snapshot_and_cleanup(
@@ -474,7 +485,11 @@ async fn backup_the_snapshot_and_cleanup(
     epoch: u64,
 ) {
     let snapshot_folder_name = snapshot_folder_name(context.chain_id().id() as u64, epoch);
-
+    aptos_logger::info!(
+        epoch = epoch,
+        snapshot_folder_name = snapshot_folder_name,
+        "[Table Info] Backing up the snapshot and cleaning up the old snapshot."
+    );
     let ledger_chain_id = context.chain_id().id();
     // Validate the runtime.
     let backup_metadata = backup_restore_operator.get_metadata().await;
@@ -486,6 +501,12 @@ async fn backup_the_snapshot_and_cleanup(
                 metadata.chain_id
             );
         }
+    } else {
+        aptos_logger::warn!(
+            epoch = epoch,
+            snapshot_folder_name = snapshot_folder_name,
+            "[Table Info] No backup metadata found. Skipping the backup."
+        );
     }
 
     let start_time = std::time::Instant::now();
@@ -493,16 +514,32 @@ async fn backup_the_snapshot_and_cleanup(
     let snapshot_dir = context
         .node_config
         .get_data_dir()
-        .join(snapshot_folder_name);
-
+        .join(snapshot_folder_name.clone());
     // If the backup is for old epoch, clean up and return.
     if let Some(metadata) = backup_metadata {
         if metadata.epoch >= epoch {
+            aptos_logger::info!(
+                epoch = epoch,
+                snapshot_folder_name = snapshot_folder_name,
+                "[Table Info] Snapshot already backed up. Skipping the backup."
+            );
             // Remove the snapshot directory.
             std::fs::remove_dir_all(snapshot_dir).unwrap();
             return;
         }
+    } else {
+        aptos_logger::warn!(
+            epoch = epoch,
+            snapshot_folder_name = snapshot_folder_name,
+            "[Table Info] No backup metadata found."
+        );
     }
+    aptos_logger::info!(
+        epoch = epoch,
+        snapshot_folder_name = snapshot_folder_name,
+        snapshot_dir = snapshot_dir.to_str(),
+        "[Table Info] Backing up the snapshot."
+    );
     // TODO: add checks to handle concurrent backup jobs.
     backup_restore_operator
         .backup_db_snapshot_and_update_metadata(ledger_chain_id as u64, epoch, snapshot_dir.clone())

@@ -41,7 +41,7 @@ def main():
     # Build the move-disassembler in release mode.
     subprocess.run(["cargo", "build", "--release", "-p", "move-disassembler"])
     (total_1, total_2) = (0, 0)  # Total number of instructions.
-    tally = []  # List of tuples containing the percentage increase and the file name.
+    tally = []  # List of tuples containing the net increase and the file name.
     common_path = os.path.commonpath([dir1, dir2])
     # Compute for all bytecode files in the build folders.
     for file1 in glob.glob(dir1 + "/**/*.mv", recursive=True):
@@ -50,17 +50,17 @@ def main():
             print(f"There is no file comparable to {file1} in {dir2}")
             sys.exit(1)
         (i1, i2) = (count_instructions(file1), count_instructions(file2))
-        percent_inc = percentage_change(i1, i2)
-        tally.append((percent_inc, file1.removeprefix(common_path)))
+        net_increase = i2 - i1
+        tally.append((net_increase, file1.removeprefix(common_path)))
         total_1 += i1
         total_2 += i2
     # Print the results per file, in order of higher increase earlier.
-    for percent_inc, file in sorted(tally, reverse=True):
-        print(f"{file}: {percent_inc:.1f}%")
+    for net_increase, file in sorted(tally, reverse=True):
+        print(f"{file}: {net_increase}")
     # Print the total percentage increase across all files.
     percent_inc = percentage_change(total_1, total_2)
     print(
-        f"Total percentage change in instructions: {percent_inc:.1f}%, {total_1} -> {total_2}"
+        f"Total percentage increase in instructions: {percent_inc:.1f}%, going from {total_1} -> {total_2}, with net increase of: {total_2 - total_1}"
     )
     # Change back to the original working directory.
     os.chdir(original_working_dir)
@@ -69,7 +69,7 @@ def main():
 def percentage_change(i1, i2):
     """Percentage change from `i1` to `i2`."""
     if i1 != 0:
-        return ((i1 - i2) * 100.0) / i1
+        return ((i2 - i1) * 100.0) / i1
     return 0
 
 

@@ -1,0 +1,37 @@
+// -- Model dump before bytecode pipeline
+module 0x815::test {
+    private fun f1() {
+        loop {
+          loop {
+            loop {
+              if true {
+                loop {
+                  if false {
+                    continue[3]
+                  } else {
+                    break[1]
+                  };
+                  break
+                }
+              } else {
+                continue[2]
+              }
+            }
+          };
+          break
+        }
+    }
+} // end 0x815::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::test {
+    fun f1() {
+        'l0: loop {
+            loop 'l1: loop if (true) loop {
+                if (false) continue 'l0 else break 'l1;
+                break
+            } else continue 'l0;
+            break
+        }
+    }
+}

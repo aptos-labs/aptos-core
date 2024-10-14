@@ -83,10 +83,10 @@ impl<'a> CoinClient<'a> {
     pub async fn get_account_balance(&self, account: &AccountAddress) -> Result<u64> {
         let response = self
             .api_client
-            .get_account_balance(*account)
+            .view_apt_account_balance(*account)
             .await
             .context("Failed to get account balance")?;
-        Ok(response.inner().get())
+        Ok(response.into_inner())
     }
 }
 

@@ -8,9 +8,9 @@ module 0x8675309::M {
     }
     private fun t() {
         {
-          let s: M::S = pack M::S(false);
+          let s: S = pack M::S(false);
           {
-            let r: M::R = pack M::R(false);
+            let r: R = pack M::R(false);
             0;
             s;
             M::R{ dummy_field: _ } = r;
@@ -19,3 +19,18 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+    }
+    struct S has drop {
+    }
+    fun t() {
+        let s = S{};
+        let r = R{};
+        0;
+        s;
+        R{} = r;
+    }
+}

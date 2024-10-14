@@ -98,7 +98,7 @@ pub fn benchmark(args: &[String]) {
     let matches = cmd_line_parser.get_matches_from(args);
     let get_vec = |s: &str| -> Vec<String> {
         let vs = matches.get_many::<String>(s);
-        vs.map_or(vec![], |v| v.cloned().collect())
+        vs.map_or_else(Vec::new, |v| v.cloned().collect())
     };
     let sources = get_vec("sources");
     let deps = get_vec("dependencies");

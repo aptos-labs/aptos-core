@@ -6,7 +6,9 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+        apply_chunk_output::ApplyChunkOutput,
+        block_tree::{block_output::BlockOutput, BlockTree},
+        chunk_output::ChunkOutput,
     },
     logging::{LogEntry, LogSchema},
     metrics::{
@@ -17,8 +19,8 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult,
+    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
+    ExecutorResult, StateComputeResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -277,7 +279,7 @@ where
         let _ = self.block_tree.add_block(
             parent_block_id,
             block_id,
-            ExecutionOutput::new(state, epoch_state),
+            BlockOutput::new(state, epoch_state),
         )?;
         Ok(state_checkpoint_output)
     }

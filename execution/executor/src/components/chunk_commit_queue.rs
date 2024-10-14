@@ -4,13 +4,14 @@
 
 #![forbid(unsafe_code)]
 
+use crate::components::{
+    chunk_result_verifier::ChunkResultVerifier, executed_chunk::ExecutedChunk,
+};
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
 use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    epoch_state::EpochState, proof::accumulator::InMemoryTransactionAccumulator,
     transaction::Version,
 };
 use std::{collections::VecDeque, sync::Arc};
@@ -22,11 +23,9 @@ pub(crate) struct ChunkToUpdateLedger {
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
 
-    /// the below are from the input -- can be checked / used only after the transaction accumulator
+    /// from the input -- can be checked / used only after the transaction accumulator
     /// is updated.
-    pub verified_target_li: LedgerInfoWithSignatures,
-    pub epoch_change_li: Option<LedgerInfoWithSignatures>,
-    pub txn_infos_with_proof: TransactionInfoListWithProof,
+    pub chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
 }
 
 /// It's a two stage pipeline:
@@ -67,18 +66,7 @@ impl ChunkCommitQueue {
     }
 
     pub(crate) fn expecting_version(&self) -> Version {
-        self.latest_txn_accumulator.num_leaves()
-    }
-
-    pub(crate) fn expect_latest_view(&self) -> Result<ExecutedTrees> {
-        ensure!(
-            self.to_update_ledger.is_empty(),
-            "Pending chunk to update_ledger, can't construct latest ExecutedTrees."
-        );
-        Ok(ExecutedTrees::new(
-            self.latest_state.clone(),
-            self.latest_txn_accumulator.clone(),
-        ))
+        self.latest_state.next_version()
     }
 
     pub(crate) fn enqueue_for_ledger_update(
@@ -131,17 +119,6 @@ impl ChunkCommitQueue {
         Ok((self.persisted_state.clone(), chunk))
     }
 
-    pub(crate) fn enqueue_chunk_to_commit_directly(&mut self, chunk: ExecutedChunk) -> Result<()> {
-        ensure!(
-            self.to_update_ledger.is_empty(),
-            "Mixed usage of different modes."
-        );
-        self.latest_state = chunk.result_state.clone();
-        self.latest_txn_accumulator = chunk.ledger_update_output.transaction_accumulator.clone();
-        self.to_commit.push_back(Some(chunk));
-        Ok(())
-    }
-
     pub(crate) fn dequeue_committed(&mut self, latest_state: StateDelta) -> Result<()> {
         ensure!(!self.to_commit.is_empty(), "to_commit is empty.");
         ensure!(
@@ -154,5 +131,9 @@ impl ChunkCommitQueue {
             .current
             .log_generation("commit_queue_base");
         Ok(())
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.to_commit.is_empty() && self.to_update_ledger.is_empty()
     }
 }

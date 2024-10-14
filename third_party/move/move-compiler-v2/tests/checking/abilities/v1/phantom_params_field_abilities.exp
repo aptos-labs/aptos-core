@@ -1,30 +1,60 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct HasCopy {
-        a: #1,
+    struct HasCopy<T1,T2> {
+        a: T2,
     }
-    struct HasDrop {
-        a: #1,
+    struct HasDrop<T1,T2> {
+        a: T2,
     }
-    struct HasKey {
-        a: #1,
+    struct HasKey<T1,T2> {
+        a: T2,
     }
-    struct HasStore {
-        a: #1,
+    struct HasStore<T1,T2> {
+        a: T2,
     }
     struct NoAbilities {
         dummy_field: bool,
     }
     struct S1 {
-        a: M::HasDrop<M::NoAbilities, u64>,
+        a: HasDrop<NoAbilities, u64>,
     }
     struct S2 {
-        a: M::HasCopy<M::NoAbilities, u64>,
+        a: HasCopy<NoAbilities, u64>,
     }
     struct S3 {
-        a: M::HasStore<M::NoAbilities, u64>,
+        a: HasStore<NoAbilities, u64>,
     }
     struct S4 {
-        a: M::HasStore<M::NoAbilities, u64>,
+        a: HasStore<NoAbilities, u64>,
     }
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct HasCopy<phantom T1, T2> has copy {
+        a: T2,
+    }
+    struct HasDrop<phantom T1, T2> has drop {
+        a: T2,
+    }
+    struct HasKey<phantom T1, T2> has key {
+        a: T2,
+    }
+    struct HasStore<phantom T1, T2> has store {
+        a: T2,
+    }
+    struct NoAbilities {
+    }
+    struct S1 has drop {
+        a: HasDrop<NoAbilities, u64>,
+    }
+    struct S2 has copy {
+        a: HasCopy<NoAbilities, u64>,
+    }
+    struct S3 has store {
+        a: HasStore<NoAbilities, u64>,
+    }
+    struct S4 has key {
+        a: HasStore<NoAbilities, u64>,
+    }
+}

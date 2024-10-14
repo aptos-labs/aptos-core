@@ -8,7 +8,10 @@ use aptos_framework::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
+use aptos_types::{
+    keyless::{AnyKeylessPublicKey, EphemeralCertificate},
+    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
+};
 use arbitrary::Arbitrary;
 use libfuzzer_sys::Corpus;
 use move_binary_format::{
@@ -20,6 +23,7 @@ use move_core_types::{
     value::{MoveStructLayout, MoveTypeLayout, MoveValue},
     vm_status::{StatusType, VMStatus},
 };
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 #[macro_export]
@@ -60,22 +64,6 @@ pub struct UserAccount {
     fund: FundAmount,
 }
 
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub enum Authenticator {
-    Ed25519 {
-        sender: UserAccount,
-    },
-    MultiAgent {
-        sender: UserAccount,
-        secondary_signers: Vec<UserAccount>,
-    },
-    FeePayer {
-        sender: UserAccount,
-        secondary_signers: Vec<UserAccount>,
-        fee_payer: UserAccount,
-    },
-}
-
 impl UserAccount {
     pub fn fund_amount(&self) -> u64 {
         match self.fund {
@@ -94,15 +82,32 @@ impl UserAccount {
     }
 }
 
-impl Authenticator {
+// Used to fuzz the MoveVM
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
+pub enum FuzzerRunnableAuthenticator {
+    Ed25519 {
+        sender: UserAccount,
+    },
+    MultiAgent {
+        sender: UserAccount,
+        secondary_signers: Vec<UserAccount>,
+    },
+    FeePayer {
+        sender: UserAccount,
+        secondary_signers: Vec<UserAccount>,
+        fee_payer: UserAccount,
+    },
+}
+
+impl FuzzerRunnableAuthenticator {
     pub fn sender(&self) -> UserAccount {
         match self {
-            Authenticator::Ed25519 { sender } => *sender,
-            Authenticator::MultiAgent {
+            FuzzerRunnableAuthenticator::Ed25519 { sender } => *sender,
+            FuzzerRunnableAuthenticator::MultiAgent {
                 sender,
                 secondary_signers: _,
             } => *sender,
-            Authenticator::FeePayer {
+            FuzzerRunnableAuthenticator::FeePayer {
                 sender,
                 secondary_signers: _,
                 fee_payer: _,
@@ -130,7 +135,118 @@ pub enum ExecVariant {
 pub struct RunnableState {
     pub dep_modules: Vec<CompiledModule>,
     pub exec_variant: ExecVariant,
-    pub tx_auth_type: Authenticator,
+    pub tx_auth_type: FuzzerRunnableAuthenticator,
+}
+
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct JwtHeader {
+    pub alg: String,
+    pub typ: Option<String>,
+    pub kid: Option<String>,
+    // Add other JWT header fields as needed
+}
+
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct FuzzingKeylessSignature {
+    exp_date_secs: u64,
+    jwt_header: JwtHeader,
+    cert: EphemeralCertificate,
+    //ephemeral_pubkey: EphemeralPublicKey,
+    //ephemeral_signature: EphemeralSignature,
+}
+
+impl FuzzingKeylessSignature {
+    pub fn exp_date_secs(&self) -> u64 {
+        self.exp_date_secs
+    }
+
+    pub fn jwt_header(&self) -> &JwtHeader {
+        &self.jwt_header
+    }
+
+    pub fn cert(&self) -> &EphemeralCertificate {
+        &self.cert
+    }
+
+    /*
+    pub fn ephemeral_pubkey(&self) -> &EphemeralPublicKey {
+        &self.ephemeral_pubkey
+    }
+
+    pub fn ephemeral_signature(&self) -> &EphemeralSignature {
+        &self.ephemeral_signature
+    }
+     */
+}
+
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
+pub enum Style {
+    Break,
+    //MatchJWT,
+    //MatchKeys,
+}
+
+//TODO: reorganize this type excluding not usefull fields. Do it after implementing JWK and Federated Keyless.
+// Used to fuzz the transaction authenticator
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
+pub enum FuzzerTransactionAuthenticator {
+    Ed25519 {
+        sender: UserAccount,
+    },
+    Keyless {
+        sender: UserAccount,
+        style: Style,
+        any_keyless_public_key: AnyKeylessPublicKey,
+        keyless_signature: FuzzingKeylessSignature,
+    },
+    MultiAgent {
+        sender: UserAccount,
+        secondary_signers: Vec<UserAccount>,
+    },
+    FeePayer {
+        sender: UserAccount,
+        secondary_signers: Vec<UserAccount>,
+        fee_payer: UserAccount,
+    },
+}
+
+impl FuzzerTransactionAuthenticator {
+    pub fn sender(&self) -> UserAccount {
+        match self {
+            FuzzerTransactionAuthenticator::Ed25519 { sender } => *sender,
+            FuzzerTransactionAuthenticator::Keyless {
+                sender,
+                style: _,
+                any_keyless_public_key: _,
+                keyless_signature: _,
+            } => *sender,
+            FuzzerTransactionAuthenticator::MultiAgent {
+                sender,
+                secondary_signers: _,
+            } => *sender,
+            FuzzerTransactionAuthenticator::FeePayer {
+                sender,
+                secondary_signers: _,
+                fee_payer: _,
+            } => *sender,
+        }
+    }
+
+    pub fn get_jwt_header_json(&self) -> Option<String> {
+        if let FuzzerTransactionAuthenticator::Keyless {
+            keyless_signature, ..
+        } = self
+        {
+            serde_json::to_string(&keyless_signature.jwt_header).ok()
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
+pub struct TransactionState {
+    pub tx_auth_type: FuzzerTransactionAuthenticator,
 }
 
 // used for ordering modules topologically
