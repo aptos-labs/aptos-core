@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::vm::code_cache::{ModuleCache, ScriptCache};
-use hashbrown::HashMap;
+use hashbrown::{hash_map::Entry, HashMap};
 use std::{cell::RefCell, hash::Hash};
 
 /// A per-block code cache to be used for sequential transaction execution.
@@ -75,8 +75,18 @@ where
         self.module_cache.borrow_mut().insert(key, module);
     }
 
-    fn fetch_module(&self, key: &Self::Key) -> Option<Self::Module> {
-        self.module_cache.borrow().get(key).cloned()
+    fn fetch_module_or_store_with<F, E>(
+        &self,
+        key: &Self::Key,
+        default: F,
+    ) -> Result<Option<Self::Module>, E>
+    where
+        F: FnOnce() -> Result<Option<Self::Module>, E>,
+    {
+        Ok(match self.module_cache.borrow_mut().entry(key.clone()) {
+            Entry::Occupied(e) => Some(e.get().clone()),
+            Entry::Vacant(e) => default()?.map(|m| e.insert(m).clone()),
+        })
     }
 
     fn flush_modules(&self) {
@@ -91,6 +101,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use claims::assert_err;
 
     #[test]
     fn test_empty() {
@@ -103,7 +114,26 @@ mod test {
     fn test_cache_misses() {
         let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
         assert_eq!(code_cache.fetch_script(&1), None);
-        assert_eq!(code_cache.fetch_module(&1), None);
+        assert_eq!(
+            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(None)),
+            Ok(None)
+        );
+        assert_eq!(code_cache.num_modules(), 0);
+
+        assert_eq!(
+            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(Some(77))),
+            Ok(Some(77))
+        );
+        assert_eq!(code_cache.num_scripts(), 0);
+        assert_eq!(code_cache.num_modules(), 1);
+
+        assert_eq!(
+            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(Some(2))),
+            Ok(Some(77))
+        );
+
+        assert_err!(code_cache.fetch_module_or_store_with(&2, || Err(())));
+        assert_eq!(code_cache.num_modules(), 1);
     }
 
     #[test]
@@ -123,7 +153,14 @@ mod test {
 
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
-        assert_eq!(code_cache.fetch_module(&1), Some(1));
+        assert_eq!(
+            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(None)),
+            Ok(Some(1))
+        );
+        assert_eq!(
+            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(Some(10))),
+            Ok(Some(1))
+        );
     }
 
     #[test]
