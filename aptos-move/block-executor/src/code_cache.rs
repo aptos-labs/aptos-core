@@ -449,18 +449,12 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
     {
         let module_id = ModuleId::new(*address, module_name.to_owned());
-        let read = match self.unsync_map.code_cache().fetch_module(&module_id) {
-            Some(v) => Some(v),
-            None => match init_func(&module_id)?.map(Arc::new) {
-                Some(v) => {
-                    self.unsync_map
-                        .code_cache()
-                        .store_module(module_id.clone(), v.clone());
-                    Some(v)
-                },
-                None => None,
-            },
-        };
+        let read = self
+            .unsync_map
+            .code_cache()
+            .fetch_module_or_store_with(&module_id, || {
+                init_func(&module_id).map(|v| v.map(Arc::new))
+            })?;
         self.read_set.borrow_mut().capture_module_read(module_id);
         Ok(read)
     }
@@ -666,7 +660,15 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
-    /// Records the read from [CrossBlockModuleCache] in the read-set,
+    /// Returns the script cache.
+    fn as_script_cache(&self) -> &dyn ScriptCache<Key = [u8; 32], Script = ScriptCacheEntry> {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.versioned_map.code_cache(),
+            ViewState::Unsync(state) => state.unsync_map.code_cache(),
+        }
+    }
+
+    /// Records the read from [CrossBlockModuleCache] in the read-set.
     fn capture_global_cache_read(&self, address: &AccountAddress, module_name: &IdentStr) {
         let module_id = ModuleId::new(*address, module_name.to_owned());
         match &self.latest_view {
@@ -686,13 +688,5 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .map_err(|e| e.finish(Location::Undefined))?
             .map(|s| ModuleCacheEntry::from_state_value(self.runtime_environment, s))
             .transpose()
-    }
-
-    /// Returns the script cache.
-    fn as_script_cache(&self) -> &dyn ScriptCache<Key = [u8; 32], Script = ScriptCacheEntry> {
-        match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache(),
-            ViewState::Unsync(state) => state.unsync_map.code_cache(),
-        }
     }
 }
