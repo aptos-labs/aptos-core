@@ -42,7 +42,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 
-    code_cache: SyncCodeCache<ModuleId, ModuleCacheEntry, ScriptCacheEntry>,
+    code_cache: SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry>,
 }
 
 impl<
@@ -97,7 +97,9 @@ impl<
         &self.modules
     }
 
-    pub fn code_cache(&self) -> &SyncCodeCache<ModuleId, ModuleCacheEntry, ScriptCacheEntry> {
+    pub fn code_cache(
+        &self,
+    ) -> &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry> {
         &self.code_cache
     }
 }

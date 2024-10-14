@@ -11,7 +11,11 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
+    vm::{
+        code_cache::{ModuleCache, ScriptCache},
+        modules::ModuleCacheEntry,
+        scripts::ScriptCacheEntry,
+    },
 };
 use aptos_vm_types::module_and_script_storage::{
     code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
@@ -49,14 +53,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         use ScriptCacheEntry::*;
 
         let hash = compute_code_hash(serialized_script);
-        Ok(match self.fetch_script(&hash) {
+        let script_cache = self.as_script_cache();
+
+        Ok(match script_cache.fetch_script(&hash) {
             Some(script) => script.compiled_script().clone(),
             None => {
                 let compiled_script = self
                     .runtime_environment
                     .deserialize_into_script(serialized_script)
                     .map(Arc::new)?;
-                self.store_script(hash, Deserialized(compiled_script.clone()));
+                script_cache.store_script(hash, Deserialized(compiled_script.clone()));
                 compiled_script
             },
         })
@@ -66,7 +72,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         use ScriptCacheEntry::*;
 
         let hash = compute_code_hash(serialized_script);
-        let compiled_script = match self.fetch_script(&hash) {
+        let script_cache = self.as_script_cache();
+
+        let compiled_script = match script_cache.fetch_script(&hash) {
             Some(Verified(script)) => return Ok(script),
             Some(Deserialized(compiled_script)) => compiled_script,
             None => self
@@ -95,7 +103,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
             .build_verified_script(locally_verified_script, &immediate_dependencies)
             .map(Arc::new)?;
 
-        self.store_script(hash, Verified(script.clone()));
+        script_cache.store_script(hash, Verified(script.clone()));
         Ok(script)
     }
 }
@@ -441,10 +449,18 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
     {
         let module_id = ModuleId::new(*address, module_name.to_owned());
-        let read = self
-            .unsync_map
-            .code_cache()
-            .fetch_or_initialize_module(&module_id, init_func)?;
+        let read = match self.unsync_map.code_cache().fetch_module(&module_id) {
+            Some(v) => Some(v),
+            None => match init_func(&module_id)?.map(Arc::new) {
+                Some(v) => {
+                    self.unsync_map
+                        .code_cache()
+                        .store_module(module_id.clone(), v.clone());
+                    Some(v)
+                },
+                None => None,
+            },
+        };
         self.read_set.borrow_mut().capture_module_read(module_id);
         Ok(read)
     }
@@ -548,7 +564,9 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
             .map(Arc::new)?;
 
         let entry = entry.make_verified(module.clone());
-        self.unsync_map.code_cache().store_module(module_id, entry);
+        self.unsync_map
+            .code_cache()
+            .store_module(module_id, Arc::new(entry));
 
         Ok(module)
     }
@@ -670,19 +688,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .transpose()
     }
 
-    /// Returns the script stored in the code cache. If it does not exist, returns [None].
-    fn fetch_script(&self, hash: &[u8; 32]) -> Option<ScriptCacheEntry> {
+    /// Returns the script cache.
+    fn as_script_cache(&self) -> &dyn ScriptCache<Key = [u8; 32], Script = ScriptCacheEntry> {
         match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache().fetch_script(hash),
-            ViewState::Unsync(state) => state.unsync_map.code_cache().fetch_script(hash),
-        }
-    }
-
-    /// Adds the script to the code cache.
-    fn store_script(&self, hash: [u8; 32], script: ScriptCacheEntry) {
-        match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache().store_script(hash, script),
-            ViewState::Unsync(state) => state.unsync_map.code_cache().store_script(hash, script),
+            ViewState::Sync(state) => state.versioned_map.code_cache(),
+            ViewState::Unsync(state) => state.unsync_map.code_cache(),
         }
     }
 }

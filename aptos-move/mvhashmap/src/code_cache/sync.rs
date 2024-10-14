@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::types::TxnIndex;
+use aptos_types::vm::code_cache::ScriptCache;
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use hashbrown::HashMap;
@@ -14,12 +15,18 @@ use std::{
     sync::Arc,
 };
 
-pub struct SyncCodeCache<K, V, S> {
-    script_cache: DashMap<[u8; 32], CachePadded<S>>,
-    module_cache: ModuleCache<K, V>,
+pub struct SyncCodeCache<K, M, Q, S> {
+    script_cache: DashMap<Q, CachePadded<S>>,
+    module_cache: ModuleCache<K, M>,
 }
 
-impl<K: Eq + Hash + Clone, V: Clone, S: Clone> SyncCodeCache<K, V, S> {
+impl<K, M, Q, S> SyncCodeCache<K, M, Q, S>
+where
+    K: Eq + Hash + Clone,
+    M: Clone,
+    Q: Eq + Hash + Clone,
+    S: Clone,
+{
     pub(crate) fn empty() -> Self {
         Self {
             script_cache: DashMap::new(),
@@ -27,18 +34,36 @@ impl<K: Eq + Hash + Clone, V: Clone, S: Clone> SyncCodeCache<K, V, S> {
         }
     }
 
-    pub fn store_script(&self, hash: [u8; 32], script: S) {
-        self.script_cache.insert(hash, CachePadded::new(script));
-    }
-
-    /// Returns a script if it exists in cache, and [None] otherwise.
-    pub fn fetch_script(&self, hash: &[u8; 32]) -> Option<S> {
-        Some(self.script_cache.get(hash)?.clone().into_inner())
-    }
-
     /// Returns the module cache.
-    pub fn module_cache(&self) -> &ModuleCache<K, V> {
+    pub fn module_cache(&self) -> &ModuleCache<K, M> {
         &self.module_cache
+    }
+}
+
+impl<K, M, Q, S> ScriptCache for SyncCodeCache<K, M, Q, S>
+where
+    K: Eq + Hash + Clone,
+    M: Clone,
+    Q: Eq + Hash + Clone,
+    S: Clone,
+{
+    type Key = Q;
+    type Script = S;
+
+    fn store_script(&self, key: Self::Key, script: Self::Script) {
+        self.script_cache.insert(key, CachePadded::new(script));
+    }
+
+    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+        Some(self.script_cache.get(key)?.clone().into_inner())
+    }
+
+    fn flush_scripts(&self) {
+        self.script_cache.clear();
+    }
+
+    fn num_scripts(&self) -> usize {
+        self.script_cache.len()
     }
 }
 
