@@ -45,7 +45,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
-    vm::modules::ModuleCacheEntry,
+    vm::{code_cache::ModuleCache, modules::ModuleCacheEntry},
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -1154,7 +1154,7 @@ where
                     ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
 
                 CrossBlockModuleCache::mark_invalid(&id);
-                unsync_map.code_cache().store_module(id, entry);
+                unsync_map.code_cache().store_module(id, Arc::new(entry));
             } else {
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());
@@ -1519,7 +1519,9 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
         CrossBlockModuleCache::populate_from_unsync_code_cache_at_block_end(
-            unsync_map.code_cache(),
+            unsync_map
+                .into_modules_iter()
+                .map(|(k, v)| (k, v.as_ref().clone())),
         );
 
         let block_end_info = if self

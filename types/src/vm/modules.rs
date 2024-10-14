@@ -154,15 +154,6 @@ impl ModuleCacheEntry {
         }
     }
 
-    /// If the module representation is verified, returns it. Otherwise, returns [None].
-    pub fn try_as_verified_module(&self) -> Option<Arc<Module>> {
-        use Representation::*;
-        match &self.representation {
-            Deserialized(_) => None,
-            Verified(m) => Some(m.clone()),
-        }
-    }
-
     /// Creates a new module storage entry which carries all additional metadata, but uses a
     /// verified module representation.
     pub fn make_verified(&self, module: Arc<Module>) -> Self {
