@@ -10,10 +10,9 @@ use crate::{
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
 use aptos_logger::debug;
 use async_trait::async_trait;
-use futures::TryFutureExt;
+use futures::FutureExt;
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -78,30 +77,36 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
         let mut futs = vec![];
-        for b in &ordered_blocks {
-            let fut = self
-                .execution_proxy
-                .schedule_compute(
-                    b.block(),
-                    b.parent_id(),
-                    b.randomness().cloned(),
-                    lifetime_guard.spawn(()),
-                )
-                .await;
+        for block in &ordered_blocks {
+            let prepare_fut = block.get_prepare_fut();
+            let fut = if let Ok(Ok((input_txns, sig_verified_txns))) = prepare_fut.await {
+                self.execution_proxy
+                    .schedule_compute(
+                        block,
+                        (input_txns, sig_verified_txns),
+                        lifetime_guard.spawn(()),
+                    )
+                    .await
+            } else {
+                async move {
+                    Err(aptos_executor_types::ExecutorError::InternalError {
+                        error: "Prepare failed".to_string(),
+                    })
+                }
+                .boxed()
+            };
             futs.push(fut)
         }
 
         // In the future being returned, wait for the compute results in order.
-        let fut = tokio::task::spawn(async move {
+        let fut = async move {
             let mut results = vec![];
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
                 results.push(block.set_execution_result(fut.await?));
             }
             Ok(results)
-        })
-        .map_err(ExecutorError::internal_err)
-        .and_then(|res| async { res });
+        };
 
         ExecutionWaitRequest {
             block_id,

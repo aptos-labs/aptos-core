@@ -19,7 +19,6 @@ use crate::{
     monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
 };
@@ -265,7 +264,6 @@ impl BlockStore {
             retriever,
             self.storage.clone(),
             self.execution_client.clone(),
-            self.payload_manager.clone(),
             self.order_vote_enabled,
         )
         .await?
@@ -296,7 +294,6 @@ impl BlockStore {
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
-        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
@@ -398,9 +395,9 @@ impl BlockStore {
         );
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
-            if let Some(payload) = block.payload() {
-                payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
-            }
+            // if let Some(payload) = block.payload() {
+            //     payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
+            // }
         }
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.

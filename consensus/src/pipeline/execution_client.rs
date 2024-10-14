@@ -22,8 +22,6 @@ use crate::{
     },
     state_computer::ExecutionProxy,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
-    transaction_deduper::create_transaction_deduper,
-    transaction_shuffler::create_transaction_shuffler,
 };
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
@@ -324,20 +322,14 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_publisher.clone(),
         );
 
-        let transaction_shuffler =
-            create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
         let block_executor_onchain_config =
             onchain_execution_config.block_executor_onchain_config();
-        let transaction_deduper =
-            create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
-            transaction_shuffler,
             block_executor_onchain_config,
-            transaction_deduper,
             randomness_enabled,
         );
 

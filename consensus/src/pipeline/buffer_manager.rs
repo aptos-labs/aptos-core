@@ -31,7 +31,7 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
@@ -557,11 +557,20 @@ impl BufferManager {
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
+        while let Some(item) = self.buffer.pop_front() {
+            if item.is_ordered() {
+                for block in item.get_blocks() {
+                    block.abort_prepare();
+                }
+            }
+        }
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
         self.previous_commit_time = Instant::now();
-        self.commit_proof_rb_handle.take();
+        {
+            self.commit_proof_rb_handle.take();
+        }
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
@@ -700,6 +709,7 @@ impl BufferManager {
 
     fn generate_commit_message(commit_vote: CommitVote) -> CommitMessage {
         fail_point!("consensus::create_invalid_commit_vote", |_| {
+            use aptos_crypto::bls12381;
             CommitMessage::Vote(CommitVote::new_with_signature(
                 commit_vote.author(),
                 commit_vote.ledger_info().clone(),

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block_preparer::BlockPreparer,
     block_storage::{
         pending_blocks::PendingBlocks,
         tracing::{observe_block, BlockStage},
@@ -51,6 +52,9 @@ use crate::{
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
+    transaction_deduper::create_transaction_deduper,
+    transaction_filter::TransactionFilter,
+    transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
 };
 use anyhow::{anyhow, bail, ensure, Context};
@@ -811,6 +815,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             )
             .await;
 
+        let txn_shuffler =
+            create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
+        let txn_deduper =
+            create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
+        let txn_filter = Arc::new(TransactionFilter::new(
+            self.execution_config.transaction_filter.clone(),
+        ));
+
+        let block_preparer = Arc::new(BlockPreparer::new(
+            payload_manager,
+            txn_filter,
+            txn_deduper,
+            txn_shuffler,
+        ));
+
         info!(epoch = epoch, "Create BlockStore");
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
@@ -821,7 +840,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
-            payload_manager,
+            block_preparer,
             onchain_consensus_config.order_vote_enabled(),
             self.pending_blocks.clone(),
         ));

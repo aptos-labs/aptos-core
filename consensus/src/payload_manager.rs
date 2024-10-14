@@ -372,6 +372,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
         };
+        self.prefetch_payload_data(payload, block.timestamp_usecs());
 
         let transaction_payload = match payload {
             Payload::InQuorumStore(proof_with_data) => {

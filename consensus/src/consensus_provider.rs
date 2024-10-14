@@ -20,7 +20,6 @@ use crate::{
     quorum_store::quorum_store_db::QuorumStoreDB,
     rand::rand_gen::storage::db::RandDb,
     state_computer::ExecutionProxy,
-    transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
@@ -69,7 +68,6 @@ pub fn start_consensus(
         txn_notifier,
         state_sync_notifier,
         runtime.handle(),
-        TransactionFilter::new(node_config.execution.transaction_filter.clone()),
         node_config.consensus.enable_pre_commit,
     );
 
@@ -162,7 +160,6 @@ pub fn start_consensus_observer(
             txn_notifier,
             state_sync_notifier,
             consensus_observer_runtime.handle(),
-            TransactionFilter::new(node_config.execution.transaction_filter.clone()),
             node_config.consensus.enable_pre_commit,
         );
 

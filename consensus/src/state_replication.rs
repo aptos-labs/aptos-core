@@ -5,15 +5,17 @@
 use crate::{
     error::StateSyncError, payload_manager::TPayloadManager,
     pipeline::pipeline_phase::CountedRequest, state_computer::StateComputeResultFut,
-    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
-use aptos_crypto::HashValue;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+    },
 };
 use std::sync::Arc;
 
@@ -27,11 +29,8 @@ pub type StateComputerCommitCallBackType =
 pub trait StateComputer: Send + Sync {
     async fn schedule_compute(
         &self,
-        // The block that will be computed.
-        _block: &Block,
-        // The parent block root hash.
-        _parent_block_id: HashValue,
-        _randomness: Option<Randomness>,
+        _pipelined_block: &PipelinedBlock,
+        _txns: (Vec<SignedTransaction>, Vec<SignatureVerifiedTransaction>),
         _lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         unimplemented!();
@@ -56,9 +55,7 @@ pub trait StateComputer: Send + Sync {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<dyn TPayloadManager>,
-        transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-        transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
     );
 

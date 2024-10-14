@@ -70,7 +70,7 @@ impl ThreadManagerBuilder {
 }
 
 /// This assumes that we have a minimum of 4 stealable tasks per thread - this tries to find an optimal balance
-/// between not having too many small tasks which introduces signficant overhead of task stealing and not having
+/// between not having too many small tasks which introduces significant overhead of task stealing and not having
 /// too few tasks which leads to under utilization of threads.
 static OPTIMAL_MAX_PARALLELISM: usize = MAX_THREAD_POOL_SIZE * 4;
 pub fn optimal_min_len(num_tasks: usize, min_threshold: usize) -> usize {

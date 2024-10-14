@@ -104,7 +104,6 @@ impl RecoveryManager {
             &mut retriever,
             self.storage.clone(),
             self.execution_client.clone(),
-            self.payload_manager.clone(),
             self.order_vote_enabled,
         )
         .await?;

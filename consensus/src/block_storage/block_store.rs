@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block_preparer::BlockPreparer,
     block_storage::{
         block_tree::BlockTree,
         pending_blocks::PendingBlocks,
@@ -10,7 +11,7 @@ use crate::{
         BlockReader,
     },
     counters,
-    payload_manager::TPayloadManager,
+    execution_pipeline::SIG_VERIFY_POOL,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
@@ -28,18 +29,30 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::{ExecutorError, StateComputeResult};
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use futures::executor::block_on;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+};
+use futures::{
+    executor::block_on,
+    future::{AbortHandle, Abortable},
+    FutureExt, TryFutureExt,
+};
+use rayon::prelude::*;
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::AtomicBool;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::Ordering;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -80,7 +93,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     vote_back_pressure_limit: Round,
-    payload_manager: Arc<dyn TPayloadManager>,
+    block_preparer: Arc<BlockPreparer>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
@@ -95,7 +108,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
-        payload_manager: Arc<dyn TPayloadManager>,
+        block_preparer: Arc<BlockPreparer>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
@@ -112,7 +125,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             vote_back_pressure_limit,
-            payload_manager,
+            block_preparer,
             order_vote_enabled,
             pending_blocks,
         ));
@@ -150,7 +163,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
-        payload_manager: Arc<dyn TPayloadManager>,
+        block_preparer: Arc<BlockPreparer>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
@@ -189,7 +202,6 @@ impl BlockStore {
 
         let pipelined_root_block = PipelinedBlock::new(
             *root_block,
-            vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
@@ -209,7 +221,7 @@ impl BlockStore {
             storage,
             time_service,
             vote_back_pressure_limit,
-            payload_manager,
+            block_preparer,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
             order_vote_enabled,
@@ -322,7 +334,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
-            self.payload_manager.clone(),
+            self.block_preparer.clone(),
             self.order_vote_enabled,
             self.pending_blocks.clone(),
         )
@@ -352,7 +364,7 @@ impl BlockStore {
             "Block with old round"
         );
 
-        let pipelined_block = PipelinedBlock::new_ordered(block.clone());
+        let pipelined_block = PipelinedBlock::new_ordered(block);
         // ensure local time past the block time
         let block_time = Duration::from_micros(pipelined_block.timestamp_usecs());
         let current_timestamp = self.time_service.get_current_timestamp();
@@ -366,10 +378,44 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
-        if let Some(payload) = pipelined_block.block().payload() {
-            self.payload_manager
-                .prefetch_payload_data(payload, pipelined_block.block().timestamp_usecs());
-        }
+        let preparer = self.block_preparer.clone();
+        let block = pipelined_block.block().clone();
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        // Start preparing the payload of the block for execution
+        let prepare_task = async move {
+            let input_txns = loop {
+                match preparer.prepare_block(&block).await {
+                    Ok(input_txns) => break input_txns,
+                    Err(e) => {
+                        warn!(
+                            "[BlockPreparer] failed to prepare block {}, retrying: {}",
+                            block.id(),
+                            e
+                        );
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    },
+                }
+            };
+            let sig_verification_start = Instant::now();
+            let input_txns_clone = input_txns.clone();
+            let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
+                SIG_VERIFY_POOL.install(|| {
+                    let num_txns = input_txns.len();
+                    input_txns_clone
+                        .into_par_iter()
+                        .with_min_len(optimal_min_len(num_txns, 32))
+                        .map(|t| Transaction::UserTransaction(t).into())
+                        .collect::<Vec<_>>()
+                });
+            counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
+                .observe_duration(sig_verification_start.elapsed());
+            (input_txns, sig_verified_txns)
+        };
+        let prepare_fut = tokio::spawn(Abortable::new(prepare_task, abort_registration))
+            .map_err(ExecutorError::internal_err)
+            .boxed()
+            .shared();
+        pipelined_block.set_prepare_fut(prepare_fut, abort_handle);
         self.storage
             .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
@@ -475,14 +521,14 @@ impl BlockStore {
     pub async fn wait_for_payload(&self, block: &Block) -> anyhow::Result<()> {
         tokio::time::timeout(
             Duration::from_secs(1),
-            self.payload_manager.get_transactions(block),
+            self.block_preparer.get_transactions(block),
         )
         .await??;
         Ok(())
     }
 
     pub fn check_payload(&self, proposal: &Block) -> bool {
-        self.payload_manager.check_payload_availability(proposal)
+        self.block_preparer.check_payload_availability(proposal)
     }
 }
 

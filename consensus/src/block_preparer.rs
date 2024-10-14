@@ -14,6 +14,7 @@ use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use std::{sync::Arc, time::Instant};
 
+#[derive(Clone)]
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
     txn_filter: Arc<TransactionFilter>,
@@ -34,6 +35,17 @@ impl BlockPreparer {
             txn_deduper,
             txn_shuffler,
         }
+    }
+
+    pub fn check_payload_availability(&self, block: &Block) -> bool {
+        self.payload_manager.check_payload_availability(block)
+    }
+
+    pub async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+        self.payload_manager.get_transactions(block).await
     }
 
     pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
     counters,
     error::StateSyncError,
@@ -12,9 +11,6 @@ use crate::{
     payload_manager::TPayloadManager,
     pipeline::pipeline_phase::CountedRequest,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
-    transaction_deduper::TransactionDeduper,
-    transaction_filter::TransactionFilter,
-    transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
@@ -23,15 +19,19 @@ use aptos_consensus_types::{
     block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
 use aptos_types::{
-    account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
-    block_metadata_ext::BlockMetadataExt, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_metadata_ext::BlockMetadataExt,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+    },
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -58,9 +58,7 @@ impl LogicalTime {
 struct MutableState {
     validators: Arc<[AccountAddress]>,
     payload_manager: Arc<dyn TPayloadManager>,
-    transaction_shuffler: Arc<dyn TransactionShuffler>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-    transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
 }
 
@@ -73,7 +71,6 @@ pub struct ExecutionProxy {
     pre_commit_notifier: aptos_channels::Sender<NotificationType>,
     commit_notifier: aptos_channels::Sender<NotificationType>,
     write_mutex: AsyncMutex<LogicalTime>,
-    transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
 }
@@ -84,7 +81,6 @@ impl ExecutionProxy {
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
-        txn_filter: TransactionFilter,
         enable_pre_commit: bool,
     ) -> Self {
         let pre_commit_notifier = Self::spawn_future_runner(
@@ -104,7 +100,6 @@ impl ExecutionProxy {
             pre_commit_notifier,
             commit_notifier,
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
-            transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
             state: RwLock::new(None),
         }
@@ -174,13 +169,13 @@ impl StateComputer for ExecutionProxy {
     async fn schedule_compute(
         &self,
         // The block to be executed.
-        block: &Block,
-        // The parent block id.
-        parent_block_id: HashValue,
-        randomness: Option<Randomness>,
+        pipelined_block: &PipelinedBlock,
+        txns: (Vec<SignedTransaction>, Vec<SignatureVerifiedTransaction>),
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
+        let block = pipelined_block.block();
         let block_id = block.id();
+        let parent_block_id = block.parent_id();
         debug!(
             block = %block,
             parent_id = parent_block_id,
@@ -189,9 +184,7 @@ impl StateComputer for ExecutionProxy {
         let MutableState {
             validators,
             payload_manager,
-            transaction_shuffler,
             block_executor_onchain_config,
-            transaction_deduper,
             is_randomness_enabled,
         } = self
             .state
@@ -201,18 +194,12 @@ impl StateComputer for ExecutionProxy {
             .expect("must be set within an epoch");
 
         let txn_notifier = self.txn_notifier.clone();
-        let transaction_generator = BlockPreparer::new(
-            payload_manager.clone(),
-            self.transaction_filter.clone(),
-            transaction_deduper.clone(),
-            transaction_shuffler.clone(),
-        );
 
         let block_executor_onchain_config = block_executor_onchain_config.clone();
 
         let timestamp = block.timestamp_usecs();
         let metadata = if is_randomness_enabled {
-            block.new_metadata_with_randomness(&validators, randomness)
+            block.new_metadata_with_randomness(&validators, pipelined_block.randomness().cloned())
         } else {
             block.new_block_metadata(&validators).into()
         };
@@ -224,7 +211,8 @@ impl StateComputer for ExecutionProxy {
                 block.clone(),
                 metadata.clone(),
                 parent_block_id,
-                transaction_generator,
+                txns.0,
+                txns.1,
                 block_executor_onchain_config,
                 self.pre_commit_hook(block, metadata, payload_manager),
                 lifetime_guard,
@@ -381,9 +369,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<dyn TPayloadManager>,
-        transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-        transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
     ) {
         *self.state.write() = Some(MutableState {
@@ -393,9 +379,7 @@ impl StateComputer for ExecutionProxy {
                 .collect::<Vec<_>>()
                 .into(),
             payload_manager,
-            transaction_shuffler,
             block_executor_onchain_config,
-            transaction_deduper,
             is_randomness_enabled: randomness_enabled,
         });
     }
@@ -409,13 +393,9 @@ impl StateComputer for ExecutionProxy {
 
 #[tokio::test]
 async fn test_commit_sync_race() {
-    use crate::{
-        error::MempoolError, payload_manager::DirectMempoolPayloadManager,
-        transaction_deduper::create_transaction_deduper,
-        transaction_shuffler::create_transaction_shuffler,
-    };
-    use aptos_config::config::transaction_filter_type::Filter;
+    use crate::{error::MempoolError, payload_manager::DirectMempoolPayloadManager};
     use aptos_consensus_notifications::Error;
+    use aptos_crypto::HashValue;
     use aptos_executor_types::{
         state_checkpoint_output::StateCheckpointOutput, StateComputeResult,
     };
@@ -426,7 +406,6 @@ async fn test_commit_sync_race() {
         block_info::BlockInfo,
         contract_event::ContractEvent,
         ledger_info::LedgerInfo,
-        on_chain_config::{TransactionDeduperType, TransactionShufflerType},
         transaction::{SignedTransaction, Transaction, TransactionStatus},
     };
 
@@ -547,16 +526,13 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
-        TransactionFilter::new(Filter::empty()),
         true,
     );
 
     executor.new_epoch(
         &EpochState::empty(),
-        Arc::new(DirectMempoolPayloadManager {}),
-        create_transaction_shuffler(TransactionShufflerType::NoShuffling),
+        Arc::new(DirectMempoolPayloadManager::new()),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        create_transaction_deduper(TransactionDeduperType::NoDedup),
         false,
     );
     executor
