@@ -733,7 +733,7 @@ impl<T: Transaction> CapturedReads<T> {
     ///   3. Entries that were in block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
-        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, ScriptCacheEntry>,
+        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
             return false;

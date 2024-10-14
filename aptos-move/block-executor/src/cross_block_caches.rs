@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_mvhashmap::code_cache::{SyncCodeCache, UnsyncCodeCache};
+use aptos_mvhashmap::code_cache::SyncCodeCache;
 use aptos_types::{
     state_store::{state_value::StateValueMetadata, StateView},
     vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
@@ -163,7 +163,7 @@ impl CrossBlockModuleCache {
     /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
     /// cache if its size is too large. Should only be called at block end.
     pub(crate) fn populate_from_sync_code_cache_at_block_end(
-        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, ScriptCacheEntry>,
+        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry>,
     ) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
@@ -179,15 +179,20 @@ impl CrossBlockModuleCache {
 
     /// Same as [Self::populate_from_sync_code_cache_at_block_end], but only used by sequential
     /// execution.
-    pub(crate) fn populate_from_unsync_code_cache_at_block_end(code_cache: &UnsyncCodeCache) {
+    pub(crate) fn populate_from_unsync_code_cache_at_block_end(
+        modules: impl Iterator<Item = (ModuleId, ModuleCacheEntry)>,
+    ) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
             cache.clear();
         }
 
-        code_cache.collect_verified_entries_into(cache.dereference_mut(), |e| {
-            CrossBlockModuleCacheEntry::new(e.clone())
-        });
+        for (id, entry) in modules {
+            if entry.is_verified() {
+                let entry = CrossBlockModuleCacheEntry::new(entry);
+                cache.insert(id, entry);
+            }
+        }
     }
 
     /// Returns true if the module is stored in cross-block cache and is valid.

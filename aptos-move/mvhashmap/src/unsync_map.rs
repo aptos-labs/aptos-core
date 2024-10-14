@@ -12,10 +12,11 @@ use aptos_crypto::hash::HashValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     executable::ModulePath,
+    vm::{code_cache::ModuleCache, modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -47,7 +48,7 @@ pub struct UnsyncMap<
     module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
 
     // Code caches for loader V2 implementation: contains modules and scripts.
-    code_cache: UnsyncCodeCache,
+    code_cache: UnsyncCodeCache<ModuleId, Arc<ModuleCacheEntry>, [u8; 32], ScriptCacheEntry>,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
@@ -85,9 +86,16 @@ impl<
         Self::default()
     }
 
-    /// Returns the code cache stored in this [UnsyncMap].
-    pub fn code_cache(&self) -> &UnsyncCodeCache {
+    /// Returns the code cache for this [UnsyncMap].
+    pub fn code_cache(
+        &self,
+    ) -> &UnsyncCodeCache<ModuleId, Arc<ModuleCacheEntry>, [u8; 32], ScriptCacheEntry> {
         &self.code_cache
+    }
+
+    /// Returns all modules stored inside the [UnsyncMap].
+    pub fn into_modules_iter(self) -> impl Iterator<Item = (ModuleId, Arc<ModuleCacheEntry>)> {
+        self.code_cache.into_modules_iter()
     }
 
     pub fn stats(&self) -> BlockStateStats {
