@@ -1653,6 +1653,77 @@ mod test {
 
     #[test]
     fn test_block_cache_module_reads() {
-        // TODO(loader_v2): Add a test here.
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry =
+            ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
+        mvhashmap
+            .code_cache()
+            .module_cache()
+            .store_committed_module(foo_id.clone(), foo_entry.clone(), 10);
+        captured_reads.capture_block_cache_read(
+            foo_id.clone(),
+            Some(Arc::new(MaybeCommitted::committed(foo_entry.clone(), 10))),
+        );
+
+        let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
+        captured_reads.capture_block_cache_read(bar_id.clone(), None);
+
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Entry did not exist before --> now exists.
+        let bar_entry =
+            ModuleCacheEntry::deserialized_for_test("bar", vec![], &RUNTIME_ENVIRONMENT);
+        mvhashmap
+            .code_cache()
+            .module_cache()
+            .store_committed_module(bar_id.clone(), bar_entry.clone(), 12);
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        captured_reads.module_reads.remove(&bar_id);
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Version has been republished, with a higher transaction index. Should fail validation.
+        mvhashmap
+            .code_cache()
+            .module_cache()
+            .store_committed_module(foo_id.clone(), foo_entry, 20);
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+    }
+
+    #[test]
+    fn test_global_and_block_cache_module_reads() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        // Module exists in global cache.
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
+        CrossBlockModuleCache::add_to_to_cross_block_module_cache(
+            foo_id.clone(),
+            foo_entry.clone(),
+        );
+        captured_reads.capture_global_cache_read(foo_id.clone());
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Assume we republish this module: validation must fail.
+        CrossBlockModuleCache::mark_invalid(&foo_id);
+        mvhashmap
+            .code_cache()
+            .module_cache()
+            .store_committed_module(foo_id.clone(), foo_entry.clone(), 10);
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Assume we re-read the new correct version. Then validation should pass again.
+        captured_reads.capture_block_cache_read(
+            foo_id.clone(),
+            Some(Arc::new(MaybeCommitted::committed(foo_entry.clone(), 10))),
+        );
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!CrossBlockModuleCache::is_valid(&foo_id));
     }
 }
