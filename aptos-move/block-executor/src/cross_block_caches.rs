@@ -303,8 +303,97 @@ impl CrossBlockModuleCache {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         cache.remove(module_id);
     }
+
+    /// Returns the size of the cross-block module cache.
+    #[cfg(test)]
+    pub fn size() -> usize {
+        CROSS_BLOCK_MODULE_CACHE.acquire().len()
+    }
 }
 
 type SyncCrossBlockModuleCache = ExplicitSyncWrapper<HashMap<ModuleId, CrossBlockModuleCacheEntry>>;
 static CROSS_BLOCK_MODULE_CACHE: Lazy<SyncCrossBlockModuleCache> =
     Lazy::new(|| ExplicitSyncWrapper::new(HashMap::new()));
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_types::{
+        on_chain_config::{FeatureFlag, Features},
+        state_store::{
+            errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, StateViewId, TStateView,
+        },
+    };
+    use move_core_types::identifier::Identifier;
+    use move_vm_runtime::RuntimeEnvironment;
+
+    #[derive(Default)]
+    struct HashMapView {
+        data: HashMap<StateKey, StateValue>,
+    }
+
+    impl TStateView for HashMapView {
+        type Key = StateKey;
+
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
+            Ok(self.data.get(state_key).cloned())
+        }
+
+        fn id(&self) -> StateViewId {
+            unreachable!("Not used in tests");
+        }
+
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+            unreachable!("Not used in tests");
+        }
+    }
+
+    #[test]
+    fn test_cross_block_module_cache_flush() {
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry =
+            ModuleCacheEntry::verified_for_test("foo", &[], &RuntimeEnvironment::new(vec![]));
+        CrossBlockModuleCache::add_to_to_cross_block_module_cache(foo_id, foo_entry);
+        assert_eq!(CrossBlockModuleCache::size(), 1);
+
+        CrossBlockModuleCache::flush_at_block_start();
+        assert_eq!(CrossBlockModuleCache::size(), 0);
+
+        // Now check that cache is flushed when the environment is flushed.
+        let mut state_view = HashMapView::default();
+        let env_old = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
+
+        for i in 0..10 {
+            let module_name = format!("foo_{}", i);
+            let id = ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new(module_name.clone()).unwrap(),
+            );
+            let entry = ModuleCacheEntry::verified_for_test(
+                &module_name,
+                &[],
+                &RuntimeEnvironment::new(vec![]),
+            );
+            CrossBlockModuleCache::add_to_to_cross_block_module_cache(id.clone(), entry);
+        }
+        assert_eq!(CrossBlockModuleCache::size(), 10);
+
+        let state_key = StateKey::on_chain_config::<Features>().unwrap();
+        let mut features = Features::default();
+        features.disable(FeatureFlag::KEYLESS_ACCOUNTS);
+        state_view.data.insert(
+            state_key,
+            StateValue::new_legacy(bcs::to_bytes(&features).unwrap().into()),
+        );
+
+        // New environment means we need to also flush global caches - to invalidate struct name
+        // indices.
+        let env_new = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
+        assert!(env_old != env_new);
+        assert_eq!(CrossBlockModuleCache::size(), 0);
+    }
+}
