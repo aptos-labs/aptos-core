@@ -10,7 +10,9 @@ use aptos_crypto::{
 use aptos_forge::{AptosPublicInfo, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_sdk::types::{EphemeralKeyPair, KeylessAccount, LocalAccount};
+use aptos_sdk::types::{
+    EphemeralKeyPair, EphemeralPrivateKey, FederatedKeylessAccount, KeylessAccount, LocalAccount,
+};
 use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
@@ -21,11 +23,11 @@ use aptos_types::{
         get_public_inputs_hash,
         test_utils::{
             self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_aud, get_sample_epk_blinder,
-            get_sample_esk, get_sample_exp_date, get_sample_groth16_sig_and_fed_pk,
-            get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
-            get_sample_iss, get_sample_jwk, get_sample_jwt_header_json, get_sample_jwt_token,
-            get_sample_openid_sig_and_pk, get_sample_pepper, get_sample_tw_sk, get_sample_uid_key,
-            get_sample_uid_val, get_sample_zk_sig, get_upgraded_vk,
+            get_sample_esk, get_sample_exp_date, get_sample_groth16_sig_and_pk,
+            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
+            get_sample_jwt_header_json, get_sample_jwt_token, get_sample_openid_sig_and_pk,
+            get_sample_pepper, get_sample_tw_sk, get_sample_uid_key, get_sample_uid_val,
+            get_sample_zk_sig, get_upgraded_vk,
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
@@ -248,7 +250,7 @@ async fn federated_keyless_scenario(
     install_fed_jwk: bool,
     expect_txn_succeed: bool,
 ) {
-    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net_inner(set_feature_flag).await;
+    let (_tw_sk, _config, _jwk, swarm, mut cli, _) = setup_local_net_inner(set_feature_flag).await;
     let root_addr = swarm.chain_info().root_account().address();
     let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
@@ -317,19 +319,63 @@ script {{
         assert_eq!(Some(true), txn_result.unwrap().success);
     }
 
-    // For simplicity we use the root account as the jwk owner.
-    let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_transaction_any_keyless_pk(
-        &mut info,
-        sig.clone(),
-        AnyKeylessPublicKey::Federated(pk),
-        &jwk,
-        &config,
-        Some(&tw_sk),
-        1,
+
+    let esk = EphemeralPrivateKey::Ed25519 {
+        inner_private_key: get_sample_esk(),
+    };
+    let ephemeral_key_pair =
+        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+    let federated_keyless_account = FederatedKeylessAccount::new_from_jwt(
+        &get_sample_jwt_token(),
+        ephemeral_key_pair,
+        root_addr,
+        None,
+        Some(get_sample_pepper()),
+        Some(get_sample_zk_sig()),
     )
-    .await;
+    .unwrap();
+
+    let federated_keyless_public_key = federated_keyless_account.public_key().clone();
+
+    let local_account = LocalAccount::new_federated_keyless(
+        federated_keyless_account
+            .authentication_key()
+            .account_address(),
+        federated_keyless_account,
+        0,
+    );
+
+    // If the account does not exist, create it.
+    if info.account_exists(local_account.address()).await.is_err() {
+        info!(
+            "{} account does not exist. Creating...",
+            local_account.address().to_hex_literal()
+        );
+        info.sync_root_account_sequence_number().await;
+        info.create_user_account_with_any_key(&AnyPublicKey::FederatedKeyless {
+            public_key: federated_keyless_public_key,
+        })
+        .await
+        .unwrap();
+        info.mint(local_account.address(), 10_000_000_000)
+            .await
+            .unwrap();
+    }
+    info.sync_root_account_sequence_number().await;
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let txn_builder = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(
+            recipient.address(),
+            1_000_000,
+        ));
+
+    let signed_txn = local_account.sign_with_transaction_builder(txn_builder);
 
     let result = swarm
         .aptos_public_info()
@@ -384,10 +430,11 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
 
-    let blinder = get_sample_epk_blinder();
-    let exp_date = get_sample_exp_date();
-    let esk = get_sample_esk();
-    let ephemeral_key_pair = EphemeralKeyPair::new(esk, exp_date, blinder).unwrap();
+    let esk = EphemeralPrivateKey::Ed25519 {
+        inner_private_key: get_sample_esk(),
+    };
+    let ephemeral_key_pair =
+        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
 
     let mut info = swarm.aptos_public_info();
     let keyless_account = KeylessAccount::new(
@@ -443,15 +490,15 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
 async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
 
-    let jwt = get_sample_jwt_token();
-    let blinder = get_sample_epk_blinder();
-    let exp_date = get_sample_exp_date();
-    let esk = get_sample_esk();
-    let ephemeral_key_pair = EphemeralKeyPair::new(esk, exp_date, blinder).unwrap();
+    let esk = EphemeralPrivateKey::Ed25519 {
+        inner_private_key: get_sample_esk(),
+    };
+    let ephemeral_key_pair =
+        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
 
     let mut info = swarm.aptos_public_info();
     let keyless_account = KeylessAccount::new_from_jwt(
-        &jwt,
+        &get_sample_jwt_token(),
         ephemeral_key_pair,
         None,
         Some(get_sample_pepper()),

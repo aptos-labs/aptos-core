@@ -54,10 +54,7 @@ impl WriteSetDb {
     pub(crate) fn get_write_set(&self, version: Version) -> Result<WriteSet> {
         self.db
             .get::<WriteSetSchema>(&version)?
-            .ok_or(AptosDbError::NotFound(format!(
-                "WriteSet at version {}",
-                version
-            )))
+            .ok_or_else(|| AptosDbError::NotFound(format!("WriteSet at version {}", version)))
     }
 
     /// Returns an iterator that yields `num_transactions` write sets starting from `start_version`.

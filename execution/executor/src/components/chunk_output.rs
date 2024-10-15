@@ -116,12 +116,10 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_output(
-        transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
+        transactions: Vec<Transaction>,
+        transaction_outputs: Vec<TransactionOutput>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
-            transactions_and_outputs.into_iter().unzip();
-
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
 
         // collect all accounts touched and dedup

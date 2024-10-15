@@ -1009,6 +1009,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "aptos-crypto-derive",
+ "arbitrary",
  "ark-bls12-381",
  "ark-bn254",
  "ark-ec",
@@ -2092,6 +2093,25 @@ dependencies = [
  "tonic-reflection",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-file-checker"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-metrics-core",
+ "async-trait",
+ "clap 4.4.14",
+ "cloud-storage",
+ "jemallocator",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3704,6 +3724,7 @@ dependencies = [
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "serde",
  "serde_json",
  "tiny-bip39",
  "tokio",
@@ -4286,6 +4307,7 @@ dependencies = [
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-proptest-helpers",
+ "arbitrary",
  "ark-bn254",
  "ark-crypto-primitives",
  "ark-ec",
@@ -8410,6 +8432,7 @@ name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
  "aptos-cached-packages",
+ "aptos-crypto",
  "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-types",
@@ -8423,6 +8446,8 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -12234,9 +12259,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.62"
+version = "0.10.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cde4d2d9200ad5909f8dac647e29482e07c3a35de8a13fce7c9c7747ad9f671"
+checksum = "9529f4786b70a3e8c61e11179af17ab6188ad8d0ded78c5529441ed39d4bd9c1"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
@@ -12266,9 +12291,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.98"
+version = "0.9.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1665caf8ab2dc9aef43d1c0023bd904633a6a05cb30b0ad59bec2ae986e57a7"
+checksum = "7f9e8deee91df40a943c71b917e5874b951d32a802526c85721ce3b776c929d6"
 dependencies = [
  "cc",
  "libc",
@@ -15850,9 +15875,9 @@ dependencies = [
 
 [[package]]
 name = "strum"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
+checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
 
 [[package]]
 name = "strum_macros"
@@ -16697,7 +16722,7 @@ dependencies = [
  "prost 0.12.3",
  "rustls-native-certs 0.7.0",
  "rustls-pemfile 2.1.1",
- "strum 0.26.2",
+ "strum 0.26.3",
  "strum_macros 0.26.4",
  "tokio",
  "tokio-rustls 0.26.0",

@@ -349,9 +349,7 @@ impl<'t> AccountMinter<'t> {
             .await
             .into_iter()
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| format_err!("Failed to create accounts: {:?}", e))?
-            .into_iter()
-            .collect();
+            .map_err(|e| format_err!("Failed to create accounts: {:?}", e))?;
 
         info!(
             "Successfully completed creating {} accounts in {}s, request stats: {}",
@@ -493,7 +491,7 @@ async fn create_and_fund_new_accounts(
         .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
     let source_address = source_account.address();
-    for batch in accounts_by_batch {
+    for (batch_index, batch) in accounts_by_batch.into_iter().enumerate() {
         let creation_requests: Vec<_> = batch
             .iter()
             .map(|account| {
@@ -509,7 +507,12 @@ async fn create_and_fund_new_accounts(
         txn_executor
             .execute_transactions_with_counter(&creation_requests, counters)
             .await
-            .with_context(|| format!("Account {} couldn't mint", source_address))?;
+            .with_context(|| {
+                format!(
+                    "Account {} couldn't mint batch {}",
+                    source_address, batch_index
+                )
+            })?;
     }
     Ok(())
 }
@@ -698,18 +701,24 @@ pub async fn bulk_create_accounts(
             .iter()
             .map(|account| txn_executor.get_account_balance(account.address()));
         let balances: Vec<_> = try_join_all(balance_futures).await?;
-        accounts
+        let underfunded = accounts
             .iter()
             .zip(balances)
-            .for_each(|(account, balance)| {
-                assert!(
-                    balance >= coins_per_account,
-                    "Account {} has balance {} < needed_min_balance {}",
-                    account.address(),
-                    balance,
-                    coins_per_account
-                );
-            });
+            .enumerate()
+            .filter(|(_idx, (_account, balance))| *balance < coins_per_account)
+            .collect::<Vec<_>>();
+
+        let first = underfunded.first();
+        assert!(
+            underfunded.is_empty(),
+            "{} out of {} accounts are underfunded. For example Account[{}] {} has balance {} < needed_min_balance {}",
+            underfunded.len(),
+            accounts.len(),
+            first.unwrap().0, // idx
+            first.unwrap().1.0.address(), // account
+            first.unwrap().1.1, // balance
+            coins_per_account,
+        );
 
         info!("Skipping funding accounts");
         Ok(accounts)

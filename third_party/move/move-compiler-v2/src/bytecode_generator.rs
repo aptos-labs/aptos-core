@@ -450,11 +450,11 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::Jump(attr, continue_label));
                 self.emit_with(*id, |attr| Bytecode::Label(attr, break_label));
             },
-            ExpData::LoopCont(id, 0, do_continue) => {
+            ExpData::LoopCont(id, nest, do_continue) => {
                 if let Some(LoopContext {
                     continue_label,
                     break_label,
-                }) = self.loops.last()
+                }) = self.loops.iter().rev().nth(*nest)
                 {
                     let target = if *do_continue {
                         *continue_label
@@ -465,9 +465,6 @@ impl<'env> Generator<'env> {
                 } else {
                     self.error(*id, "missing enclosing loop statement")
                 }
-            },
-            ExpData::LoopCont(_, _, _) => {
-                unimplemented!("continue/break with nesting")
             },
             ExpData::SpecBlock(id, spec) => {
                 // Map locals in spec to assigned temporaries.

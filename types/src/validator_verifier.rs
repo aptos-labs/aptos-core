@@ -628,6 +628,25 @@ pub fn random_validator_verifier(
     custom_voting_power_quorum: Option<u128>,
     pseudo_random_account_address: bool,
 ) -> (Vec<ValidatorSigner>, ValidatorVerifier) {
+    random_validator_verifier_with_voting_power(
+        count,
+        custom_voting_power_quorum,
+        pseudo_random_account_address,
+        &[],
+    )
+}
+
+/// Helper function to get random validator signers and a corresponding validator verifier for
+/// testing.  If custom_voting_power_quorum is not None, set a custom voting power quorum amount.
+/// With pseudo_random_account_address enabled, logs show `0 -> [0000]`, `1 -> [1000]`
+/// `voting_power` is optional in that if it's empty then a voting power of 1 is used.
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn random_validator_verifier_with_voting_power(
+    count: usize,
+    custom_voting_power_quorum: Option<u128>,
+    pseudo_random_account_address: bool,
+    voting_power: &[u64],
+) -> (Vec<ValidatorSigner>, ValidatorVerifier) {
     let mut signers = Vec::new();
     let mut validator_infos = vec![];
     for i in 0..count {
@@ -639,7 +658,7 @@ pub fn random_validator_verifier(
         validator_infos.push(ValidatorConsensusInfo::new(
             random_signer.author(),
             random_signer.public_key(),
-            1,
+            *voting_power.get(i).unwrap_or(&1),
         ));
         signers.push(random_signer);
     }
