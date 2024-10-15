@@ -527,6 +527,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
             exclude_transactions,
             callback,
         ) => {
+            info!("Process quorum store request: GetBatchRequest");
             let txns;
             {
                 let lock_timer = counters::mempool_service_start_latency_timer(
