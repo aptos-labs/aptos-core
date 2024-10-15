@@ -49,7 +49,7 @@ if SOURCE not in ["ADHOC", "CI", "LOCAL"]:
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "20000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "300000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
@@ -213,8 +213,14 @@ TESTS = [
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed1-market"), expected_stages=10, included_in=Flow.ECONIA),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed10-market"), expected_stages=10, included_in=Flow.ECONIA),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed100-market"), expected_stages=10, included_in=Flow.ECONIA),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market10-market-reuse-accounts"), included_in=Flow.ECONIA),
-    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market1-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market10-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market100-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed1-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed10-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed100-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), included_in=Flow.ECONIA),
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
