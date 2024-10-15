@@ -2482,6 +2482,9 @@ impl VectorRef {
     ) -> PartialVMResult<()> {
         let from_c = self.0.container();
         let to_c = to_self.0.container();
+
+        // potentially unnecessary as native call should've checked the types already
+        // (unlike other vector functions that are bytecodes)
         check_elem_layout(type_param, from_c)?;
         check_elem_layout(type_param, to_c)?;
 

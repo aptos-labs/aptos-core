@@ -23,13 +23,15 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
+use super::mem::get_feature_not_available_error;
+
 /// The generic type supplied to aggregator snapshots is not supported.
 pub const EINDEX_OUT_OF_BOUNDS: u64 = 0x03_0001;
 
 /***************************************************************************************************
- * native fun vector_move<T>(from: &mut vector<T>, removal_position: u64, length: u64, to: &mut vector<T>, insert_position: u64)
+ * native fun range_move<T>(from: &mut vector<T>, removal_position: u64, length: u64, to: &mut vector<T>, insert_position: u64)
  *
- *   gas cost: VECTOR_RANGE_MOVE_BASE + EINDEX_OUT_OF_BOUNDS * num_elements_to_move
+ *   gas cost: VECTOR_RANGE_MOVE_BASE + VECTOR_RANGE_MOVE_PER_INDEX_MOVED * num_elements_to_move
  *
  **************************************************************************************************/
 fn native_range_move(
@@ -37,6 +39,10 @@ fn native_range_move(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if !context.get_feature_flags().is_native_memory_operations_enabled() {
+        return Err(get_feature_not_available_error());
+    }
+
     context.charge(VECTOR_RANGE_MOVE_BASE)?;
 
     let map_err = |_| SafeNativeError::Abort {
