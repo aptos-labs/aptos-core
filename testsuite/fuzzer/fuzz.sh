@@ -120,10 +120,18 @@ function build-oss-fuzz() {
     ld.lld --version
     clang --version
 
-    if ! build all ./target; then
-        env
-        error "Build failed. Exiting."
-    fi
+    # Limit the number of parallel jobs to avoid OOM
+    # export CARGO_BUILD_JOBS = 3
+
+    # Build the fuzz targets
+    # Doing one target at the time should prevent OOM, but use all thread while bulding dependecies
+    for fuzz_target in $(list); do
+        if ! build $fuzz_target ./target ; then
+            env
+            error "Build failed. Exiting."
+        fi
+    done
+
     find ./target/*/release/ -maxdepth 1 -type f -perm /111 -exec cp {} $oss_fuzz_out \;
 
     # Download corpus zip
