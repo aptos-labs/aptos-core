@@ -832,21 +832,19 @@ module aptos_framework::atomic_bridge_store {
     public fun get_bridge_transfer_details_initiator(
         bridge_transfer_id: vector<u8>
     ): BridgeTransferDetails<address, EthereumAddress> acquires SmartTableWrapper {
-        let table = borrow_global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<address, EthereumAddress>>>(@aptos_framework);
-
-        let details_ref = smart_table::borrow(
-            &table.inner,
-            bridge_transfer_id
-        );
-
-        *details_ref
+        get_bridge_transfer_details(bridge_transfer_id)
     }
 
     #[view]
     public fun get_bridge_transfer_details_counterparty(
         bridge_transfer_id: vector<u8>
     ): BridgeTransferDetails<EthereumAddress, address> acquires SmartTableWrapper {
-        let table = borrow_global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<EthereumAddress, address>>>(@aptos_framework);
+        get_bridge_transfer_details(bridge_transfer_id)
+    }
+
+    fun get_bridge_transfer_details<Initiator: store + copy, Recipient: store + copy>(bridge_transfer_id: vector<u8>
+    ): BridgeTransferDetails<Initiator, Recipient> acquires SmartTableWrapper {
+        let table = borrow_global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details_ref = smart_table::borrow(
             &table.inner,
