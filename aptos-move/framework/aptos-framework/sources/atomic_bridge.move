@@ -1356,8 +1356,7 @@ module aptos_framework::atomic_bridge_counterparty {
     ) {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
         let ethereum_address = ethereum::ethereum_address(initiator);
-        let time_lock = atomic_bridge_store::create_time_lock(
-            atomic_bridge_configuration::counterparty_timelock_duration());
+        let time_lock = atomic_bridge_configuration::counterparty_timelock_duration();
         let details = atomic_bridge_store::create_details(
             ethereum_address,
             recipient,
