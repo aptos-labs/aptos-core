@@ -64,7 +64,7 @@ struct Args {
     #[clap(long)]
     pub fanout_init_randomly: bool,
 
-    #[clap(long, default_value_t = 0.2)]
+    #[clap(long, default_value_t = 0.1)]
     pub fanout_probability: f32,
 
     #[clap(long, default_value_t = 1.0)]
@@ -107,14 +107,14 @@ fn main() {
             num_iterations: args.fanout_num_iterations,
             init_strategy: if args.fanout_init_randomly { InitStrategy::Random } else { InitStrategy::PriorityBfs },
             move_probability: args.fanout_move_probability,
-            fanout_formula: FanoutFormula::new(args.fanout_probability),
+            init_fanout_formula: FanoutFormula::new(args.fanout_probability),
         })],
         "fanout_sweep" => vec![
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 50, init_strategy: InitStrategy::Random, move_probability: 0.8, fanout_formula: FanoutFormula::new(args.fanout_probability) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 0, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(args.fanout_probability) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(0.2) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(0.5) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, fanout_formula: FanoutFormula::new(0.8) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 50, init_strategy: InitStrategy::Random, move_probability: 0.8, init_fanout_formula: FanoutFormula::new(args.fanout_probability) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 0, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(args.fanout_probability) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.2) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.5) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.8) }),
             Box::new(V3FennelBasedPartitioner { print_debug_stats: args.debug_logs }),
         ],
         _ => {

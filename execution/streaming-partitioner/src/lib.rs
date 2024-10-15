@@ -88,7 +88,7 @@ impl BlockPartitioner for V3FennelBasedPartitioner {
         }
 
         let txns = txn_holders.into_iter().map(|holder| holder.unwrap()).collect();
-        PartitionedTransactions::V3(build_partitioning_result(num_shards,txns, shard_idxs_by_txn, self.print_debug_stats))
+        PartitionedTransactions::V3(build_partitioning_result(num_shards,txns, shard_idxs_by_txn, self.print_debug_stats, false))
     }
 }
 

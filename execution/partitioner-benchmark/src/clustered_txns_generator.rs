@@ -1,13 +1,14 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 use rand::Rng;
 use rand::seq::SliceRandom;
 use aptos_block_partitioner::test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use rand_distr::{Distribution, LogNormal, Normal};
 use aptos_logger::info;
+use rayon::prelude::*;
 
 pub struct ClusteredTxnsGenerator {
     num_clusters: usize,
@@ -218,12 +219,16 @@ impl ClusteredTxnsGenerator {
         info!("Time taken to generate txn_indices: {:?}", duration);
 
         let start_time = Instant::now();
-        let txns: Vec<AnalyzedTransaction> = txn_indices.iter().map(|indices| {
-            let(sender_idx, (recvr_cluster, recvr_resource_idx)) = indices;
+        let mut by_sender = HashMap::new();
+        for (sender_idx, (recvr_cluster, recvr_resource_idx)) in txn_indices {
+            by_sender.entry(sender_idx).or_insert(Vec::new()).push((recvr_cluster, recvr_resource_idx));
+        }
+
+        let txns: Vec<AnalyzedTransaction> = by_sender.par_iter().map(|(sender_idx, recvs)| {
+            let receivers = recvs.iter().map(|(recvr_cluster, recvr_resource_idx)| &self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]).collect::<Vec<_>>();
             let sender = &self.all_user_accounts[*sender_idx];
-            let receiver = &self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx];
-            create_signed_p2p_transaction(sender, vec![receiver]).remove(0)
-        }).collect();
+            create_signed_p2p_transaction(sender, receivers)
+        }).flatten().collect();
         let duration = start_time.elapsed();
         info!("Time taken to create p2p txns: {:?}", duration);
 

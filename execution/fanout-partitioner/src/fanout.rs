@@ -47,7 +47,7 @@ pub struct FanoutPartitioner {
     pub num_iterations: usize,
     pub init_strategy: InitStrategy,
     pub move_probability: f64,
-    pub fanout_formula: FanoutFormula,
+    pub init_fanout_formula: FanoutFormula,
 }
 
 impl BlockPartitioner for FanoutPartitioner {
@@ -74,7 +74,7 @@ impl BlockPartitioner for FanoutPartitioner {
 
         let shard_idxs = transactions.iter().map(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize] as usize).collect();
 
-        PartitionedTransactions::V3(build_partitioning_result(num_shards, transactions, shard_idxs, self.print_debug_stats))
+        PartitionedTransactions::V3(build_partitioning_result(num_shards, transactions, shard_idxs, self.print_debug_stats, self.print_detailed_debug_stats))
     }
 }
 
@@ -236,6 +236,7 @@ impl CompressedGraph {
 
 const UNASSIGNED_SHARD: u16 = u16::MAX;
 
+#[derive(Clone)]
 pub struct FanoutFormula {
     fanout_probability: f32,
     fanout_1_minus_p: f32,
@@ -344,15 +345,23 @@ impl FanoutPartitioner {
     }
 
     fn optimize_probabilistic_fanout(&self, mut sender_shard: Vec<u16>, graph: &CompressedGraph, num_shards: u16) -> Vec<u16> {
+        let mut fanout_formula = self.init_fanout_formula.clone();
         let mut shard_weights = Self::compute_shard_weights(graph, num_shards, &sender_shard);
         let mut access_shards = Self::compute_access_shards(graph, num_shards, &sender_shard);
-        let mut sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards);
+        let mut sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards, &fanout_formula);
 
-        self.print_fanout_stats(&access_shards, graph, "init");
+        let mut prev_fanout = self.print_fanout_stats(&access_shards, graph, "init", &fanout_formula);
         self.print_weight_stats(&shard_weights);
         for iter in 0..self.num_iterations {
-            self.optimize_probabilistic_fanout_iteration(&mut sender_shard, &mut shard_weights, &mut access_shards, &mut sender_shard_weights, graph, num_shards);
-            self.print_fanout_stats(&access_shards, graph, format!("iter {}", iter).as_str());
+            let num_moves = self.optimize_probabilistic_fanout_iteration(&mut sender_shard, &mut shard_weights, &mut access_shards, &mut sender_shard_weights, graph, num_shards, &fanout_formula);
+            let cur_fanout = self.print_fanout_stats(&access_shards, graph, format!("iter {} with {} moves", iter, num_moves).as_str(), &fanout_formula);
+            if (cur_fanout - 1.0) > (prev_fanout - 1.0) * 0.998 && fanout_formula.fanout_probability < 0.99 {
+                let new_fanout_prob = fanout_formula.fanout_probability.powf(0.75);
+                println!("Not enough improvement, increasing probability to {}", new_fanout_prob);
+                fanout_formula = FanoutFormula::new(new_fanout_prob);
+                sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards, &fanout_formula);
+            }
+            prev_fanout = cur_fanout;
             self.print_weight_stats(&shard_weights);
         }
 
@@ -379,7 +388,7 @@ impl FanoutPartitioner {
         access_shards
     }
 
-    fn compute_sender_shard_weights(&self, graph: &CompressedGraph, num_shards: u16, access_shards: &Vec<Vec<u32>>) -> Vec<Vec<f32>> {
+    fn compute_sender_shard_weights(&self, graph: &CompressedGraph, num_shards: u16, access_shards: &Vec<Vec<u32>>, fanout_formula: &FanoutFormula) -> Vec<Vec<f32>> {
         let mut sender_shard_weights = Vec::with_capacity(graph.num_senders() as usize);
 
         for sender in graph.sender_range() {
@@ -387,7 +396,7 @@ impl FanoutPartitioner {
             for access in graph.edges.get_edges(sender) {
                 let cur_shards = &*access_shards[graph.access_to_vec_index(*access)];
                 for i in 0..(num_shards as usize) {
-                    weights[i] += self.fanout_formula.calc_aggregatable_weight(cur_shards[i]);
+                    weights[i] += fanout_formula.calc_aggregatable_weight(cur_shards[i]);
                 }
             }
             sender_shard_weights.push(weights);
@@ -403,7 +412,7 @@ impl FanoutPartitioner {
         println!("Shard weights: avg={}, min={}, max={}, min_ratio={}, max_ratio={} ", avg, min, max, min as f32 / avg as f32, max as f32 / avg as f32);
     }
 
-    fn print_fanout_stats(&self, access_shards: &[Vec<u32>], graph: &CompressedGraph, desc: &str) {
+    fn print_fanout_stats(&self, access_shards: &[Vec<u32>], graph: &CompressedGraph, desc: &str, fanout_formula: &FanoutFormula) -> f32 {
         let mut fanout = 0;
         let mut prob_fanout = 0.0f32;
         let mut in_max = 0;
@@ -413,7 +422,7 @@ impl FanoutPartitioner {
             for count in &access_shards[graph.access_to_vec_index(access_idx)] {
                 if *count > 0 {
                     fanout += 1;
-                    prob_fanout += self.fanout_formula.calc_prob_fanout(*count);
+                    prob_fanout += fanout_formula.calc_prob_fanout(*count);
                 }
             }
             let max = *access_shards[graph.access_to_vec_index(access_idx)].iter().max().unwrap();
@@ -422,9 +431,10 @@ impl FanoutPartitioner {
             in_total += total;
         }
         println!("{}: fanuot: {}, prob fanout: {}, avg degree in max: {}, avg degree in rest {}", desc, fanout as f32 / num_accesses, prob_fanout / num_accesses, in_max as f32 / num_accesses, (in_total - in_max) as f32 / num_accesses);
+        fanout as f32 / num_accesses
     }
 
-    fn optimize_probabilistic_fanout_iteration(&self, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>, access_shards: &mut Vec<Vec<u32>>, sender_shard_weights: &mut Vec<Vec<f32>>, graph: &CompressedGraph, num_shards: u16) {
+    fn optimize_probabilistic_fanout_iteration(&self, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>, access_shards: &mut Vec<Vec<u32>>, sender_shard_weights: &mut Vec<Vec<f32>>, graph: &CompressedGraph, num_shards: u16, fanout_formula: &FanoutFormula) -> usize {
         let target_shard_weight = shard_weights.iter().sum::<u32>() / shard_weights.len() as u32;
         let max_shard_weight = 1 + target_shard_weight * 102 / 100;
 
@@ -445,7 +455,7 @@ impl FanoutPartitioner {
                 .map(|(index, _)| index)
                 .unwrap() as u16;
 
-            let gain = self.fanout_formula.calc_gain(&weights, cur_sender_shard, best_end_shard);
+            let gain = fanout_formula.calc_gain(&weights, cur_sender_shard, best_end_shard);
             let gain_not_nan = NotNan::new(gain).unwrap();
 
             if &gain > &0.0 {
@@ -453,7 +463,7 @@ impl FanoutPartitioner {
             }
             best_queue[cur_sender_shard as usize][best_end_shard as usize].push((gain_not_nan, sender));
 
-            let gain_lower_limit = NotNan::new(self.fanout_formula.calc_gain_lower_limit(&weights, cur_sender_shard)).unwrap();
+            let gain_lower_limit = NotNan::new(fanout_formula.calc_gain_lower_limit(&weights, cur_sender_shard)).unwrap();
             least_worst_queue[cur_sender_shard as usize].push((gain_lower_limit, sender));
         }
 
@@ -463,7 +473,7 @@ impl FanoutPartitioner {
         let mut best_gain: f32 = 0.0;
         let mut rng = rand::thread_rng();
 
-        let mut move_sender = |sender: u32, sender_weight: u32, to_shard: u16, moved: &mut Vec<bool>, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>| {
+        let move_sender = |sender: u32, sender_weight: u32, to_shard: u16, moved: &mut Vec<bool>, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>| {
             let sender = sender as usize;
             moved[sender] = true;
             let from_shard = sender_shard[sender];
@@ -549,7 +559,7 @@ impl FanoutPartitioner {
                 let pass_weight_check = from_shard_weight.max(to_shard_weight).max(max_shard_weight) >=
                     (from_shard_weight - sender_weight + other_weight).max(to_shard_weight + sender_weight - other_weight);
 
-                let other_gain = self.fanout_formula.calc_gain(&sender_shard_weights[*other_sender as usize], to_shard, from_shard);
+                let other_gain = fanout_formula.calc_gain(&sender_shard_weights[*other_sender as usize], to_shard, from_shard);
                 let total_gain = (gain + other_gain).into_inner();
                 if pass_weight_check && !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
                     if self.print_detailed_debug_stats && num_moves == 0 {
@@ -571,14 +581,12 @@ impl FanoutPartitioner {
             }
         }
 
-        if self.print_detailed_debug_stats {
-            println!("Num moves : {}", num_moves);
-        }
-
         // this can be done incrementally.
         // *shard_weights = Self::compute_shard_weights(graph, num_shards, &sender_shard);
         *access_shards = Self::compute_access_shards(graph, num_shards, sender_shard);
-        *sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards);
+        *sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards, fanout_formula);
+
+        num_moves
     }
 
     fn optimize_transaction_order(&self, transactions: &mut Vec<AnalyzedTransaction>, sender_shard: &Vec<u16>, graph: &CompressedGraph, num_shards: u16) {
@@ -614,32 +622,86 @@ impl FanoutPartitioner {
             }
         }
 
-        transactions.sort_by_key(|txn| {
+        let mut tmp = vec![];
+        mem::swap(&mut tmp, transactions);
+        let (unconstrained, mut constrained): (Vec<_>, Vec<_>) = tmp.into_iter().map(|txn| {
             let sender = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize;
             let (sum, count) = sender_to_positions[sender];
-            Reverse((NotNan::new(if count > 0 { sum / (count as f32) } else { 0.5 }).unwrap(), sender_shard[sender]))
-        });
+            (txn, sum, count, sender_shard[sender])
+        }).partition(|(_txn, _sum, count, _shard)| *count == 0);
+
+        constrained.sort_by_key(|(_txn, sum, count, shard)| (Reverse(NotNan::new(*sum / (*count as f32)).unwrap()), *shard));
+
+        let mut shard_to_unconstrained = vec![vec![]; num_shards as usize];
+        for (txn, _sum, _count, shard) in unconstrained {
+            shard_to_unconstrained[shard as usize].push(txn);
+        }
+
+        println!("Starting unconstrained counts {:?}", shard_to_unconstrained.iter().map(|v| v.len()).collect::<Vec<_>>());
+
+        // transactions.sort_by_key(|txn| {
+        //     let sender = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize;
+        //     let (sum, count) = sender_to_positions[sender];
+        //     Reverse((NotNan::new(if count > 0 { sum / (count as f32) } else { 0.5 }).unwrap(), sender_shard[sender]))
+        // });
+
+        // if self.print_debug_stats {
+
+        let mut prev = 1.0;
+        let mut last = 1.0 + 1.0 / num_shards as f32;
+        let mut shard_fill = vec![0u32; num_shards as usize];
+        for (txn, sum, count, shard) in constrained.into_iter() {
+            let cur = sum / (count as f32);
+            if prev > cur {
+                if self.print_detailed_debug_stats {
+                    println!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
+                }
+
+                if (last == 1.0 && last > cur) || (last > cur as f32 + 1.0 / num_shards as f32) {
+                    if !self.print_detailed_debug_stats && self.print_debug_stats {
+                        println!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
+                    }
+
+                    let fill_max = *shard_fill.iter().max().unwrap();
+
+                    // let fill_max = (0..num_shards).map(|shard| shard_to_unconstrained[shard as usize].len() as u32 + shard_fill[shard as usize]).min().unwrap().min(fill_max);
+
+                    for shard in 0..num_shards {
+                        let cur_unconstrained = &mut shard_to_unconstrained[shard as usize];
+                        while !cur_unconstrained.is_empty() && shard_fill[shard as usize] < fill_max {
+                            transactions.push(cur_unconstrained.pop().unwrap());
+                            shard_fill[shard as usize] += 1;
+                            if cur_unconstrained.is_empty() {
+                                println!("Run out of unconstrained on {}", shard);
+                            }
+                        }
+                    }
+
+                    last = cur;
+                }
+
+                prev = cur;
+            }
+            // if self.print_debug_stats {
+            //     if transactions.len() % 10000 == 0 {
+            //         println!("running value {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
+            //     }
+            // }
+
+            transactions.push(txn);
+            shard_fill[shard as usize] += 1;
+        }
+        if self.print_debug_stats {
+            println!("Ending {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
+        }
+
+        for shard in 0..num_shards {
+            shard_fill[shard as usize] += shard_to_unconstrained[shard as usize].len() as u32;
+            transactions.append(&mut shard_to_unconstrained[shard as usize]);
+        }
 
         if self.print_debug_stats {
-            let mut prev = 1.0;
-            let mut shard_fill = vec![0; num_shards as usize];
-            for (txn_idx, txn) in transactions.iter().enumerate() {
-                let sender = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize;
-
-                let (sum, count) = sender_to_positions[sender];
-
-                let cur = if count > 0 { sum / (count as f32) } else { 0.5 };
-                if prev > cur {
-                    println!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, txn_idx, cur, sum, count, shard_fill);
-                    prev = cur;
-                }
-                if txn_idx % 10000 == 0 {
-                    println!("running value {} at {}, cur {}={}/{}. shard fill: {:?}", prev, txn_idx, cur, sum, count, shard_fill);
-                }
-
-                shard_fill[sender_shard[sender] as usize] += 1;
-            }
-            println!("Ending {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
+            println!("Ending after top-up {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
         }
 
         // transactions.sort_by_key(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize]);

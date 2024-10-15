@@ -113,7 +113,7 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
             })
             .collect();
 
-        PartitionedTransactions::V3(build_partitioning_result(num_shards, txns, shard_idxs, self.print_debug_stats))
+        PartitionedTransactions::V3(build_partitioning_result(num_shards, txns, shard_idxs, self.print_debug_stats, false))
     }
 }
 

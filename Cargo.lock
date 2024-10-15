@@ -11983,6 +11983,7 @@ dependencies = [
  "clap 4.4.14",
  "rand 0.8.5",
  "rand_distr",
+ "rayon",
 ]
 
 [[package]]
