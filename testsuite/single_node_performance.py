@@ -39,12 +39,19 @@ class Flow(Flag):
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 
 SELECTED_FLOW = Flow[os.environ.get("FLOW", default="ECONIA")]
+print(f"Executing flow: {SELECTED_FLOW}")
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
+SOURCE = os.environ.get("SOURCE", default="LOCAL")
+if SOURCE not in ["ADHOC", "CI", "LOCAL"]:
+    print(f"Unrecogznied source {SOURCE}")
+    exit(1)
+
+RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
     "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "20000"
 )
-DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
+DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=45))
@@ -59,11 +66,14 @@ NUM_ACCOUNTS = (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
-NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
+NOISE_LOWER_LIMIT_WARN = 0.9
 # If you want to calibrate the upper limit for perf improvement, you can
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
-NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
+NOISE_UPPER_LIMIT = 1.15
+NOISE_UPPER_LIMIT_WARN = 1.05
+
+SKIP_WARNS = IS_MAINNET
+SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
@@ -120,8 +130,6 @@ class RunGroupKeyExtra:
     transaction_weights_override: Optional[str] = field(default=None)
     sharding_traffic_flags: Optional[str] = field(default=None)
 
-    smaller_working_set: bool = field(default=False)
-
 
 @dataclass
 class RunGroupConfig:
@@ -146,54 +154,59 @@ class RunGroupConfig:
 
 # 0-indexed
 CALIBRATED_TPS_INDEX = -1
+CALIBRATED_COUNT_INDEX = -4
+CALIBRATED_MIN_RATIO_INDEX = -3
+CALIBRATED_MAX_RATIO_INDEX = -2
 CALIBRATION_SEPARATOR = "	"
 
-# transaction_type	module_working_set_size	executor_type	min_ratio	max_ratio	median
+# transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
 CALIBRATION = """
-no-op	1	VM	0.900	1.031	33440.0
-no-op	1000	VM	0.926	1.020	20420.9
-apt-fa-transfer	1	VM	0.860	1.030	25331.5
-account-generation	1	VM	0.892	1.036	20798.2
-account-resource32-b	1	VM	0.896	1.046	29796.4
-modify-global-resource	1	VM	0.932	1.009	2870.9
-modify-global-resource	10	VM	0.931	1.016	16886.3
-publish-package	1	VM	0.932	1.031	149.5
-mix_publish_transfer	1	VM	0.956	1.099	2259.6
-batch100-transfer	1	VM	0.859	1.023	784.5
-vector-picture30k	1	VM	0.954	1.021	112.2
-vector-picture30k	20	VM	0.879	1.036	1119.0
-smart-table-picture30-k-with200-change	1	VM	0.950	1.044	21.8
-smart-table-picture30-k-with200-change	20	VM	0.946	1.056	185.9
-modify-global-resource-agg-v2	1	VM	0.877	1.050	29796.4
-modify-global-flag-agg-v2	1	VM	0.964	1.022	5294.9
-modify-global-bounded-agg-v2	1	VM	0.938	1.076	8866.4
-modify-global-milestone-agg-v2	1	VM	0.907	1.026	24885.0
-resource-groups-global-write-tag1-kb	1	VM	0.941	1.043	9039.0
-resource-groups-global-write-and-read-tag1-kb	1	VM	0.936	1.020	6221.0
-resource-groups-sender-write-tag1-kb	1	VM	0.893	1.047	20798.2
-resource-groups-sender-multi-change1-kb	1	VM	0.906	1.054	16553.6
-token-v1ft-mint-and-transfer	1	VM	0.899	1.041	1276.2
-token-v1ft-mint-and-transfer	20	VM	0.879	1.011	11483.9
-token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.024	812.9
-token-v1nft-mint-and-transfer-sequential	20	VM	0.883	1.012	7732.8
-coin-init-and-mint	1	VM	0.845	1.026	27205.9
-coin-init-and-mint	20	VM	0.815	1.033	23591.6
-fungible-asset-mint	1	VM	0.848	1.018	21180.4
-fungible-asset-mint	20	VM	0.874	1.043	19680.6
-no-op5-signers	1	VM	0.884	1.041	33440.0
-token-v2-ambassador-mint	1	VM	0.840	1.028	15320.8
-token-v2-ambassador-mint	20	VM	0.866	1.016	15320.8
-liquidity-pool-swap	1	VM	0.909	1.028	975.7
-liquidity-pool-swap	20	VM	0.895	1.010	8194.6
-liquidity-pool-swap-stable	1	VM	0.899	1.016	957.5
-liquidity-pool-swap-stable	20	VM	0.917	1.022	7881.5
-deserialize-u256	1	VM	0.850	1.039	33440.0
-no-op-fee-payer	1	VM	0.907	1.018	2216.5
-no-op-fee-payer	50	VM	0.837	1.011	25786.3
+no-op	1	VM	59	0.815	1.101	37283.8
+no-op	1000	VM	59	0.679	1.036	22232.7
+apt-fa-transfer	1	VM	59	0.779	1.064	28096.3
+account-generation	1	VM	59	0.763	1.046	22960.6
+account-resource32-b	1	VM	59	0.794	1.085	34394.7
+modify-global-resource	1	VM	59	0.849	1.029	2784.1
+modify-global-resource	100	VM	17	0.845	1.071	33592.9
+publish-package	1	VM	59	0.926	1.076	142.6
+mix_publish_transfer	1	VM	59	0.917	1.134	2145.5
+batch100-transfer	1	VM	59	0.695	1.028	740.9
+vector-picture30k	1	VM	59	0.891	1.027	111.2
+vector-picture30k	100	VM	17	0.593	1.042	1982.6
+smart-table-picture30-k-with200-change	1	VM	59	0.844	1.078	21.5
+smart-table-picture30-k-with200-change	100	VM	17	0.786	1.018	405.6
+modify-global-resource-agg-v2	1	VM	59	0.706	1.113	35274.8
+modify-global-flag-agg-v2	1	VM	59	0.818	1.023	5508.5
+modify-global-bounded-agg-v2	1	VM	59	0.766	1.089	9840.3
+modify-global-milestone-agg-v2	1	VM	59	0.723	1.038	28560.2
+resource-groups-global-write-tag1-kb	1	VM	59	0.872	1.046	9198.2
+resource-groups-global-write-and-read-tag1-kb	1	VM	59	0.867	1.023	6174.8
+resource-groups-sender-write-tag1-kb	1	VM	59	0.843	1.129	19680.5
+resource-groups-sender-multi-change1-kb	1	VM	59	0.825	1.074	16174.0
+token-v1ft-mint-and-transfer	1	VM	59	0.811	1.045	1262.2
+token-v1ft-mint-and-transfer	100	VM	17	0.718	1.041	17535.3
+token-v1nft-mint-and-transfer-sequential	1	VM	59	0.820	1.032	795.5
+token-v1nft-mint-and-transfer-sequential	100	VM	17	0.586	1.035	12683.5
+coin-init-and-mint	1	VM	59	0.704	1.073	28612.4
+coin-init-and-mint	100	VM	17	0.716	1.087	23415.6
+fungible-asset-mint	1	VM	59	0.644	1.052	26193.9
+fungible-asset-mint	100	VM	17	0.698	1.070	20606.2
+no-op5-signers	1	VM	59	0.783	1.124	37424.8
+token-v2-ambassador-mint	1	VM	59	0.670	1.035	17671.5
+token-v2-ambassador-mint	100	VM	17	0.717	1.058	15617.8
+liquidity-pool-swap	1	VM	59	0.728	1.021	963.2
+liquidity-pool-swap	100	VM	17	0.717	1.019	11116.3
+liquidity-pool-swap-stable	1	VM	59	0.776	1.023	934.6
+liquidity-pool-swap-stable	100	VM	17	0.796	1.021	10839.9
+deserialize-u256	1	VM	59	0.817	1.093	37002.8
+no-op-fee-payer	1	VM	59	0.775	1.027	2103.7
+no-op-fee-payer	100	VM	17	0.585	1.021	27642.4
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
 # And then after a day or two - add calibration result for it above, removing expected_tps/waived fields.
+
+DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
@@ -204,14 +217,14 @@ TESTS = [
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
         transaction_type_override="publish-package apt-fa-transfer",
         transaction_weights_override="1 500",
@@ -220,72 +233,72 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=100, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow(0), waived=True),
     RunGroupConfig(key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("vector-picture30k", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with256-change"), included_in=LAND_BLOCKING_AND_C),
     # RunGroupConfig(expected_tps=40, key=RunGroupKey("smart-table-picture1-m-with256-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2, waived=True),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.AGG_V2, waived=True),
     RunGroupConfig(key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2, waived=True),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.AGG_V2, waived=True),
     RunGroupConfig(key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2, waived=True),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.AGG_V2, waived=True),
     RunGroupConfig(key=RunGroupKey("modify-global-milestone-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
+
     RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow(0), waived=True),
 
     RunGroupConfig(key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("coin-init-and-mint", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("fungible-asset-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("fungible-asset-mint", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
 
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
     RunGroupConfig(key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
-   
-    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
+    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(key=RunGroupKey("liquidity-pool-swap", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("liquidity-pool-swap", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap-stable"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("deserialize-u256"), included_in=Flow.CONTINUOUS),
-    
+
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
     # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=26000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("apt-fa-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=20000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=140 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=15400 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=20000, key=RunGroupKey("apt-fa-transfer"), included_in=Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET_LARGE_DB),
     # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
@@ -359,6 +372,23 @@ class RunGroupInstance:
     number_of_threads_results: Mapping[int, RunResults]
     block_size: int
     expected_tps: float
+
+
+@dataclass
+class CalibrationData:
+    expected_tps: float
+    count: int
+    min_ratio: float
+    max_ratio: float
+
+
+@dataclass
+class Criteria:
+    expected_tps: float
+    min_tps: float
+    min_warn_tps: float
+    max_tps: float
+    max_warn_tps: float
 
 
 def get_only(values):
@@ -540,7 +570,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             transaction_type=parts[0],
             module_working_set_size=int(parts[1]),
             executor_type=parts[2],
-        ): float(parts[CALIBRATED_TPS_INDEX])
+        ): CalibrationData(
+            expected_tps=float(parts[CALIBRATED_TPS_INDEX]),
+            count=int(parts[CALIBRATED_COUNT_INDEX]),
+            min_ratio=float(parts[CALIBRATED_MIN_RATIO_INDEX]),
+            max_ratio=float(parts[CALIBRATED_MAX_RATIO_INDEX]),
+        )
         for line in CALIBRATION.split("\n")
         if len(
             parts := [
@@ -580,11 +615,42 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
         if test.expected_tps is not None:
             print(f"WARNING: using uncalibrated TPS for {test.key}")
-            expected_tps = test.expected_tps
+            criteria = Criteria(
+                expected_tps=test.expected_tps,
+                min_tps=test.expected_tps * NOISE_LOWER_LIMIT,
+                min_warn_tps=test.expected_tps * NOISE_LOWER_LIMIT_WARN,
+                max_tps=test.expected_tps * NOISE_UPPER_LIMIT,
+                max_warn_tps=test.expected_tps * NOISE_UPPER_LIMIT_WARN,
+            )
         else:
             assert test.key in calibrated_expected_tps, test
-            expected_tps = calibrated_expected_tps[test.key]
-        cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
+            cur_calibration = calibrated_expected_tps[test.key]
+            if cur_calibration.count > 20:
+                criteria = Criteria(
+                    expected_tps=cur_calibration.expected_tps,
+                    min_tps=cur_calibration.expected_tps
+                    * (cur_calibration.min_ratio - 0.01),
+                    min_warn_tps=cur_calibration.expected_tps
+                    * pow(cur_calibration.min_ratio, 0.5),
+                    max_tps=cur_calibration.expected_tps
+                    * (cur_calibration.max_ratio + 0.01),
+                    max_warn_tps=cur_calibration.expected_tps
+                    * pow(cur_calibration.max_ratio, 0.5),
+                )
+            else:
+                criteria = Criteria(
+                    expected_tps=cur_calibration.expected_tps,
+                    min_tps=cur_calibration.expected_tps
+                    * (cur_calibration.min_ratio - 0.1),
+                    min_warn_tps=cur_calibration.expected_tps
+                    * min(cur_calibration.min_ratio, 0.95),
+                    max_tps=cur_calibration.expected_tps
+                    * (cur_calibration.max_ratio + 0.1),
+                    max_warn_tps=cur_calibration.expected_tps
+                    * max(cur_calibration.max_ratio, 1.05),
+                )
+
+        cur_block_size = int(min([criteria.expected_tps, MAX_BLOCK_SIZE]))
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":
@@ -610,11 +676,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             raise Exception(f"executor type not supported {test.key.executor_type}")
         txn_emitter_prefix_str = "" if NUM_BLOCKS > 200 else " --generate-then-execute"
 
-        ADDITIONAL_DST_POOL_ACCOUNTS = (
-            2
-            * MAX_BLOCK_SIZE
-            * (1 if test.key_extra.smaller_working_set else NUM_BLOCKS)
-        )
+        ADDITIONAL_DST_POOL_ACCOUNTS = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
 
         common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
@@ -647,7 +709,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 single_node_result=single_node_result,
                 number_of_threads_results=number_of_threads_results,
                 block_size=cur_block_size,
-                expected_tps=expected_tps,
+                expected_tps=criteria.expected_tps,
             )
         )
 
@@ -663,7 +725,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     single_node_result=stage_node_result,
                     number_of_threads_results=number_of_threads_results,
                     block_size=cur_block_size,
-                    expected_tps=expected_tps,
+                    expected_tps=criteria.expected_tps,
                 )
             )
 
@@ -672,17 +734,23 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             json.dumps(
                 {
                     "grep": "grep_json_single_node_perf",
+                    "source": SOURCE,
+                    "runner_name": RUNNER_NAME,
                     "transaction_type": test.key.transaction_type,
                     "module_working_set_size": test.key.module_working_set_size,
                     "executor_type": test.key.executor_type,
                     "block_size": cur_block_size,
                     "execution_threads": NUMBER_OF_EXECUTION_THREADS,
-                    "expected_tps": expected_tps,
+                    "warmup_num_accounts": NUM_ACCOUNTS,
+                    "expected_tps": criteria.expected_tps,
+                    "expected_min_tps": criteria.min_tps,
+                    "expected_max_tps": criteria.max_tps,
                     "waived": test.waived,
                     "tps": single_node_result.tps,
                     "gps": single_node_result.gps,
                     "gpt": single_node_result.gpt,
                     "code_perf_version": CODE_PERF_VERSION,
+                    "flow": str(SELECTED_FLOW),
                     "test_index": test_index,
                 }
             )
@@ -727,39 +795,29 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
             print_table(results, by_levels=False, single_field=None)
 
-        # if expected TPS is not set, skip performance checks
-        if expected_tps is None:
-            continue
-
-        if (
-            NOISE_LOWER_LIMIT is not None
-            and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT
-        ):
-            text = f"regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT} = {expected_tps} * {NOISE_LOWER_LIMIT}, {test.key} didn't meet TPS requirements"
+        if single_node_result.tps < criteria.min_tps:
+            text = f"regression detected {single_node_result.tps} < {criteria.min_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
-        elif (
-            NOISE_LOWER_LIMIT_WARN is not None
-            and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT_WARN
-        ):
-            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT_WARN} = {expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {test.key} didn't meet TPS requirements"
+        elif single_node_result.tps < criteria.min_warn_tps:
+            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {criteria.min_warn_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
             warnings.append(text)
         elif (
-            NOISE_UPPER_LIMIT is not None
-            and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT
+            not SKIP_PERF_IMPROVEMENT_NOTICE
+            and single_node_result.tps > criteria.max_tps
         ):
-            text = f"perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT} = {expected_tps} * {NOISE_UPPER_LIMIT}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"perf improvement detected {single_node_result.tps} > {criteria.max_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
         elif (
-            NOISE_UPPER_LIMIT_WARN is not None
-            and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT_WARN
+            not SKIP_PERF_IMPROVEMENT_NOTICE
+            and single_node_result.tps > criteria.max_warn_tps
         ):
-            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT_WARN} = {expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {criteria.max_warn_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             warnings.append(text)
 
 if HIDE_OUTPUT:
@@ -768,10 +826,20 @@ if HIDE_OUTPUT:
 if warnings:
     print("Warnings: ")
     print("\n".join(warnings))
+    print("You can run again to see if it is noise, or consistent.")
 
 if errors:
     print("Errors: ")
     print("\n".join(errors))
+    print(
+        """If you expect your PR to change the performance, you need to recalibrate the values.
+To do so, you should run the test on your branch 6 times 
+(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml).
+Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
+update it to your branch, and export values as CSV, and then open and copy values inside 
+testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
+"""
+    )
     exit(1)
 
 if move_e2e_benchmark_failed:

@@ -189,12 +189,12 @@ pub async fn transfer_and_maybe_reconfig(
 
 pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance: u64) {
     let on_chain_balance = client
-        .get_account_balance(account.address())
+        .view_apt_account_balance(account.address())
         .await
         .unwrap()
         .into_inner();
 
-    assert_eq!(on_chain_balance.get(), balance);
+    assert_eq!(on_chain_balance, balance);
 }
 
 /// This helper function creates 3 new accounts, mints funds, transfers funds

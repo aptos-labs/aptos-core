@@ -332,17 +332,8 @@ impl BatchStore {
 
     pub fn update_certified_timestamp(&self, certified_time: u64) {
         trace!("QS: batch reader updating time {:?}", certified_time);
-        let prev_time = self
-            .last_certified_time
+        self.last_certified_time
             .fetch_max(certified_time, Ordering::SeqCst);
-        // Note: prev_time may be equal to certified_time due to state-sync
-        // at the epoch boundary.
-        assert!(
-            prev_time <= certified_time,
-            "Decreasing executed block timestamp reported to BatchReader {} {}",
-            prev_time,
-            certified_time,
-        );
 
         let expired_keys = self.clear_expired_payload(certified_time);
         if let Err(e) = self.db.delete_batches(expired_keys) {

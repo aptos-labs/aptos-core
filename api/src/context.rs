@@ -259,12 +259,26 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
-        if self.indexer_reader.is_some() {
-            let ledger_info = self.get_latest_internal_indexer_ledger_version_and_ledger_info()?;
-            Ok(ledger_info)
-        } else {
-            self.get_latest_storage_ledger_info()
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if indexer_reader.is_internal_indexer_enabled() {
+                return self.get_latest_internal_indexer_ledger_info();
+            }
         }
+        self.get_latest_storage_ledger_info()
+    }
+
+    pub fn get_latest_internal_and_storage_ledger_info<E: ServiceUnavailableError>(
+        &self,
+    ) -> Result<(Option<LedgerInfo>, LedgerInfo), E> {
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if indexer_reader.is_internal_indexer_enabled() {
+                return Ok((
+                    Some(self.get_latest_internal_indexer_ledger_info()?),
+                    self.get_latest_storage_ledger_info()?,
+                ));
+            }
+        }
+        Ok((None, self.get_latest_storage_ledger_info()?))
     }
 
     pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
@@ -292,43 +306,53 @@ impl Context {
         Ok((latest_ledger_info, requested_ledger_version))
     }
 
-    pub fn get_latest_internal_indexer_ledger_version_and_ledger_info<
-        E: ServiceUnavailableError,
-    >(
+    pub fn get_latest_internal_indexer_ledger_info<E: ServiceUnavailableError>(
         &self,
     ) -> Result<LedgerInfo, E> {
         if let Some(indexer_reader) = self.indexer_reader.as_ref() {
-            if let Some(latest_version) = indexer_reader
-                .get_latest_internal_indexer_ledger_version()
-                .map_err(|err| {
-                    E::service_unavailable_with_code_no_info(err, AptosErrorCode::InternalError)
-                })?
-            {
-                let (_, _, new_block_event) = self
-                    .db
-                    .get_block_info_by_version(latest_version)
-                    .map_err(|_| {
-                        E::service_unavailable_with_code_no_info(
-                            "Failed to get block",
-                            AptosErrorCode::InternalError,
-                        )
-                    })?;
-                let (oldest_version, oldest_block_height) =
-                    self.get_oldest_version_and_block_height()?;
-                return Ok(LedgerInfo::new_ledger_info(
-                    &self.chain_id(),
-                    new_block_event.epoch(),
-                    latest_version,
-                    oldest_version,
-                    oldest_block_height,
-                    new_block_event.height(),
-                    new_block_event.proposed_time(),
-                ));
+            if indexer_reader.is_internal_indexer_enabled() {
+                if let Some(mut latest_version) = indexer_reader
+                    .get_latest_internal_indexer_ledger_version()
+                    .map_err(|err| {
+                        E::service_unavailable_with_code_no_info(err, AptosErrorCode::InternalError)
+                    })?
+                {
+                    // The internal indexer version can be ahead of the storage committed version since it syncs to db's latest synced version
+                    let last_storage_version =
+                        self.get_latest_storage_ledger_info()?.ledger_version.0;
+                    latest_version = std::cmp::min(latest_version, last_storage_version);
+                    let (_, block_end_version, new_block_event) = self
+                        .db
+                        .get_block_info_by_version(latest_version)
+                        .map_err(|_| {
+                            E::service_unavailable_with_code_no_info(
+                                "Failed to get block",
+                                AptosErrorCode::InternalError,
+                            )
+                        })?;
+                    let (oldest_version, oldest_block_height) =
+                        self.get_oldest_version_and_block_height()?;
+                    return Ok(LedgerInfo::new_ledger_info(
+                        &self.chain_id(),
+                        new_block_event.epoch(),
+                        block_end_version,
+                        oldest_version,
+                        oldest_block_height,
+                        new_block_event.height(),
+                        new_block_event.proposed_time(),
+                    ));
+                } else {
+                    // Indexer doesn't have data yet as DB is boostrapping.
+                    return Err(E::service_unavailable_with_code_no_info(
+                        "DB is bootstrapping",
+                        AptosErrorCode::InternalError,
+                    ));
+                }
             }
         }
 
         Err(E::service_unavailable_with_code_no_info(
-            "Indexer reader doesn't exist, or doesn't have data.",
+            "Indexer reader doesn't exist",
             AptosErrorCode::InternalError,
         ))
     }
@@ -834,7 +858,7 @@ impl Context {
         } else {
             self.indexer_reader
                 .as_ref()
-                .ok_or(anyhow!("Indexer reader is None"))
+                .ok_or_else(|| anyhow!("Indexer reader is None"))
                 .map_err(|err| {
                     E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
                 })?
@@ -933,7 +957,7 @@ impl Context {
         } else {
             self.indexer_reader
                 .as_ref()
-                .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                .ok_or_else(|| anyhow!("Internal indexer reader doesn't exist"))?
                 .get_events(event_key, start, order, limit as u64, ledger_version)?
         };
         if order == Order::Descending {
@@ -942,6 +966,10 @@ impl Context {
         } else {
             Ok(res)
         }
+    }
+
+    pub fn get_indexer_reader(&self) -> Option<&Arc<dyn IndexerReader>> {
+        self.indexer_reader.as_ref()
     }
 
     fn next_bucket(&self, gas_unit_price: u64) -> u64 {

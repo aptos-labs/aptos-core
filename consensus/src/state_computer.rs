@@ -7,7 +7,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
     error::StateSyncError,
-    execution_pipeline::ExecutionPipeline,
+    execution_pipeline::{ExecutionPipeline, PreCommitHook},
     monitor,
     payload_manager::TPayloadManager,
     pipeline::pipeline_phase::CountedRequest,
@@ -24,13 +24,14 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult};
+use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::IntGauge;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
-    contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    randomness::Randomness, transaction::Transaction,
+    block_metadata_ext::BlockMetadataExt, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::SignedTransaction,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -39,11 +40,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
-type NotificationType = (
-    Box<dyn FnOnce() + Send + Sync>,
-    Vec<Transaction>,
-    Vec<ContractEvent>, // Subscribable events, e.g. NewEpochEvent, DKGStartEvent
-);
+type NotificationType = BoxFuture<'static, ()>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 struct LogicalTime {
@@ -73,7 +70,8 @@ pub struct ExecutionProxy {
     executor: Arc<dyn BlockExecutorTrait>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-    async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
+    pre_commit_notifier: aptos_channels::Sender<NotificationType>,
+    commit_notifier: aptos_channels::Sender<NotificationType>,
     write_mutex: AsyncMutex<LogicalTime>,
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
@@ -89,28 +87,22 @@ impl ExecutionProxy {
         txn_filter: TransactionFilter,
         enable_pre_commit: bool,
     ) -> Self {
-        let (tx, mut rx) =
-            aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
-        let notifier = state_sync_notifier.clone();
-        handle.spawn(async move {
-            while let Some((callback, txns, subscribable_events)) = rx.next().await {
-                if let Err(e) = monitor!(
-                    "notify_state_sync",
-                    notifier.notify_new_commit(txns, subscribable_events).await
-                ) {
-                    error!(error = ?e, "Failed to notify state synchronizer");
-                }
+        let pre_commit_notifier = Self::spawn_future_runner(
+            handle,
+            "pre-commit",
+            &counters::PENDING_STATE_SYNC_NOTIFICATION,
+        );
+        let commit_notifier =
+            Self::spawn_future_runner(handle, "commit", &counters::PENDING_COMMIT_NOTIFICATION);
 
-                callback();
-            }
-        });
         let execution_pipeline =
             ExecutionPipeline::spawn(executor.clone(), handle, enable_pre_commit);
         Self {
             executor,
             txn_notifier,
             state_sync_notifier,
-            async_state_sync_notifier: tx,
+            pre_commit_notifier,
+            commit_notifier,
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
@@ -118,33 +110,62 @@ impl ExecutionProxy {
         }
     }
 
-    fn transactions_to_commit(
+    fn spawn_future_runner(
+        handle: &tokio::runtime::Handle,
+        name: &'static str,
+        pending_notifications_gauge: &IntGauge,
+    ) -> aptos_channels::Sender<NotificationType> {
+        let (tx, mut rx) = aptos_channels::new::<NotificationType>(10, pending_notifications_gauge);
+        let _join_handle = handle.spawn(async move {
+            while let Some(fut) = rx.next().await {
+                fut.await
+            }
+            info!(name = name, "Future runner stopped.")
+        });
+        tx
+    }
+
+    fn pre_commit_hook(
         &self,
-        executed_block: &PipelinedBlock,
-        validators: &[AccountAddress],
-        randomness_enabled: bool,
-    ) -> Vec<Transaction> {
-        // reconfiguration suffix don't execute
-        if executed_block.is_reconfiguration_suffix() {
-            return vec![];
-        }
+        block: &Block,
+        metadata: BlockMetadataExt,
+        payload_manager: Arc<dyn TPayloadManager>,
+    ) -> PreCommitHook {
+        let mut pre_commit_notifier = self.pre_commit_notifier.clone();
+        let state_sync_notifier = self.state_sync_notifier.clone();
+        let payload = block.payload().cloned();
+        let timestamp = block.timestamp_usecs();
+        let validator_txns = block.validator_txns().cloned().unwrap_or_default();
+        let block_id = block.id();
+        Box::new(
+            move |user_txns: &[SignedTransaction], state_compute_result: &StateComputeResult| {
+                let input_txns = Block::combine_to_input_transactions(
+                    validator_txns,
+                    user_txns.to_vec(),
+                    metadata,
+                );
+                let txns = state_compute_result.transactions_to_commit(input_txns, block_id);
+                let subscribable_events = state_compute_result.subscribable_events().to_vec();
+                Box::pin(async move {
+                    pre_commit_notifier
+                        .send(Box::pin(async move {
+                            if let Err(e) = monitor!(
+                                "notify_state_sync",
+                                state_sync_notifier
+                                    .notify_new_commit(txns, subscribable_events)
+                                    .await
+                            ) {
+                                error!(error = ?e, "Failed to notify state synchronizer");
+                            }
 
-        let user_txns = executed_block.input_transactions().clone();
-        let validator_txns = executed_block.validator_txns().cloned().unwrap_or_default();
-        let metadata = if randomness_enabled {
-            executed_block
-                .block()
-                .new_metadata_with_randomness(validators, executed_block.randomness().cloned())
-        } else {
-            executed_block.block().new_block_metadata(validators).into()
-        };
-
-        let input_txns = Block::combine_to_input_transactions(validator_txns, user_txns, metadata);
-
-        // Adds StateCheckpoint/BlockEpilogue transaction if needed.
-        executed_block
-            .compute_result()
-            .transactions_to_commit(input_txns, executed_block.id())
+                            let payload_vec = payload.into_iter().collect();
+                            payload_manager.notify_commit(timestamp, payload_vec);
+                        }))
+                        .await
+                        .expect("Failed to send pre-commit notification");
+                })
+            },
+        )
     }
 }
 
@@ -201,10 +222,11 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
-                metadata,
+                metadata.clone(),
                 parent_block_id,
                 transaction_generator,
                 block_executor_onchain_config,
+                self.pre_commit_hook(block, metadata, payload_manager),
                 lifetime_guard,
             )
             .await;
@@ -264,40 +286,14 @@ impl StateComputer for ExecutionProxy {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         let mut latest_logical_time = self.write_mutex.lock().await;
-        let mut txns = Vec::new();
-        let mut subscribable_txn_events = Vec::new();
-        let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
             finality_proof.ledger_info().round(),
         );
-        let block_timestamp = finality_proof.commit_info().timestamp_usecs();
-
-        let MutableState {
-            payload_manager,
-            validators,
-            is_randomness_enabled,
-            ..
-        } = self
-            .state
-            .read()
-            .as_ref()
-            .cloned()
-            .expect("must be set within an epoch");
-        let mut pre_commit_futs = Vec::with_capacity(blocks.len());
-        for block in blocks {
-            if let Some(payload) = block.block().payload() {
-                payloads.push(payload.clone());
-            }
-
-            txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
-            subscribable_txn_events.extend(block.subscribable_events());
-            pre_commit_futs.push(block.take_pre_commit_fut());
-        }
 
         // wait until all blocks are committed
-        for pre_commit_fut in pre_commit_futs {
-            pre_commit_fut.await?
+        for block in blocks {
+            block.take_pre_commit_fut().await?
         }
 
         let executor = self.executor.clone();
@@ -314,17 +310,17 @@ impl StateComputer for ExecutionProxy {
         .expect("spawn_blocking failed");
 
         let blocks = blocks.to_vec();
-        let wrapped_callback = move || {
+        let callback_fut = Box::pin(async move {
             callback(&blocks, finality_proof);
-        };
-        self.async_state_sync_notifier
+        });
+
+        self.commit_notifier
             .clone()
-            .send((Box::new(wrapped_callback), txns, subscribable_txn_events))
+            .send(callback_fut)
             .await
-            .expect("Failed to send async state sync notification");
+            .expect("Failed to send commit notification");
 
         *latest_logical_time = logical_time;
-        payload_manager.notify_commit(block_timestamp, payloads);
         Ok(())
     }
 
@@ -428,9 +424,10 @@ async fn test_commit_sync_race() {
         aggregate_signature::AggregateSignature,
         block_executor::partitioner::ExecutableBlock,
         block_info::BlockInfo,
+        contract_event::ContractEvent,
         ledger_info::LedgerInfo,
         on_chain_config::{TransactionDeduperType, TransactionShufflerType},
-        transaction::{SignedTransaction, TransactionStatus},
+        transaction::{SignedTransaction, Transaction, TransactionStatus},
     };
 
     struct RecordedCommit {

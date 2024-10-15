@@ -473,9 +473,9 @@ pub async fn submit_transactions(
                             None
                         };
                     let balance = client
-                        .get_account_balance(sender)
+                        .view_apt_account_balance(sender)
                         .await
-                        .map_or(-1, |v| v.into_inner().get() as i64);
+                        .map_or(-1, |v| v.into_inner() as i64);
 
                     warn!(
                         "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",

@@ -29,3 +29,24 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+    }
+    fun t0() {
+        let x = /*freeze*/&mut 0;
+        x;
+    }
+    fun t1() {
+        let (x,y) = (&mut 0, /*freeze*/&mut 0);
+        x;
+        y;
+        let (x,y) = (/*freeze*/&mut 0, &mut 0);
+        x;
+        y;
+        let (x,y) = (/*freeze*/&mut 0, /*freeze*/&mut 0);
+        x;
+        y;
+    }
+}

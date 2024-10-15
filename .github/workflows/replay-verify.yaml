@@ -32,7 +32,6 @@ on:
     paths:
       - ".github/workflows/replay-verify.yaml"
       - ".github/workflows/workflow-run-replay-verify.yaml"
-      - "testsuite/replay_verify.py"
   schedule:
     - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
 
@@ -74,7 +73,7 @@ jobs:
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 180
-      MAX_VERSIONS_PER_RANGE: 1800000
+      MAX_VERSIONS_PER_RANGE: 2000000
 
   replay-mainnet:
     if: |
@@ -98,7 +97,7 @@ jobs:
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 180
-      MAX_VERSIONS_PER_RANGE: 1000000
+      MAX_VERSIONS_PER_RANGE: 800000
 
   test-replay:
     if: ${{ (github.event_name == 'pull_request') && contains(github.event.pull_request.labels.*.name, 'CICD:test-replay')}}
@@ -119,4 +118,4 @@ jobs:
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 120 # increase test replay timeout to capture more flaky errors
-      MAX_VERSIONS_PER_RANGE: 1800000
+      MAX_VERSIONS_PER_RANGE: 2000000

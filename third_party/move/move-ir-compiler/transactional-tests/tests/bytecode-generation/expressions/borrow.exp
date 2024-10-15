@@ -1,7 +1,7 @@
 processed 9 tasks
 
 task 0 'print-bytecode'. lines 1-11:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -20,7 +20,7 @@ B0:
 }
 
 task 1 'print-bytecode'. lines 13-24:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -40,7 +40,7 @@ B0:
 }
 
 task 2 'print-bytecode'. lines 26-59:
-// Move bytecode v6
+// Move bytecode v7
 module 1d4.M {
 struct T {
 	u: u64
@@ -79,7 +79,7 @@ B0:
 }
 
 task 3 'print-bytecode'. lines 61-80:
-// Move bytecode v6
+// Move bytecode v7
 module 2d4.M {
 struct T<Ty0> {
 	u: Ty0

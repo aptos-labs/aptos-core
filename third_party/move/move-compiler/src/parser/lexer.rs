@@ -41,6 +41,16 @@ pub enum Tok {
     LessEqual,
     LessLess,
     Equal,
+    PlusEqual,
+    SubEqual,
+    MulEqual,
+    ModEqual,
+    DivEqual,
+    BitOrEqual,
+    BitAndEqual,
+    XorEqual,
+    ShlEqual,
+    ShrEqual,
     EqualEqual,
     EqualGreater,
     EqualEqualGreater,
@@ -82,6 +92,7 @@ pub enum Tok {
     NumSign,
     AtSign,
     Inline,
+    Label,
 }
 
 impl fmt::Display for Tok {
@@ -105,6 +116,16 @@ impl fmt::Display for Tok {
             RBracket => "]",
             Star => "*",
             Plus => "+",
+            PlusEqual => "+=",
+            SubEqual => "-=",
+            MulEqual => "*=",
+            ModEqual => "%=",
+            DivEqual => "/=",
+            BitOrEqual => "|=",
+            BitAndEqual => "&=",
+            XorEqual => "^=",
+            ShlEqual => "<<=",
+            ShrEqual => ">>=",
             Comma => ",",
             Minus => "-",
             Period => ".",
@@ -158,6 +179,7 @@ impl fmt::Display for Tok {
             Friend => "friend",
             NumSign => "#",
             AtSign => "@",
+            Label => "[Label]",
         };
         fmt::Display::fmt(s, formatter)
     }
@@ -420,6 +442,13 @@ impl<'input> Lexer<'input> {
         Ok(())
     }
 
+    pub fn advance_with_loc(&mut self) -> Result<Loc, Box<Diagnostic>> {
+        let start_loc = self.start_loc();
+        self.advance()?;
+        let end_loc = self.previous_end_loc();
+        Ok(make_loc(self.file_hash, start_loc, end_loc))
+    }
+
     // Replace the current token. The lexer will always match the longest token,
     // but sometimes the parser will prefer to replace it with a shorter one,
     // e.g., ">" instead of ">>".
@@ -478,6 +507,19 @@ fn find_token(
                 (get_name_token(&text[..len]), len)
             }
         },
+        '\'' => {
+            if text.len() <= 1
+                || !matches!(text.chars().nth(1).unwrap(), 'A'..='Z' | 'a'..='z' | '_')
+            {
+                let loc = make_loc(file_hash, start_offset + 1, start_offset + 2);
+                return Err(Box::new(diag!(
+                    Syntax::InvalidCharacter,
+                    (loc, "Label quote must be followed by 'A-Z', `a-z', or '_'")
+                )));
+            }
+            let len = get_name_len(&text[1..]);
+            (Tok::Label, 1 + len)
+        },
         '"' => {
             let line = &text.lines().next().unwrap()[1..];
             match get_string_len(line) {
@@ -502,6 +544,8 @@ fn find_token(
                 (Tok::AmpMut, 5)
             } else if text.starts_with("&&") {
                 (Tok::AmpAmp, 2)
+            } else if text.starts_with("&=") {
+                (Tok::BitAndEqual, 2)
             } else {
                 (Tok::Amp, 1)
             }
@@ -509,6 +553,8 @@ fn find_token(
         '|' => {
             if text.starts_with("||") {
                 (Tok::PipePipe, 2)
+            } else if text.starts_with("|=") {
+                (Tok::BitOrEqual, 2)
             } else {
                 (Tok::Pipe, 1)
             }
@@ -534,6 +580,8 @@ fn find_token(
         '<' => {
             if text.starts_with("<==>") {
                 (Tok::LessEqualEqualGreater, 4)
+            } else if text.starts_with("<<=") {
+                (Tok::ShlEqual, 3)
             } else if text.starts_with("<=") {
                 (Tok::LessEqual, 2)
             } else if text.starts_with("<<") {
@@ -543,7 +591,9 @@ fn find_token(
             }
         },
         '>' => {
-            if text.starts_with(">=") {
+            if text.starts_with(">>=") {
+                (Tok::ShrEqual, 3)
+            } else if text.starts_with(">=") {
                 (Tok::GreaterEqual, 2)
             } else if text.starts_with(">>") {
                 (Tok::GreaterGreater, 2)
@@ -558,15 +608,39 @@ fn find_token(
                 (Tok::Colon, 1)
             }
         },
-        '%' => (Tok::Percent, 1),
+        '%' => {
+            if text.starts_with("%=") {
+                (Tok::ModEqual, 2)
+            } else {
+                (Tok::Percent, 1)
+            }
+        },
         '(' => (Tok::LParen, 1),
         ')' => (Tok::RParen, 1),
         '[' => (Tok::LBracket, 1),
         ']' => (Tok::RBracket, 1),
-        '*' => (Tok::Star, 1),
-        '+' => (Tok::Plus, 1),
+        '*' => {
+            if text.starts_with("*=") {
+                (Tok::MulEqual, 2)
+            } else {
+                (Tok::Star, 1)
+            }
+        },
+        '+' => {
+            if text.starts_with("+=") {
+                (Tok::PlusEqual, 2)
+            } else {
+                (Tok::Plus, 1)
+            }
+        },
         ',' => (Tok::Comma, 1),
-        '-' => (Tok::Minus, 1),
+        '-' => {
+            if text.starts_with("-=") {
+                (Tok::SubEqual, 2)
+            } else {
+                (Tok::Minus, 1)
+            }
+        },
         '.' => {
             if text.starts_with("..") {
                 (Tok::PeriodPeriod, 2)
@@ -574,9 +648,21 @@ fn find_token(
                 (Tok::Period, 1)
             }
         },
-        '/' => (Tok::Slash, 1),
+        '/' => {
+            if text.starts_with("/=") {
+                (Tok::DivEqual, 2)
+            } else {
+                (Tok::Slash, 1)
+            }
+        },
         ';' => (Tok::Semicolon, 1),
-        '^' => (Tok::Caret, 1),
+        '^' => {
+            if text.starts_with("^=") {
+                (Tok::XorEqual, 2)
+            } else {
+                (Tok::Caret, 1)
+            }
+        },
         '{' => (Tok::LBrace, 1),
         '}' => (Tok::RBrace, 1),
         '#' => (Tok::NumSign, 1),

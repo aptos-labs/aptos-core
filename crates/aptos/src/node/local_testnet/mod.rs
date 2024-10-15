@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod docker;
-mod health_checker;
 mod indexer_api;
 mod logging;
 mod postgres;
@@ -12,12 +11,12 @@ mod utils;
 
 // This is to allow external crates to use the localnode.
 pub mod faucet;
+pub mod health_checker;
 pub mod node;
 pub mod traits;
 
 use self::{
     faucet::FaucetArgs,
-    health_checker::HealthChecker,
     indexer_api::IndexerApiArgs,
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
@@ -41,6 +40,7 @@ use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
+pub use health_checker::HealthChecker;
 use std::{
     collections::HashSet,
     fs::{create_dir_all, remove_dir_all},

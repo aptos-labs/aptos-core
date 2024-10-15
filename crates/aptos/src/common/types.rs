@@ -1501,12 +1501,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    pub faucet_url: Option<reqwest::Url>,
+    faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    pub faucet_auth_token: Option<String>,
+    faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -1623,7 +1623,7 @@ pub struct TransactionOptions {
     #[clap(flatten)]
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
+    pub prompt_options: PromptOptions,
 
     /// If this option is set, simulate the transaction locally.
     #[clap(long)]
@@ -1899,7 +1899,7 @@ impl TransactionOptions {
         let sequence_number = account.sequence_number;
 
         let balance = client
-            .get_account_balance_at_version(sender_address, version)
+            .view_apt_account_balance_at_version(sender_address, version)
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?
             .into_inner();
@@ -1908,7 +1908,7 @@ impl TransactionOptions {
             if gas_unit_price == 0 {
                 DEFAULT_MAX_GAS
             } else {
-                std::cmp::min(balance.coin.value.0 / gas_unit_price, DEFAULT_MAX_GAS)
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
             }
         });
 
@@ -2037,7 +2037,7 @@ pub struct MultisigAccountWithSequenceNumber {
     pub(crate) sequence_number: u64,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct TypeArgVec {
     /// TypeTag arguments separated by spaces.
     ///
@@ -2076,7 +2076,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
     }
 }
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Default, Parser)]
 pub struct ArgWithTypeVec {
     /// Arguments combined with their type separated by spaces.
     ///
@@ -2218,9 +2218,7 @@ impl TryInto<MemberId> for &EntryFunctionArguments {
     fn try_into(self) -> Result<MemberId, Self::Error> {
         self.function_id
             .clone()
-            .ok_or(CliError::CommandArgumentError(
-                "No function ID provided".to_string(),
-            ))
+            .ok_or_else(|| CliError::CommandArgumentError("No function ID provided".to_string()))
     }
 }
 
@@ -2242,7 +2240,7 @@ impl TryInto<ViewRequest> for EntryFunctionArguments {
 }
 
 /// Common options for constructing a script payload
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct ScriptFunctionArguments {
     #[clap(flatten)]
     pub(crate) type_arg_vec: TypeArgVec,

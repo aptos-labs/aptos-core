@@ -26,7 +26,7 @@ use ring::signature::RsaKeyPair;
 /// The JWT header, decoded as JSON
 pub(crate) static SAMPLE_JWT_HEADER_JSON: Lazy<String> = Lazy::new(|| {
     format!(
-        r#"{{"alg":"{}","kid":"{}","typ":"JWT"}}"#,
+        r#"{{"alg":"{}","typ":"JWT","kid":"{}"}}"#,
         SAMPLE_JWK.alg.as_str(),
         SAMPLE_JWK.kid.as_str()
     )
@@ -38,7 +38,7 @@ pub(crate) static SAMPLE_JWT_HEADER_B64: Lazy<String> =
 
 /// The JWT payload, decoded as JSON
 
-static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
+pub static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     let config = Configuration::new_for_testing();
     OpenIdSig::reconstruct_oauth_nonce(
         SAMPLE_EPK_BLINDER.as_slice(),
@@ -49,15 +49,31 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
+pub const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
 
-pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
+pub fn sample_jwt_payload_json() -> String {
+    sample_jwt_payload_json_overrides(
+        SAMPLE_TEST_ISS_VALUE,
+        SAMPLE_UID_VAL,
+        SAMPLE_JWT_EXTRA_FIELD.as_str(),
+        SAMPLE_JWT_IAT,
+        SAMPLE_NONCE.as_str(),
+    )
+}
+
+pub fn sample_jwt_payload_json_overrides(
+    iss: &str,
+    uid_val: &str,
+    extra_field: &str,
+    iat: u64,
+    nonce: &str,
+) -> String {
     format!(
         r#"{{
             "iss":"{}",
             "azp":"407408718192.apps.googleusercontent.com",
             "aud":"407408718192.apps.googleusercontent.com",
-            "sub":"113990307082899718775",
+            "sub":"{}",
             "hd":"aptoslabs.com",
             "email":"michael@aptoslabs.com",
             "email_verified":true,
@@ -67,26 +83,27 @@ pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
             "given_name":"Michael",
             {}
             "locale":"en",
-            "iat":1700255944,
+            "iat":{},
             "nonce":"{}",
             "exp":2700259544
          }}"#,
-        SAMPLE_TEST_ISS_VALUE,
-        SAMPLE_JWT_EXTRA_FIELD.as_str(),
-        SAMPLE_NONCE.as_str()
+        iss, uid_val, extra_field, iat, nonce
     )
-});
+}
+
+/// An example IAT.
+pub const SAMPLE_JWT_IAT: u64 = 1700255944;
 
 /// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
 pub(crate) const SAMPLE_JWT_EXTRA_FIELD_KEY: &str = "family_name";
 
 /// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
-pub(crate) static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
+pub static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
     Lazy::new(|| format!(r#""{}":"Straka","#, SAMPLE_JWT_EXTRA_FIELD_KEY));
 
 /// The JWT parsed as a struct
 pub(crate) static SAMPLE_JWT_PARSED: Lazy<Claims> =
-    Lazy::new(|| serde_json::from_str(SAMPLE_JWT_PAYLOAD_JSON.as_str()).unwrap());
+    Lazy::new(|| serde_json::from_str(sample_jwt_payload_json().as_str()).unwrap());
 
 pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
 
@@ -96,8 +113,10 @@ pub(crate) static SAMPLE_JWK_SK: Lazy<&RsaKeyPair> = Lazy::new(|| &*INSECURE_TES
 
 pub(crate) const SAMPLE_UID_KEY: &str = "sub";
 
+pub const SAMPLE_UID_VAL: &str = "113990307082899718775";
+
 /// The nonce-committed expiration date (not the JWT `exp`), 12/21/5490
-pub(crate) const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
+pub const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
 
 /// ~31,710 years
 pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = 999_999_999_999;
@@ -138,9 +157,9 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("95030afdb785624d3f305655579775fe216a4780496ccb7abe899dc8a7bcf798").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("08d5814954cb04ac1f80771f783585162abb2cd673203f7ee22ec87a783f431cc649ca449bc1d2d93ba4aaecd382f94306c23003ed1e1c0592a46c64e5cf6504").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("117177343a361982883579c3f49eb30b05d79b7ca1e96556be7ccb2ee88ea391").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("3304cc0defd488d770af0439480ec24c8473b30dbcbfad9fdf99ca62256bd908").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("2f432b9459375ed2032bcb1ff3ccc1dd5d05a752d6956d2bb003f4e3b42d0b242cf4ab4d3dc8dc700ede17bbfeaddedd42033691e3d85ff8d6621663cb2e779a").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("d44ee2772f4b48fdb0dbd8d870d3fb4401cd3a28fbdde535e9c57bac9a263f9c").unwrap()).unwrap(),
     )
 });
 
@@ -151,13 +170,13 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("62b167d43c33169b96c018deaa4efdc5223e095016dc6ee2cd1ad1e61755d8a5").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("2dd8fcc64014ab9f877c7ba03618cf59c49c69204b981be297dc835f60d4f923192e0f894ad947bd4aee96fd19305eb79ff359e8c341a17e8f6ba470be655e12").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("5e6e3e076e632f1440327758c634a311d83244ad7d32edcdf66458d7e0ed5619").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("bdfda383c9131ab44dd3d8efe65c59842b28e17467e2d07c4020742407c580a7").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("d27b4c0296ec1045dd050894c635095c25ff8d89c8adf5da401b3434639c560550e3da14e5ec953769aac9d256ddc9b2a8071c021f271f0937fd5be404f2b919").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("52a25b0b58013a77f8713105d7e0f817468bbdd25d644e9f2a9b3eabd7d4bc17").unwrap()).unwrap(),
     )
 });
 
-/// A new Groth16 VK to test the VK rotation.
+/// A new Groth16 VK to test the VK rotation.  Using https://raw.githubusercontent.com/aptos-labs/devnet-groth16-keys/refs/heads/master/verification_key.json
 pub(crate) static SAMPLE_UPGRADED_VK: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(|| {
     let alpha_g1 = g1_projective_str_to_affine(
         "20491192805390485299153009773594534940189261866228447918068658471970481763042",
@@ -191,12 +210,12 @@ pub(crate) static SAMPLE_UPGRADED_VK: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::
 
     let delta_g2 = g2_projective_str_to_affine(
         [
-            "15739617451905904008434505563810388078669603068902989994513586227673794325099",
-            "21857380320483623058628157959587768917537193338055331958890662600728443003915",
+            "10857046999023057135944570762232829481370756359578518086990519993285655852781",
+            "11559732032986387107991004021392285783925812861821192530917403151452391805634",
         ],
         [
-            "19098250091710633666997475602144489052978746302163092635335135789683361496958",
-            "5464980335669797405967071507706948120862078317539655982950789440091501244210",
+            "8495653923123431417604973247489272438418190587263600148770280649306958101930",
+            "4082367875863433681332203403145435568316851327593401208105741076214120093531",
         ],
     )
     .unwrap();
@@ -204,13 +223,13 @@ pub(crate) static SAMPLE_UPGRADED_VK: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::
     let mut gamma_abc_g1 = Vec::new();
     for points in [
         g1_projective_str_to_affine(
-            "19759886250806183187785579505109257837989251596255610913102572077808842056375",
-            "8515569072948108462120402914801299810016610043704833841603450087200707784492",
+            "3314139460766150258181182511839382093976747705712051605578952681462625768062",
+            "15177929890957116336235565528373348502554233971408496072173139426537995658198",
         )
         .unwrap(),
         g1_projective_str_to_affine(
-            "18250059095913215666541561118844673017538035392793529003420365565251085504261",
-            "21846936675713878002567053788450833465715833259428778772043736890983365407823",
+            "11040819149070528816396253292991080175919431363817777522273571096667537087166",
+            "13976660124609527451731647657081915019685631850685519260597009755390746148997",
         )
         .unwrap(),
     ] {
@@ -233,9 +252,9 @@ pub(crate) static SAMPLE_UPGRADED_VK: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::
 /// Like `SAMPLE_PROOF` but w.r.t. to `SAMPLE_UPGRADED_VK`.
 pub(crate) static SAMPLE_PROOF_FOR_UPGRADED_VK: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("f8c6b4182fcb28be5e1392297e86e03ed97c0166fcda3861cdb2b17a77778006").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("0264b7e4bb0ab8eecbed406f02d11f6b0c22a055aa9918a84a81bcf93a5a1324be81a8098c44127eab5cc4fb9cf06d58e1562d69d3b43686d82a1886fd41bf15").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("58c3e6c6ad0fa09123e4c415b3759b8b61d9ffebf90119b7592a5dc707016299").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("4889b1896f0335f8d375370879136577633c8f7ff6957e66bbb10afe244dfa95").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("f0e1971b492baf5aff3c5ab2c0083fe2bca911d7414416ca160fce4ae9290d07457a6820251d08500f5f4c3d680b063c7bbb0ab4fe52a509f175cf02ef6afe18").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("7aab5c31cf2fc43acb9cc470e28c7917259a424a2c9d53fbc1c473d49c302c8d").unwrap()).unwrap(),
     )
     // println!("SAMPLE_PROOF_FOR_UPGRADED_VK: {}", &proof.hash());
 });

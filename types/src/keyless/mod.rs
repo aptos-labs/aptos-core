@@ -23,11 +23,12 @@ use std::{
 
 mod bn254_circom;
 mod circuit_constants;
-mod circuit_testcases;
+pub mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
+pub mod proof_simulation;
 pub mod test_utils;
 mod zkp_sig;
 
@@ -75,6 +76,7 @@ macro_rules! serialize {
 /// the expiration time
 /// `exp_timestamp_secs`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralCertificate {
     ZeroKnowledgeSig(ZeroKnowledgeSig),
     OpenIdSig(OpenIdSig),
@@ -141,8 +143,9 @@ impl KeylessSignature {
     }
 
     pub fn verify_expiry(&self, current_time_microseconds: u64) -> anyhow::Result<()> {
-        let block_time = UNIX_EPOCH + Duration::from_micros(current_time_microseconds);
-        let expiry_time = seconds_from_epoch(self.exp_date_secs);
+        let block_time = UNIX_EPOCH.checked_add(Duration::from_micros(current_time_microseconds))
+            .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + current_time_microseconds when checking exp_date_secs"))?;
+        let expiry_time = seconds_from_epoch(self.exp_date_secs)?;
 
         if block_time > expiry_time {
             bail!("Keyless signature is expired");
@@ -159,6 +162,7 @@ impl KeylessSignature {
 /// This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
 /// hashing with a larger pepper would lead to a different address).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Pepper(pub(crate) [u8; poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR]);
 
 impl Pepper {
@@ -224,6 +228,7 @@ impl Serialize for Pepper {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct IdCommitment(#[serde(with = "serde_bytes")] pub(crate) Vec<u8>);
 
 impl IdCommitment {
@@ -291,6 +296,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 /// `PublicKey` struct. But the `key_name` procedural macro only works with the `[De]SerializeKey`
 /// procedural macros, which we cannot use since they force us to reimplement serialization.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
     /// e.g., <https://accounts.google.com>
@@ -309,6 +315,7 @@ pub struct KeylessPublicKey {
 /// Unlike a normal keyless account, a "federated" keyless account will accept JWKs published at a
 /// specific contract address.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct FederatedKeylessPublicKey {
     pub jwk_addr: AccountAddress,
     pub pk: KeylessPublicKey,
@@ -334,6 +341,7 @@ impl TryFrom<&[u8]> for FederatedKeylessPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum AnyKeylessPublicKey {
     Normal(KeylessPublicKey),
     Federated(FederatedKeylessPublicKey),
@@ -428,8 +436,10 @@ fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
     Ok(str)
 }
 
-fn seconds_from_epoch(secs: u64) -> SystemTime {
-    UNIX_EPOCH + Duration::from_secs(secs)
+fn seconds_from_epoch(secs: u64) -> anyhow::Result<SystemTime> {
+    UNIX_EPOCH
+        .checked_add(Duration::from_secs(secs))
+        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))
 }
 
 #[cfg(test)]
