@@ -62,7 +62,11 @@ use aptos_testcases::{
 };
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{
+    future,
+    stream::{FuturesUnordered, StreamExt},
+    FutureExt,
+};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
@@ -194,11 +198,14 @@ struct K8sSwarm {
         help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
     )]
     retain_debug_logs: bool,
+    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
+    enable_indexer: bool,
     #[clap(
         long,
-        help = "If set, spins up an indexer stack alongside the testnet. Same as --enable-indexer"
+        help = "The deployer profile used to spin up and configure forge infrastructure",
+        default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
     )]
-    enable_indexer: bool,
+    deployer_profile: String,
 }
 
 #[derive(Parser, Debug)]
@@ -262,6 +269,13 @@ struct Create {
         requires = "enable_indexer"
     )]
     indexer_image_tag: Option<String>,
+    #[clap(
+        long,
+        help = "The deployer profile used to spin up and configure forge infrastructure",
+        default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
+
+    )]
+    deployer_profile: String,
 }
 
 // common metrics thresholds:
@@ -408,6 +422,7 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
+                            k8s.deployer_profile.clone(),
                         )
                         .unwrap(),
                         &args.options,
@@ -444,7 +459,7 @@ fn main() -> Result<()> {
                     .or(Some(create.validator_image_tag.clone()))
                     .expect("Expected indexer or validator image tag to use");
                 let config: Value = serde_json::from_value(json!({
-                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "profile": create.deployer_profile,
                     "era": era.clone(),
                     "namespace": create.namespace.clone(),
                     "indexer-grpc-values": {
@@ -455,32 +470,44 @@ fn main() -> Result<()> {
                     },
                 }))?;
 
-                runtime.block_on(install_testnet_resources(
-                    era.clone(),
-                    create.namespace.clone(),
-                    create.num_validators,
-                    create.num_fullnodes,
-                    create.validator_image_tag,
-                    create.testnet_image_tag,
-                    create.move_modules_dir,
-                    false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
-                    create.enable_haproxy,
-                    create.enable_indexer,
-                    None,
-                    None,
-                    true,
-                ))?;
-
-                if create.enable_indexer {
-                    let indexer_deployer = ForgeDeployerManager::new(
-                        kube_client.clone(),
+                let deploy_testnet_fut = async {
+                    install_testnet_resources(
+                        era.clone(),
                         create.namespace.clone(),
-                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        create.num_validators,
+                        create.num_fullnodes,
+                        create.validator_image_tag,
+                        create.testnet_image_tag,
+                        create.move_modules_dir,
+                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                        create.enable_haproxy,
+                        create.enable_indexer,
+                        create.deployer_profile,
                         None,
-                    );
-                    runtime.block_on(indexer_deployer.start(config))?;
-                    runtime.block_on(indexer_deployer.wait_completed())?;
+                        None,
+                        true,
+                    )
+                    .await
                 }
+                .boxed();
+
+                let deploy_indexer_fut = async {
+                    if create.enable_indexer {
+                        let indexer_deployer = ForgeDeployerManager::new(
+                            kube_client.clone(),
+                            create.namespace.clone(),
+                            FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                            None,
+                        );
+                        indexer_deployer.start(config).await?;
+                        indexer_deployer.wait_completed().await
+                    } else {
+                        Ok(())
+                    }
+                }
+                .boxed();
+
+                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_indexer_fut))?;
                 Ok(())
             },
         },
