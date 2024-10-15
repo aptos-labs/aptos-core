@@ -41,6 +41,31 @@ module aptos_framework::nonce_validation {
         nonce_history.current_table = 3 - nonce_history.current_table;
     }
 
+    public(friend) fun check_and_insert_nonce(
+        sender_address: address,
+        nonce: u64,
+        txn_expiration_time: u64,
+    ): bool acquires NonceHistory {
+        let nonce_history = borrow_global_mut<NonceHistory>(@aptos_framework);
+        let nonce_key = NonceKey {
+            sender_address,
+            nonce,
+            txn_expiration_time,
+        };
+        let hash = sip_hash_from_value(&nonce_key);
+        let index = hash % 200000;
+        if (!table::contains(&nonce_history.table_1, index)) {
+            table::add(&mut nonce_history.table_1, index, vector::empty());
+        };
+        let bucket = table::borrow_mut(&mut nonce_history.table_1, index);
+        if (vector::contains(bucket, &nonce_key)) {
+            return false;
+        };
+        vector::push_back(bucket, nonce_key);
+        true
+    }
+
+
     public(friend) fun insert_nonce(
         sender_address: address,
         nonce: u64,

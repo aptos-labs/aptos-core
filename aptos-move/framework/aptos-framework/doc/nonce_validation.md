@@ -10,6 +10,7 @@
 -  [Resource `NonceHistorySignerCap`](#0x1_nonce_validation_NonceHistorySignerCap)
 -  [Function `initialize`](#0x1_nonce_validation_initialize)
 -  [Function `switch_table`](#0x1_nonce_validation_switch_table)
+-  [Function `check_and_insert_nonce`](#0x1_nonce_validation_check_and_insert_nonce)
 -  [Function `insert_nonce`](#0x1_nonce_validation_insert_nonce)
 -  [Function `nonce_exists`](#0x1_nonce_validation_nonce_exists)
 
@@ -170,6 +171,50 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_switch_table">switch_table</a>() <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
     <b>let</b> nonce_history = <b>borrow_global_mut</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework);
     nonce_history.current_table = 3 - nonce_history.current_table;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_nonce_validation_check_and_insert_nonce"></a>
+
+## Function `check_and_insert_nonce`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">check_and_insert_nonce</a>(sender_address: <b>address</b>, nonce: u64, txn_expiration_time: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">check_and_insert_nonce</a>(
+    sender_address: <b>address</b>,
+    nonce: u64,
+    txn_expiration_time: u64,
+): bool <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
+    <b>let</b> nonce_history = <b>borrow_global_mut</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework);
+    <b>let</b> nonce_key = <a href="nonce_validation.md#0x1_nonce_validation_NonceKey">NonceKey</a> {
+        sender_address,
+        nonce,
+        txn_expiration_time,
+    };
+    <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> = sip_hash_from_value(&nonce_key);
+    <b>let</b> index = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> % 200000;
+    <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&nonce_history.table_1, index)) {
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> nonce_history.table_1, index, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>());
+    };
+    <b>let</b> bucket = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> nonce_history.table_1, index);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(bucket, &nonce_key)) {
+        <b>return</b> <b>false</b>;
+    };
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(bucket, nonce_key);
+    <b>true</b>
 }
 </code></pre>
 
