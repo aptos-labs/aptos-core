@@ -258,7 +258,7 @@ module aptos_std::pool_u64 {
         }
     }
 
-    public fun multiply_then_divide(self: &Pool, x: u64, y: u64, z: u64): u64 {
+    public fun multiply_then_divide(_self: &Pool, x: u64, y: u64, z: u64): u64 {
         let result = (to_u128(x) * to_u128(y)) / to_u128(z);
         (result as u64)
     }
