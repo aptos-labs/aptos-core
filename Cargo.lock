@@ -2096,6 +2096,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-file-checker"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-metrics-core",
+ "async-trait",
+ "clap 4.4.14",
+ "cloud-storage",
+ "jemallocator",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-file-store"
 version = "1.0.0"
 dependencies = [
