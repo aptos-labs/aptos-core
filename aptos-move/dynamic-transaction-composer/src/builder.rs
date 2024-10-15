@@ -1,330 +1,222 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult};
+//! Code to generate compiled Move script from a series of individual Move calls.
+//!
+//! Defined a struct called `TransactionComposer`. With `TransactionComposer`, you will be able to add new Move calls
+//! to it via the `add_batched_call` api. The code will perform a light weight type check to make sure the ability and
+//! type safety of the Move calls will be held. After adding the calls, you will be able to consume the `TransactionComposer`
+//! and get the corresponding `CompiledScript` via the `generate_batched_calls` api.
+
+use crate::{
+    helpers::{import_signature, import_type_tag, Script},
+    ArgumentOperation, APTOS_SCRIPT_BUILDER_KEY,
+};
+#[cfg(test)]
+use crate::{BatchArgument, BatchedFunctionCall};
 use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
-    access::ModuleAccess,
+    access::ScriptAccess,
     binary_views::BinaryIndexedView,
-    file_format::{Ability, AbilitySet, FunctionDefinition, FunctionHandle, SignatureToken},
+    builders::CompiledScriptBuilder,
+    errors::PartialVMResult,
+    file_format::{
+        empty_script, Bytecode, FunctionHandleIndex, FunctionInstantiation,
+        FunctionInstantiationIndex, Signature, SignatureToken, TableIndex,
+    },
     CompiledModule,
 };
 use move_core_types::{
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag},
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
+    transaction_argument::TransactionArgument,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, str::FromStr};
+use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-/// Arguments for each function.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BatchArgumentType {
-    Raw,
-    Signer,
-    PreviousResult,
+#[derive(Tsify, Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub struct AllocatedLocal {
+    op_type: ArgumentOperation,
+    is_parameter: bool,
+    local_idx: u16,
 }
 
-#[wasm_bindgen(js_name = BatchArgument)]
-/// Arguments for each function. Wasm bindgen only support C-style enum so use option to work around.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BatchArgumentWASM {
-    ty: BatchArgumentType,
-    raw: Option<Vec<u8>>,
-    signer: Option<u16>,
-    previous_result: Option<PreviousResult>,
+#[derive(Tsify, Clone, Debug, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub enum Argument {
+    Raw(Vec<u8>),
+    Signer(u16),
+    Local(AllocatedLocal),
 }
 
+#[derive(Clone, Debug)]
 #[wasm_bindgen]
-pub struct BatchedFunctionCallBuilder {
-    calls: Vec<BatchedFunctionCall>,
-    num_signers: u16,
+struct BuilderCall {
+    type_args: Vec<SignatureToken>,
+    call_idx: FunctionHandleIndex,
+    arguments: Vec<AllocatedLocal>,
+    // Assigned index of returned values in the local pool.
+    returns: Vec<u16>,
+
+    #[cfg(test)]
+    type_tags: Vec<TypeTag>,
+}
+
+#[derive(Clone, Debug)]
+#[wasm_bindgen]
+pub struct TransactionComposer {
     modules: BTreeMap<ModuleId, CompiledModule>,
-    // (nth move call, position in the returned call results) -> (Type of the value, Ability of the value).
-    type_of_returns: BTreeMap<(u16, u16), (TypeTag, AbilitySet)>,
+    builder: CompiledScriptBuilder,
+    calls: Vec<BuilderCall>,
+    parameters: Vec<Vec<u8>>,
+    locals_availability: Vec<bool>,
+
+    locals_ty: Vec<SignatureToken>,
+    parameters_ty: Vec<SignatureToken>,
+
+    #[cfg(test)]
+    signer_count: u16,
 }
 
 #[wasm_bindgen]
-impl BatchedFunctionCallBuilder {
-    // Create a builder with one signer needed for script. This should be the default configuration.
+impl TransactionComposer {
+    /// Create a builder with one distinct signer available. This should be the default configuration.
     pub fn single_signer() -> Self {
+        let mut script = empty_script();
+        script.code.code = vec![];
+
+        let builder = CompiledScriptBuilder::new(script);
         Self {
-            calls: vec![],
-            num_signers: 1,
             modules: BTreeMap::new(),
-            type_of_returns: BTreeMap::new(),
+            builder,
+            calls: vec![],
+            parameters: vec![],
+            locals_availability: vec![],
+            locals_ty: vec![],
+            parameters_ty: vec![SignatureToken::Reference(Box::new(SignatureToken::Signer))],
+
+            #[cfg(test)]
+            signer_count: 1,
         }
     }
 
-    // Create a builder with one signer needed for script. This would be needed for multi-agent transaction where multiple signers are present.
+    /// Create a builder with one signer needed for script. This would be needed for multi-agent transaction where multiple signers are present.
     pub fn multi_signer(signer_count: u16) -> Self {
+        let mut script = empty_script();
+        script.code.code = vec![];
+
+        let builder = CompiledScriptBuilder::new(script);
         Self {
-            calls: vec![],
-            num_signers: signer_count,
             modules: BTreeMap::new(),
-            type_of_returns: BTreeMap::new(),
+            builder,
+            calls: vec![],
+            parameters: vec![],
+            locals_availability: vec![],
+            locals_ty: vec![],
+            parameters_ty: std::iter::repeat(SignatureToken::Reference(Box::new(
+                SignatureToken::Signer,
+            )))
+            .take(signer_count.into())
+            .collect(),
+
+            #[cfg(test)]
+            signer_count,
         }
     }
 
-    #[wasm_bindgen(js_name = add_batched_call)]
-    // Add a call to the script builder. Script builder will check the type compatibility of the call and returns error.
-    pub fn add_batched_call_wasm(
-        &mut self,
-        module: String,
-        function: String,
-        ty_args: Vec<String>,
-        args: Vec<BatchArgumentWASM>,
-    ) -> Result<Vec<BatchArgumentWASM>, String> {
-        Ok(self
-            .add_batched_call(
-                module,
-                function,
-                ty_args,
-                args.into_iter().map(BatchArgument::from).collect(),
-            )
-            .map_err(|err| format!("{:?}", err))?
-            .into_iter()
-            .map(|arg| arg.into())
-            .collect())
+    /// Consume the builder and generate a serialized script with calls in the builder.
+    pub fn generate_batched_calls(self, with_metadata: bool) -> Result<Vec<u8>, String> {
+        self.generate_batched_calls_impl(with_metadata)
+            .map_err(|e| e.to_string())
     }
 
-    // Consume the builder and generate a serialized script with calls in the builder.
-    pub fn generate_batched_calls(self) -> Result<Vec<u8>, String> {
-        crate::codegen::generate_script_from_batched_calls(
-            &self.calls,
-            self.num_signers,
-            &self.modules,
-        )
-        .map_err(|err| format!("{:?}", err))
-    }
-
-    // Load up a module from a remote endpoint. Will need to invoke this function prior to the call.
+    /// Load up a module from a remote endpoint. Will need to invoke this function prior to the call.
     pub async fn load_module(
         &mut self,
         api_url: String,
         module_name: String,
     ) -> Result<(), JsValue> {
-        self.load_module_impl(api_url, module_name)
+        let module_id = ModuleId::from_str(&module_name)
+            .map_err(|err| JsValue::from(format!("Invalid module name: {:?}", err)))?;
+        self.load_module_impl(api_url.as_str(), module_id)
             .await
+            .map_err(|err| JsValue::from(format!("{:?}", err)))
+    }
+
+    pub async fn load_type_tag(
+        &mut self,
+        api_url: String,
+        type_tag: String,
+    ) -> Result<(), JsValue> {
+        let type_tag = TypeTag::from_str(&type_tag)
+            .map_err(|err| JsValue::from(format!("Invalid type name: {:?}", err)))?;
+        self.load_type_tag_impl(api_url.as_str(), &type_tag)
+            .await
+            .map_err(|err| JsValue::from(format!("{:?}", err)))
+    }
+
+    #[wasm_bindgen(js_name = add_batched_call)]
+    pub fn add_batched_call_wasm(
+        &mut self,
+        module: String,
+        function: String,
+        ty_args: Vec<String>,
+        args: Vec<Argument>,
+    ) -> Result<Vec<Argument>, JsValue> {
+        self.add_batched_call(module, function, ty_args, args)
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
 }
 
-// Given a module, return the handle and definition of a provided function name
-fn find_function<'a>(
-    map: &'a BTreeMap<ModuleId, CompiledModule>,
-    module_id: &ModuleId,
-    func_name: &IdentStr,
-) -> anyhow::Result<(
-    &'a CompiledModule,
-    &'a FunctionHandle,
-    &'a FunctionDefinition,
-)> {
-    if let Some(module) = map.get(module_id) {
-        for def in module.function_defs() {
-            let handle = module.function_handle_at(def.function);
-            if module.identifier_at(handle.name) == func_name {
-                return Ok((module, handle, def));
-            }
-        }
-    }
-    anyhow::bail!("{}::{} doesn't exist on chain", module_id, func_name)
-}
-
-impl BatchedFunctionCallBuilder {
-    // Generate the return values for a function call. Those returned values could be passed
-    // as an arugment to a future function call.
-    fn return_values(
-        &mut self,
-        module_id: &ModuleId,
-        func_name: &IdentStr,
-        ty_args: &[TypeTag],
-    ) -> anyhow::Result<Vec<BatchArgument>> {
-        if self.calls.is_empty() {
-            bail!("No calls exists in the builder yet");
-        }
-        let (module, handle, _) = find_function(&self.modules, module_id, func_name)?;
-        let mut returns = vec![];
-        for (idx, sig) in module.signature_at(handle.return_).0.iter().enumerate() {
-            let call_idx = (self.calls.len() - 1) as u16;
-            let return_idx = idx as u16;
-            let ty = Self::type_tag_from_signature(module, sig, ty_args)?;
-            let ability = BinaryIndexedView::Module(module)
-                .abilities(sig, &handle.type_parameters)
-                .unwrap();
-
-            self.type_of_returns
-                .insert((call_idx, return_idx), (ty, ability));
-
-            returns.push(BatchArgument::PreviousResult(PreviousResult {
-                call_idx,
-                return_idx,
-                operation_type: ArgumentOperation::Move,
-            }));
-        }
-        Ok(returns)
-    }
-
-    // Check if the arguments could be used to invoke a function.
-    fn check_parameters(
-        &self,
-        module_id: &ModuleId,
-        func_name: &IdentStr,
-        params: &[BatchArgument],
-        ty_args: &[TypeTag],
-    ) -> anyhow::Result<()> {
-        let (module, handle, def) = find_function(&self.modules, module_id, func_name)?;
-
-        if !def.visibility.is_public() {
-            bail!(
-                "{}::{} function is not public and thus not invokable in a transaction",
-                module_id,
-                func_name
-            );
-        }
-
-        let param_tys = module.signature_at(handle.parameters);
-        if param_tys.0.len() != params.len() {
-            bail!(
-                "{}::{} function argument length mismatch, expected: {:?}, got: {:?}",
-                module_id,
-                func_name,
-                param_tys.len(),
-                params.len()
-            );
-        }
-        for (tok, param) in param_tys.0.iter().zip(params.iter()) {
-            if let BatchArgument::PreviousResult(PreviousResult {
-                call_idx,
-                return_idx,
-                operation_type,
-            }) = param
-            {
-                let (ty, ability) = self
-                    .type_of_returns
-                    .get(&(*call_idx, *return_idx))
-                    .ok_or_else(|| anyhow!("Type of return not found"))?;
-                match operation_type {
-                    ArgumentOperation::Copy => {
-                        if !ability.has_ability(Ability::Copy) {
-                            bail!("Copying value of non-copyable type: {}", ty);
-                        }
-                        let expected_ty = Self::type_tag_from_signature(module, tok, ty_args)?;
-                        if &expected_ty != ty {
-                            bail!(
-                                "Type mismatch in arguments. Expected: {}, got: {}",
-                                expected_ty,
-                                ty
-                            );
-                        }
-                    },
-                    ArgumentOperation::Move => {
-                        let expected_ty = Self::type_tag_from_signature(module, tok, ty_args)?;
-                        if &expected_ty != ty {
-                            bail!(
-                                "Type mismatch in arguments. Expected: {}, got: {}",
-                                expected_ty,
-                                ty
-                            );
-                        }
-                    },
-                    ArgumentOperation::Borrow => {
-                        let expected_ty = match tok {
-                            SignatureToken::Reference(inner_ty) => {
-                                Self::type_tag_from_signature(module, inner_ty, ty_args)?
-                            },
-                            _ => bail!("Type mismatch in arguments. Got reference of {}", ty),
-                        };
-
-                        if &expected_ty != ty {
-                            bail!(
-                                "Type mismatch in arguments. Expected: {}, got: {}",
-                                expected_ty,
-                                ty
-                            );
-                        }
-                    },
-                    ArgumentOperation::BorrowMut => {
-                        let expected_ty = match tok {
-                            SignatureToken::MutableReference(inner_ty) => {
-                                Self::type_tag_from_signature(module, inner_ty, ty_args)?
-                            },
-                            _ => bail!(
-                                "Type mismatch in arguments. Got mutable reference of {}",
-                                ty
-                            ),
-                        };
-                        if &expected_ty != ty {
-                            bail!(
-                                "Type mismatch in arguments. Expected: {}, got: {}",
-                                expected_ty,
-                                ty
-                            );
-                        }
-                    },
-                }
-            }
-        }
-        Ok(())
-    }
-
-    // Normalize signature token into type tag so they can be compared in different modules.
-    fn type_tag_from_signature(
-        module: &CompiledModule,
-        tok: &SignatureToken,
-        ty_args: &[TypeTag],
-    ) -> anyhow::Result<TypeTag> {
-        Ok(match tok {
-            SignatureToken::Address => TypeTag::Address,
-            SignatureToken::Bool => TypeTag::Bool,
-            SignatureToken::U8 => TypeTag::U8,
-            SignatureToken::U16 => TypeTag::U16,
-            SignatureToken::U32 => TypeTag::U32,
-            SignatureToken::U64 => TypeTag::U64,
-            SignatureToken::U128 => TypeTag::U128,
-            SignatureToken::U256 => TypeTag::U256,
-            SignatureToken::Signer => TypeTag::Signer,
-            SignatureToken::MutableReference(_) | SignatureToken::Reference(_) => {
-                // TODO: This forbids returning references from a call, which is not necessary. Remove the constraint later.
-                bail!("Unexpected reference type in the return value")
-            },
-            SignatureToken::Struct(idx) => {
-                let st_handle = module.struct_handle_at(*idx);
-                let module_handle = module.module_handle_at(st_handle.module);
-                TypeTag::Struct(Box::new(StructTag {
-                    address: *module.address_identifier_at(module_handle.address),
-                    module: module.identifier_at(module_handle.name).to_owned(),
-                    name: module.identifier_at(st_handle.name).to_owned(),
-                    type_args: vec![],
-                }))
-            },
-            SignatureToken::Vector(tok) => TypeTag::Vector(Box::new(
-                Self::type_tag_from_signature(module, tok, ty_args)?,
-            )),
-            SignatureToken::StructInstantiation(idx, toks) => {
-                let st_handle = module.struct_handle_at(*idx);
-                let module_handle = module.module_handle_at(st_handle.module);
-                TypeTag::Struct(Box::new(StructTag {
-                    address: *module.address_identifier_at(module_handle.address),
-                    module: module.identifier_at(module_handle.name).to_owned(),
-                    name: module.identifier_at(st_handle.name).to_owned(),
-                    type_args: toks
-                        .iter()
-                        .map(|tok| Self::type_tag_from_signature(module, tok, ty_args))
-                        .collect::<anyhow::Result<_>>()?,
-                }))
-            },
-            SignatureToken::TypeParameter(idx) => ty_args
-                .get(*idx as usize)
-                .ok_or_else(|| anyhow!("Type parameter access out of bound"))?
-                .clone(),
-        })
-    }
-
+impl TransactionComposer {
     pub fn insert_module(&mut self, module: CompiledModule) {
         self.modules.insert(module.self_id(), module);
+    }
+
+    fn check_argument_compatibility(
+        &mut self,
+        argument: &AllocatedLocal,
+        expected_ty: &SignatureToken,
+    ) -> anyhow::Result<()> {
+        let local_ty = if argument.is_parameter {
+            self.parameters_ty[argument.local_idx as usize].clone()
+        } else {
+            self.locals_ty[argument.local_idx as usize].clone()
+        };
+
+        let ty = match argument.op_type {
+            ArgumentOperation::Borrow => SignatureToken::Reference(Box::new(local_ty)),
+            ArgumentOperation::BorrowMut => SignatureToken::MutableReference(Box::new(local_ty)),
+            ArgumentOperation::Copy => {
+                let ability = BinaryIndexedView::Script(self.builder.as_script())
+                    .abilities(&local_ty, &[])
+                    .map_err(|_| anyhow!("Failed to calculate ability for type"))?;
+                if !ability.has_copy() {
+                    bail!("Trying to copy move values that does NOT have copy ability");
+                }
+                local_ty
+            },
+            ArgumentOperation::Move => {
+                if !argument.is_parameter {
+                    if self.locals_availability[argument.local_idx as usize] {
+                        self.locals_availability[argument.local_idx as usize] = false;
+                    } else {
+                        bail!("Trying to use a Move value that has already been moved");
+                    }
+                }
+                local_ty
+            },
+        };
+
+        if &ty != expected_ty {
+            bail!("Type mismatch when passing arugments around");
+        }
+        Ok(())
     }
 
     pub fn add_batched_call(
@@ -332,30 +224,199 @@ impl BatchedFunctionCallBuilder {
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<BatchArgument>,
-    ) -> anyhow::Result<Vec<BatchArgument>> {
+        args: Vec<Argument>,
+    ) -> anyhow::Result<Vec<Argument>> {
         let ty_args = ty_args
             .iter()
             .map(|s| TypeTag::from_str(s))
             .collect::<anyhow::Result<Vec<_>>>()?;
         let module = ModuleId::from_str(&module)?;
         let function = Identifier::new(function)?;
-        self.check_parameters(&module, &function, &args, &ty_args)?;
-        self.calls.push(BatchedFunctionCall {
-            module: module.clone(),
-            function: function.clone(),
-            ty_args: ty_args.clone(),
-            args,
+
+        let target_module = match self.modules.get(&module) {
+            Some(module) => module,
+            None => {
+                bail!("Module {} is not yet loaded", module);
+            },
+        };
+
+        let call_idx = self
+            .builder
+            .import_call_by_name(function.as_ident_str(), target_module)?;
+        let call_type_params = ty_args
+            .iter()
+            .map(|ty| import_type_tag(&mut self.builder, ty, &self.modules))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+
+        let subst_mapping = call_type_params
+            .iter()
+            .enumerate()
+            .map(|(idx, ty)| (idx as u16, ty.clone()))
+            .collect::<BTreeMap<_, _>>();
+
+        let mut arguments = vec![];
+        let expected_args_ty = {
+            let script = self.builder.as_script();
+            let func = script.function_handle_at(call_idx);
+            if script.signature_at(func.parameters).0.len() != args.len() {
+                bail!(
+                    "Function {}::{} argument call size mismatch",
+                    module,
+                    function
+                );
+            }
+            script
+                .signature_at(func.parameters)
+                .0
+                .iter()
+                .map(|ty| ty.instantiate(&subst_mapping))
+                .collect::<Vec<_>>()
+        };
+
+        for (arg, ty) in args.into_iter().zip(expected_args_ty) {
+            match arg {
+                Argument::Local(i) => {
+                    self.check_argument_compatibility(&i, &ty)?;
+                    arguments.push(i)
+                },
+                Argument::Signer(i) => arguments.push(AllocatedLocal {
+                    op_type: ArgumentOperation::Copy,
+                    is_parameter: true,
+                    local_idx: i,
+                }),
+                Argument::Raw(bytes) => {
+                    let new_local_idx = self.parameters_ty.len() as u16;
+                    self.parameters_ty.push(ty);
+                    self.parameters.push(bytes);
+                    arguments.push(AllocatedLocal {
+                        op_type: ArgumentOperation::Move,
+                        is_parameter: true,
+                        local_idx: new_local_idx,
+                    })
+                },
+            }
+        }
+
+        let mut returns = vec![];
+
+        let expected_returns_ty = {
+            let func = self.builder.as_script().function_handle_at(call_idx);
+            self.builder
+                .as_script()
+                .signature_at(func.return_)
+                .0
+                .iter()
+                .map(|ty| ty.instantiate(&subst_mapping))
+                .collect::<Vec<_>>()
+        };
+
+        for return_ty in expected_returns_ty {
+            let local_idx = self.locals_ty.len() as u16;
+            self.locals_ty.push(return_ty);
+            self.locals_availability.push(true);
+            returns.push(local_idx);
+        }
+
+        self.calls.push(BuilderCall {
+            type_args: call_type_params,
+            call_idx,
+            arguments,
+            returns: returns.clone(),
+            #[cfg(test)]
+            type_tags: ty_args,
         });
-        self.return_values(&module, &function, &ty_args)
+        Ok(returns
+            .into_iter()
+            .map(|idx| {
+                Argument::Local(AllocatedLocal {
+                    op_type: ArgumentOperation::Move,
+                    is_parameter: false,
+                    local_idx: idx,
+                })
+            })
+            .collect())
     }
 
-    async fn load_module_impl(
-        &mut self,
-        api_url: String,
-        module_name: String,
-    ) -> anyhow::Result<()> {
-        let module_id = ModuleId::from_str(&module_name).unwrap();
+    fn check_drop_at_end(&self) -> anyhow::Result<()> {
+        let view = BinaryIndexedView::Script(self.builder.as_script());
+        for (available, ty) in self.locals_availability.iter().zip(self.locals_ty.iter()) {
+            if *available {
+                let ability = view
+                    .abilities(ty, &[])
+                    .map_err(|_| anyhow!("Failed to calculate ability for type"))?;
+                if !ability.has_drop() {
+                    bail!("Unused non-droppable Move value");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn generate_batched_calls_impl(self, with_metadata: bool) -> anyhow::Result<Vec<u8>> {
+        self.check_drop_at_end()?;
+        let parameters_count = self.parameters_ty.len() as u16;
+        let mut script = self.builder.into_script();
+        for call in self.calls {
+            for arg in call.arguments {
+                script.code.code.push(arg.to_instruction(parameters_count)?);
+            }
+
+            // Calls
+            if call.type_args.is_empty() {
+                script.code.code.push(Bytecode::Call(call.call_idx));
+            } else {
+                if script.function_instantiations.len() >= TableIndex::MAX as usize {
+                    bail!("Too many function instantiations");
+                }
+                let fi_idx =
+                    FunctionInstantiationIndex(script.function_instantiations.len() as u16);
+
+                let type_parameters = import_signature(&mut script, Signature(call.type_args))?;
+
+                script.function_instantiations.push(FunctionInstantiation {
+                    handle: call.call_idx,
+                    type_parameters,
+                });
+                script.code.code.push(Bytecode::CallGeneric(fi_idx));
+            }
+
+            // Storing return values
+            for arg in call.returns {
+                script
+                    .code
+                    .code
+                    .push(Bytecode::StLoc((arg + parameters_count) as u8));
+            }
+        }
+        script.code.code.push(Bytecode::Ret);
+        script.parameters = import_signature(&mut script, Signature(self.parameters_ty))?;
+        script.code.locals = import_signature(&mut script, Signature(self.locals_ty))?;
+
+        move_bytecode_verifier::verify_script(&script).map_err(|err| anyhow!("{:?}", err))?;
+        if with_metadata {
+            script.metadata.push(Metadata {
+                key: APTOS_SCRIPT_BUILDER_KEY.to_owned(),
+                value: vec![],
+            });
+        }
+        let mut bytes = vec![];
+        script
+            .serialize(&mut bytes)
+            .map_err(|err| anyhow!("Failed to serialize script: {:?}", err))?;
+
+        Ok(bcs::to_bytes(&Script {
+            code: bytes,
+            ty_args: vec![],
+            args: self
+                .parameters
+                .into_iter()
+                .map(TransactionArgument::Serialized)
+                .collect(),
+        })
+        .unwrap())
+    }
+
+    async fn load_module_impl(&mut self, api_url: &str, module_id: ModuleId) -> anyhow::Result<()> {
         let url = format!(
             "{}/{}/{}/{}/{}",
             api_url, "accounts", &module_id.address, "module", &module_id.name
@@ -392,107 +453,141 @@ impl BatchedFunctionCallBuilder {
         }
     }
 
+    async fn load_type_tag_impl(
+        &mut self,
+        api_url: &str,
+        type_tag: &TypeTag,
+    ) -> anyhow::Result<()> {
+        match type_tag {
+            TypeTag::Struct(s) => {
+                self.load_module_impl(api_url, s.module_id()).await?;
+                for ty in s.type_args.iter() {
+                    Box::pin(self.load_type_tag_impl(api_url, ty)).await?;
+                }
+                Ok(())
+            },
+            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, &v)).await,
+            _ => Ok(()),
+        }
+    }
+
     #[cfg(test)]
-    pub(crate) fn calls(&self) -> &[BatchedFunctionCall] {
-        &self.calls
+    pub(crate) fn assert_decompilation_eq(&self, calls: &[BatchedFunctionCall]) {
+        let script = self.builder.as_script();
+
+        assert_eq!(self.calls.len(), calls.len());
+        for (lhs_call, rhs_call) in self.calls.iter().zip(calls.iter()) {
+            let fh = script.function_handle_at(lhs_call.call_idx);
+            assert_eq!(
+                script.identifier_at(fh.name),
+                rhs_call.function.as_ident_str()
+            );
+            assert_eq!(
+                script.module_id_for_handle(script.module_handle_at(fh.module)),
+                rhs_call.module
+            );
+            assert_eq!(lhs_call.type_tags, rhs_call.ty_args);
+            assert_eq!(lhs_call.arguments.len(), rhs_call.args.len());
+            for (lhs_arg, rhs_arg) in lhs_call.arguments.iter().zip(rhs_call.args.iter()) {
+                self.check_argument_eq(lhs_arg, rhs_arg);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn check_argument_eq(&self, lhs: &AllocatedLocal, rhs: &BatchArgument) {
+        use crate::PreviousResult;
+
+        match rhs {
+            BatchArgument::PreviousResult(PreviousResult {
+                call_idx,
+                return_idx,
+                operation_type,
+            }) => {
+                let local_idx = self.calls[*call_idx as usize].returns[*return_idx as usize];
+                assert_eq!(lhs, &AllocatedLocal {
+                    local_idx,
+                    op_type: operation_type.clone(),
+                    is_parameter: false,
+                });
+            },
+            BatchArgument::Raw(input) => {
+                assert!(lhs.is_parameter);
+                assert_eq!(lhs.op_type, ArgumentOperation::Move);
+                assert_eq!(
+                    &self.parameters[(lhs.local_idx - self.signer_count) as usize],
+                    input
+                );
+            },
+            BatchArgument::Signer(idx) => {
+                assert_eq!(lhs, &AllocatedLocal {
+                    op_type: ArgumentOperation::Copy,
+                    is_parameter: true,
+                    local_idx: *idx
+                })
+            },
+        }
     }
 }
 
-#[wasm_bindgen(js_class = BatchArgument)]
-impl BatchArgumentWASM {
+impl AllocatedLocal {
+    fn to_instruction(&self, parameter_size: u16) -> anyhow::Result<Bytecode> {
+        let local_idx = if self.is_parameter {
+            self.local_idx
+        } else {
+            parameter_size
+                .checked_add(self.local_idx)
+                .ok_or_else(|| anyhow!("Too many locals"))?
+        };
+        if local_idx >= u8::MAX as u16 {
+            bail!("Too many locals");
+        };
+        Ok(match self.op_type {
+            ArgumentOperation::Borrow => Bytecode::ImmBorrowLoc(local_idx as u8),
+            ArgumentOperation::BorrowMut => Bytecode::MutBorrowLoc(local_idx as u8),
+            ArgumentOperation::Move => Bytecode::MoveLoc(local_idx as u8),
+            ArgumentOperation::Copy => Bytecode::CopyLoc(local_idx as u8),
+        })
+    }
+}
+
+#[wasm_bindgen]
+impl Argument {
     pub fn new_bytes(bytes: Vec<u8>) -> Self {
-        Self {
-            ty: BatchArgumentType::Raw,
-            raw: Some(bytes),
-            signer: None,
-            previous_result: None,
-        }
+        Argument::Raw(bytes)
     }
 
     pub fn new_signer(signer_idx: u16) -> Self {
-        Self {
-            ty: BatchArgumentType::Signer,
-            raw: None,
-            signer: Some(signer_idx),
-            previous_result: None,
-        }
+        Argument::Signer(signer_idx)
     }
 
-    pub fn borrow(&self) -> Result<BatchArgumentWASM, String> {
+    pub fn borrow(&self) -> Result<Argument, String> {
         self.change_op_type(ArgumentOperation::Borrow)
     }
 
-    pub fn borrow_mut(&self) -> Result<BatchArgumentWASM, String> {
+    pub fn borrow_mut(&self) -> Result<Argument, String> {
         self.change_op_type(ArgumentOperation::BorrowMut)
     }
 
-    pub fn copy(&self) -> Result<BatchArgumentWASM, String> {
+    pub fn copy(&self) -> Result<Argument, String> {
         self.change_op_type(ArgumentOperation::Copy)
     }
 
-    fn change_op_type(
-        &self,
-        operation_type: ArgumentOperation,
-    ) -> Result<BatchArgumentWASM, String> {
-        match (&self.ty, &self.previous_result) {
-            (
-                BatchArgumentType::PreviousResult,
-                Some(PreviousResult {
-                    call_idx,
-                    return_idx,
-                    operation_type: _,
-                }),
-            ) => Ok(BatchArgumentWASM {
-                ty: BatchArgumentType::PreviousResult,
-                raw: None,
-                signer: None,
-                previous_result: Some(PreviousResult {
-                    call_idx: *call_idx,
-                    return_idx: *return_idx,
-                    operation_type,
-                }),
-            }),
+    fn change_op_type(&self, operation_type: ArgumentOperation) -> Result<Argument, String> {
+        match &self {
+            Argument::Local(AllocatedLocal {
+                op_type: _,
+                is_parameter,
+                local_idx,
+            }) => Ok(Argument::Local(AllocatedLocal {
+                op_type: operation_type,
+                is_parameter: *is_parameter,
+                local_idx: *local_idx,
+            })),
             _ => Err(
                 "Unexpected argument type, can only borrow from previous function results"
                     .to_string(),
             ),
-        }
-    }
-}
-
-impl From<BatchArgumentWASM> for BatchArgument {
-    fn from(value: BatchArgumentWASM) -> Self {
-        match value.ty {
-            BatchArgumentType::PreviousResult => {
-                BatchArgument::PreviousResult(value.previous_result.unwrap())
-            },
-            BatchArgumentType::Raw => BatchArgument::Raw(value.raw.unwrap()),
-            BatchArgumentType::Signer => BatchArgument::Signer(value.signer.unwrap()),
-        }
-    }
-}
-
-impl From<BatchArgument> for BatchArgumentWASM {
-    fn from(value: BatchArgument) -> BatchArgumentWASM {
-        match value {
-            BatchArgument::PreviousResult(r) => BatchArgumentWASM {
-                ty: BatchArgumentType::PreviousResult,
-                raw: None,
-                signer: None,
-                previous_result: Some(r),
-            },
-            BatchArgument::Raw(r) => BatchArgumentWASM {
-                ty: BatchArgumentType::Raw,
-                raw: Some(r),
-                signer: None,
-                previous_result: None,
-            },
-            BatchArgument::Signer(r) => BatchArgumentWASM {
-                ty: BatchArgumentType::Signer,
-                raw: None,
-                signer: Some(r),
-                previous_result: None,
-            },
         }
     }
 }

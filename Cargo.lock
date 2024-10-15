@@ -1361,10 +1361,11 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "reqwest 0.11.23",
+ "reqwest 0.12.5",
  "serde",
  "serde_bytes",
  "serde_json",
+ "tsify-next",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -8681,6 +8682,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "gloo-utils"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5555354113b18c547c1d3a98fbf7fb32a9ff4f6fa112ce823a21641a0ba3aa"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "goldenfile"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9441,6 +9455,22 @@ dependencies = [
  "native-tls",
  "tokio",
  "tokio-native-tls",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
 ]
 
 [[package]]
@@ -14179,7 +14209,7 @@ dependencies = [
  "http-body 0.4.6",
  "hyper 0.14.28",
  "hyper-rustls 0.24.2",
- "hyper-tls",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
@@ -14218,19 +14248,24 @@ dependencies = [
  "async-compression",
  "base64 0.22.1",
  "bytes",
+ "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
+ "h2 0.4.5",
  "http 1.1.0",
  "http-body 1.0.0",
  "http-body-util",
  "hyper 1.4.1",
  "hyper-rustls 0.27.2",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "ipnet",
  "js-sys",
  "log",
  "mime",
  "mime_guess",
+ "native-tls",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -14243,7 +14278,9 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sync_wrapper 1.0.1",
+ "system-configuration",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.26.0",
  "tokio-util 0.7.10",
  "tower-service",
@@ -15058,6 +15095,17 @@ name = "serde_derive"
 version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eb0b34b42edc17f6b7cac84a52a1c5f0e1bb2227e997ca9011ea3dd34e8610b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -16962,6 +17010,31 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "termcolor",
+]
+
+[[package]]
+name = "tsify-next"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f4a645dca4ee0800f5ab60ce166deba2db6a0315de795a2691e138a3d55d756"
+dependencies = [
+ "gloo-utils",
+ "serde",
+ "serde_json",
+ "tsify-next-macros",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "tsify-next-macros"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d5c06f8a51d759bb58129e30b2631739e7e1e4579fad1f30ac09a6c88e488a6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.48",
 ]
 
 [[package]]

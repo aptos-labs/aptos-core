@@ -16,6 +16,7 @@ use std::collections::{btree_map::Entry, BTreeMap};
 
 /// Structure to support incremental additions to an existing `CompiledScript`.
 /// For incremental construction, start with `CompiledScript::new()`.
+#[derive(Clone, Debug)]
 pub struct CompiledScriptBuilder {
     script: CompiledScript,
     address_pool: BTreeMap<AccountAddress, usize>,
@@ -312,5 +313,9 @@ impl CompiledScriptBuilder {
 
     pub fn into_script(self) -> CompiledScript {
         self.script
+    }
+
+    pub fn as_script(&self) -> &CompiledScript {
+        &self.script
     }
 }

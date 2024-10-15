@@ -1,6 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Code to decode the series of individual Move calls from a compiled script.
+//!
+//! Core api is `generate_batched_call_payload` which takes in a compiled Move script and render it as a
+//! series of `BatchedFunctionCall`.
+
 use crate::{
     ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult, APTOS_SCRIPT_BUILDER_KEY,
 };
@@ -260,7 +265,7 @@ pub fn generate_batched_call_payload(
 pub fn generate_batched_call_payload_serialized(
     script: &[u8],
 ) -> anyhow::Result<Vec<BatchedFunctionCall>> {
-    let script = bcs::from_bytes::<crate::codegen::Script>(script)?;
+    let script = bcs::from_bytes::<crate::helpers::Script>(script)?;
     generate_batched_call_payload(&script.code, &script.args)
 }
 

@@ -27,6 +27,7 @@ reqwest = { version = "*", features = ["blocking"] }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+tsify-next = "0.5.4"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.42"
 
