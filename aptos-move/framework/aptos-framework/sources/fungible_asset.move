@@ -1272,7 +1272,7 @@ module aptos_framework::fungible_asset {
         permissioned_signer::authorize(
             master,
             permissioned,
-            amount as u256,
+            (amount as u256),
             WithdrawPermission { metadata_address: @aptos_fungible_asset }
         )
     }
