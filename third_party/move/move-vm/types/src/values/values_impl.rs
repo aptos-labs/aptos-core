@@ -1099,6 +1099,9 @@ impl IndexedRef {
             },
         }
 
+        self.container_ref.mark_dirty();
+        other.container_ref.mark_dirty();
+
         Ok(())
     }
 }

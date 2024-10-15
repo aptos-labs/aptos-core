@@ -95,6 +95,8 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    /// covers mem::swap and vector::move_range
+    NATIVE_MEMORY_OPERATIONS = 80,
 }
 
 impl FeatureFlag {
@@ -172,6 +174,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
         ]
     }
 }
@@ -315,6 +318,10 @@ impl Features {
 
     pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn is_native_memory_operations_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

@@ -22,6 +22,16 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
+/// The feature is not enabled.
+/// (0xD is unavailable)
+pub const EFEATURE_NOT_ENABLED: u64 = 0x0D_0001;
+
+pub fn get_feature_not_available_error() -> SafeNativeError {
+    SafeNativeError::Abort {
+        abort_code: EFEATURE_NOT_ENABLED,
+    }
+}
+
 /***************************************************************************************************
  * native fun native_swap
  *
@@ -33,6 +43,13 @@ fn native_swap(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if !context
+        .get_feature_flags()
+        .is_native_memory_operations_enabled()
+    {
+        return Err(get_feature_not_available_error());
+    }
+
     debug_assert!(args.len() == 2);
 
     if args.len() != 2 {
