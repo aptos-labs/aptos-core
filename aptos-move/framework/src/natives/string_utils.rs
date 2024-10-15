@@ -188,7 +188,7 @@ fn native_format_impl(
             let addr = if fix_enabled {
                 val.value_as::<Struct>()?
                     .unpack()?
-                    .next()
+                    .nth(1)
                     .unwrap()
                     .value_as::<AccountAddress>()?
             } else {
