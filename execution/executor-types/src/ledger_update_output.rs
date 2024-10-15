@@ -6,6 +6,7 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
+use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -24,7 +25,7 @@ use std::sync::Arc;
 #[derive(Clone, Debug, Default, Deref)]
 pub struct LedgerUpdateOutput {
     #[deref]
-    inner: Arc<Inner>,
+    inner: Arc<DropHelper<Inner>>,
 }
 
 impl LedgerUpdateOutput {
@@ -76,7 +77,7 @@ impl LedgerUpdateOutput {
 
     fn new_impl(inner: Inner) -> Self {
         Self {
-            inner: Arc::new(inner),
+            inner: Arc::new(DropHelper::new(inner)),
         }
     }
 
