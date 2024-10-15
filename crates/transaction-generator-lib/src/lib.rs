@@ -35,9 +35,9 @@ mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
+mod stable_coin_minter;
 mod transaction_mix_generator;
 mod workflow_delegator;
-mod stable_coin_minter;
 
 use self::{
     account_generator::AccountGeneratorCreator,

@@ -348,8 +348,8 @@ impl WorkflowTxnGeneratorCreator {
                     num_modules,
                     "stablecoin",
                     Some(20_00000000),
-                ).await;
-
+                )
+                .await;
 
                 let minter_creation = Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
@@ -366,12 +366,7 @@ impl WorkflowTxnGeneratorCreator {
                     creation_balance,
                 ));
                 let stages = vec![minter_creation, destination_creation];
-                Self::new(
-                    stage_tracking,
-                    stages,
-                    vec![],
-                    count,
-                )
+                Self::new(stage_tracking, stages, vec![], count)
             },
         }
     }
