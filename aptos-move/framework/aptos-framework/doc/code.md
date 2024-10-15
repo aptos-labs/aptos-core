@@ -50,6 +50,7 @@ This module supports functionality related to code management.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -598,6 +599,7 @@ package.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_publish_package">publish_package</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pack: <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(owner);
     // Disallow incompatible upgrade mode. Governance can decide later <b>if</b> this should be reconsidered.
     <b>assert</b>!(
         pack.upgrade_policy.policy &gt; <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy,
@@ -679,6 +681,7 @@ package.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: Object&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(publisher);
     <b>let</b> code_object_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
     <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
     <b>assert</b>!(

@@ -530,6 +530,7 @@ spec aptos_framework::vesting {
     }
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
+        aborts_if permissioned_signer::spec_is_permissioned_signer(admin);
         /// [high-level-req-9]
         aborts_if signer::address_of(admin) != vesting_contract.admin;
     }
@@ -630,6 +631,8 @@ spec aptos_framework::vesting {
     spec schema VerifyAdminAbortsIf {
         contract_address: address;
         admin: signer;
+
+        aborts_if permissioned_signer::spec_is_permissioned_signer(admin);
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if signer::address_of(admin) != vesting_contract.admin;

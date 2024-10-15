@@ -429,7 +429,8 @@ The Capabilities<CoinType> should not be under the signer before creating;
 The Capabilities<CoinType> should be under the signer after creating;
 
 
-<pre><code><b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">coin::InitializeInternalSchema</a>&lt;CoinType&gt;;
+<pre><code><b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(<a href="account.md#0x1_account">account</a>);
+<b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">coin::InitializeInternalSchema</a>&lt;CoinType&gt;;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(name);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(symbol);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
