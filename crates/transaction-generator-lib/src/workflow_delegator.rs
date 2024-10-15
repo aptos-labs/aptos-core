@@ -334,6 +334,45 @@ impl WorkflowTxnGeneratorCreator {
                     count,
                 )
             },
+            WorkflowKind::StableCoinMint {
+                count,
+                creation_balance,
+            } => {
+                let minter_pool = Arc::new(ObjectPool::new());
+                let destination_pool = Arc::new(ObjectPool::new());
+
+                let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    num_modules,
+                    "stablecoin",
+                    Some(20_00000000),
+                ).await;
+
+
+                let minter_creation = Box::new(AccountGeneratorCreator::new(
+                    txn_factory.clone(),
+                    None,
+                    Some(minter_pool.clone()),
+                    count,
+                    creation_balance,
+                ));
+                let destination_creation = Box::new(AccountGeneratorCreator::new(
+                    txn_factory.clone(),
+                    None,
+                    Some(destination_pool.clone()),
+                    count,
+                    creation_balance,
+                ));
+                let stages = vec![minter_creation, destination_creation];
+                Self::new(
+                    stage_tracking,
+                    stages,
+                    vec![],
+                    count,
+                )
+            },
         }
     }
 }

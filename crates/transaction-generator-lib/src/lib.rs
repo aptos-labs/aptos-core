@@ -37,6 +37,8 @@ pub mod publish_modules;
 pub mod publishing;
 mod transaction_mix_generator;
 mod workflow_delegator;
+mod stable_coin_minter;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
@@ -96,6 +98,7 @@ pub enum AccountType {
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateMintBurn { count: usize, creation_balance: u64 },
+    StableCoinMint { count: usize, creation_balance: u64 },
 }
 
 #[derive(Debug, Copy, Clone)]
