@@ -386,6 +386,7 @@ where
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        scheduler: &Scheduler,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
@@ -406,7 +407,8 @@ where
 
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
-            && read_set.validate_module_reads(versioned_cache.code_cache())
+            && (scheduler.skip_module_reads_validation()
+                || read_set.validate_module_reads(versioned_cache.code_cache()))
     }
 
     fn update_transaction_on_abort(
@@ -589,6 +591,7 @@ where
                                 txn_idx,
                                 module_write_set,
                                 versioned_cache,
+                                scheduler,
                                 runtime_environment,
                             )?;
                         }
@@ -597,7 +600,8 @@ where
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
 
-                let validation_result = Self::validate(txn_idx, last_input_output, versioned_cache);
+                let validation_result =
+                    Self::validate(txn_idx, last_input_output, versioned_cache, scheduler);
                 if !validation_result
                     || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
                         .unwrap_or(false)
@@ -620,6 +624,7 @@ where
                             txn_idx,
                             module_write_set,
                             versioned_cache,
+                            scheduler,
                             runtime_environment,
                         )?;
                         scheduler.finish_execution_during_commit(txn_idx)?;
@@ -708,8 +713,10 @@ where
         txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        scheduler: &Scheduler,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
+        scheduler.validate_module_reads();
         for (_, write) in module_write_set {
             let (id, write_op) = write.unpack();
             let entry = ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
@@ -957,7 +964,8 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
-                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache);
+                    let valid =
+                        Self::validate(txn_idx, last_input_output, versioned_cache, scheduler);
                     Self::update_on_validation(
                         txn_idx,
                         incarnation,
