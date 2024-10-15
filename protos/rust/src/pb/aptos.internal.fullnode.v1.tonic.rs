@@ -131,7 +131,7 @@ pub mod fullnode_data_server {
     #[async_trait]
     pub trait FullnodeData: Send + Sync + 'static {
         /// Server streaming response type for the GetTransactionsFromNode method.
-        type GetTransactionsFromNodeStream: futures_core::Stream<
+        type GetTransactionsFromNodeStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<
                     super::TransactionsFromNodeResponse,
                     tonic::Status,
@@ -250,7 +250,11 @@ pub mod fullnode_data_server {
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                (*inner).get_transactions_from_node(request).await
+                                <T as FullnodeData>::get_transactions_from_node(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }

@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{
-    DynamicExpression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, NumBytes,
-    Octa,
-};
+use aptos_gas_algebra::{DynamicExpression, Fee, FeePerGasUnit, Gas, GasExpression, InternalGas, InternalGasUnit, NumBytes, Octa};
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
 use aptos_vm_types::storage::{io_pricing::IoPricing, space_pricing::DiskSpacePricing};
@@ -40,6 +37,10 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
 
     fn balance_internal(&self) -> InternalGas {
         self.base.balance_internal()
+    }
+
+    fn reset_initial_balance_internal(&mut self, new_balance: impl Into<Gas>) -> PartialVMResult<()> {
+        self.base.reset_initial_balance_internal(new_balance)
     }
 
     fn check_consistency(&self) -> PartialVMResult<()> {

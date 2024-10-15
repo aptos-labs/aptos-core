@@ -95,6 +95,7 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    ACCOUNT_ABSTRACTION = 80,
 }
 
 impl FeatureFlag {
@@ -172,6 +173,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -246,6 +248,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {

@@ -127,6 +127,15 @@ impl GasAlgebra for StandardGasAlgebra {
         self.balance
     }
 
+    fn reset_initial_balance_internal(&mut self, new_balance: impl Into<Gas>) -> PartialVMResult<()> {
+        let total_calculated =
+            self.execution_gas_used + self.io_gas_used + self.storage_fee_in_internal_units;
+        self.initial_balance = new_balance.into().to_unit_with_params(&self.vm_gas_params.txn);
+        self.balance = self.initial_balance;
+        let (_, res) = self.charge(total_calculated);
+        res
+    }
+
     fn check_consistency(&self) -> PartialVMResult<()> {
         let total = self
             .initial_balance

@@ -25,6 +25,7 @@ module aptos_framework::permissioned_signer {
 
     #[test_only]
     friend aptos_framework::permissioned_signer_tests;
+    friend aptos_framework::permissioned_delegation;
 
     /// Trying to grant permission using master signer.
     const ENOT_MASTER_SIGNER: u64 = 1;

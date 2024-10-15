@@ -11,7 +11,6 @@ pub mod core_account;
 pub mod fungible_asset_metadata;
 pub mod fungible_store;
 pub mod object;
-
 pub use chain_id::*;
 pub use challenge::*;
 pub use coin_info::*;

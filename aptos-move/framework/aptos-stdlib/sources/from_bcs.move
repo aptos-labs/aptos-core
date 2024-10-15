@@ -68,7 +68,6 @@ module aptos_std::from_bcs {
     friend aptos_std::any;
     friend aptos_std::copyable_any;
 
-
     #[test_only]
     use std::bcs;
 

@@ -37,6 +37,8 @@ pub trait GasAlgebra {
     /// Returns the current balance, measured in internal gas units.
     fn balance_internal(&self) -> InternalGas;
 
+    fn reset_initial_balance_internal(&mut self, new_balance: impl Into<Gas>) -> PartialVMResult<()>;
+
     /// Checks if the internal states (counters) are consistent.
     fn check_consistency(&self) -> PartialVMResult<()>;
 

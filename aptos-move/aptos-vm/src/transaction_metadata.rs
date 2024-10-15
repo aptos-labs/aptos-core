@@ -8,19 +8,19 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        user_transaction_context::UserTransactionContext, EntryFunction, Multisig,
-        SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
+        EntryFunction, Multisig, SignedTransaction, TransactionPayload,
     },
 };
 
 pub struct TransactionMetadata {
     pub sender: AccountAddress,
-    pub authentication_key: Vec<u8>,
+    pub authentication_proof: AuthenticationProof,
     pub secondary_signers: Vec<AccountAddress>,
-    pub secondary_authentication_keys: Vec<Vec<u8>>,
+    pub secondary_authentication_proofs: Vec<AuthenticationProof>,
     pub sequence_number: u64,
     pub fee_payer: Option<AccountAddress>,
-    pub fee_payer_authentication_key: Option<Vec<u8>>,
+    pub fee_payer_authentication_proof: Option<AuthenticationProof>,
     pub max_gas_amount: Gas,
     pub gas_unit_price: FeePerGasUnit,
     pub transaction_size: NumBytes,
@@ -37,29 +37,20 @@ impl TransactionMetadata {
     pub fn new(txn: &SignedTransaction) -> Self {
         Self {
             sender: txn.sender(),
-            authentication_key: txn
-                .authenticator()
-                .sender()
-                .authentication_key()
-                .map_or_else(Vec::new, |auth_key| auth_key.to_vec()),
+            authentication_proof: txn.authenticator().sender().authentication_proof(),
             secondary_signers: txn.authenticator().secondary_signer_addresses(),
-            secondary_authentication_keys: txn
+            secondary_authentication_proofs: txn
                 .authenticator()
                 .secondary_signers()
                 .iter()
-                .map(|account_auth| {
-                    account_auth
-                        .authentication_key()
-                        .map_or_else(Vec::new, |auth_key| auth_key.to_vec())
-                })
+                .map(|account_auth| account_auth.authentication_proof())
                 .collect(),
             sequence_number: txn.sequence_number(),
             fee_payer: txn.authenticator_ref().fee_payer_address(),
-            fee_payer_authentication_key: txn.authenticator().fee_payer_signer().map(|signer| {
-                signer
-                    .authentication_key()
-                    .map_or_else(Vec::new, |auth_key| auth_key.to_vec())
-            }),
+            fee_payer_authentication_proof: txn
+                .authenticator()
+                .fee_payer_signer()
+                .map(|signer| signer.authentication_proof()),
             max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
@@ -122,8 +113,14 @@ impl TransactionMetadata {
         senders
     }
 
-    pub fn authentication_key(&self) -> &[u8] {
-        &self.authentication_key
+    pub fn authentication_proofs(&self) -> Vec<&AuthenticationProof> {
+        let mut proofs = vec![self.authentication_proof()];
+        proofs.extend(self.secondary_authentication_proofs.iter());
+        proofs
+    }
+
+    pub fn authentication_proof(&self) -> &AuthenticationProof {
+        &self.authentication_proof
     }
 
     pub fn sequence_number(&self) -> u64 {
