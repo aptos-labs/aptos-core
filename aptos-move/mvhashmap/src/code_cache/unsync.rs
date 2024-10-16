@@ -3,19 +3,17 @@
 
 use hashbrown::{hash_map::Entry, HashMap};
 use move_vm_types::code::{ModuleCache, ScriptCache};
-use std::{cell::RefCell, hash::Hash, marker::PhantomData};
+use std::{cell::RefCell, hash::Hash};
 
 /// A per-block code cache to be used for sequential transaction execution.
-pub struct UnsyncCodeCache<K, M, Q, S, E> {
+pub struct UnsyncCodeCache<K, M, Q, S> {
     /// Script cache, indexed by keys such as hashes.
     script_cache: RefCell<HashMap<Q, S>>,
     /// Module cache, indexed by keys such as address and module name pairs.
     module_cache: RefCell<HashMap<K, M>>,
-
-    phantom_data: PhantomData<E>,
 }
 
-impl<K, M, Q, S, E> UnsyncCodeCache<K, M, Q, S, E>
+impl<K, M, Q, S> UnsyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -27,7 +25,6 @@ where
         Self {
             script_cache: RefCell::new(HashMap::new()),
             module_cache: RefCell::new(HashMap::new()),
-            phantom_data: PhantomData,
         }
     }
 
@@ -47,7 +44,7 @@ where
     }
 }
 
-impl<K, M, Q, S, E> ScriptCache for UnsyncCodeCache<K, M, Q, S, E>
+impl<K, M, Q, S> ScriptCache for UnsyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -66,14 +63,13 @@ where
     }
 }
 
-impl<K, M, Q, S, E> ModuleCache for UnsyncCodeCache<K, M, Q, S, E>
+impl<K, M, Q, S> ModuleCache for UnsyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
     M: Clone,
     Q: Eq + Hash + Clone,
     S: Clone,
 {
-    type Error = E;
     type Key = K;
     type Module = M;
 
@@ -81,13 +77,13 @@ where
         self.module_cache.borrow_mut().insert(key, module);
     }
 
-    fn get_module_or_insert_with<F>(
+    fn get_module_or_insert_with<F, E>(
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, Self::Error>
+    ) -> Result<Option<Self::Module>, E>
     where
-        F: FnOnce() -> Result<Option<Self::Module>, Self::Error>,
+        F: FnOnce() -> Result<Option<Self::Module>, E>,
     {
         Ok(match self.module_cache.borrow_mut().entry(key.clone()) {
             Entry::Occupied(e) => Some(e.get().clone()),
@@ -103,30 +99,30 @@ mod test {
 
     #[test]
     fn test_empty() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 0);
     }
 
     #[test]
     fn test_cache_misses() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
         assert_eq!(code_cache.get_script(&1), None);
         assert_eq!(
-            code_cache.get_module_or_insert_with(&1, || Ok(None)),
+            code_cache.get_module_or_insert_with(&1, || Ok::<_, ()>(None)),
             Ok(None)
         );
         assert_eq!(code_cache.num_modules(), 0);
 
         assert_eq!(
-            code_cache.get_module_or_insert_with(&1, || Ok(Some(77))),
+            code_cache.get_module_or_insert_with(&1, || Ok::<_, ()>(Some(77))),
             Ok(Some(77))
         );
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
 
         assert_eq!(
-            code_cache.get_module_or_insert_with(&1, || Ok(Some(2))),
+            code_cache.get_module_or_insert_with(&1, || Ok::<_, ()>(Some(2))),
             Ok(Some(77))
         );
 
@@ -136,7 +132,7 @@ mod test {
 
     #[test]
     fn test_script_cache() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
         code_cache.insert_script(1, 1);
 
         assert_eq!(code_cache.num_scripts(), 1);
@@ -146,18 +142,17 @@ mod test {
 
     #[test]
     fn test_module_cache() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
         code_cache.insert_module(1, 1);
 
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
-        assert_eq!(
-            code_cache.get_module_or_insert_with(&1, || Ok(None)),
-            Ok(Some(1))
-        );
-        assert_eq!(
-            code_cache.get_module_or_insert_with(&1, || Ok(Some(10))),
-            Ok(Some(1))
-        );
+
+        for default in [Ok(None), Ok(Some(10)), Err(())] {
+            assert_eq!(
+                code_cache.get_module_or_insert_with(&1, || default),
+                Ok(Some(1))
+            );
+        }
     }
 }

@@ -31,10 +31,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use derivative::Derivative;
-use move_binary_format::{
-    errors::{VMError, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata, value::MoveTypeLayout,
@@ -741,7 +738,6 @@ impl<T: Transaction> CapturedReads<T> {
             Arc<MaybeCommitted<ModuleCacheEntry>>,
             [u8; 32],
             CachedScript,
-            VMError,
         >,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {

@@ -130,8 +130,7 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
         );
-        let execute_result =
-            executor.execute_transaction(&sync_view, &sync_view, txn, idx_to_execute);
+        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute, true)
@@ -1253,8 +1252,7 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res =
-                executor.execute_transaction(&latest_view, &latest_view, txn, idx as TxnIndex);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {

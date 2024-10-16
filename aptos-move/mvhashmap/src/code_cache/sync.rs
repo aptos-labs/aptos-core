@@ -9,19 +9,17 @@ use parking_lot::lock_api;
 use std::{
     cell::RefCell,
     hash::{Hash, RandomState},
-    marker::PhantomData,
     ops::Deref,
 };
 
 /// A per-block code cache to be used for parallel transaction execution.
-pub struct SyncCodeCache<K, M, Q, S, E> {
+pub struct SyncCodeCache<K, M, Q, S> {
     /// Script cache, indexed by keys (e.g., hashes).
     script_cache: DashMap<Q, CachePadded<S>>,
-    /// Thread-safe module cache.
-    module_cache: SyncModuleCache<K, M, E>,
+    module_cache: SyncModuleCache<K, M>,
 }
 
-impl<K, M, Q, S, E> SyncCodeCache<K, M, Q, S, E>
+impl<K, M, Q, S> SyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -42,12 +40,12 @@ where
     }
 
     /// Returns the module cache.
-    pub fn module_cache(&self) -> &SyncModuleCache<K, M, E> {
+    pub fn module_cache(&self) -> &SyncModuleCache<K, M> {
         &self.module_cache
     }
 }
 
-impl<K, M, Q, S, E> ScriptCache for SyncCodeCache<K, M, Q, S, E>
+impl<K, M, Q, S> ScriptCache for SyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -67,12 +65,11 @@ where
 }
 
 /// A per-block module cache to be used for parallel transaction execution.
-pub struct SyncModuleCache<K, M, E> {
+pub struct SyncModuleCache<K, M> {
     cache: DashMap<K, CachePadded<M>>,
-    phantom_data: PhantomData<E>,
 }
 
-impl<K, M, E> SyncModuleCache<K, M, E>
+impl<K, M> SyncModuleCache<K, M>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -81,7 +78,6 @@ where
     fn empty() -> Self {
         Self {
             cache: DashMap::new(),
-            phantom_data: PhantomData,
         }
     }
 
@@ -100,14 +96,13 @@ where
     where
         P: FnOnce(&M) -> bool,
     {
-        match self.cache.get(key) {
-            Some(current) => p(current.value()),
-            None => false,
-        }
+        self.cache
+            .get(key)
+            .is_some_and(|current| p(current.value()))
     }
 
     /// Locks the module cache, and returns a guard.
-    pub fn lock(&self) -> LockedSyncModuleCache<K, M, E> {
+    pub fn lock(&self) -> LockedSyncModuleCache<K, M> {
         let mut locked_cache_shards = vec![];
         for shard in self.cache.shards() {
             let lock = shard.write();
@@ -117,7 +112,6 @@ where
         // At this point all shards are locked. Only one thread can manipulate the locked cache.
         LockedSyncModuleCache {
             cache: &self.cache,
-            phantom_data: self.phantom_data,
             locked_cache_shards: RefCell::new(locked_cache_shards),
         }
     }
@@ -133,12 +127,11 @@ where
     }
 }
 
-impl<K, M, E> ModuleCache for SyncModuleCache<K, M, E>
+impl<K, M> ModuleCache for SyncModuleCache<K, M>
 where
     K: Eq + Hash + Clone,
     M: Clone,
 {
-    type Error = E;
     type Key = K;
     type Module = M;
 
@@ -146,13 +139,13 @@ where
         self.cache.insert(key, CachePadded::new(module));
     }
 
-    fn get_module_or_insert_with<F>(
+    fn get_module_or_insert_with<F, E>(
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, Self::Error>
+    ) -> Result<Option<Self::Module>, E>
     where
-        F: FnOnce() -> Result<Option<Self::Module>, Self::Error>,
+        F: FnOnce() -> Result<Option<Self::Module>, E>,
     {
         if let Some(m) = self.cache.get(key) {
             return Ok(Some(m.value().deref().clone()));
@@ -181,14 +174,13 @@ pub type HashMapShard<K, M> = HashMap<K, dashmap::SharedValue<CachePadded<M>>, R
 pub type HashMapShardWriteGuard<'a, K, M> =
     lock_api::RwLockWriteGuard<'a, dashmap::RawRwLock, HashMapShard<K, M>>;
 
-pub struct LockedSyncModuleCache<'a, K, M, E> {
+pub struct LockedSyncModuleCache<'a, K, M> {
     // Note: the reference to the dashmap is used ONLY to calculate the shard index!
     cache: &'a DashMap<K, CachePadded<M>>,
-    phantom_data: PhantomData<E>,
     locked_cache_shards: RefCell<Vec<HashMapShardWriteGuard<'a, K, M>>>,
 }
 
-impl<'a, K, M, E> LockedSyncModuleCache<'a, K, M, E>
+impl<'a, K, M> LockedSyncModuleCache<'a, K, M>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -201,12 +193,11 @@ where
     }
 }
 
-impl<K, M, E> ModuleCache for LockedSyncModuleCache<'_, K, M, E>
+impl<K, M> ModuleCache for LockedSyncModuleCache<'_, K, M>
 where
     K: Eq + Hash + Clone,
     M: Clone,
 {
-    type Error = E;
     type Key = K;
     type Module = M;
 
@@ -220,13 +211,13 @@ where
             .insert(key, value);
     }
 
-    fn get_module_or_insert_with<F>(
+    fn get_module_or_insert_with<F, E>(
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, Self::Error>
+    ) -> Result<Option<Self::Module>, E>
     where
-        F: FnOnce() -> Result<Option<Self::Module>, Self::Error>,
+        F: FnOnce() -> Result<Option<Self::Module>, E>,
     {
         let shard_idx = self.cache.determine_shard(self.cache.hash_usize(key));
         let mut locked_cache_shards = self.locked_cache_shards.borrow_mut();

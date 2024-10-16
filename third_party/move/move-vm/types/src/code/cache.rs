@@ -20,7 +20,6 @@ pub trait ScriptCache {
 pub trait ModuleCache {
     type Key: Eq + Hash + Clone;
     type Module: Clone;
-    type Error;
 
     /// Inserts the module to the code cache.
     // TODO(loader_v2): Document the return type and when we insert, when not.
@@ -28,11 +27,11 @@ pub trait ModuleCache {
 
     /// Ensures that the entry in the module cache is initialized based on the default value, if it
     /// was not stored before. Returns the stored module, or [None] if it does not exist.
-    fn get_module_or_insert_with<F>(
+    fn get_module_or_insert_with<F, E>(
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, Self::Error>
+    ) -> Result<Option<Self::Module>, E>
     where
-        F: FnOnce() -> Result<Option<Self::Module>, Self::Error>;
+        F: FnOnce() -> Result<Option<Self::Module>, E>;
 }

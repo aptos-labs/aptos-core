@@ -12,7 +12,6 @@ use aptos_types::{
     vm::modules::ModuleCacheEntry,
     write_set::TransactionWrite,
 };
-use move_binary_format::errors::VMError;
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::CachedScript;
 use serde::Serialize;
@@ -44,13 +43,8 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 
-    code_cache: SyncCodeCache<
-        ModuleId,
-        Arc<MaybeCommitted<ModuleCacheEntry>>,
-        [u8; 32],
-        CachedScript,
-        VMError,
-    >,
+    code_cache:
+        SyncCodeCache<ModuleId, Arc<MaybeCommitted<ModuleCacheEntry>>, [u8; 32], CachedScript>,
 }
 
 impl<
@@ -107,13 +101,8 @@ impl<
 
     pub fn code_cache(
         &self,
-    ) -> &SyncCodeCache<
-        ModuleId,
-        Arc<MaybeCommitted<ModuleCacheEntry>>,
-        [u8; 32],
-        CachedScript,
-        VMError,
-    > {
+    ) -> &SyncCodeCache<ModuleId, Arc<MaybeCommitted<ModuleCacheEntry>>, [u8; 32], CachedScript>
+    {
         &self.code_cache
     }
 }

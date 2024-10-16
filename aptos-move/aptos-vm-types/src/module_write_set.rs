@@ -18,13 +18,13 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleWrite<V> {
     id: ModuleId,
-    op: V,
+    write_op: V,
 }
 
 impl<V: TransactionWrite> ModuleWrite<V> {
     /// Creates a new module write.
-    pub fn new(id: ModuleId, op: V) -> Self {
-        Self { id, op }
+    pub fn new(id: ModuleId, write_op: V) -> Self {
+        Self { id, write_op }
     }
 
     /// Returns the address of the module written.
@@ -39,22 +39,22 @@ impl<V: TransactionWrite> ModuleWrite<V> {
 
     /// Returns the mutable reference to the write for the published module.
     pub fn write_op_mut(&mut self) -> &mut V {
-        &mut self.op
+        &mut self.write_op
     }
 
     /// Returns the reference to the write for the published module.
     pub fn write_op(&self) -> &V {
-        &self.op
+        &self.write_op
     }
 
     /// Returns the write for the published module.
     pub fn into_write_op(self) -> V {
-        self.op
+        self.write_op
     }
 
     /// Returns the module identifier with the corresponding operation.
     pub fn unpack(self) -> (ModuleId, V) {
-        (self.id, self.op)
+        (self.id, self.write_op)
     }
 }
 
