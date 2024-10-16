@@ -259,13 +259,6 @@ module aptos_framework::staking_contract {
     }
 
     #[event]
-    struct SetBeneficiaryForOperator has drop, store {
-        operator: address,
-        old_beneficiary: address,
-        new_beneficiary: address,
-    }
-
-    #[event]
     struct DestroyStakingContractEvent has drop, store {
         staker: address,
         operator: address,

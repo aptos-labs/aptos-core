@@ -5233,7 +5233,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[],
             vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
@@ -5266,7 +5266,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
@@ -5303,7 +5303,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
@@ -5393,7 +5393,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
@@ -5492,7 +5492,7 @@ module aptos_framework::delegation_pool {
         operator_3: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
@@ -5558,7 +5558,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolOwnership {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[
                 features::get_staking_contract_to_delegation_pool_conversion_feature(),
@@ -5649,9 +5649,9 @@ module aptos_framework::delegation_pool {
         staker: &signer,
         operator: &signer,
         delegator: &signer,
-    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
