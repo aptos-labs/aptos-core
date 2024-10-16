@@ -10,8 +10,8 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-hex = "0.4.3"
+anyhow = { workspace = true }
+hex = { workspace = true }
 move-command-line-common = { path = "../../../move-command-line-common" }
 move-core-types = { path = "../../../move-core/types" }
 move-ir-types = { path = "../../../move-ir/types" }

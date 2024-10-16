@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: undeclared struct `m::Red`
+   ┌─ tests/checking/variants/variants_inference.move:17:14
+   │
+17 │         take(Red{}) // errors expected because of bottom-up type inference
+   │              ^^^
+
+error: undeclared struct `m::Red`
+   ┌─ tests/checking/variants/variants_inference.move:21:17
+   │
+21 │         let c = Red{}; // error expected
+   │                 ^^^
+
+error: enum `m::Color` must be used with one of its variants
+   ┌─ tests/checking/variants/variants_inference.move:26:17
+   │
+26 │         let c = Color{}; // error expected
+   │                 ^^^^^

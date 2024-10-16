@@ -47,7 +47,7 @@ pub fn validator_swarm(
     let seeds = build_seed_for_network(seed_config, PeerRole::Validator);
     for node in &mut nodes {
         let network = node.validator_network.as_mut().unwrap();
-        network.seeds = seeds.clone();
+        network.seeds.clone_from(&seeds);
     }
 
     nodes.sort_by(|a, b| {

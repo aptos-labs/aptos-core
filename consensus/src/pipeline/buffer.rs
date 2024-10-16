@@ -48,6 +48,7 @@ impl<T: Hashable> Buffer<T> {
         &self.tail
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn push_back(&mut self, elem: T) {
         self.count = self.count.checked_add(1).unwrap();
         let t_hash = elem.hash();
@@ -63,6 +64,7 @@ impl<T: Hashable> Buffer<T> {
         self.head.get_or_insert(t_hash);
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn pop_front(&mut self) -> Option<T> {
         self.head.take().map(|head| {
             let mut item = self.map.remove(&head).unwrap();
@@ -77,10 +79,12 @@ impl<T: Hashable> Buffer<T> {
     }
 
     // utils - assuming item is not None
+    #[allow(clippy::unwrap_used)]
     pub fn get_next(&self, cursor: &Cursor) -> Cursor {
         self.map.get(cursor.as_ref().unwrap()).unwrap().next
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn get(&self, cursor: &Cursor) -> &T {
         self.map
             .get(cursor.as_ref().unwrap())
@@ -90,6 +94,7 @@ impl<T: Hashable> Buffer<T> {
             .unwrap()
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn set(&mut self, cursor: &Cursor, new_val: T) {
         self.map
             .get_mut(cursor.as_ref().unwrap())
@@ -98,6 +103,7 @@ impl<T: Hashable> Buffer<T> {
             .replace(new_val);
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn take(&mut self, cursor: &Cursor) -> T {
         self.map
             .get_mut(cursor.as_ref().unwrap())
@@ -130,7 +136,7 @@ impl<T: Hashable> Buffer<T> {
     /// we make sure that the element found by the key is after `cursor`
     /// if `cursor` is None, this function returns None (same as find_elem)
     pub fn find_elem_by_key(&self, cursor: Cursor, key: HashValue) -> Cursor {
-        let cursor_order = self.map.get(cursor.as_ref()?).unwrap().index;
+        let cursor_order = self.map.get(cursor.as_ref()?)?.index;
         let item = self.map.get(&key)?;
         if item.index >= cursor_order {
             Some(key)

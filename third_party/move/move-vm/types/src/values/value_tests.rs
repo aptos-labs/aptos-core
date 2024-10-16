@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loaded_data::runtime_types::Type, values::*, views::*};
+use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
 use move_binary_format::errors::*;
 use move_core_types::{account_address::AccountAddress, u256::U256};
 
@@ -139,7 +139,7 @@ fn global_value_non_struct() -> PartialVMResult<()> {
 }
 
 #[test]
-fn leagacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
+fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let mut locals = Locals::new(10);
 
     locals.store_loc(0, Value::u128(0), false)?;
@@ -150,8 +150,11 @@ fn leagacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let r = locals.borrow_loc(1)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
+    // Actual limits for type builder are irrelevant for the test.
+    let u8_ty = TypeBuilder::with_limits(10, 10).create_u8_ty();
+
     let r: VectorRef = r.value_as()?;
-    let r = r.borrow_elem(0, &Type::U8)?;
+    let r = r.borrow_elem(0, &u8_ty)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
     locals.store_loc(2, Value::struct_(Struct::pack([])), false)?;
@@ -162,7 +165,7 @@ fn leagacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
 }
 
 #[test]
-fn legacy_struct_abstract_memory_size_consistenty() -> PartialVMResult<()> {
+fn legacy_struct_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let structs = [
         Struct::pack([]),
         Struct::pack([Value::struct_(Struct::pack([Value::u8(0), Value::u64(0)]))]),
@@ -199,13 +202,12 @@ fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
     ];
 
     let mut locals = Locals::new(vals.len());
-    for (idx, val) in vals.iter().enumerate() {
-        locals.store_loc(idx, val.copy_value()?, false)?;
-
+    for (idx, val) in vals.into_iter().enumerate() {
         let val_size_new = val.legacy_abstract_memory_size();
         let val_size_old = val.legacy_size();
-
         assert_eq!(val_size_new, val_size_old);
+
+        locals.store_loc(idx, val, false)?;
 
         let val_size_through_ref = locals
             .borrow_loc(idx)?
@@ -225,4 +227,69 @@ fn test_vm_value_vector_u64_casting() {
         vec![1, 2, 3],
         Value::vector_u64([1, 2, 3]).value_as::<Vec<u64>>().unwrap()
     );
+}
+
+#[cfg(test)]
+mod native_values {
+    use super::*;
+    use crate::delayed_values::delayed_field_id::{
+        DelayedFieldID, ExtractUniqueIndex, ExtractWidth,
+    };
+    use claims::{assert_err, assert_ok};
+
+    #[test]
+    fn test_native_value_equality() {
+        let v = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
+
+        // Comparing delayed values to all other values results in error.
+
+        assert_err!(Value::bool(false).equals(&v));
+
+        assert_err!(Value::u8(0).equals(&v));
+        assert_err!(Value::u16(0).equals(&v));
+        assert_err!(Value::u32(0).equals(&v));
+        assert_err!(Value::u64(0).equals(&v));
+        assert_err!(Value::u128(0).equals(&v));
+        assert_err!(Value::u256(U256::zero()).equals(&v));
+
+        assert_err!(Value::address(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::signer(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::signer_reference(AccountAddress::ONE).equals(&v));
+
+        assert_err!(Value::vector_bool(vec![true, false]).equals(&v));
+
+        assert_err!(Value::vector_u8(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_u16(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_u32(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_u64(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_u128(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_u256(vec![U256::zero(), U256::one()]).equals(&v));
+
+        assert_err!(
+            Value::vector_address(vec![AccountAddress::ONE, AccountAddress::TWO]).equals(&v)
+        );
+
+        let s = Struct::pack(vec![Value::u32(0), Value::u32(1)]);
+        assert_err!(Value::struct_(s).equals(&v));
+
+        // Comparing native values to other native values, even self, results
+        // in error.
+        assert_err!(Value::delayed_value(DelayedFieldID::new_with_width(0, 8)).equals(&v));
+        assert_err!(v.equals(&v));
+    }
+
+    #[test]
+    fn test_native_value_borrow() {
+        let delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
+        let mut locals = Locals::new(1);
+        assert_ok!(locals.store_loc(0, delayed_value, false));
+
+        let local = assert_ok!(locals.borrow_loc(0));
+        let reference = assert_ok!(local.value_as::<Reference>());
+        let v = assert_ok!(reference.read_ref());
+
+        let expected_id = assert_ok!(v.value_as::<DelayedFieldID>());
+        assert_eq!(expected_id.extract_unique_index(), 0);
+        assert_eq!(expected_id.extract_width(), 8);
+    }
 }

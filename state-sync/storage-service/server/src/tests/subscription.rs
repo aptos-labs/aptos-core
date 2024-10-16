@@ -10,7 +10,6 @@ use crate::{
     subscription::{SubscriptionRequest, SubscriptionStreamRequests},
     tests::{mock, mock::MockClient, utils},
 };
-use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
@@ -74,7 +73,6 @@ async fn test_peers_with_ready_subscriptions() {
     let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
 
     // Create test data with an empty storage server summary
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let optimistic_fetches = Arc::new(DashMap::new());
@@ -89,7 +87,7 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Verify that there are no peers with ready subscriptions
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -109,7 +107,7 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Verify that peer 1 has a ready subscription
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -135,7 +133,7 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Verify that peer 2 has a ready subscription
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -161,7 +159,7 @@ async fn test_peers_with_ready_subscriptions() {
     // Verify that subscription 3 is not returned because it was invalid
     // (i.e., the epoch ended at version 9, but the peer didn't respect it).
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -194,7 +192,6 @@ async fn test_remove_expired_subscriptions_no_new_data() {
     let time_service = TimeService::mock();
 
     // Create test data with an empty storage server summary
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let optimistic_fetches = Arc::new(DashMap::new());
@@ -227,7 +224,7 @@ async fn test_remove_expired_subscriptions_no_new_data() {
 
     // Remove the expired subscriptions and verify none were removed
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -257,7 +254,7 @@ async fn test_remove_expired_subscriptions_no_new_data() {
 
     // Remove the expired subscriptions and verify the first batch was removed
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -277,7 +274,7 @@ async fn test_remove_expired_subscriptions_no_new_data() {
 
     // Remove the expired subscriptions and verify the second batch was removed
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -326,7 +323,6 @@ async fn test_remove_expired_subscriptions_blocked_stream() {
     }
 
     // Create test data with an empty storage server summary
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let optimistic_fetches = Arc::new(DashMap::new());
@@ -348,7 +344,7 @@ async fn test_remove_expired_subscriptions_blocked_stream() {
 
     // Handle the active subscriptions
     subscription::handle_active_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         cached_storage_server_summary.clone(),
         storage_service_config,
         optimistic_fetches.clone(),
@@ -383,7 +379,7 @@ async fn test_remove_expired_subscriptions_blocked_stream() {
 
     // Remove the expired subscriptions and verify the second batch was removed
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -427,7 +423,6 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
     }
 
     // Create test data with an empty storage server summary
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let optimistic_fetches = Arc::new(DashMap::new());
@@ -450,7 +445,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
 
     // Verify that all peers have ready subscriptions (but don't serve them!)
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -472,7 +467,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
 
     // Remove the expired subscriptions and verify they were all removed
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -511,7 +506,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
 
     // Verify that none of the subscriptions are ready to be served (they are blocked)
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -540,7 +535,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
 
     // Verify that the first peer subscription stream is unblocked
     let peers_with_ready_subscriptions = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -559,7 +554,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
 
     // Remove the expired subscriptions and verify all but one were removed
     let _ = subscription::get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
+        Handle::current(),
         storage_service_config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwk_observer::JWKObserver,
@@ -9,13 +10,13 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::{bls12381::PrivateKey, SigningKey};
-use aptos_logger::{debug, error, info};
+use aptos_logger::{debug, error, info, warn};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
     jwks::{
-        jwk::JWKMoveStruct, AllProvidersJWKs, Issuer, ObservedJWKs, ObservedJWKsUpdated,
-        ProviderJWKs, QuorumCertifiedUpdate, SupportedOIDCProviders,
+        jwk::JWKMoveStruct, AllProvidersJWKs, Issuer, OIDCProvider, ObservedJWKs,
+        ObservedJWKsUpdated, ProviderJWKs, QuorumCertifiedUpdate, SupportedOIDCProviders,
     },
     validator_txn::{Topic, ValidatorTransaction},
 };
@@ -102,15 +103,27 @@ impl JWKManager {
             .unwrap_or_default()
             .into_provider_vec()
             .into_iter()
-            .map(|provider| {
-                JWKObserver::spawn(
-                    self.epoch_state.epoch,
-                    self.my_addr,
-                    provider.name.clone(),
-                    provider.config_url.clone(),
-                    Duration::from_secs(10),
-                    local_observation_tx.clone(),
-                )
+            .filter_map(|provider| {
+                let OIDCProvider { name, config_url } = provider;
+                let maybe_issuer = String::from_utf8(name);
+                let maybe_config_url = String::from_utf8(config_url);
+                match (maybe_issuer, maybe_config_url) {
+                    (Ok(issuer), Ok(config_url)) => Some(JWKObserver::spawn(
+                        self.epoch_state.epoch,
+                        self.my_addr,
+                        issuer,
+                        config_url,
+                        Duration::from_secs(10),
+                        local_observation_tx.clone(),
+                    )),
+                    (maybe_issuer, maybe_config_url) => {
+                        warn!(
+                            "unable to spawn observer, issuer={:?}, config_url={:?}",
+                            maybe_issuer, maybe_config_url
+                        );
+                        None
+                    },
+                }
             })
             .collect();
 

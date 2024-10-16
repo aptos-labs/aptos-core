@@ -35,7 +35,7 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     path::PathBuf,
-    sync::Arc,
+    sync::{atomic::AtomicU32, Arc},
 };
 use tempfile::TempDir;
 
@@ -49,6 +49,7 @@ const FULLNODE_CONFIG_MAP_KEY: &str = "fullnode.yaml";
 // the path where the genesis is mounted in the validator
 const GENESIS_CONFIG_VOLUME_NAME: &str = "genesis-config";
 const GENESIS_CONFIG_VOLUME_PATH: &str = "/opt/aptos/genesis";
+const GENESIS_CONFIG_WRITABLE_VOLUME_NAME: &str = "writable-genesis";
 
 // the path where the config file is mounted in the fullnode
 const APTOS_CONFIG_VOLUME_NAME: &str = "aptos-config";
@@ -168,7 +169,7 @@ fn create_fullnode_container(
 ) -> Result<Container> {
     Ok(Container {
         image: Some(fullnode_image),
-        command: Some(vec![
+        args: Some(vec![
             "/usr/local/bin/aptos-node".to_string(),
             "-f".to_string(),
             format!("/opt/aptos/etc/{}", FULLNODE_CONFIG_MAP_KEY),
@@ -186,7 +187,7 @@ fn create_fullnode_container(
             },
             VolumeMount {
                 mount_path: GENESIS_CONFIG_VOLUME_PATH.to_string(),
-                name: GENESIS_CONFIG_VOLUME_NAME.to_string(),
+                name: GENESIS_CONFIG_WRITABLE_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
         ]),
@@ -215,6 +216,11 @@ fn create_fullnode_volumes(
                 name: Some(fullnode_node_config_config_map_name),
                 ..ConfigMapVolumeSource::default()
             }),
+            ..Volume::default()
+        },
+        Volume {
+            name: GENESIS_CONFIG_WRITABLE_VOLUME_NAME.to_string(),
+            empty_dir: Some(Default::default()),
             ..Volume::default()
         },
     ]
@@ -498,7 +504,7 @@ pub async fn install_public_fullnode<'a>(
         haproxy_enabled: false,
 
         port_forward_enabled: use_port_forward,
-        rest_api_port: REST_API_SERVICE_PORT, // in the case of port-forward, this port will be changed at runtime
+        rest_api_port: AtomicU32::new(REST_API_SERVICE_PORT), // in the case of port-forward, this port will be changed at runtime
     };
 
     Ok((node_peer_id, ret_node))
@@ -507,9 +513,7 @@ pub async fn install_public_fullnode<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        MockConfigMapApi, MockPersistentVolumeClaimApi, MockServiceApi, MockStatefulSetApi,
-    };
+    use crate::MockK8sResourceApi;
     use aptos_config::config::Identity;
     use aptos_sdk::crypto::{x25519::PrivateKey, Uniform};
     use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
@@ -597,7 +601,7 @@ mod tests {
                                 },
                                 VolumeMount {
                                     mount_path: GENESIS_CONFIG_VOLUME_PATH.to_string(),
-                                    name: GENESIS_CONFIG_VOLUME_NAME.to_string(),
+                                    name: GENESIS_CONFIG_WRITABLE_VOLUME_NAME.to_string(),
                                     ..VolumeMount::default()
                                 },
                             ]),
@@ -722,15 +726,14 @@ mod tests {
         let version = Version::new(0, "banana".to_string());
 
         // create APIs
-        let stateful_set_api = Arc::new(MockStatefulSetApi::from_stateful_set(
-            get_dummy_validator_stateful_set(),
+        let stateful_set_api: Arc<MockK8sResourceApi<StatefulSet>> = Arc::new(
+            MockK8sResourceApi::from_resource(get_dummy_validator_stateful_set()),
+        );
+        let configmap_api = Arc::new(MockK8sResourceApi::new());
+        let persistent_volume_claim_api = Arc::new(MockK8sResourceApi::from_resource(
+            get_dummy_validator_persistent_volume_claim(),
         ));
-        let configmap_api = Arc::new(MockConfigMapApi::from_config_map(ConfigMap::default()));
-        let persistent_volume_claim_api =
-            Arc::new(MockPersistentVolumeClaimApi::from_persistent_volume_claim(
-                get_dummy_validator_persistent_volume_claim(),
-            ));
-        let service_api = Arc::new(MockServiceApi::from_service(Service::default()));
+        let service_api = Arc::new(MockK8sResourceApi::new());
 
         // get the base config and mutate it
         let mut node_config = get_default_pfn_node_config();

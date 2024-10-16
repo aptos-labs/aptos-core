@@ -90,91 +90,91 @@ error[E04004]: expected a single non-reference type
    │              Invalid type argument
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:23:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:28:9
    │
  3 │     struct S<T: drop> has drop { f: T }
    │                 ---- 'drop' constraint declared here
  4 │     struct R {}
    │            - To satisfy the constraint, the 'drop' ability would need to be added here
    ·
-23 │         S<R>,
+28 │         S<R>,
    │         ^^^^
    │         │ │
    │         │ The type '0x42::M::R' does not have the ability 'drop'
    │         'drop' constraint not satisifed
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:24:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:29:9
    │
-24 │         S<&u64>,
+29 │         S<&u64>,
    │         ^^^^^^^
    │         │ │
    │         │ Expected a single non-reference type, but found: '&u64'
    │         Invalid type argument
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:25:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:30:9
    │
-25 │         &(&u64),
+30 │         &(&u64),
    │         ^^^^^^^
    │         ││
    │         │Expected a single non-reference type, but found: '&u64'
    │         Invalid reference type
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:26:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:31:9
    │
-26 │         S<(u64, u64)>,
+31 │         S<(u64, u64)>,
    │         ^^^^^^^^^^^^^
    │         │ │
    │         │ Expected a single non-reference type, but found: '(u64, u64)'
    │         Invalid type argument
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:32:17
+   ┌─ tests/move_check/typing/instantiate_signatures.move:37:17
    │
  3 │     struct S<T: drop> has drop { f: T }
    │                 ---- 'drop' constraint declared here
  4 │     struct R {}
    │            - To satisfy the constraint, the 'drop' ability would need to be added here
    ·
-32 │         let f1: S<R> = abort 0;
+37 │         let f1: S<R> = abort 0;
    │                 ^^^^
    │                 │ │
    │                 │ The type '0x42::M::R' does not have the ability 'drop'
    │                 'drop' constraint not satisifed
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:33:17
+   ┌─ tests/move_check/typing/instantiate_signatures.move:38:17
    │
-33 │         let f2: S<&u64> = abort 0;
+38 │         let f2: S<&u64> = abort 0;
    │                 ^^^^^^^
    │                 │ │
    │                 │ Expected a single non-reference type, but found: '&u64'
    │                 Invalid type argument
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:34:17
+   ┌─ tests/move_check/typing/instantiate_signatures.move:39:17
    │
-34 │         let f3: &(&u64) = abort 0;
+39 │         let f3: &(&u64) = abort 0;
    │                 ^^^^^^^
    │                 ││
    │                 │Expected a single non-reference type, but found: '&u64'
    │                 Invalid reference type
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:35:17
+   ┌─ tests/move_check/typing/instantiate_signatures.move:40:17
    │
-35 │         let f4: S<(u64, u64)> = abort 0;
+40 │         let f4: S<(u64, u64)> = abort 0;
    │                 ^^^^^^^^^^^^^
    │                 │ │
    │                 │ Expected a single non-reference type, but found: '(u64, u64)'
    │                 Invalid type argument
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:37:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:42:9
    │
-37 │         id<S<R>>(abort 0);
+42 │         id<S<R>>(abort 0);
    │         ^^^^^^^^^^^^^^^^^
    │         │  │ │
    │         │  │ The type '0x42::M::S<0x42::M::R>' can have the ability 'drop' but the type argument '0x42::M::R' does not have the required ability 'drop'
@@ -182,62 +182,62 @@ error[E05001]: ability constraint not satisfied
    │         Cannot ignore values without the 'drop' ability. The value must be used
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:37:12
+   ┌─ tests/move_check/typing/instantiate_signatures.move:42:12
    │
  3 │     struct S<T: drop> has drop { f: T }
    │                 ---- 'drop' constraint declared here
  4 │     struct R {}
    │            - To satisfy the constraint, the 'drop' ability would need to be added here
    ·
-37 │         id<S<R>>(abort 0);
+42 │         id<S<R>>(abort 0);
    │            ^^^^
    │            │ │
    │            │ The type '0x42::M::R' does not have the ability 'drop'
    │            'drop' constraint not satisifed
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:38:12
+   ┌─ tests/move_check/typing/instantiate_signatures.move:43:12
    │
-38 │         id<S<&u64>>(abort 0);
+43 │         id<S<&u64>>(abort 0);
    │            ^^^^^^^
    │            │ │
    │            │ Expected a single non-reference type, but found: '&u64'
    │            Invalid type argument
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:39:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:44:9
    │
-39 │         id<&(&u64)>(abort 0);
+44 │         id<&(&u64)>(abort 0);
    │         ^^^^^^^^^^^^^^^^^^^^
    │         │  │
    │         │  Expected a single non-reference type, but found: '&&u64'
    │         Invalid type argument
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:39:12
+   ┌─ tests/move_check/typing/instantiate_signatures.move:44:12
    │
-39 │         id<&(&u64)>(abort 0);
+44 │         id<&(&u64)>(abort 0);
    │            ^^^^^^^
    │            ││
    │            │Expected a single non-reference type, but found: '&u64'
    │            Invalid reference type
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:40:12
+   ┌─ tests/move_check/typing/instantiate_signatures.move:45:12
    │
-40 │         id<S<(u64, u64)>>(abort 0);
+45 │         id<S<(u64, u64)>>(abort 0);
    │            ^^^^^^^^^^^^^
    │            │ │
    │            │ Expected a single non-reference type, but found: '(u64, u64)'
    │            Invalid type argument
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:42:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:47:9
    │
  3 │     struct S<T: drop> has drop { f: T }
    │                 ---- 'drop' constraint declared here
    ·
-42 │         S<S<R>> { f: abort 0 };
+47 │         S<S<R>> { f: abort 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^^
    │         │ │ │
    │         │ │ The type '0x42::M::S<0x42::M::R>' can have the ability 'drop' but the type argument '0x42::M::R' does not have the required ability 'drop'
@@ -245,9 +245,9 @@ error[E05001]: ability constraint not satisfied
    │         'drop' constraint not satisifed
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:42:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:47:9
    │
-42 │         S<S<R>> { f: abort 0 };
+47 │         S<S<R>> { f: abort 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^^
    │         │ │
    │         │ The type '0x42::M::S<0x42::M::S<0x42::M::R>>' can have the ability 'drop' but the type argument '0x42::M::S<0x42::M::R>' does not have the required ability 'drop'
@@ -255,50 +255,50 @@ error[E05001]: ability constraint not satisfied
    │         The type '0x42::M::S<0x42::M::S<0x42::M::R>>' does not have the ability 'drop'
 
 error[E05001]: ability constraint not satisfied
-   ┌─ tests/move_check/typing/instantiate_signatures.move:42:11
+   ┌─ tests/move_check/typing/instantiate_signatures.move:47:11
    │
  3 │     struct S<T: drop> has drop { f: T }
    │                 ---- 'drop' constraint declared here
  4 │     struct R {}
    │            - To satisfy the constraint, the 'drop' ability would need to be added here
    ·
-42 │         S<S<R>> { f: abort 0 };
+47 │         S<S<R>> { f: abort 0 };
    │           ^^^^
    │           │ │
    │           │ The type '0x42::M::R' does not have the ability 'drop'
    │           'drop' constraint not satisifed
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:43:11
+   ┌─ tests/move_check/typing/instantiate_signatures.move:48:11
    │
-43 │         S<S<&u64>> { f: abort 0 };
+48 │         S<S<&u64>> { f: abort 0 };
    │           ^^^^^^^
    │           │ │
    │           │ Expected a single non-reference type, but found: '&u64'
    │           Invalid type argument
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:44:9
+   ┌─ tests/move_check/typing/instantiate_signatures.move:49:9
    │
-44 │         S<&(&u64)> { f: abort 0 };
+49 │         S<&(&u64)> { f: abort 0 };
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
    │         │ │
    │         │ Expected a single non-reference type, but found: '&&u64'
    │         Invalid type argument
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:44:11
+   ┌─ tests/move_check/typing/instantiate_signatures.move:49:11
    │
-44 │         S<&(&u64)> { f: abort 0 };
+49 │         S<&(&u64)> { f: abort 0 };
    │           ^^^^^^^
    │           ││
    │           │Expected a single non-reference type, but found: '&u64'
    │           Invalid reference type
 
 error[E04004]: expected a single non-reference type
-   ┌─ tests/move_check/typing/instantiate_signatures.move:45:11
+   ┌─ tests/move_check/typing/instantiate_signatures.move:50:11
    │
-45 │         S<S<(u64, u64)>> { f: abort 0 };
+50 │         S<S<(u64, u64)>> { f: abort 0 };
    │           ^^^^^^^^^^^^^
    │           │ │
    │           │ Expected a single non-reference type, but found: '(u64, u64)'

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: invalid 'module' declaration
+  ┌─ tests/visibility-checker/package_visibility_cycle.move:3:9
+  │
+3 │         0x42::B::foo()
+  │         ^^^^^^^^^^^^ '0x42::B' uses '0x42::A'. This 'use' relationship creates a dependency cycle.
+  ·
+9 │         0x42::A::foo()
+  │         ------------ '0x42::A' uses '0x42::B'

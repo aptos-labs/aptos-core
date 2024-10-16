@@ -9,7 +9,7 @@ inputs:
     description: "The docker image tag to use for the local testnet if NETWORK=custom."
     required: true
   GCP_DOCKER_ARTIFACT_REPO:
-    description: "The GCP Docker artifact repository."
+    description: "The GCP Docker artifact repository"
     required: true
 
 runs:
@@ -24,7 +24,7 @@ runs:
     - name: Run Redis server
       uses: shogo82148/actions-setup-redis@v1
       with:
-        redis-version: '6.x'
+        redis-version: "6.x"
 
     # Set up Rust for running the integration tests.
     - name: Set up Rust
@@ -50,7 +50,7 @@ runs:
     # we don't pass the image tag.
     - name: Run integration tests
       if: ${{ inputs.NETWORK != 'custom' }}
-      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} ${{ endif }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
       working-directory: crates/aptos-faucet/integration-tests
       shell: bash
 

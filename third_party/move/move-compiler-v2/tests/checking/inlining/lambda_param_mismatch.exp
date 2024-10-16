@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: cannot pass `|u64|u64` to a function which expects argument of type `|u64|`
+   ┌─ tests/checking/inlining/lambda_param_mismatch.move:12:33
+   │
+12 │           vector::for_each(input, |item| {
+   │ ╭─────────────────────────────────^
+13 │ │             vector::remove(&mut mut_ref.inner, item)
+14 │ │         })
+   │ ╰─────────^

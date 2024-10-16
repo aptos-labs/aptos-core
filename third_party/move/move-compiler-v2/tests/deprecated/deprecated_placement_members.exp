@@ -1,0 +1,40 @@
+
+Diagnostics:
+warning: Use of deprecated struct
+   ┌─ tests/deprecated/deprecated_placement_members.move:31:18
+   │
+19 │     #[deprecated]
+   │       ---------- Struct 'S' in module '0x41::N' deprecated here
+   ·
+31 │     use 0x41::N::S;
+   │                  ^ Use of deprecated struct 'S' from module '0x41::N'
+
+warning: Use of deprecated struct
+   ┌─ tests/deprecated/deprecated_placement_members.move:34:11
+   │
+19 │     #[deprecated]
+   │       ---------- Struct 'S' in module '0x41::N' deprecated here
+   ·
+34 │     let foo: S = M::foo();
+   │              ^ Use of deprecated struct 'S' from module '0x41::N'
+
+warning: Use of deprecated function
+   ┌─ tests/deprecated/deprecated_placement_members.move:34:18
+   │
+11 │     #[deprecated]
+   │       ---------- Function 'foo' in module '0x42::M' deprecated here
+   ·
+34 │     let foo: S = M::foo();
+   │                     ^^^ Use of deprecated function 'foo' from module '0x42::M'
+
+warning: Use of deprecated function
+   ┌─ tests/deprecated/deprecated_placement_members.move:35:11
+   │
+25 │     #[deprecated]
+   │       ---------- Function 'consume' in module '0x41::N' deprecated here
+   ·
+35 │     0x41::N::consume(foo);
+   │              ^^^^^^^ Use of deprecated function 'consume' from module '0x41::N'
+
+
+============ bytecode verification succeeded ========

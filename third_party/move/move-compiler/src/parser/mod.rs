@@ -8,7 +8,7 @@ pub(crate) mod filter;
 pub mod keywords;
 pub mod lexer;
 pub(crate) mod merge_spec_modules;
-pub(crate) mod syntax;
+pub mod syntax;
 
 use crate::{
     attr_derivation,
@@ -26,6 +26,10 @@ use std::{
     io::Read,
 };
 
+/// Note that all directory paths must be restricted so that all
+/// Move files under the are suitable for use: e.g., rather than
+/// pointing to a package's Move.toml's directory, they point
+/// to `.../source`, `.../scripts`, and/or `../tests` as appropriate.
 pub(crate) fn parse_program(
     compilation_env: &mut CompilationEnv,
     named_address_maps: NamedAddressMaps,

@@ -11,9 +11,7 @@ use anyhow::Result;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_schemadb::{
-    schema::Schema, Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME,
-};
+use aptos_schemadb::{schema::Schema, Options, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use aptos_storage_interface::AptosDbError;
 pub use schema::{
     block::BlockSchema,
@@ -202,7 +200,7 @@ impl ConsensusDB {
     }
 
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
-        let mut iter = self.db.iter::<S>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<S>()?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
     }

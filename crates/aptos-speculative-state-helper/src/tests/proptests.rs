@@ -74,7 +74,7 @@ fn prepare_work(
     let mut counter_values = vec![0; num_counters];
 
     // Pre-process indices and deltas and put them into worker tasks.
-    let mut worker_tasks: Vec<Vec<Operator>> = vec![Vec::with_capacity(200); 4];
+    let mut worker_tasks: Vec<Vec<Operator>> = (0..4).map(|_| Vec::with_capacity(200)).collect();
 
     for (i, (mut idx, mut delta)) in counter_ops.iter().enumerate() {
         // Group based on modulo (num_counters + 1). Last group is for testing out of bounds.

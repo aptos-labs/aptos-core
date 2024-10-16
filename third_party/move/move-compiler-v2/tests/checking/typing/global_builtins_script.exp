@@ -1,24 +1,19 @@
-// ---- Model Dump
-module 0x42::M {
-    struct R {
-        dummy_field: bool,
-    }
-    public fun new(): M::R {
-        pack M::R(false)
-    }
-    spec fun $new(): M::R {
-        pack M::R(false)
-    }
-} // end 0x42::M
-module <SELF>_0 {
-    use 0x42::M; // resolved as: 0x42::M
-    private fun test<Token>(account: signer) {
-        {
-          let r: M::R = M::new();
-          BorrowGlobal(Immutable)<M::R>(0x1);
-          MoveTo<M::R>(Borrow(Immutable)(account), r);
-          Tuple()
-        }
-    }
-    spec fun $test<Token>(account: signer);
-} // end <SELF>_0
+
+Diagnostics:
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/checking/typing/global_builtins_script.move:14:5
+   │
+14 │ fun test<Token>(account: signer) {
+   │     ^^^^
+15 │     let r = M::new();
+16 │     borrow_global<M::R>(@0x1);
+   │     ------------------------- called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/checking/typing/global_builtins_script.move:14:5
+   │
+14 │ fun test<Token>(account: signer) {
+   │     ^^^^
+   ·
+17 │     move_to(&account, r);
+   │     -------------------- called here

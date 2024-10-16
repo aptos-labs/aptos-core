@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::value::{MoveStruct, MoveValue};
 
@@ -33,9 +34,27 @@ impl<T: AsMoveValue> AsMoveValue for Vec<T> {
     }
 }
 
+impl AsMoveValue for bool {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Bool(*self)
+    }
+}
+
 impl AsMoveValue for u8 {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::U8(*self)
+    }
+}
+
+impl AsMoveValue for u16 {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::U16(*self)
+    }
+}
+
+impl AsMoveValue for u32 {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::U32(*self)
     }
 }
 

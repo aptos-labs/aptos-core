@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: type unification cycle check failed (`?3 =?= (?3, integer)`, try to annotate type) (from assignment or declaration context)
+error: unable to infer type due to cyclic type constraints (try annotating the type)
   ┌─ tests/checking/typing/recursive_local.move:5:9
   │
 5 │         x = (x, 0);

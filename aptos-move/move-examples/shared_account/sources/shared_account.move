@@ -79,7 +79,7 @@ module shared_account::SharedAccount {
     }
 
     #[test_only]
-    public entry fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
+    public fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
         let addresses = vector::empty<address>();
         let numerators = vector::empty<u64>();
         let seed = x"01";
@@ -108,8 +108,8 @@ module shared_account::SharedAccount {
         use aptos_framework::aptos_coin::{Self, AptosCoin};
         let user_addr1 = signer::address_of(&test_user1);
         let user_addr2 = signer::address_of(&test_user2);
-        let resource_addr = set_up(user, test_user1, test_user2);
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&core_framework);
+        let resource_addr = set_up(user, test_user1, test_user2);
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);

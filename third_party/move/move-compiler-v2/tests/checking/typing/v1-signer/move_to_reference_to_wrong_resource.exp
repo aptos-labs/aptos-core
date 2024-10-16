@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot use `X` with an operator which expects a value of type `R`
+  ┌─ tests/checking/typing/v1-signer/move_to_reference_to_wrong_resource.move:5:23
+  │
+5 │         move_to<R>(s, X { f: false })
+  │                       ^^^^^^^^^^^^^^
+
+error: cannot use `R<bool>` with an operator which expects a value of type `X<bool>`
+   ┌─ tests/checking/typing/v1-signer/move_to_reference_to_wrong_resource.move:16:34
+   │
+16 │         () = move_to<X<bool>>(s, R { f: false })
+   │                                  ^^^^^^^^^^^^^^

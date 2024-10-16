@@ -1,9 +1,2 @@
 
-Diagnostics:
-error: cannot pass mutable reference in local `s1`, which is still borrowed, as function argument
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows.move:11:22
-   │
-11 │         (freeze(s1), freeze(s1)) // error in v2 since &mut cannot be copied
-   │          ----------  ^^^^^^^^^^ passed here
-   │          │
-   │          previous call result
+============ bytecode verification succeeded ========

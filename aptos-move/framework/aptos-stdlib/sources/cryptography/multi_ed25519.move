@@ -365,7 +365,7 @@ module aptos_std::multi_ed25519 {
 
     #[test(fx = @std)]
     fun bugfix_validated_pk_from_zero_subpks(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
         let bytes = vector<u8>[1u8];
         assert!(vector::length(&bytes) == 1, 1);
 
@@ -383,7 +383,7 @@ module aptos_std::multi_ed25519 {
 
     #[test(fx = @std)]
     fun test_validated_pk_without_threshold_byte(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
 
         let (_, subpk) = ed25519::generate_keys();
         let bytes = ed25519::validated_public_key_to_bytes(&subpk);
@@ -402,7 +402,7 @@ module aptos_std::multi_ed25519 {
 
     #[test(fx = @std)]
     fun test_validated_pk_from_small_order_subpk(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
         let torsion_point_with_threshold_1 = vector<u8>[
             1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 1,

@@ -1,0 +1,15 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-46:
+- warning[W09003]: unused assignment
+-    ┌─ TEMPFILE:23:13
++ warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
++    ┌─ TEMPFILE:23:17
+=    │
+= 23 │         let x = q;
+-    │             ^ Unused assignment or binding for local 'x'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_x')
++    │                 ^
+= 
+= 
+= 

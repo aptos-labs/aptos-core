@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
@@ -7,14 +8,21 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
+/// Chain should not be blocked by failing validator txns.
 #[tokio::test]
 async fn dummy_validator_txns() {
     let swarm = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.api.failpoints_enabled = true;
+        }))
+        .with_init_genesis_config(Arc::new(move |conf| {
+            // start with randomness enabled.
+            conf.consensus_config.enable_validator_txns();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .with_aptos()
         .build()

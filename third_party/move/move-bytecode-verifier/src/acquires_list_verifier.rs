@@ -119,6 +119,10 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::MutBorrowFieldGeneric(_)
             | Bytecode::ImmBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
+            | Bytecode::MutBorrowVariantField(_)
+            | Bytecode::MutBorrowVariantFieldGeneric(_)
+            | Bytecode::ImmBorrowVariantField(_)
+            | Bytecode::ImmBorrowVariantFieldGeneric(_)
             | Bytecode::LdU8(_)
             | Bytecode::LdU16(_)
             | Bytecode::LdU32(_)
@@ -132,6 +136,12 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::PackGeneric(_)
             | Bytecode::Unpack(_)
             | Bytecode::UnpackGeneric(_)
+            | Bytecode::PackVariant(_)
+            | Bytecode::PackVariantGeneric(_)
+            | Bytecode::UnpackVariant(_)
+            | Bytecode::UnpackVariantGeneric(_)
+            | Bytecode::TestVariant(_)
+            | Bytecode::TestVariantGeneric(_)
             | Bytecode::ReadRef
             | Bytecode::WriteRef
             | Bytecode::CastU8

@@ -4,5 +4,5 @@ error[E02001]: duplicate declaration, item, or annotation
 3 │         f: u64,
   │         - Field previously defined here
 4 │         f: u64,
-  │         ^ Duplicate definition for field 'f' in struct 'S'
+  │         ^ Duplicate definition for field 'f'
 

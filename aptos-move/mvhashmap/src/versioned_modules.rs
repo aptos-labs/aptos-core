@@ -101,10 +101,14 @@ impl<V: TransactionWrite, X: Executable> Default for VersionedValue<V, X> {
 }
 
 impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<K, V, X> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             values: DashMap::new(),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.values.len()
     }
 
     /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write

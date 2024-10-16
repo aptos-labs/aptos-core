@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: type `R` is missing required ability `drop`
+  ┌─ tests/more-v1/typing/constraints_not_satisfied_type_arguments_internal_pack.move:8:18
+  │
+2 │     struct CupD<T: drop> has drop { f: T }
+  │                 - declaration of type parameter `T`
+  ·
+8 │         Box<CupD<R>>{ f: abort 0 };
+  │                  ^
+  │
+  = required by instantiating type parameter `T:drop` of struct `CupD`

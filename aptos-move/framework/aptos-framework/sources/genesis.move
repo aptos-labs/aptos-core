@@ -7,6 +7,7 @@ module aptos_framework::genesis {
 
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
+    use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
@@ -130,12 +131,15 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
-        jwks::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
     fun initialize_aptos_coin(aptos_framework: &signer) {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
+
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
@@ -150,6 +154,10 @@ module aptos_framework::genesis {
         core_resources_auth_key: vector<u8>,
     ) {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
+
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
@@ -159,6 +167,7 @@ module aptos_framework::genesis {
 
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
+        aptos_account::register_apt(&core_resources); // registers APT store
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
@@ -382,7 +391,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_framework::jwks;
 
     #[verify_only]
     fun initialize_for_verification(
@@ -424,7 +432,7 @@ module aptos_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        features::change_feature_flags(aptos_framework, vector[1, 2], vector[]);
+        features::change_feature_flags_for_verification(aptos_framework, vector[1, 2], vector[]);
         initialize_aptos_coin(aptos_framework);
         aptos_governance::initialize_for_verification(
             aptos_framework,
@@ -510,5 +518,33 @@ module aptos_framework::genesis {
 
         create_account(aptos_framework, addr0, 23456);
         assert!(coin::balance<AptosCoin>(addr0) == 12345, 2);
+    }
+
+    #[test(aptos_framework = @0x1, root = @0xabcd)]
+    fun test_create_root_account(aptos_framework: &signer) {
+        use aptos_framework::aggregator_factory;
+        use aptos_framework::object;
+        use aptos_framework::primary_fungible_store;
+        use aptos_framework::fungible_asset::Metadata;
+        use std::features;
+
+        let feature = features::get_new_accounts_default_to_fa_apt_store_feature();
+        features::change_feature_flags_for_testing(aptos_framework, vector[feature], vector[]);
+
+        aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
+
+        let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
+        aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
+
+        let core_resources = account::create_account(@core_resources);
+        aptos_account::register_apt(&core_resources); // registers APT store
+
+        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        assert!(primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
+
+        aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
+
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
     }
 }

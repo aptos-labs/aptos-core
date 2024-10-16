@@ -14,7 +14,7 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     control_flow_graph::{BlockId, ControlFlowGraph},
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature, StructFieldInformation},
+    file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature},
 };
 use move_core_types::vm_status::StatusCode;
 
@@ -151,6 +151,12 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::MutBorrowFieldGeneric(_)
             | Bytecode::ImmBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
+            | Bytecode::MutBorrowVariantField(_)
+            | Bytecode::MutBorrowVariantFieldGeneric(_)
+            | Bytecode::ImmBorrowVariantField(_)
+            | Bytecode::ImmBorrowVariantFieldGeneric(_)
+            | Bytecode::TestVariant(_)
+            | Bytecode::TestVariantGeneric(_)
             | Bytecode::MoveFrom(_)
             | Bytecode::MoveFromGeneric(_)
             | Bytecode::CastU8
@@ -225,43 +231,69 @@ impl<'a> StackUsageVerifier<'a> {
             // Pack performs `num_fields` pops and one push
             Bytecode::Pack(idx) => {
                 let struct_definition = self.resolver.struct_def_at(*idx)?;
-                let field_count = match &struct_definition.field_information {
-                    // 'Native' here is an error that will be caught by the bytecode verifier later
-                    StructFieldInformation::Native => 0,
-                    StructFieldInformation::Declared(fields) => fields.len(),
-                };
-                (field_count as u64, 1)
+                let field_count = struct_definition.field_information.field_count(None) as u64;
+                (field_count, 1)
             },
             Bytecode::PackGeneric(idx) => {
                 let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                 let struct_definition = self.resolver.struct_def_at(struct_inst.def)?;
-                let field_count = match &struct_definition.field_information {
-                    // 'Native' here is an error that will be caught by the bytecode verifier later
-                    StructFieldInformation::Native => 0,
-                    StructFieldInformation::Declared(fields) => fields.len(),
-                };
-                (field_count as u64, 1)
+                let field_count = struct_definition.field_information.field_count(None) as u64;
+                (field_count, 1)
+            },
+            Bytecode::PackVariant(idx) => {
+                let variant_handle = self.resolver.struct_variant_handle_at(*idx)?;
+                let struct_definition = self.resolver.struct_def_at(variant_handle.struct_index)?;
+                let field_count = struct_definition
+                    .field_information
+                    .field_count(Some(variant_handle.variant))
+                    as u64;
+                (field_count, 1)
+            },
+            Bytecode::PackVariantGeneric(idx) => {
+                let variant_inst = self.resolver.struct_variant_instantiation_at(*idx)?;
+                let variant_handle = self
+                    .resolver
+                    .struct_variant_handle_at(variant_inst.handle)?;
+                let struct_definition = self.resolver.struct_def_at(variant_handle.struct_index)?;
+                let field_count = struct_definition
+                    .field_information
+                    .field_count(Some(variant_handle.variant))
+                    as u64;
+                (field_count, 1)
             },
 
             // Unpack performs one pop and `num_fields` pushes
             Bytecode::Unpack(idx) => {
                 let struct_definition = self.resolver.struct_def_at(*idx)?;
-                let field_count = match &struct_definition.field_information {
-                    // 'Native' here is an error that will be caught by the bytecode verifier later
-                    StructFieldInformation::Native => 0,
-                    StructFieldInformation::Declared(fields) => fields.len(),
-                };
-                (1, field_count as u64)
+                let field_count = struct_definition.field_information.field_count(None) as u64;
+                (1, field_count)
             },
             Bytecode::UnpackGeneric(idx) => {
                 let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                 let struct_definition = self.resolver.struct_def_at(struct_inst.def)?;
-                let field_count = match &struct_definition.field_information {
-                    // 'Native' here is an error that will be caught by the bytecode verifier later
-                    StructFieldInformation::Native => 0,
-                    StructFieldInformation::Declared(fields) => fields.len(),
-                };
-                (1, field_count as u64)
+                let field_count = struct_definition.field_information.field_count(None) as u64;
+                (1, field_count)
+            },
+            Bytecode::UnpackVariant(idx) => {
+                let variant_handle = self.resolver.struct_variant_handle_at(*idx)?;
+                let struct_definition = self.resolver.struct_def_at(variant_handle.struct_index)?;
+                let field_count = struct_definition
+                    .field_information
+                    .field_count(Some(variant_handle.variant))
+                    as u64;
+                (1, field_count)
+            },
+            Bytecode::UnpackVariantGeneric(idx) => {
+                let variant_inst = self.resolver.struct_variant_instantiation_at(*idx)?;
+                let variant_handle = self
+                    .resolver
+                    .struct_variant_handle_at(variant_inst.handle)?;
+                let struct_definition = self.resolver.struct_def_at(variant_handle.struct_index)?;
+                let field_count = struct_definition
+                    .field_information
+                    .field_count(Some(variant_handle.variant))
+                    as u64;
+                (1, field_count)
             },
         })
     }

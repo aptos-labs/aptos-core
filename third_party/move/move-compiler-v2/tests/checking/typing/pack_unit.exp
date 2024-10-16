@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: tuple type `()` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/pack_unit.move:5:9
+  │
+2 │     struct Box<T> has drop { f: T }
+  │                - declaration of type parameter `T`
+  ·
+5 │         Box { f: () };
+  │         ^^^
+  │
+  = required by instantiating type parameter `T` of struct `Box`

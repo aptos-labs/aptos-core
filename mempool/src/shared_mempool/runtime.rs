@@ -11,7 +11,7 @@ use crate::{
     },
     QuorumStoreRequest,
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, NodeType};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
@@ -22,7 +22,7 @@ use aptos_network::application::{
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::on_chain_config::OnChainConfigProvider;
-use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
+use aptos_vm_validator::vm_validator::{PooledVMValidator, TransactionValidation};
 use futures::channel::mpsc::{Receiver, UnboundedSender};
 use std::sync::Arc;
 use tokio::runtime::{Handle, Runtime};
@@ -50,6 +50,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     TransactionValidator: TransactionValidation + 'static,
     ConfigProvider: OnChainConfigProvider,
 {
+    let node_type = NodeType::extract_from_config(config);
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
         SharedMempool::new(
             mempool.clone(),
@@ -58,7 +59,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
             db,
             validator,
             subscribers,
-            config.base.role,
+            node_type,
         );
 
     executor.spawn(coordinator(
@@ -99,7 +100,10 @@ pub fn bootstrap(
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
-    let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
+    let vm_validator = Arc::new(RwLock::new(PooledVMValidator::new(
+        Arc::clone(&db),
+        num_cpus::get(),
+    )));
     start_shared_mempool(
         runtime.handle(),
         config,

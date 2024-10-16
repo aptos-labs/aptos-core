@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::mime_types::BCS;
+use aptos_api_types::mime_types::{BCS, JSON};
 use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 
 /// Accept types from input headers
@@ -17,7 +17,6 @@ pub enum AcceptType {
 
 /// This impl allows us to get the data straight from the arguments to the
 /// endpoint handler.
-#[async_trait::async_trait]
 impl<'a> FromRequest<'a> for AcceptType {
     async fn from_request(request: &'a Request, _body: &mut RequestBody) -> Result<Self> {
         let accept = Accept::from_request_without_body(request).await?;
@@ -29,6 +28,9 @@ impl<'a> FromRequest<'a> for AcceptType {
 /// overriding explicit accept type, default to JSON.
 fn parse_accept(accept: &Accept) -> Result<AcceptType> {
     for mime in &accept.0 {
+        if matches!(mime.as_ref(), JSON) {
+            return Ok(AcceptType::Json);
+        }
         if matches!(mime.as_ref(), BCS) {
             return Ok(AcceptType::Bcs);
         }

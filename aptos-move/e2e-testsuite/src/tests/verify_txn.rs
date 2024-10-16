@@ -8,7 +8,7 @@ use aptos_gas_algebra::Gas;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
-    compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
+    current_function_name, executor::FakeExecutor, transaction_status_eq,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -23,7 +23,6 @@ use move_core_types::{
     gas_algebra::GasQuantity,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
-    vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
 };
 use move_ir_compiler::Compiler;
 
@@ -41,12 +40,12 @@ fn verify_signature() {
         *sender.address(),
         0,
         &private_key,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         program,
     );
 
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
     );
@@ -71,13 +70,13 @@ fn verify_multi_agent_invalid_sender_signature() {
         vec![*secondary_signer.address()],
         10,
         &private_key,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.clone()],
+        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
         None,
     );
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
     );
@@ -101,13 +100,13 @@ fn verify_multi_agent_invalid_secondary_signature() {
         vec![*secondary_signer.address()],
         10,
         &sender.account().privkey,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         vec![&private_key],
-        vec![secondary_signer.account().pubkey.clone()],
+        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
         None,
     );
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
     );
@@ -135,21 +134,21 @@ fn verify_multi_agent_duplicate_secondary_signer() {
         ],
         10,
         &sender.account().privkey,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         vec![
             &secondary_signer.account().privkey,
             &third_signer.account().privkey,
             &secondary_signer.account().privkey,
         ],
         vec![
-            secondary_signer.account().pubkey.clone(),
-            third_signer.account().pubkey.clone(),
-            secondary_signer.account().pubkey.clone(),
+            secondary_signer.account().pubkey.as_ed25519().unwrap(),
+            third_signer.account().pubkey.as_ed25519().unwrap(),
+            secondary_signer.account().pubkey.as_ed25519().unwrap(),
         ],
         None,
     );
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::SIGNERS_CONTAIN_DUPLICATES
     );
@@ -172,7 +171,7 @@ fn verify_reserved_sender() {
     );
 
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
     );
@@ -202,7 +201,7 @@ fn verify_simple_payment() {
         ))
         .sequence_number(10)
         .sign();
-    assert_eq!(executor.verify_transaction(txn).status(), None);
+    assert_eq!(executor.validate_transaction(txn).status(), None);
 
     // Create a new transaction that has the bad auth key.
     let txn = receiver
@@ -213,12 +212,15 @@ fn verify_simple_payment() {
         .max_gas_amount(100_000)
         .gas_unit_price(1)
         .raw()
-        .sign(&sender.account().privkey, sender.account().pubkey.clone())
+        .sign(
+            &sender.account().privkey,
+            sender.account().pubkey.as_ed25519().unwrap(),
+        )
         .unwrap()
         .into_inner();
 
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::INVALID_AUTH_KEY
     );
@@ -231,7 +233,7 @@ fn verify_simple_payment() {
         .sequence_number(1)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::SEQUENCE_NUMBER_TOO_OLD
     );
@@ -244,7 +246,7 @@ fn verify_simple_payment() {
         .sequence_number(11)
         .sign();
     assert_prologue_disparity!(
-        executor.verify_transaction(txn.clone()).status() => None,
+        executor.validate_transaction(txn.clone()).status() => None,
         executor.execute_transaction(txn).status() =>
         TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
     );
@@ -259,7 +261,7 @@ fn verify_simple_payment() {
         .gas_unit_price(1)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
     );
@@ -273,7 +275,7 @@ fn verify_simple_payment() {
         .sequence_number(10)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
     );
@@ -295,16 +297,15 @@ fn verify_simple_payment() {
         .max_gas_amount(1_000_000)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND
     );
 
     // Test for a max_gas_amount that is insufficient to pay the minimum fee.
     // Find the minimum transaction gas units and subtract 1.
-    let mut gas_limit: Gas = txn_gas_params
-        .min_transaction_gas_units
-        .to_unit_round_up_with_params(&txn_gas_params);
+    let mut gas_limit: Gas =
+        (txn_gas_params.min_transaction_gas_units).to_unit_round_up_with_params(&txn_gas_params);
 
     if gas_limit > 0.into() {
         gas_limit = gas_limit.checked_sub(1.into()).unwrap();
@@ -336,7 +337,7 @@ fn verify_simple_payment() {
         .gas_unit_price(txn_gas_params.max_price_per_gas_unit.into())
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
     );
@@ -350,7 +351,7 @@ fn verify_simple_payment() {
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND
     );
@@ -368,7 +369,7 @@ fn verify_simple_payment() {
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE
     );
@@ -415,7 +416,7 @@ pub fn test_arbitrary_script_execution() {
         .max_gas_amount(100_000)
         .gas_unit_price(1)
         .sign();
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     let status = executor.execute_transaction(txn).status().clone();
     assert!(!status.is_discarded());
     assert_eq!(
@@ -444,7 +445,7 @@ fn verify_expiration_time() {
         None, /* max_gas_amount */
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::TRANSACTION_EXPIRED
     );
@@ -462,7 +463,7 @@ fn verify_expiration_time() {
         None, /* max_gas_amount */
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::TRANSACTION_EXPIRED
     );
@@ -483,7 +484,7 @@ fn verify_chain_id() {
         ChainId::new(ChainId::test().id() + 1),
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::BAD_CHAIN_ID
     );
@@ -506,123 +507,9 @@ fn verify_max_sequence_number() {
         None,     /* max_gas_amount */
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::SEQUENCE_NUMBER_TOO_BIG
-    );
-}
-
-#[test]
-pub fn test_open_publishing_invalid_address() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    let receiver = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-    executor.add_account_data(&receiver);
-
-    let module = format!(
-        "
-        module 0x{}.M {{
-            public max(a: u64, b: u64): u64 {{
-            label b0:
-                jump_if (copy(a) > copy(b)) b2;
-            label b1:
-                return copy(b);
-            label b2:
-                return copy(a);
-            }}
-
-            public sum(a: u64, b: u64): u64 {{
-                let c: u64;
-            label b0:
-                c = copy(a) + copy(b);
-                return copy(c);
-            }}
-        }}
-        ",
-        receiver.address().to_hex(),
-    );
-
-    let random_module = compile_module(&module).1;
-    let txn = sender
-        .account()
-        .transaction()
-        .module(random_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-
-    // TODO: This is not verified for now.
-    // verify and fail because the addresses don't match
-    // let vm_status = executor.verify_transaction(txn.clone()).status().unwrap();
-
-    // assert!(vm_status.is(StatusType::Verification));
-    // assert!(vm_status.major_status == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
-
-    // execute and fail for the same reason
-    let output = executor.execute_transaction(txn);
-    if let TransactionStatus::Keep(status) = output.status() {
-        // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER)
-        assert!(
-            status
-                == &ExecutionStatus::MiscellaneousError(Some(MODULE_ADDRESS_DOES_NOT_MATCH_SENDER))
-        );
-    } else {
-        panic!("Unexpected execution status: {:?}", output)
-    };
-}
-
-#[test]
-pub fn test_open_publishing() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(10_0000_0000, 10);
-    executor.add_account_data(&sender);
-
-    let program = format!(
-        "
-        module 0x{}.M {{
-            public max(a: u64, b: u64): u64 {{
-            label b0:
-                jump_if (copy(a) > copy(b)) b2;
-            label b1:
-                return copy(b);
-            label b2:
-                return copy(a);
-            }}
-
-            public sum(a: u64, b: u64): u64 {{
-                let c: u64;
-            label b0:
-                c = copy(a) + copy(b);
-                return copy(c);
-            }}
-        }}
-        ",
-        sender.address().to_hex(),
-    );
-
-    let random_module = compile_module(&program).1;
-    let txn = sender
-        .account()
-        .transaction()
-        .module(random_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(100)
-        .sign();
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    assert_eq!(
-        executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 }
 
@@ -727,43 +614,7 @@ fn test_script_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
-}
-
-#[test]
-fn test_module_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-    let good_module = {
-        let (_, serialized_module) = good_module_uses_bad(*sender.address(), bad_module);
-        aptos_types::transaction::Module::new(serialized_module)
-    };
-
-    let txn = sender
-        .account()
-        .transaction()
-        .module(good_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
@@ -805,7 +656,7 @@ fn test_type_tag_dependency_fails_verification() {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: Identifier::new("Test").unwrap(),
                 name: Identifier::new("S1").unwrap(),
-                type_params: vec![],
+                type_args: vec![],
             }))],
             vec![],
         ))
@@ -815,7 +666,7 @@ fn test_type_tag_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
@@ -866,68 +717,7 @@ fn test_script_transitive_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
-}
-
-#[test]
-fn test_module_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a module that tries to use that module.
-    let (good_module, good_module_bytes) =
-        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, bad_module);
-    executor.add_module(&good_module.self_id(), good_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let module_code = format!(
-        "
-    module 0x{}.Test3 {{
-        import 0x1.Test2;
-        public bar() {{
-        label b0:
-            Test2.bar();
-            return;
-        }}
-    }}
-    ",
-        sender.address().to_hex()
-    );
-    let module = {
-        let compiler = Compiler {
-            deps: vec![&good_module],
-        };
-        aptos_types::transaction::Module::new(
-            compiler
-                .into_module_blob(module_code.as_str())
-                .expect("Module compilation failed"),
-        )
-    };
-
-    let txn = sender
-        .account()
-        .transaction()
-        .module(module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
@@ -974,7 +764,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: Identifier::new("Test2").unwrap(),
                 name: Identifier::new("S").unwrap(),
-                type_params: vec![],
+                type_args: vec![],
             }))],
             vec![],
         ))
@@ -984,7 +774,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));

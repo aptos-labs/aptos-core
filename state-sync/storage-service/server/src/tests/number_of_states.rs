@@ -20,7 +20,7 @@ async fn test_get_number_of_states_at_version() {
     // Create the mock db reader
     let mut db_reader = mock::create_mock_db_reader();
     db_reader
-        .expect_get_state_leaf_count()
+        .expect_get_state_item_count()
         .times(1)
         .with(eq(version))
         .returning(move |_| Ok(number_of_states as usize));
@@ -70,7 +70,7 @@ async fn test_get_number_of_states_at_version_invalid() {
     // Create the mock db reader
     let mut db_reader = mock::create_mock_db_reader();
     db_reader
-        .expect_get_state_leaf_count()
+        .expect_get_state_item_count()
         .times(1)
         .with(eq(version))
         .returning(move |_| {

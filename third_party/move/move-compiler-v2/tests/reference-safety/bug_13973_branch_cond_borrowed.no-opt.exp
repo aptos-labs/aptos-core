@@ -1,0 +1,24 @@
+
+Diagnostics:
+error: cannot copy local `x` which is still mutably borrowed
+  ┌─ tests/reference-safety/bug_13973_branch_cond_borrowed.move:4:9
+  │
+3 │           let y: &mut bool =  &mut x;
+  │                               ------ local `x` previously mutably borrowed here
+4 │ ╭         if (x) {
+5 │ │         } else {
+6 │ │             *y= false;
+  │ │             --------- conflicting reference `y` used here
+7 │ │         };
+  │ ╰─────────^ copy attempted here
+
+error: cannot copy local `x` which is still mutably borrowed
+   ┌─ tests/reference-safety/bug_13973_branch_cond_borrowed.move:13:9
+   │
+12 │           let y: &mut bool =  &mut x;
+   │                               ------ local `x` previously mutably borrowed here
+13 │ ╭         while (x) {
+14 │ │             *y= false;
+   │ │             --------- conflicting reference `y` used here
+15 │ │         };
+   │ ╰─────────^ copy attempted here

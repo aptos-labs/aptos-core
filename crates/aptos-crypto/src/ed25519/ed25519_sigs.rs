@@ -18,9 +18,18 @@ use std::{cmp::Ordering, fmt};
 #[derive(DeserializeKey, Clone, SerializeKey)]
 pub struct Ed25519Signature(pub(crate) ed25519_dalek::Signature);
 
+#[cfg(any(test, feature = "fuzzing"))]
+impl<'a> arbitrary::Arbitrary<'a> for Ed25519Signature {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let bytes: [u8; ED25519_SIGNATURE_LENGTH] = u.arbitrary()?;
+        Ed25519Signature::from_bytes_unchecked(&bytes)
+            .map_err(|_| arbitrary::Error::IncorrectFormat)
+    }
+}
+
 impl Ed25519Signature {
     /// The length of the Ed25519Signature
-    pub const LENGTH: usize = ed25519_dalek::SIGNATURE_LENGTH;
+    pub const LENGTH: usize = ED25519_SIGNATURE_LENGTH;
 
     /// Serialize an Ed25519Signature.
     pub fn to_bytes(&self) -> [u8; ED25519_SIGNATURE_LENGTH] {

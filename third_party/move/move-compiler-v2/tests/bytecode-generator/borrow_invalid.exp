@@ -1,57 +1,7 @@
-// ---- Model Dump
-module 0x42::borrow {
-    struct S {
-        f: u64,
-    }
-    private fun mut_expr(x: u64): u64 {
-        {
-          let r: &mut u64 = Borrow(Mutable)(Add<u64>(x, 1));
-          r = 22;
-          Deref(r)
-        }
-    }
-    private fun mut_field(s: &borrow::S): u64 {
-        {
-          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f(s));
-          r = 22;
-          Deref(r)
-        }
-    }
-    spec fun $mut_expr(x: u64): u64;
-    spec fun $mut_field(s: &borrow::S): u64;
-} // end 0x42::borrow
 
-============ initial bytecode ================
-
-[variant baseline]
-fun borrow::mut_expr($t0: u64): u64 {
-     var $t1: u64
-     var $t2: &mut u64
-     var $t3: &mut u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t5 := 1
-  1: $t4 := +($t0, $t5)
-  2: $t3 := borrow_local($t4)
-  3: $t2 := infer($t3)
-  4: $t6 := 22
-  5: write_ref($t2, $t6)
-  6: $t1 := read_ref($t2)
-  7: return $t1
-}
-
-
-[variant baseline]
-fun borrow::mut_field($t0: &borrow::S): u64 {
-     var $t1: u64
-     var $t2: &mut u64
-     var $t3: &mut u64
-     var $t4: u64
-  0: $t3 := borrow_field<borrow::S>.f($t0)
-  1: $t2 := infer($t3)
-  2: $t4 := 22
-  3: write_ref($t2, $t4)
-  4: $t1 := read_ref($t2)
-  5: return $t1
-}
+Diagnostics:
+error: cannot mutably borrow from an immutable ref
+  ┌─ tests/bytecode-generator/borrow_invalid.move:8:17
+  │
+8 │         let r = &mut s.f;
+  │                 ^^^^^^^^

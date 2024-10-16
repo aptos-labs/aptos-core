@@ -4,12 +4,8 @@
 use crate::{
     account_address::AccountAddress,
     state_store::{
-        account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
-        errors::StateviewError,
-        in_memory_state_view::InMemoryStateView,
-        state_key::StateKey,
-        state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
+        errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
+        state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
 };
@@ -17,14 +13,12 @@ use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use arr_macro::arr;
 use bytes::Bytes;
+use move_core_types::move_resource::MoveResource;
 use std::{collections::HashMap, ops::Deref};
 
-pub mod account_with_state_cache;
-pub mod account_with_state_view;
 pub mod errors;
 pub mod in_memory_state_view;
 pub mod state_key;
-pub mod state_key_prefix;
 pub mod state_storage_usage;
 pub mod state_value;
 pub mod table;
@@ -66,13 +60,20 @@ impl<T: TStateView<Key = StateKey>> StateView for T {}
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StateViewId {
     /// State-sync applying a chunk of transactions.
-    ChunkExecution { first_version: Version },
+    ChunkExecution {
+        first_version: Version,
+    },
     /// LEC applying a block.
-    BlockExecution { block_id: HashValue },
+    BlockExecution {
+        block_id: HashValue,
+    },
     /// VmValidator verifying incoming transaction.
-    TransactionValidation { base_version: Version },
+    TransactionValidation {
+        base_version: Version,
+    },
     /// For test, db-bootstrapper, etc. Usually not aimed to pass to VM.
     Miscellaneous,
+    Replay,
 }
 
 impl<R, S, K> TStateView for R
@@ -92,15 +93,6 @@ where
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.deref().get_usage()
-    }
-}
-
-impl<'a, S: 'a + StateView> AsAccountWithStateView<'a> for S {
-    fn as_account_with_state_view(
-        &'a self,
-        account_address: &'a AccountAddress,
-    ) -> AccountWithStateView<'a> {
-        AccountWithStateView::new(account_address, self)
     }
 }
 
@@ -132,3 +124,18 @@ pub fn combine_sharded_state_updates(lhs: &mut ShardedStateUpdates, rhs: Sharded
             })
     })
 }
+
+pub trait MoveResourceExt: MoveResource {
+    fn fetch_move_resource(
+        state_view: &dyn StateView,
+        address: &AccountAddress,
+    ) -> Result<Option<Self>> {
+        let state_key = StateKey::resource_typed::<Self>(address)?;
+        Ok(state_view
+            .get_state_value_bytes(&state_key)?
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()?)
+    }
+}
+
+impl<T: MoveResource> MoveResourceExt for T {}

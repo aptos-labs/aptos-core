@@ -28,7 +28,7 @@ pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
         address: CORE_CODE_ADDRESS,
         module: ident_str!("transaction_fee").to_owned(),
         name: ident_str!("FeeStatement").to_owned(),
-        type_params: vec![],
+        type_args: vec![],
     }))
 });
 
@@ -160,6 +160,10 @@ impl ContractEvent {
             ContractEvent::V1(event) => *event.key() == new_epoch_event_key(),
             ContractEvent::V2(_event) => false,
         }
+    }
+
+    pub fn expect_new_block_event(&self) -> Result<NewBlockEvent> {
+        NewBlockEvent::try_from_bytes(self.event_data())
     }
 }
 

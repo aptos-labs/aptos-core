@@ -1,4 +1,4 @@
 self-hosted-runner:
   # Labels of self-hosted runners in array of string
   labels:
-    - high-perf-docker
+    - runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}

@@ -111,7 +111,14 @@ impl Block {
             None => 0,
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
-                Payload::DirectMempool(txns) => txns.len(),
+                Payload::DirectMempool(_txns) => 0,
+                Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    inline_batches.len() + proof_with_data.proofs.len()
+                },
+                Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                    opt_quorum_store_payload.num_txns()
+                },
             },
         }
     }
@@ -491,7 +498,7 @@ impl Block {
                         )
                     })
             })
-            .map(|index| u32::try_from(index).unwrap())
+            .map(|index| u32::try_from(index).expect("Index is out of bounds for u32"))
             .collect()
     }
 }

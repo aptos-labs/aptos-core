@@ -42,7 +42,7 @@ async fn test_peer_updater_loop_multiple_peers() {
 
     // Verify peers and metadata is empty
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
-    assert!(peers_and_metadata.get_all_peers().unwrap().is_empty());
+    assert!(peers_and_metadata.get_all_peers().is_empty());
 
     // Add a connected validator peer
     let validator_peer =

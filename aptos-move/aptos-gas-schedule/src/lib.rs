@@ -32,4 +32,4 @@ mod ver;
 
 pub use gas_schedule::*;
 pub use traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
-pub use ver::LATEST_GAS_FEATURE_VERSION;
+pub use ver::{gas_feature_versions, LATEST_GAS_FEATURE_VERSION};

@@ -19,7 +19,6 @@ aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-data-client = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -27,24 +26,24 @@ aptos-mempool-notifications = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true }
-aptos-proptest-helpers = { workspace = true, optional = true }
+aptos-peer-monitoring-service-types = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-storage-interface = { workspace = true }
+aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
-async-trait = { workspace = true }
 bcs = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
+num_cpus = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
@@ -55,6 +54,7 @@ aptos-config = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-storage-interface = { workspace = true, features = ["fuzzing"] }
+aptos-time-service = { workspace = true, features = ["testing"] }
 enum_dispatch = { workspace = true }
 proptest = { workspace = true }
 

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot transfer mutable local `f` since it is borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/factor_invalid_1.move:12:9
+   │
+ 9 │         let f_g = &mut f.g;
+   │                   -------- field `g` previously mutably borrowed here
+   ·
+12 │         foo(f_g, f);
+   │         ^^^^^^^^^^^ transfer attempted here
+
+error: cannot transfer mutable local `f` since it is borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/factor_invalid_1.move:22:9
+   │
+19 │         let f_g = &mut f.g;
+   │                   -------- field `g` previously mutably borrowed here
+   ·
+22 │         bar(f, f_g);
+   │         ^^^^^^^^^^^ transfer attempted here

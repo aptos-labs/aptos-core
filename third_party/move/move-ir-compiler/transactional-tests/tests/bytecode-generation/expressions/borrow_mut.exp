@@ -1,7 +1,7 @@
 processed 3 tasks
 
 task 0 'print-bytecode'. lines 1-10:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -21,13 +21,14 @@ B0:
 }
 
 task 1 'print-bytecode'. lines 12-23:
-// Move bytecode v6
+// Move bytecode v7
 module 3d.Foobar {
 struct FooCoin {
 	value: u64
 }
 
 public borrow_mut_field(Arg0: &mut FooCoin) /* def_idx: 0 */ {
+L1:	loc0: &mut u64
 B0:
 	0: MoveLoc[0](Arg0: &mut FooCoin)
 	1: MutBorrowField[0](FooCoin.value: u64)
@@ -39,13 +40,14 @@ B0:
 }
 
 task 2 'print-bytecode'. lines 25-36:
-// Move bytecode v6
+// Move bytecode v7
 module 4d.Foobar {
 struct FooCoin<Ty0> {
 	value: u64
 }
 
 public borrow_mut_field(Arg0: &mut FooCoin<address>) /* def_idx: 0 */ {
+L1:	loc0: &mut u64
 B0:
 	0: MoveLoc[0](Arg0: &mut FooCoin<address>)
 	1: MutBorrowFieldGeneric[0](FooCoin.value: u64)

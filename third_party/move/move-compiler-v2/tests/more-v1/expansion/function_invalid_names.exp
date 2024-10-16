@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: invalid name
+  ┌─ tests/more-v1/expansion/function_invalid_names.move:3:9
+  │
+3 │     fun _foo() {}
+  │         ^^^^ Invalid function name '_foo'. Function names cannot start with '_'
+
+error: invalid name
+  ┌─ tests/more-v1/expansion/function_invalid_names.move:4:9
+  │
+4 │     fun _() {}
+  │         ^ Invalid function name '_'. Function names cannot start with '_'
+
+error: invalid name
+  ┌─ tests/more-v1/expansion/function_invalid_names.move:5:9
+  │
+5 │     fun ___() {}
+  │         ^^^ Invalid function name '___'. Function names cannot start with '_'
+
+error: invalid name
+   ┌─ tests/more-v1/expansion/function_invalid_names.move:10:9
+   │
+10 │     fun _foo() {}
+   │         ^^^^ Invalid function name '_foo'. Function names cannot start with '_'
+
+error: invalid name
+   ┌─ tests/more-v1/expansion/function_invalid_names.move:13:9
+   │
+13 │     fun _() {}
+   │         ^ Invalid function name '_'. Function names cannot start with '_'
+
+error: invalid name
+   ┌─ tests/more-v1/expansion/function_invalid_names.move:16:9
+   │
+16 │     fun ___() {}
+   │         ^^^ Invalid function name '___'. Function names cannot start with '_'

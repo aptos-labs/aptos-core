@@ -1,6 +1,4 @@
 // Copyright © Aptos Foundation
-
-// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]

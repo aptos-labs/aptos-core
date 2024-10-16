@@ -560,7 +560,7 @@ impl AbstractState {
 
     /// Check if the local at index `i` exists
     pub fn local_exists(&self, i: usize) -> bool {
-        self.locals.get(&i).is_some()
+        self.locals.contains_key(&i)
     }
 
     /// Get the local at index `i` if it exists

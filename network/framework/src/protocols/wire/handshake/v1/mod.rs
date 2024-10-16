@@ -71,6 +71,8 @@ pub enum ProtocolId {
     JWKConsensusRpcCompressed = 24,
     JWKConsensusRpcBcs = 25,
     JWKConsensusRpcJson = 26,
+    ConsensusObserver = 27,
+    ConsensusObserverRpc = 28,
 }
 
 /// The encoding types for Protocols
@@ -111,6 +113,8 @@ impl ProtocolId {
             JWKConsensusRpcCompressed => "JWKConsensusRpcCompressed",
             JWKConsensusRpcBcs => "JWKConsensusRpcBcs",
             JWKConsensusRpcJson => "JWKConsensusRpcJson",
+            ConsensusObserver => "ConsensusObserver",
+            ConsensusObserverRpc => "ConsensusObserverRpc",
         }
     }
 
@@ -144,6 +148,8 @@ impl ProtocolId {
             ProtocolId::JWKConsensusRpcCompressed,
             ProtocolId::JWKConsensusRpcBcs,
             ProtocolId::JWKConsensusRpcJson,
+            ProtocolId::ConsensusObserver,
+            ProtocolId::ConsensusObserverRpc,
         ]
     }
 
@@ -154,6 +160,7 @@ impl ProtocolId {
             ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
+            ProtocolId::ConsensusObserver => Encoding::CompressedBcs(RECURSION_LIMIT),
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
@@ -171,6 +178,7 @@ impl ProtocolId {
             ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
                 CompressionClient::Consensus
             },
+            ProtocolId::ConsensusObserver => CompressionClient::ConsensusObserver,
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 CompressionClient::DKG

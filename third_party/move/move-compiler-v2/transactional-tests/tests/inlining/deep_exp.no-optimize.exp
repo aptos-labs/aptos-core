@@ -1,0 +1,23 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-28:
++ Error: compilation errors:
++  error: exceeded maximal local count: 255
++    ┌─ TEMPFILE:19:16
++    │
++ 19 │     public fun test(): u64 {
++    │                ^^^^
++ 
++ 
++ 
+= task 1 'run'. lines 30-30:
+- return values: 625
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 

@@ -10,14 +10,14 @@ publish = false
 edition = "2021"
 
 [dev-dependencies]
-fail = { version = "0.4.0", features = ['failpoints'] }
-hex = "0.4.3"
+fail = { workspace = true, features = ['failpoints'] }
+hex = { workspace = true }
 invalid-mutations = { path = "../invalid-mutations" }
-move-binary-format = { path = "../../move-binary-format", features = ["fuzzing" ] }
+move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
 move-bytecode-verifier = { path = "../" }
 move-core-types = { path = "../../move-core/types" }
-petgraph = "0.5.1"
-proptest = "1.0.0"
+petgraph = { workspace = true }
+proptest = { workspace = true }
 
 [features]
 fuzzing = ["move-binary-format/fuzzing"]

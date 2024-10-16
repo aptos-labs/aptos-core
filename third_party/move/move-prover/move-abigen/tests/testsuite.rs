@@ -8,6 +8,7 @@ use log::debug;
 use move_prover::{cli::Options, run_move_prover};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use std::{
+    collections::BTreeSet,
     ffi::OsStr,
     fs::{self, File},
     io::Read,
@@ -25,24 +26,26 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
     options.abigen.compiled_script_directory = "tests/sources".to_string();
-    options.move_deps.push("../../move-stdlib".to_string());
+    options
+        .move_deps
+        .push("../../move-stdlib/sources".to_string());
     options
         .move_named_address_values
         .push("std=0x1".to_string());
 
-    test_abigen(path, options, "abi")?;
+    test_abigen(path, options, "exp")?;
 
     Ok(())
 }
 
-fn get_generated_abis(dir: &Path) -> std::io::Result<Vec<String>> {
+fn get_abi_paths_under_dir(dir: &Path) -> std::io::Result<Vec<String>> {
     let mut abi_paths = Vec::new();
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
-                abi_paths.append(&mut get_generated_abis(&path)?);
+                abi_paths.append(&mut get_abi_paths_under_dir(&path)?);
             } else if let Some("abi") = path.extension().and_then(OsStr::to_str) {
                 abi_paths.push(path.to_str().unwrap().to_string());
             }
@@ -54,11 +57,16 @@ fn get_generated_abis(dir: &Path) -> std::io::Result<Vec<String>> {
 fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Result<()> {
     let temp_path = PathBuf::from(TempDir::new()?.path());
     options.abigen.output_directory = temp_path.to_string_lossy().to_string();
+    let output_dir = path.with_extension("");
+    let mut expected_apis = match get_abi_paths_under_dir(&output_dir) {
+        Ok(found) => found.iter().map(PathBuf::from).collect::<BTreeSet<_>>(),
+        _ => BTreeSet::new(),
+    };
 
     let mut error_writer = Buffer::no_color();
     match run_move_prover(&mut error_writer, options) {
         Ok(()) => {
-            for abi_path in get_generated_abis(&temp_path)?.iter() {
+            for abi_path in get_abi_paths_under_dir(&temp_path)?.iter() {
                 let mut contents = String::new();
                 if let Ok(mut file) = File::open(abi_path) {
                     file.read_to_string(&mut contents).unwrap();
@@ -68,7 +76,16 @@ fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
                 baseline_file_name.pop();
                 baseline_file_name.push(buf.strip_prefix(&temp_path)?);
                 verify_or_update_baseline(&baseline_file_name, &contents)?;
+                expected_apis.remove(&baseline_file_name);
             }
+            let empty_contents = "".to_string();
+            for baseline_file_name in expected_apis.iter() {
+                verify_or_update_baseline(Path::new(baseline_file_name), &empty_contents)?;
+            }
+            let buffer = error_writer.into_inner();
+            let contents = String::from_utf8_lossy(&buffer);
+            let baseline_path = path.with_extension(suffix);
+            verify_or_update_baseline(&baseline_path, &contents)?;
         },
         Err(err) => {
             let mut contents = format!("Move prover abigen returns: {}\n", err);
@@ -80,4 +97,4 @@ fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     Ok(())
 }
 
-datatest_stable::harness!(test_runner, "tests/sources", r".*\.move",);
+datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$",);

@@ -5,7 +5,9 @@ use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
         fund::FundWithFaucet,
-        key_rotation::{LookupAddress, RotateKey, RotateSummary},
+        key_rotation::{
+            LookupAddress, NewAuthKeyOptions, NewProfileOptions, RotateKey, RotateSummary,
+        },
         list::{ListAccount, ListQuery},
         transfer::{TransferCoins, TransferSummary},
     },
@@ -13,11 +15,12 @@ use crate::{
         init::{InitTool, Network},
         types::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
-            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
-            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
-            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
-            ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
+            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -72,6 +75,7 @@ use std::{
     time::Duration,
 };
 use tempfile::TempDir;
+use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -263,10 +267,16 @@ impl CliTestFramework {
                 prompt_options: PromptOptions::yes(),
                 ..Default::default()
             },
-            new_private_key: Some(new_private_key),
-            save_to_profile: None,
-            new_private_key_file: None,
-            skip_saving_profile: true,
+            new_auth_key_options: NewAuthKeyOptions {
+                new_private_key: Some(new_private_key),
+                new_private_key_file: None,
+                new_derivation_path: None,
+                new_derivation_index: None,
+            },
+            new_profile_options: NewProfileOptions {
+                skip_saving_profile: true,
+                save_to_profile: None,
+            },
         }
         .execute()
         .await?;
@@ -470,6 +480,16 @@ impl CliTestFramework {
         .await
     }
 
+    pub fn add_file_in_package(&self, rel_path: &str, content: String) {
+        let source_path = self.move_dir().join(rel_path);
+        write_to_file(
+            source_path.as_path(),
+            &source_path.as_display().to_string(),
+            content.as_bytes(),
+        )
+        .unwrap();
+    }
+
     pub async fn update_validator_network_addresses(
         &self,
         operator_index: usize,
@@ -517,9 +537,10 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
-            txn_options: self.transaction_options(operator_index, None),
+            txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
             operator_config_file_args: OperatorConfigFileArgs {
                 operator_config_file: None,
@@ -817,6 +838,7 @@ impl CliTestFramework {
                 framework_local_dir: framework_dir,
                 skip_fetch_latest_git_deps: false,
             },
+            template: None,
         }
         .execute()
         .await
@@ -865,9 +887,14 @@ impl CliTestFramework {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
-            override_size_check: false,
+            override_size_check_option: OverrideSizeCheckOption {
+                override_size_check: false,
+            },
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
+            chunked_publish_option: ChunkedPublishOption {
+                chunked_publish: false,
             },
         }
         .execute()
@@ -887,6 +914,7 @@ impl CliTestFramework {
             package,
             output_dir: Some(output_dir),
             print_metadata: false,
+            bytecode: true,
         }
         .execute()
         .await
@@ -945,6 +973,25 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn run_script_with_gas_options(
+        &self,
+        index: usize,
+        script_contents: &str,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<TransactionSummary> {
+        self.run_script_with_framework_package_and_gas_options(
+            index,
+            script_contents,
+            FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: Some(Self::aptos_framework_dir()),
+                skip_fetch_latest_git_deps: false,
+            },
+            gas_options,
+        )
+        .await
+    }
+
     /// Runs the given script contents using the aptos_framework from aptos-core git repository.
     pub async fn run_script_with_default_framework(
         &self,
@@ -966,6 +1013,22 @@ impl CliTestFramework {
         script_contents: &str,
         framework_package_args: FrameworkPackageArgs,
     ) -> CliTypedResult<TransactionSummary> {
+        self.run_script_with_framework_package_and_gas_options(
+            index,
+            script_contents,
+            framework_package_args,
+            None,
+        )
+        .await
+    }
+
+    pub async fn run_script_with_framework_package_and_gas_options(
+        &self,
+        index: usize,
+        script_contents: &str,
+        framework_package_args: FrameworkPackageArgs,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<TransactionSummary> {
         // Make a temporary directory for compilation
         let temp_dir = TempDir::new().map_err(|err| {
             CliError::UnexpectedError(format!("Failed to create temporary directory {}", err))
@@ -980,12 +1043,12 @@ impl CliTestFramework {
         .unwrap();
 
         RunScript {
-            txn_options: self.transaction_options(index, None),
+            txn_options: self.transaction_options(index, gas_options),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(source_path),
                 compiled_script_path: None,
                 framework_package_args,
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
@@ -1008,13 +1071,12 @@ impl CliTestFramework {
             txn_options: self.transaction_options(index, None),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args },
@@ -1026,7 +1088,7 @@ impl CliTestFramework {
         .await
     }
 
-    fn aptos_framework_dir() -> PathBuf {
+    pub fn aptos_framework_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..")
@@ -1038,14 +1100,9 @@ impl CliTestFramework {
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
             dev: true,
-            package_dir: Some(self.move_dir()),
-            output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
-            skip_fetch_latest_git_deps: true,
-            bytecode_version: None,
-            compiler_version: None,
-            skip_attribute_checks: false,
-            check_test_code: false,
+            package_dir: Some(self.move_dir()),
+            ..MovePackageDir::new()
         }
     }
 
@@ -1144,13 +1201,12 @@ impl CliTestFramework {
                 is_multi_step,
                 compile_proposal_args: CompileScriptFunction {
                     script_path: Some(script_path),
-                    compiled_script_path: None,
                     framework_package_args: FrameworkPackageArgs {
                         framework_git_rev: None,
                         framework_local_dir: Some(Self::aptos_framework_dir()),
                         skip_fetch_latest_git_deps: false,
                     },
-                    bytecode_version: None,
+                    ..CompileScriptFunction::default()
                 },
             },
         }
@@ -1190,13 +1246,12 @@ impl CliTestFramework {
             proposal_id,
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             rest_options: self.rest_options(),
             profile: Default::default(),

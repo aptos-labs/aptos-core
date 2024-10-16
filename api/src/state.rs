@@ -18,15 +18,8 @@ use aptos_api_types::{
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
     RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_types::{
-    access_path::AccessPath,
-    state_store::{state_key::StateKey, table::TableHandle, TStateView},
-};
-use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::{
-    language_storage::{ModuleId, StructTag},
-    resolver::MoveResolver,
-};
+use aptos_types::state_store::{state_key::StateKey, table::TableHandle, TStateView};
+use move_core_types::language_storage::StructTag;
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -285,7 +278,7 @@ impl StateApi {
         resource_type: MoveStructTag,
         ledger_version: Option<u64>,
     ) -> BasicResultWith404<MoveResource> {
-        let resource_type: StructTag = resource_type
+        let tag: StructTag = resource_type
             .try_into()
             .context("Failed to parse given resource type")
             .map_err(|err| {
@@ -294,11 +287,11 @@ impl StateApi {
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let bytes = state_view
-            .as_move_resolver()
-            .get_resource(&address.into(), &resource_type)
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+            .find_resource(&state_view, address, &tag)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
-                resource_type, address
+                tag, address
             ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
@@ -307,16 +300,13 @@ impl StateApi {
                     &ledger_info,
                 )
             })?
-            .ok_or_else(|| {
-                resource_not_found(address, &resource_type, ledger_version, &ledger_info)
-            })?;
+            .ok_or_else(|| resource_not_found(address, &tag, ledger_version, &ledger_info))?;
 
         match accept_type {
             AcceptType::Json => {
                 let resource = state_view
-                    .as_move_resolver()
-                    .as_converter(self.context.db.clone())
-                    .try_into_resource(&resource_type, &bytes)
+                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+                    .try_into_resource(&tag, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
@@ -347,9 +337,7 @@ impl StateApi {
         name: IdentifierWrapper,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
-        let module_id = ModuleId::new(address.into(), name.into());
-        let access_path = AccessPath::code_access_path(module_id.clone());
-        let state_key = StateKey::access_path(access_path);
+        let state_key = StateKey::module(address.inner(), &name);
         let (ledger_info, ledger_version, state_view) = self
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
@@ -363,9 +351,7 @@ impl StateApi {
                     &ledger_info,
                 )
             })?
-            .ok_or_else(|| {
-                module_not_found(address, module_id.name(), ledger_version, &ledger_info)
-            })?;
+            .ok_or_else(|| module_not_found(address, &name, ledger_version, &ledger_info))?;
 
         match accept_type {
             AcceptType::Json => {
@@ -420,8 +406,8 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.context.db.clone());
+        let converter =
+            state_view.as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
 
         // Convert key to lookup version for DB
         let vm_key = converter
@@ -442,7 +428,7 @@ impl StateApi {
         })?;
 
         // Retrieve value from the state key
-        let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
+        let state_key = StateKey::table_item(&TableHandle(table_handle.into()), &raw_key);
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!(
@@ -496,10 +482,8 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let state_key = StateKey::table_item(
-            TableHandle(table_handle.into()),
-            table_item_request.key.0.clone(),
-        );
+        let state_key =
+            StateKey::table_item(&TableHandle(table_handle.into()), &table_item_request.key.0);
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!(

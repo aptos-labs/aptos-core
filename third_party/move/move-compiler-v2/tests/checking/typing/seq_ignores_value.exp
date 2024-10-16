@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         dummy_field: bool,
@@ -23,8 +23,22 @@ module 0x8675309::M {
         };
         Tuple()
     }
-    spec fun $t0();
-    spec fun $t1();
-    spec fun $t2();
-    spec fun $t3();
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S has drop {
+    }
+    fun t0() {
+        ();
+    }
+    fun t1() {
+        0;
+    }
+    fun t2() {
+        (0, false, S{});
+    }
+    fun t3() {
+        if (true) (0, false, S{}) else (0, false, S{});
+    }
+}

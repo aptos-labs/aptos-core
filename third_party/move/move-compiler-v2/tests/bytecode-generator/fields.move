@@ -1,15 +1,15 @@
 module 0x42::fields {
 
-    struct S {
+    struct S has drop {
         f: u64,
         g: T
     }
 
-    struct T {
+    struct T has drop {
         h: u64
     }
 
-    struct G<X> {
+    struct G<X> has drop {
         f: X
     }
 

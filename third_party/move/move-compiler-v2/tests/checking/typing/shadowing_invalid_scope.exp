@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/checking/typing/shadowing_invalid_scope.move:5:10
   │
 5 │         (x: bool);

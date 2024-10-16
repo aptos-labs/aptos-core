@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
@@ -27,6 +28,7 @@ pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    value_serde::{deserialize_and_allow_delayed_values, serialize_and_allow_delayed_values},
     values::{GlobalValue, Reference, StructRef, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -139,18 +141,10 @@ impl<'a> NativeTableContext<'a> {
 
                 match op {
                     Op::New(val) => {
-                        let bytes = serialize(&value_layout_info.layout, &val)?;
-                        let layout = value_layout_info
-                            .has_identifier_mappings
-                            .then(|| value_layout_info.layout.clone());
-                        entries.insert(key, Op::New((bytes.into(), layout)));
+                        entries.insert(key, Op::New(serialize_value(&value_layout_info, &val)?));
                     },
                     Op::Modify(val) => {
-                        let bytes = serialize(&value_layout_info.layout, &val)?;
-                        let layout = value_layout_info
-                            .has_identifier_mappings
-                            .then(|| value_layout_info.layout.clone());
-                        entries.insert(key, Op::Modify((bytes.into(), layout)));
+                        entries.insert(key, Op::Modify(serialize_value(&value_layout_info, &val)?));
                     },
                     Op::Delete => {
                         entries.insert(key, Op::Delete);
@@ -229,7 +223,7 @@ impl Table {
 
                 let (gv, loaded) = match data {
                     Some(val_bytes) => {
-                        let val = deserialize(&self.value_layout_info.layout, &val_bytes)?;
+                        let val = deserialize_value(&self.value_layout_info, &val_bytes)?;
                         (
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),
@@ -356,7 +350,7 @@ fn native_add_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -395,7 +389,7 @@ fn native_borrow_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -434,7 +428,7 @@ fn native_contains_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -467,7 +461,7 @@ fn native_remove_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -534,14 +528,36 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
     Ok(TableHandle(handle))
 }
 
-fn serialize(layout: &MoveTypeLayout, val: &Value) -> PartialVMResult<Vec<u8>> {
-    val.simple_serialize(layout)
-        .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
+fn serialize_key(layout: &MoveTypeLayout, key: &Value) -> PartialVMResult<Vec<u8>> {
+    key.simple_serialize(layout)
+        .ok_or_else(|| partial_extension_error("cannot serialize table key"))
 }
 
-fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> {
-    Value::simple_deserialize(bytes, layout)
-        .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))
+fn serialize_value(
+    layout_info: &LayoutInfo,
+    val: &Value,
+) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
+    let serialization_result = if layout_info.has_identifier_mappings {
+        // Value contains delayed fields, so we should be able to serialize it.
+        serialize_and_allow_delayed_values(val, layout_info.layout.as_ref())?
+            .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
+    } else {
+        // No delayed fields, make sure serialization fails if there are any
+        // native values.
+        val.simple_serialize(layout_info.layout.as_ref())
+            .map(|bytes| (bytes.into(), None))
+    };
+    serialization_result.ok_or_else(|| partial_extension_error("cannot serialize table value"))
+}
+
+fn deserialize_value(layout_info: &LayoutInfo, bytes: &[u8]) -> PartialVMResult<Value> {
+    let layout = layout_info.layout.as_ref();
+    let deserialization_result = if layout_info.has_identifier_mappings {
+        deserialize_and_allow_delayed_values(bytes, layout)
+    } else {
+        Value::simple_deserialize(bytes, layout)
+    };
+    deserialization_result.ok_or_else(|| partial_extension_error("cannot deserialize table value"))
 }
 
 fn partial_extension_error(msg: impl ToString) -> PartialVMError {

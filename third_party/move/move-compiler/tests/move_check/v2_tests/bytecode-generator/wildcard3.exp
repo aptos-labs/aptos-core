@@ -1,0 +1,22 @@
+error[E05001]: ability constraint not satisfied
+  ┌─ tests/move_check/v2_tests/bytecode-generator/wildcard3.move:5:13
+  │
+2 │     struct S {}
+  │            - To satisfy the constraint, the 'drop' ability would need to be added here
+3 │ 
+4 │     public fun foo(s: S) {
+  │                       - The type '0xC0FFEE::m::S' does not have the ability 'drop'
+5 │         let _ = s;
+  │             ^ Cannot ignore values without the 'drop' ability. The value must be used
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/v2_tests/bytecode-generator/wildcard3.move:10:13
+   │
+ 2 │     struct S {}
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+ 9 │         let s = S{};
+   │                 --- The type '0xC0FFEE::m::S' does not have the ability 'drop'
+10 │         let _ = s;
+   │             ^ Cannot ignore values without the 'drop' ability. The value must be used
+

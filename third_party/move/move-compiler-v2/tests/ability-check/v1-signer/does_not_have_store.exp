@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: type `signer` is missing required ability `store` (type was inferred)
+  ┌─ tests/ability-check/v1-signer/does_not_have_store.move:5:9
+  │
+5 │         move_to(account, S<signer> { f: s })
+  │         ^^^^^^^
+  │
+  = required by instantiating type parameter `T` of struct `S`
+  = required by instantiating type parameter `T:key` of function `move_to`

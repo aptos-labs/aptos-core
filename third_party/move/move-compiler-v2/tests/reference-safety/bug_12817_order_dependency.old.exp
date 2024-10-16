@@ -1,0 +1,9 @@
+
+============ bytecode verification failed ========
+
+Diagnostics:
+bug: bytecode verification failed with unexpected status code `READREF_EXISTS_MUTABLE_BORROW_ERROR`. This is a compiler bug, consider reporting it.
+   ┌─ tests/reference-safety/bug_12817_order_dependency.move:14:9
+   │
+14 │         *r2 + *r1 // <- changed order here
+   │         ^^^

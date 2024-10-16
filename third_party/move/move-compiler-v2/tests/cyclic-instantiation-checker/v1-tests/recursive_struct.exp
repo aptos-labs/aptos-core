@@ -1,0 +1,45 @@
+
+Diagnostics:
+error: cyclic data
+  ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_struct.move:4:5
+  │
+4 │     struct Foo { f: Foo }
+  │     ^^^^^^^^^^^^^^^^^^^^^
+  │
+  = field `f` of `Foo` contains `Foo`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_struct.move:10:5
+   │
+10 │     struct Foo { f: Cup<Foo> }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                  │
+   │                  invalid field `f` of `Foo` containing `Foo` itself
+
+error: cyclic data
+   ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_struct.move:22:5
+   │
+22 │     struct X has key, store { y: vector<Y> }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `y` of `X` contains `Y`
+   = field `x` of `Y` contains `X`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_struct.move:41:5
+   │
+41 │     struct Foo { f: M1::Cup<Foo> }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                  │
+   │                  invalid field `f` of `Foo` containing `Foo` itself
+
+error: cyclic data
+   ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_struct.move:48:5
+   │
+48 │     struct A { b: B }
+   │     ^^^^^^^^^^^^^^^^^
+   │
+   = field `b` of `A` contains `B`
+   = field `c` of `B` contains `C`
+   = field `d` of `C` contains `D`
+   = field `x` of `D` contains `A`, which forms a cycle.

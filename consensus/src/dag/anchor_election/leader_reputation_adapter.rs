@@ -14,20 +14,18 @@ use crate::{
     },
 };
 use aptos_bitvec::BitVec;
+use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::account_config::NewBlockEvent;
 use move_core_types::account_address::AccountAddress;
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 pub struct MetadataBackendAdapter {
     epoch_to_validators: HashMap<u64, HashMap<Author, usize>>,
     window_size: usize,
-    sliding_window: Mutex<VecDeque<CommitEvent>>,
+    sliding_window: Mutex<BoundedVecDeque<CommitEvent>>,
 }
 
 impl MetadataBackendAdapter {
@@ -38,7 +36,7 @@ impl MetadataBackendAdapter {
         Self {
             epoch_to_validators,
             window_size,
-            sliding_window: Mutex::new(VecDeque::new()),
+            sliding_window: Mutex::new(BoundedVecDeque::new(window_size)),
         }
     }
 
@@ -46,23 +44,30 @@ impl MetadataBackendAdapter {
         if !self.epoch_to_validators.contains_key(&event.epoch()) {
             return;
         }
-        let mut lock = self.sliding_window.lock();
-        if lock.len() == self.window_size {
-            lock.pop_back();
-        }
-        lock.push_front(event);
+        self.sliding_window.lock().push_front(event);
     }
 
     // TODO: we should change NewBlockEvent on LeaderReputation to take a trait
     fn convert(&self, event: CommitEvent) -> NewBlockEvent {
-        let validators = self.epoch_to_validators.get(&event.epoch()).unwrap();
+        let validators = self
+            .epoch_to_validators
+            .get(&event.epoch())
+            .expect("Event epoch should map back to validators!");
         let mut bitvec = BitVec::with_num_bits(validators.len() as u16);
         for author in event.parents() {
-            bitvec.set(*validators.get(author).unwrap() as u16);
+            bitvec.set(
+                *validators
+                    .get(author)
+                    .expect("Author should be in validators set!") as u16,
+            );
         }
         let mut failed_authors = vec![];
         for author in event.failed_authors() {
-            failed_authors.push(*validators.get(author).unwrap() as u64);
+            failed_authors.push(
+                *validators
+                    .get(author)
+                    .expect("Author should be in validators set!") as u64,
+            );
         }
         NewBlockEvent::new(
             AccountAddress::ZERO,

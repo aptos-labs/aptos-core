@@ -1,0 +1,94 @@
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:17:9
+   │
+ 2 │     struct S { u: u64 }
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+12 │     fun t0(s: S, s2: S) {
+   │               - The type '0x8675309::M::S' does not have the ability 'drop'
+   ·
+17 │         s != s2;
+   │         ^ '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:17:14
+   │
+ 2 │     struct S { u: u64 }
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+12 │     fun t0(s: S, s2: S) {
+   │                      - The type '0x8675309::M::S' does not have the ability 'drop'
+   ·
+17 │         s != s2;
+   │              ^^ '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:22:9
+   │
+ 3 │     struct R {
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+21 │     fun t1(r1: R, r2: R) {
+   │                - The type '0x8675309::M::R' does not have the ability 'drop'
+22 │         r1 != r2;
+   │         ^^ '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:22:15
+   │
+ 3 │     struct R {
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+21 │     fun t1(r1: R, r2: R) {
+   │                       - The type '0x8675309::M::R' does not have the ability 'drop'
+22 │         r1 != r2;
+   │               ^^ '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:27:9
+   │
+ 7 │     struct G1<phantom T: key> {}
+   │            -- To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+27 │         G1<Key>{} != G1<Key>{};
+   │         ^^^^^^^^^
+   │         │
+   │         '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+   │         The type '0x8675309::M::G1<0x8675309::M::Key>' does not have the ability 'drop'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:27:22
+   │
+ 7 │     struct G1<phantom T: key> {}
+   │            -- To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+27 │         G1<Key>{} != G1<Key>{};
+   │                      ^^^^^^^^^
+   │                      │
+   │                      '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+   │                      The type '0x8675309::M::G1<0x8675309::M::Key>' does not have the ability 'drop'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:28:9
+   │
+ 8 │     struct G2<phantom T> {}
+   │            -- To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+28 │         G2<Key>{} != G2<Key>{};
+   │         ^^^^^^^^^
+   │         │
+   │         '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+   │         The type '0x8675309::M::G2<0x8675309::M::Key>' does not have the ability 'drop'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/neq_invalid2.move:28:22
+   │
+ 8 │     struct G2<phantom T> {}
+   │            -- To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+28 │         G2<Key>{} != G2<Key>{};
+   │                      ^^^^^^^^^
+   │                      │
+   │                      '!=' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+   │                      The type '0x8675309::M::G2<0x8675309::M::Key>' does not have the ability 'drop'
+

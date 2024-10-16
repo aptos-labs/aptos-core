@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_language_e2e_tests::{
@@ -10,7 +11,7 @@ use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
-    state_store::state_key::StateKeyInner,
+    state_store::state_key::inner::StateKeyInner,
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,

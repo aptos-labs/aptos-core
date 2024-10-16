@@ -248,6 +248,7 @@ spec aptos_framework::voting {
         next_execution_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
+        pragma verify_duration_estimate = 300;
         // Ensures existence of Timestamp
         requires chain_status::is_operating();
 

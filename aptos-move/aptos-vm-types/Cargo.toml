@@ -24,11 +24,14 @@ claims = { workspace = true }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
+aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-vm = { workspace = true }
 test-case = { workspace = true }

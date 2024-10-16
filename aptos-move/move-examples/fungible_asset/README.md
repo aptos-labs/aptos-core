@@ -6,3 +6,4 @@
 * Pre-minted managed coin: an example issuing pre-minting coin based on managed fungible asset.
 * Multisig managed coin: how to use multisig account to manage fungible assets.
 * FA coin: an all-in-one module coin example using manged fungible asset with limited functionalities (only deal with primary fungible stores).
+* Managed Stablecoin: A managed fungible asset with Role management features and access control rules.

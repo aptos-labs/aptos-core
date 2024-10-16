@@ -89,6 +89,10 @@ fn get_field_signature<'a>(module: &'a CompiledModule, handle: &FieldHandle) -> 
     match &struct_def.field_information {
         StructFieldInformation::Native => panic!("borrow field on a native struct"),
         StructFieldInformation::Declared(fields) => &fields[handle.field as usize].signature.0,
+        StructFieldInformation::DeclaredVariants(..) => {
+            // TODO(#13806): consider implementing for struct variants
+            panic!("enum types not yet implemented")
+        },
     }
 }
 

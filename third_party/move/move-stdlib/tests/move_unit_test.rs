@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, effects::ChangeSet};
 use move_stdlib::{
     natives::{all_natives, nursery_natives, GasParameters, NurseryGasParameters},
     path_in_crate,
@@ -32,9 +32,11 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, include_nursery_natives: bo
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             ..Default::default()
         },
-        UnitTestingConfig::default_with_bound(Some(100_000)),
+        UnitTestingConfig::default(),
         natives,
-        None,
+        ChangeSet::new(),
+        /* gas_limit */ Some(100_000),
+        /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
     )

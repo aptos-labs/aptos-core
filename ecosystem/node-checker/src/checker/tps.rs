@@ -127,7 +127,7 @@ impl Checker for TpsChecker {
             targets: Some(vec![target_url; self.config.repeat_target_count]),
             targets_file: None,
             coin_source_args: self.config.coin_source_args.clone(),
-            chain_id,
+            chain_id: Some(chain_id),
             node_api_key: None,
         };
         let cluster = Cluster::try_from_cluster_args(&cluster_config)
@@ -141,9 +141,9 @@ impl Checker for TpsChecker {
         // AKA stats per second.
         let rate = stats.rate();
 
-        if rate.submitted < self.config.minimum_tps {
+        if rate.submitted < (self.config.minimum_tps as f64) {
             return Err(TpsCheckerError::InsufficientSubmittedTransactionsError(
-                rate.submitted,
+                rate.submitted as u64,
                 self.config.minimum_tps,
             )
             .into());
@@ -151,7 +151,7 @@ impl Checker for TpsChecker {
 
         let mut description = format!("The minimum TPS (transactions per second) \
             required of nodes is {}, your node hit: {} (out of {} transactions submitted per second).", self.config.minimum_tps, rate.committed, rate.submitted);
-        let evaluation_result = if rate.committed >= self.config.minimum_tps {
+        let evaluation_result = if rate.committed >= (self.config.minimum_tps as f64) {
             if stats.committed == stats.submitted {
                 description.push_str(
                     " Your node could theoretically hit \

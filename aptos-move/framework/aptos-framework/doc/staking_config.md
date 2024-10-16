@@ -10,6 +10,7 @@ Provides the configuration for staking and rewards
 -  [Resource `StakingRewardsConfig`](#0x1_staking_config_StakingRewardsConfig)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_staking_config_initialize)
+-  [Function `reward_rate`](#0x1_staking_config_reward_rate)
 -  [Function `initialize_rewards`](#0x1_staking_config_initialize_rewards)
 -  [Function `get`](#0x1_staking_config_get)
 -  [Function `get_allow_validator_set_change`](#0x1_staking_config_get_allow_validator_set_change)
@@ -32,6 +33,7 @@ Provides the configuration for staking and rewards
     -  [Resource `StakingConfig`](#@Specification_1_StakingConfig)
     -  [Resource `StakingRewardsConfig`](#@Specification_1_StakingRewardsConfig)
     -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `reward_rate`](#@Specification_1_reward_rate)
     -  [Function `initialize_rewards`](#@Specification_1_initialize_rewards)
     -  [Function `get`](#@Specification_1_get)
     -  [Function `get_reward_rate`](#@Specification_1_get_reward_rate)
@@ -384,6 +386,32 @@ Only called during genesis.
         rewards_rate_denominator,
         voting_power_increase_limit,
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_staking_config_reward_rate"></a>
+
+## Function `reward_rate`
+
+Return the reward rate of this epoch as a tuple (numerator, denominator).
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_reward_rate">reward_rate</a>(): (u64, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_reward_rate">reward_rate</a>(): (u64, u64) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>, <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
+    <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(<b>borrow_global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework))
 }
 </code></pre>
 
@@ -1211,6 +1239,28 @@ StakingConfig does not exist under the aptos_framework before creating it.
 
 
 
+<a id="@Specification_1_reward_rate"></a>
+
+### Function `reward_rate`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_reward_rate">reward_rate</a>(): (u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
+<b>ensures</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() &&
+    (<b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate.value <b>as</b> u64) != 0) ==&gt;
+    result_1 &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a> && result_2 &lt;= <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>;
+</code></pre>
+
+
+
 <a id="@Specification_1_initialize_rewards"></a>
 
 ### Function `initialize_rewards`
@@ -1226,7 +1276,8 @@ Abort at any condition in StakingRewardsConfigValidationAborts.
 StakingRewardsConfig does not exist under the aptos_framework before creating it.
 
 
-<pre><code><b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 // This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;
@@ -1303,7 +1354,8 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<pre><code><b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
 </code></pre>
@@ -1404,7 +1456,8 @@ Caller must be @aptos_framework.
 StakingRewardsConfig is under the @aptos_framework.
 
 
-<pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 // This enforces <a id="high-level-req-1.6" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> addr != @aptos_framework;

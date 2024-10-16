@@ -66,6 +66,19 @@ pub trait ModuleAccess: Sync {
         handle
     }
 
+    fn variant_field_handle_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldHandle {
+        let handle = &self.as_module().variant_field_handles[idx.into_index()];
+        debug_assert!(handle.struct_index.into_index() < self.as_module().struct_defs.len()); // invariant
+
+        handle
+    }
+
+    fn struct_variant_handle_at(&self, idx: StructVariantHandleIndex) -> &StructVariantHandle {
+        let handle = &self.as_module().struct_variant_handles[idx.into_index()];
+        debug_assert!(handle.struct_index.into_index() < self.as_module().struct_defs.len()); // invariant
+        handle
+    }
+
     fn struct_instantiation_at(&self, idx: StructDefInstantiationIndex) -> &StructDefInstantiation {
         &self.as_module().struct_def_instantiations[idx.into_index()]
     }
@@ -76,6 +89,20 @@ pub trait ModuleAccess: Sync {
 
     fn field_instantiation_at(&self, idx: FieldInstantiationIndex) -> &FieldInstantiation {
         &self.as_module().field_instantiations[idx.into_index()]
+    }
+
+    fn variant_field_instantiation_at(
+        &self,
+        idx: VariantFieldInstantiationIndex,
+    ) -> &VariantFieldInstantiation {
+        &self.as_module().variant_field_instantiations[idx.into_index()]
+    }
+
+    fn struct_variant_instantiation_at(
+        &self,
+        idx: StructVariantInstantiationIndex,
+    ) -> &StructVariantInstantiation {
+        &self.as_module().struct_variant_instantiations[idx.into_index()]
     }
 
     fn signature_at(&self, idx: SignatureIndex) -> &Signature {
@@ -124,6 +151,14 @@ pub trait ModuleAccess: Sync {
         &self.as_module().field_handles
     }
 
+    fn variant_field_handles(&self) -> &[VariantFieldHandle] {
+        &self.as_module().variant_field_handles
+    }
+
+    fn struct_variant_handles(&self) -> &[StructVariantHandle] {
+        &self.as_module().struct_variant_handles
+    }
+
     fn struct_instantiations(&self) -> &[StructDefInstantiation] {
         &self.as_module().struct_def_instantiations
     }
@@ -134,6 +169,14 @@ pub trait ModuleAccess: Sync {
 
     fn field_instantiations(&self) -> &[FieldInstantiation] {
         &self.as_module().field_instantiations
+    }
+
+    fn variant_field_instantiations(&self) -> &[VariantFieldInstantiation] {
+        &self.as_module().variant_field_instantiations
+    }
+
+    fn struct_variant_instantiations(&self) -> &[StructVariantInstantiation] {
+        &self.as_module().struct_variant_instantiations
     }
 
     fn signatures(&self) -> &[Signature] {
@@ -190,6 +233,37 @@ pub trait ModuleAccess: Sync {
             .iter()
             .map(|handle| self.module_id_for_handle(handle))
             .collect()
+    }
+
+    /// Returns an iterator that iterates over all immediate dependencies of the module.
+    ///
+    /// This is more efficient than `immediate_dependencies` as it does not make new
+    /// copies of module ids on the heap.
+    fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.module_handles()
+            .iter()
+            .filter(|&handle| handle != self.self_handle())
+            .map(|handle| {
+                let addr = self.address_identifier_at(handle.address);
+                let name = self.identifier_at(handle.name);
+                (addr, name)
+            })
+    }
+
+    /// Returns an iterator that iterates over all immediate friends of the module.
+    ///
+    /// This is more efficient than `immediate_dependencies` as it does not make new
+    /// copies of module ids on the heap.
+    fn immediate_friends_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.friend_decls().iter().map(|handle| {
+            let addr = self.address_identifier_at(handle.address);
+            let name = self.identifier_at(handle.name);
+            (addr, name)
+        })
     }
 
     fn find_struct_def(&self, idx: StructHandleIndex) -> Option<&StructDefinition> {
@@ -293,6 +367,20 @@ pub trait ScriptAccess: Sync {
                 )
             })
             .collect()
+    }
+
+    /// Returns an iterator that iterates over all immediate dependencies of the module.
+    ///
+    /// This is more efficient than `immediate_dependencies` as it does not make new
+    /// copies of module ids on the heap.
+    fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.module_handles().iter().map(|handle| {
+            let addr = self.address_identifier_at(handle.address);
+            let name = self.identifier_at(handle.name);
+            (addr, name)
+        })
     }
 }
 

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: undeclared `y`
+  ┌─ tests/checking/typing/v1-commands/no_let_outside_if.move:4:9
+  │
+4 │         y = 5;
+  │         ^
+
+error: undeclared `y`
+  ┌─ tests/checking/typing/v1-commands/no_let_outside_if.move:6:9
+  │
+6 │         y = 0;
+  │         ^
+
+error: undeclared `y`
+  ┌─ tests/checking/typing/v1-commands/no_let_outside_if.move:8:13
+  │
+8 │     assert!(y == 5, 42);
+  │             ^

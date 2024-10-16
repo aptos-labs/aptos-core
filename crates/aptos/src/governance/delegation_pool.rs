@@ -209,24 +209,26 @@ async fn is_partial_governance_voting_enabled_for_delegation_pool(
     pool_address: AccountAddress,
 ) -> CliTypedResult<bool> {
     let response = client
-        .view(
-            &ViewRequest {
-                function: "0x1::delegation_pool::partial_governance_voting_enabled"
-                    .parse()
-                    .unwrap(),
-                type_arguments: vec![],
-                arguments: vec![serde_json::Value::String(pool_address.to_string())],
+        .view_bcs_with_json_response(
+            &ViewFunction {
+                module: ModuleId::new(
+                    AccountAddress::ONE,
+                    ident_str!("delegation_pool").to_owned(),
+                ),
+                function: ident_str!("partial_governance_voting_enabled").to_owned(),
+                ty_args: vec![],
+                args: vec![bcs::to_bytes(&pool_address).unwrap()],
             },
             None,
         )
         .await?;
-    response.inner()[0]
-        .as_bool()
-        .ok_or(CliError::UnexpectedError(
+    response.inner()[0].as_bool().ok_or_else(|| {
+        CliError::UnexpectedError(
             "Unexpected response from node when checking if partial governance_voting is \
         enabled for delegation pool"
                 .to_string(),
-        ))
+        )
+    })
 }
 
 async fn get_remaining_voting_power(
@@ -236,29 +238,30 @@ async fn get_remaining_voting_power(
     proposal_id: u64,
 ) -> CliTypedResult<u64> {
     let response = client
-        .view(
-            &ViewRequest {
-                function: "0x1::delegation_pool::calculate_and_update_remaining_voting_power"
-                    .parse()
-                    .unwrap(),
-                type_arguments: vec![],
-                arguments: vec![
-                    serde_json::Value::String(pool_address.to_string()),
-                    serde_json::Value::String(voter_address.to_string()),
-                    serde_json::Value::String(proposal_id.to_string()),
+        .view_bcs_with_json_response(
+            &ViewFunction {
+                module: ModuleId::new(
+                    AccountAddress::ONE,
+                    ident_str!("delegation_pool").to_owned(),
+                ),
+                function: ident_str!("calculate_and_update_remaining_voting_power").to_owned(),
+                ty_args: vec![],
+                args: vec![
+                    bcs::to_bytes(&pool_address).unwrap(),
+                    bcs::to_bytes(&voter_address).unwrap(),
+                    bcs::to_bytes(&proposal_id).unwrap(),
                 ],
             },
             None,
         )
         .await?;
-    let remaining_voting_power_str =
-        response.inner()[0]
-            .as_str()
-            .ok_or(CliError::UnexpectedError(format!(
-                "Unexpected response from node when getting remaining voting power of {}\
+    let remaining_voting_power_str = response.inner()[0].as_str().ok_or_else(|| {
+        CliError::UnexpectedError(format!(
+            "Unexpected response from node when getting remaining voting power of {}\
         in delegation pool {}",
-                pool_address, voter_address
-            )))?;
+            pool_address, voter_address
+        ))
+    })?;
     remaining_voting_power_str.parse().map_err(|err| {
         CliError::UnexpectedError(format!(
             "Unexpected response from node when getting remaining voting power of {}\

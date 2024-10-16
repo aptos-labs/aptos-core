@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: label `'outer` undefined
+  ┌─ tests/checking/control_flow/loop_labels_check_err.move:3:15
+  │
+3 │         break 'outer;
+  │               ^^^^^^
+
+error: label `'inner` undefined
+  ┌─ tests/checking/control_flow/loop_labels_check_err.move:5:19
+  │
+5 │             break 'inner
+  │                   ^^^^^^
+
+error: label `'l1` already used by outer loop
+   ┌─ tests/checking/control_flow/loop_labels_check_err.move:11:19
+   │
+11 │         'l1: loop 'l1: loop {};
+   │         ---       ^^^
+   │         │
+   │         outer definition of label

@@ -3,7 +3,10 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_language_e2e_tests::{
+    account::Account,
+    executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType},
+};
 use aptos_types::{move_utils::MemberId, transaction::TransactionPayload};
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -61,8 +64,15 @@ pub fn execute_module_txn(
 
 // sign user transaction and only records the body of the transaction
 pub fn execute_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
-    let elapsed =
-        executor.exec_func_record_running_time(module_name, function_name, vec![], vec![], 10);
+    let elapsed = executor.exec_func_record_running_time(
+        module_name,
+        function_name,
+        vec![],
+        vec![],
+        10,
+        ExecFuncTimerDynamicArgs::NoArgs,
+        GasMeterType::UnmeteredGasMeter,
+    );
     println!("running time (microseconds): {}", elapsed);
 }
 

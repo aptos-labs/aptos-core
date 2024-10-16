@@ -1,7 +1,8 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
-
-// Copyright © Aptos Foundation
 
 use aptos_dkg::{
     pvss,
@@ -14,6 +15,7 @@ use aptos_dkg::{
     utils::random::random_scalar,
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 use sha3::{Digest, Sha3_256};
@@ -162,8 +164,11 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
         .expect("WVUF aggregated proof should verify");
 
     // Derive the VUF evaluation
-    let eval_aggr = WVUF::derive_eval(&wc, &vuf_pp, msg, &apks[..], &proof)
-        .expect("WVUF derivation was expected to succeed");
+    let eval_aggrs = [1, 32].map(|num_threads| {
+        let pool = spawn_rayon_thread_pool("test-wvuf".to_string(), Some(num_threads));
+        WVUF::derive_eval(&wc, &vuf_pp, msg, &apks[..], &proof, &pool)
+            .expect("WVUF derivation was expected to succeed")
+    });
 
     // TODO: When APKs are missing, not yet testing proof verification and derivation.
 
@@ -171,5 +176,8 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     let eval_bytes = bcs::to_bytes(&eval).unwrap();
     let _hash = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
 
-    assert_eq!(eval_aggr, eval);
+    for (i, eval_aggr) in eval_aggrs.into_iter().enumerate() {
+        println!("Checking WVUF evaluation #{}", i);
+        assert_eq!(eval_aggr, eval);
+    }
 }

@@ -13,14 +13,18 @@ use aptos_types::{
     state_store::state_value::StateValue,
     write_set::{TransactionWrite, WriteOpKind},
 };
+use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use claims::assert_none;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 const DEFAULT_TIMEOUT: u64 = 30;
@@ -82,14 +86,6 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
 
     fn set_bytes(&mut self, bytes: Bytes) {
         self.maybe_bytes = Some(bytes);
-    }
-
-    fn convert_read_to_modification(&self) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        // If we have no bytes, no modification can be created.
-        self.maybe_bytes.as_ref().map(|_| self.clone())
     }
 }
 
@@ -245,11 +241,23 @@ where
         let value = Value::new(None);
         let idx = idx as TxnIndex;
         if test_group {
+            map.group_data
+                .set_raw_base_values(key.clone(), vec![])
+                .unwrap();
             map.group_data()
-                .write(key.clone(), idx, 0, vec![(5, (value, None))]);
-            map.group_data().mark_estimate(&key, idx);
+                .write(
+                    key.clone(),
+                    idx,
+                    0,
+                    vec![(5, (value, None))],
+                    ResourceGroupSize::zero_combined(),
+                    HashSet::new(),
+                )
+                .unwrap();
+            map.group_data()
+                .mark_estimate(&key, idx, [5usize].into_iter().collect());
         } else {
-            map.data().write(key.clone(), idx, 0, (value, None));
+            map.data().write(key.clone(), idx, 0, Arc::new(value), None);
             map.data().mark_estimate(&key, idx);
         }
     }
@@ -298,12 +306,12 @@ where
                                         assert_value(v);
                                         break;
                                     },
-                                    Err(MVGroupError::Uninitialized) => {
+                                    Err(MVGroupError::Uninitialized)
+                                    | Err(MVGroupError::TagNotFound) => {
                                         assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                         break;
                                     },
                                     Err(MVGroupError::Dependency(_i)) => (),
-                                    Err(_) => unreachable!("Unreachable error cases for test"),
                                 }
                             } else {
                                 match map
@@ -355,9 +363,18 @@ where
                         let value = Value::new(None);
                         if test_group {
                             map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
+                                .write(
+                                    key,
+                                    idx as TxnIndex,
+                                    1,
+                                    vec![(5, (value, None))],
+                                    ResourceGroupSize::zero_combined(),
+                                    HashSet::new(),
+                                )
+                                .unwrap();
                         } else {
-                            map.data().write(key, idx as TxnIndex, 1, (value, None));
+                            map.data()
+                                .write(key, idx as TxnIndex, 1, Arc::new(value), None);
                         }
                     },
                     Operator::Insert(v) => {
@@ -365,9 +382,18 @@ where
                         let value = Value::new(Some(v.clone()));
                         if test_group {
                             map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
+                                .write(
+                                    key,
+                                    idx as TxnIndex,
+                                    1,
+                                    vec![(5, (value, None))],
+                                    ResourceGroupSize::zero_combined(),
+                                    HashSet::new(),
+                                )
+                                .unwrap();
                         } else {
-                            map.data().write(key, idx as TxnIndex, 1, (value, None));
+                            map.data()
+                                .write(key, idx as TxnIndex, 1, Arc::new(value), None);
                         }
                     },
                     Operator::Update(delta) => {

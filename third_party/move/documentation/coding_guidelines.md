@@ -39,7 +39,7 @@ We require every PR to have approval by at least two reviewers. This is enforced
 - Don't forget to list any issues this PR fixes (if you mention 'closes #nnn' in the PR description the issue will be automatically closed).
 - If you have any significant TODOs in your code, please open an issue for them. Use `TODO(#nnn)` to link the TODO to the issue.
 - Respond to each comment of the reviewers. If you think you resolved a request for a change, just use 'done' as a response. If you disagree with the reviewer, explain why -- it is OK to pushback, but should be justified.
-- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTLA' ('please take another look') as an acronym for this purpose.
+- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTAL' ('please take another look') as an acronym for this purpose.
 - If possible, avoid force push so the reviewer can see how you changed code in comparison. There are exceptions to this, for example if you need to rebase.
 
 ### Guidelines for Reviewers of PRs
@@ -239,7 +239,7 @@ It forces us to think of edge-cases, and handle them explicitely.
 This is a brief and simplified mini guide of the different functions that exist to handle integer arithmetic:
 
 * [checked_](https://doc.rust-lang.org/std/primitive.u32.html#method.checked_add): use this function if you want to handle overflows and underflows as a special edge-case. It returns `None` if an underflow or overflow has happened, and `Some(operation_result)` otherwise.
-* [overflowing_](https://doc.rust-lang.org/std/primitive.u32.html#method.overflowing_add): use this function if you want the result of an overflow to potentially wrap around (e.g. `u64::MAX.overflow_add(10) == (9, true)`). It returns the underflowed or overflowed result as well as a flag indicating if an overflow has occured or not.
+* [overflowing_](https://doc.rust-lang.org/std/primitive.u32.html#method.overflowing_add): use this function if you want the result of an overflow to potentially wrap around (e.g. `u64::MAX.overflow_add(10) == (9, true)`). It returns the underflowed or overflowed result as well as a flag indicating if an overflow has occurred or not.
 * [wrapping_](https://doc.rust-lang.org/std/primitive.u32.html#method.wrapping_add): this is similar to overflowing operations, except that it returns the result directly. Use this function if you are sure that you want to handle underflows and overflows by wrapping around.
 * [saturating_](https://doc.rust-lang.org/std/primitive.u32.html#method.saturating_add): if an overflow occurs, the result is kept within the boundary of the type (e.g. `u64::MAX.saturating_add(1) == u64::MAX`).
 

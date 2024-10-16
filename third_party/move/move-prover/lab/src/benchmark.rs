@@ -15,6 +15,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use log::LevelFilter;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
+use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_model::{
     model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope},
     parse_addresses_from_options, run_model_builder_with_options,
@@ -97,7 +98,7 @@ pub fn benchmark(args: &[String]) {
     let matches = cmd_line_parser.get_matches_from(args);
     let get_vec = |s: &str| -> Vec<String> {
         let vs = matches.get_many::<String>(s);
-        vs.map_or(vec![], |v| v.cloned().collect())
+        vs.map_or_else(Vec::new, |v| v.cloned().collect())
     };
     let sources = get_vec("sources");
     let deps = get_vec("dependencies");
@@ -152,12 +153,13 @@ fn run_benchmark(
     options.move_deps.append(&mut dep_dirs.to_vec());
     let skip_attribute_checks = true;
     let known_attributes = KnownAttribute::get_all_attribute_names().clone();
-    let env = run_model_builder_with_options(
+    let mut env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
             paths: modules.to_vec(),
             named_address_map: addrs.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),
@@ -176,11 +178,7 @@ fn run_benchmark(
                     "../../../../../aptos-move/framework/src/aptos-natives.bpl"
                 )
                 .to_vec(),
-                module_instance_names: vec![(
-                    "0x1::object".to_string(),
-                    "object_instances".to_string(),
-                    true,
-                )],
+                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
             });
     }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
@@ -218,6 +216,17 @@ fn run_benchmark(
         Notice that execution is slow because we enforce single core execution.",
         config_descr
     );
+    // Need to run the pipeline to
+    let compiler_options = move_compiler_v2::Options::default()
+        .set_experiment(Experiment::OPTIMIZE, false)
+        .set_experiment(Experiment::SPEC_REWRITE, true);
+    env.set_extension(compiler_options.clone());
+    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+        &compiler_options,
+        true,
+        RewritingScope::Everything,
+    );
+    pipeline.run(&mut env);
     runner.bench(&env)
 }
 

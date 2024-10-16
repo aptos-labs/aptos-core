@@ -4,10 +4,12 @@
 use crate::{counters, types::ReadWriteSummary};
 use aptos_logger::info;
 use aptos_types::{
-    fee_statement::FeeStatement, on_chain_config::BlockGasLimitType,
-    transaction::BlockExecutableTransaction as Transaction,
+    fee_statement::FeeStatement,
+    on_chain_config::BlockGasLimitType,
+    transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
 };
 use claims::{assert_le, assert_none};
+use std::time::Instant;
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
@@ -16,8 +18,8 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
-    block_limit_reached: bool,
     module_rw_conflict: bool,
+    start_time: Instant,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -29,8 +31,8 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
-            block_limit_reached: false,
             module_rw_conflict: false,
+            start_time: Instant::now(),
         }
     }
 
@@ -130,8 +132,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
                     mode, accumulated_block_gas, per_block_gas_limit,
                 );
-                self.block_limit_reached = true;
-
                 return true;
             }
         }
@@ -147,8 +147,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
                     mode, accumulated_output, per_block_output_limit,
                 );
-                self.block_limit_reached = true;
-
                 return true;
             }
         }
@@ -195,6 +193,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         is_parallel: bool,
         num_committed: u32,
         num_total: u32,
+        num_workers: usize,
     ) {
         let accumulated_effective_block_gas = self.get_effective_accumulated_block_gas();
         let accumulated_approx_output_size = self.get_accumulated_approx_output_size();
@@ -221,11 +220,15 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 .block_gas_limit_type
                 .block_output_limit()
                 .map_or(false, |limit| accumulated_approx_output_size >= limit),
+            elapsed_ms = self.start_time.elapsed().as_millis(),
+            num_committed = num_committed,
+            num_total = num_total,
+            num_workers = num_workers,
             "[BlockSTM]: {} execution completed. {} out of {} txns committed",
             if is_parallel {
-                "Parallel"
+                format!("Parallel[{}]", num_workers)
             } else {
-                "Sequential"
+                "Sequential".to_string()
             },
             num_committed,
             num_total,
@@ -236,8 +239,9 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         &self,
         num_committed: u32,
         num_total: u32,
+        num_workers: usize,
     ) {
-        self.finish_update_counters_and_log_info(true, num_committed, num_total)
+        self.finish_update_counters_and_log_info(true, num_committed, num_total, num_workers)
     }
 
     pub(crate) fn finish_sequential_update_counters_and_log_info(
@@ -245,12 +249,28 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         num_committed: u32,
         num_total: u32,
     ) {
-        self.finish_update_counters_and_log_info(false, num_committed, num_total)
+        self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
-    #[allow(unused)]
-    pub(crate) fn is_block_limit_reached(&self) -> bool {
-        self.block_limit_reached
+    pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {
+        BlockEndInfo::V0 {
+            block_gas_limit_reached: self
+                .block_gas_limit_type
+                .block_gas_limit()
+                .map(|per_block_gas_limit| {
+                    self.get_effective_accumulated_block_gas() >= per_block_gas_limit
+                })
+                .unwrap_or(false),
+            block_output_limit_reached: self
+                .block_gas_limit_type
+                .block_output_limit()
+                .map(|per_block_output_limit| {
+                    self.get_accumulated_approx_output_size() >= per_block_output_limit
+                })
+                .unwrap_or(false),
+            block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
+            block_approx_output_size: self.get_accumulated_approx_output_size(),
+        }
     }
 }
 
@@ -261,7 +281,7 @@ mod test {
         proptest_types::types::{KeyType, MockEvent, MockTransaction},
         types::InputOutputKey,
     };
-    use aptos_types::delayed_fields::DelayedFieldID;
+    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use std::collections::HashSet;
 
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs

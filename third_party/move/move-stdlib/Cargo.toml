@@ -11,9 +11,9 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-anyhow = "1.0.52"
-hex = "0.4.3"
-log = "0.4.14"
+anyhow = { workspace = true }
+hex = { workspace = true }
+log = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
 move-command-line-common = { path = "../move-command-line-common" }
 move-compiler = { path = "../move-compiler" }
@@ -23,18 +23,18 @@ move-errmapgen = { path = "../move-prover/move-errmapgen" }
 move-prover = { path = "../move-prover" }
 move-vm-runtime = { path = "../move-vm/runtime" }
 move-vm-types = { path = "../move-vm/types" }
-sha2 = "0.9.3"
-sha3 = "0.9.1"
-smallvec = "1.6.1"
-walkdir = "2.3.1"
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+smallvec = { workspace = true }
+walkdir = { workspace = true }
 
 [dev-dependencies]
-dir-diff = "0.3.2"
-file_diff = "1.0.0"
+dir-diff = { workspace = true }
+file_diff = { workspace = true }
 move-cli = { path = "../tools/move-cli" }
 move-package = { path = "../tools/move-package" }
 move-unit-test = { path = "../tools/move-unit-test" }
-tempfile = "3.2.0"
+tempfile = { workspace = true }
 
 [features]
 testing = []

@@ -1,0 +1,24 @@
+error[E01008]: invalid hex string
+  ┌─ tests/move_check/parser/constants_hexstring.move:6:29
+  │
+6 │     const C12: vector<u8> = x"hello";
+  │                             ^^^^^^^^ Odd number of characters in hex string. Expected 2 hexadecimal digits for each byte
+
+error[E08001]: cannot compute constant value
+  ┌─ tests/move_check/parser/constants_hexstring.move:6:29
+  │
+6 │     const C12: vector<u8> = x"hello";
+  │                             ^^^^^^^^ Invalid expression in 'const'. This expression could not be evaluated to a value
+
+error[E08001]: cannot compute constant value
+  ┌─ tests/move_check/parser/constants_hexstring.move:7:29
+  │
+7 │     const C13: vector<u8> = x"hello!";
+  │                             ^^^^^^^^^ Invalid expression in 'const'. This expression could not be evaluated to a value
+
+error[E01008]: invalid hex string
+  ┌─ tests/move_check/parser/constants_hexstring.move:7:31
+  │
+7 │     const C13: vector<u8> = x"hello!";
+  │                               ^ Invalid hexadecimal character: 'h'
+

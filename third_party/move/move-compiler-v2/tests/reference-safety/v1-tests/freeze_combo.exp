@@ -1,27 +1,2 @@
 
-Diagnostics:
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
-   ┌─ tests/reference-safety/v1-tests/freeze_combo.move:13:9
-   │
-12 │         if (cond) f = &s.f else f = &other.f;
-   │                       ---- previous field borrow
-13 │         freeze(s); // error in v2 even though s is not read
-   │         ^^^^^^^^^ passed here
-
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
-   ┌─ tests/reference-safety/v1-tests/freeze_combo.move:20:9
-   │
-19 │         if (cond) f = &s.f else f = &s.g;
-   │                       ----          ---- previous field borrow
-   │                       │
-   │                       previous field borrow
-20 │         freeze(s); // error in v2 even though s is not read
-   │         ^^^^^^^^^ passed here
-
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
-   ┌─ tests/reference-safety/v1-tests/freeze_combo.move:27:9
-   │
-26 │         if (cond) x = freeze(s) else x = other;
-   │                       --------- previous call result
-27 │         freeze(s); // error in v2 even though s is not read
-   │         ^^^^^^^^^ passed here
+============ bytecode verification succeeded ========

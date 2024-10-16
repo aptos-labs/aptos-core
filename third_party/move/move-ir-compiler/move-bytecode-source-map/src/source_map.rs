@@ -9,7 +9,7 @@ use move_binary_format::{
     file_format::{
         AbilitySet, CodeOffset, CodeUnit, ConstantPoolIndex, FunctionDefinitionIndex, LocalIndex,
         MemberCount, ModuleHandleIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
-        TableIndex,
+        TableIndex, VariantIndex,
     },
 };
 use move_command_line_common::files::FileHash;
@@ -37,8 +37,9 @@ pub struct StructSourceMap {
     pub type_parameters: Vec<SourceName>,
 
     /// Note that fields to a struct source map need to be added in the order of the fields in the
-    /// struct definition.
-    pub fields: Vec<Loc>,
+    /// struct definition, variant by variant. If the struct has no variant, there is only
+    /// one outer vector.
+    pub fields: Vec<Vec<Loc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -108,12 +109,24 @@ impl StructSourceMap {
         self.type_parameters.get(type_parameter_idx).cloned()
     }
 
-    pub fn add_field_location(&mut self, field_loc: Loc) {
-        self.fields.push(field_loc)
+    pub fn add_field_location(&mut self, variant: Option<VariantIndex>, field_loc: Loc) {
+        let variant = variant.unwrap_or_default() as usize;
+        while self.fields.len() <= variant {
+            self.fields.push(vec![])
+        }
+        self.fields[variant].push(field_loc)
     }
 
-    pub fn get_field_location(&self, field_index: MemberCount) -> Option<Loc> {
-        self.fields.get(field_index as usize).cloned()
+    pub fn get_field_location(
+        &self,
+        variant: Option<VariantIndex>,
+        field_index: MemberCount,
+    ) -> Option<Loc> {
+        let variant = variant.unwrap_or_default() as usize;
+        self.fields
+            .get(variant)
+            .and_then(|v| v.get(field_index as usize))
+            .cloned()
     }
 
     pub fn dummy_struct_map(
@@ -125,11 +138,24 @@ impl StructSourceMap {
         let struct_handle = view.struct_handle_at(struct_def.struct_handle);
 
         // Add dummy locations for the fields
-        match struct_def.declared_field_count() {
-            Err(_) => (),
-            Ok(count) => (0..count).for_each(|_| self.fields.push(default_loc)),
+        let variant_count = struct_def.field_information.variant_count();
+        if variant_count > 0 {
+            for variant in 0..variant_count {
+                self.fields.push(
+                    (0..struct_def
+                        .field_information
+                        .field_count(Some(variant as VariantIndex)))
+                        .map(|_| default_loc)
+                        .collect(),
+                )
+            }
+        } else {
+            self.fields.push(
+                (0..struct_def.field_information.field_count(None))
+                    .map(|_| default_loc)
+                    .collect(),
+            )
         }
-
         for i in 0..struct_handle.type_parameters.len() {
             let name = format!("Ty{}", i);
             self.add_type_parameter((name, default_loc))
@@ -426,24 +452,26 @@ impl SourceMap {
     pub fn add_struct_field_mapping(
         &mut self,
         struct_def_idx: StructDefinitionIndex,
+        variant: Option<VariantIndex>,
         location: Loc,
     ) -> Result<()> {
         let struct_entry = self
             .struct_map
             .get_mut(&struct_def_idx.0)
             .ok_or_else(|| format_err!("Tried to add file mapping to undefined struct index"))?;
-        struct_entry.add_field_location(location);
+        struct_entry.add_field_location(variant, location);
         Ok(())
     }
 
     pub fn get_struct_field_name(
         &self,
         struct_def_idx: StructDefinitionIndex,
+        variant: Option<VariantIndex>,
         field_idx: MemberCount,
     ) -> Option<Loc> {
         self.struct_map
             .get(&struct_def_idx.0)
-            .and_then(|struct_source_map| struct_source_map.get_field_location(field_idx))
+            .and_then(|struct_source_map| struct_source_map.get_field_location(variant, field_idx))
     }
 
     pub fn add_struct_type_parameter_mapping(

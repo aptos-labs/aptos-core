@@ -154,19 +154,30 @@ pub async fn sync_and_load(
             let local_file = cache_dir_ref.join(*h);
             let local_tmp_file = cache_dir_ref.join(format!(".{}", *h));
 
-            download_file(storage_ref, file_handle, &local_tmp_file).await?;
-            // rename to target file only if successful; stale tmp file caused by failure will be
-            // reclaimed on next run
-            tokio::fs::rename(local_tmp_file.clone(), local_file)
-                .await
-                .err_notes(local_tmp_file)?;
-            info!(
-                file_handle = file_handle,
-                processed = i + 1,
-                total = num_new_files,
-                "Metadata file downloaded."
-            );
-            NUM_META_DOWNLOAD.inc();
+            match download_file(storage_ref, file_handle, &local_tmp_file).await {
+                Ok(_) => {
+                    // rename to target file only if successful; stale tmp file caused by failure will be
+                    // reclaimed on next run
+                    tokio::fs::rename(local_tmp_file.clone(), local_file)
+                        .await
+                        .err_notes(local_tmp_file)?;
+                    info!(
+                        file_handle = file_handle,
+                        processed = i + 1,
+                        total = num_new_files,
+                        "Metadata file downloaded."
+                    );
+                    NUM_META_DOWNLOAD.inc();
+                },
+                Err(e) => {
+                    warn!(
+                        file_handle = file_handle,
+                        error = %e,
+                        "Ignoring metadata file download error -- can be compactor removing files."
+                    )
+                },
+            }
+
             Ok(())
         }
     });

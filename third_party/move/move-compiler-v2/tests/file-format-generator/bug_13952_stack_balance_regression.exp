@@ -1,0 +1,87 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+enum Data has drop {
+ V1{
+	x: u64
+ },
+ V2{
+	x: u64,
+	y: bool
+ },
+ V3{
+
+ }
+}
+
+test_v1(): bool /* def_idx: 0 */ {
+L0:	loc0: Data
+L1:	loc1: bool
+B0:
+	0: LdU64(43)
+	1: PackVariant[0](Data/V1)
+	2: StLoc[0](loc0: Data)
+	3: ImmBorrowLoc[0](loc0: Data)
+	4: TestVariant[0](Data/V1)
+	5: StLoc[1](loc1: bool)
+	6: CopyLoc[1](loc1: bool)
+	7: BrTrue(8)
+B1:
+	8: MoveLoc[1](loc1: bool)
+	9: Ret
+}
+test_v1v3(): bool /* def_idx: 1 */ {
+L0:	loc0: Data
+L1:	loc1: &Data
+L2:	loc2: bool
+L3:	loc3: Data
+L4:	loc4: &Data
+L5:	loc5: bool
+B0:
+	0: LdU64(43)
+	1: PackVariant[0](Data/V1)
+	2: StLoc[0](loc0: Data)
+	3: ImmBorrowLoc[0](loc0: Data)
+	4: StLoc[1](loc1: &Data)
+	5: CopyLoc[1](loc1: &Data)
+	6: TestVariant[0](Data/V1)
+	7: StLoc[2](loc2: bool)
+	8: CopyLoc[2](loc2: bool)
+	9: BrTrue(15)
+B1:
+	10: MoveLoc[1](loc1: &Data)
+	11: TestVariant[1](Data/V3)
+	12: StLoc[2](loc2: bool)
+	13: CopyLoc[2](loc2: bool)
+	14: BrTrue(15)
+B2:
+	15: PackVariant[1](Data/V3)
+	16: StLoc[3](loc3: Data)
+	17: MoveLoc[2](loc2: bool)
+	18: BrFalse(32)
+B3:
+	19: ImmBorrowLoc[3](loc3: Data)
+	20: StLoc[4](loc4: &Data)
+	21: CopyLoc[4](loc4: &Data)
+	22: TestVariant[0](Data/V1)
+	23: StLoc[5](loc5: bool)
+	24: CopyLoc[5](loc5: bool)
+	25: BrTrue(31)
+B4:
+	26: MoveLoc[4](loc4: &Data)
+	27: TestVariant[1](Data/V3)
+	28: StLoc[5](loc5: bool)
+	29: CopyLoc[5](loc5: bool)
+	30: BrTrue(31)
+B5:
+	31: Branch(34)
+B6:
+	32: LdFalse
+	33: StLoc[5](loc5: bool)
+B7:
+	34: MoveLoc[5](loc5: bool)
+	35: Ret
+}
+}
+============ bytecode verification succeeded ========

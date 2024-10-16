@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: undeclared `<SELF>_0::_`
+error: undeclared `_`
   ┌─ tests/checking/control_flow/for_loop_empty_novar.move:4:9
   │
 4 │         for (_ in 0..10) {};

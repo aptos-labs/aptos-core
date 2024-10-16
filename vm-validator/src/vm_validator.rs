@@ -11,14 +11,15 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_view::AccountView,
-    state_store::{account_with_state_view::AsAccountWithStateView, StateView},
+    account_config::AccountResource,
+    state_store::{MoveResourceExt, StateView},
     transaction::{SignedTransaction, VMValidatorResult},
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::AptosVM;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
-use std::sync::Arc;
+use rand::{thread_rng, Rng};
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -55,7 +56,7 @@ impl VMValidator {
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
         );
-        AptosVM::new(&state_view.as_move_resolver())
+        AptosVM::new(state_view)
     }
 
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
@@ -113,10 +114,52 @@ pub fn get_account_sequence_number(
         ))
     });
 
-    let account_state_view = state_view.as_account_with_state_view(&address);
-
-    match account_state_view.get_account_resource()? {
+    match AccountResource::fetch_move_resource(state_view, &address)? {
         Some(account_resource) => Ok(account_resource.sequence_number()),
         None => Ok(0),
+    }
+}
+
+// A pool of VMValidators that can be used to validate transactions concurrently. This is done because
+// the VM is not thread safe today. This is a temporary solution until the VM is made thread safe.
+#[derive(Clone)]
+pub struct PooledVMValidator {
+    vm_validators: Vec<Arc<Mutex<VMValidator>>>,
+}
+
+impl PooledVMValidator {
+    pub fn new(db_reader: Arc<dyn DbReader>, pool_size: usize) -> Self {
+        let mut vm_validators = Vec::new();
+        for _ in 0..pool_size {
+            vm_validators.push(Arc::new(Mutex::new(VMValidator::new(db_reader.clone()))));
+        }
+        PooledVMValidator { vm_validators }
+    }
+
+    pub fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
+        let mut rng = thread_rng(); // Create a thread-local random number generator
+        let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
+        self.vm_validators[random_index].clone() // Return the VM at the random index
+    }
+}
+
+impl TransactionValidation for PooledVMValidator {
+    type ValidationInstance = AptosVM;
+
+    fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
+        self.get_next_vm().lock().unwrap().validate_transaction(txn)
+    }
+
+    fn restart(&mut self) -> Result<()> {
+        for vm_validator in &self.vm_validators {
+            vm_validator.lock().unwrap().restart()?;
+        }
+        Ok(())
+    }
+
+    fn notify_commit(&mut self) {
+        for vm_validator in &self.vm_validators {
+            vm_validator.lock().unwrap().notify_commit();
+        }
     }
 }

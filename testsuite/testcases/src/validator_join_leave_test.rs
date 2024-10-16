@@ -4,15 +4,15 @@
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_forge::{
-    reconfig, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport,
-    FORGE_KEY_SEED,
+    reconfig, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Swarm,
+    SwarmExt, Test, TestReport, FORGE_KEY_SEED,
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
-use std::time::Duration;
-use tokio::runtime::Runtime;
+use async_trait::async_trait;
+use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;
 
@@ -24,20 +24,21 @@ impl Test for ValidatorJoinLeaveTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for ValidatorJoinLeaveTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn test(
+    async fn test(
         &self,
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can lose 2 validators but still make progress.
-        let num_validators = swarm.validators().count();
+        let num_validators = { swarm.read().await.validators().count() };
         if num_validators < 7 {
             return Err(anyhow::format_err!(
                 "ValidatorSet leaving and rejoining test require at least 7 validators! Given: {:?}.",
@@ -47,20 +48,23 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
         // Connect the operator tool to the node's JSON RPC API
-        let rest_client = swarm.validators().next().unwrap().rest_client();
-        let transaction_factory = swarm.chain_info().transaction_factory();
-        let runtime = Runtime::new().unwrap();
+        let transaction_factory = { swarm.read().await.chain_info().transaction_factory() };
 
-        let mut cli = runtime.block_on(async {
-            CliTestFramework::new(
-                swarm.validators().next().unwrap().rest_api_endpoint(),
-                faucet_endpoint,
-                /*num_cli_accounts=*/ 0,
-            )
-            .await
-        });
+        let (rest_client, rest_api_endpoint) = {
+            let swarm = swarm.read().await;
+            let first_validator = swarm.validators().next().unwrap();
+            let rest_client = first_validator.rest_client();
+            let rest_api_endpoint = first_validator.rest_api_endpoint();
+            (rest_client, rest_api_endpoint)
+        };
+        let mut cli = CliTestFramework::new(
+            rest_api_endpoint,
+            faucet_endpoint,
+            /*num_cli_accounts=*/ 0,
+        )
+        .await;
 
-        let mut public_info = swarm.chain_info().into_aptos_public_info();
+        let mut public_info = { swarm.read().await.chain_info().into_aptos_public_info() };
 
         let mut validator_cli_indices = Vec::new();
 
@@ -77,30 +81,25 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 
             let mut keygen = KeyGen::from_seed(seed_slice);
 
-            let (validator_cli_index, _keys, account_balance) = runtime.block_on(async {
-                let (validator_cli_index, keys) =
-                    init_validator_account(&mut cli, &mut keygen).await;
+            let (validator_cli_index, keys) = init_validator_account(&mut cli, &mut keygen).await;
 
-                let auth_key = AuthenticationKey::ed25519(&keys.account_private_key.public_key());
-                let validator_account_address = AccountAddress::new(*auth_key.account_address());
+            let auth_key = AuthenticationKey::ed25519(&keys.account_private_key.public_key());
+            let validator_account_address = AccountAddress::new(*auth_key.account_address());
 
-                public_info
-                    .mint(validator_account_address, DEFAULT_FUNDED_COINS)
-                    .await
-                    .unwrap();
+            public_info
+                .mint(validator_account_address, DEFAULT_FUNDED_COINS)
+                .await
+                .unwrap();
 
-                let account_balance = public_info
-                    .get_balance(validator_account_address)
-                    .await
-                    .unwrap();
-
-                (validator_cli_index, keys, account_balance)
-            });
+            let account_balance = public_info
+                .get_balance(validator_account_address)
+                .await
+                .unwrap();
             assert_eq!(account_balance, DEFAULT_FUNDED_COINS);
             validator_cli_indices.push(validator_cli_index);
 
             assert_eq!(
-                runtime.block_on(get_validator_state(&cli, validator_cli_index)),
+                get_validator_state(&cli, validator_cli_index).await,
                 ValidatorState::ACTIVE
             );
         }
@@ -114,79 +113,66 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
-        runtime.block_on(async {
+        {
             swarm
-                .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+                .read()
                 .await
-        })?;
+                .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+                .await?;
+        }
 
         // Wait for 1/3 of the test duration.
-        std::thread::sleep(duration / 3);
+        tokio::time::sleep(duration / 3).await;
 
-        runtime.block_on(async {
-            // 1/3 validators leave the validator set.
-            info!("Make the last 1/3 validators leave the validator set!");
-            for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
-                cli.leave_validator_set(*operator_index, None)
-                    .await
-                    .unwrap();
+        // 1/3 validators leave the validator set.
+        info!("Make the last 1/3 validators leave the validator set!");
+        for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
+            cli.leave_validator_set(*operator_index, None)
+                .await
+                .unwrap();
 
-                reconfig(
-                    &rest_client,
-                    &transaction_factory,
-                    swarm.chain_info().root_account(),
-                )
-                .await;
-            }
+            let root_account = swarm.read().await.chain_info().root_account();
+            reconfig(&rest_client, &transaction_factory, root_account).await;
+        }
 
-            reconfig(
-                &rest_client,
-                &transaction_factory,
-                swarm.chain_info().root_account(),
-            )
-            .await;
-        });
+        {
+            let root_account = swarm.read().await.chain_info().root_account();
+            reconfig(&rest_client, &transaction_factory, root_account).await;
+        }
 
         // Wait for 1/3 of the test duration.
-        std::thread::sleep(duration / 3);
+        tokio::time::sleep(duration / 3).await;
 
-        runtime.block_on(async {
-            // Rejoining validator set.
-            info!("Make the last 1/3 validators rejoin the validator set!");
-            for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
-                cli.join_validator_set(*operator_index, None).await.unwrap();
+        // Rejoining validator set.
+        info!("Make the last 1/3 validators rejoin the validator set!");
+        for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
+            cli.join_validator_set(*operator_index, None).await.unwrap();
 
-                reconfig(
-                    &rest_client,
-                    &transaction_factory,
-                    swarm.chain_info().root_account(),
-                )
-                .await;
-            }
+            let root_account = swarm.read().await.chain_info().root_account();
+            reconfig(&rest_client, &transaction_factory, root_account).await;
+        }
 
-            reconfig(
-                &rest_client,
-                &transaction_factory,
-                swarm.chain_info().root_account(),
-            )
-            .await;
-        });
+        {
+            let root_account = swarm.read().await.chain_info().root_account();
+            reconfig(&rest_client, &transaction_factory, root_account).await;
+        }
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
-        runtime.block_on(async {
-            swarm
-                .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
-                .await
-        })?;
+        swarm
+            .read()
+            .await
+            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+            .await?;
 
         Ok(())
     }
 }
 
+#[async_trait]
 impl NetworkTest for ValidatorJoinLeaveTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 

@@ -3,7 +3,7 @@
 
 use super::{
     intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation,
-    ModuleStorageAdapter, Scope, ScriptHash, StructNameCache,
+    ModuleStorageAdapter, ScriptHash, StructNameCache,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -12,17 +12,20 @@ use move_binary_format::{
     file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
+use move_vm_types::loaded_data::{
+    runtime_access_specifier::AccessSpecifier,
+    runtime_types::{StructIdentifier, Type},
+};
 use std::{collections::BTreeMap, sync::Arc};
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
 // more appropriate to execution.
 // When code executes, indices in instructions are resolved against runtime structures
-// (rather then "compiled") to make available data needed for execution
+// (rather than "compiled") to make available data needed for execution.
 #[derive(Clone, Debug)]
-pub(crate) struct Script {
+pub struct Script {
     // primitive pools
-    pub(crate) script: CompiledScript,
+    pub(crate) script: Arc<CompiledScript>,
 
     // functions as indexes into the Loader function list
     pub(crate) function_refs: Vec<FunctionHandle>,
@@ -32,20 +35,13 @@ pub(crate) struct Script {
     // entry point
     pub(crate) main: Arc<Function>,
 
-    // parameters of main
-    pub(crate) parameter_tys: Vec<Type>,
-
-    // return values
-    pub(crate) return_tys: Vec<Type>,
-
     // a map of single-token signature indices to type
     pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, Type>,
 }
 
 impl Script {
     pub(crate) fn new(
-        script: CompiledScript,
-        script_hash: &ScriptHash,
+        script: Arc<CompiledScript>,
         cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
     ) -> VMResult<Self> {
@@ -96,12 +92,10 @@ impl Script {
             });
         }
 
-        let scope = Scope::Script(*script_hash);
-
         let code: Vec<Bytecode> = script.code.code.clone();
         let parameters = script.signature_at(script.parameters).clone();
 
-        let parameter_tys = parameters
+        let param_tys = parameters
             .0
             .iter()
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
@@ -121,14 +115,7 @@ impl Script {
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
-        let return_ = Signature(vec![]);
-        let return_tys = return_
-            .0
-            .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let type_parameters = script.type_parameters.clone();
+        let ty_param_abilities = script.type_parameters.clone();
         // TODO: main does not have a name. Revisit.
         let name = Identifier::new("main").unwrap();
         let (native, def_is_native) = (None, false); // Script entries cannot be native
@@ -136,15 +123,17 @@ impl Script {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
-            type_parameters,
+            ty_param_abilities,
             native,
-            def_is_native,
-            def_is_friend_or_private: false,
-            scope,
+            is_native: def_is_native,
+            is_friend_or_private: false,
+            is_entry: false,
             name,
-            return_types: return_tys.clone(),
-            local_types: local_tys,
-            parameter_types: parameter_tys.clone(),
+            // Script must not return values.
+            return_tys: vec![],
+            local_tys,
+            param_tys,
+            access_specifier: AccessSpecifier::Any,
         });
 
         let mut single_signature_token_map = BTreeMap::new();
@@ -189,8 +178,6 @@ impl Script {
             function_refs,
             function_instantiations,
             main,
-            parameter_tys,
-            return_tys,
             single_signature_token_map,
         })
     }
@@ -203,8 +190,12 @@ impl Script {
         &self.function_refs[idx as usize]
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
-        &self.function_instantiations[idx as usize]
+    pub(crate) fn function_instantiation_handle_at(&self, idx: u16) -> &FunctionHandle {
+        &self.function_instantiations[idx as usize].handle
+    }
+
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
+        &self.function_instantiations[idx as usize].instantiation
     }
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
@@ -227,31 +218,14 @@ impl ScriptCache {
         }
     }
 
-    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<(Arc<Function>, Vec<Type>, Vec<Type>)> {
-        self.scripts.get(hash).map(|script| {
-            (
-                script.entry_point(),
-                script.parameter_tys.clone(),
-                script.return_tys.clone(),
-            )
-        })
+    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Script>> {
+        self.scripts.get(hash).cloned()
     }
 
-    pub(crate) fn insert(
-        &mut self,
-        hash: ScriptHash,
-        script: Script,
-    ) -> (Arc<Function>, Vec<Type>, Vec<Type>) {
+    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Script> {
         match self.get(&hash) {
             Some(cached) => cached,
-            None => {
-                let script = self.scripts.insert(hash, script);
-                (
-                    script.entry_point(),
-                    script.parameter_tys.clone(),
-                    script.return_tys.clone(),
-                )
-            },
+            None => self.scripts.insert(hash, script).clone(),
         }
     }
 }

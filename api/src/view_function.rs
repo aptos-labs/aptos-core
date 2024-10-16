@@ -18,7 +18,7 @@ use aptos_api_types::{
     U64,
 };
 use aptos_bcs_utils::serialize_uleb128;
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::AptosVM;
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
 use poem_openapi::{param::Query, payload::Json, ApiRequest, OpenApi};
@@ -94,19 +94,16 @@ fn view_request(
         })?;
 
     let view_function: ViewFunction = match request {
-        ViewFunctionRequest::Json(data) => {
-            let resolver = state_view.as_move_resolver();
-            resolver
-                .as_converter(context.db.clone())
-                .convert_view_function(data.0)
-                .map_err(|err| {
-                    BasicErrorWith404::bad_request_with_code(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                        &ledger_info,
-                    )
-                })?
-        },
+        ViewFunctionRequest::Json(data) => state_view
+            .as_converter(context.db.clone(), context.indexer_reader.clone())
+            .convert_view_function(data.0)
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    &ledger_info,
+                )
+            })?,
         ViewFunctionRequest::Bcs(data) => {
             bcs::from_bytes_with_limit(data.0.as_slice(), MAX_RECURSIVE_TYPES_ALLOWED as usize)
                 .context("Failed to deserialize input into ViewRequest")
@@ -169,9 +166,8 @@ fn view_request(
             BasicResponse::try_from_encoded((ret, &ledger_info, BasicResponseStatus::Ok))
         },
         AcceptType::Json => {
-            let resolver = state_view.as_move_resolver();
-            let return_types = resolver
-                .as_converter(context.db.clone())
+            let return_types = state_view
+                .as_converter(context.db.clone(), context.indexer_reader.clone())
                 .function_return_types(&view_function)
                 .and_then(|tys| {
                     tys.into_iter()
@@ -190,8 +186,8 @@ fn view_request(
                 .into_iter()
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
-                    resolver
-                        .as_converter(context.db.clone())
+                    state_view
+                        .as_converter(context.db.clone(), context.indexer_reader.clone())
                         .try_into_move_value(&ty, &v)
                 })
                 .collect::<anyhow::Result<Vec<_>>>()
@@ -210,5 +206,5 @@ fn view_request(
         FunctionStats::function_to_key(&view_function.module, &view_function.function),
         output.gas_used,
     );
-    result
+    result.map(|r| r.with_gas_used(Some(output.gas_used)))
 }

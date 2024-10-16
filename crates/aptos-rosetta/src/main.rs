@@ -1,17 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Runs the Rosetta server directly.
+
 #![forbid(unsafe_code)]
 
 use aptos_config::config::{ApiConfig, DEFAULT_MAX_PAGE_SIZE};
 use aptos_logger::prelude::*;
 use aptos_node::AptosNodeArgs;
-use aptos_rosetta::bootstrap;
-use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_rosetta::{bootstrap, common::native_coin, types::Currency};
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use std::{
-    fs::read_to_string,
+    collections::HashSet,
+    fs::File,
     net::SocketAddr,
     path::PathBuf,
     sync::{
@@ -89,7 +91,7 @@ async fn main() {
         args.chain_id(),
         args.api_config(),
         args.rest_client(),
-        args.owner_addresses(),
+        args.supported_currencies(),
     )
     .expect("aptos-rosetta: Should bootstrap rosetta server");
 
@@ -112,8 +114,8 @@ trait ServerArgs {
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
 
-    /// Retrieve owner addresses
-    fn owner_addresses(&self) -> Vec<AccountAddress>;
+    /// Supported currencies for the service
+    fn supported_currencies(&self) -> HashSet<Currency>;
 }
 
 /// Aptos Rosetta API Server
@@ -155,11 +157,11 @@ impl ServerArgs for CommandArgs {
         }
     }
 
-    fn owner_addresses(&self) -> Vec<AccountAddress> {
+    fn supported_currencies(&self) -> HashSet<Currency> {
         match self {
-            CommandArgs::OnlineRemote(args) => args.owner_addresses(),
-            CommandArgs::Offline(args) => args.owner_addresses(),
-            CommandArgs::Online(args) => args.owner_addresses(),
+            CommandArgs::OnlineRemote(args) => args.supported_currencies(),
+            CommandArgs::Offline(args) => args.supported_currencies(),
+            CommandArgs::Online(args) => args.supported_currencies(),
         }
     }
 }
@@ -186,6 +188,31 @@ pub struct OfflineArgs {
     /// This can be configured to change performance characteristics
     #[clap(long, default_value_t = DEFAULT_MAX_PAGE_SIZE)]
     transactions_page_size: u16,
+
+    /// A file of currencies to support other than APT
+    ///
+    /// Example file for testnet:
+    /// ```json
+    /// [
+    ///   {
+    ///     "symbol": "TC",
+    ///     "decimals": 4,
+    ///     "metadata": {
+    ///       "fa_address": "0xb528ad40e472f8fcf0f21aa78aecd09fe68f6208036a5845e6d16b7d561c83b8",
+    ///       "move_type": "0xf5a9b6ccc95f8ad3c671ddf1e227416e71f7bcd3c971efe83c0ae8e5e028350f::test_faucet::TestFaucetCoin"
+    ///     }
+    ///   },
+    ///   {
+    ///     "symbol": "TFA",
+    ///     "decimals": 4,
+    ///     "metadata": {
+    ///       "fa_address": "0x7e51ad6e79cd113f5abe08f53ed6a3c2bfbf88561a24ae10b9e1e822e0623dfd"
+    ///     }
+    ///   }
+    /// ]
+    /// ```
+    #[clap(long)]
+    currency_config_file: Option<PathBuf>,
 }
 
 impl ServerArgs for OfflineArgs {
@@ -209,8 +236,19 @@ impl ServerArgs for OfflineArgs {
         self.chain_id
     }
 
-    fn owner_addresses(&self) -> Vec<AccountAddress> {
-        vec![]
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        let mut supported_currencies = HashSet::new();
+        supported_currencies.insert(native_coin());
+
+        if let Some(ref filepath) = self.currency_config_file {
+            let file = File::open(filepath).unwrap();
+            let currencies: Vec<Currency> = serde_json::from_reader(file).unwrap();
+            currencies.into_iter().for_each(|item| {
+                supported_currencies.insert(item);
+            });
+        }
+
+        supported_currencies
     }
 }
 
@@ -221,7 +259,7 @@ pub struct OnlineRemoteArgs {
     /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
     #[clap(long, default_value = "http://localhost:8080")]
     rest_api_url: url::Url,
-    /// Owner addresses file as a YAML file with a list
+    /// DEPRECATED: Owner addresses file as a YAML file with a list
     #[clap(long, value_parser)]
     owner_address_file: Option<PathBuf>,
 }
@@ -239,15 +277,8 @@ impl ServerArgs for OnlineRemoteArgs {
         self.offline_args.chain_id
     }
 
-    fn owner_addresses(&self) -> Vec<AccountAddress> {
-        if let Some(ref path) = self.owner_address_file {
-            serde_yaml::from_str(
-                &read_to_string(path.as_path()).expect("Failed to read owner address file"),
-            )
-            .expect("Owner address file is in an invalid format")
-        } else {
-            vec![]
-        }
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.offline_args.supported_currencies()
     }
 }
 
@@ -274,8 +305,8 @@ impl ServerArgs for OnlineLocalArgs {
         self.online_args.offline_args.chain_id
     }
 
-    fn owner_addresses(&self) -> Vec<AccountAddress> {
-        self.online_args.owner_addresses()
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.online_args.offline_args.supported_currencies()
     }
 }
 

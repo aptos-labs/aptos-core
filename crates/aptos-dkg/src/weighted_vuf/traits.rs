@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 //! Notes: Unlike PVSS, we do NOT want to use a generic unweighted-to-weighted VUF transformation,
 //! since we have a more optimized transformation for some VRF schemes (e.g., BLS and [GJM+21e]).
@@ -6,6 +7,7 @@
 //! As a result, we only define weighted VUF traits here.
 
 use crate::pvss::{Player, WeightedConfig};
+use rayon::ThreadPool;
 use serde::Serialize;
 use std::fmt::Debug;
 
@@ -67,6 +69,7 @@ pub trait WeightedVUF {
         msg: &[u8],
         apks: &[Option<Self::AugmentedPubKeyShare>],
         proof: &Self::Proof,
+        thread_pool: &ThreadPool,
     ) -> anyhow::Result<Self::Evaluation>;
 
     /// Verifies an aggregated proof against the `pk` and, for some WVUF constructions, against the

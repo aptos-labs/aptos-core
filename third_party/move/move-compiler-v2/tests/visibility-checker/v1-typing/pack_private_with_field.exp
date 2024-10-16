@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: Invalid operation: pack of `m::S` can only be done within the defining module `0x42::m`
+   ┌─ tests/visibility-checker/v1-typing/pack_private_with_field.move:18:5
+   │
+18 │   fun f() {
+   │       ^
+19 │     let s = S {
+   │ ╭───────────'
+20 │ │     f1: 0,
+21 │ │     f4: 0,
+22 │ │     f2: 0,
+23 │ │     f3: 0,
+24 │ │   };
+   │ ╰───' packed here

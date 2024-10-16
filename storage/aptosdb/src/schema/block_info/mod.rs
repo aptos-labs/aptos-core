@@ -15,10 +15,10 @@ use aptos_schemadb::{
     schema::{KeyCodec, ValueCodec},
 };
 use aptos_storage_interface::block_info::BlockInfo;
+use aptos_types::block_info::BlockHeight;
 use byteorder::{BigEndian, ReadBytesExt};
 use std::mem::size_of;
 
-type BlockHeight = u64;
 type Key = BlockHeight;
 type Value = BlockInfo;
 

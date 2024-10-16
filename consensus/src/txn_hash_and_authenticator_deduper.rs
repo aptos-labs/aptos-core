@@ -65,7 +65,7 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
             .zip(&transactions)
             .with_min_len(optimal_min_len(num_txns, 48))
             .map(|(need_hash, txn)| match need_hash {
-                true => Some((txn.clone().committed_hash(), txn.authenticator())),
+                true => Some((txn.committed_hash(), txn.authenticator())),
                 false => None,
             })
             .collect();

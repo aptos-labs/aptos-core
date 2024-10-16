@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: indexing can only be applied to a vector or a resource type (a struct type which has key ability)
+   ┌─ tests/checking/typing/index_err.move:14:9
+   │
+14 │         UNUSED_Test[@0x1];
+   │         ^^^^^^^^^^^^^^^^^
+
+error: indexing can only be applied to a vector or a resource type (a struct type which has key ability)
+   ┌─ tests/checking/typing/index_err.move:19:9
+   │
+19 │         &test::UNUSED_Test[@0x1];
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^

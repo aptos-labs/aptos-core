@@ -10,18 +10,17 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-fail = "0.4.0"
+fail = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
-petgraph = "0.5.1"
-serde = "1.0.149"
-typed-arena = "2.0.2"
+petgraph = { workspace = true }
+serde = { workspace = true }
+typed-arena = { workspace = true }
 
 move-borrow-graph = { path = "../move-borrow-graph" }
 move-core-types = { path = "../move-core/types" }
 
 [dev-dependencies]
-hex-literal = "0.3.4"
+hex-literal = { workspace = true }
 invalid-mutations = { path = "invalid-mutations" }
 
 [features]

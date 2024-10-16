@@ -930,6 +930,10 @@ impl<'a> BytecodeGenerator<'a> {
                     .struct_def_at(StructDefinitionIndex(struct_def_idx as TableIndex));
                 let fields = match &struct_def.field_information {
                     StructFieldInformation::Native => panic!("Can't inhabit native structs"),
+                    StructFieldInformation::DeclaredVariants(..) => {
+                        // TODO(#13806): consider implementing for variants
+                        panic!("Can't work with enum variants")
+                    },
                     StructFieldInformation::Declared(fields) => fields.clone(),
                 };
                 let mut bytecodes: Vec<Bytecode> = fields
@@ -958,6 +962,10 @@ impl<'a> BytecodeGenerator<'a> {
                     .struct_def_at(StructDefinitionIndex(struct_def_idx as TableIndex));
                 let fields = match &struct_def.field_information {
                     StructFieldInformation::Native => panic!("Can't inhabit native structs"),
+                    StructFieldInformation::DeclaredVariants(..) => {
+                        // TODO(#13806): consider adding support for variants
+                        panic!("Can't work with enum variants")
+                    },
                     StructFieldInformation::Declared(fields) => fields.clone(),
                 };
                 let mut bytecodes: Vec<Bytecode> = fields

@@ -49,12 +49,11 @@ impl Payload for Bcs {
     }
 }
 
-#[poem::async_trait]
 impl ParsePayload for Bcs {
     const IS_REQUIRED: bool = true;
 
     async fn from_request(request: &Request, body: &mut RequestBody) -> Result<Self> {
-        let data: Vec<u8> = FromRequest::from_request(request, body).await?;
+        let data = Vec::<u8>::from_request(request, body).await?;
         Ok(Self(data))
     }
 }

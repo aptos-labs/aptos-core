@@ -41,6 +41,7 @@ pub use verifier::{
 };
 
 mod acquires_list_verifier;
+mod features;
 mod locals_safety;
 pub mod meter;
 mod reference_safety;

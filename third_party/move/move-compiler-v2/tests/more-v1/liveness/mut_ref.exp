@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: cannot transfer mutable local `x` since it is borrowed
+   ┌─ tests/more-v1/liveness/mut_ref.move:41:9
+   │
+41 │         some2(x, x); // expected error because multiple use
+   │         ^^^^^^^^^^^
+   │         │
+   │         transfer attempted here
+   │         previously mutably borrowed here
+
+error: cannot transfer mutable local `x` since it is borrowed
+   ┌─ tests/more-v1/liveness/mut_ref.move:64:13
+   │
+62 │         let y = x; // expected error because of implicit copy
+   │                 - previously mutably borrowed here
+63 │         if (cond) {
+64 │             some(x);
+   │             ^^^^^^^ transfer attempted here
+65 │             some(y)
+   │             ------- conflicting reference `y` used here

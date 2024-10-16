@@ -27,10 +27,10 @@ use std::{
 // genesis directly if necessary.
 pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
     StateKey::table_item(
-        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
+        &"1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
             .parse()
             .unwrap(),
-        vec![
+        &[
             6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
             245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
         ],
@@ -213,6 +213,15 @@ impl WriteOp {
         }
     }
 
+    pub fn size(&self) -> usize {
+        use WriteOp::*;
+
+        match self {
+            Creation { data, .. } | Modification { data, .. } => data.len(),
+            Deletion { .. } => 0,
+        }
+    }
+
     pub fn metadata(&self) -> &StateValueMetadata {
         use WriteOp::*;
 
@@ -286,21 +295,6 @@ pub enum WriteOpSize {
     Deletion,
 }
 
-impl From<&WriteOp> for WriteOpSize {
-    fn from(value: &WriteOp) -> Self {
-        use WriteOp::*;
-        match value {
-            Creation { data, .. } => WriteOpSize::Creation {
-                write_len: data.len() as u64,
-            },
-            Modification { data, .. } => WriteOpSize::Modification {
-                write_len: data.len() as u64,
-            },
-            Deletion { .. } => WriteOpSize::Deletion,
-        }
-    }
-}
-
 impl WriteOpSize {
     pub fn write_len(&self) -> Option<u64> {
         match self {
@@ -329,9 +323,10 @@ pub trait TransactionWrite: Debug {
     // Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
     // to emulate reading from storage after W has been applied. However, in some contexts,
     // it is also helpful to convert a StateValue to a potential instance of W that would
-    // have the desired effect. This allows e.g. to store certain sentinel elements of
-    // type W in data-structures (happens in MVHashMap). If there are several instances of
-    // W that correspond to maybe_state_value, an arbitrary one may be provided.
+    // have the desired effect. This allows e.g. storing sentinel elements of type W in
+    // data-structures (notably in MVHashMap). The kind of W will be Modification and not
+    // Creation, but o.w. if there are several instances of W that correspond to the
+    // provided maybe_state_value, an arbitrary one may be provided.
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self;
 
     fn extract_raw_bytes(&self) -> Option<Bytes> {
@@ -361,12 +356,18 @@ pub trait TransactionWrite: Debug {
 
     fn set_bytes(&mut self, bytes: Bytes);
 
-    /// Convert a `self`, which was read (containing DelayedField exchanges) in a current
-    /// transaction, to a modification write, in which we can then exchange DelayedField
-    /// identifiers into their final values, to produce a write operation.
-    fn convert_read_to_modification(&self) -> Option<Self>
-    where
-        Self: Sized;
+    fn write_op_size(&self) -> WriteOpSize {
+        use WriteOpKind::*;
+        match self.write_op_kind() {
+            Creation => WriteOpSize::Creation {
+                write_len: self.bytes().unwrap().len() as u64,
+            },
+            Modification => WriteOpSize::Modification {
+                write_len: self.bytes().unwrap().len() as u64,
+            },
+            Deletion { .. } => WriteOpSize::Deletion,
+        }
+    }
 }
 
 impl TransactionWrite for WriteOp {
@@ -390,7 +391,7 @@ impl TransactionWrite for WriteOp {
             None => Self::legacy_deletion(),
             Some(state_value) => {
                 let (metadata, data) = state_value.unpack();
-                Self::Creation { data, metadata }
+                Self::Modification { data, metadata }
             },
         }
     }
@@ -410,18 +411,6 @@ impl TransactionWrite for WriteOp {
         match self {
             Creation { data, .. } | Modification { data, .. } => *data = bytes,
             Deletion { .. } => (),
-        }
-    }
-
-    fn convert_read_to_modification(&self) -> Option<Self> {
-        use WriteOp::*;
-
-        match self.clone() {
-            Creation { data, metadata } | Modification { data, metadata } => {
-                Some(Modification { data, metadata })
-            },
-            // Deletion don't have data to become modification.
-            Deletion { .. } => None,
         }
     }
 }

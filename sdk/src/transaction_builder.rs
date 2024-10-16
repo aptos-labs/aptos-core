@@ -137,6 +137,10 @@ impl TransactionFactory {
         self.transaction_expiration_time
     }
 
+    pub fn get_chain_id(&self) -> ChainId {
+        self.chain_id
+    }
+
     pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
         self.transaction_builder(payload)
     }
@@ -181,6 +185,36 @@ impl TransactionFactory {
             vec![],
             vec![],
         ))
+    }
+
+    pub fn create_multisig_account_with_existing_account(
+        &self,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+    ) -> TransactionBuilder {
+        self.payload(
+            aptos_stdlib::multisig_account_create_with_existing_account_call(
+                owners,
+                signatures_required,
+                vec![],
+                vec![],
+            ),
+        )
+    }
+
+    pub fn create_multisig_account_with_existing_account_and_revoke_auth_key(
+        &self,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+    ) -> TransactionBuilder {
+        self.payload(
+            aptos_stdlib::multisig_account_create_with_existing_account_and_revoke_auth_key_call(
+                owners,
+                signatures_required,
+                vec![],
+                vec![],
+            ),
+        )
     }
 
     pub fn create_multisig_transaction(

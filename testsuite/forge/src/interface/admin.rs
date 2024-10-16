@@ -20,12 +20,12 @@ pub trait AdminTest: Test {
 pub struct AdminContext<'t> {
     core: CoreContext,
 
-    chain_info: ChainInfo<'t>,
+    chain_info: ChainInfo,
     pub report: &'t mut TestReport,
 }
 
 impl<'t> AdminContext<'t> {
-    pub fn new(core: CoreContext, chain_info: ChainInfo<'t>, report: &'t mut TestReport) -> Self {
+    pub fn new(core: CoreContext, chain_info: ChainInfo, report: &'t mut TestReport) -> Self {
         Self {
             core,
             chain_info,
@@ -45,7 +45,7 @@ impl<'t> AdminContext<'t> {
         RestClient::new(Url::parse(self.chain_info.rest_api()).unwrap())
     }
 
-    pub fn chain_info(&mut self) -> &mut ChainInfo<'t> {
+    pub fn chain_info(&mut self) -> &mut ChainInfo {
         &mut self.chain_info
     }
 

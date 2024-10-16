@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use itertools::Itertools;
 use std::collections::BinaryHeap;
@@ -7,10 +8,7 @@ use std::collections::BinaryHeap;
 /// Time complexity: O(num_tasks * log2(num_workers))
 ///
 /// Read more at https://en.wikipedia.org/wiki/Longest-processing-time-first_scheduling.
-pub fn longest_processing_time_first(
-    task_costs: &Vec<u64>,
-    num_workers: usize,
-) -> (u64, Vec<usize>) {
+pub fn longest_processing_time_first(task_costs: &[u64], num_workers: usize) -> (u64, Vec<usize>) {
     assert!(num_workers >= 1);
     let num_tasks = task_costs.len();
     let mut cost_tid_pairs: Vec<(u64, usize)> = task_costs
@@ -38,22 +36,22 @@ pub fn longest_processing_time_first(
 
 #[test]
 fn test_longest_processing_time_first() {
-    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 1);
+    let (actual, assignment) = longest_processing_time_first(&[1, 2, 3, 4, 5], 1);
     assert_eq!(15, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 2);
+    let (actual, assignment) = longest_processing_time_first(&[1, 2, 3, 4, 5], 2);
     assert_eq!(8, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 3);
+    let (actual, assignment) = longest_processing_time_first(&[1, 2, 3, 4, 5], 3);
     assert_eq!(5, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 4);
+    let (actual, assignment) = longest_processing_time_first(&[1, 2, 3, 4, 5], 4);
     assert_eq!(5, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = longest_processing_time_first(&vec![1, 2, 3, 4, 5], 5);
+    let (actual, assignment) = longest_processing_time_first(&[1, 2, 3, 4, 5], 5);
     assert_eq!(5, actual);
     println!("{:?}", assignment);
-    let (actual, assignment) = longest_processing_time_first(&vec![6, 7, 8, 4, 5], 2);
+    let (actual, assignment) = longest_processing_time_first(&[6, 7, 8, 4, 5], 2);
     assert_eq!(17, actual);
     println!("{:?}", assignment);
 }

@@ -1,5 +1,5 @@
 
-<a name="0x1_errors"></a>
+<a id="0x1_errors"></a>
 
 # Module `0x1::errors`
 
@@ -37,12 +37,12 @@ framework evolves.
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_errors_ALREADY_PUBLISHED"></a>
+<a id="0x1_errors_ALREADY_PUBLISHED"></a>
 
 Attempting to publish a resource that is already published. Example: calling an initialization function
 twice.
@@ -53,7 +53,7 @@ twice.
 
 
 
-<a name="0x1_errors_CUSTOM"></a>
+<a id="0x1_errors_CUSTOM"></a>
 
 A custom error category for extension points.
 
@@ -63,7 +63,7 @@ A custom error category for extension points.
 
 
 
-<a name="0x1_errors_INTERNAL"></a>
+<a id="0x1_errors_INTERNAL"></a>
 
 An internal error (bug) has occurred.
 
@@ -73,7 +73,7 @@ An internal error (bug) has occurred.
 
 
 
-<a name="0x1_errors_INVALID_ARGUMENT"></a>
+<a id="0x1_errors_INVALID_ARGUMENT"></a>
 
 An argument provided to an operation is invalid. Example: a signing key has the wrong format.
 
@@ -83,7 +83,7 @@ An argument provided to an operation is invalid. Example: a signing key has the 
 
 
 
-<a name="0x1_errors_INVALID_STATE"></a>
+<a id="0x1_errors_INVALID_STATE"></a>
 
 The system is in a state where the performed operation is not allowed. Example: call to a function only allowed
 in genesis.
@@ -94,7 +94,7 @@ in genesis.
 
 
 
-<a name="0x1_errors_LIMIT_EXCEEDED"></a>
+<a id="0x1_errors_LIMIT_EXCEEDED"></a>
 
 A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window
 is exhausted.
@@ -105,7 +105,7 @@ is exhausted.
 
 
 
-<a name="0x1_errors_NOT_PUBLISHED"></a>
+<a id="0x1_errors_NOT_PUBLISHED"></a>
 
 A resource is required but not published. Example: access to non-existing AccountLimits resource.
 
@@ -115,7 +115,7 @@ A resource is required but not published. Example: access to non-existing Accoun
 
 
 
-<a name="0x1_errors_REQUIRES_ADDRESS"></a>
+<a id="0x1_errors_REQUIRES_ADDRESS"></a>
 
 The signer of a transaction does not have the expected address for this operation. Example: a call to a function
 which publishes a resource under a particular address.
@@ -126,7 +126,7 @@ which publishes a resource under a particular address.
 
 
 
-<a name="0x1_errors_REQUIRES_CAPABILITY"></a>
+<a id="0x1_errors_REQUIRES_CAPABILITY"></a>
 
 The signer of a transaction does not have a required capability.
 
@@ -136,7 +136,7 @@ The signer of a transaction does not have a required capability.
 
 
 
-<a name="0x1_errors_REQUIRES_ROLE"></a>
+<a id="0x1_errors_REQUIRES_ROLE"></a>
 
 The signer of a transaction does not have the expected  role for this operation. Example: a call to a function
 which requires the signer to have the role of treasury compliance.
@@ -147,7 +147,7 @@ which requires the signer to have the role of treasury compliance.
 
 
 
-<a name="0x1_errors_make"></a>
+<a id="0x1_errors_make"></a>
 
 ## Function `make`
 
@@ -187,7 +187,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_invalid_state"></a>
+<a id="0x1_errors_invalid_state"></a>
 
 ## Function `invalid_state`
 
@@ -223,7 +223,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_requires_address"></a>
+<a id="0x1_errors_requires_address"></a>
 
 ## Function `requires_address`
 
@@ -259,7 +259,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_requires_role"></a>
+<a id="0x1_errors_requires_role"></a>
 
 ## Function `requires_role`
 
@@ -295,7 +295,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_requires_capability"></a>
+<a id="0x1_errors_requires_capability"></a>
 
 ## Function `requires_capability`
 
@@ -331,7 +331,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_not_published"></a>
+<a id="0x1_errors_not_published"></a>
 
 ## Function `not_published`
 
@@ -367,7 +367,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_already_published"></a>
+<a id="0x1_errors_already_published"></a>
 
 ## Function `already_published`
 
@@ -403,7 +403,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_invalid_argument"></a>
+<a id="0x1_errors_invalid_argument"></a>
 
 ## Function `invalid_argument`
 
@@ -439,7 +439,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_limit_exceeded"></a>
+<a id="0x1_errors_limit_exceeded"></a>
 
 ## Function `limit_exceeded`
 
@@ -475,7 +475,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_internal"></a>
+<a id="0x1_errors_internal"></a>
 
 ## Function `internal`
 
@@ -511,7 +511,7 @@ A function to create an error from from a category and a reason.
 
 </details>
 
-<a name="0x1_errors_custom"></a>
+<a id="0x1_errors_custom"></a>
 
 ## Function `custom`
 

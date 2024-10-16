@@ -5,7 +5,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config,
-    transaction::{Transaction, TransactionOutput, TransactionOutputProvider, TransactionStatus},
+    transaction::{
+        Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionOutputProvider,
+        TransactionStatus,
+    },
     write_set::WriteSet,
 };
 use itertools::zip_eq;
@@ -14,6 +17,7 @@ use std::ops::Deref;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
+#[derive(Clone)]
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,
     reconfig_events: Vec<ContractEvent>,
@@ -66,14 +70,22 @@ impl ParsedTransactionOutput {
         Vec<ContractEvent>,
         u64,
         TransactionStatus,
+        TransactionAuxiliaryData,
     ) {
         let Self {
             output,
             reconfig_events,
         } = self;
-        let (write_set, events, gas_used, status) = output.unpack();
+        let (write_set, events, gas_used, status, auxiliary_data) = output.unpack();
 
-        (write_set, events, reconfig_events, gas_used, status)
+        (
+            write_set,
+            events,
+            reconfig_events,
+            gas_used,
+            status,
+            auxiliary_data,
+        )
     }
 }
 
@@ -96,6 +108,15 @@ impl TransactionsWithParsedOutput {
             transactions: transaction,
             parsed_output,
         }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, transaction: Transaction, parsed_output: ParsedTransactionOutput) {
+        self.transactions.push(transaction);
+        self.parsed_output.push(parsed_output);
     }
 
     pub fn len(&self) -> usize {
@@ -129,7 +150,9 @@ impl TransactionsWithParsedOutput {
             | Transaction::BlockMetadataExt(_)
             | Transaction::UserTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
-            Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
+            Transaction::GenesisTransaction(_)
+            | Transaction::StateCheckpoint(_)
+            | Transaction::BlockEpilogue(_) => true,
         }
     }
 

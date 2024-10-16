@@ -1,0 +1,11 @@
+
+Diagnostics:
+error: cannot drop local `x` which is still borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc_invalid.move:5:9
+  │
+4 │         let y = &x;
+  │                 -- local `x` previously borrowed here
+5 │         x = 0;
+  │         ^^^^^ dropped here
+6 │         y;
+  │         - conflicting reference `y` used here

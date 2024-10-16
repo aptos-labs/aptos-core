@@ -53,10 +53,21 @@ impl<
 
     pub fn new() -> MVHashMap<K, T, V, X, I> {
         MVHashMap {
-            data: VersionedData::new(),
-            group_data: VersionedGroupData::new(),
-            delayed_fields: VersionedDelayedFields::new(),
-            modules: VersionedModules::new(),
+            data: VersionedData::empty(),
+            group_data: VersionedGroupData::empty(),
+            delayed_fields: VersionedDelayedFields::empty(),
+            modules: VersionedModules::empty(),
+        }
+    }
+
+    pub fn stats(&self) -> BlockStateStats {
+        BlockStateStats {
+            num_resources: self.data.num_keys(),
+            num_resource_groups: self.group_data.num_keys(),
+            num_delayed_fields: self.delayed_fields.num_keys(),
+            num_modules: self.modules.num_keys(),
+            base_resources_size: self.data.total_base_value_size(),
+            base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
     }
 
@@ -91,4 +102,14 @@ impl<
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub struct BlockStateStats {
+    pub num_resources: usize,
+    pub num_resource_groups: usize,
+    pub num_delayed_fields: usize,
+    pub num_modules: usize,
+
+    pub base_resources_size: u64,
+    pub base_delayed_fields_size: u64,
 }

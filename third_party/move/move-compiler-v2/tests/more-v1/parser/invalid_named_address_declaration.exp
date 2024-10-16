@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/invalid_named_address_declaration.move:3:13
+  │
+3 │ address Addr;
+  │             ^
+  │             │
+  │             Unexpected ';'
+  │             Expected '{'

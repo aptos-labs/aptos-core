@@ -1,16 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
+use aptos_gas_algebra::{
+    AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes,
+};
 use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOpSize,
+    account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
+    state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
 };
-use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    vm_status::StatusCode,
+};
 use move_vm_types::{
     gas::{GasMeter as MoveGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
@@ -156,6 +162,10 @@ where
         ) -> PartialVMResult<()>;
 
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+
+        fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]
@@ -466,6 +476,10 @@ where
     delegate_mut! {
         fn algebra_mut(&mut self) -> &mut Self::Algebra;
 
+        fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+        fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()>;
+
         fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()>;
 
         fn charge_storage_fee(
@@ -475,5 +489,7 @@ where
         ) -> PartialVMResult<()>;
 
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+        fn charge_keyless(&mut self) -> VMResult<()>;
     }
 }

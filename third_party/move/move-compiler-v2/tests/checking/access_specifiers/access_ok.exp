@@ -18,12 +18,12 @@ warning: Unused parameter `x`. Consider removing or prefixing with an underscore
 41 │     fun make_up_address(x: u64): address {
    │                         ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     struct T {
         dummy_field: bool,
     }
-    struct G {
+    struct G<T> {
         dummy_field: bool,
     }
     struct R {
@@ -33,7 +33,7 @@ module 0x42::m {
         dummy_field: bool,
     }
     private fun f1()
-        acquires m::S(*)
+        acquires S(*)
      {
         Tuple()
     }
@@ -53,17 +53,17 @@ module 0x42::m {
         Tuple()
     }
     private fun f2()
-        reads m::S(*)
+        reads S(*)
      {
         Tuple()
     }
     private fun f3()
-        writes m::S(*)
+        writes S(*)
      {
         Tuple()
     }
     private fun f4()
-        acquires m::S(*)
+        acquires S(*)
      {
         Tuple()
     }
@@ -93,57 +93,87 @@ module 0x42::m {
         Tuple()
     }
     private fun f_multiple()
-        acquires m::R(*)
-        reads m::R(*)
-        writes m::T(*)
-        writes m::S(*)
-        reads m::G<u64>(*)
+        acquires R(*)
+        reads R(*)
+        writes T(*)
+        writes S(*)
+        reads G<u64>(*)
      {
         Tuple()
     }
     private fun make_up_address(x: u64): address {
         0x42
     }
-    spec fun $f1() {
-        Tuple()
+} // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct T has store {
     }
-    spec fun $f10(x: u64) {
-        Tuple()
+    struct G<phantom T> has store {
     }
-    spec fun $f11() {
-        Tuple()
+    struct R has store {
     }
-    spec fun $f12() {
-        Tuple()
+    struct S has store {
     }
-    spec fun $f2() {
-        Tuple()
+    fun f1()
+        acquires S
+    {
     }
-    spec fun $f3() {
-        Tuple()
+    fun f10(x: u64)
+        acquires *(m::make_up_address(x))
+
+    {
     }
-    spec fun $f4() {
-        Tuple()
+    fun f11()
+        !reads *(0x42)
+        !reads *(0x43)
+
+    {
     }
-    spec fun $f5() {
-        Tuple()
+    fun f12()
+
+    {
     }
-    spec fun $f6() {
-        Tuple()
+    fun f2()
+        reads S
+    {
     }
-    spec fun $f7() {
-        Tuple()
+    fun f3()
+        writes S
+    {
     }
-    spec fun $f8() {
-        Tuple()
+    fun f4()
+        acquires S
+    {
     }
-    spec fun $f9(a: address) {
-        Tuple()
+    fun f5()
+        acquires 0x42::*
+    {
     }
-    spec fun $f_multiple() {
-        Tuple()
+    fun f6()
+        acquires 0x42::m::*
+    {
     }
-    spec fun $make_up_address(x: u64): address {
+    fun f7()
+        acquires *
+    {
+    }
+    fun f8()
+        acquires *(0x42)
+
+    {
+    }
+    fun f9(a: address)
+        acquires *(a)
+
+    {
+    }
+    fun f_multiple()
+        acquires Rreads Rwrites Twrites Sreads G<u64>
+    {
+    }
+    fun make_up_address(x: u64): address {
         0x42
     }
-} // end 0x42::m
+}

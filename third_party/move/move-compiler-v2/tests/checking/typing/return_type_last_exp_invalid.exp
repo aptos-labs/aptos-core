@@ -1,37 +1,31 @@
 
 Diagnostics:
-error: expected `u64` but found `()`
+error: cannot return nothing from a function with result type `u64`
   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:5:9
   │
 5 │         ()
   │         ^^
 
-error: expected `()` but found `integer`
+error: cannot return `integer` from a function which returns nothing
   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:9:9
   │
 9 │         0
   │         ^
 
-error: expected 2 item(s), found 3
+error: the function returns 2 arguments but 3 were provided
    ┌─ tests/checking/typing/return_type_last_exp_invalid.move:13:9
    │
 13 │         (0, false, R{})
    │         ^^^^^^^^^^^^^^^
 
-error: expected 4 item(s), found 3
+error: the function returns 4 arguments but 3 were provided
    ┌─ tests/checking/typing/return_type_last_exp_invalid.move:17:9
    │
 17 │         (0, false, R{})
    │         ^^^^^^^^^^^^^^^
 
-error: expected `bool` but found `integer`
-   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:21:10
+error: cannot return `(integer, bool, R)` from a function with result type `(bool, u64, R)`
+   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:21:9
    │
 21 │         (0, false, R{})
-   │          ^
-
-error: expected `u64` but found `bool`
-   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:21:13
-   │
-21 │         (0, false, R{})
-   │             ^^^^^
+   │         ^^^^^^^^^^^^^^^

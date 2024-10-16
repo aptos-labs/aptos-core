@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: native struct `C::T` cannot be packed or unpacked
+error: native struct `C::T` has no fields
   ┌─ tests/checking/typing/native_structs_pack_unpack.move:9:9
   │
 9 │         C::T {}
   │         ^^^^
 
-error: native struct `C::T` cannot be packed or unpacked
+error: native struct `C::T` has no fields
    ┌─ tests/checking/typing/native_structs_pack_unpack.move:12:13
    │
 12 │         let C::T {} = c;

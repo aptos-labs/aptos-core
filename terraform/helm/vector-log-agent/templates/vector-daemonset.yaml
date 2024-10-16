@@ -171,7 +171,6 @@ spec:
             - name: sysfs
               mountPath: "/host/sys"
               readOnly: true
-      terminationGracePeriodSeconds: 60
       volumes:
         - name: config
           projected:

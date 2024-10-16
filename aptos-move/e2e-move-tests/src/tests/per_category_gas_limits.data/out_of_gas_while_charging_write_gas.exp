@@ -38,7 +38,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "7b8e0100000000000500000000000000a286010000000000340f0300000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "7b8e0100000000000500000000000000a286010000000000340f0300000000000000000000000000" },
             ],
             gas_used: 102011,
             status: Keep(
@@ -71,7 +71,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "b0ad0100000000000500000000000000acad01000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "b0ad0100000000000500000000000000acad01000000000000000000000000000000000000000000" },
             ],
             gas_used: 110000,
             status: Keep(
@@ -104,7 +104,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "b0ad0100000000000500000000000000acad01000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "b0ad0100000000000500000000000000acad01000000000000000000000000000000000000000000" },
             ],
             gas_used: 110000,
             status: Keep(

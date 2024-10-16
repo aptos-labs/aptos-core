@@ -11,7 +11,7 @@ use crate::{
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::OnChainConfig,
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::StateKey,
     transaction::{Transaction, WriteSetPayload},
 };
 use serde_yaml::Value;
@@ -77,12 +77,15 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
         let input_dir = RootPath::new(&self.node_config_path);
         node_config.execution.load_from_path(&input_dir)?;
 
+        // Update the data directory. This needs to be done before
+        // we optimize and sanitize the node configs (because some optimizers
+        // rely on the data directory for file reading/writing).
+        node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
+
         // Optimize and sanitize the node config
         let local_config_yaml = get_local_config_yaml(&self.node_config_path)?;
         optimize_and_sanitize_node_config(&mut node_config, local_config_yaml)?;
 
-        // Update the data directory
-        node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
         Ok(node_config)
     }
 }
@@ -156,22 +159,14 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
     // TODO: can we make this less hacky?
 
     // Load the genesis transaction from disk
-    let genesis_txn = get_genesis_txn(node_config).ok_or(Error::InvariantViolation(
-        "The genesis transaction was not found!".to_string(),
-    ))?;
+    let genesis_txn = get_genesis_txn(node_config).ok_or_else(|| {
+        Error::InvariantViolation("The genesis transaction was not found!".to_string())
+    })?;
 
     // Extract the chain ID from the genesis transaction
     match genesis_txn {
         Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set)) => {
-            // Get the chain ID state key
-            let chain_id_access_path = ChainId::access_path().map_err(|error| {
-                Error::InvariantViolation(format!(
-                    "Failed to get the chain ID access path! Error: {:?}",
-                    error
-                ))
-            })?;
-            let chain_id_state_key =
-                StateKey::from(StateKeyInner::AccessPath(chain_id_access_path));
+            let chain_id_state_key = StateKey::on_chain_config::<ChainId>()?;
 
             // Get the write op from the write set
             let write_set_mut = change_set.clone().write_set().clone().into_mut();

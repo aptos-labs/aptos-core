@@ -1,7 +1,18 @@
 
 Diagnostics:
-error: expected `bool` but found `integer`
+error: cannot return `Box<integer>` from a function with result type `Box<bool>`
    ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:42:9
    │
 42 │         b
    │         ^
+
+error: type `Box<R>` is missing required ability `drop` (type was inferred)
+   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:47:17
+   │
+10 │     public fun get<V: drop>(self: &T<V>): V {
+   │                    - declaration of type parameter `V`
+   ·
+47 │         let x = Container::get(&v);
+   │                 ^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `V:drop` of function `get`

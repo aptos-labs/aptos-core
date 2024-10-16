@@ -14,7 +14,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, hash::Hash};
 use thiserror::Error;
 
-/// An error type for key and signature validation issues, see [`ValidCryptoMaterial`][ValidCryptoMaterial].
+/// An error type for key and signature validation issues, see [`ValidCryptoMaterial`].
 ///
 /// This enum reflects there are two interesting causes of validation
 /// failure for the ingestion of key or signature material: deserialization errors
@@ -52,12 +52,12 @@ pub trait Length {
 ///
 /// A type family for material that knows how to serialize and
 /// deserialize, as well as validate byte-encoded material. The
-/// validation must be implemented as a [`TryFrom`][TryFrom] which
+/// validation must be implemented as a [`TryFrom`] which
 /// classifies its failures against the above
-/// [`CryptoMaterialError`][CryptoMaterialError].
+/// [`CryptoMaterialError`].
 ///
 /// This provides an implementation for a validation that relies on a
-/// round-trip to bytes and corresponding [`TryFrom`][TryFrom].
+/// round-trip to bytes and corresponding [`TryFrom`].
 pub trait ValidCryptoMaterial:
     // The for<'a> exactly matches the assumption "deserializable from any lifetime".
     for<'a> TryFrom<&'a [u8], Error=CryptoMaterialError> + Serialize + DeserializeOwned
@@ -66,9 +66,9 @@ pub trait ValidCryptoMaterial:
     fn to_bytes(&self) -> Vec<u8>;
 }
 
-/// An extension to to/from Strings for [`ValidCryptoMaterial`][ValidCryptoMaterial].
+/// An extension to to/from Strings for [`ValidCryptoMaterial`].
 ///
-/// Relies on [`hex`][::hex] for string encoding / decoding.
+/// Relies on [`hex`] for string encoding / decoding.
 /// No required fields, provides a default implementation.
 pub trait ValidCryptoMaterialStringExt: ValidCryptoMaterial {
     /// When trying to convert from bytes, we simply decode the string into
@@ -96,7 +96,7 @@ pub trait ValidCryptoMaterialStringExt: ValidCryptoMaterial {
 impl<T: ValidCryptoMaterial> ValidCryptoMaterialStringExt for T {}
 
 /// A type family for key material that should remain secret and has an
-/// associated type of the [`PublicKey`][PublicKey] family.
+/// associated type of the [`PublicKey`] family.
 pub trait PrivateKey: Sized {
     /// We require public / private types to be coupled, i.e. their
     /// associated type is each other.
@@ -113,7 +113,7 @@ pub trait PrivateKey: Sized {
 /// This trait has a requirement on a `pub(crate)` marker trait meant to
 /// specifically limit its implementations to the present crate.
 ///
-/// A trait for a [`ValidCryptoMaterial`][ValidCryptoMaterial] which knows how to sign a
+/// A trait for a [`ValidCryptoMaterial`] which knows how to sign a
 /// message, and return an associated `Signature` type.
 pub trait SigningKey:
     PrivateKey<PublicKeyMaterial = <Self as SigningKey>::VerifyingKeyMaterial>
@@ -158,7 +158,7 @@ pub fn signing_message<T: CryptoHash + Serialize>(
 }
 
 /// A type for key material that can be publicly shared, and in asymmetric
-/// fashion, can be obtained from a [`PrivateKey`][PrivateKey]
+/// fashion, can be obtained from a [`PrivateKey`]
 /// reference.
 /// This convertibility requirement ensures the existence of a
 /// deterministic, canonical public key construction from a private key.
@@ -219,7 +219,7 @@ pub trait VerifyingKey:
 /// verify.
 ///
 /// This trait simply requires an association to some type of the
-/// [`PublicKey`][PublicKey] family of which we are the `SignatureMaterial`.
+/// [`PublicKey`] family of which we are the `SignatureMaterial`.
 ///
 /// This trait has a requirement on a `pub(crate)` marker trait meant to
 /// specifically limit its implementations to the present crate.
@@ -228,7 +228,7 @@ pub trait VerifyingKey:
 /// checks signature material passed as `&[u8]` and only returns Ok when
 /// that material de-serializes to a signature of the expected concrete
 /// scheme. This would be done as an extension trait of
-/// [`Signature`][Signature].
+/// [`Signature`].
 pub trait Signature:
     for<'a> TryFrom<&'a [u8], Error = CryptoMaterialError>
     + Sized
@@ -276,7 +276,7 @@ pub trait Signature:
 }
 
 /// A type family for schemes which know how to generate key material from
-/// a cryptographically-secure [`CryptoRng`][::rand::CryptoRng].
+/// a cryptographically-secure [`CryptoRng`].
 pub trait Uniform {
     /// Generate key material from a cryptographically-secure RNG.
     fn generate<R>(rng: &mut R) -> Self

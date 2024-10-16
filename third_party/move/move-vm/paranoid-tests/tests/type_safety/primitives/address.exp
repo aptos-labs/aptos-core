@@ -3,7 +3,7 @@ processed 7 tasks
 task 2 'run'. lines 33-41:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
-    sub_status: None,
+    sub_status: Some(1),
     location: 0x2::A,
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 3)],
@@ -30,7 +30,7 @@ Error: Script execution failed with VMError: {
 task 6 'run'. lines 78-87:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
-    sub_status: None,
+    sub_status: Some(1),
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 6)],

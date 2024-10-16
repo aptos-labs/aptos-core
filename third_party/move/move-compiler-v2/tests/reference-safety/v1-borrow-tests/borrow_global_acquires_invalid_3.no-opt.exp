@@ -1,0 +1,42 @@
+
+Diagnostics:
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:9:9
+   │
+ 8 │         let y = get_v(x);
+   │                 -------- struct `A::T1` previously mutably borrowed here
+ 9 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+10 │         acquires_t2(account);
+11 │         move y;
+   │         ------ conflicting reference `y` used here
+   ·
+34 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here
+
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:18:9
+   │
+16 │         let y = get_v(x);
+   │                 -------- struct `A::T1` previously mutably borrowed here
+17 │         acquires_t2(account);
+18 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+19 │         move y;
+   │         ------ conflicting reference `y` used here
+   ·
+34 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here
+
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:25:9
+   │
+24 │         let y = get_v(x);
+   │                 -------- struct `A::T1` previously mutably borrowed here
+25 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+26 │         move y;
+   │         ------ conflicting reference `y` used here
+   ·
+34 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here

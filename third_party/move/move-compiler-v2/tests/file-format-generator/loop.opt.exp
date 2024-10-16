@@ -1,0 +1,79 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.loops {
+
+
+nested_loop(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(17)
+B1:
+	4: CopyLoc[0](Arg0: u64)
+	5: LdU64(10)
+	6: Gt
+	7: BrFalse(12)
+B2:
+	8: MoveLoc[0](Arg0: u64)
+	9: LdU64(1)
+	10: Sub
+	11: StLoc[0](Arg0: u64)
+B3:
+	12: MoveLoc[0](Arg0: u64)
+	13: LdU64(1)
+	14: Sub
+	15: StLoc[0](Arg0: u64)
+	16: Branch(0)
+B4:
+	17: MoveLoc[0](Arg0: u64)
+	18: Ret
+}
+while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
+L1:	loc0: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(9)
+B1:
+	4: MoveLoc[0](Arg0: u64)
+	5: LdU64(1)
+	6: Sub
+	7: StLoc[0](Arg0: u64)
+	8: Branch(0)
+B2:
+	9: MoveLoc[0](Arg0: u64)
+	10: Ret
+}
+while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
+L1:	loc0: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(8)
+B1:
+	4: CopyLoc[0](Arg0: u64)
+	5: LdU64(42)
+	6: Eq
+	7: BrFalse(10)
+B2:
+	8: MoveLoc[0](Arg0: u64)
+	9: Ret
+B3:
+	10: CopyLoc[0](Arg0: u64)
+	11: LdU64(21)
+	12: Eq
+	13: BrTrue(0)
+B4:
+	14: MoveLoc[0](Arg0: u64)
+	15: LdU64(1)
+	16: Sub
+	17: StLoc[0](Arg0: u64)
+	18: Branch(0)
+}
+}
+============ bytecode verification succeeded ========

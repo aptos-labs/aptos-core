@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `s` of type `signer` does not have the `copy` ability
+  ┌─ tests/ability-check/v1-signer/copy_loc.move:3:9
+  │
+3 │         copy s
+  │         ^^^^^^ explicitly copied here

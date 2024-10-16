@@ -12,6 +12,7 @@ use crate::{
             Dependencies, Dependency, FileName, NamedAddress, PackageDigest, PackageName,
             SourceManifest, SubstOrRename,
         },
+        std_lib::{StdLib, StdVersion},
     },
     BuildConfig,
 };
@@ -107,14 +108,22 @@ impl ResolvingGraph {
         }
         let mut resolution_graph = Self {
             root_package_path: root_package_path.clone(),
-            build_options,
+            build_options: build_options.clone(),
             root_package: root_package.clone(),
             graph: DiGraphMap::new(),
             package_table: BTreeMap::new(),
         };
 
+        let override_std = &build_options.override_std;
+
         resolution_graph
-            .build_resolution_graph(root_package.clone(), root_package_path, true, writer)
+            .build_resolution_graph(
+                root_package.clone(),
+                root_package_path,
+                true,
+                override_std,
+                writer,
+            )
             .with_context(|| {
                 format!(
                     "Unable to resolve packages for package '{}'",
@@ -199,6 +208,7 @@ impl ResolvingGraph {
         package: SourceManifest,
         package_path: PathBuf,
         is_root_package: bool,
+        override_std: &Option<StdVersion>,
         writer: &mut W,
     ) -> Result<()> {
         let package_name = package.package.name;
@@ -237,12 +247,17 @@ impl ResolvingGraph {
             BTreeMap::new()
         };
 
-        for (dep_name, dep) in package
+        for (dep_name, mut dep) in package
             .dependencies
             .clone()
             .into_iter()
             .chain(additional_deps.into_iter())
         {
+            if let Some(std_version) = &override_std {
+                if let Some(std_lib) = StdLib::from_package_name(dep_name) {
+                    dep = std_lib.dependency(std_version);
+                }
+            }
             let dep_node_id = self.get_or_add_node(dep_name).with_context(|| {
                 format!(
                     "Cycle between packages {} and {} found",
@@ -252,7 +267,7 @@ impl ResolvingGraph {
             self.graph.add_edge(package_node_id, dep_node_id, ());
 
             let (dep_renaming, dep_resolution_table) = self
-                .process_dependency(dep_name, dep, package_path.clone(), writer)
+                .process_dependency(dep_name, dep, package_path.clone(), override_std, writer)
                 .with_context(|| {
                     format!(
                         "While resolving dependency '{}' in package '{}'",
@@ -393,6 +408,7 @@ impl ResolvingGraph {
         dep_name_in_pkg: PackageName,
         dep: Dependency,
         root_path: PathBuf,
+        override_std: &Option<StdVersion>,
         writer: &mut W,
     ) -> Result<(Renaming, ResolvingTable)> {
         Self::download_and_update_if_remote(
@@ -404,10 +420,14 @@ impl ResolvingGraph {
         let (dep_package, dep_package_dir) =
             Self::parse_package_manifest(&dep, &dep_name_in_pkg, root_path)
                 .with_context(|| format!("While processing dependency '{}'", dep_name_in_pkg))?;
-        self.build_resolution_graph(dep_package.clone(), dep_package_dir, false, writer)
-            .with_context(|| {
-                format!("Unable to resolve package dependency '{}'", dep_name_in_pkg)
-            })?;
+        self.build_resolution_graph(
+            dep_package.clone(),
+            dep_package_dir,
+            false,
+            override_std,
+            writer,
+        )
+        .with_context(|| format!("Unable to resolve package dependency '{}'", dep_name_in_pkg))?;
 
         if dep_name_in_pkg != dep_package.package.name {
             bail!("Name of dependency declared in package '{}' does not match dependency's package name '{}'",
@@ -957,7 +977,7 @@ fn confirm_git_available() -> Result<()> {
                 );
             } else {
                 bail!(
-                    "Unexpected error occured when checking for presence of `git`: {:#}",
+                    "Unexpected error occurred when checking for presence of `git`: {:#}",
                     e
                 );
             }

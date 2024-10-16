@@ -23,7 +23,11 @@ pub struct VoteMsg {
 
 impl Display for VoteMsg {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "VoteMsg: [{}]", self.vote,)
+        write!(
+            f,
+            "VoteMsg: [{}], SyncInfo: [{}]",
+            self.vote, self.sync_info
+        )
     }
 }
 

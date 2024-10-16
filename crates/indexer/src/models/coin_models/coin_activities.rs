@@ -19,7 +19,7 @@ use aptos_api_types::{
     Event as APIEvent, Transaction as APITransaction, TransactionInfo as APITransactionInfo,
     TransactionPayload, UserTransactionRequest, WriteSetChange as APIWriteSetChange,
 };
-use aptos_types::APTOS_COIN_TYPE;
+use aptos_types::{AptosCoinType, CoinType as CoinTypeTrait};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -87,6 +87,7 @@ impl CoinActivity {
         let mut all_event_to_coin_type: EventToCoinType = HashMap::new();
         let mut all_coin_supply = Vec::new();
 
+        #[allow(deprecated)]
         let (txn_info, writesets, events, maybe_user_request, txn_timestamp) = match &transaction {
             APITransaction::GenesisTransaction(inner) => (
                 &inner.info,
@@ -266,7 +267,7 @@ impl CoinActivity {
             event_creation_number: BURN_GAS_EVENT_CREATION_NUM,
             event_sequence_number: user_transaction_request.sequence_number.0 as i64,
             owner_address: standardize_address(&user_transaction_request.sender.to_string()),
-            coin_type: APTOS_COIN_TYPE.to_string(),
+            coin_type: AptosCoinType::type_tag().to_string(),
             amount: aptos_coin_burned,
             activity_type: GAS_FEE_EVENT.to_string(),
             is_gas_fee: true,

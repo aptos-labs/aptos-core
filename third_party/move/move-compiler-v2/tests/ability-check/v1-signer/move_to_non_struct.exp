@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: type `u64` is missing required ability `key`
+  ┌─ tests/ability-check/v1-signer/move_to_non_struct.move:3:17
+  │
+3 │         move_to<u64>(s, 0)
+  │                 ^^^
+  │
+  = required by instantiating type parameter `T:key` of function `move_to`
+
+error: cannot use `integer` with an operator which expects a value of type `R<u64>`
+   ┌─ tests/ability-check/v1-signer/move_to_non_struct.move:13:28
+   │
+13 │         move_to<R<u64>>(s, 0)
+   │                            ^

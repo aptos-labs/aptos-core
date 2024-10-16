@@ -30,20 +30,20 @@
 ///
 /// There are four well-supported networks for integrating with the Aptos blockchain:
 ///
-/// 1. [Local testnet](http://127.0.0.1:8080) -- our standalone tool for local development against a known version of the codebase with no external network.
+/// 1. [Localnet](http://127.0.0.1:8080) -- our standalone tool for local development against a known version of the codebase with no external network.
 /// 1. [Devnet](https://fullnode.devnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
 /// 1. [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 /// 1. [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
 ///
 /// See [Aptos Blockchain Networks](../nodes/networks.md) for full details on each environment.
 ///
-/// ### Run a local testnet
+/// ### Run a localnet
 ///
-/// There are two options for running a local testnet:
-/// * Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](../nodes/local-testnet/run-a-local-testnet.md#using-the-aptos-core-source-code) or a [Docker image](../nodes/local-testnet/run-a-local-testnet.md#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
+/// There are two options for running a localnet:
+/// * Directly [run a localnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](../nodes/local-testnet/run-a-local-testnet.md#using-the-aptos-core-source-code) or a [Docker image](../nodes/local-testnet/run-a-local-testnet.md#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
 /// * [Install the Aptos CLI](../tools/install-cli/index.md) and 2) start a [local node with a faucet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 ///
-/// Either of these methods will expose a [REST API service](../integration/fullnode-rest-api.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
+/// Either of these methods will expose a [REST API service](../integration/fullnode-rest-api.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a localnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
 ///
 /// ### Production network access
 ///
@@ -52,27 +52,27 @@
 ///     <ul>
 ///       <li>REST API: <a href="https://fullnode.devnet.aptoslabs.com/v1">https://fullnode.devnet.aptoslabs.com/v1</a></li>
 ///       <li>REST API Spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
-///       <li>Indexer API: <a href="https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
+///       <li>Indexer API: <a href="https://api.devnet.aptoslabs.com/v1/graphql">https://api.devnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet API: <a href="https://faucet.devnet.aptoslabs.com">https://faucet.devnet.aptoslabs.com</a></li>
-///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
+///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://api.devnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
 ///     </ul>
 ///   </TabItem>
 ///   <TabItem value="testnet" label="Testnet">
 ///     <ul>
 ///       <li>REST API: <a href="https://fullnode.testnet.aptoslabs.com/v1">https://fullnode.testnet.aptoslabs.com/v1</a></li>
 ///       <li>REST API Spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
-///       <li>Indexer API: <a href="https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
+///       <li>Indexer API: <a href="https://api.testnet.aptoslabs.com/v1/graphql">https://api.testnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet API: <a href="https://faucet.testnet.aptoslabs.com">https://faucet.testnet.aptoslabs.com</a></li>
-///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
+///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://api.testnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
 ///     </ul>
 ///   </TabItem>
 ///   <TabItem value="mainnet" label="Mainnet">
 ///     <ul>
 ///       <li>REST API: <a href="https://fullnode.mainnet.aptoslabs.com/v1">https://fullnode.mainnet.aptoslabs.com/v1</a></li>
 ///       <li>REST API Spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
-///       <li>Indexer API: <a href="https://indexer.mainnet.aptoslabs.com/v1/graphql">https://indexer.mainnet.aptoslabs.com/v1/graphql</a></li>
+///       <li>Indexer API: <a href="https://api.mainnet.aptoslabs.com/v1/graphql">https://api.mainnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet: N/A</li>
-///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
+///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://api.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
 ///     </ul>
 ///   </TabItem>
 /// </Tabs>

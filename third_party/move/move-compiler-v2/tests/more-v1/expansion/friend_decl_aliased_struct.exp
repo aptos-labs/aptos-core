@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unbound module
+  ┌─ tests/more-v1/expansion/friend_decl_aliased_struct.move:8:12
+  │
+8 │     friend A;
+  │            ^ Unbound module alias 'A'

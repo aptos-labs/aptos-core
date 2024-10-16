@@ -54,11 +54,13 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
+        use aptos_framework::chain_status;
 
         // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 600;
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        requires chain_status::is_genesis();
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
 
@@ -82,7 +84,7 @@ spec aptos_framework::gas_schedule {
         use aptos_framework::staking_config;
 
         // TODO: set because of timeout (property proved).
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 600;
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
@@ -90,5 +92,51 @@ spec aptos_framework::gas_schedule {
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
         ensures global<StorageGasConfig>(@aptos_framework) == config;
+    }
+
+    spec set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
+        use aptos_framework::util;
+
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        include config_buffer::SetForNextEpochAbortsIf {
+            account: aptos_framework,
+            config: gas_schedule_blob
+        };
+        let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(gas_schedule_blob);
+        let cur_gas_schedule = global<GasScheduleV2>(@aptos_framework);
+        aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < cur_gas_schedule.feature_version;
+    }
+
+    spec set_for_next_epoch_check_hash(aptos_framework: &signer, old_gas_schedule_hash: vector<u8>, new_gas_schedule_blob: vector<u8>) {
+        use aptos_std::aptos_hash;
+        use std::bcs;
+        use std::features;
+        use aptos_framework::util;
+
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        include config_buffer::SetForNextEpochAbortsIf {
+            account: aptos_framework,
+            config: new_gas_schedule_blob
+        };
+        let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(new_gas_schedule_blob);
+        let cur_gas_schedule = global<GasScheduleV2>(@aptos_framework);
+        aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < cur_gas_schedule.feature_version;
+        aborts_if exists<GasScheduleV2>(@aptos_framework) && (!features::spec_sha_512_and_ripemd_160_enabled() || aptos_hash::spec_sha3_512_internal(bcs::serialize(cur_gas_schedule)) != old_gas_schedule_hash);
+    }
+
+    spec on_new_epoch(framework: &signer) {
+        requires @aptos_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<GasScheduleV2>;
+        aborts_if false;
+    }
+
+    spec set_storage_gas_config(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if !exists<storage_gas::StorageGasConfig>(@aptos_framework);
+    }
+
+    spec set_storage_gas_config_for_next_epoch(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if !exists<storage_gas::StorageGasConfig>(@aptos_framework);
     }
 }

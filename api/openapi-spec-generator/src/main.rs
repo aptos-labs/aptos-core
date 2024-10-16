@@ -4,7 +4,7 @@
 mod fake_context;
 
 use anyhow::Result;
-use aptos_api::get_api_service;
+use aptos_api::{get_api_service, spec::get_spec};
 use clap::{Parser, ValueEnum};
 use fake_context::get_fake_context;
 use std::{path::PathBuf, sync::Arc};
@@ -49,9 +49,10 @@ pub fn main() -> Result<()> {
     let api_service = get_api_service(Arc::new(get_fake_context()));
 
     let spec = match args.output_args.format {
-        OutputFormat::Json => api_service.spec(),
-        OutputFormat::Yaml => api_service.spec_yaml(),
+        OutputFormat::Json => get_spec(&api_service, false),
+        OutputFormat::Yaml => get_spec(&api_service, true),
     };
+
     args.output_args.write(&spec)
 }
 

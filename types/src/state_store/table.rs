@@ -33,6 +33,12 @@ impl From<move_table_extension::TableHandle> for TableHandle {
     }
 }
 
+impl From<&move_table_extension::TableHandle> for TableHandle {
+    fn from(hdl: &move_table_extension::TableHandle) -> Self {
+        Self(hdl.0)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct TableInfo {

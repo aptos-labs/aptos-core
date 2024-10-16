@@ -52,6 +52,7 @@ pub const CONTEXTUAL_KEYWORDS: &[&str] = &[
     "min",
     "modifies",
     "mut",
+    "package",
     "phantom",
     "post",
     "pragma",

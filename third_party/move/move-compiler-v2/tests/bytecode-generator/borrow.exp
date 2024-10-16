@@ -12,24 +12,21 @@ warning: Unused parameter `param`. Consider removing or prefixing with an unders
 29 │     fun mut_local(param: u64): u64 {
    │                   ^^^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::borrow {
     struct S {
         f: u64,
     }
-    private fun field(s: &borrow::S): u64 {
+    private fun field(s: &S): u64 {
         {
-          let r: &u64 = Borrow(Immutable)(select borrow::S.f(s));
+          let r: &u64 = Borrow(Immutable)(select borrow::S.f<&S>(s));
           Deref(r)
         }
     }
     private fun local(param: u64): u64 {
         {
-          let local: u64 = 33;
-          {
-            let r: &u64 = Borrow(Immutable)(local);
-            Deref(r)
-          }
+          let r: &u64 = Borrow(Immutable)(33);
+          Deref(r)
         }
     }
     private fun param(param: u64): u64 {
@@ -38,9 +35,9 @@ module 0x42::borrow {
           Deref(r)
         }
     }
-    private fun mut_field(s: &mut borrow::S): u64 {
+    private fun mut_field(s: &mut S): u64 {
         {
-          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f(s));
+          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f<&mut S>(s));
           r = 22;
           Deref(r)
         }
@@ -62,59 +59,64 @@ module 0x42::borrow {
           Deref(r)
         }
     }
-    spec fun $field(s: borrow::S): u64 {
-        {
-          let r: u64 = select borrow::S.f(s);
-          r
-        }
-    }
-    spec fun $local(param: u64): u64 {
-        {
-          let local: u64 = 33;
-          {
-            let r: u64 = local;
-            r
-          }
-        }
-    }
-    spec fun $mut_field(s: &mut borrow::S): u64;
-    spec fun $mut_local(param: u64): u64;
-    spec fun $mut_param(param: u64): u64;
-    spec fun $param(param: u64): u64 {
-        {
-          let r: u64 = param;
-          r
-        }
-    }
 } // end 0x42::borrow
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::borrow {
+    struct S {
+        f: u64,
+    }
+    fun field(s: &S): u64 {
+        let r = &s.f;
+        *r
+    }
+    fun local(param: u64): u64 {
+        let r = &33;
+        *r
+    }
+    fun param(param: u64): u64 {
+        let r = &param;
+        *r
+    }
+    fun mut_field(s: &mut S): u64 {
+        let r = &mut s.f;
+        *r = 22;
+        *r
+    }
+    fun mut_local(param: u64): u64 {
+        let local = 33;
+        let r = &mut local;
+        *r = 22;
+        *r
+    }
+    fun mut_param(param: u64): u64 {
+        let r = &mut param;
+        *r = 22;
+        *r
+    }
+}
 
 ============ initial bytecode ================
 
 [variant baseline]
-fun borrow::field($t0: &borrow::S): u64 {
+fun borrow::field($t0: &0x42::borrow::S): u64 {
      var $t1: u64
      var $t2: &u64
-     var $t3: &u64
-  0: $t3 := borrow_field<borrow::S>.f($t0)
-  1: $t2 := infer($t3)
-  2: $t1 := read_ref($t2)
-  3: return $t1
+  0: $t2 := borrow_field<0x42::borrow::S>.f($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
 }
 
 
 [variant baseline]
 fun borrow::local($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
+     var $t2: &u64
      var $t3: u64
-     var $t4: &u64
-     var $t5: &u64
   0: $t3 := 33
-  1: $t2 := infer($t3)
-  2: $t5 := borrow_local($t2)
-  3: $t4 := infer($t5)
-  4: $t1 := read_ref($t4)
-  5: return $t1
+  1: $t2 := borrow_local($t3)
+  2: $t1 := read_ref($t2)
+  3: return $t1
 }
 
 
@@ -122,26 +124,22 @@ fun borrow::local($t0: u64): u64 {
 fun borrow::param($t0: u64): u64 {
      var $t1: u64
      var $t2: &u64
-     var $t3: &u64
-  0: $t3 := borrow_local($t0)
-  1: $t2 := infer($t3)
-  2: $t1 := read_ref($t2)
-  3: return $t1
+  0: $t2 := borrow_local($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
 }
 
 
 [variant baseline]
-fun borrow::mut_field($t0: &mut borrow::S): u64 {
+fun borrow::mut_field($t0: &mut 0x42::borrow::S): u64 {
      var $t1: u64
      var $t2: &mut u64
-     var $t3: &mut u64
-     var $t4: u64
-  0: $t3 := borrow_field<borrow::S>.f($t0)
-  1: $t2 := infer($t3)
-  2: $t4 := 22
-  3: write_ref($t2, $t4)
-  4: $t1 := read_ref($t2)
-  5: return $t1
+     var $t3: u64
+  0: $t2 := borrow_field<0x42::borrow::S>.f($t0)
+  1: $t3 := 22
+  2: write_ref($t2, $t3)
+  3: $t1 := read_ref($t2)
+  4: return $t1
 }
 
 
@@ -149,18 +147,14 @@ fun borrow::mut_field($t0: &mut borrow::S): u64 {
 fun borrow::mut_local($t0: u64): u64 {
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-     var $t4: &mut u64
-     var $t5: &mut u64
-     var $t6: u64
-  0: $t3 := 33
-  1: $t2 := infer($t3)
-  2: $t5 := borrow_local($t2)
-  3: $t4 := infer($t5)
-  4: $t6 := 22
-  5: write_ref($t4, $t6)
-  6: $t1 := read_ref($t4)
-  7: return $t1
+     var $t3: &mut u64
+     var $t4: u64
+  0: $t2 := 33
+  1: $t3 := borrow_local($t2)
+  2: $t4 := 22
+  3: write_ref($t3, $t4)
+  4: $t1 := read_ref($t3)
+  5: return $t1
 }
 
 
@@ -168,12 +162,13 @@ fun borrow::mut_local($t0: u64): u64 {
 fun borrow::mut_param($t0: u64): u64 {
      var $t1: u64
      var $t2: &mut u64
-     var $t3: &mut u64
-     var $t4: u64
-  0: $t3 := borrow_local($t0)
-  1: $t2 := infer($t3)
-  2: $t4 := 22
-  3: write_ref($t2, $t4)
-  4: $t1 := read_ref($t2)
-  5: return $t1
+     var $t3: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := 22
+  2: write_ref($t2, $t3)
+  3: $t1 := read_ref($t2)
+  4: return $t1
 }
+
+
+============ bytecode verification succeeded ========

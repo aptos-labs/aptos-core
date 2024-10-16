@@ -2,7 +2,7 @@
 //#      --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 //#      --initial-coins 1000000000000000
 
-//# publish
+//# publish --private-key Alice
 module Alice::Module {
     use std::vector;
     use std::string::{Self, String};

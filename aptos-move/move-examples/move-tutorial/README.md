@@ -7,7 +7,7 @@ slug: "move-tutorial"
 
 Welcome to the Aptos Move Tutorial! This is the original Move language and tools tutorial, independent of a particular network, adapted to use Aptos tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move.
 
-This tutorial does not teach you how to use the existing [Aptos Move frameworks](https://aptos.dev/reference/move) or how to run code on the Aptos network. See the [Aptos developer documentation](../../../developer-docs-site/docs/tutorials/index.md) for those instructions.
+This tutorial does not teach you how to use the existing [Aptos Move frameworks](https://aptos.dev/reference/move) or how to run code on the Aptos network. See the [Aptos developer documentation](https://aptos.dev/tutorials/) for those instructions.
 
 There are nine steps in total:
 
@@ -27,7 +27,7 @@ Now let's get started!
 
 ## Step 0: Preparation
 
-You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial`] directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right contents, run the `cd` and `ls` commands below to ensure the `move-tutorial` directory has the relevant subdirectories:
+You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial`](..) directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right contents, run the `cd` and `ls` commands below to ensure the `move-tutorial` directory has the relevant subdirectories:
 
 ```shell
 > cd move-tutorial
@@ -35,7 +35,7 @@ You should obtain a copy of the content of the directory in which this `README.m
 step_1 step_2 step_2_sol step_3 ...
 ```
 
-You also need a recent version of the [Aptos CLI](../../../developer-docs-site/docs/tools/aptos-cli/install-cli/index.md). This tutorial is written using the following version:
+You also need a recent version of the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/). This tutorial is written using the following version:
 
 ```shell
 > aptos --version
@@ -67,13 +67,13 @@ module 0xCAFE::basic_coin {
 ```
 
 This is defining a Move
-[module](../../../developer-docs-site/docs/move/book/modules-and-scripts.md). Modules are the
+[module](https://aptos.dev/move/book/modules-and-scripts/). Modules are the
 building blocks of Move code, and are defined with a specific address -- the
 address that the module can be published under. In this case, the `basic_coin`
 module can be published only under `0xCAFE`.
 
 Let's now take a look at the next part of this file where we define a
-[struct](../../../developer-docs-site/docs/move/book/structs-and-resources.md)
+[struct](https://aptos.dev/move/book/structs-and-resources)
 to represent a `Coin` with a given `value`:
 
 ```
@@ -100,7 +100,7 @@ module 0xCAFE::basic_coin {
 ```
 
 Let us take a look at this function and what it is saying:
-* It takes a [`&signer`](../../../developer-docs-site/docs/move/book/signer.md) reference ('`&`') -- an
+* It takes a [`&signer`](https://aptos.dev/move/book/signer) reference ('`&`') -- an
   unforgeable token that represents control over a particular address, and
   a `value` to mint.
 * It creates a `Coin` with the given value and stores it under the
@@ -120,11 +120,11 @@ aptos move compile
     aptos move init --name <pkg_name>
     ```
 * Move code can also live in a number of other places. See the [Move
-  book](../../../developer-docs-site/docs/move/book/packages.md) for more information on the
+  book](https://aptos.dev/move/book/packages) for more information on the
   Move package system.
-* More information on the `Move.toml` file can also be found in the [Package](../../../developer-docs-site/docs/move/book/packages.md#movetoml) section of the Move book.
+* More information on the `Move.toml` file can also be found in the [Package](https://aptos.dev/move/book/packages#movetoml) section of the Move book.
 * Move also supports the idea of [named
-  addresses](../../../developer-docs-site/docs/move/book/address.md#named-addresses); Named
+  addresses](https://aptos.dev/move/book/address#named-addresses); Named
   addresses are a way to parameterize Move source code so that you can compile
   the module using different values for `named_addr` to get different bytecode
   that you can deploy, depending on what address(es) you control. They are used quite frequently, and can be defined in the `Move.toml` file in the `[addresses]` section, like so:
@@ -132,9 +132,9 @@ aptos move compile
     [addresses]
     Somenamed_address = "0xC0FFEE"
     ```
-* [Structures](../../../developer-docs-site/docs/move/book/structs-and-resources.md) in Move
+* [Structures](https://aptos.dev/move/book/structs-and-resources) in Move
   can be given different
-  [abilities](../../../developer-docs-site/docs/move/book/abilities.md) that describe what
+  [abilities](https://aptos.dev/move/book/abilities) that describe what
   can be done with that type. There are four different abilities:
     - `copy`: Allows values of types with this ability to be copied.
     - `drop`: Allows values of types with this ability to be popped/dropped.
@@ -145,12 +145,12 @@ aptos move compile
     in global storage and, because it has no other abilities, it cannot be
     copied, dropped, or stored as a non-key value in storage. So you can't copy
     coins, and you also can't lose coins by accident!
-* [Functions](../../../developer-docs-site/docs/move/book/functions.md) are default
+* [Functions](https://aptos.dev/move/book/functions) are default
     private, and can also be `public`,
-    [`public(friend)`](../../../developer-docs-site/docs/move/book/friends.md).
+    [`public(friend)`](https://aptos.dev/move/book/friends).
     A function marked as `entry` can be called as a transaction.
 * `move_to` is one of the [five different global storage
-  operators](../../../developer-docs-site/docs/move/book/global-storage-operators.md).
+  operators](https://aptos.dev/move/book/global-storage-operators).
 </details>
 
 ## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>
@@ -196,7 +196,7 @@ assertion fails the unit test will fail.
 <details>
 <summary>Advanced concepts and exercises</summary>
 
-* There are a number of [test-related annotations](https://github.com/move-language/move/blob/main/language/changes/4-unit-testing.md#testing-annotations-their-meaning-and-usage) that are worth exploring.
+* There are a number of [test-related annotations](https://aptos.dev/move/book/unit-testing#testing-annotations-their-meaning-and-usage) that are worth exploring.
   You'll see some of these used in Step 5.
 
 #### Exercises
@@ -233,7 +233,7 @@ assertion fails the unit test will fail.
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
 be minted and transferred between balances held under different addresses. 
 
-> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer [coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/coin.md#0x1_coin) contained in the Aptos framework.
+> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer [coin type](https://aptos.dev/reference/move?branch=mainnet&page=aptos-framework/doc/coin.md) contained in the Aptos framework.
 
 The signatures of the public Move function are the following:
 
@@ -291,7 +291,7 @@ method directly from a transaction, you'll want to change its signature to:
 ```
 public entry fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
 ```
-Read more on Move function [visibilities](../../../developer-docs-site/docs/move/book/functions.md#visibility).
+Read more on Move function [visibilities](https://aptos.dev/move/book/functions#visibility).
 </details>
 <details>
 <summary>Comparison with Ethereum/Solidity</summary>
@@ -348,7 +348,7 @@ is false, then abort the transaction with `<abort_code>`. Here `MODULE_OWNER` an
 defined at the beginning of the module. The standard library's [`error`] module also defines common error categories we can use.
 
 It is important to note that Move is transactional in its execution -- so
-if an [abort](../../../developer-docs-site/docs/move/book/abort-and-assert.md) is raised no unwinding of state
+if an [abort](https://aptos.dev/move/book/abort-and-assert) is raised no unwinding of state
 needs to be performed, as no changes from that transaction will be persisted to the blockchain.
 
 [`error` module]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/sources/error.move
@@ -385,7 +385,7 @@ fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
 }
 ```
 At the beginning of the method, we assert that the withdrawing account has enough balance. We then use `borrow_global_mut`
-to get a mutable reference to the global storage, and `&mut` is used to create a mutable [reference](../../../developer-docs-site/docs/move/book/references.md) to a field of a
+to get a mutable reference to the global storage, and `&mut` is used to create a mutable [reference](https://aptos.dev/move/book/references) to a field of a
 struct. We then modify the balance through this mutable reference and return a new coin with the withdrawn amount.
 </details>
 
@@ -446,7 +446,7 @@ The solution to this exercise can be found in [`step_5_sol`](./step_5_sol).
 ## Step 6: Making my `basic_coin` module generic<span id="Step6"><span>
 
 In Move, we can use
-[generics](../../../developer-docs-site/docs/move/book/generics.md)
+[generics](https://aptos.dev/move/book/generics)
 to define functions and structs over different input data types. Generics are a great
 building block for library code. In this section, we are going to make our simple
 `basic_coin` module generic so that it can serve as a library module to be used by
@@ -487,17 +487,17 @@ In definitions of both `Coin` and `Balance`, we declare the type parameter `Coin
 to be phantom because `CoinType` is not used in the struct definition or is only used as a phantom type
 parameter.
 
-Read more about [phantom type](../../../developer-docs-site/docs/move/book/generics.md#phantom-type-parameters) parameters in the Aptos Move Book.
+Read more about [phantom type](https://aptos.dev/move/book/generics#phantom-type-parameters) parameters in the Aptos Move Book.
 </details>
 
 ## Step 7:  Use the Move Prover
     
-> NOTE: Before running the Move Prover, ensure that the [Move Prover](../../../developer-docs-site/docs/tools/aptos-cli/install-cli/install-move-prover.md) and associated tools are installed.
+> NOTE: Before running the Move Prover, ensure that the [Move Prover](https://aptos.dev/tools/aptos-cli/install-cli/install-move-prover) and associated tools are installed.
 
 Smart contracts deployed on the blockchain may manipulate high-value assets. As a technique that uses strict
 mathematical methods to describe behavior and reason correctness of computer systems, formal verification
 has been used in blockchains to prevent bugs in smart contracts. The
-[Move Prover](../../../developer-docs-site/docs/move/prover/index.md)
+[Move Prover](https://aptos.dev/move/prover/move-prover)
 is an evolving formal verification tool for smart contracts written in the Move language. The user can employ the 
 [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to specify
 functional properties of smart contracts

@@ -32,10 +32,7 @@ pub fn setup_indexer() -> anyhow::Result<PgDbPool> {
     Ok(conn_pool)
 }
 
-pub async fn execute_nft_txns<'t>(
-    creator: LocalAccount,
-    info: &mut AptosPublicInfo<'t>,
-) -> Result<()> {
+pub async fn execute_nft_txns<'t>(creator: LocalAccount, info: &mut AptosPublicInfo) -> Result<()> {
     let collection_name = "collection name".to_owned().into_bytes();
     let token_name = "token name".to_owned().into_bytes();
     let collection_builder =
@@ -90,6 +87,8 @@ pub async fn execute_nft_txns<'t>(
     Ok(())
 }
 
+// TODO(grao): Old indexer is not used anymore, cleanup corresponding code and tests.
+#[ignore]
 #[tokio::test]
 async fn test_old_indexer() {
     if aptos_indexer::should_skip_pg_tests() {
@@ -98,7 +97,7 @@ async fn test_old_indexer() {
 
     let conn_pool = setup_indexer().unwrap();
 
-    let mut swarm = crate::smoke_test_environment::SwarmBuilder::new_local(1)
+    let swarm = crate::smoke_test_environment::SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
             config.storage.enable_indexer = true;

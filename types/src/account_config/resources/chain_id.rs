@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::chain_id::ChainId;
+use crate::{chain_id::ChainId, on_chain_config::OnChainConfig};
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -27,3 +27,8 @@ impl MoveStructType for ChainIdResource {
 }
 
 impl MoveResource for ChainIdResource {}
+
+impl OnChainConfig for ChainIdResource {
+    const MODULE_IDENTIFIER: &'static str = "chain_id";
+    const TYPE_IDENTIFIER: &'static str = "ChainId";
+}

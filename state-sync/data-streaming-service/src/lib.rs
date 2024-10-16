@@ -6,6 +6,7 @@
 
 pub mod data_notification;
 pub mod data_stream;
+mod dynamic_prefetching;
 pub mod error;
 mod logging;
 mod metrics;

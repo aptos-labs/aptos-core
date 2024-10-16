@@ -485,6 +485,19 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     | Gt | Le | Ge | Abort | Nop => {
                         panic!("Bytecode has no internal index: {:?}", code[bytecode_idx])
                     },
+                    PackVariant(_)
+                    | PackVariantGeneric(_)
+                    | UnpackVariant(_)
+                    | UnpackVariantGeneric(_)
+                    | TestVariant(_)
+                    | TestVariantGeneric(_)
+                    | MutBorrowVariantField(_)
+                    | MutBorrowVariantFieldGeneric(_)
+                    | ImmBorrowVariantField(_)
+                    | ImmBorrowVariantFieldGeneric(_) => {
+                        // TODO(#13806): implement
+                        panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
+                    },
                 };
 
                 code[bytecode_idx] = new_bytecode;
@@ -543,5 +556,19 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         | LdU256(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue
         | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
         | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
+
+        PackVariant(_)
+        | PackVariantGeneric(_)
+        | UnpackVariant(_)
+        | UnpackVariantGeneric(_)
+        | TestVariant(_)
+        | TestVariantGeneric(_)
+        | MutBorrowVariantField(_)
+        | MutBorrowVariantFieldGeneric(_)
+        | ImmBorrowVariantField(_)
+        | ImmBorrowVariantFieldGeneric(_) => {
+            // TODO(#13806): implement
+            false
+        },
     }
 }

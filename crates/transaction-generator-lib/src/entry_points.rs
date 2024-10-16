@@ -9,6 +9,7 @@ use crate::{
     call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator},
     create_account_transaction,
     publishing::module_simple::MultiSigConfig,
+    RootAccountHandle,
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -16,7 +17,7 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use rand::rngs::StdRng;
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 pub struct EntryPointTransactionGenerator {
     pub entry_point: EntryPoints,
@@ -45,7 +46,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
 
     async fn create_generator_fn(
         &self,
-        root_account: &mut LocalAccount,
+        root_account: &dyn RootAccountHandle,
         txn_factory: &TransactionFactory,
         txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
@@ -54,6 +55,15 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
 
         let additional_signers = match entry_point.multi_sig_additional_num() {
             MultiSigConfig::Random(num) => {
+                root_account
+                    .approve_funds(
+                        (num as u64)
+                            * txn_factory.get_max_gas_amount()
+                            * txn_factory.get_gas_unit_price(),
+                        "creating random multi-sig accounts",
+                    )
+                    .await;
+
                 let new_accounts = Arc::new(
                     (0..num)
                         .map(|_| LocalAccount::generate(rng))
@@ -65,7 +75,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                             .iter()
                             .map(|to| {
                                 create_account_transaction(
-                                    root_account,
+                                    root_account.get_root_account().borrow(),
                                     to.address(),
                                     txn_factory,
                                     0,
@@ -96,6 +106,9 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                 ),
                 MultiSigConfig::Publisher => {
                     account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
+                },
+                MultiSigConfig::FeePayerPublisher => {
+                    account.sign_fee_payer_with_transaction_builder(vec![], publisher, builder)
                 },
             })
         })

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::loops {
     private fun nested_loop(x: u64): u64 {
         loop {
@@ -53,10 +53,36 @@ module 0x42::loops {
         };
         x
     }
-    spec fun $nested_loop(x: u64): u64;
-    spec fun $while_loop(x: u64): u64;
-    spec fun $while_loop_with_break_and_continue(x: u64): u64;
 } // end 0x42::loops
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::loops {
+    fun nested_loop(x: u64): u64 {
+        while (x > 0) {
+            while (x > 10) {
+                x = x - 1;
+                break;
+            };
+            x = x - 1;
+            continue;
+        };
+        x
+    }
+    fun while_loop(x: u64): u64 {
+        while (x > 0) {
+            x = x - 1;
+        };
+        x
+    }
+    fun while_loop_with_break_and_continue(x: u64): u64 {
+        while (x > 0) {
+            if (x == 42) break;
+            if (x == 21) continue;
+            x = x - 1;
+        };
+        x
+    }
+}
 
 ============ initial bytecode ================
 
@@ -176,3 +202,6 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
  30: $t1 := infer($t0)
  31: return $t1
 }
+
+
+============ bytecode verification succeeded ========

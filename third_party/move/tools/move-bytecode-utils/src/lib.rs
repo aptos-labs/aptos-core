@@ -2,9 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod compiled_module_viewer;
 pub mod dependency_graph;
 pub mod layout;
-pub mod module_cache;
 
 use crate::dependency_graph::DependencyGraph;
 use anyhow::{anyhow, Result};

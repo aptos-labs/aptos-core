@@ -80,6 +80,21 @@ macro_rules! define_schema {
     };
 }
 
+#[macro_export]
+macro_rules! define_pub_schema {
+    ($schema_type:ident, $key_type:ty, $value_type:ty, $cf_name:expr) => {
+        #[derive(Debug)]
+        pub struct $schema_type;
+
+        impl $crate::schema::Schema for $schema_type {
+            type Key = $key_type;
+            type Value = $value_type;
+
+            const COLUMN_FAMILY_NAME: $crate::ColumnFamilyName = $cf_name;
+        }
+    };
+}
+
 /// This trait defines a type that can serve as a [`Schema::Key`].
 pub trait KeyCodec<S: Schema + ?Sized>: Sized + PartialEq + Debug {
     /// Converts `self` to bytes to be stored in DB.

@@ -1,72 +1,88 @@
 
 Diagnostics:
-error: expected `M::S` but found `M::R`
+error: cannot bind `R` to left-hand side of type `S`
   ┌─ tests/checking/typing/bind_wrong_type.move:6:13
   │
 6 │         let S { g } = R {f :0};
   │             ^^^^^^^
 
-error: expected `M::S` but found `M::R`
+error: cannot bind `R` to left-hand side of type `S`
   ┌─ tests/checking/typing/bind_wrong_type.move:7:14
   │
 7 │         let (S { g }, R { f }) = (R{ f: 0 }, R{ f: 1 });
   │              ^^^^^^^
 
-error: expected `()` but found `integer` (from assignment or declaration context)
+error: tuple type `()` is not allowed as a local variable type
+   ┌─ tests/checking/typing/bind_wrong_type.move:11:13
+   │
+11 │         let x = ();
+   │             ^
+   │
+   = required by declaration of local `x`
+
+error: cannot bind `integer` to left-hand side of type `()`
    ┌─ tests/checking/typing/bind_wrong_type.move:12:13
    │
 12 │         let () = 0;
    │             ^^
 
-error: expected 4 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 4
    ┌─ tests/checking/typing/bind_wrong_type.move:13:13
    │
 13 │         let (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
    │             ^^^^^^^^^^^^
 
-error: expected 2 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 2
    ┌─ tests/checking/typing/bind_wrong_type.move:14:13
    │
 14 │         let (x, b, R{f}) = (0, false);
    │             ^^^^^^^^^^^^
 
-error: expected `()` but found `integer`
+error: tuple type `()` is not allowed as a local variable type
+   ┌─ tests/checking/typing/bind_wrong_type.move:18:13
+   │
+18 │         let x: () = 0;
+   │             ^
+   │
+   = required by declaration of local `x`
+
+error: cannot adapt `integer` to annotated type `()`
    ┌─ tests/checking/typing/bind_wrong_type.move:18:21
    │
 18 │         let x: () = 0;
    │                     ^
 
-error: expected `()` but found `u64` (from assignment or declaration context)
+error: cannot bind `u64` to left-hand side of type `()`
    ┌─ tests/checking/typing/bind_wrong_type.move:19:13
    │
 19 │         let (): u64 = ();
    │             ^^
 
-error: expected `u64` but found `()`
+error: cannot adapt `()` to annotated type `u64`
    ┌─ tests/checking/typing/bind_wrong_type.move:19:23
    │
 19 │         let (): u64 = ();
    │                       ^^
 
-error: expected 4 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 4
    ┌─ tests/checking/typing/bind_wrong_type.move:20:13
    │
 20 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0});
    │             ^^^^^^^^^^^^
 
-error: expected 4 item(s), found 3
+error: expected 4 items but found 3
    ┌─ tests/checking/typing/bind_wrong_type.move:20:47
    │
 20 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0});
    │                                               ^^^^^^^^^^^^^^^^^^^
 
-error: expected 2 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 2
    ┌─ tests/checking/typing/bind_wrong_type.move:21:13
    │
 21 │         let (x, b, R{f}): (u64, bool) = (0, false, R{f: 0});
    │             ^^^^^^^^^^^^
 
-error: expected 2 item(s), found 3
+error: expected 2 items but found 3
    ┌─ tests/checking/typing/bind_wrong_type.move:21:41
    │
 21 │         let (x, b, R{f}): (u64, bool) = (0, false, R{f: 0});

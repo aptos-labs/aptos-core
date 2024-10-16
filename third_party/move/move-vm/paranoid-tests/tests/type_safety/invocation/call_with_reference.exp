@@ -8,3 +8,12 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
+
+task 2 'run'. lines 30-39:
+Error: Script execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

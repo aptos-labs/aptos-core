@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/enum_self.move:12:9
+   │
+12 │         invariant self.self.self > 10;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum_self.move:17: test_enum_self
+   =     at tests/sources/functional/enum_self.move:16: test_enum_self
+   =     at tests/sources/functional/enum_self.move:19: test_enum_self
+   =     at tests/sources/functional/enum_self.move:12
+   =     at tests/sources/functional/enum_self.move:19: test_enum_self
+   =         self_s = <redacted>
+   =     at tests/sources/functional/enum_self.move:22: test_enum_self
+   =         self = <redacted>
+   =     at tests/sources/functional/enum_self.move:23: test_enum_self
+   =     at tests/sources/functional/enum_self.move:12

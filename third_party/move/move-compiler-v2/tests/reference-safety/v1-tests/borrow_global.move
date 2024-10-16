@@ -26,7 +26,7 @@ module 0x8675309::M {
     fun t4(cond: bool, addr: address): bool acquires R {
         let r = R { f: 0 };
         let f = &borrow_global<R>(addr).f;
-        let r1; if (cond) r1 = borrow_global<R>(addr) else r1 = &mut r;
+        let r1; if (cond) r1 = borrow_global<R>(addr) else r1 = &mut r; // See #14274
         let res = f == &r1.f;
         R { f: _ } = r;
         res

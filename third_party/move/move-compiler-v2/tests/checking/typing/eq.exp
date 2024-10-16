@@ -1,13 +1,72 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct G<T> {
+        f: T,
+    }
+    struct R {
+        f: u64,
+    }
+    struct S {
+        u: u64,
+    }
+    private fun t0(r: &R,r_mut: &mut R,s: S,s_ref: &S,s_mut: &mut S) {
+        false;
+        false;
+        false;
+        false;
+        false;
+        Eq<u64>(Borrow(Immutable)(0), Borrow(Immutable)(1));
+        false;
+        false;
+        Eq<S>(Borrow(Immutable)(s), s_ref);
+        Eq<S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
+        Eq<S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
+        Eq<S>(Borrow(Immutable)(s), Freeze(false)(s_mut));
+        Eq<S>(s_ref, Freeze(false)(s_mut));
+        Eq<S>(Freeze(false)(s_mut), Freeze(false)(s_mut));
+        Eq<S>(pack M::S(0), s);
+        Eq<R>(r, r);
+        Eq<R>(Freeze(false)(r_mut), Freeze(false)(r_mut));
+        Eq<R>(r, Freeze(false)(r_mut));
+        Eq<R>(Freeze(false)(r_mut), r);
+        Eq<G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
+        Eq<G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
+        Tuple()
+    }
+} // end 0x8675309::M
 
-Diagnostics:
-error: invalid call of `==`: mutability mismatch (&mut != &) for argument 2
-   ┌─ tests/checking/typing/eq.move:18:20
-   │
-18 │         (&mut s == s_ref: bool);
-   │                    ^^^^^
-
-error: invalid call of `==`: mutability mismatch (&mut != &) for argument 2
-   ┌─ tests/checking/typing/eq.move:27:19
-   │
-27 │         (r_mut == r: bool);
-   │                   ^
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct G<T> has drop {
+        f: T,
+    }
+    struct R {
+        f: u64,
+    }
+    struct S has drop {
+        u: u64,
+    }
+    fun t0(r: &R, r_mut: &mut R, s: S, s_ref: &S, s_mut: &mut S) {
+        false;
+        false;
+        false;
+        false;
+        false;
+        &0 == &1;
+        false;
+        false;
+        &s == s_ref;
+        /*freeze*/&mut s == s_ref;
+        /*freeze*/&mut s == /*freeze*/s_mut;
+        &s == /*freeze*/s_mut;
+        s_ref == /*freeze*/s_mut;
+        /*freeze*/s_mut == /*freeze*/s_mut;
+        S{u: 0} == s;
+        r == r;
+        /*freeze*/r_mut == /*freeze*/r_mut;
+        r == /*freeze*/r_mut;
+        /*freeze*/r_mut == r;
+        G<u64>{f: 1} == G<u64>{f: 1};
+        G<u64>{f: 1} == G<u64>{f: 1};
+    }
+}

@@ -206,3 +206,7 @@ output "kubernetes" {
   value     = jsondecode(local_file.kubernetes.content)
   sensitive = true
 }
+
+output "oidc_provider" {
+  value = local.oidc_provider
+}

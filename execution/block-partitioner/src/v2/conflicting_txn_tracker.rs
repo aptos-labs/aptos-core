@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::v2::types::{PrePartitionedTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]
@@ -85,8 +86,7 @@ impl ConflictingTxnTracker {
 
 #[test]
 fn test_conflicting_txn_tracker() {
-    let mut tracker =
-        ConflictingTxnTracker::new(StorageLocation::Specific(StateKey::raw(vec![])), 0);
+    let mut tracker = ConflictingTxnTracker::new(StorageLocation::Specific(StateKey::raw(&[])), 0);
     tracker.add_write_candidate(4);
     tracker.add_write_candidate(10);
     tracker.add_write_candidate(7);

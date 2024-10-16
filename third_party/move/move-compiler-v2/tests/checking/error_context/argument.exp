@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: cannot pass `integer` to a function which expects argument of type `bool`
+   ┌─ tests/checking/error_context/argument.move:14:14
+   │
+14 │         f(1, 2);
+   │              ^
+
+error: cannot pass `&mut integer` to a function which expects argument of type `&mut bool`
+   ┌─ tests/checking/error_context/argument.move:20:15
+   │
+20 │         g(&1, &mut x);
+   │               ^^^^^^
+
+error: cannot pass `&bool` to a function which expects argument of type `&u64`
+   ┌─ tests/checking/error_context/argument.move:21:11
+   │
+21 │         g(&true, &mut y);
+   │           ^^^^^
+
+error: cannot pass `&bool` to a function which expects argument of type `&mut address`
+   ┌─ tests/checking/error_context/argument.move:26:19
+   │
+26 │         h(&mut x, &true);
+   │                   ^^^^^
+
+error: the function takes `&mut` but `&` was provided
+   ┌─ tests/checking/error_context/argument.move:30:15
+   │
+30 │         g(&1, x)
+   │               ^
+
+error: the function takes 2 arguments but 1 were provided
+   ┌─ tests/checking/error_context/argument.move:34:9
+   │
+34 │         f(1);
+   │         ^^^^
+
+error: the function takes 2 arguments but 3 were provided
+   ┌─ tests/checking/error_context/argument.move:35:9
+   │
+35 │         f(1, false, 2);
+   │         ^^^^^^^^^^^^^^

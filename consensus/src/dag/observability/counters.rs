@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use aptos_metrics_core::{
     register_histogram, register_histogram_vec, register_int_gauge, Histogram, HistogramVec,
     IntGauge,

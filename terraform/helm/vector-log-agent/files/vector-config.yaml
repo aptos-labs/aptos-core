@@ -18,6 +18,7 @@ sources:
 
   internal_metrics:
     type: internal_metrics
+    scrape_interval_secs: 60
 
 transforms:
   # applying workaround from https://github.com/vectordotdev/vector/issues/11821#issuecomment-1068041226 to reduce internal metrics cardinality

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot assign `T` to left-hand side of type `X`
+  ┌─ tests/checking/typing/v1-commands/unpack_wrong_type.move:6:9
+  │
+6 │         X { b: _ } = t;
+  │         ^^^^^^^^^^

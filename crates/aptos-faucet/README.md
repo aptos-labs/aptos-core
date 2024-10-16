@@ -34,7 +34,7 @@ To run the faucet, the simplest way to start is with this command:
 cargo run -p aptos-faucet-service -- run-simple --key <private_key> --node-url <api_url> --chain-id TESTING
 ```
 
-Another example, running alongside a local testnet (without `--use-faucet`):
+Another example, running alongside a localnet (without `--use-faucet`):
 ```
 cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
 cargo run -p aptos-faucet-service -- run-simple --key ~/.aptos/testnet/mint.key --node-url http://127.0.0.1:8080 --chain-id TESTING

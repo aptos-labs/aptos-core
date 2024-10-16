@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: cannot freeze value which is still mutably borrowed
+  ┌─ tests/reference-safety/freeze_dead_code.move:8:9
+  │
+5 │         let n = &mut x;
+  │                 ------ previously mutably borrowed here
+  ·
+8 │         freeze(y);
+  │         ^^^^^^^^^ frozen here
+9 │         *n = *n + 1;
+  │              -- conflicting reference `n` used here

@@ -1,0 +1,19 @@
+[package]
+name = "std-lib-conflicts"
+version = "1.0.0"
+authors = []
+
+[addresses]
+A = "0x42"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "devnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.B]
+local = "./deps_only"
+
+[dev-dependencies]

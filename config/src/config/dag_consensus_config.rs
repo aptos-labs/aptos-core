@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,
@@ -83,6 +84,7 @@ pub struct DagFetcherConfig {
     pub rpc_timeout_ms: u64,
     pub min_concurrent_responders: u32,
     pub max_concurrent_responders: u32,
+    pub max_concurrent_fetches: usize,
 }
 
 impl Default for DagFetcherConfig {
@@ -92,6 +94,7 @@ impl Default for DagFetcherConfig {
             rpc_timeout_ms: 1000,
             min_concurrent_responders: 1,
             max_concurrent_responders: 4,
+            max_concurrent_fetches: 4,
         }
     }
 }
@@ -122,14 +125,12 @@ impl Default for ReliableBroadcastConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagRoundStateConfig {
-    pub round_event_channel_size: usize,
     pub adaptive_responsive_minimum_wait_time_ms: u64,
 }
 
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
-            round_event_channel_size: 1024,
             adaptive_responsive_minimum_wait_time_ms: 500,
         }
     }

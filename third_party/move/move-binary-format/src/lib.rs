@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
+#![deny(deprecated)]
 
 use std::fmt;
 
@@ -10,8 +11,10 @@ pub mod access;
 pub mod binary_views;
 pub mod check_bounds;
 pub mod compatibility;
+pub mod compatibility_legacy;
 #[macro_use]
 pub mod errors;
+pub mod check_complexity;
 pub mod constant;
 pub mod control_flow_graph;
 pub mod deserializer;
@@ -51,6 +54,12 @@ pub enum IndexKind {
     CodeDefinition,
     TypeParameter,
     MemberCount,
+    // Since bytecode version 7
+    VariantDefinition,
+    VariantFieldHandle,
+    VariantFieldInstantiation,
+    StructVariantHandle,
+    StructVariantInstantiation,
 }
 
 impl IndexKind {
@@ -77,6 +86,12 @@ impl IndexKind {
             CodeDefinition,
             TypeParameter,
             MemberCount,
+            // Since bytecode version 7
+            VariantDefinition,
+            VariantFieldHandle,
+            VariantFieldInstantiation,
+            StructVariantHandle,
+            StructVariantInstantiation,
         ]
     }
 }
@@ -97,6 +112,7 @@ impl fmt::Display for IndexKind {
             StructDefinition => "struct definition",
             FunctionDefinition => "function definition",
             FieldDefinition => "field definition",
+            VariantDefinition => "variant definition",
             Signature => "signature",
             Identifier => "identifier",
             AddressIdentifier => "address identifier",
@@ -105,6 +121,10 @@ impl fmt::Display for IndexKind {
             CodeDefinition => "code definition pool",
             TypeParameter => "type parameter",
             MemberCount => "field offset",
+            VariantFieldHandle => "variant field handle",
+            VariantFieldInstantiation => "variant field instantiation",
+            StructVariantHandle => "struct variant handle",
+            StructVariantInstantiation => "struct variant instantiation",
         };
 
         f.write_str(desc)

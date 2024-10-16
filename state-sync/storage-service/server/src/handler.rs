@@ -17,7 +17,7 @@ use crate::{
     utils,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_logger::{debug, error, sample, sample::SampleRate, trace, warn};
+use aptos_logger::{debug, sample, sample::SampleRate, trace, warn};
 use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
@@ -146,7 +146,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                     // Periodically log the failure
                     sample!(
                             SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQUENCY_SECS)),
-                            error!(LogSchema::new(LogEntry::StorageServiceError)
+                            warn!(LogSchema::new(LogEntry::StorageServiceError)
                                 .error(&error)
                                 .peer_network_id(peer_network_id)
                                 .request(&request)
@@ -247,7 +247,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         {
             sample!(
                 SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQUENCY_SECS)),
-                warn!(LogSchema::new(LogEntry::OptimisticFetchRequest)
+                trace!(LogSchema::new(LogEntry::OptimisticFetchRequest)
                     .error(&Error::InvalidRequest(
                         "An active optimistic fetch was already found for the peer!".into()
                     ))

@@ -1,12 +1,153 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{
+    assert_success, assert_vm_status,
+    resource_groups::{
+        initialize, initialize_enabled_disabled_comparison, ResourceGroupsTestHarness,
+    },
+    tests::{aggregator_v2::arb_block_split, common},
+    BlockSplit, MoveHarness, SUCCESS,
+};
+use aptos_language_e2e_tests::executor::ExecutorMode;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
+use proptest::prelude::*;
 use serde::Deserialize;
 use test_case::test_case;
+
+// This mode describes whether to enable or disable RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET flag
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ResourceGroupMode {
+    EnabledOnly,
+    DisabledOnly,
+    BothComparison,
+}
+
+const STRESSTEST_MODE: bool = false;
+const ENOT_EQUAL: u64 = 17;
+const EINVALID_ARG: u64 = 18;
+const ERESOURCE_DOESNT_EXIST: u64 = 19;
+
+// TODO[agg_v2](cleanup): This interface looks similar to aggregator v2 test harness.
+// Could cleanup later on.
+fn setup(
+    executor_mode: ExecutorMode,
+    // This mode describes whether to enable or disable RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET flag
+    resource_group_mode: ResourceGroupMode,
+    txns: usize,
+) -> ResourceGroupsTestHarness {
+    let path = common::test_dir_path("resource_groups.data/pack");
+    match resource_group_mode {
+        ResourceGroupMode::EnabledOnly => initialize(path, executor_mode, true, txns),
+        ResourceGroupMode::DisabledOnly => initialize(path, executor_mode, false, txns),
+        ResourceGroupMode::BothComparison => {
+            initialize_enabled_disabled_comparison(path, executor_mode, txns)
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct TestEnvConfig {
+    pub executor_mode: ExecutorMode,
+    pub resource_group_mode: ResourceGroupMode,
+    pub block_split: BlockSplit,
+}
+
+#[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
+fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
+    prop_oneof![
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            resource_group_mode: ResourceGroupMode::BothComparison,
+            block_split
+        }),
+    ]
+    .boxed()
+}
+
+#[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
+fn arb_test_env_non_equivalent(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
+    prop_oneof![
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            resource_group_mode: ResourceGroupMode::DisabledOnly,
+            block_split
+        }),
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            resource_group_mode: ResourceGroupMode::EnabledOnly,
+            block_split
+        }),
+    ]
+    .boxed()
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig {
+        // Cases are expensive, few cases is enough.
+        // We will test a few more comprehensive tests more times, and the rest even fewer.
+        cases: if STRESSTEST_MODE { 1000 } else { 20 },
+        result_cache: if STRESSTEST_MODE { prop::test_runner::noop_result_cache } else {prop::test_runner::basic_result_cache },
+        .. ProptestConfig::default()
+    })]
+
+    #[test]
+    fn proptest_resource_groups_1(test_env in arb_test_env(17)) {
+        println!("Testing test_aggregator_lifetime {:?}", test_env);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 17);
+
+        let txns = vec![
+            (SUCCESS, h.init_signer(vec![5,2,3])),
+            (SUCCESS, h.set_resource(4, "ABC".to_string(), 10)),
+            (SUCCESS, h.set_resource(2, "DEFG".to_string(), 20)),
+            (SUCCESS, h.unset_resource(3)),
+            (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
+            (SUCCESS, h.set_resource(4, "JKLMNO".to_string(), 40)),
+            (SUCCESS, h.set_and_check(2,  4, "MNOP".to_string(), 50, "JKLMNO".to_string(), 40)),
+            (SUCCESS, h.read_or_init(1)),
+            (SUCCESS, h.check(2, "MNOP".to_string(), 50)),
+            (SUCCESS, h.check(1, "init_name".to_string(), 5)),
+            (SUCCESS, h.unset_resource(1)),
+            (SUCCESS, h.set_3_group_members(1, 2, 3, "L".to_string(), 25)),
+            (SUCCESS, h.check(1, "L".to_string(), 25)),
+            (SUCCESS, h.unset_resource(3)),
+            (ENOT_EQUAL, h.check(2, "MNOP".to_string(), 50)),
+            (EINVALID_ARG, h.set_resource(5, "JKLI".to_string(), 40)),
+            (ERESOURCE_DOESNT_EXIST, h.check(3, "L".to_string(), 25)),
+        ];
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn proptest_resource_groups_2(test_env in arb_test_env_non_equivalent(12)) {
+        println!("Testing test_aggregator_lifetime {:?}", test_env);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
+
+        let txns = vec![
+            (SUCCESS, h.init_signer(vec![5,2,3])),
+            (SUCCESS, h.set_resource(4, "ABCDEF".to_string(), 10)),
+            (SUCCESS, h.set_resource(2, "DEF".to_string(), 20)),
+            (SUCCESS, h.read_or_init(4)),
+            (SUCCESS, h.set_resource(2, "XYZK".to_string(), 25)),
+            (ENOT_EQUAL, h.check(2, "DEF".to_string(), 20)),
+            (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
+            (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
+            (SUCCESS, h.unset_resource(3)),
+            (ERESOURCE_DOESNT_EXIST, h.check(3, "LJH".to_string(), 25)),
+            (ERESOURCE_DOESNT_EXIST, h.set_and_check(2,  1, "MNO".to_string(), 50, "GH".to_string(), 30)),
+            (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
+        ];
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+}
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Primary {
@@ -24,12 +165,12 @@ fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
     let mut h = MoveHarness::new();
     if resource_group_charge_as_sum_enabled {
         h.enable_features(
-            vec![FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM],
+            vec![FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET],
             vec![],
         );
     } else {
         h.enable_features(vec![], vec![
-            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
 
@@ -66,19 +207,19 @@ fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
         address: primary_addr,
         module: Identifier::new("primary").unwrap(),
         name: Identifier::new("ResourceGroupContainer").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let primary_tag = StructTag {
         address: primary_addr,
         module: Identifier::new("primary").unwrap(),
         name: Identifier::new("Primary").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let secondary_tag = StructTag {
         address: secondary_addr,
         module: Identifier::new("secondary").unwrap(),
         name: Identifier::new("Secondary").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
 
     // Assert that no data exists yet

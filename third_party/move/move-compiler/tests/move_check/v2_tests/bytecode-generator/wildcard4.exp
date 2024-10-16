@@ -1,0 +1,9 @@
+error[E07002]: mutable ownership violated
+  ┌─ tests/move_check/v2_tests/bytecode-generator/wildcard4.move:6:17
+  │
+4 │         let r = &mut x;
+  │                 ------ It is still being mutably borrowed by this reference
+5 │         let y = &mut x;
+6 │         let _ = freeze(y);
+  │                 ^^^^^^^^^ Invalid freeze.
+

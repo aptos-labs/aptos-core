@@ -14,16 +14,12 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-block-executor = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-gas-meter = { workspace = true }
 aptos-gas-profiling = { workspace = true }
-aptos-gas-schedule = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-memory-usage-tracker = { workspace = true }
-aptos-resource-viewer = { workspace = true }
 aptos-rest-client = { workspace = true }
-aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
@@ -31,13 +27,7 @@ aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
-move-binary-format = { workspace = true }
-move-cli = { workspace = true }
-move-compiler = { workspace = true }
-move-core-types = { workspace = true }
-move-resource-viewer = { workspace = true }
-move-vm-runtime = { workspace = true }
-move-vm-test-utils = { workspace = true }
+itertools = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }

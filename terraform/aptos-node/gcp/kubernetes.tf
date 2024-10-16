@@ -26,6 +26,7 @@ provider "helm" {
 locals {
   # helm chart paths
   aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
+  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
 
   # override the helm release name if an override exists, otherwise adopt the workspace name
   helm_release_name = var.helm_release_name_override != "" ? var.helm_release_name_override : local.workspace_name
@@ -100,5 +101,47 @@ resource "helm_release" "validator" {
       name  = "chart_sha1"
       value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
     }
+  }
+}
+
+resource "helm_release" "monitoring" {
+  count       = var.enable_monitoring ? 1 : 0
+  name        = "${local.helm_release_name}-mon"
+  chart       = local.monitoring_helm_chart_path
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      chain = {
+        name = var.chain_name
+      }
+      validator = {
+        name = var.validator_name
+      }
+      service = {
+        domain = local.domain
+      }
+      monitoring = {
+        prometheus = {
+          storage = {
+            class = kubernetes_storage_class.ssd.metadata[0].name
+          }
+        }
+      }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
+      }
+    }),
+    jsonencode(var.monitoring_helm_values),
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
 }

@@ -1,0 +1,34 @@
+
+Diagnostics:
+error: Cannot use both package and friend visibility in the same module
+  ┌─ tests/visibility-checker/mix_friend_package_visibility_invalid.move:7:9
+  │
+3 │         public(package) fun foo() {
+  │         --------------- package visibility declared here
+  ·
+7 │         public(friend) fun bar() {
+  │         ^^^^^^^^^^^^^^
+  │         │
+  │         friend visibility declared here
+
+error: Cannot use both package and friend visibility in the same module
+   ┌─ tests/visibility-checker/mix_friend_package_visibility_invalid.move:15:9
+   │
+15 │         public(friend) fun foo() {
+   │         ^^^^^^^^^^^^^^
+   │         │
+   │         friend visibility declared here
+   ·
+19 │         public(package) fun bar() {
+   │         --------------- package visibility declared here
+
+error: Cannot use both package and friend visibility in the same module
+   ┌─ tests/visibility-checker/mix_friend_package_visibility_invalid.move:27:9
+   │
+27 │         friend 0x44::B;
+   │         ^^^^^^^^^^^^^^^
+   │         │
+   │         friend visibility declared here
+28 │
+29 │         public(package) fun bar() {
+   │         --------------- package visibility declared here

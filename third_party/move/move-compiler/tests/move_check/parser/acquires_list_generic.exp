@@ -2,5 +2,5 @@ error[E01012]: invalid access specifier
   ┌─ tests/move_check/parser/acquires_list_generic.move:6:24
   │
 6 │     fun foo() acquires B<CupC<R>> {
-  │                        ^^^^^^^^^^^ compiler version 1 only supports simple 'acquires <resource_name>' clauses
+  │                        ^^^^^^^^^^^ language version 1 only supports simple 'acquires <resource_name>' clauses
 

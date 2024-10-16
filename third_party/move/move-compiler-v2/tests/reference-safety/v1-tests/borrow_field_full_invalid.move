@@ -1,6 +1,6 @@
 module 0x8675309::M {
-    struct Outer { s1: Inner, s2: Inner }
-    struct Inner { f1: u64, f2: u64 }
+    struct Outer has drop { s1: Inner, s2: Inner }
+    struct Inner has drop, copy { f1: u64, f2: u64 }
     fun id<T>(r: &T): &T {
         r
     }
@@ -10,7 +10,7 @@ module 0x8675309::M {
 
     fun t0(outer: &mut Outer) {
         let inner = &mut outer.s1;
-        let c = inner; // error in v2
+        let c = inner;
         let f1 = &inner.f1;
         *c;
         *inner;

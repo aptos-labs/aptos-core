@@ -1,24 +1,32 @@
 
 Diagnostics:
-error: expected `X::R` but found `()`
+error: cannot return nothing from a function with result type `X::R`
    ┌─ tests/checking/typing/loop_result_type_invalid.move:11:9
    │
 11 │         loop { if (false) break }
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `u64` but found `()`
+error: cannot return nothing from a function with result type `u64`
    ┌─ tests/checking/typing/loop_result_type_invalid.move:15:9
    │
 15 │         loop { let x = 0; break }
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: invalid call of `M::foo`: expected `u64` but found `()` for argument 1
+error: cannot pass `()` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/loop_result_type_invalid.move:19:13
    │
 19 │         foo(loop { break })
    │             ^^^^^^^^^^^^^^
 
-error: expected 0 item(s), found 2
+error: tuple type `()` is not allowed as a local variable type
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:25:13
+   │
+25 │         let x = loop { break };
+   │             ^
+   │
+   = required by declaration of local `x`
+
+error: the left-hand side has 2 items but the right-hand side provided 0
    ┌─ tests/checking/typing/loop_result_type_invalid.move:26:13
    │
 26 │         let (x, y) = loop { if (false) break };

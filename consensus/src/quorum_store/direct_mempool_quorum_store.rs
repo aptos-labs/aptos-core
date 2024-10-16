@@ -58,7 +58,6 @@ impl DirectMempoolQuorumStore {
             max_items,
             max_bytes,
             return_non_full,
-            false,
             exclude_txns,
             callback,
         );
@@ -138,19 +137,13 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_consensus_request(&self, req: GetPayloadCommand) {
         match req {
-            GetPayloadCommand::GetPayloadRequest(
-                max_txns,
-                max_bytes,
-                return_non_full,
-                payload_filter,
-                callback,
-            ) => {
+            GetPayloadCommand::GetPayloadRequest(request) => {
                 self.handle_block_request(
-                    max_txns,
-                    max_bytes,
-                    return_non_full,
-                    payload_filter,
-                    callback,
+                    request.max_txns_after_filtering,
+                    request.max_txns.size_in_bytes(),
+                    request.return_non_full,
+                    request.filter,
+                    request.callback,
                 )
                 .await;
             },

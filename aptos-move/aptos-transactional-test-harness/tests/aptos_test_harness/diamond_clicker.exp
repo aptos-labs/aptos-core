@@ -1,7 +1,76 @@
-processed 3 tasks
+processed 4 tasks
 
-task 1 'publish'. lines 4-35:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(CALL_TYPE_MISMATCH_ERROR))
+task 1 'print-bytecode'. lines 4-35:
+Error: extended checks failed:
 
-task 2 'run'. lines 37-37:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))
+bug: BYTECODE VERIFICATION FAILED
+   ┌─ TEMPFILE:25:13
+   │
+25 │             debug::print(field); // INTERNAL TEST ERROR: INTERNAL VM INVARIANT VIOLATION
+   │             ^^^^^^^^^^^^^^^^^^^ ICE failed bytecode verifier: VMError {
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    message: None,
+    exec_state: None,
+    location: Module(
+        ModuleId {
+            address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6,
+            name: Identifier(
+                "game",
+            ),
+        },
+    ),
+    indices: [
+        (
+            FunctionDefinition,
+            0,
+        ),
+    ],
+    offsets: [
+        (
+            FunctionDefinitionIndex(0),
+            25,
+        ),
+    ],
+}
+
+
+
+task 2 'publish'. lines 37-68:
+Error: extended checks failed:
+
+bug: BYTECODE VERIFICATION FAILED
+   ┌─ TEMPFILE1:58:13
+   │
+58 │             debug::print(field); // INTERNAL TEST ERROR: INTERNAL VM INVARIANT VIOLATION
+   │             ^^^^^^^^^^^^^^^^^^^ ICE failed bytecode verifier: VMError {
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    message: None,
+    exec_state: None,
+    location: Module(
+        ModuleId {
+            address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6,
+            name: Identifier(
+                "game",
+            ),
+        },
+    ),
+    indices: [
+        (
+            FunctionDefinition,
+            0,
+        ),
+    ],
+    offsets: [
+        (
+            FunctionDefinitionIndex(0),
+            25,
+        ),
+    ],
+}
+
+
+
+task 3 'run'. lines 70-70:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)

@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use log::debug;
+use log::info;
 use std::{
     ffi::{OsStr, OsString},
     process::{Command, Stdio},
 };
 
+#[derive(Debug)]
 pub struct Cargo {
     inner: Command,
     pass_through_args: Vec<OsString>,
@@ -45,15 +46,37 @@ impl Cargo {
         self
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, ignore_failed_exit_status: bool) {
+        // Set up the output and arguments
         self.inner.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-
         if !self.pass_through_args.is_empty() {
             self.inner.arg("--").args(&self.pass_through_args);
         }
 
-        debug!("Executing command: {:?}", self.inner);
+        // Log the command
+        let command_to_execute = format!("{:?}", self.inner);
+        info!("Executing command: {:?}", command_to_execute);
 
-        let _ = self.inner.output();
+        // Execute the command
+        let result = self.inner.output();
+
+        // If the command failed, panic immediately with the error.
+        // This will ensure that failures are not dropped silently.
+        match result {
+            Ok(output) => {
+                if !ignore_failed_exit_status && !output.status.success() {
+                    panic!(
+                        "Command failed: {:?}. Output: {:?}",
+                        command_to_execute, output
+                    );
+                }
+            },
+            Err(error) => {
+                panic!(
+                    "Unexpected error executing command: {:?}. Error: {:?}",
+                    command_to_execute, error
+                );
+            },
+        }
     }
 }

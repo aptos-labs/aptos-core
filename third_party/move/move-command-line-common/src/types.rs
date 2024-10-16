@@ -129,7 +129,7 @@ impl ParsedStructType {
             address: address.into_account_address(mapping)?,
             module: Identifier::new(module)?,
             name: Identifier::new(name)?,
-            type_params: type_args
+            type_args: type_args
                 .into_iter()
                 .map(|t| t.into_type_tag(mapping))
                 .collect::<anyhow::Result<_>>()?,

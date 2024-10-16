@@ -1,0 +1,76 @@
+
+Diagnostics:
+error: specification expression cannot call impure Move function `impure_borrow`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:29:48
+   │
+ 8 │         let r = &mut x;
+   │                 ------ in `impure_borrow`: mutably borrows value
+   ·
+29 │     spec fun cannot_call_impure(x: u64): u64 { impure_borrow(1) }
+   │                                                ^^^^^^^^^^^^^^^^ called here
+
+error: specification expression cannot call impure Move function `impure_indirect`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:31:57
+   │
+ 8 │         let r = &mut x;
+   │                 ------ in `impure_borrow`: mutably borrows value
+   ·
+19 │         impure_borrow(x)
+   │         ---------------- transitively calling `impure_borrow` from `impure_indirect` here
+   ·
+31 │     spec fun cannot_call_impure_indirect(x: u64): u64 { impure_indirect(1) }
+   │                                                         ^^^^^^^^^^^^^^^^^^ called here
+
+error: specification expression cannot call impure Move function `impure_assign`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:33:55
+   │
+14 │         x = x + 1;
+   │         --------- in `impure_assign`: assigns variable
+   ·
+33 │     spec fun cannot_call_impure_assign(x: u64): u64 { impure_assign(x) }
+   │                                                       ^^^^^^^^^^^^^^^^ called here
+
+error: specification expression cannot call impure Move function `uses_return`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:35:37
+   │
+23 │         if (x > 0) return x + 1;
+   │                    ------------ in `uses_return`: return not allowed in specifications
+   ·
+35 │     spec fun cannot_return(): u64 { uses_return(2) }
+   │                                     ^^^^^^^^^^^^^^ called here
+
+error: specification expression cannot call impure Move function `impure_indirect`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:41:27
+   │
+ 8 │         let r = &mut x;
+   │                 ------ in `impure_borrow`: mutably borrows value
+   ·
+19 │         impure_borrow(x)
+   │         ---------------- transitively calling `impure_borrow` from `impure_indirect` here
+   ·
+41 │         ensures result == impure_indirect(x);
+   │                           ^^^^^^^^^^^^^^^^^^ called here
+
+error: specification expression cannot call impure Move function `impure_indirect`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:46:20
+   │
+ 8 │         let r = &mut x;
+   │                 ------ in `impure_borrow`: mutably borrows value
+   ·
+19 │         impure_borrow(x)
+   │         ---------------- transitively calling `impure_borrow` from `impure_indirect` here
+   ·
+46 │             assert impure_indirect(x) == 2;
+   │                    ^^^^^^^^^^^^^^^^^^ called here
+
+error: specification expression cannot call impure Move function `impure_indirect`
+   ┌─ tests/checking/specs/spec_pureness_checks.move:52:19
+   │
+ 8 │         let r = &mut x;
+   │                 ------ in `impure_borrow`: mutably borrows value
+   ·
+19 │         impure_borrow(x)
+   │         ---------------- transitively calling `impure_borrow` from `impure_indirect` here
+   ·
+52 │         invariant impure_indirect(22) == 2;
+   │                   ^^^^^^^^^^^^^^^^^^^ called here

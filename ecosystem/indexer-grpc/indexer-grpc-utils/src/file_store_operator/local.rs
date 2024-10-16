@@ -23,7 +23,7 @@ pub struct LocalFileStoreOperator {
 impl LocalFileStoreOperator {
     pub fn new(path: PathBuf, enable_compression: bool) -> Self {
         let storage_format = if enable_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::JsonBase64UncompressedProto
         };
@@ -171,8 +171,10 @@ impl FileStoreOperator for LocalFileStoreOperator {
             let file_entry_key =
                 FileEntry::build_key(starting_version, self.storage_format).to_string();
             let txns_path = self.path.join(file_entry_key.as_str());
-            if !txns_path.exists() {
-                tokio::fs::create_dir_all(txns_path.clone()).await?;
+            let parent_dir = txns_path.parent().unwrap();
+            if !parent_dir.exists() {
+                tracing::debug!("Creating parent dir: {parent_dir:?}.");
+                tokio::fs::create_dir_all(parent_dir).await?;
             }
 
             tracing::debug!(

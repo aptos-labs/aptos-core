@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unbound module
+   ┌─ tests/verification/noverify/cross_module_invalid.move:23:9
+   │
+23 │         A::build_foo()
+   │         ^ Unbound module or type alias 'A'

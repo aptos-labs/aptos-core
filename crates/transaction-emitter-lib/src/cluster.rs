@@ -1,20 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emitter::query_sequence_number, instance::Instance, ClusterArgs};
+use crate::{emitter::load_specific_account, instance::Instance, ClusterArgs};
 use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
 };
 use aptos_logger::{info, warn};
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::{
-    account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount,
-};
+use aptos_rest_client::{Client as RestClient, State};
+use aptos_sdk::types::{chain_id::ChainId, AccountKey, LocalAccount};
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::seq::SliceRandom;
-use std::{convert::TryFrom, time::Instant};
+use std::convert::TryFrom;
 use url::Url;
 
 #[derive(Debug)]
@@ -37,14 +35,14 @@ impl Cluster {
         peers: Vec<Url>,
         coin_source_key: Ed25519PrivateKey,
         coin_source_is_root: bool,
-        chain_id: ChainId,
-        api_key: Option<String>,
+        maybe_chain_id: Option<ChainId>,
+        maybe_api_key: Option<String>,
     ) -> Result<Self> {
         let num_peers = peers.len();
 
         let mut instance_states = Vec::new();
         let mut errors = Vec::new();
-        let start = Instant::now();
+        let fetch_timestamp = aptos_infallible::duration_since_epoch().as_secs();
         let futures = FuturesUnordered::new();
         for url in &peers {
             let instance = Instance::new(
@@ -55,7 +53,7 @@ impl Cluster {
                 ), /* short_hash */
                 url.clone(),
                 None,
-                api_key.clone(),
+                maybe_api_key.clone(),
             );
             futures.push(async move {
                 let result = instance.rest_client().get_ledger_information().await;
@@ -64,7 +62,7 @@ impl Cluster {
         }
 
         let results: Vec<_> = futures.collect().await;
-        let fetch_time_s = start.elapsed().as_secs();
+
         for (instance, result) in results {
             match result {
                 Ok(v) => instance_states.push((instance, v.into_inner())),
@@ -91,6 +89,25 @@ impl Cluster {
             .map(|(_, s)| s.timestamp_usecs / 1000000)
             .max()
             .unwrap();
+        if max_timestamp + 10 < fetch_timestamp {
+            return Err(anyhow!(
+                "None of the rest endpoints provided have chain timestamp within 10s of local time: {} < {}",
+                max_timestamp,
+                fetch_timestamp,
+            ));
+        }
+
+        let chain_id_from_instances = get_chain_id_from_instances(instance_states.clone())?;
+        let chain_id: ChainId = match maybe_chain_id {
+            Some(c) => c,
+            None => {
+                warn!(
+                    "Chain ID not provided, using the chain ID derived from the rest endpoints: {}",
+                    chain_id_from_instances
+                );
+                chain_id_from_instances
+            },
+        };
 
         for (instance, state) in instance_states.into_iter() {
             let state_timestamp = state.timestamp_usecs / 1000000;
@@ -101,18 +118,19 @@ impl Cluster {
                     state.chain_id,
                     chain_id.id(),
                 );
-            } else if state_timestamp + 20 + fetch_time_s < max_timestamp {
+            } else if state_timestamp + 10 < fetch_timestamp {
                 warn!(
-                    "Excluding Client {} too stale, {}, while chain at {} (delta of {}s)",
+                    "Excluding Client {} too stale, {}, while current time when fetching is {} (delta of {}s)",
                     instance.peer_name(),
                     state_timestamp,
-                    max_timestamp,
-                    max_timestamp - state_timestamp,
+                    fetch_timestamp,
+                    fetch_timestamp - state_timestamp,
                 );
             } else {
                 info!(
-                    "Client {} is healthy, adding to the list of end points for load testing",
-                    instance.peer_name()
+                    "Client {} is healthy ({}s delay), adding to the list of end points for load testing",
+                    instance.peer_name(),
+                    fetch_timestamp.saturating_sub(state_timestamp),
                 );
                 instances.push(instance);
             }
@@ -188,22 +206,7 @@ impl Cluster {
     }
 
     pub async fn load_coin_source_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        let account_key = self.account_key();
-        let address = if self.coin_source_is_root {
-            aptos_test_root_address()
-        } else {
-            account_key.authentication_key().account_address()
-        };
-
-        let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
-            format_err!(
-                "query_sequence_number on {:?} for account {} failed: {:?}",
-                client,
-                address,
-                e
-            )
-        })?;
-        Ok(LocalAccount::new(address, account_key, sequence_number))
+        load_specific_account(self.account_key(), self.coin_source_is_root, client).await
     }
 
     pub fn random_instance(&self) -> Instance {
@@ -216,5 +219,145 @@ impl Cluster {
 
     pub fn all_instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances.iter()
+    }
+}
+
+/// In the case that the chain_id is not provided, we can derive it from the instances
+/// Error if there there is a mix of chain_ids from the instances
+fn get_chain_id_from_instances(instance_states: Vec<(Instance, State)>) -> Result<ChainId> {
+    let num_instances = instance_states.len();
+    let mut chain_id_counts = std::collections::HashMap::new();
+    for (_, state) in instance_states {
+        *chain_id_counts.entry(state.chain_id).or_insert(0) += 1;
+    }
+    let (max_chain_id, num_instances_with_max_chain_id) = chain_id_counts
+        .into_iter()
+        .max_by_key(|&(_, count)| count)
+        .expect("Failed to get the most frequent chain ID from the instances");
+    if num_instances_with_max_chain_id < num_instances {
+        bail!(
+            "The most frequent chain ID {} is only present in {}/{} instances",
+            max_chain_id,
+            num_instances_with_max_chain_id,
+            num_instances
+        );
+    }
+    Ok(ChainId::new(max_chain_id))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_sdk::types::chain_id::ChainId;
+
+    fn create_dummy_rest_api_state(chain_id: u8) -> State {
+        State {
+            chain_id,
+            epoch: 0,
+            version: 0,
+            timestamp_usecs: 0,
+            oldest_ledger_version: 0,
+            oldest_block_height: 0,
+            block_height: 0,
+            cursor: None,
+        }
+    }
+
+    #[test]
+    fn test_get_chain_id_from_instances_mix() {
+        let chain_id_1 = ChainId::new(1);
+        let chain_id_2 = ChainId::new(2);
+        let chain_id_3 = ChainId::new(3);
+
+        // some dummy instances with a mix of chain_ids
+        // expect this to fail
+        let instance_states = vec![
+            (
+                Instance::new(
+                    "peer1".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_1.id()),
+            ),
+            (
+                Instance::new(
+                    "peer2".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_1.id()),
+            ),
+            (
+                Instance::new(
+                    "peer3".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_2.id()),
+            ),
+            (
+                Instance::new(
+                    "peer4".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+        ];
+
+        assert!(get_chain_id_from_instances(instance_states).is_err());
+    }
+
+    #[test]
+    fn test_get_chain_id_from_instances_ok() {
+        let chain_id_3 = ChainId::new(3);
+
+        // some dummy instances with a mix of chain_ids
+        // expect this to fail
+        let instance_states = vec![
+            (
+                Instance::new(
+                    "peer1".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+            (
+                Instance::new(
+                    "peer2".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+            (
+                Instance::new(
+                    "peer3".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+            (
+                Instance::new(
+                    "peer4".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+        ];
+
+        assert!(get_chain_id_from_instances(instance_states).is_ok_and(|x| x == chain_id_3),);
     }
 }

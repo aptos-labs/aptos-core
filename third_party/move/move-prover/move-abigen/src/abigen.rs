@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail};
-use heck::SnakeCase;
+use heck::ToSnakeCase;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_binary_format::{file_format::Ability, CompiledModule};
@@ -80,7 +80,7 @@ impl<'env> Abigen<'env> {
     /// Generates ABIs for all script modules in the environment (excluding the dependency set).
     pub fn gen(&mut self) {
         for module in self.env.get_modules() {
-            if module.is_target() {
+            if module.is_primary_target() {
                 let mut path = PathBuf::from(&self.options.output_directory);
                 // We make a directory for all of the script function ABIs in a module. But, if
                 // it's a script, we don't create a directory.
@@ -292,13 +292,13 @@ impl<'env> Abigen<'env> {
                 let struct_module_env = module_env.env.get_module(*module_id);
                 let abilities = struct_module_env.get_struct(*struct_id).get_abilities();
                 if abilities.has_ability(Ability::Copy) && !abilities.has_ability(Ability::Key) {
-                    let mut type_params = vec![];
+                    let mut type_args = vec![];
                     for e in vec_type {
-                        let type_param = match Self::get_type_tag(e, module_env)? {
+                        let type_arg = match Self::get_type_tag(e, module_env)? {
                             Some(type_param) => type_param,
                             None => return Ok(None),
                         };
-                        type_params.push(type_param);
+                        type_args.push(type_arg);
                     }
                     let address = if let Address::Numerical(a) = &struct_module_env.self_address() {
                         *a
@@ -316,7 +316,7 @@ impl<'env> Abigen<'env> {
                             .unwrap_or_else(|| {
                                 panic!("type {:?} is not allowed in entry function", ty0)
                             }),
-                        type_params,
+                        type_args,
                     }))
                 } else {
                     return Ok(None);

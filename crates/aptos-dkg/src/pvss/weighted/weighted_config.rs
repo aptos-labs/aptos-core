@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
@@ -28,7 +29,9 @@ pub struct WeightedConfig {
     /// `W[a, a + weight[player])`. Useful during weighted secret reconstruction.
     starting_index: Vec<usize>,
     /// The maximum weight of any player.
-    max_player_weight: usize,
+    max_weight: usize,
+    /// The minimum weight of any player.
+    min_weight: usize,
 }
 
 impl WeightedConfig {
@@ -45,13 +48,8 @@ impl WeightedConfig {
         if weights.is_empty() {
             return Err(anyhow!("expected a non-empty vector of player weights"));
         }
-        let max_player_weight = *weights.iter().max().unwrap();
-
-        for (idx, w) in weights.iter().enumerate() {
-            if *w == 0 {
-                return Err(anyhow!("expected player at index {idx} to have weight > 0"));
-            }
-        }
+        let max_weight = *weights.iter().max().unwrap();
+        let min_weight = *weights.iter().min().unwrap();
 
         let n = weights.len();
         let W = weights.iter().sum();
@@ -75,12 +73,47 @@ impl WeightedConfig {
             num_players: n,
             weight: weights,
             starting_index,
-            max_player_weight,
+            max_weight,
+            min_weight,
         })
     }
 
-    pub fn get_max_player_weight(&self) -> usize {
-        self.max_player_weight
+    pub fn get_min_weight(&self) -> usize {
+        self.min_weight
+    }
+
+    /// Returns _a_ player who has the smallest weight.
+    pub fn get_min_weight_player(&self) -> Player {
+        if let Some((i, _weight)) = self
+            .weight
+            .iter()
+            .enumerate()
+            .min_by_key(|&(_, &weight)| weight)
+        {
+            // println!("Player {} has the smallest weight: {}", i, _weight);
+            self.get_player(i)
+        } else {
+            panic!("Weights vector should not be empty");
+        }
+    }
+
+    /// Returns _a_ player who has the largest weight.
+    pub fn get_max_weight_player(&self) -> Player {
+        if let Some((i, _weight)) = self
+            .weight
+            .iter()
+            .enumerate()
+            .max_by_key(|&(_, &weight)| weight)
+        {
+            // println!("Player {} has the largest weight: {}", i, _weight);
+            self.get_player(i)
+        } else {
+            panic!("Weights vector should not be empty");
+        }
+    }
+
+    pub fn get_max_weight(&self) -> usize {
+        self.max_weight
     }
 
     pub fn get_threshold_config(&self) -> &ThresholdConfig {
@@ -130,7 +163,6 @@ impl WeightedConfig {
     ///
     /// Returns the index of this player's share in the vector of shares, or None if out of bounds.
     pub fn get_share_index(&self, i: usize, j: usize) -> Option<usize> {
-        assert_lt!(i, self.tc.n);
         if j < self.weight[i] {
             Some(self.starting_index[i] + j)
         } else {
@@ -311,12 +343,26 @@ mod test {
         assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
         assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).id, 1);
 
-        // 2-out-of-2, weights 1, 1
-        let _wc = WeightedConfig::new(1, vec![1, 1]).unwrap();
-        assert_eq!(wc.starting_index.len(), 2);
-        assert_eq!(wc.starting_index[0], 0);
-        assert_eq!(wc.starting_index[1], 1);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).id, 1);
+        // 3-out-of-5, some weights are 0.
+        let wc = WeightedConfig::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap();
+        assert_eq!(
+            vec![0, 0, 0, 0, 2, 4, 6, 6, 6, 6, 9, 12, 15, 15, 15],
+            wc.starting_index
+        );
+        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 0).id, 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 1).id, 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 0).id, 2);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 1).id, 3);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 0).id, 4);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 1).id, 5);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 0).id, 6);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 1).id, 7);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 2).id, 8);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 0).id, 9);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 1).id, 10);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 2).id, 11);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 0).id, 12);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 1).id, 13);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 2).id, 14);
     }
 }

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
 use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};

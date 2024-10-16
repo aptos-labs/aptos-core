@@ -58,7 +58,8 @@ pub struct AccountBalanceMetadata {
     pub operators: Option<Vec<AccountAddress>>,
     pub lockup_expiration_time_utc: U64,
 }
-/// Reqyest a block (version) on the account
+
+/// Request a block (version) on the account
 ///
 /// With neither value for PartialBlockIdentifier, get the latest version
 ///

@@ -25,10 +25,10 @@ use std::{
 
 pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
     StateKey::table_item(
-        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
+        &"1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
             .parse()
             .unwrap(),
-        vec![
+        &[
             6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
             245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
         ],

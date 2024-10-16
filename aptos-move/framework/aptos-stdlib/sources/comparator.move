@@ -11,16 +11,16 @@ module aptos_std::comparator {
         inner: u8,
     }
 
-    public fun is_equal(result: &Result): bool {
-        result.inner == EQUAL
+    public fun is_equal(self: &Result): bool {
+        self.inner == EQUAL
     }
 
-    public fun is_smaller_than(result: &Result): bool {
-        result.inner == SMALLER
+    public fun is_smaller_than(self: &Result): bool {
+        self.inner == SMALLER
     }
 
-    public fun is_greater_than(result: &Result): bool {
-        result.inner == GREATER
+    public fun is_greater_than(self: &Result): bool {
+        self.inner == GREATER
     }
 
     // Performs a comparison of two types after BCS serialization.

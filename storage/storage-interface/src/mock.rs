@@ -6,18 +6,13 @@
 
 use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::AccountResource,
-    account_state::AccountState,
-    event::EventHandle,
     proof::SparseMerkleProofExt,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValue,
     },
     transaction::Version,
 };
-use move_core_types::move_resource::MoveResource;
 
 /// This is a mock of the DbReaderWriter in tests.
 pub struct MockDbReaderWriter;
@@ -32,6 +27,7 @@ impl DbReader for MockDbReaderWriter {
         &self,
         _state_key: &StateKey,
         _version: Version,
+        _root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         Ok(SparseMerkleProofExt::new(None, vec![]))
     }
@@ -42,13 +38,7 @@ impl DbReader for MockDbReaderWriter {
         _: Version,
     ) -> Result<Option<StateValue>> {
         match state_key.inner() {
-            StateKeyInner::AccessPath(access_path) => {
-                let account_state = get_mock_account_state();
-                Ok(account_state
-                    .get(&access_path.path)
-                    .cloned()
-                    .map(StateValue::from))
-            },
+            StateKeyInner::AccessPath(..) => Ok(None),
             StateKeyInner::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
             _ => Err(AptosDbError::Other(format!(
                 "Not supported state key type {:?}",
@@ -66,19 +56,6 @@ impl DbReader for MockDbReaderWriter {
             .get_state_value_by_version(state_key, version)?
             .map(|value| (version, value)))
     }
-}
-
-fn get_mock_account_state() -> AccountState {
-    let account_resource =
-        AccountResource::new(0, vec![], EventHandle::random(0), EventHandle::random(0));
-
-    AccountState::new(
-        AccountAddress::random(),
-        std::collections::BTreeMap::from([(
-            AccountResource::resource_path(),
-            bcs::to_bytes(&account_resource).unwrap(),
-        )]),
-    )
 }
 
 impl DbWriter for MockDbReaderWriter {}

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
@@ -68,6 +69,7 @@ impl ChainHealthBackoff {
 impl TChainHealth for ChainHealthBackoff {
     fn get_round_backoff(&self, round: Round) -> Option<Duration> {
         let chain_health_backoff = self.get_chain_health_backoff(round);
+
         if let Some(value) = chain_health_backoff {
             CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
             Some(Duration::from_millis(value.backoff_proposal_delay_ms))
@@ -79,9 +81,10 @@ impl TChainHealth for ChainHealthBackoff {
 
     fn get_round_payload_limits(&self, round: Round) -> Option<(u64, u64)> {
         let chain_health_backoff = self.get_chain_health_backoff(round);
+
         chain_health_backoff.map(|value| {
             (
-                value.max_sending_block_txns_override,
+                value.max_sending_block_txns_after_filtering_override,
                 value.max_sending_block_bytes_override,
             )
         })

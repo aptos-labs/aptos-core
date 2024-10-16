@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/checking/variants/variants_check_duplicate_variant_err.move:7:9
+  │
+4 │         RGB{red: u64, green: u64, blue: u64},
+  │         ------------------------------------ Variant previously defined here
+  ·
+7 │         RGB{red: u64, green: u64, blue: u64},
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Duplicate definition for variant 'RGB'

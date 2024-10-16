@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::health::HealthBackoff;
+use super::{dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule};
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
         dag_network::RpcHandler,
-        dag_store::Dag,
         errors::NodeBroadcastHandleError,
         observability::{
             logging::{LogEvent, LogSchema},
@@ -21,40 +20,49 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{Features, ValidatorTxnConfig},
+    on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
 };
 use async_trait::async_trait;
+use claims::assert_some;
+use dashmap::DashSet;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
-    dag: Arc<RwLock<Dag>>,
-    votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
+    dag: Arc<DagStore>,
+    order_rule: Arc<dyn TOrderRule>,
+    /// Note: The mutex around BTreeMap is to work around Rust Sync semantics.
+    /// Fine grained concurrency is implemented by the DashSet below.
+    votes_by_round_peer: Mutex<BTreeMap<Round, BTreeMap<Author, Vote>>>,
+    votes_fine_grained_lock: DashSet<(Round, Author)>,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
     vtxn_config: ValidatorTxnConfig,
-    features: Features,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
     health_backoff: HealthBackoff,
 }
 
 impl NodeBroadcastHandler {
     pub fn new(
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<DagStore>,
+        order_rule: Arc<dyn TOrderRule>,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
         vtxn_config: ValidatorTxnConfig,
-        features: Features,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
         health_backoff: HealthBackoff,
     ) -> Self {
         let epoch = epoch_state.epoch;
@@ -62,28 +70,33 @@ impl NodeBroadcastHandler {
 
         Self {
             dag,
-            votes_by_round_peer,
+            order_rule,
+            votes_by_round_peer: Mutex::new(votes_by_round_peer),
+            votes_fine_grained_lock: DashSet::with_capacity(epoch_state.verifier.len() * 10),
             signer,
             epoch_state,
             storage,
             fetch_requester,
             payload_config,
             vtxn_config,
-            features,
+            randomness_config,
+            jwk_consensus_config,
             health_backoff,
         }
     }
 
-    pub fn gc(&mut self) {
+    pub fn gc(&self) {
         let lowest_round = self.dag.read().lowest_round();
         if let Err(e) = self.gc_before_round(lowest_round) {
             error!("Error deleting votes: {}", e);
         }
     }
 
-    pub fn gc_before_round(&mut self, min_round: Round) -> anyhow::Result<()> {
-        let to_retain = self.votes_by_round_peer.split_off(&min_round);
-        let to_delete = mem::replace(&mut self.votes_by_round_peer, to_retain);
+    pub fn gc_before_round(&self, min_round: Round) -> anyhow::Result<()> {
+        let mut votes_by_round_peer_guard = self.votes_by_round_peer.lock();
+        let to_retain = votes_by_round_peer_guard.split_off(&min_round);
+        let to_delete = mem::replace(&mut *votes_by_round_peer_guard, to_retain);
+        drop(votes_by_round_peer_guard);
 
         let to_delete = to_delete
             .iter()
@@ -97,11 +110,18 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
+        ensure!(
+            node.epoch() == self.epoch_state.epoch,
+            "different epoch {}, current {}",
+            node.epoch(),
+            self.epoch_state.epoch
+        );
+
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         for vtxn in node.validator_txns() {
             ensure!(
-                is_vtxn_expected(&self.features, vtxn),
+                is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                 "unexpected validator transaction: {:?}",
                 vtxn.topic()
             );
@@ -192,11 +212,20 @@ impl RpcHandler for NodeBroadcastHandler {
     type Request = Node;
     type Response = Vote;
 
-    async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&self, node: Self::Request) -> anyhow::Result<Self::Response> {
         ensure!(
             !self.health_backoff.stop_voting(),
             NodeBroadcastHandleError::VoteRefused
         );
+
+        let key = (node.round(), *node.author());
+        ensure!(
+            self.votes_fine_grained_lock.insert(key),
+            "concurrent insertion"
+        );
+        defer!({
+            assert_some!(self.votes_fine_grained_lock.remove(&key));
+        });
 
         let node = self.validate(node)?;
         observe_node(node.timestamp(), NodeStage::NodeReceived);
@@ -204,24 +233,31 @@ impl RpcHandler for NodeBroadcastHandler {
             .remote_peer(*node.author())
             .round(node.round()));
 
-        let votes_by_peer = self
+        if let Some(ack) = self
             .votes_by_round_peer
-            .entry(node.metadata().round())
-            .or_default();
-        match votes_by_peer.get(node.metadata().author()) {
-            None => {
-                let signature = node.sign_vote(&self.signer)?;
-                let vote = Vote::new(node.metadata().clone(), signature);
-
-                self.storage.save_vote(&node.id(), &vote)?;
-                votes_by_peer.insert(*node.author(), vote.clone());
-
-                debug!(LogSchema::new(LogEvent::Vote)
-                    .remote_peer(*node.author())
-                    .round(node.round()));
-                Ok(vote)
-            },
-            Some(ack) => Ok(ack.clone()),
+            .lock()
+            .entry(node.round())
+            .or_default()
+            .get(node.author())
+        {
+            return Ok(ack.clone());
         }
+
+        let signature = node.sign_vote(&self.signer)?;
+        let vote = Vote::new(node.metadata().clone(), signature);
+        self.storage.save_vote(&node.id(), &vote)?;
+        self.votes_by_round_peer
+            .lock()
+            .get_mut(&node.round())
+            .expect("must exist")
+            .insert(*node.author(), vote.clone());
+
+        self.dag.write().update_votes(&node, false);
+        self.order_rule.process_new_node(node.metadata());
+
+        debug!(LogSchema::new(LogEvent::Vote)
+            .remote_peer(*node.author())
+            .round(node.round()));
+        Ok(vote)
     }
 }

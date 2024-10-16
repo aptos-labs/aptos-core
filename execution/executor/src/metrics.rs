@@ -4,11 +4,12 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
+    IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
-pub static APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_execute_chunk_seconds",
@@ -19,7 +20,7 @@ pub static APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_APPLY_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static APPLY_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_apply_chunk_seconds",
@@ -30,7 +31,7 @@ pub static APTOS_EXECUTOR_APPLY_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static COMMIT_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_commit_chunk_seconds",
@@ -41,7 +42,7 @@ pub static APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static VM_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_vm_execute_block_seconds",
@@ -52,7 +53,7 @@ pub static APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_executor_other_timers_seconds",
@@ -64,11 +65,11 @@ pub static APTOS_EXECUTOR_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
+pub static EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
 });
 
-pub static APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_execute_block_seconds",
@@ -79,7 +80,7 @@ pub static APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static UPDATE_LEDGER: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_ledger_update_seconds",
@@ -90,7 +91,7 @@ pub static APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static APTOS_CHUNK_EXECUTOR_OTHER_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static CHUNK_OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_chunk_executor_other_seconds",
@@ -102,7 +103,7 @@ pub static APTOS_CHUNK_EXECUTOR_OTHER_SECONDS: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static VM_EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_vm_execute_chunk_seconds",
@@ -113,7 +114,7 @@ pub static APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static COMMIT_BLOCKS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_commit_blocks_seconds",
@@ -124,7 +125,7 @@ pub static APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+pub static SAVE_TRANSACTIONS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_save_transactions_seconds",
@@ -135,7 +136,7 @@ pub static APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS: Lazy<Histogram> = Lazy::new
     .unwrap()
 });
 
-pub static APTOS_EXECUTOR_TRANSACTIONS_SAVED: Lazy<Histogram> = Lazy::new(|| {
+pub static TRANSACTIONS_SAVED: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_executor_transactions_saved",
@@ -150,7 +151,7 @@ pub static APTOS_EXECUTOR_TRANSACTIONS_SAVED: Lazy<Histogram> = Lazy::new(|| {
 //////////////////////////////////////
 
 /// Count of the executed transactions since last restart.
-pub static APTOS_PROCESSED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_processed_txns_count",
         "Count of the transactions since last restart. state is success, failed or retry",
@@ -160,7 +161,7 @@ pub static APTOS_PROCESSED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 /// Count of the executed transactions since last restart.
-pub static APTOS_PROCESSED_FAILED_TXNS_REASON_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSED_FAILED_TXNS_REASON_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_processed_failed_txns_reason_count",
         "Count of the transactions since last restart. state is success, failed or retry",
@@ -170,7 +171,7 @@ pub static APTOS_PROCESSED_FAILED_TXNS_REASON_COUNT: Lazy<IntCounterVec> = Lazy:
 });
 
 /// Counter of executed user transactions by payload type
-pub static APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSED_USER_TXNS_BY_PAYLOAD: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_processed_user_transactions_by_payload",
         "Counter of processed user transactions by payload type",
@@ -180,18 +181,17 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE: Lazy<IntCounterVec> =
 });
 
 /// Counter of executed EntryFunction user transactions by module
-pub static APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_MODULE: Lazy<IntCounterVec> =
-    Lazy::new(|| {
-        register_int_counter_vec!(
-            "aptos_processed_user_transactions_entry_function_by_module",
-            "Counter of processed EntryFunction user transactions by module",
-            &["is_detailed", "process", "account", "name", "state"]
-        )
-        .unwrap()
-    });
+pub static PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_MODULE: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_processed_user_transactions_entry_function_by_module",
+        "Counter of processed EntryFunction user transactions by module",
+        &["is_detailed", "process", "account", "name", "state"]
+    )
+    .unwrap()
+});
 
 /// Counter of executed EntryFunction user transaction for core address by method
-pub static APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_CORE_METHOD: Lazy<IntCounterVec> =
+pub static PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_CORE_METHOD: Lazy<IntCounterVec> =
     Lazy::new(|| {
         register_int_counter_vec!(
             "aptos_processed_user_transactions_entry_function_by_core_method",
@@ -202,7 +202,7 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_CORE_METHOD: Lazy<In
     });
 
 /// Counter of executed EntryFunction user transaction for core address by method
-pub static APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSED_USER_TXNS_CORE_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_processed_user_transactions_core_events",
         "Counter of processed EntryFunction user transaction for core address by method",
@@ -211,11 +211,40 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS: Lazy<IntCounterVec> = 
     .unwrap()
 });
 
-pub static APTOS_PROCESSED_TXNS_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static PROCESSED_TXNS_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "aptos_processed_txns_output_size",
-        "Histogram of transaction outputs",
+        "Histogram of transaction output sizes",
+        &["process"],
         exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 25).unwrap()
+    )
+    .unwrap()
+});
+
+pub static PROCESSED_TXNS_NUM_AUTHENTICATORS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_processed_txns_num_authenticators",
+        "Histogram of number of authenticators in a transaction",
+        &["process"],
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 6).unwrap()
+    )
+    .unwrap()
+});
+
+pub static PROCESSED_TXNS_AUTHENTICATOR: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_processed_txns_authenticator",
+        "Counter of authenticators by type, for processed transactions",
+        &["process", "auth_type"]
+    )
+    .unwrap()
+});
+
+pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_executor_call_concurrency",
+        "Call concurrency by API.",
+        &["executor", "call"]
     )
     .unwrap()
 });

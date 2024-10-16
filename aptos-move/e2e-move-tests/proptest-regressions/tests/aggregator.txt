@@ -4,5 +4,5 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc 29ff577b59ed799377eed4cc25edb500730068f10c46b66793fa70c0bbc8e0b6 # shrinks to block_split = Whole
-cc 0236a1bba591a25b2aa4e0cc78bb87c3475f8da01aeb46cf9ea9eb3cbeeca7d0 # shrinks to block_split = Whole
+cc 0d06e418a86d5a07e5ac65d22e86d78a819989e1e0815db4750efcc12dc9d905 # shrinks to block_split = Whole
+cc c5ad38cf3be8dea3f90d1504b070a030228a03829c63964d2855e8946d17ffe6 # shrinks to block_split = Whole

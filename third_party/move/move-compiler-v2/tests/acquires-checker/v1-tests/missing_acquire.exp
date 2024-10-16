@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: missing acquires annotation for `R1`
+  ┌─ tests/acquires-checker/v1-tests/missing_acquire.move:5:9
+  │
+5 │     fun t1(a: address) acquires R2 {
+  │         ^^
+  ·
+9 │         borrow_global<R1>(a);
+  │         -------------------- acquired here

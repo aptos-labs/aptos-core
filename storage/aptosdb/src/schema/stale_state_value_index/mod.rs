@@ -43,7 +43,7 @@ impl KeyCodec<StaleStateValueIndexSchema> for StaleStateValueIndex {
         let mut encoded = vec![];
         encoded.write_u64::<BigEndian>(self.stale_since_version)?;
         encoded.write_u64::<BigEndian>(self.version)?;
-        encoded.write_all(&self.state_key.encode()?)?;
+        encoded.write_all(self.state_key.encoded())?;
 
         Ok(encoded)
     }

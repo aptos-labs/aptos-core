@@ -44,6 +44,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 2,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "2"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -71,16 +89,59 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::state_storage::StateStorageUsage",
           "data": "state storage omitted"
         },
         "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x01000000",
+        "value": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121010000000000000001000000000000000100000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef0020a1070000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121",
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "1",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "500000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -114,7 +175,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "9",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -276,11 +337,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-          "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "execution_gas_units": "5",
+          "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "9"
         }
       }
     ],

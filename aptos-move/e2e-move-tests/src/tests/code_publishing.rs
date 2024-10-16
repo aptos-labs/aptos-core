@@ -92,6 +92,56 @@ fn code_publishing_upgrade_success_compat() {
 }
 
 #[test]
+fn code_publishing_disallow_native() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_vm_status!(
+        h.publish_package_cache_building(
+            &acc,
+            &common::test_dir_path("code_publishing.data/pack_native"),
+        ),
+        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    );
+}
+
+#[test]
+fn code_publishing_disallow_native_entry_func() {
+    let mut h = MoveHarness::new();
+    // Disable feature for now to publish the package.
+    h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_cache_building(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_native"),
+    ));
+
+    // Re-enable the flag to test the behavior for this entry native
+    h.enable_features(vec![FeatureFlag::DISALLOW_USER_NATIVES], vec![]);
+    assert_vm_status!(
+        h.run_entry_function(
+            &acc,
+            str::parse("0xcafe::test::hello").unwrap(),
+            vec![],
+            vec![]
+        ),
+        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    );
+}
+
+#[test]
+fn code_publishing_allow_system_native() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
+
+    assert_success!(h.publish_package_cache_building(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_native_system"),
+    ));
+}
+
+#[test]
 fn code_publishing_upgrade_fail_compat() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
@@ -182,10 +232,17 @@ fn code_publishing_upgrade_loader_cache_consistency() {
             |_| {},
         ),
     ];
-    let result = h.run_block(txns);
-    assert_success!(result[0]);
-    assert_success!(result[1]);
-    assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+    let result = h.run_block_get_output(txns);
+    assert_success!(result[0].status().to_owned());
+    assert_success!(result[1].status().to_owned());
+    assert_eq!(
+        result[2]
+            .auxiliary_data()
+            .get_detail_error_message()
+            .unwrap()
+            .status_code(),
+        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
+    )
 }
 
 #[test]

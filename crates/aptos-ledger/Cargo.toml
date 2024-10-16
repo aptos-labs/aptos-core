@@ -18,5 +18,4 @@ aptos-types = { workspace = true }
 hex = { workspace = true }
 ledger-apdu = "0.10.0"
 ledger-transport-hid = "0.10.0"
-once_cell = { workspace = true }
 thiserror = { workspace = true }

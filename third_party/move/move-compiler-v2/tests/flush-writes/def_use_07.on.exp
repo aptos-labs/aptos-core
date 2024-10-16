@@ -1,0 +1,68 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+  0: $t1 := m::one()
+     # live vars: $t1
+  1: $t2 := m::foo($t1)
+     # live vars: $t2
+  2: $t1 := move($t2)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+one(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test(): u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+B0:
+	0: Call one(): u64
+	1: Call foo(u64): u64
+	2: Ret
+}
+}
+============ bytecode verification succeeded ========

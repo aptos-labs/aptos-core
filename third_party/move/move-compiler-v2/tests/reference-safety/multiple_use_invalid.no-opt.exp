@@ -1,0 +1,27 @@
+
+Diagnostics:
+error: cannot transfer mutable value since it is borrowed
+  ┌─ tests/reference-safety/multiple_use_invalid.move:5:9
+  │
+5 │         s(&mut s.x, &mut s.x)
+  │         ^^^^^^^^^^^^^^^^^^^^^
+  │         │ │
+  │         │ previously mutably borrowed here
+  │         transfer attempted here
+
+error: cannot transfer mutable local `r` since it is borrowed
+   ┌─ tests/reference-safety/multiple_use_invalid.move:11:9
+   │
+10 │         let x = r;
+   │                 - previously mutably borrowed here
+11 │         s(r, x)
+   │         ^^^^^^^ transfer attempted here
+
+error: cannot transfer mutable local `r2` since it is borrowed
+   ┌─ tests/reference-safety/multiple_use_invalid.move:20:9
+   │
+18 │         let r1 = &mut x;
+   │                  ------ previously mutably borrowed here
+19 │         let r2 = &mut x;
+20 │         s(r1, r2)
+   │         ^^^^^^^^^ transfer attempted here

@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: cannot mutably borrow field `g` of value which is already borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/factor_invalid_2.move:8:9
+  │
+6 │         let eps = if (cond) bar(root) else &x1;
+  │                             --------- previously borrowed here
+7 │         // Error: root has weak empty borrow and hence a field cannot be borrowed mutably
+8 │         &mut root.g;
+  │         ^^^^^^^^^^^ borrow attempted here
+9 │         eps;
+  │         --- conflicting reference `eps` used here

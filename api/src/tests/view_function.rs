@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{new_test_context, new_test_context_with_config};
-use aptos_api_test_context::current_function_name;
+use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{NodeConfig, ViewFilter, ViewFunctionId};
 use aptos_types::account_address::AccountAddress;
 use serde_json::{json, Value};
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 fn build_coin_balance_request(address: &AccountAddress) -> Value {
     json!({
@@ -41,6 +41,37 @@ async fn test_simple_view() {
         .await;
 
     context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_view_gas_used_header() {
+    let mut context = new_test_context(current_function_name!());
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator).await;
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    let req = warp::test::request()
+        .method("POST")
+        .path("/v1/view")
+        .json(&build_coin_balance_request(&owner.address()));
+    let resp = context.reply(req).await;
+
+    // Confirm the gas used header is present.
+    assert!(
+        resp.headers()
+            .get("X-Aptos-Gas-Used")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            > 0
+    );
+
+    context.check_golden_output_no_prune(serde_json::from_slice(resp.body()).unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -188,7 +219,32 @@ async fn test_view_tuple() {
         .post(
             "/view",
             json!({
-                "function":"0xa550c18::test_module::return_tuple",
+                "function": "0xa550c18::test_module::return_tuple",
+                "arguments": [],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_view_aggregator() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.root_account().await;
+
+    let named_addresses = vec![("addr".to_string(), account.address())];
+    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_counter");
+    let payload = TestContext::build_package(path, named_addresses);
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    context.commit_block(&vec![txn]).await;
+
+    let function = format!("{}::counter::add_and_get_counter_value", account.address());
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": function,
                 "arguments": [],
                 "type_arguments": [],
             }),

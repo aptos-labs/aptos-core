@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: type `R` is missing required ability `copy`
+  ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_lvalues_pack_type_args.move:8:20
+  │
+2 │     struct CupC<phantom T: copy> {}
+  │                         - declaration of type parameter `T`
+  ·
+8 │         let B<CupC<R>> {} = abort 0;
+  │                    ^
+  │
+  = required by instantiating type parameter `phantom T:copy` of struct `CupC`

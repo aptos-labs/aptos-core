@@ -20,9 +20,10 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
-    ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
+    ConsensusCommitNotification, ConsensusNotification, ConsensusSyncDurationNotification,
+    ConsensusSyncTargetNotification,
 };
 use aptos_data_client::interface::AptosDataClientInterface;
 use aptos_data_streaming_service::streaming_client::{
@@ -45,6 +46,7 @@ use tokio::{
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver
+const DRIVER_INFO_LOG_FREQ_SECS: u64 = 2;
 const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// The configuration of the state sync driver
@@ -52,6 +54,9 @@ const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 pub struct DriverConfiguration {
     // The config file of the driver
     pub config: StateSyncDriverConfig,
+
+    // The config for consensus observer
+    pub consensus_observer_config: ConsensusObserverConfig,
 
     // The role of the node
     pub role: RoleType,
@@ -61,9 +66,15 @@ pub struct DriverConfiguration {
 }
 
 impl DriverConfiguration {
-    pub fn new(config: StateSyncDriverConfig, role: RoleType, waypoint: Waypoint) -> Self {
+    pub fn new(
+        config: StateSyncDriverConfig,
+        consensus_observer_config: ConsensusObserverConfig,
+        role: RoleType,
+        waypoint: Waypoint,
+    ) -> Self {
         Self {
             config,
+            consensus_observer_config,
             role,
             waypoint,
         }
@@ -88,7 +99,7 @@ pub struct StateSyncDriver<
     // The listener for commit notifications
     commit_notification_listener: CommitNotificationListener,
 
-    // The handler for notifications from consensus
+    // The handler for notifications from consensus or consensus observer
     consensus_notification_handler: ConsensusNotificationHandler,
 
     // The component that manages the continuous syncing of the node
@@ -142,6 +153,7 @@ impl<
         StreamingClient,
     >
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_notification_listener: ClientNotificationListener,
         commit_notification_listener: CommitNotificationListener,
@@ -213,12 +225,10 @@ impl<
                     self.handle_client_notification(notification).await;
                 },
                 notification = self.commit_notification_listener.select_next_some() => {
-                    // TODO(joshlind): we should probably just remove this path
-                    // now that we aren't reusing it.
-                    self.handle_commit_notification(notification).await;
+                    self.handle_snapshot_commit_notification(notification).await;
                 }
                 notification = self.consensus_notification_handler.select_next_some() => {
-                    self.handle_consensus_notification(notification).await;
+                    self.handle_consensus_or_observer_notification(notification).await;
                 }
                 notification = self.error_notification_listener.select_next_some() => {
                     self.handle_error_notification(notification).await;
@@ -230,11 +240,13 @@ impl<
         }
     }
 
-    /// Handles a notification sent by consensus
-    async fn handle_consensus_notification(&mut self, notification: ConsensusNotification) {
-        // Verify the notification: full nodes shouldn't receive notifications
-        // and consensus should only send notifications after bootstrapping!
-        let result = if self.driver_configuration.role == RoleType::FullNode {
+    /// Handles a notification sent by consensus or consensus observer
+    async fn handle_consensus_or_observer_notification(
+        &mut self,
+        notification: ConsensusNotification,
+    ) {
+        // Verify the notification before processing it
+        let result = if !self.is_consensus_or_observer_enabled() {
             Err(Error::FullNodeConsensusNotification(format!(
                 "Received consensus notification: {:?}",
                 notification
@@ -248,20 +260,27 @@ impl<
             Ok(())
         };
 
-        // Respond to consensus with any verification errors and then return
+        // Handle any verification errors
         if let Err(error) = result {
             match notification {
                 ConsensusNotification::NotifyCommit(commit_notification) => {
                     let _ = self
                         .consensus_notification_handler
-                        .respond_to_commit_notification(commit_notification, Err(error.clone()))
-                        .await;
+                        .respond_to_commit_notification(commit_notification, Err(error.clone()));
                 },
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     let _ = self
                         .consensus_notification_handler
-                        .respond_to_sync_notification(sync_notification, Err(error.clone()))
-                        .await;
+                        .respond_to_sync_target_notification(sync_notification, Err(error.clone()));
+                },
+                ConsensusNotification::SyncForDuration(sync_notification) => {
+                    let _ = self
+                        .consensus_notification_handler
+                        .respond_to_sync_duration_notification(
+                            sync_notification,
+                            Err(error.clone()),
+                            None,
+                        );
                 },
             }
             warn!(LogSchema::new(LogEntry::ConsensusNotification)
@@ -277,7 +296,11 @@ impl<
                     .await
             },
             ConsensusNotification::SyncToTarget(sync_notification) => {
-                self.handle_consensus_sync_notification(sync_notification)
+                self.handle_consensus_sync_target_notification(sync_notification)
+                    .await
+            },
+            ConsensusNotification::SyncForDuration(sync_notification) => {
+                self.handle_consensus_sync_duration_notification(sync_notification)
                     .await
             },
         };
@@ -290,26 +313,24 @@ impl<
         }
     }
 
-    /// Handles a commit notification sent by consensus
+    /// Handles a commit notification sent by consensus or consensus observer
     async fn handle_consensus_commit_notification(
         &mut self,
-        consensus_commit_notification: ConsensusCommitNotification,
+        commit_notification: ConsensusCommitNotification,
     ) -> Result<(), Error> {
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
                 "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
-                consensus_commit_notification.transactions.len(),
-                consensus_commit_notification.subscribable_events.len()
+                commit_notification.get_transactions().len(),
+                commit_notification.get_subscribable_events().len()
             ))
         );
-        self.update_consensus_commit_metrics(&consensus_commit_notification);
-
-        // TODO(joshlind): can we get consensus to forward the events?
+        self.update_consensus_commit_metrics(&commit_notification);
 
         // Handle the commit notification
         let committed_transactions = CommittedTransactions {
-            events: consensus_commit_notification.subscribable_events.clone(),
-            transactions: consensus_commit_notification.transactions.clone(),
+            events: commit_notification.get_subscribable_events().clone(),
+            transactions: commit_notification.get_transactions().clone(),
         };
         utils::handle_committed_transactions(
             committed_transactions,
@@ -320,10 +341,9 @@ impl<
         )
         .await;
 
-        // Respond to consensus successfully
+        // Respond successfully
         self.consensus_notification_handler
-            .respond_to_commit_notification(consensus_commit_notification, Ok(()))
-            .await?;
+            .respond_to_commit_notification(commit_notification, Ok(()))?;
 
         // Check the progress of any sync requests. We need this here because
         // consensus might issue a sync request and then commit (asynchronously).
@@ -351,13 +371,13 @@ impl<
             metrics::increment_gauge(
                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                 operation.get_label(),
-                consensus_commit_notification.transactions.len() as u64,
+                consensus_commit_notification.get_transactions().len() as u64,
             );
         }
 
         // Update the synced epoch
         if consensus_commit_notification
-            .subscribable_events
+            .get_subscribable_events()
             .iter()
             .any(ContractEvent::is_new_epoch_event)
         {
@@ -365,28 +385,53 @@ impl<
         }
     }
 
-    /// Handles a consensus notification to sync to a specified target
-    async fn handle_consensus_sync_notification(
+    /// Handles a consensus or consensus observer request to sync for a specified duration
+    async fn handle_consensus_sync_duration_notification(
         &mut self,
-        sync_notification: ConsensusSyncNotification,
+        sync_duration_notification: ConsensusSyncDurationNotification,
     ) -> Result<(), Error> {
-        let latest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
+        // Update the sync duration notification metrics
+        let latest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
-            "Received a consensus sync notification! Target version: {:?}. Latest synced version: {:?}",
-            sync_notification.target, latest_synced_version,
+                "Received a consensus sync duration notification! Duration: {:?}. Latest synced version: {:?}",
+                sync_duration_notification.get_duration(), latest_synced_version,
             ))
         );
         metrics::increment_counter(
             &metrics::DRIVER_COUNTERS,
-            metrics::DRIVER_CONSENSUS_SYNC_NOTIFICATION,
+            metrics::DRIVER_CONSENSUS_SYNC_DURATION_NOTIFICATION,
+        );
+
+        // Initialize a new sync request
+        self.consensus_notification_handler
+            .initialize_sync_duration_request(sync_duration_notification)
+            .await
+    }
+
+    /// Handles a consensus or consensus observer request to sync to a specified target
+    async fn handle_consensus_sync_target_notification(
+        &mut self,
+        sync_target_notification: ConsensusSyncTargetNotification,
+    ) -> Result<(), Error> {
+        // Update the sync target notification metrics
+        let latest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        info!(
+            LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
+                "Received a consensus sync target notification! Target version: {:?}. Latest synced version: {:?}",
+                sync_target_notification.get_target(), latest_synced_version,
+            ))
+        );
+        metrics::increment_counter(
+            &metrics::DRIVER_COUNTERS,
+            metrics::DRIVER_CONSENSUS_SYNC_TARGET_NOTIFICATION,
         );
 
         // Initialize a new sync request
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         self.consensus_notification_handler
-            .initialize_sync_request(sync_notification, latest_synced_ledger_info)
+            .initialize_sync_target_request(sync_target_notification, latest_synced_ledger_info)
             .await
     }
 
@@ -415,9 +460,11 @@ impl<
         }
     }
 
-    /// Handles a commit notification sent by the storage synchronizer for a
-    /// new state snapshot.
-    async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
+    /// Handles a notification from the storage synchronizer for a new state snapshot
+    async fn handle_snapshot_commit_notification(
+        &mut self,
+        commit_notification: CommitNotification,
+    ) {
         let CommitNotification::CommittedStateSnapshot(committed_snapshot) = commit_notification;
         info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
@@ -479,31 +526,27 @@ impl<
         };
     }
 
-    /// Checks if the node has successfully reached the sync target
+    /// Checks if the node has successfully reached the sync target or duration
     async fn check_sync_request_progress(&mut self) -> Result<(), Error> {
-        if !self.active_sync_request() {
-            return Ok(()); // There's no pending sync request
+        // Check if the sync request has been satisfied
+        let consensus_sync_request = self.consensus_notification_handler.get_sync_request();
+        match consensus_sync_request.lock().as_ref() {
+            Some(consensus_sync_request) => {
+                let latest_synced_ledger_info =
+                    utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
+                if !consensus_sync_request
+                    .sync_request_satisfied(&latest_synced_ledger_info, self.time_service.clone())
+                {
+                    return Ok(()); // The sync request hasn't been satisfied yet
+                }
+            },
+            None => {
+                return Ok(()); // There's no active sync request
+            },
         }
 
-        // There's a sync request. Fetch it and check if we're still behind the target.
-        let sync_request = self.consensus_notification_handler.get_sync_request();
-        let sync_target_version = sync_request
-            .lock()
-            .as_ref()
-            .ok_or_else(|| {
-                Error::UnexpectedError(
-                    "We've already verified there is an active sync request!".into(),
-                )
-            })?
-            .get_sync_target_version();
-        let latest_synced_ledger_info =
-            utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
-        if latest_synced_ledger_info.ledger_info().version() < sync_target_version {
-            return Ok(());
-        }
-
-        // Wait for the storage synchronizer to drain (if it hasn't already).
-        // This prevents notifying consensus prematurely.
+        // The sync request has been satisfied. Wait for the storage synchronizer
+        // to drain. This prevents notifying consensus prematurely.
         while self.storage_synchronizer.pending_storage_data() {
             sample!(
                 SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
@@ -514,35 +557,70 @@ impl<
             yield_now().await;
         }
 
-        // Refresh the latest synced ledger info and handle the sync request
+        // If the request was to sync for a specified duration, we should only
+        // stop syncing when the synced version and synced ledger info version match.
+        // Otherwise, the DB will be left in an inconsistent state on handover.
+        if let Some(sync_request) = consensus_sync_request.lock().as_ref() {
+            if sync_request.is_sync_duration_request() {
+                // Get the latest synced version and ledger info version
+                let latest_synced_version =
+                    utils::fetch_pre_committed_version(self.storage.clone())?;
+                let latest_synced_ledger_info =
+                    utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
+                let latest_ledger_info_version = latest_synced_ledger_info.ledger_info().version();
+
+                // Check if the latest synced version matches the latest ledger info version
+                if latest_synced_version != latest_ledger_info_version {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(DRIVER_INFO_LOG_FREQ_SECS)),
+                        info!(
+                            "Waiting for state sync to sync to a ledger info! \
+                            Latest synced version: {:?}, latest ledger info version: {:?}",
+                            latest_synced_version, latest_ledger_info_version
+                        )
+                    );
+
+                    return Ok(()); // State sync should continue to run
+                }
+            }
+        }
+
+        // Handle the satisfied sync request
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         self.consensus_notification_handler
-            .check_sync_request_progress(latest_synced_ledger_info)
+            .handle_satisfied_sync_request(latest_synced_ledger_info)
             .await?;
 
         // If the sync request was successfully handled, reset the continuous syncer
         // so that in the event another sync request occurs, we have fresh state.
         if !self.active_sync_request() {
             self.continuous_syncer.reset_active_stream(None).await?;
-            self.storage_synchronizer.finish_chunk_executor(); // Consensus is now in control
+            self.storage_synchronizer.finish_chunk_executor(); // Consensus or consensus observer is now in control
         }
+
         Ok(())
     }
 
-    /// Returns true iff there's an active sync request from consensus
+    /// Returns true iff there's an active sync request from consensus or consensus observer
     fn active_sync_request(&self) -> bool {
         self.consensus_notification_handler.active_sync_request()
     }
 
-    /// Returns true iff this node is a validator
-    fn is_validator(&self) -> bool {
+    /// Returns true iff this node enables consensus or consensus observer
+    fn is_consensus_or_observer_enabled(&self) -> bool {
         self.driver_configuration.role == RoleType::Validator
+            || self
+                .driver_configuration
+                .consensus_observer_config
+                .observer_enabled
     }
 
-    /// Returns true iff consensus is currently executing
-    fn check_if_consensus_executing(&self) -> bool {
-        self.is_validator() && self.bootstrapper.is_bootstrapped() && !self.active_sync_request()
+    /// Returns true iff consensus or consensus observer is currently executing
+    fn check_if_consensus_or_observer_executing(&self) -> bool {
+        self.is_consensus_or_observer_enabled()
+            && self.bootstrapper.is_bootstrapped()
+            && !self.active_sync_request()
     }
 
     /// Checks if the connection deadline has passed. If so, validators with
@@ -551,7 +629,7 @@ impl<
     /// and state sync is trivial.
     async fn check_auto_bootstrapping(&mut self) {
         if !self.bootstrapper.is_bootstrapped()
-            && self.is_validator()
+            && self.is_consensus_or_observer_enabled()
             && self.driver_configuration.config.enable_auto_bootstrapping
             && self.driver_configuration.waypoint.version() == 0
         {
@@ -597,13 +675,16 @@ impl<
                 .message("Error found when checking the sync request progress!"));
         }
 
-        // If consensus is executing, there's nothing to do
-        if self.check_if_consensus_executing() {
-            trace!(LogSchema::new(LogEntry::Driver)
-                .message("Consensus is executing. There's nothing to do."));
+        // If consensus or consensus observer is executing, there's nothing to do
+        if self.check_if_consensus_or_observer_executing() {
+            let executing_component = if self.driver_configuration.role.is_validator() {
+                ExecutingComponent::Consensus
+            } else {
+                ExecutingComponent::ConsensusObserver
+            };
             metrics::increment_counter(
                 &metrics::EXECUTING_COMPONENT,
-                ExecutingComponent::Consensus.get_label(),
+                executing_component.get_label(),
             );
             return;
         }

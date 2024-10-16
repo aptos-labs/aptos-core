@@ -45,8 +45,8 @@ impl TestReport {
         let rate = stats.rate();
         self.report_metric(test_name.clone(), "submitted_txn", stats.submitted as f64);
         self.report_metric(test_name.clone(), "expired_txn", stats.expired as f64);
-        self.report_metric(test_name.clone(), "avg_tps", rate.committed as f64);
-        self.report_metric(test_name.clone(), "avg_latency", rate.latency as f64);
+        self.report_metric(test_name.clone(), "avg_tps", rate.committed);
+        self.report_metric(test_name.clone(), "avg_latency", rate.latency);
         self.report_metric(test_name.clone(), "p50_latency", rate.p50_latency as f64);
         self.report_metric(test_name.clone(), "p90_latency", rate.p90_latency as f64);
         self.report_metric(test_name.clone(), "p99_latency", rate.p99_latency as f64);

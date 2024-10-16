@@ -300,9 +300,9 @@ module defi::locked_coins {
     #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234)]
     public entry fun test_recipient_can_claim_coins(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         aptos_account::create_account(recipient_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, sponsor_address);
         add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
@@ -318,9 +318,9 @@ module defi::locked_coins {
     #[expected_failure(abort_code = 0x30002, location = Self)]
     public entry fun test_recipient_cannot_claim_coins_if_lockup_has_not_expired(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         aptos_account::create_account(recipient_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, sponsor_address);
         add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
@@ -333,9 +333,9 @@ module defi::locked_coins {
     #[expected_failure(abort_code = 0x60001, location = Self)]
     public entry fun test_recipient_cannot_claim_twice(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         aptos_account::create_account(recipient_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, sponsor_address);
         add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
@@ -348,9 +348,9 @@ module defi::locked_coins {
     #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234)]
     public entry fun test_sponsor_can_update_lockup(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         aptos_account::create_account(recipient_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, sponsor_address);
         add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
@@ -370,12 +370,12 @@ module defi::locked_coins {
     #[test(aptos_framework = @0x1, sponsor = @0x123, recipient_1 = @0x234, recipient_2 = @0x345)]
     public entry fun test_sponsor_can_batch_update_lockup(
         aptos_framework: &signer, sponsor: &signer, recipient_1: &signer, recipient_2: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_addr = signer::address_of(sponsor);
         let recipient_1_addr = signer::address_of(recipient_1);
         let recipient_2_addr = signer::address_of(recipient_2);
         aptos_account::create_account(recipient_1_addr);
         aptos_account::create_account(recipient_2_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, sponsor_address);
         batch_add_locked_coins<AptosCoin>(
@@ -401,11 +401,11 @@ module defi::locked_coins {
     #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234, withdrawal = @0x345)]
     public entry fun test_sponsor_can_cancel_lockup(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer, withdrawal: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         let withdrawal_addr = signer::address_of(withdrawal);
         aptos_account::create_account(withdrawal_addr);
         aptos_account::create_account(recipient_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, withdrawal_addr);
         add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
@@ -430,13 +430,13 @@ module defi::locked_coins {
         recipient_2: &signer,
         withdrawal: &signer,
     ) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_1_addr = signer::address_of(recipient_1);
         let recipient_2_addr = signer::address_of(recipient_2);
         let withdrawal_addr = signer::address_of(withdrawal);
         aptos_account::create_account(recipient_1_addr);
         aptos_account::create_account(recipient_2_addr);
         aptos_account::create_account(withdrawal_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, withdrawal_addr);
         batch_add_locked_coins<AptosCoin>(
@@ -462,11 +462,11 @@ module defi::locked_coins {
         recipient: &signer,
         withdrawal: &signer,
     ) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         let withdrawal_addr = signer::address_of(withdrawal);
         aptos_account::create_account(recipient_addr);
         aptos_account::create_account(withdrawal_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, withdrawal_addr);
         add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
@@ -481,11 +481,11 @@ module defi::locked_coins {
         recipient: &signer,
         withdrawal: &signer,
     ) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor);
         let recipient_addr = signer::address_of(recipient);
         let withdrawal_addr = signer::address_of(withdrawal);
         aptos_account::create_account(recipient_addr);
         aptos_account::create_account(withdrawal_addr);
-        let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, withdrawal_addr);
         assert!(withdrawal_address<AptosCoin>(sponsor_address) == withdrawal_addr, 0);

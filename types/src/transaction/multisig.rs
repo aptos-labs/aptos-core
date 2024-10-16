@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::EntryFunction;
+use crate::transaction::{user_transaction_context::MultisigPayload, EntryFunction};
 use move_core_types::{account_address::AccountAddress, vm_status::VMStatus};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,19 @@ pub struct Multisig {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MultisigTransactionPayload {
     EntryFunction(EntryFunction),
+}
+
+impl Multisig {
+    pub fn as_multisig_payload(&self) -> MultisigPayload {
+        MultisigPayload {
+            multisig_address: self.multisig_address,
+            entry_function_payload: self.transaction_payload.as_ref().map(
+                |MultisigTransactionPayload::EntryFunction(entry)| {
+                    entry.as_entry_function_payload()
+                },
+            ),
+        }
+    }
 }
 
 /// Contains information about execution failure.

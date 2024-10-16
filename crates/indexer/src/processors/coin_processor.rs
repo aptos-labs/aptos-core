@@ -19,7 +19,7 @@ use crate::{
     schema,
 };
 use aptos_api_types::Transaction as APITransaction;
-use aptos_types::APTOS_COIN_TYPE;
+use aptos_types::{AptosCoinType, CoinType};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -280,7 +280,8 @@ impl TransactionProcessor for CoinTransactionProcessor {
         // get aptos_coin info for supply tracking
         // TODO: This only needs to be fetched once. Need to persist somehow
         let maybe_aptos_coin_info =
-            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap();
+            &CoinInfoQuery::get_by_coin_type(AptosCoinType::type_tag().to_string(), &mut conn)
+                .unwrap();
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];

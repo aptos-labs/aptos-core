@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-async-trait = { workspace = true }
 percent-encoding = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }

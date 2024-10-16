@@ -1,0 +1,11 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/more-v1/expansion/duplicate_field_unpack.move:4:13
+  │
+4 │         let S { f, f } = S { f: 0 };
+  │             ^^^^^^^^^^
+  │             │   │  │
+  │             │   │  Duplicate binding given for field 'f'
+  │             │   Field previously defined here
+  │             Invalid deconstruction binding

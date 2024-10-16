@@ -120,12 +120,21 @@ spec aptos_framework::primary_fungible_store {
     /// Criticality: High
     /// Implementation: The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag
     /// which validates the TransferRef's metadata with the store's metadata and then updates the frozen flag.
-    /// Enforcement: Audited that it aborts if the store's metadata is not same as the the TransferRef's metadata.
+    /// Enforcement: Audited that it aborts if the store's metadata is not same as the TransferRef's metadata.
     /// Audited that the status of the frozen flag is updated correctly.
     /// </high-level-req>
     ///
     spec module {
         // TODO: verification disabled until this module is specified.
         pragma verify = false;
+    }
+
+    spec fun spec_primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
+        fungible_asset::store_exists(spec_primary_store_address(account, metadata))
+    }
+
+    spec fun spec_primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
+        let metadata_addr = object::object_address(metadata);
+        object::spec_create_user_derived_object_address(owner, metadata_addr)
     }
 }

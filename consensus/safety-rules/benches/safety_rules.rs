@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use aptos_consensus_types::block::block_test_utils;
 use aptos_safety_rules::{test_utils, PersistentSafetyStorage, SafetyRulesManager, TSafetyRules};
 use aptos_secure_storage::{InMemoryStorage, KVStorage, OnDiskStorage, Storage, VaultStorage};

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: function `0x815::b::f` cannot be called from function `0x815::c::f` because module `0x815::c` is not a `friend` of `0x815::b`
+  ┌─ tests/checking/visibility-checker/direct_visibility_err.move:2:16
+  │
+2 │     friend fun f() {}
+  │                ^ callee
+  ·
+7 │         0x815::b::f();
+  │         ------------- called here

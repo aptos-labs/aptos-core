@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
-    state_store::account_with_state_view::AsAccountWithStateView,
+    account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
+    vm::configs::set_paranoid_type_checks,
 };
 use aptos_vm::AptosVM;
+use std::cmp::min;
 
 /// Error message to display when non-production features are enabled
 pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
@@ -38,18 +39,24 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
         .reader
         .latest_state_checkpoint_view()
         .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
-    Ok(db_state_view
-        .as_account_with_state_view(&CORE_CODE_ADDRESS)
-        .get_chain_id_resource()
-        .map_err(|err| anyhow!("[aptos-node] failed to get chain id resource {}", err))?
+    Ok(ChainIdResource::fetch_config(&db_state_view)
         .expect("[aptos-node] missing chain ID resource")
         .chain_id())
 }
 
 /// Sets the Aptos VM configuration based on the node configurations
 pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
-    AptosVM::set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
-    AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
+    set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
+    let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
+        min(
+            DEFAULT_EXECUTION_CONCURRENCY_LEVEL,
+            (num_cpus::get() / 2) as u16,
+        )
+    } else {
+        node_config.execution.concurrency_level
+    };
+    AptosVM::set_concurrency_level_once(effective_concurrency_level as usize);
+    AptosVM::set_discard_failed_blocks(node_config.execution.discard_failed_blocks);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );

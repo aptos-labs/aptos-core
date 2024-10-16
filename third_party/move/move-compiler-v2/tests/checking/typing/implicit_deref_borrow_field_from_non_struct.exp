@@ -42,7 +42,7 @@ error: expected a struct with field `R` but found `()`
 12 │         ().R;
    │         ^^
 
-error: expected a struct with field `f` but found `(?18, ?19)`
+error: expected a struct with field `f` but found `(S, S)`
    ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:13:9
    │
 13 │         (S{f: 0}, S{f:0}).f;

@@ -40,25 +40,42 @@
 
 use crate::{
     account_address::AccountAddress,
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
 };
 use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
 use move_core_types::language_storage::{ModuleId, StructTag};
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, fmt::Formatter};
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AccessPath {
     pub address: AccountAddress,
     #[serde(with = "serde_bytes")]
     pub path: Vec<u8>,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for AccessPath {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (any::<AccountAddress>(), any::<Path>())
+            .prop_map(|(address, path)| AccessPath {
+                address,
+                path: bcs::to_bytes(&path).unwrap(),
+            })
+            .boxed()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum Path {
     Code(ModuleId),
     Resource(StructTag),
@@ -208,8 +225,8 @@ impl TryFrom<StateKey> for AccessPath {
     type Error = Error;
 
     fn try_from(state_key: StateKey) -> Result<Self> {
-        match state_key.into_inner() {
-            StateKeyInner::AccessPath(access_path) => Ok(access_path),
+        match state_key.inner() {
+            StateKeyInner::AccessPath(access_path) => Ok(access_path.clone()),
             _ => anyhow::bail!("Unsupported state key type"),
         }
     }

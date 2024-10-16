@@ -32,7 +32,7 @@ use constants::ConstantPoolGen;
 use functions::{
     FnDefnMaterializeState, FnHandleMaterializeState, FunctionDefinitionGen, FunctionHandleGen,
 };
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 /// Represents how large [`CompiledModule`] tables can be.
 pub type TableSize = u16;
@@ -300,14 +300,10 @@ impl CompiledModuleStrategyGen {
                         identifiers_len,
                         struct_handles,
                     );
-                    let mut struct_def_to_field_count: HashMap<usize, usize> = HashMap::new();
                     let mut struct_defs: Vec<StructDefinition> = vec![];
                     for struct_def_gen in struct_def_gens {
-                        if let (Some(struct_def), offset) = struct_def_gen.materialize(&mut state) {
+                        if let Some(struct_def) = struct_def_gen.materialize(&mut state) {
                             struct_defs.push(struct_def);
-                            if offset > 0 {
-                                struct_def_to_field_count.insert(struct_defs.len() - 1, offset);
-                            }
                         }
                     }
                     let StDefnMaterializeState { struct_handles, .. } = state;
@@ -352,7 +348,6 @@ impl CompiledModuleStrategyGen {
                         &struct_defs,
                         signatures,
                         function_handles,
-                        struct_def_to_field_count,
                     );
                     let mut function_defs: Vec<FunctionDefinition> = vec![];
                     for function_def_gen in function_def_gens {
@@ -367,6 +362,10 @@ impl CompiledModuleStrategyGen {
                         struct_def_instantiations,
                         function_instantiations,
                         field_instantiations,
+                        variant_field_handles,
+                        variant_field_instantiations,
+                        struct_variant_handles,
+                        struct_variant_instantiations,
                     ) = state.return_tables();
 
                     // Build a compiled module
@@ -385,6 +384,11 @@ impl CompiledModuleStrategyGen {
 
                         struct_defs,
                         function_defs,
+
+                        variant_field_handles,
+                        variant_field_instantiations,
+                        struct_variant_handles,
+                        struct_variant_instantiations,
 
                         signatures,
 

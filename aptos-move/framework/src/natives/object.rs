@@ -6,6 +6,8 @@ use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
     SafeNativeResult,
 };
+use aptos_types::transaction::authenticator::AuthenticationKey;
+use better_any::{Tid, TidAble};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, InternalGasPerByte},
@@ -16,7 +18,21 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
 };
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+};
+
+/// Cached emitted module events.
+#[derive(Default, Tid)]
+pub struct NativeObjectContext {
+    // TODO - if further optimizations is important, we can consider if:
+    //   - caching all (or just some derive_from) locations is useful
+    //   - if it is faster to use BTreeMap or HashMap, given the lenghts of the addresses
+    //   - if it is worth moving to native/caching other address deriving as well
+    derived_from_object_addresses:
+        RefCell<HashMap<(AccountAddress, AccountAddress), AccountAddress>>,
+}
 
 /***************************************************************************************************
  * native exists_at<T>
@@ -61,13 +77,50 @@ fn native_exists_at(
 }
 
 /***************************************************************************************************
+ * native fun create_user_derived_object_address_impl
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+fn native_create_user_derived_object_address_impl(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.is_empty());
+    debug_assert!(args.len() == 2);
+
+    context.charge(OBJECT_USER_DERIVED_ADDRESS_BASE)?;
+
+    let object_context = context.extensions().get::<NativeObjectContext>();
+    let derive_from = safely_pop_arg!(args, AccountAddress);
+    let source = safely_pop_arg!(args, AccountAddress);
+
+    let derived_address = *object_context
+        .derived_from_object_addresses
+        .borrow_mut()
+        .entry((derive_from, source))
+        .or_insert_with(|| {
+            AuthenticationKey::object_address_from_object(&source, &derive_from).account_address()
+        });
+
+    Ok(smallvec![Value::address(derived_address)])
+}
+
+/***************************************************************************************************
  * module
  *
  **************************************************************************************************/
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
-    let natives = [("exists_at", native_exists_at as RawSafeNative)];
+    let natives = [
+        ("exists_at", native_exists_at as RawSafeNative),
+        (
+            "create_user_derived_object_address_impl",
+            native_create_user_derived_object_address_impl,
+        ),
+    ];
 
     builder.make_named_natives(natives)
 }

@@ -7,6 +7,8 @@ pub mod values_impl;
 #[cfg(test)]
 mod value_tests;
 
+#[cfg(test)]
+mod serialization_tests;
 #[cfg(all(test, feature = "fuzzing"))]
 mod value_prop_tests;
 

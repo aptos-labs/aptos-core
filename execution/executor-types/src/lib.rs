@@ -11,20 +11,23 @@ use aptos_crypto::{
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
+    account_config::NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
+    dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
     epoch_state::EpochState,
+    jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
     proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
+        block_epilogue::{BlockEndInfo, BlockEpiloguePayload},
         ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
 pub use error::{ExecutorError, ExecutorResult};
-pub use executed_chunk::ExecutedChunk;
 pub use ledger_update_output::LedgerUpdateOutput;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
@@ -32,6 +35,7 @@ use std::{
     cmp::max,
     collections::{BTreeSet, HashMap},
     fmt::Debug,
+    ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -39,8 +43,6 @@ use std::{
 };
 
 mod error;
-mod executed_chunk;
-pub mod execution_output;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
@@ -48,9 +50,7 @@ pub mod state_checkpoint_output;
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
     /// are valid, executes them and returns the executed result for commit.
-    ///
-    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
-    ///       and pipe them up.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn execute_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
@@ -65,9 +65,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
     /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
     /// outputs directly to get the executed result.
-    ///
-    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
-    ///       and pipe them up.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn apply_chunk(
         &self,
         txn_output_list_with_proof: TransactionOutputListWithProof,
@@ -134,6 +132,7 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Executes a block - TBD, this API will be removed in favor of `execute_and_state_checkpoint`, followed
     /// by `ledger_update` once we have ledger update as a separate pipeline phase.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn execute_block(
         &self,
         block: ExecutableBlock,
@@ -161,33 +160,27 @@ pub trait BlockExecutorTrait: Send + Sync {
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
-    /// Saves eligible blocks to persistent storage.
-    /// If we have multiple blocks and not all of them have signatures, we may send them to storage
-    /// in a few batches. For example, if we have
-    /// ```text
-    /// A <- B <- C <- D <- E
-    /// ```
-    /// and only `C` and `E` have signatures, we will send `A`, `B` and `C` in the first batch,
-    /// then `D` and `E` later in the another batch.
-    /// Commits a block and all its ancestors in a batch manner.
-    fn commit_blocks_ext(
-        &self,
-        block_ids: Vec<HashValue>,
-        ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
-    ) -> ExecutorResult<()>;
-
+    #[cfg(any(test, feature = "fuzzing"))]
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> ExecutorResult<()> {
-        self.commit_blocks_ext(
-            block_ids,
-            ledger_info_with_sigs,
-            true, /* save_state_snapshots */
-        )
+        let mut parent_block_id = self.committed_block_id();
+        for block_id in block_ids {
+            self.pre_commit_block(block_id, parent_block_id)?;
+            parent_block_id = block_id;
+        }
+        self.commit_ledger(ledger_info_with_sigs)
     }
+
+    fn pre_commit_block(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<()>;
+
+    fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
@@ -266,19 +259,20 @@ impl VerifyExecutionMode {
 }
 
 pub trait TransactionReplayer: Send {
-    fn replay(
+    fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
-    ) -> Result<()>;
+    ) -> Result<usize>;
 
-    fn commit(&self) -> Result<ExecutedChunk>;
+    fn commit(&self) -> Result<Version>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
+#[derive(Clone)]
 pub struct ChunkCommitNotification {
     pub subscribable_events: Vec<ContractEvent>,
     pub committed_transactions: Vec<Transaction>,
@@ -325,6 +319,8 @@ pub struct StateComputeResult {
     transaction_info_hashes: Vec<HashValue>,
 
     subscribable_events: Vec<ContractEvent>,
+
+    block_end_info: Option<BlockEndInfo>,
 }
 
 impl StateComputeResult {
@@ -338,6 +334,7 @@ impl StateComputeResult {
         compute_status_for_input_txns: Vec<TransactionStatus>,
         transaction_info_hashes: Vec<HashValue>,
         subscribable_events: Vec<ContractEvent>,
+        block_end_info: Option<BlockEndInfo>,
     ) -> Self {
         Self {
             root_hash,
@@ -349,6 +346,7 @@ impl StateComputeResult {
             compute_status_for_input_txns,
             transaction_info_hashes,
             subscribable_events,
+            block_end_info,
         }
     }
 
@@ -366,6 +364,7 @@ impl StateComputeResult {
             compute_status_for_input_txns: vec![],
             transaction_info_hashes: vec![],
             subscribable_events: vec![],
+            block_end_info: None,
         }
     }
 
@@ -383,6 +382,7 @@ impl StateComputeResult {
             ],
             transaction_info_hashes: vec![],
             subscribable_events: vec![],
+            block_end_info: None,
         }
     }
 
@@ -400,9 +400,7 @@ impl StateComputeResult {
         ret.compute_status_for_input_txns = compute_status;
         ret
     }
-}
 
-impl StateComputeResult {
     pub fn version(&self) -> Version {
         max(self.num_leaves, 1)
             .checked_sub(1)
@@ -418,8 +416,11 @@ impl StateComputeResult {
     }
 
     pub fn transactions_to_commit_len(&self) -> usize {
-        // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
-        self.compute_status_for_input_txns().len()
+        self.compute_status_for_input_txns()
+            .iter()
+            .filter(|status| matches!(status, TransactionStatus::Keep(_)))
+            .count()
+            // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
             + (if self.has_reconfiguration() { 0 } else { 1 })
     }
 
@@ -430,6 +431,10 @@ impl StateComputeResult {
         input_txns: Vec<Transaction>,
         block_id: HashValue,
     ) -> Vec<Transaction> {
+        if self.is_reconfiguration_suffix() {
+            return vec![];
+        }
+
         assert_eq!(
             input_txns.len(),
             self.compute_status_for_input_txns().len(),
@@ -440,7 +445,7 @@ impl StateComputeResult {
         let output = itertools::zip_eq(input_txns, self.compute_status_for_input_txns())
             .filter_map(|(txn, status)| {
                 assert!(
-                    !matches!(txn, Transaction::StateCheckpoint(_)),
+                    !txn.is_non_reconfig_block_ending(),
                     "{:?}: {:?}",
                     txn,
                     status
@@ -450,12 +455,24 @@ impl StateComputeResult {
                     _ => None,
                 }
             })
-            .chain((!self.has_reconfiguration()).then_some(Transaction::StateCheckpoint(block_id)))
+            .chain(
+                (!self.has_reconfiguration()).then_some(self.block_end_info.clone().map_or(
+                    Transaction::StateCheckpoint(block_id),
+                    |block_end_info| {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
+                            block_id,
+                            block_end_info,
+                        })
+                    },
+                )),
+            )
             .collect::<Vec<_>>();
 
         assert!(
             self.has_reconfiguration()
-                || matches!(output.last(), Some(Transaction::StateCheckpoint(_))),
+                || output
+                    .last()
+                    .map_or(false, Transaction::is_non_reconfig_block_ending),
             "{:?}",
             output.last()
         );
@@ -502,6 +519,10 @@ impl StateComputeResult {
     pub fn subscribable_events(&self) -> &[ContractEvent] {
         &self.subscribable_events
     }
+
+    pub fn is_reconfiguration_suffix(&self) -> bool {
+        self.has_reconfiguration() && self.compute_status_for_input_txns().is_empty()
+    }
 }
 
 pub struct ProofReader {
@@ -526,10 +547,19 @@ impl ProofRead for ProofReader {
 
 /// Used in both state sync and consensus to filter the txn events that should be subscribable by node components.
 pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
+    let type_tag = event.type_tag();
+    type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref()
+        || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
+        || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
+}
+
+#[cfg(feature = "bench")]
+pub fn should_forward_to_subscription_service_old(event: &ContractEvent) -> bool {
     matches!(
         event.type_tag().to_string().as_str(),
         "0x1::reconfiguration::NewEpochEvent"
             | "0x1::dkg::DKGStartEvent"
-            | "0x1::jwks::ObservedJWKsUpdated"
+            | "\
+            0x1::jwks::ObservedJWKsUpdated"
     )
 }

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
-    metrics::NUM_TXNS, OverallMeasuring, TransactionCommitter, TransactionExecutor,
+    block_preparation::BlockPreparationStage,
+    ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
+    metrics::NUM_TXNS,
+    OverallMeasuring, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
@@ -85,7 +87,7 @@ where
             );
 
         let (commit_sender, commit_receiver) = mpsc::sync_channel::<CommitBlockMessage>(
-            if config.split_stages || config.skip_commit {
+            if config.split_stages {
                 (num_blocks.unwrap() + 1).max(3)
             } else {
                 3
@@ -99,7 +101,7 @@ where
             (None, None)
         };
 
-        let (start_commit_tx, start_commit_rx) = if config.split_stages || config.skip_commit {
+        let (start_commit_tx, start_commit_rx) = if config.split_stages {
             let (start_commit_tx, start_commit_rx) = mpsc::sync_channel::<()>(1);
             (Some(start_commit_tx), Some(start_commit_rx))
         } else {
@@ -120,8 +122,13 @@ where
             config.allow_retries,
         );
 
+        let commit_processing = if config.skip_commit {
+            CommitProcessing::Skip
+        } else {
+            CommitProcessing::SendToQueue(commit_sender)
+        };
         let mut ledger_update_stage =
-            LedgerUpdateStage::new(executor_2, Some(commit_sender), version);
+            LedgerUpdateStage::new(executor_2, commit_processing, version);
 
         let (executable_block_sender, executable_block_receiver) =
             mpsc::sync_channel::<ExecuteBlockMessage>(3);
@@ -173,7 +180,7 @@ where
                         if stage_executed > 0 {
                             info!("Execution finished stage {}", stage_index);
                             stage_overall_measuring.print_end(
-                                &format!("Staged execution: stage {}: ", stage_index),
+                                &format!("Staged execution: stage {}:", stage_index),
                                 stage_executed,
                             );
                         }
@@ -186,12 +193,14 @@ where
                 if stage_index > 0 && stage_executed > 0 {
                     info!("Execution finished stage {}", stage_index);
                     stage_overall_measuring.print_end(
-                        &format!("Staged execution: stage {}: ", stage_index),
+                        &format!("Staged execution: stage {}:", stage_index),
                         stage_executed,
                     );
                 }
 
-                overall_measuring.print_end("Overall execution", executed);
+                if num_blocks.is_some() {
+                    overall_measuring.print_end("Overall execution", executed);
+                }
                 start_commit_tx.map(|tx| tx.send(()));
             })
             .expect("Failed to spawn transaction executor thread.");
@@ -212,21 +221,19 @@ where
             .expect("Failed to spawn ledger update thread.");
         join_handles.push(ledger_update_thread);
 
-        let skip_commit = config.skip_commit;
-
-        let commit_thread = std::thread::Builder::new()
-            .name("txn_committer".to_string())
-            .spawn(move || {
-                start_commit_rx.map(|rx| rx.recv());
-                info!("Starting commit thread");
-                if !skip_commit {
+        if !config.skip_commit {
+            let commit_thread = std::thread::Builder::new()
+                .name("txn_committer".to_string())
+                .spawn(move || {
+                    start_commit_rx.map(|rx| rx.recv());
+                    info!("Starting commit thread");
                     let mut committer =
                         TransactionCommitter::new(executor_3, version, commit_receiver);
                     committer.run();
-                }
-            })
-            .expect("Failed to spawn transaction committer thread.");
-        join_handles.push(commit_thread);
+                })
+                .expect("Failed to spawn transaction committer thread.");
+            join_handles.push(commit_thread);
+        }
 
         (
             Self {

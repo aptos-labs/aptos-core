@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: undeclared `0x1::M::Foo`
+  ┌─ tests/verification/noverify/single_module_invalid.move:8:23
+  │
+8 │     public fun foo(): Foo {
+  │                       ^^^
+
+error: undeclared struct `M::Foo`
+  ┌─ tests/verification/noverify/single_module_invalid.move:9:9
+  │
+9 │         Foo {}
+  │         ^^^
+
+error: no function named `bar` found
+   ┌─ tests/verification/noverify/single_module_invalid.move:17:24
+   │
+17 │     public fun baz() { bar() }
+   │                        ^^^^^

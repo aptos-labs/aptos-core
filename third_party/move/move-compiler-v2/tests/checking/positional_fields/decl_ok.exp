@@ -1,0 +1,73 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        V1,
+        V2,
+        V3 {
+            0: u8,
+            1: bool,
+        }
+    }
+    struct S1 {
+        dummy_field: bool,
+    }
+    struct S2 {
+        0: u8,
+        1: bool,
+    }
+    struct S3<T1,T2> {
+        0: T2,
+        1: u8,
+        2: T1,
+    }
+    private fun bar(x: S2) {
+        select test::S2.0<S2>(x);
+        Tuple()
+    }
+    private fun baz() {
+        pack test::E1::V1();
+        pack test::E1::V2();
+        pack test::E1::V3(42, true);
+        Tuple()
+    }
+    private fun foo(x: S2) {
+        select test::S2.0<S2>(x);
+        select test::S2.1<S2>(x);
+        Tuple()
+    }
+} // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        V1,
+        V2,
+        V3 {
+            0: u8,
+            1: bool,
+        }
+    }
+    struct S1 {
+    }
+    struct S2 {
+        0: u8,
+        1: bool,
+    }
+    struct S3<T1, T2> {
+        0: T2,
+        1: u8,
+        2: T1,
+    }
+    fun bar(x: S2) {
+        x.0;
+    }
+    fun baz() {
+        E1::V1{};
+        E1::V2{};
+        E1::V3(42u8,true);
+    }
+    fun foo(x: S2) {
+        x.0;
+        x.1;
+    }
+}

@@ -9,7 +9,7 @@ use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_mint_transfer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     let account1 = info.random_account();
@@ -36,11 +36,10 @@ async fn test_mint_transfer() {
     info.client().submit_and_wait(&transfer_txn).await.unwrap();
     assert_eq!(
         info.client()
-            .get_account_balance(account2.address())
+            .view_apt_account_balance(account2.address())
             .await
             .unwrap()
-            .into_inner()
-            .get(),
+            .into_inner(),
         40000
     );
 
@@ -81,7 +80,7 @@ async fn test_mint_transfer() {
         .unwrap();
 
     let output = debugger
-        .execute_past_transactions(txn_ver, 1)
+        .execute_past_transactions(txn_ver, 1, false, 1, &[1])
         .await
         .unwrap()
         .pop()

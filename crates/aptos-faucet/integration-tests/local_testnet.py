@@ -1,7 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-# This file contains functions for running the local testnet.
+# This file contains functions for running the localnet.
 
 import logging
 import subprocess
@@ -12,14 +12,14 @@ from common import NODE_PORT, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
 
-# Run a local testnet in a docker container. We choose to detach here and we'll
+# Run a localnet in a docker container. We choose to detach here and we'll
 # stop running it later using the container name. For an explanation of these
 # arguments, see the argument parser in main.py.
 def run_node(network: Network, image_repo_with_project: str, external_test_dir: str):
     image_name = build_image_name(image_repo_with_project, network)
     container_name = f"local-testnet-{network}"
     internal_mount_path = "/mymount"
-    LOG.info(f"Trying to run local testnet from image: {image_name}")
+    LOG.info(f"Trying to run localnet from image: {image_name}")
 
     # Confirm that the Docker daemon is running.
     try:
@@ -66,7 +66,7 @@ def run_node(network: Network, image_repo_with_project: str, external_test_dir: 
             "--no-txn-stream",
         ],
     )
-    LOG.info(f"Running local testnet from image: {image_name}")
+    LOG.info(f"Running localnet from image: {image_name}")
     return container_name
 
 

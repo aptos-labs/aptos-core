@@ -39,16 +39,6 @@ pub(crate) fn get_struct_field(value: &StructRef, index: usize) -> PartialVMResu
     field_ref.read_ref()
 }
 
-/// Given a reference to `Aggregator` Move struct, updates a field value at `index`.
-pub(crate) fn set_aggregator_field(
-    aggregator: &StructRef,
-    index: usize,
-    value: Value,
-) -> PartialVMResult<()> {
-    let field_ref = aggregator.borrow_field(index)?.value_as::<Reference>()?;
-    field_ref.write_ref(value)
-}
-
 /// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
     let handle = get_struct_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
@@ -66,19 +56,17 @@ pub(crate) fn unpack_aggregator_struct(
 
     let pop_with_err = |vec: &mut Vec<Value>, msg: &str| {
         vec.pop()
-            .map_or(Err(extension_error(msg)), |v| v.value_as::<u128>())
+            .map_or_else(|| Err(extension_error(msg)), |v| v.value_as::<u128>())
     };
 
     let limit = pop_with_err(&mut fields, "unable to pop 'limit' field")?;
-    let key = fields
-        .pop()
-        .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
-            v.value_as::<AccountAddress>()
-        })?;
-    let handle = fields
-        .pop()
-        .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
-            v.value_as::<AccountAddress>()
-        })?;
+    let key = fields.pop().map_or_else(
+        || Err(extension_error("unable to pop `handle` field")),
+        |v| v.value_as::<AccountAddress>(),
+    )?;
+    let handle = fields.pop().map_or_else(
+        || Err(extension_error("unable to pop `handle` field")),
+        |v| v.value_as::<AccountAddress>(),
+    )?;
     Ok((TableHandle(handle), key, limit))
 }

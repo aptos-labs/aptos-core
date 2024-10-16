@@ -9,9 +9,11 @@ use aptos_logger::{
     prelude::{sample, SampleRate},
     warn, Schema,
 };
-use hyper::Method;
 use once_cell::sync::Lazy;
-use poem::{http::header, Endpoint, Request, Response, Result};
+use poem::{
+    http::{header, Method},
+    Endpoint, Request, Response, Result,
+};
 use poem_openapi::OperationId;
 use regex::Regex;
 use std::time::Duration;

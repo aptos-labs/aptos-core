@@ -1,0 +1,15 @@
+Move prover returns: exiting with checking errors
+error: specification expression cannot call impure Move function `init`
+   ┌─ tests/sources/functional/pure_function_call_incorrect.move:32:20
+   │
+11 │             return true
+   │             ----------- in `init`: return not allowed in specifications
+   ·
+32 │         aborts_if !init(account);
+   │                    ^^^^^^^^^^^^^ called here
+
+error: specification expression cannot use impure construct
+   ┌─ tests/sources/functional/pure_function_call_incorrect.move:56:27
+   │
+56 │         ensures result == vector::pop_back(old(v));
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^ calls a function which modifies state

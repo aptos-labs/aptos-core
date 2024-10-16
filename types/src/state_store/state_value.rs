@@ -354,3 +354,15 @@ pub struct StaleStateValueIndex {
     /// The `StateKey` identifying the value associated with this record.
     pub state_key: StateKey,
 }
+
+/// Indicates a state value becomes stale since `stale_since_version`.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct StaleStateValueByKeyHashIndex {
+    /// The version since when the node is overwritten and becomes stale.
+    pub stale_since_version: Version,
+    /// The version identifying the value associated with this record.
+    pub version: Version,
+    /// The hash of `StateKey` identifying the value associated with this record.
+    pub state_key_hash: HashValue,
+}

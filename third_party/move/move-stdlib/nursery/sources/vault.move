@@ -415,7 +415,7 @@ module std::vault {
                 to_signer,
                 VaultDelegate{vault_address: cap.vault_address, granted_caps: vector::empty()}
             );
-            // Add the the delegate to VaultDelegates.
+            // Add the delegate to VaultDelegates.
             let vault_delegates = borrow_global_mut<VaultDelegates<Content>>(cap.vault_address);
             add_element(&mut vault_delegates.delegates, addr);
         };

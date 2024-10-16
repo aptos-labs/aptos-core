@@ -7,6 +7,7 @@
 use crate::{account::AccountData, executor::FakeExecutor};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_gas_algebra::GasQuantity;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{
@@ -18,7 +19,10 @@ use proptest::{
     collection::{vec, SizeRange},
     prelude::*,
 };
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
+};
 mod module_generator;
 
 const DEFAULT_BALANCE: u64 = 1_000_000_000;
@@ -29,6 +33,8 @@ pub struct Node {
     self_value: u64,
     account_data: AccountData,
     expected_value: u64,
+    self_size: u64,
+    transitive_dep_size: u64,
 }
 
 #[derive(Debug)]
@@ -134,6 +140,8 @@ impl DependencyGraph {
                     self_value: self_value as u64,
                     account_data,
                     expected_value: 0,
+                    self_size: 0,
+                    transitive_dep_size: 0,
                 })
             })
             .collect::<Vec<_>>();
@@ -161,7 +169,7 @@ impl DependencyGraph {
         }
     }
 
-    /// Set up [`DepGraph`] with the initial state generated in this universe.
+    /// Set up `DepGraph` with the initial state generated in this universe.
     pub fn setup(&self, executor: &mut FakeExecutor) {
         for node in self.graph.raw_nodes().iter() {
             executor.add_account_data(&node.weight.account_data);
@@ -191,6 +199,40 @@ impl DependencyGraph {
                 .expect("Node should exist");
 
             node.expected_value = result + node.self_value;
+        }
+    }
+
+    pub fn caculate_dependency_sizes(&mut self) {
+        let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
+        let mut deps_map: BTreeMap<NodeIndex, BTreeSet<NodeIndex>> = BTreeMap::new();
+        for account_idx in accounts.iter().rev() {
+            let mut result = 0;
+            let mut deps = BTreeSet::new();
+
+            // Calculate the expected result of module entry function
+            for successor in self
+                .graph
+                .neighbors_directed(*account_idx, Direction::Outgoing)
+            {
+                deps.extend(deps_map.get(&successor).unwrap().iter().copied());
+                deps.insert(successor);
+            }
+
+            for dep in deps.iter() {
+                result += self
+                    .graph
+                    .node_weight(*dep)
+                    .expect("Node should exist")
+                    .self_size;
+            }
+
+            let node = self
+                .graph
+                .node_weight_mut(*account_idx)
+                .expect("Node should exist");
+
+            deps_map.insert(*account_idx, deps);
+            node.transitive_dep_size = result;
         }
     }
 
@@ -240,6 +282,7 @@ impl DependencyGraph {
         let package = BuiltPackage::build(package_path, BuildOptions::default()).unwrap();
 
         let code = package.extract_code();
+        let self_size = code.first().unwrap().len();
         let metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
@@ -254,11 +297,9 @@ impl DependencyGraph {
             ))
             .sign();
 
-        self.graph
-            .node_weight_mut(*node_idx)
-            .unwrap()
-            .account_data
-            .increment_sequence_number();
+        let node = self.graph.node_weight_mut(*node_idx).unwrap();
+        node.account_data.increment_sequence_number();
+        node.self_size = self_size as u64;
         txn
     }
 
@@ -292,6 +333,42 @@ impl DependencyGraph {
                 output.status(),
                 &TransactionStatus::Keep(ExecutionStatus::Success)
             )
+        }
+    }
+
+    pub fn execute_and_check_deps_sizes(&mut self, executor: &mut FakeExecutor) {
+        let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
+        let mut txns = vec![];
+        for account_idx in accounts.iter().rev() {
+            let txn = self.build_package_for_node(account_idx);
+            txns.push(txn);
+        }
+        let outputs = executor.execute_block(txns).unwrap();
+        for output in outputs {
+            assert_eq!(
+                output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+            executor.apply_write_set(output.write_set());
+        }
+        self.caculate_dependency_sizes();
+        for account_idx in accounts.iter() {
+            let txn = self.invoke_at(account_idx);
+            let (output, log) = executor.execute_transaction_with_gas_profiler(txn).unwrap();
+            assert_eq!(
+                output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+            let node = self.graph.node_weight(*account_idx).unwrap();
+            assert!(
+                GasQuantity::new(node.self_size + node.transitive_dep_size)
+                    == log
+                        .exec_io
+                        .dependencies
+                        .iter()
+                        .fold(GasQuantity::new(0), |total_size, dep| total_size + dep.size)
+            );
+            executor.apply_write_set(output.write_set());
         }
     }
 

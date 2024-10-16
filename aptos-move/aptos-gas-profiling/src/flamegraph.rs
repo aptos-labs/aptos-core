@@ -101,11 +101,24 @@ impl ExecutionAndIOCosts {
 
         lines.push("intrinsic", self.intrinsic_cost);
 
+        lines.push("keyless", self.keyless_cost);
+
         let mut path = vec![];
 
         struct Rec<'a> {
             lines: &'a mut LineBuffer,
             path: &'a mut Vec<String>,
+        }
+
+        for dep in &self.dependencies {
+            lines.push(
+                format!(
+                    "dependencies;{}{}",
+                    Render(&dep.id),
+                    if dep.is_new { "(new)" } else { "" }
+                ),
+                dep.cost,
+            )
         }
 
         impl<'a> Rec<'a> {
@@ -119,7 +132,7 @@ impl ExecutionAndIOCosts {
 
                     match event {
                         Loc(_) => (),
-                        Bytecode { cost, .. } => frame_cost += *cost,
+                        Bytecode { cost, .. } | CreateTy { cost } => frame_cost += *cost,
                         Call(inner_frame) => self.visit(inner_frame),
                         CallNative {
                             module_id: module,
@@ -156,9 +169,22 @@ impl ExecutionAndIOCosts {
         }
         .visit(&self.call_graph);
 
+        if let Some(cost) = &self.transaction_transient {
+            lines.push("ledger_writes;transaction", *cost)
+        }
+        for item in &self.events_transient {
+            lines.push(
+                format!("ledger_writes;events;{}", Render(&item.ty)),
+                item.cost,
+            )
+        }
         for item in &self.write_set_transient {
             lines.push(
-                format!("write_set;{}<{}>", Render(&item.op_type), Render(&item.key)),
+                format!(
+                    "ledger_writes;state_write_ops;{}<{}>",
+                    Render(&item.op_type),
+                    Render(&item.key)
+                ),
                 item.cost,
             )
         }

@@ -109,7 +109,7 @@ fn storage_limit_reached_by_new_bytes() {
     // Modify the gas schedule.
     h.modify_gas_schedule(|gas_params| {
         // Make other aspects of the gas schedule irrelevant by setting byte fee super high.
-        gas_params.vm.txn.storage_fee_per_excess_state_byte = 1_000_000.into();
+        gas_params.vm.txn.legacy_storage_fee_per_excess_state_byte = 1_000_000.into();
         gas_params.vm.txn.storage_io_per_state_byte_write = 1.into();
         // Allow 10 value bytes charged at most.
         gas_params.vm.txn.max_storage_fee = 11_000_000.into();
@@ -154,7 +154,7 @@ fn out_of_gas_while_charging_storage_fee() {
     // Modify the gas schedule.
     h.modify_gas_schedule(|gas_params| {
         // Make other aspects of the gas schedule irrelevant by setting per state byte storage fee super high.
-        gas_params.vm.txn.storage_fee_per_excess_state_byte = 1_000_000.into();
+        gas_params.vm.txn.legacy_storage_fee_per_excess_state_byte = 1_000_000.into();
         // Make sure we don't hit storage fee limit
         gas_params.vm.txn.max_storage_fee = 100_000_000.into();
         // Bump max gas allowed
@@ -170,7 +170,7 @@ fn out_of_gas_while_charging_storage_fee() {
 }
 
 fn state_key_size() -> NumBytes {
-    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
+    let key_size = StateKey::table_item(&TableHandle(AccountAddress::ONE), &[0u8]).size();
     (key_size as u64).into()
 }
 

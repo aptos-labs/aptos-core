@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_1.move:7:9
+   │
+ 6 │         let x = borrow_global_mut<T1>(signer::address_of(account));
+   │                 -------------------------------------------------- previous mutable global borrow
+ 7 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+   ·
+11 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here

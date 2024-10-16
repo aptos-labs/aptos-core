@@ -5,7 +5,6 @@ use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_api::Context;
 use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainData};
 use aptos_logger::prelude::*;
-use aptos_vm::data_cache::AsMoveResolver;
 use futures::{channel::mpsc, SinkExt};
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
@@ -243,8 +242,7 @@ async fn fetch_nexts(
     let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
     let state_view = context.latest_state_view().unwrap();
-    let resolver = state_view.as_move_resolver();
-    let converter = resolver.as_converter(context.db.clone());
+    let converter = state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
 
     let mut transactions = vec![];
     for (ind, raw_txn) in raw_txns.into_iter().enumerate() {
@@ -252,7 +250,13 @@ async fn fetch_nexts(
         // Do not update block_height if first block is block metadata
         if ind > 0 {
             // Update the timestamp if the next block occurs
-            if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
+            if let Some(txn) = raw_txn.transaction.try_as_block_metadata_ext() {
+                timestamp = txn.timestamp_usecs();
+                epoch = txn.epoch();
+                epoch_bcs = aptos_api_types::U64::from(epoch);
+                block_height += 1;
+                block_height_bcs = aptos_api_types::U64::from(block_height);
+            } else if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                 timestamp = txn.timestamp_usecs();
                 epoch = txn.epoch();
                 epoch_bcs = aptos_api_types::U64::from(epoch);
@@ -260,7 +264,7 @@ async fn fetch_nexts(
                 block_height_bcs = aptos_api_types::U64::from(block_height);
             }
         }
-        match converter
+        let res = converter
             .try_into_onchain_transaction(timestamp, raw_txn)
             .map(|mut txn| {
                 match txn {
@@ -283,13 +287,19 @@ async fn fetch_nexts(
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
                     },
+                    Transaction::BlockEpilogueTransaction(ref mut bet) => {
+                        bet.info.block_height = Some(block_height_bcs);
+                        bet.info.epoch = Some(epoch_bcs);
+                    },
                     Transaction::ValidatorTransaction(ref mut st) => {
-                        st.info.block_height = Some(block_height_bcs);
-                        st.info.epoch = Some(epoch_bcs);
+                        let info = st.transaction_info_mut();
+                        info.block_height = Some(block_height_bcs);
+                        info.epoch = Some(epoch_bcs);
                     },
                 };
                 txn
-            }) {
+            });
+        match res {
             Ok(transaction) => transactions.push(transaction),
             Err(err) => {
                 UNABLE_TO_FETCH_TRANSACTION.inc();

@@ -1,0 +1,9 @@
+
+============ bytecode verification failed ========
+
+Diagnostics:
+bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`. This is a compiler bug, consider reporting it.
+   ┌─ tests/reference-safety/bug_13976.move:12:13
+   │
+12 │             lifted_lambda(&mut a, z))
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/checking/visibility-checker/direct_visibility_err2.move:2:13
+  │
+2 │     package friend fun f() {}
+  │     ------- ^^^^^^ Duplicate visibility modifier
+  │     │
+  │     Visibility modifier previously given here

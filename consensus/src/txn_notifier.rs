@@ -4,7 +4,6 @@
 use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
 use aptos_consensus_types::common::RejectedTransactionSummary;
-use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
 use futures::channel::{mpsc, oneshot};
@@ -19,8 +18,8 @@ pub trait TxnNotifier: Send + Sync {
     /// state sync.)
     async fn notify_failed_txn(
         &self,
-        txns: Vec<SignedTransaction>,
-        compute_results: &StateComputeResult,
+        txns: &[SignedTransaction],
+        statuses: &[TransactionStatus],
     ) -> Result<(), MempoolError>;
 }
 
@@ -48,37 +47,17 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
-        user_txns: Vec<SignedTransaction>,
-        compute_results: &StateComputeResult,
+        user_txns: &[SignedTransaction],
+        user_txn_statuses: &[TransactionStatus],
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
 
-        if user_txns.is_empty() {
-            return Ok(());
-        }
-        let compute_status = compute_results.compute_status_for_input_txns();
-        // the length of compute_status is user_txns.len() + 1 due to having blockmetadata
-        let expected_len = user_txns.len() + 1;
-        if expected_len != compute_status.len() {
-            // reconfiguration suffix blocks don't have any transactions
-            if compute_status.is_empty() {
-                return Ok(());
-            }
-            return Err(format_err!(
-                "Expected compute_status length and actual compute_status length mismatch! user_txns len: {}, expected compute_status len: {}, compute_status len: {}, has_reconfiguration: {}",
-                user_txns.len(),
-                expected_len,
-                compute_status.len(),
-                compute_results.has_reconfiguration(),
-            ).into());
-        }
-        let user_txn_status = &compute_status[1..user_txns.len() + 1];
-        for (txn, status) in user_txns.iter().zip_eq(user_txn_status) {
+        for (txn, status) in user_txns.iter().zip_eq(user_txn_statuses) {
             if let TransactionStatus::Discard(reason) = status {
                 rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
                     sequence_number: txn.sequence_number(),
-                    hash: txn.clone().committed_hash(),
+                    hash: txn.committed_hash(),
                     reason: *reason,
                 });
             }

@@ -4,8 +4,9 @@
 
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
+use move_compiler_v2::{self, env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_stackless_bytecode::{
@@ -26,12 +27,16 @@ pub fn test_runner(
     path: &Path,
     pipeline_opt: Option<FunctionTargetPipeline>,
 ) -> anyhow::Result<()> {
-    let mut sources = extract_test_directives(path, "// dep:")?;
-    sources.push(path.to_string_lossy().to_string());
-    let env: GlobalEnv = run_model_builder_with_options(
+    let dep_sources = extract_test_directives(path, "// dep:")?;
+    let mut env: GlobalEnv = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
-            paths: sources,
+            paths: vec![path.to_string_lossy().to_string()],
+            named_address_map: move_stdlib::move_stdlib_named_addresses(),
+        }],
+        vec![PackagePaths {
+            name: None,
+            paths: dep_sources,
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
         }],
         vec![],
@@ -39,6 +44,15 @@ pub fn test_runner(
         false,
         KnownAttribute::get_all_attribute_names(),
     )?;
+    let compiler_options =
+        move_compiler_v2::Options::default().set_experiment(Experiment::SPEC_REWRITE, true);
+    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+        &compiler_options,
+        true,
+        RewritingScope::Everything,
+    );
+    env.set_extension(compiler_options);
+    pipeline.run(&mut env);
     let out = if env.has_errors() {
         let mut error_writer = Buffer::no_color();
         env.report_diag(&mut error_writer, Severity::Error);
@@ -88,7 +102,7 @@ pub fn test_runner(
         }
         text
     };
-    let baseline_path = path.with_extension(EXP_EXT);
+    let baseline_path = path.with_extension(get_compiler_exp_extension());
     verify_or_update_baseline(baseline_path.as_path(), &out)?;
     Ok(())
 }

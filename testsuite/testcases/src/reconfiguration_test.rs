@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
+use async_trait::async_trait;
 
 pub struct ReconfigurationTest;
 
@@ -13,8 +14,9 @@ impl Test for ReconfigurationTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for ReconfigurationTest {
-    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+    async fn run<'a>(&self, _ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         Err(anyhow!("Not supported in aptos-framework yet"))
     }
     // TODO(https://github.com/aptos-labs/aptos-core/issues/317): add back after support those transactions in aptos-framework

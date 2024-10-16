@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot use `&address` with an operator which expects a value of type `&signer`
+  ┌─ tests/checking/typing/v1-signer/move_to_non_signer.move:4:17
+  │
+4 │         move_to(s, R { f: false })
+  │                 ^
+
+error: cannot use `address` with an operator which expects a value of type `&signer`
+   ┌─ tests/checking/typing/v1-signer/move_to_non_signer.move:12:17
+   │
+12 │         move_to(s, R { f: false })
+   │                 ^

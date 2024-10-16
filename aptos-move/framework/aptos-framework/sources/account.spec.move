@@ -203,6 +203,16 @@ spec aptos_framework::account {
         ensures account_resource.authentication_key == new_auth_key;
     }
 
+    spec rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
+        let addr = signer::address_of(account);
+        /// [high-level-req-10]
+        let post account_resource = global<Account>(addr);
+        aborts_if !exists<Account>(addr);
+        aborts_if vector::length(new_auth_key) != 32;
+        modifies global<Account>(addr);
+        ensures account_resource.authentication_key == new_auth_key;
+    }
+
     spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;
 
     spec assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
@@ -565,6 +575,7 @@ spec aptos_framework::account {
         // This function should not abort assuming the result of `sha3_256` is deserializable into an address.
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_resource_address(source, seed);
+        ensures [abstract] source != result; // We can assume that the derived resource account does not equal to `source`
     }
 
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
@@ -607,7 +618,7 @@ spec aptos_framework::account {
     }
 
     /// The Account existed under the signer.
-    /// The guid_creation_num of the ccount resource is up to MAX_U64.
+    /// The guid_creation_num of the account resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
         include NewEventHandleAbortsIf {

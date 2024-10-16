@@ -1,0 +1,384 @@
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    struct Box<T> {
+        f: T,
+    }
+    struct Pair<T1,T2> {
+        f1: T1,
+        f2: T2,
+    }
+    struct R {
+        dummy_field: bool,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    struct Sc<T> {
+        dummy_field: bool,
+    }
+    struct Scds<T> {
+        dummy_field: bool,
+    }
+    struct Sd<T> {
+        dummy_field: bool,
+    }
+    struct Sk<T> {
+        dummy_field: bool,
+    }
+    struct Ss<T> {
+        dummy_field: bool,
+    }
+    struct Ssk<T> {
+        dummy_field: bool,
+    }
+    private fun c<T>() {
+        Tuple()
+    }
+    private fun cds<T>() {
+        Tuple()
+    }
+    private fun d<T>() {
+        Tuple()
+    }
+    private fun k<T>() {
+        Tuple()
+    }
+    private fun s<T>() {
+        Tuple()
+    }
+    private fun sk<T>() {
+        Tuple()
+    }
+    private fun t1<Tc,Td,Ts,Tk,Tcd,Tcs,Tds,Tsk,Tcds>() {
+        M::c<u64>();
+        M::d<signer>();
+        M::s<bool>();
+        M::cds<address>();
+        M::c<vector<u64>>();
+        M::d<vector<signer>>();
+        M::s<vector<bool>>();
+        M::cds<vector<address>>();
+        {
+          let M::Sc<u64>{ dummy_field: _ } = pack M::Sc<u64>(false);
+          {
+            let M::Sd<signer>{ dummy_field: _ } = pack M::Sd<signer>(false);
+            {
+              let M::Ss<bool>{ dummy_field: _ } = pack M::Ss<bool>(false);
+              {
+                let M::Scds<address>{ dummy_field: _ } = pack M::Scds<address>(false);
+                {
+                  let M::Sc<vector<u64>>{ dummy_field: _ } = pack M::Sc<vector<u64>>(false);
+                  {
+                    let M::Sd<vector<signer>>{ dummy_field: _ } = pack M::Sd<vector<signer>>(false);
+                    {
+                      let M::Ss<vector<bool>>{ dummy_field: _ } = pack M::Ss<vector<bool>>(false);
+                      {
+                        let M::Scds<vector<address>>{ dummy_field: _ } = pack M::Scds<vector<address>>(false);
+                        M::c<Tc>();
+                        M::c<Tcd>();
+                        M::c<Tcs>();
+                        M::c<Tcds>();
+                        M::d<Td>();
+                        M::d<Tcd>();
+                        M::d<Tds>();
+                        M::d<Tcds>();
+                        M::s<Ts>();
+                        M::s<Tcs>();
+                        M::s<Tds>();
+                        M::s<Tsk>();
+                        M::s<Tcds>();
+                        M::k<Tk>();
+                        M::k<Tsk>();
+                        M::sk<Tsk>();
+                        M::cds<Tcds>();
+                        {
+                          let M::Sc<Tc>{ dummy_field: _ } = pack M::Sc<Tc>(false);
+                          {
+                            let M::Sc<Tcd>{ dummy_field: _ } = pack M::Sc<Tcd>(false);
+                            {
+                              let M::Sc<Tcs>{ dummy_field: _ } = pack M::Sc<Tcs>(false);
+                              {
+                                let M::Sc<Tcds>{ dummy_field: _ } = pack M::Sc<Tcds>(false);
+                                {
+                                  let M::Sd<Td>{ dummy_field: _ } = pack M::Sd<Td>(false);
+                                  {
+                                    let M::Sd<Tcd>{ dummy_field: _ } = pack M::Sd<Tcd>(false);
+                                    {
+                                      let M::Sd<Tds>{ dummy_field: _ } = pack M::Sd<Tds>(false);
+                                      {
+                                        let M::Sd<Tcds>{ dummy_field: _ } = pack M::Sd<Tcds>(false);
+                                        {
+                                          let M::Ss<Ts>{ dummy_field: _ } = pack M::Ss<Ts>(false);
+                                          {
+                                            let M::Ss<Tcs>{ dummy_field: _ } = pack M::Ss<Tcs>(false);
+                                            {
+                                              let M::Ss<Tds>{ dummy_field: _ } = pack M::Ss<Tds>(false);
+                                              {
+                                                let M::Ss<Tsk>{ dummy_field: _ } = pack M::Ss<Tsk>(false);
+                                                {
+                                                  let M::Ss<Tcds>{ dummy_field: _ } = pack M::Ss<Tcds>(false);
+                                                  {
+                                                    let M::Sk<Tk>{ dummy_field: _ } = pack M::Sk<Tk>(false);
+                                                    {
+                                                      let M::Sk<Tsk>{ dummy_field: _ } = pack M::Sk<Tsk>(false);
+                                                      {
+                                                        let M::Ssk<Tsk>{ dummy_field: _ } = pack M::Ssk<Tsk>(false);
+                                                        {
+                                                          let M::Scds<Tcds>{ dummy_field: _ } = pack M::Scds<Tcds>(false);
+                                                          M::c<S>();
+                                                          M::c<Box<S>>();
+                                                          M::c<Pair<Box<S>, S>>();
+                                                          M::d<S>();
+                                                          M::d<Box<S>>();
+                                                          M::d<Pair<Box<S>, S>>();
+                                                          M::s<S>();
+                                                          M::s<R>();
+                                                          M::s<Box<S>>();
+                                                          M::s<Box<R>>();
+                                                          M::s<Pair<Box<S>, S>>();
+                                                          M::s<Pair<R, Box<Pair<R, S>>>>();
+                                                          M::k<R>();
+                                                          M::k<Box<R>>();
+                                                          M::k<Pair<R, Box<R>>>();
+                                                          M::k<Pair<R, Box<Pair<R, S>>>>();
+                                                          M::sk<R>();
+                                                          M::sk<Box<R>>();
+                                                          M::sk<Pair<R, Box<R>>>();
+                                                          M::sk<Pair<R, Box<Pair<R, S>>>>();
+                                                          M::cds<S>();
+                                                          M::cds<Box<S>>();
+                                                          M::cds<Pair<Box<S>, S>>();
+                                                          {
+                                                            let M::Sc<S>{ dummy_field: _ } = pack M::Sc<S>(false);
+                                                            {
+                                                              let M::Sc<Box<S>>{ dummy_field: _ } = pack M::Sc<Box<S>>(false);
+                                                              {
+                                                                let M::Sc<Pair<Box<S>, S>>{ dummy_field: _ } = pack M::Sc<Pair<Box<S>, S>>(false);
+                                                                {
+                                                                  let M::Sd<S>{ dummy_field: _ } = pack M::Sd<S>(false);
+                                                                  {
+                                                                    let M::Sd<Box<S>>{ dummy_field: _ } = pack M::Sd<Box<S>>(false);
+                                                                    {
+                                                                      let M::Sd<Pair<Box<S>, S>>{ dummy_field: _ } = pack M::Sd<Pair<Box<S>, S>>(false);
+                                                                      {
+                                                                        let M::Ss<S>{ dummy_field: _ } = pack M::Ss<S>(false);
+                                                                        {
+                                                                          let M::Ss<R>{ dummy_field: _ } = pack M::Ss<R>(false);
+                                                                          {
+                                                                            let M::Ss<Box<S>>{ dummy_field: _ } = pack M::Ss<Box<S>>(false);
+                                                                            {
+                                                                              let M::Ss<Box<R>>{ dummy_field: _ } = pack M::Ss<Box<R>>(false);
+                                                                              {
+                                                                                let M::Ss<Pair<Box<S>, S>>{ dummy_field: _ } = pack M::Ss<Pair<Box<S>, S>>(false);
+                                                                                {
+                                                                                  let M::Ss<Pair<R, Box<Pair<R, S>>>>{ dummy_field: _ } = pack M::Ss<Pair<R, Box<Pair<R, S>>>>(false);
+                                                                                  {
+                                                                                    let M::Sk<R>{ dummy_field: _ } = pack M::Sk<R>(false);
+                                                                                    {
+                                                                                      let M::Sk<Box<R>>{ dummy_field: _ } = pack M::Sk<Box<R>>(false);
+                                                                                      {
+                                                                                        let M::Sk<Pair<R, Box<R>>>{ dummy_field: _ } = pack M::Sk<Pair<R, Box<R>>>(false);
+                                                                                        {
+                                                                                          let M::Sk<Pair<R, Box<Pair<R, S>>>>{ dummy_field: _ } = pack M::Sk<Pair<R, Box<Pair<R, S>>>>(false);
+                                                                                          {
+                                                                                            let M::Ssk<R>{ dummy_field: _ } = pack M::Ssk<R>(false);
+                                                                                            {
+                                                                                              let M::Ssk<Box<R>>{ dummy_field: _ } = pack M::Ssk<Box<R>>(false);
+                                                                                              {
+                                                                                                let M::Ssk<Pair<R, Box<R>>>{ dummy_field: _ } = pack M::Ssk<Pair<R, Box<R>>>(false);
+                                                                                                {
+                                                                                                  let M::Ssk<Pair<R, Box<Pair<R, S>>>>{ dummy_field: _ } = pack M::Ssk<Pair<R, Box<Pair<R, S>>>>(false);
+                                                                                                  {
+                                                                                                    let M::Scds<S>{ dummy_field: _ } = pack M::Scds<S>(false);
+                                                                                                    {
+                                                                                                      let M::Scds<Box<S>>{ dummy_field: _ } = pack M::Scds<Box<S>>(false);
+                                                                                                      {
+                                                                                                        let M::Scds<Pair<Box<S>, S>>{ dummy_field: _ } = pack M::Scds<Pair<Box<S>, S>>(false);
+                                                                                                        Tuple()
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct Box<T> has copy, drop, store, key {
+        f: T,
+    }
+    struct Pair<T1, T2> has copy, drop, store, key {
+        f1: T1,
+        f2: T2,
+    }
+    struct R has store, key {
+    }
+    struct S has copy, drop, store, key {
+    }
+    struct Sc<phantom T: copy> {
+    }
+    struct Scds<phantom T: copy + drop + store> {
+    }
+    struct Sd<phantom T: drop> {
+    }
+    struct Sk<phantom T: key> {
+    }
+    struct Ss<phantom T: store> {
+    }
+    struct Ssk<phantom T: store + key> {
+    }
+    fun c<T: copy>() {
+    }
+    fun cds<T: copy + drop + store>() {
+    }
+    fun d<T: drop>() {
+    }
+    fun k<T: key>() {
+    }
+    fun s<T: store>() {
+    }
+    fun sk<T: store + key>() {
+    }
+    fun t1<Tc: copy, Td: drop, Ts: store, Tk: key, Tcd: copy + drop, Tcs: copy + store, Tds: drop + store, Tsk: store + key, Tcds: copy + drop + store>() {
+        c<u64>();
+        d<signer>();
+        s<bool>();
+        cds<address>();
+        c<vector<u64>>();
+        d<vector<signer>>();
+        s<vector<bool>>();
+        cds<vector<address>>();
+        let Sc<u64>{} = Sc<u64>{};
+        let Sd<signer>{} = Sd<signer>{};
+        let Ss<bool>{} = Ss<bool>{};
+        let Scds<address>{} = Scds<address>{};
+        let Sc<vector<u64>>{} = Sc<vector<u64>>{};
+        let Sd<vector<signer>>{} = Sd<vector<signer>>{};
+        let Ss<vector<bool>>{} = Ss<vector<bool>>{};
+        let Scds<vector<address>>{} = Scds<vector<address>>{};
+        c<Tc>();
+        c<Tcd>();
+        c<Tcs>();
+        c<Tcds>();
+        d<Td>();
+        d<Tcd>();
+        d<Tds>();
+        d<Tcds>();
+        s<Ts>();
+        s<Tcs>();
+        s<Tds>();
+        s<Tsk>();
+        s<Tcds>();
+        k<Tk>();
+        k<Tsk>();
+        sk<Tsk>();
+        cds<Tcds>();
+        let Sc<Tc>{} = Sc<Tc>{};
+        let Sc<Tcd>{} = Sc<Tcd>{};
+        let Sc<Tcs>{} = Sc<Tcs>{};
+        let Sc<Tcds>{} = Sc<Tcds>{};
+        let Sd<Td>{} = Sd<Td>{};
+        let Sd<Tcd>{} = Sd<Tcd>{};
+        let Sd<Tds>{} = Sd<Tds>{};
+        let Sd<Tcds>{} = Sd<Tcds>{};
+        let Ss<Ts>{} = Ss<Ts>{};
+        let Ss<Tcs>{} = Ss<Tcs>{};
+        let Ss<Tds>{} = Ss<Tds>{};
+        let Ss<Tsk>{} = Ss<Tsk>{};
+        let Ss<Tcds>{} = Ss<Tcds>{};
+        let Sk<Tk>{} = Sk<Tk>{};
+        let Sk<Tsk>{} = Sk<Tsk>{};
+        let Ssk<Tsk>{} = Ssk<Tsk>{};
+        let Scds<Tcds>{} = Scds<Tcds>{};
+        c<S>();
+        c<Box<S>>();
+        c<Pair<Box<S>, S>>();
+        d<S>();
+        d<Box<S>>();
+        d<Pair<Box<S>, S>>();
+        s<S>();
+        s<R>();
+        s<Box<S>>();
+        s<Box<R>>();
+        s<Pair<Box<S>, S>>();
+        s<Pair<R, Box<Pair<R, S>>>>();
+        k<R>();
+        k<Box<R>>();
+        k<Pair<R, Box<R>>>();
+        k<Pair<R, Box<Pair<R, S>>>>();
+        sk<R>();
+        sk<Box<R>>();
+        sk<Pair<R, Box<R>>>();
+        sk<Pair<R, Box<Pair<R, S>>>>();
+        cds<S>();
+        cds<Box<S>>();
+        cds<Pair<Box<S>, S>>();
+        let Sc<S>{} = Sc<S>{};
+        let Sc<Box<S>>{} = Sc<Box<S>>{};
+        let Sc<Pair<Box<S>, S>>{} = Sc<Pair<Box<S>, S>>{};
+        let Sd<S>{} = Sd<S>{};
+        let Sd<Box<S>>{} = Sd<Box<S>>{};
+        let Sd<Pair<Box<S>, S>>{} = Sd<Pair<Box<S>, S>>{};
+        let Ss<S>{} = Ss<S>{};
+        let Ss<R>{} = Ss<R>{};
+        let Ss<Box<S>>{} = Ss<Box<S>>{};
+        let Ss<Box<R>>{} = Ss<Box<R>>{};
+        let Ss<Pair<Box<S>, S>>{} = Ss<Pair<Box<S>, S>>{};
+        let Ss<Pair<R, Box<Pair<R, S>>>>{} = Ss<Pair<R, Box<Pair<R, S>>>>{};
+        let Sk<R>{} = Sk<R>{};
+        let Sk<Box<R>>{} = Sk<Box<R>>{};
+        let Sk<Pair<R, Box<R>>>{} = Sk<Pair<R, Box<R>>>{};
+        let Sk<Pair<R, Box<Pair<R, S>>>>{} = Sk<Pair<R, Box<Pair<R, S>>>>{};
+        let Ssk<R>{} = Ssk<R>{};
+        let Ssk<Box<R>>{} = Ssk<Box<R>>{};
+        let Ssk<Pair<R, Box<R>>>{} = Ssk<Pair<R, Box<R>>>{};
+        let Ssk<Pair<R, Box<Pair<R, S>>>>{} = Ssk<Pair<R, Box<Pair<R, S>>>>{};
+        let Scds<S>{} = Scds<S>{};
+        let Scds<Box<S>>{} = Scds<Box<S>>{};
+        let Scds<Pair<Box<S>, S>>{} = Scds<Pair<Box<S>, S>>{};
+    }
+}

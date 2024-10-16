@@ -73,7 +73,7 @@ const fn all_bytes_numeric(b: &[u8], start_offset: usize) -> bool {
 /// Describes what identifiers are allowed.
 ///
 /// For now this is deliberately restrictive -- we would like to evolve this in the future.
-/// TODO: "<SELF>" and "<SELF>_[0-9]+" are coded as exceptions.
+/// TODO: `<SELF>` and `<SELF>_[0-9]+` are coded as exceptions.
 ///       They should be removed once CompiledScript goes away.
 // Note: needs to be pub as it's used in the `ident_str!` macro.
 pub const fn is_valid(s: &str) -> bool {

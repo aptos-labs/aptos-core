@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: missing field `dummy_field`
+  ┌─ tests/checking/typing/dummy_field_err.move:8:13
+  │
+8 │         let R {  } = move_from<R>(addr);
+  │             ^^^^^^
+
+error: missing field `dummy_field`
+   ┌─ tests/checking/typing/dummy_field_err.move:12:17
+   │
+12 │         let r = R {};
+   │                 ^^^^
+
+error: field `dummy_field` not declared in `test::T`
+   ┌─ tests/checking/typing/dummy_field_err.move:20:17
+   │
+20 │         let T { dummy_field } = move_from<T>(addr);
+   │                 ^^^^^^^^^^^
+
+error: empty struct `test::T` cannot access the field `dummy_field`
+   ┌─ tests/checking/typing/dummy_field_err.move:26:9
+   │
+26 │         t.dummy_field
+   │         ^^^^^^^^^^^^^
+
+error: missing field `dummy_field_1`
+   ┌─ tests/checking/typing/dummy_field_err.move:34:13
+   │
+34 │         let G {  } = move_from<G>(addr);
+   │             ^^^^^^
+
+error: missing field `dummy_field_1`
+   ┌─ tests/checking/typing/dummy_field_err.move:38:17
+   │
+38 │         let r = G {};
+   │                 ^^^^
+
+error: empty struct `test::A` cannot access the field `dummy_field`
+   ┌─ tests/checking/typing/dummy_field_err.move:47:17
+   │
+47 │         let x = a.dummy_field;
+   │                 ^^^^^^^^^^^^^

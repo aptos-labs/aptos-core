@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:35:9
+   │
+16 │     fun t<
+   │         - Alias previously defined here
+   ·
+35 │     fun t<
+   │         ^ Duplicate module member or alias 't'. Top level names in a namespace must be unique

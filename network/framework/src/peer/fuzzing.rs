@@ -21,7 +21,7 @@ use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{executor::block_on, future, io::AsyncReadExt, sink::SinkExt, stream::StreamExt};
 use proptest::{arbitrary::any, collection::vec};
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// Generate a sequence of `MultiplexMessage`, bcs serialize them, and write them
 /// out to a buffer using our length-prefixed message codec.
@@ -92,7 +92,7 @@ pub fn fuzz(data: &[u8]) {
     let channel_size = 8;
 
     let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
-    let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
+    let upstream_handlers = Arc::new(HashMap::new());
 
     // Spin up a new `Peer` actor
     let peer = Peer::new(
@@ -102,7 +102,7 @@ pub fn fuzz(data: &[u8]) {
         connection,
         connection_notifs_tx,
         peer_reqs_rx,
-        peer_notifs_tx,
+        upstream_handlers,
         Duration::from_millis(constants::INBOUND_RPC_TIMEOUT_MS),
         constants::MAX_CONCURRENT_INBOUND_RPCS,
         constants::MAX_CONCURRENT_OUTBOUND_RPCS,
@@ -120,7 +120,6 @@ pub fn fuzz(data: &[u8]) {
         // ACK the "remote" d/c and drop our handle to the Peer actor. Then wait
         // for all network notifs to drain out and finish.
         drop(peer_reqs_tx);
-        peer_notifs_rx.collect::<Vec<_>>().await;
     });
 }
 

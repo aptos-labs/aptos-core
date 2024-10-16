@@ -1,0 +1,33 @@
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/anonymous_field_fail.move:2:13
+  │
+2 │     struct S(u8);
+  │             ^ Move 2 language construct is not enabled: positional fields
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/anonymous_field_fail.move:4:5
+  │
+4 │     enum E {
+  │     ^^^^ Move 2 language construct is not enabled: enum types
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/anonymous_field_fail.move:5:10
+  │
+5 │         V(S)
+  │          ^ Move 2 language construct is not enabled: positional fields
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/anonymous_field_fail.move:9:11
+  │
+9 │         x.1;
+  │           ^ Move 2 language construct is not enabled: positional field
+
+error[E01002]: unexpected token
+   ┌─ tests/move_check/parser/anonymous_field_fail.move:10:14
+   │
+10 │         let S(_x) = x;
+   │              ^
+   │              │
+   │              Unexpected '('
+   │              Expected '{'
+

@@ -55,23 +55,25 @@ pub trait Node: Send + Sync {
 
     /// Start this Node.
     /// This should be a noop if the Node is already running.
-    async fn start(&mut self) -> Result<()>;
+    async fn start(&self) -> Result<()>;
 
     /// Stop this Node.
     /// This should be a noop if the Node isn't running.
-    async fn stop(&mut self) -> Result<()>;
+    async fn stop(&self) -> Result<()>;
 
-    async fn get_identity(&mut self) -> Result<String>;
+    async fn get_identity(&self) -> Result<String>;
 
-    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()>;
+    async fn set_identity(&self, k8s_secret_name: String) -> Result<()>;
     /// Clears this Node's Storage. This stops the node as well
-    async fn clear_storage(&mut self) -> Result<()>;
+    async fn clear_storage(&self) -> Result<()>;
 
-    async fn health_check(&mut self) -> Result<(), HealthCheckError>;
+    async fn health_check(&self) -> Result<(), HealthCheckError>;
 
     fn counter(&self, counter: &str, port: u64) -> Result<f64>;
 
     fn expose_metric(&self) -> Result<u64>;
+
+    fn service_name(&self) -> Option<String>;
 }
 
 /// Trait used to represent a running Validator
@@ -225,7 +227,7 @@ pub trait NodeExt: Node {
         Ok(self.rest_client().health_check(seconds).await?)
     }
 
-    async fn wait_until_healthy(&mut self, deadline: Instant) -> Result<()> {
+    async fn wait_until_healthy(&self, deadline: Instant) -> Result<()> {
         let mut healthcheck_error =
             HealthCheckError::Unknown(anyhow::anyhow!("No healthcheck performed yet"));
         while Instant::now() < deadline {

@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::storage::{
-    change_set_configs::ChangeSetConfigs,
-    io_pricing::{IoPricing, IoPricingV3},
-    space_pricing::DiskSpacePricing,
+    change_set_configs::ChangeSetConfigs, io_pricing::IoPricing, space_pricing::DiskSpacePricing,
 };
-use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::ConfigStorage;
-use move_core_types::gas_algebra::NumBytes;
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
+use aptos_types::{
+    on_chain_config::{ConfigStorage, Features},
+    state_store::state_key::StateKey,
+};
+use bytes::Bytes;
 use std::fmt::Debug;
 
 pub mod change_set_configs;
@@ -24,13 +25,48 @@ pub struct StorageGasParameters {
 
 impl StorageGasParameters {
     pub fn new(
-        feature_version: u64,
+        gas_feature_version: u64,
+        features: &Features,
         gas_params: &AptosGasParameters,
         config_storage: &impl ConfigStorage,
     ) -> Self {
-        let io_pricing = IoPricing::new(feature_version, gas_params, config_storage);
-        let space_pricing = DiskSpacePricing::v1();
-        let change_set_configs = ChangeSetConfigs::new(feature_version, gas_params);
+        Self::new_impl(
+            gas_feature_version,
+            features,
+            gas_params,
+            config_storage,
+            ChangeSetConfigs::new(gas_feature_version, gas_params),
+        )
+    }
+
+    pub fn unlimited() -> Self {
+        Self::new_impl(
+            LATEST_GAS_FEATURE_VERSION,
+            &Features::default(),
+            &AptosGasParameters::zeros(), // free of charge
+            &DummyConfigStorage,
+            ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION), // no limits
+        )
+    }
+
+    pub fn latest() -> Self {
+        Self::new(
+            LATEST_GAS_FEATURE_VERSION,
+            &Features::default(),
+            &AptosGasParameters::initial(),
+            &DummyConfigStorage,
+        )
+    }
+
+    fn new_impl(
+        gas_feature_version: u64,
+        features: &Features,
+        gas_params: &AptosGasParameters,
+        config_storage: &impl ConfigStorage,
+        change_set_configs: ChangeSetConfigs,
+    ) -> Self {
+        let io_pricing = IoPricing::new(gas_feature_version, gas_params, config_storage);
+        let space_pricing = DiskSpacePricing::new(gas_feature_version, features);
 
         Self {
             io_pricing,
@@ -38,17 +74,12 @@ impl StorageGasParameters {
             change_set_configs,
         }
     }
+}
 
-    pub fn unlimited(free_write_bytes_quota: NumBytes) -> Self {
-        Self {
-            io_pricing: IoPricing::V3(IoPricingV3 {
-                feature_version: LATEST_GAS_FEATURE_VERSION,
-                legacy_free_write_bytes_quota: free_write_bytes_quota,
-            }),
-            space_pricing: DiskSpacePricing::v1(),
-            change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ),
-        }
+struct DummyConfigStorage;
+
+impl ConfigStorage for DummyConfigStorage {
+    fn fetch_config_bytes(&self, _state_key: &StateKey) -> Option<Bytes> {
+        unreachable!("Not supposed to be called from latest() / tests.")
     }
 }

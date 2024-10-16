@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/phantom_param_invalid_keyword.move:2:25
+  │
+2 │     struct S<T1, phatom T2> {
+  │             -           ^ Expected '>'
+  │             │
+  │             To match this '<'

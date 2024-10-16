@@ -8,10 +8,9 @@
 use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
-    types::{
-        code_invariant_error, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr,
-    },
+    types::{DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
 };
+use aptos_types::error::{code_invariant_error, PanicOr};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct DeltaWithMax {
@@ -219,8 +218,11 @@ mod test {
         FakeAggregatorView,
     };
     use aptos_types::{
-        delayed_fields::PanicError,
-        state_store::{state_key::StateKey, state_value::StateValue},
+        error::PanicError,
+        state_store::{
+            state_key::StateKey,
+            state_value::{StateValue, StateValueMetadata},
+        },
         write_set::WriteOp,
     };
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
@@ -473,7 +475,7 @@ mod test {
         assert_eq!(b.update, Negative(1));
     }
 
-    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
+    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(b"test-key"));
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
@@ -509,11 +511,6 @@ mod test {
         type Identifier = ();
         type ResourceGroupTag = ();
         type ResourceKey = ();
-        type ResourceValue = ();
-
-        fn is_delayed_field_optimization_capable(&self) -> bool {
-            unimplemented!("Irrelevant for the test")
-        }
 
         fn get_delayed_field_value(
             &self,
@@ -536,10 +533,7 @@ mod test {
             unimplemented!("Irrelevant for the test")
         }
 
-        fn validate_and_convert_delayed_field_id(
-            &self,
-            _id: u64,
-        ) -> Result<Self::Identifier, PanicError> {
+        fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
             unimplemented!("Irrelevant for the test")
         }
 
@@ -548,7 +542,7 @@ mod test {
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
         ) -> Result<
-            BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>,
+            BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
             PanicError,
         > {
             unimplemented!("Irrelevant for the test")
@@ -558,7 +552,7 @@ mod test {
             &self,
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
-        ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
             unimplemented!("Irrelevant for the test")
         }
     }

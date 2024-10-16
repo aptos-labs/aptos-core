@@ -1,6 +1,7 @@
 locals {
   pfn_addons_helm_chart_path = "${path.module}/../../helm/pfn-addons"
   fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
+  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
 }
 
 resource "helm_release" "fullnode" {
@@ -28,6 +29,7 @@ resource "helm_release" "fullnode" {
       }
       storage = {
         class = var.fullnode_storage_class
+        size  = var.fullnode_storage_size
       }
       service = {
         type = "LoadBalancer"
@@ -71,5 +73,47 @@ resource "helm_release" "fullnode" {
       name  = "chart_sha1"
       value = sha1(join("", [for f in fileset(local.fullnode_helm_chart_path, "**") : filesha1("${local.fullnode_helm_chart_path}/${f}")]))
     }
+  }
+}
+
+resource "helm_release" "monitoring" {
+  count       = var.enable_monitoring ? 1 : 0
+  name        = "aptos-monitoring"
+  chart       = local.monitoring_helm_chart_path
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      chain = {
+        name = var.chain_name
+      }
+      fullnode = {
+        name = var.fullnode_name
+      }
+      service = {
+        domain = local.domain
+      }
+      monitoring = {
+        prometheus = {
+          storage = {
+            class = "gp3"
+          }
+        }
+      }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
+      }
+    }),
+    jsonencode(var.monitoring_helm_values),
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
 }

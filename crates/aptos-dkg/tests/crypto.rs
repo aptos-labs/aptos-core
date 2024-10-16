@@ -1,11 +1,17 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
     algebra::polynomials::{
         poly_eval, poly_mul_fft, poly_mul_less_slow, poly_mul_slow, poly_xnmul,
     },
-    utils::random::{random_g2_point, random_scalar, random_scalars},
+    utils::{
+        multi_pairing, parallel_multi_pairing,
+        random::{random_g1_point, random_g2_point, random_scalar, random_scalars},
+    },
+    weighted_vuf::pinkas::MIN_MULTIPAIR_NUM_JOBS,
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
 use group::Group;
@@ -167,5 +173,29 @@ fn test_crypto_poly_shift() {
 
             assert_eq!(shifted1, shifted2);
         }
+    }
+}
+
+#[test]
+fn test_parallel_multi_pairing() {
+    let mut rng = thread_rng();
+
+    let r1 = [random_g1_point(&mut rng), random_g1_point(&mut rng)];
+    let r2 = [random_g2_point(&mut rng), random_g2_point(&mut rng)];
+
+    let pool1 = spawn_rayon_thread_pool("testmultpair".to_string(), Some(1));
+    let pool32 = spawn_rayon_thread_pool("testmultpair".to_string(), Some(32));
+
+    for (g1, g2) in vec![
+        ([G1Projective::identity(), r1[0]], r2),
+        (r1, r2),
+        (r1, [G2Projective::identity(), r2[0]]),
+    ] {
+        let res1 = multi_pairing(g1.iter(), g2.iter());
+        let res2 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool1, MIN_MULTIPAIR_NUM_JOBS);
+        let res3 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool32, MIN_MULTIPAIR_NUM_JOBS);
+
+        assert_eq!(res1, res2);
+        assert_eq!(res1, res3);
     }
 }

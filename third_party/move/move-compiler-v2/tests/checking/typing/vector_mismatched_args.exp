@@ -1,30 +1,30 @@
 
 Diagnostics:
-error: expected `bool` but found `integer`
+error: expected `bool` but found a value of type `integer`
   ┌─ tests/checking/typing/vector_mismatched_args.move:7:19
   │
 7 │         vector[0, false];
   │                   ^^^^^
 
-error: expected `u8` but found `u64`
+error: expected `u8` but found a value of type `u64`
   ┌─ tests/checking/typing/vector_mismatched_args.move:8:21
   │
 8 │         vector[0u8, 0u64, 0u128];
   │                     ^^^^
 
-error: expected `address` but found `integer`
+error: expected `address` but found a value of type `integer`
   ┌─ tests/checking/typing/vector_mismatched_args.move:9:19
   │
 9 │         vector[0, @0];
   │                   ^^
 
-error: expected `Test::X` but found `Test::Y`
+error: expected `X` but found a value of type `Y`
    ┌─ tests/checking/typing/vector_mismatched_args.move:10:21
    │
 10 │         vector[X{}, Y{}];
    │                     ^^^
 
-error: expected `bool` but found `integer`
+error: expected `&integer` but found a value of type `&bool`
    ┌─ tests/checking/typing/vector_mismatched_args.move:11:20
    │
 11 │         vector[&0, &false];

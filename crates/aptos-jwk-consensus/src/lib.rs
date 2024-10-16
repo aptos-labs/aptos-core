@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask,
     network_interface::JWKConsensusNetworkClient, types::JWKConsensusMsg,
 };
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_config::config::SafetyRulesConfig;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
@@ -16,7 +17,7 @@ use tokio::runtime::Runtime;
 #[allow(clippy::let_and_return)]
 pub fn start_jwk_consensus_runtime(
     my_addr: AccountAddress,
-    consensus_key: PrivateKey,
+    safety_rules_config: &SafetyRulesConfig,
     network_client: NetworkClient<JWKConsensusMsg>,
     network_service_events: NetworkServiceEvents<JWKConsensusMsg>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -28,7 +29,7 @@ pub fn start_jwk_consensus_runtime(
     let jwk_consensus_network_client = JWKConsensusNetworkClient::new(network_client);
     let epoch_manager = EpochManager::new(
         my_addr,
-        consensus_key,
+        safety_rules_config,
         reconfig_events,
         jwk_updated_events,
         self_sender,

@@ -1,18 +1,31 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     struct A {
         addr: address,
     }
     public fun foo(input: address): address
-        acquires m::A(*)
+        acquires A(*)
      {
         {
-          let a: m::A = MoveFrom<m::A>(input);
+          let a: A = MoveFrom<A>(input);
           {
-            let m::A{ addr: addr: address } = a;
+            let m::A{ addr } = a;
             addr
           }
         }
     }
-    spec fun $foo(input: address): address;
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct A has key {
+        addr: address,
+    }
+    public fun foo(input: address): address
+        acquires A
+    {
+        let a = move_from<A>(input);
+        let A{addr: addr} = a;
+        addr
+    }
+}

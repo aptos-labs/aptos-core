@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/more-v1/expansion/use_nested_self_as_invalid.move:8:26
+  │
+8 │     use 0x2::X::{Self as B, foo, S};
+  │                          ^ Unused 'use' of alias 'B'. Consider removing it
+
+error: unbound module
+   ┌─ tests/more-v1/expansion/use_nested_self_as_invalid.move:12:9
+   │
+12 │         X::foo();
+   │         ^ Unbound module or type alias 'X'

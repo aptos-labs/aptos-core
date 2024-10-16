@@ -254,10 +254,7 @@ module dao_platform::nft_dao {
         let (res_signer, res_cap) = account::create_resource_account(admin, seed);
         let src_addr = signer::address_of(admin);
 
-        // register aptos coin
-        coin::register<AptosCoin>(&res_signer);
         // initalize token store and opt-in direct NFT transfer for easy of operation
-        token::initialize_token_store(&res_signer);
         token::opt_in_direct_transfer(&res_signer, true);
 
         assert!(string::length(&name) < 128, error::invalid_argument(ESTRING_TOO_LONG));
@@ -863,6 +860,8 @@ module dao_platform::nft_dao {
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
 
+        // intialize with some fund in the DAO resource account
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
 
         setup_voting_token_distribution(creator, voter);
         // creator creates a dao
@@ -913,8 +912,6 @@ module dao_platform::nft_dao {
         // Test transfer fund proposal
         //
 
-        // intialize with some fund in the DAO resource account
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
         let coins = coin::mint(100, &mint_cap);
         coin::register<AptosCoin>(creator);
         coin::register<AptosCoin>(voter);

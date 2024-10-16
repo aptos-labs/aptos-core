@@ -8,5 +8,5 @@ error[E03002]: unbound module
    ┌─ tests/move_check/verification/cross_module_invalid.move:23:9
    │
 23 │         A::build_foo()
-   │         ^ Unbound module alias 'A'
+   │         ^ Unbound module or type alias 'A'
 

@@ -4,7 +4,7 @@
 use crate::{
     quorum_store::{
         batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGenerator,
-        quorum_store_db::MockQuorumStoreDB,
+        batch_store::BatchWriter, quorum_store_db::MockQuorumStoreDB, types::PersistedValue,
     },
     test_utils::{
         create_signed_transaction, create_vec_signed_transactions,
@@ -14,7 +14,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::BatchId,
+    proof_of_store::{BatchId, SignedBatchInfo},
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
@@ -26,6 +26,20 @@ use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
+struct MockBatchWriter {}
+
+impl MockBatchWriter {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl BatchWriter for MockBatchWriter {
+    fn persist(&self, _persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo> {
+        vec![]
+    }
+}
+
 #[allow(clippy::needless_collect)]
 async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
@@ -36,7 +50,6 @@ async fn queue_mempool_batch_response(
         _max_batch_size,
         _max_bytes,
         _return_non_full,
-        _include_gas_upgraded,
         exclude_txns,
         callback,
     ) = timeout(
@@ -86,6 +99,7 @@ async fn test_batch_creation() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -195,6 +209,7 @@ async fn test_bucketed_batch_creation() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -326,6 +341,7 @@ async fn test_max_batch_txns() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -387,6 +403,7 @@ async fn test_max_batch_bytes() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -445,6 +462,7 @@ async fn test_max_num_batches() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -501,6 +519,7 @@ async fn test_last_bucketed_batch() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -564,6 +583,7 @@ async fn test_sender_max_num_batches_single_bucket() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -622,6 +642,7 @@ async fn test_sender_max_num_batches_multi_buckets() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -679,6 +700,7 @@ async fn test_batches_in_progress_same_txn_across_batches() {
         author,
         QuorumStoreConfig::default(),
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -714,12 +736,52 @@ async fn test_batches_in_progress_same_txn_across_batches() {
 
     // After all batches are complete, txns_in_progress_sorted will be empty.
     batch_generator
-        .remove_batch_in_progress_for_test(&first_three_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_three_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
     batch_generator
-        .remove_batch_in_progress_for_test(&first_two_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_two_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 1);
     batch_generator
-        .remove_batch_in_progress_for_test(&first_one_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_one_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_remote_batches_in_progress() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        QuorumStoreConfig::default(),
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let signed_txns = create_vec_signed_transactions(3);
+    let first_two: Vec<_> = signed_txns.iter().take(2).cloned().collect();
+    let cloned_txns = signed_txns.clone();
+
+    let join_handle = tokio::spawn(async move {
+        queue_mempool_batch_response(cloned_txns, 1024, &mut quorum_store_to_mempool_rx).await;
+    });
+
+    batch_generator.handle_remote_batch(
+        AccountAddress::random(),
+        BatchId::new_for_test(1),
+        first_two,
+    );
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(result.len(), 1);
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 3);
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
 }

@@ -25,4 +25,4 @@ EVCXR has some flaws at this point (or we are not using it correctly):
 - After the first evaluation, the raw output of EVCXR is often displayed. Evaluating the cell a second time fixes
   this. Unfortunately, this renders `jupyter nbconvert --execute` unusable to create reports. The only way to do
   so is to manually ensure everything is evaluated correctly, on then use the Web UIs "Print" function ("Export"
-  wont work because it seems to be based on `nbconvert`).
+  won't work because it seems to be based on `nbconvert`).

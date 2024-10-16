@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: the left-hand side has 4 items but the right-hand side provided 3
+  ┌─ tests/checking/typing/v1-commands/pop_negative.move:7:9
+  │
+7 │         (_, _, _, _) = three();
+  │         ^^^^^^^^^^^^

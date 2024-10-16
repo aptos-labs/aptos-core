@@ -1,0 +1,30 @@
+Move prover returns: exiting with model building errors
+error: unsupported language construct
+  ┌─ tests/sources/functional/bv_aborts.move:8:9
+  │
+8 │         assert!(x > 815);
+  │         ^^^^^^ single-parameter assert! macro not supported by this compiler
+
+error: too few arguments
+  ┌─ tests/sources/functional/bv_aborts.move:8:9
+  │
+8 │         assert!(x > 815);
+  │         ^^^^^^^^^^^^^^^^
+  │         │      │
+  │         │      Found 1 argument(s) here
+  │         Invalid call of 'assert'. The call expected 2 argument(s) but got 1
+
+error: unsupported language construct
+   ┌─ tests/sources/functional/bv_aborts.move:12:9
+   │
+12 │         assert!(x > 815);
+   │         ^^^^^^ single-parameter assert! macro not supported by this compiler
+
+error: too few arguments
+   ┌─ tests/sources/functional/bv_aborts.move:12:9
+   │
+12 │         assert!(x > 815);
+   │         ^^^^^^^^^^^^^^^^
+   │         │      │
+   │         │      Found 1 argument(s) here
+   │         Invalid call of 'assert'. The call expected 2 argument(s) but got 1

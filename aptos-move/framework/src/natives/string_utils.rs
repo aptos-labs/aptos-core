@@ -13,7 +13,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::TypeTag,
     u256,
-    value::{LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -22,6 +22,11 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref};
+
+// Error codes from Move contracts:
+const EARGS_MISMATCH: u64 = 1;
+const EINVALID_FORMAT: u64 = 2;
+const EUNABLE_TO_FORMAT_DELAYED_FIELD: u64 = 3;
 
 struct FormatContext<'a, 'b, 'c, 'd, 'e> {
     context: &'d mut SafeNativeContext<'a, 'b, 'c, 'e>,
@@ -303,11 +308,52 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Tagged(tag, ty) => match tag {
-            // There is no need to show any lifting information!
-            // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
-            // Can we modify this to print tagging info, or is this something that cannot be changed
-            LayoutTag::IdentifierMapping(_) => native_format_impl(context, ty, val, depth, out)?,
+        MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
+            let struct_value = val.value_as::<Struct>()?;
+            let (tag, elems) = struct_value.unpack_with_tag()?;
+            if (tag as usize) >= variants.len() {
+                return Err(SafeNativeError::Abort {
+                    abort_code: EINVALID_FORMAT,
+                });
+            }
+            out.push_str(&format!("#{}{{", tag));
+            format_vector(
+                context,
+                variants[tag as usize].iter(),
+                elems.collect(),
+                depth,
+                !context.single_line,
+                out,
+            )?;
+            out.push('}');
+        },
+        MoveTypeLayout::Struct(MoveStructLayout::WithVariants(variants)) => {
+            let struct_value = val.value_as::<Struct>()?;
+            let (tag, elems) = struct_value.unpack_with_tag()?;
+            if (tag as usize) >= variants.len() {
+                return Err(SafeNativeError::Abort {
+                    abort_code: EINVALID_FORMAT,
+                });
+            }
+            let variant = &variants[tag as usize];
+            out.push_str(&format!("{}{{", variant.name));
+            format_vector(
+                context,
+                variant.fields.iter(),
+                elems.collect(),
+                depth,
+                !context.single_line,
+                out,
+            )?;
+            out.push('}');
+        },
+
+        // This is unreachable because we check layout at the start. Still, return
+        // an error to be safe.
+        MoveTypeLayout::Native(..) => {
+            return Err(SafeNativeError::Abort {
+                abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+            })
         },
     };
     if context.include_int_type {
@@ -323,6 +369,16 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
+    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
+    let (_, has_identifier_mappings) = context
+        .deref()
+        .type_to_type_layout_with_identifier_mappings(ty)?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::Abort {
+            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+        });
+    }
+
     let layout = context.deref().type_to_fully_annotated_layout(ty)?;
     let mut format_context = FormatContext {
         context,
@@ -345,6 +401,17 @@ fn native_format(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
+
+    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
+    let (_, has_identifier_mappings) = context
+        .deref()
+        .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::Abort {
+            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+        });
+    }
+
     let ty = context
         .deref()
         .type_to_fully_annotated_layout(&ty_args[0])?;
@@ -378,9 +445,6 @@ fn native_format_list(
     debug_assert!(ty_args.len() == 1);
     let mut list_ty = &ty_args[0];
 
-    let arg_mismatch = 1;
-    let invalid_fmt = 2;
-
     let val = safely_pop_arg!(arguments, Reference);
     let mut val = val
         .read_ref()
@@ -390,7 +454,7 @@ fn native_format_list(
     let fmt_ref2 = fmt_ref.as_bytes_ref();
     // Could use unsafe here, but it's forbidden in this crate.
     let fmt = std::str::from_utf8(fmt_ref2.as_slice()).map_err(|_| SafeNativeError::Abort {
-        abort_code: invalid_fmt,
+        abort_code: EINVALID_FORMAT,
     })?;
 
     context.charge(STRING_UTILS_PER_BYTE * NumBytes::new(fmt.len() as u64))?;
@@ -405,13 +469,13 @@ fn native_format_list(
                 && struct_tag.name.as_str() == name)
             {
                 return Err(SafeNativeError::Abort {
-                    abort_code: arg_mismatch,
+                    abort_code: EARGS_MISMATCH,
                 });
             }
             Ok(())
         } else {
             Err(SafeNativeError::Abort {
-                abort_code: arg_mismatch,
+                abort_code: EARGS_MISMATCH,
             })
         }
     };
@@ -436,7 +500,17 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
+                // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
+                let (_, has_identifier_mappings) = context
+                    .deref()
+                    .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
+                if has_identifier_mappings {
+                    return Err(SafeNativeError::Abort {
+                        abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+                    });
+                }
                 let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
+
                 let mut format_context = FormatContext {
                     context,
                     should_charge_gas: true,
@@ -451,14 +525,14 @@ fn native_format_list(
                 continue;
             } else if c != '{' {
                 return Err(SafeNativeError::Abort {
-                    abort_code: invalid_fmt,
+                    abort_code: EINVALID_FORMAT,
                 });
             }
         } else if in_braces == -1 {
             in_braces = 0;
             if c != '}' {
                 return Err(SafeNativeError::Abort {
-                    abort_code: invalid_fmt,
+                    abort_code: EINVALID_FORMAT,
                 });
             }
         } else if c == '{' {
@@ -472,7 +546,7 @@ fn native_format_list(
     }
     if in_braces != 0 {
         return Err(SafeNativeError::Abort {
-            abort_code: invalid_fmt,
+            abort_code: EINVALID_FORMAT,
         });
     }
     match_list_ty(context, list_ty, "NIL")?;

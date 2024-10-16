@@ -12,6 +12,8 @@ use aptos_types::account_address::AccountAddress;
 #[test]
 fn test_smart_data_structures_gas() {
     let mut h = MoveHarness::new();
+    // This test uses a lot of execution gas so the upper bound need to be bumped to accommodate it.
+    h.modify_gas_schedule(|params| params.vm.txn.max_execution_gas = 40_000_000_000.into());
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("smart_data_structures.data")));

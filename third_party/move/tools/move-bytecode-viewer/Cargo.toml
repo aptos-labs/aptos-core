@@ -8,17 +8,15 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-clap = { version = "4.3.9", features = ["derive"] }
-crossterm = "0.26.1"
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+crossterm = { workspace = true }
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
-regex = "1.5.5"
-tui = "0.19.0"
+regex = { workspace = true }
+tui = { workspace = true }
 
-move-command-line-common = { path = "../../move-command-line-common" }
 move-disassembler = { path = "../move-disassembler" }
-move-ir-types = { path = "../../move-ir/types" }
 
 [features]
 default = []

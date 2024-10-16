@@ -1,0 +1,22 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: Ty0)
+	1: MoveLoc[1](Arg1: Ty0)
+	2: Eq
+	3: Ret
+}
+}
+============ bytecode verification failed ========
+
+Diagnostics:
+bug: bytecode verification failed with unexpected status code `EQUALITY_OP_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
+  ┌─ tests/bytecode-verify-failure/equality.move:3:9
+  │
+3 │         x == y
+  │         ^^^^^^

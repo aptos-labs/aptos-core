@@ -59,15 +59,36 @@ impl<'a> FieldRefMutation<'a> {
         for (s_idx, f_idx) in self.mutations {
             let struct_idx = s_idx.index(module.struct_defs.len());
             let struct_def = &mut module.struct_defs[struct_idx];
-            if let StructFieldInformation::Declared(fields) = &mut struct_def.field_information {
-                if fields.is_empty() {
-                    continue;
-                }
-                let field_idx = f_idx.index(fields.len());
-                let field_def = &mut fields[field_idx];
-                let new_ty = mutate_field(&field_def.signature.0);
-                fields[field_idx].signature = TypeSignature(new_ty);
-                mutations = true;
+            match &mut struct_def.field_information {
+                StructFieldInformation::Declared(fields) => {
+                    if fields.is_empty() {
+                        continue;
+                    }
+                    let field_idx = f_idx.index(fields.len());
+                    let field_def = &mut fields[field_idx];
+                    let new_ty = mutate_field(&field_def.signature.0);
+                    fields[field_idx].signature = TypeSignature(new_ty);
+                    mutations = true;
+                },
+                StructFieldInformation::DeclaredVariants(variants) => {
+                    let all_fields_count = variants.iter().map(|v| v.fields.len()).sum();
+                    if all_fields_count == 0 {
+                        continue;
+                    }
+                    let mut field_idx = f_idx.index(all_fields_count);
+                    let mut variant = 0;
+                    let mut variant_fields = &mut variants[variant].fields;
+                    while field_idx >= variant_fields.len() {
+                        field_idx -= variant_fields.len();
+                        variant += 1;
+                        variant_fields = &mut variants[variant].fields;
+                    }
+                    let field_def = &mut variant_fields[field_idx];
+                    let new_ty = mutate_field(&field_def.signature.0);
+                    variant_fields[field_idx].signature = TypeSignature(new_ty);
+                    mutations = true;
+                },
+                StructFieldInformation::Native => {},
             }
         }
         mutations

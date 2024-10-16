@@ -80,7 +80,6 @@ target-out-docker
 docker/compose/indexer-grpc/data-service-grpc-server.crt
 docker/compose/indexer-grpc/data-service-grpc-server.key
 
-
 # Doc generation output
 *.md.old
 
@@ -120,6 +119,7 @@ aptos-move/aptos-vm-profiling/**/*.txt
 
 # Gas profiler outputs
 aptos-move/e2e-move-tests/gas-profiling
+gas-profiling
 
 # replay-verify and module-verify script outputs
 metadata-cache

@@ -16,5 +16,4 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
 claims = { workspace = true }
-hostname = { workspace = true }
 once_cell = { workspace = true }

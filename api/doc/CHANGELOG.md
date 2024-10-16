@@ -5,7 +5,7 @@ All notable changes to the Aptos Node API will be captured in this file. This ch
 **Note**: The Aptos Node API does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the API will follow semantic versioning closely.
 
 ## Unreleased
-N/A
+- OpenAPI layout changed slightly in some enum cases, see [#13929](https://github.com/aptos-labs/aptos-core/pull/13929) for more information.
 
 ## 1.2.0 (2022-09-29)
 - **[Breaking Changes]** Following the deprecation notice from the previous release, the following breaking changes have landed in this release. Please see the notes from last release for information on the new endpoints you must migrate to:

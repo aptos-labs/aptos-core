@@ -40,10 +40,10 @@ fn single_peer_to_peer_with_event() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_coin_store_resource(sender.account())
+        .read_apt_coin_store_resource(sender.account())
         .expect("sender balance must exist");
     let updated_receiver_balance = executor
-        .read_coin_store_resource(receiver.account())
+        .read_apt_coin_store_resource(receiver.account())
         .expect("receiver balance must exist");
     assert_eq!(receiver_balance, updated_receiver_balance.coin());
     assert_eq!(sender_balance, updated_sender_balance.coin());
@@ -102,10 +102,10 @@ fn few_peer_to_peer_with_event() {
         }
 
         let original_sender_balance = executor
-            .read_coin_store_resource(sender.account())
+            .read_apt_coin_store_resource(sender.account())
             .expect("sender balance must exist");
         let original_receiver_balance = executor
-            .read_coin_store_resource(receiver.account())
+            .read_apt_coin_store_resource(receiver.account())
             .expect("receiver balcne must exist");
         executor.apply_write_set(txn_output.write_set());
 
@@ -116,10 +116,10 @@ fn few_peer_to_peer_with_event() {
             .read_account_resource(sender.account())
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_coin_store_resource(sender.account())
+            .read_apt_coin_store_resource(sender.account())
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_coin_store_resource(receiver.account())
+            .read_apt_coin_store_resource(receiver.account())
             .expect("receiver balance must exist");
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());
@@ -249,12 +249,12 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let sender_balance = executor
-            .read_coin_store_resource(sender)
+            .read_apt_coin_store_resource(sender)
             .expect("sender balance must exist");
         let sender_initial_balance = sender_balance.coin();
         let sender_seq_num = sender_resource.sequence_number();
         let receiver_initial_balance = executor
-            .read_coin_store_resource(receiver)
+            .read_apt_coin_store_resource(receiver)
             .expect("receiver balance must exist")
             .coin();
 
@@ -269,10 +269,10 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_coin_store_resource(sender)
+            .read_apt_coin_store_resource(sender)
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_coin_store_resource(receiver)
+            .read_apt_coin_store_resource(receiver)
             .expect("receiver balance must exist");
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());

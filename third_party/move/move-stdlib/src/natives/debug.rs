@@ -234,7 +234,7 @@ mod testing {
         Ok(())
     }
 
-    fn is_non_empty_vector_u8(vec: &Vec<MoveValue>) -> bool {
+    fn is_non_empty_vector_u8(vec: &[MoveValue]) -> bool {
         if vec.is_empty() {
             false
         } else {

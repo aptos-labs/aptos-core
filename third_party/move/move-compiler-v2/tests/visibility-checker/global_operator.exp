@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:10:9
+   │
+10 │     fun test<Token>(account: signer) {
+   │         ^^^^
+11 │         let r = M::new();
+12 │         borrow_global<M::R>(@0x1);
+   │         ------------------------- called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:10:9
+   │
+10 │     fun test<Token>(account: signer) {
+   │         ^^^^
+   ·
+13 │         borrow_global_mut<M::R>(@0x1);
+   │         ----------------------------- called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:10:9
+   │
+10 │     fun test<Token>(account: signer) {
+   │         ^^^^
+   ·
+14 │         exists<M::R>(@0x1);
+   │         ------------------ called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:10:9
+   │
+10 │     fun test<Token>(account: signer) {
+   │         ^^^^
+   ·
+15 │         move_to(&account, r);
+   │         -------------------- called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:24:9
+   │
+24 │     fun test<Token>(account: signer) {
+   │         ^^^^
+25 │         let r = M::new();
+26 │         borrow_global<M::R>(@0x1);
+   │         ------------------------- called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:24:9
+   │
+24 │     fun test<Token>(account: signer) {
+   │         ^^^^
+   ·
+27 │         borrow_global_mut<M::R>(@0x1);
+   │         ----------------------------- called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:24:9
+   │
+24 │     fun test<Token>(account: signer) {
+   │         ^^^^
+   ·
+28 │         exists<M::R>(@0x1);
+   │         ------------------ called here
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/global_operator.move:24:9
+   │
+24 │     fun test<Token>(account: signer) {
+   │         ^^^^
+   ·
+29 │         move_to(&account, r);
+   │         -------------------- called here

@@ -149,6 +149,7 @@ pub struct P2PTransactionGenerator {
     all_addresses: Arc<ObjectPool<AccountAddress>>,
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
+    use_fa_transfer: bool,
 }
 
 impl P2PTransactionGenerator {
@@ -158,6 +159,7 @@ impl P2PTransactionGenerator {
         txn_factory: TransactionFactory,
         all_addresses: Arc<ObjectPool<AccountAddress>>,
         invalid_transaction_ratio: usize,
+        use_fa_transfer: bool,
         sampler: Box<dyn Sampler<AccountAddress>>,
     ) -> Self {
         Self {
@@ -167,6 +169,7 @@ impl P2PTransactionGenerator {
             all_addresses,
             sampler,
             invalid_transaction_ratio,
+            use_fa_transfer,
         }
     }
 
@@ -178,7 +181,13 @@ impl P2PTransactionGenerator {
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
+            if self.use_fa_transfer {
+                txn_factory.payload(aptos_stdlib::aptos_account_fungible_transfer_only(
+                    *to, num_coins,
+                ))
+            } else {
+                txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
+            },
         )
     }
 
@@ -297,6 +306,7 @@ pub struct P2PTransactionGeneratorCreator {
     amount: u64,
     all_addresses: Arc<ObjectPool<AccountAddress>>,
     invalid_transaction_ratio: usize,
+    use_fa_transfer: bool,
     sampling_mode: SamplingMode,
 }
 
@@ -306,6 +316,7 @@ impl P2PTransactionGeneratorCreator {
         amount: u64,
         all_addresses: Arc<ObjectPool<AccountAddress>>,
         invalid_transaction_ratio: usize,
+        use_fa_transfer: bool,
         sampling_mode: SamplingMode,
     ) -> Self {
         let mut rng = StdRng::from_entropy();
@@ -316,6 +327,7 @@ impl P2PTransactionGeneratorCreator {
             amount,
             all_addresses,
             invalid_transaction_ratio,
+            use_fa_transfer,
             sampling_mode,
         }
     }
@@ -336,6 +348,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.txn_factory.clone(),
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
+            self.use_fa_transfer,
             sampler,
         ))
     }

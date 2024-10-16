@@ -3,7 +3,7 @@
 
 use crate::Swarm;
 use prometheus_http_query::response::Sample;
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 #[derive(Clone)]
 pub struct MetricSamples(Vec<Sample>);
@@ -43,6 +43,12 @@ impl fmt::Debug for MetricSamples {
     }
 }
 
+impl Default for MetricSamples {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SystemMetrics {
     pub cpu_core_metrics: MetricSamples,
@@ -58,14 +64,35 @@ impl SystemMetrics {
     }
 }
 
+pub async fn fetch_error_metrics(
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+) -> anyhow::Result<i64> {
+    let error_query = r#"aptos_error_log_count{role=~"validator"}"#;
+
+    let result = swarm
+        .read()
+        .await
+        .query_metrics(error_query, None, None)
+        .await?;
+    let error_samples = result.as_instant().unwrap_or(&[]);
+
+    Ok(error_samples
+        .iter()
+        .map(|s| s.sample().value().round() as i64)
+        .max()
+        .unwrap_or(0))
+}
+
 pub async fn fetch_system_metrics(
-    swarm: &dyn Swarm,
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     start_time: i64,
     end_time: i64,
 ) -> anyhow::Result<SystemMetrics> {
-    let cpu_query = r#"avg(rate(container_cpu_usage_seconds_total{container=~"validator"}[30s]))"#;
+    // CPU oscilates, so aggregate over larger period (2m) to avoid noise.
+    let cpu_query = r#"avg(rate(container_cpu_usage_seconds_total{container=~"validator"}[2m]))"#;
     let memory_query = r#"avg(container_memory_rss{container=~"validator"})"#;
 
+    let swarm = swarm.read().await;
     let cpu_samples = swarm
         .query_range_metrics(cpu_query, start_time, end_time, None)
         .await?;
@@ -84,6 +111,11 @@ pub enum LatencyBreakdownSlice {
     ConsensusProposalToOrdered,
     ConsensusOrderedToCommit,
     ConsensusProposalToCommit,
+    // each of the indexer grpc steps in order
+    IndexerFullnodeProcessedBatch,
+    IndexerCacheWorkerProcessedBatch,
+    IndexerDataServiceAllChunksSent,
+    // TODO: add processor insertion into DB latency
 }
 
 #[derive(Clone, Debug)]
@@ -98,15 +130,21 @@ impl LatencyBreakdown {
         self.0.keys().cloned().collect()
     }
 
-    pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> &MetricSamples {
-        self.0
-            .get(slice)
-            .unwrap_or_else(|| panic!("Missing latency breakdown for {:?}", slice))
+    pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> Option<&MetricSamples> {
+        self.0.get(slice)
+    }
+
+    pub fn join(&self, other: &LatencyBreakdown) -> LatencyBreakdown {
+        let mut ret_latency = self.0.clone();
+        for (slice, samples) in other.0.iter() {
+            ret_latency.insert(slice.clone(), samples.clone());
+        }
+        LatencyBreakdown::new(ret_latency)
     }
 }
 
 pub async fn fetch_latency_breakdown(
-    swarm: &dyn Swarm,
+    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
     start_time: u64,
     end_time: u64,
 ) -> anyhow::Result<LatencyBreakdown> {
@@ -118,6 +156,7 @@ pub async fn fetch_latency_breakdown(
     let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
     let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
 
+    let swarm = swarm.read().await;
     let consensus_proposal_to_ordered_samples = swarm
         .query_range_metrics(
             consensus_proposal_to_ordered_query,
@@ -188,5 +227,54 @@ pub async fn fetch_latency_breakdown(
         MetricSamples::new(consensus_proposal_to_commit_samples),
     );
 
+    if swarm.has_indexer() {
+        // These counters are defined in ecosystem/indexer-grpc/indexer-grpc-utils/src/counters.rs
+        let indexer_fullnode_processed_batch_query =
+            r#"max(indexer_grpc_duration_in_secs{step="4", service_type="indexer_fullnode"})"#;
+        let indexer_cache_worker_processed_batch_query =
+            r#"max(indexer_grpc_duration_in_secs{step="4", service_type="cache_worker"})"#;
+        let indexer_data_service_all_chunks_sent_query =
+            r#"max(indexer_grpc_duration_in_secs{step="4", service_type="data_service"})"#;
+
+        let indexer_fullnode_processed_batch_samples = swarm
+            .query_range_metrics(
+                indexer_fullnode_processed_batch_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_cache_worker_processed_batch_samples = swarm
+            .query_range_metrics(
+                indexer_cache_worker_processed_batch_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_data_service_all_chunks_sent_samples = swarm
+            .query_range_metrics(
+                indexer_data_service_all_chunks_sent_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        samples.insert(
+            LatencyBreakdownSlice::IndexerFullnodeProcessedBatch,
+            MetricSamples::new(indexer_fullnode_processed_batch_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerCacheWorkerProcessedBatch,
+            MetricSamples::new(indexer_cache_worker_processed_batch_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerDataServiceAllChunksSent,
+            MetricSamples::new(indexer_data_service_all_chunks_sent_samples),
+        );
+    }
     Ok(LatencyBreakdown::new(samples))
 }

@@ -1,0 +1,12 @@
+Move prover returns: exiting with model building errors
+error: unsupported language construct
+  ┌─ tests/sources/functional/enum_self.move:3:5
+  │
+3 │     enum EnumSelf has copy, drop {
+  │     ^^^^ Move 2 language construct is not enabled: enum types
+
+error: unsupported language construct
+  ┌─ tests/sources/functional/enum_self.move:7:5
+  │
+7 │     enum EnumUseSelf has copy, drop {
+  │     ^^^^ Move 2 language construct is not enabled: enum types

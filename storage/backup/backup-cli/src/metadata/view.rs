@@ -105,6 +105,10 @@ impl MetadataView {
         self.compaction_timestamps.clone()
     }
 
+    pub fn all_state_snapshots(&self) -> &[StateSnapshotBackupMeta] {
+        &self.state_snapshot_backups
+    }
+
     pub fn select_state_snapshot(
         &self,
         target_version: Version,
@@ -115,14 +119,14 @@ impl MetadataView {
             .sorted()
             .rev()
             .find(|m| m.version <= target_version)
-            .map(Clone::clone))
+            .cloned())
     }
 
     pub fn expect_state_snapshot(&self, version: Version) -> Result<StateSnapshotBackupMeta> {
         self.state_snapshot_backups
             .iter()
             .find(|m| m.version == version)
-            .map(Clone::clone)
+            .cloned()
             .ok_or_else(|| anyhow!("State snapshot not found at version {}", version))
     }
 
@@ -255,10 +259,10 @@ impl fmt::Display for BackupStorageState {
         write!(
             f,
             "latest_epoch_ending_epoch: {}, latest_state_snapshot_epoch: {}, latest_state_snapshot_version: {}, latest_transaction_version: {}",
-            self.latest_epoch_ending_epoch.as_ref().map_or("none".to_string(), u64::to_string),
-            self.latest_state_snapshot_epoch.as_ref().map_or("none".to_string(), u64::to_string),
-            self.latest_state_snapshot_version.as_ref().map_or("none".to_string(), Version::to_string),
-            self.latest_transaction_version.as_ref().map_or("none".to_string(), Version::to_string),
+            self.latest_epoch_ending_epoch.as_ref().map_or_else(|| "none".to_string(), u64::to_string),
+            self.latest_state_snapshot_epoch.as_ref().map_or_else(|| "none".to_string(), u64::to_string),
+            self.latest_state_snapshot_version.as_ref().map_or_else(|| "none".to_string(), Version::to_string),
+            self.latest_transaction_version.as_ref().map_or_else(|| "none".to_string(), Version::to_string),
         )
     }
 }

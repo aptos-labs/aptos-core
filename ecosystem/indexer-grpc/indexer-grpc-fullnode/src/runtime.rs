@@ -18,10 +18,14 @@ use aptos_protos::{
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use aptos_storage_interface::DbReader;
-use aptos_types::chain_id::ChainId;
-use std::{net::ToSocketAddrs, sync::Arc};
-use tokio::runtime::Runtime;
-use tonic::{codec::CompressionEncoding, transport::Server};
+use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
+use futures::channel::oneshot;
+use std::sync::Arc;
+use tokio::{net::TcpListener, runtime::Runtime};
+use tonic::{
+    codec::CompressionEncoding,
+    transport::{server::TcpIncoming, Server},
+};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -34,6 +38,8 @@ pub fn bootstrap(
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
+    indexer_reader: Option<Arc<dyn IndexerReader>>,
+    port_tx: Option<oneshot::Sender<u16>>,
 ) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
         return None;
@@ -50,7 +56,13 @@ pub fn bootstrap(
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
+        let context = Arc::new(Context::new(
+            chain_id,
+            db,
+            mp_sender,
+            node_config,
+            indexer_reader,
+        ));
         let service_context = ServiceContext {
             context: context.clone(),
             processor_task_count,
@@ -85,22 +97,29 @@ pub fn bootstrap(
         let router = match use_data_service_interface {
             false => {
                 let svc = FullnodeDataServer::new(server)
-                    .send_compressed(CompressionEncoding::Gzip)
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Zstd)
                     .accept_compressed(CompressionEncoding::Gzip);
                 tonic_server.add_service(svc)
             },
             true => {
                 let svc = RawDataServer::new(localnet_data_server)
-                    .send_compressed(CompressionEncoding::Gzip)
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Zstd)
                     .accept_compressed(CompressionEncoding::Gzip);
                 tonic_server.add_service(svc)
             },
         };
+
+        let listener = TcpListener::bind(address).await.unwrap();
+        if let Some(port_tx) = port_tx {
+            port_tx.send(listener.local_addr().unwrap().port()).unwrap();
+        }
+        let incoming = TcpIncoming::from_listener(listener, false, None).unwrap();
+
         // Make port into a config
-        router
-            .serve(address.to_socket_addrs().unwrap().next().unwrap())
-            .await
-            .unwrap();
+        router.serve_with_incoming(incoming).await.unwrap();
+
         info!(address = address, "[indexer-grpc] Started GRPC server");
     });
     Some(runtime)

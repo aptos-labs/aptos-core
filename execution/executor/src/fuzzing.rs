@@ -93,7 +93,7 @@ impl VMExecutor for FakeVM {
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Ok(BlockOutput::new(vec![]))
+        Ok(BlockOutput::new(vec![], None))
     }
 }
 
@@ -101,7 +101,7 @@ impl VMExecutor for FakeVM {
 pub struct FakeDb;
 
 impl DbReader for FakeDb {
-    fn get_latest_version(&self) -> aptos_storage_interface::Result<Version> {
+    fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version> {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
@@ -113,16 +113,24 @@ impl DbReader for FakeDb {
 }
 
 impl DbWriter for FakeDb {
-    fn save_transactions(
+    fn pre_commit_ledger(
         &self,
         _txns_to_commit: &[TransactionToCommit],
         _first_version: Version,
         _base_state_version: Option<Version>,
-        _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         _sync_commit: bool,
-        _in_memory_state: StateDelta,
-        _block_state_updates: Option<ShardedStateUpdates>,
+        _latest_in_memory_state: StateDelta,
+        _state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         _sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> aptos_storage_interface::Result<()> {
+        Ok(())
+    }
+
+    fn commit_ledger(
+        &self,
+        _version: Version,
+        _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _txns_to_commit: Option<&[TransactionToCommit]>,
     ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }

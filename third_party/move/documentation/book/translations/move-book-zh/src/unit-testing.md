@@ -126,7 +126,7 @@ A test will be marked as timing out if it exceeds the maximum number of instruct
 
 任何测试执行超过最大数量指令限制将会标记成超时。可以通过参数调整此限制，默认值为 5000 条指令。此外，虽然测试结果是确定的，但由于测试默认并行执行，所以测试结果的顺序是不确定的，除非使用单线程模式（见下述参数）。
 
-There are also a number of options that can be passed to the unit testing binary to fine-tune testing and to help debug failing tests. These can be found using the the help flag:
+There are also a number of options that can be passed to the unit testing binary to fine-tune testing and to help debug failing tests. These can be found using the help flag:
 
 存在大量参数细粒度调整测试工具的行为，帮助调试失败的测试。可以通过 help 参数查看。
 

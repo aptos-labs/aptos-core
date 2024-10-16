@@ -5,6 +5,7 @@ pub mod checkpoint;
 mod common;
 mod examine;
 pub mod ledger;
+pub mod state_kv;
 pub mod state_tree;
 pub mod truncate;
 
@@ -22,6 +23,9 @@ pub enum Cmd {
     #[clap(subcommand)]
     StateTree(state_tree::Cmd),
 
+    #[clap(subcommand)]
+    StateKv(state_kv::Cmd),
+
     Checkpoint(checkpoint::Cmd),
 
     #[clap(subcommand)]
@@ -37,6 +41,7 @@ impl Cmd {
     pub fn run(self) -> Result<()> {
         match self {
             Cmd::StateTree(cmd) => cmd.run(),
+            Cmd::StateKv(cmd) => cmd.run(),
             Cmd::Checkpoint(cmd) => cmd.run(),
             Cmd::Ledger(cmd) => cmd.run(),
             Cmd::Truncate(cmd) => cmd.run(),

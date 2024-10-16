@@ -4,6 +4,7 @@
 use super::fetch_metadata::ValidatorInfo;
 use anyhow::Result;
 use aptos_bitvec::BitVec;
+use aptos_logger::error;
 use aptos_rest_client::VersionedNewBlockEvent;
 use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
@@ -11,7 +12,13 @@ use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
 };
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, ops::Add};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap, VecDeque},
+    convert::TryFrom,
+    ops::Add,
+    time::Duration,
+};
 
 /// Single validator stats
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -100,6 +107,26 @@ impl Add for ValidatorStats {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum TpsInterval {
+    Blocks(usize),
+    Seconds(u32),
+}
+
+#[derive(Clone)]
+pub struct MaxTpsStats {
+    /// Max TPS
+    pub tps: f32,
+    /// End version of the interval at which Max TPS was achieved
+    pub end_version: u64,
+    /// Number of transactions in the interval at which Max TPS was achieved
+    pub txns: u32,
+    /// Number of blocks in which Max TPS was achieved
+    pub blocks: usize,
+    /// Duration of the interval in which Max TPS was achieved
+    pub duration: f32,
+}
+
 /// Statistics for all validators
 #[derive(Clone)]
 pub struct EpochStats {
@@ -117,6 +144,8 @@ pub struct EpochStats {
     pub nil_blocks: u32,
     /// Total voting power
     pub total_voting_power: u128,
+    /// Max TPS per block interval
+    pub max_tps_per_block_interval: BTreeMap<TpsInterval, MaxTpsStats>,
 }
 
 impl EpochStats {
@@ -182,8 +211,96 @@ impl Add for EpochStats {
             nil_blocks: self.nil_blocks + other.nil_blocks,
             total_transactions: self.total_transactions + other.total_transactions,
             total_voting_power: 0,
+            max_tps_per_block_interval: self
+                .max_tps_per_block_interval
+                .into_iter()
+                .map(|(k, v)| {
+                    let other_v = other.max_tps_per_block_interval.get(&k).unwrap();
+                    (
+                        k,
+                        if v.tps > other_v.tps {
+                            v
+                        } else {
+                            other_v.clone()
+                        },
+                    )
+                })
+                .collect(),
         }
     }
+}
+
+pub struct RunningAvg {
+    sum: f64,
+    count: u64,
+}
+
+impl RunningAvg {
+    fn empty() -> Self {
+        Self { sum: 0.0, count: 0 }
+    }
+
+    fn observe(&mut self, value: f32) {
+        self.sum += value as f64;
+        self.count += 1;
+    }
+
+    pub fn get(&self) -> f64 {
+        if self.count > 0 {
+            self.sum / self.count as f64
+        } else {
+            0.0
+        }
+    }
+}
+
+pub struct GapSummary {
+    pub max_gap: f32,
+    at_version: u64,
+    avg: RunningAvg,
+}
+
+impl GapSummary {
+    fn empty() -> Self {
+        Self {
+            max_gap: 0.0,
+            at_version: 0,
+            avg: RunningAvg::empty(),
+        }
+    }
+
+    fn observe(&mut self, gap: f32, version: u64) {
+        if gap > self.max_gap {
+            self.max_gap = gap;
+            self.at_version = version;
+        }
+        self.avg.observe(gap)
+    }
+
+    pub fn to_string_as_round(&self) -> String {
+        format!(
+            "{} rounds at version {} (avg {:.2})",
+            self.max_gap as u64,
+            self.at_version,
+            self.avg.get(),
+        )
+    }
+
+    pub fn to_string_as_time(&self) -> String {
+        format!(
+            "{:.2}s no progress at version {} (avg {:.2}s)",
+            self.max_gap,
+            self.at_version,
+            self.avg.get(),
+        )
+    }
+}
+
+pub struct MaxGapInfo {
+    pub non_epoch_round_gap: GapSummary,
+    pub epoch_round_gap: GapSummary,
+    pub non_epoch_time_gap: GapSummary,
+    pub epoch_time_gap: GapSummary,
 }
 
 /// Analyze validator performance
@@ -267,6 +384,33 @@ impl AnalyzeValidators {
         let mut votes = HashMap::<AccountAddress, u32>::new();
         let mut transactions = HashMap::<AccountAddress, u32>::new();
 
+        // because we measure based on block timestamp, we need interval larger than when backpressure
+        // kicks in, to make sure we are measuring end-to-end throughput, not just ordering throughput.
+        let mut max_tps_tuples = vec![
+            TpsInterval::Blocks(15),
+            TpsInterval::Blocks(30),
+            TpsInterval::Blocks(45),
+            TpsInterval::Blocks(60),
+            TpsInterval::Seconds(60),
+            TpsInterval::Seconds(120),
+            TpsInterval::Seconds(180),
+            TpsInterval::Seconds(300),
+            TpsInterval::Seconds(600),
+            TpsInterval::Seconds(1200),
+            TpsInterval::Seconds(1800),
+            TpsInterval::Seconds(3600),
+        ]
+        .into_iter()
+        .map(|v| {
+            (v, VecDeque::new(), MaxTpsStats {
+                tps: 0.0,
+                end_version: 0,
+                txns: 0,
+                blocks: 0,
+                duration: 0.0,
+            })
+        })
+        .collect::<Vec<_>>();
         let mut trimmed_rounds = 0;
         let mut nil_blocks = 0;
         let mut previous_round = 0;
@@ -313,6 +457,7 @@ impl AnalyzeValidators {
             let cur_transactions_option = blocks
                 .get(pos + 1)
                 .map(|next| u32::try_from(next.version - block.version - 2).unwrap());
+            let cur_next_block_option = blocks.get(pos + 1);
             if let Some(cur_transactions) = cur_transactions_option {
                 if is_nil {
                     assert_eq!(
@@ -324,6 +469,47 @@ impl AnalyzeValidators {
                     );
                 }
                 *transactions.entry(event.proposer()).or_insert(0) += cur_transactions;
+            }
+
+            if let (Some(cur_transactions), Some(cur_next_block)) =
+                (cur_transactions_option, cur_next_block_option)
+            {
+                let cur_end_timestamp = cur_next_block.event.proposed_time();
+                for (interval, max_tps_deque, max_tps) in &mut max_tps_tuples {
+                    max_tps_deque.push_back((cur_transactions, event.proposed_time()));
+
+                    match interval {
+                        TpsInterval::Blocks(num_blocks_for_max_tps) => {
+                            while max_tps_deque.len() > *num_blocks_for_max_tps {
+                                max_tps_deque.pop_front();
+                            }
+                        },
+                        TpsInterval::Seconds(num_seconds_for_max_tps) => {
+                            while let Some((_, front_ts)) = max_tps_deque.front() {
+                                let passed = (cur_end_timestamp - front_ts) as f32 / 1000000.0;
+                                if passed > *num_seconds_for_max_tps as f32 {
+                                    max_tps_deque.pop_front();
+                                } else {
+                                    break;
+                                }
+                            }
+                        },
+                    }
+
+                    if !max_tps_deque.is_empty() {
+                        let passed = (cur_end_timestamp - max_tps_deque.front().unwrap().1) as f32
+                            / 1000000.0;
+                        let txns: u32 = max_tps_deque.iter().map(|(txns, _)| *txns).sum();
+                        let tps = txns as f32 / passed;
+                        if tps > max_tps.tps {
+                            max_tps.tps = tps;
+                            max_tps.duration = passed;
+                            max_tps.end_version = cur_next_block.version - 1;
+                            max_tps.blocks = max_tps_deque.len();
+                            max_tps.txns = txns;
+                        }
+                    }
+                }
             }
         }
         let total_successes: u32 = successes.values().sum();
@@ -362,7 +548,82 @@ impl AnalyzeValidators {
                 .iter()
                 .map(|validator| validator.voting_power as u128)
                 .sum(),
+            max_tps_per_block_interval: max_tps_tuples
+                .into_iter()
+                .map(|(num_blocks_for_max_tps, _, max_tps)| (num_blocks_for_max_tps, max_tps))
+                .collect(),
         };
+    }
+
+    pub fn analyze_gap<'a, I>(blocks: I) -> MaxGapInfo
+    where
+        I: Iterator<Item = &'a VersionedNewBlockEvent>,
+    {
+        let mut non_epoch_round_gap = GapSummary::empty();
+        let mut epoch_round_gap = GapSummary::empty();
+
+        let mut non_epoch_time_gap = GapSummary::empty();
+        let mut epoch_time_gap = GapSummary::empty();
+
+        let mut prev_non_nil_block = None;
+        let mut prev_non_nil_ts = 0;
+        let mut failed_from_nil = 0;
+        let mut epoch_from_nil = false;
+        let mut previous_epooch = 0;
+        let mut previous_round = 0;
+        for block in blocks {
+            let is_nil = block.event.proposer() == AccountAddress::ZERO;
+
+            let (current_gap, current_epoch_change) = if previous_epooch == block.event.epoch() {
+                (block.event.round() - previous_round - 1, false)
+            } else {
+                (block.event.failed_proposer_indices().len() as u64, true)
+            };
+
+            if is_nil {
+                failed_from_nil += current_gap;
+                epoch_from_nil |= current_epoch_change;
+            } else {
+                if prev_non_nil_ts > 0 {
+                    let round_gap = current_gap + failed_from_nil;
+                    let time_gap = block.event.proposed_time() as i64 - prev_non_nil_ts as i64;
+                    let epoch_change = current_epoch_change || epoch_from_nil;
+
+                    let (round_gap_summary, time_gap_summary) = if epoch_change {
+                        (&mut epoch_round_gap, &mut epoch_time_gap)
+                    } else {
+                        (&mut non_epoch_round_gap, &mut non_epoch_time_gap)
+                    };
+
+                    round_gap_summary.observe(round_gap as f32, block.version);
+
+                    if time_gap < 0 {
+                        error!(
+                            "Clock went backwards? {}, {:?}, {:?}",
+                            time_gap, block, prev_non_nil_block
+                        );
+                    } else {
+                        let time_gap_secs = Duration::from_micros(time_gap as u64).as_secs_f32();
+                        time_gap_summary.observe(time_gap_secs, block.version);
+                    }
+                }
+
+                failed_from_nil = 0;
+                epoch_from_nil = false;
+                prev_non_nil_ts = block.event.proposed_time();
+                prev_non_nil_block = Some(block);
+            }
+
+            previous_epooch = block.event.epoch();
+            previous_round = block.event.round();
+        }
+
+        MaxGapInfo {
+            non_epoch_round_gap,
+            epoch_round_gap,
+            non_epoch_time_gap,
+            epoch_time_gap,
+        }
     }
 
     /// Print validator stats in a table
@@ -536,5 +797,23 @@ impl AnalyzeValidators {
                 100.0 * voted_voting_power as f32 / epoch_stats.total_voting_power as f32,
             );
         }
+    }
+
+    pub fn print_gap<'a, I>(blocks: I)
+    where
+        I: Iterator<Item = &'a VersionedNewBlockEvent>,
+    {
+        let gap_info = Self::analyze_gap(blocks);
+
+        println!(
+            "Max non-epoch-change gaps: {}, {}.",
+            gap_info.non_epoch_round_gap.to_string_as_round(),
+            gap_info.non_epoch_time_gap.to_string_as_time(),
+        );
+        println!(
+            "Max epoch-change gaps: {}, {}.",
+            gap_info.epoch_round_gap.to_string_as_round(),
+            gap_info.epoch_time_gap.to_string_as_time(),
+        );
     }
 }

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: same mutable reference in local `x` is used again in argument list
+  ┌─ tests/reference-safety/duplicate_use.move:8:9
+  │
+8 │         mut_ref(x, x)
+  │         ^^^^^^^^^^^^^ requirement enforced here

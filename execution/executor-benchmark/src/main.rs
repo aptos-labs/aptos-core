@@ -22,7 +22,11 @@ use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadMa
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    vm::configs::set_paranoid_type_checks,
+};
 use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
@@ -259,6 +263,9 @@ struct Opt {
 
     #[clap(flatten)]
     profiler_opt: ProfilerOpt,
+
+    #[clap(long)]
+    skip_paranoid_checks: bool,
 }
 
 impl Opt {
@@ -285,6 +292,22 @@ enum Command {
 
         #[clap(long, default_value_t = 10000000000)]
         init_account_balance: u64,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
+            Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
+        enable_feature: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
+            Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
+        disable_feature: Vec<FeatureFlag>,
     },
     RunExecutor {
         /// number of transfer blocks to run
@@ -321,6 +344,22 @@ enum Command {
 
         #[clap(long, value_parser)]
         checkpoint_dir: PathBuf,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
+            Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
+        enable_feature: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
+            Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
+        disable_feature: Vec<FeatureFlag>,
     },
     AddAccounts {
         #[clap(long, value_parser)]
@@ -337,6 +376,26 @@ enum Command {
     },
 }
 
+fn get_init_features(
+    enable_feature: Vec<FeatureFlag>,
+    disable_feature: Vec<FeatureFlag>,
+) -> Features {
+    // this check is O(|enable_feature| * |disable_feature|)
+    assert!(
+        enable_feature.iter().all(|f| !disable_feature.contains(f)),
+        "Enable and disable feature flags cannot overlap."
+    );
+
+    let mut init_features = Features::default();
+    for feature in enable_feature.iter() {
+        init_features.enable(*feature);
+    }
+    for feature in disable_feature.iter() {
+        init_features.disable(*feature);
+    }
+    init_features
+}
+
 fn run<E>(opt: Opt)
 where
     E: TransactionBlockExecutor + 'static,
@@ -346,6 +405,8 @@ where
             data_dir,
             num_accounts,
             init_account_balance,
+            enable_feature,
+            disable_feature,
         } => {
             aptos_executor_benchmark::db_generator::create_db_with_accounts::<E>(
                 num_accounts,
@@ -356,6 +417,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
+                get_init_features(enable_feature, disable_feature),
             );
         },
         Command::RunExecutor {
@@ -368,7 +430,14 @@ where
             use_sender_account_pool,
             data_dir,
             checkpoint_dir,
+            enable_feature,
+            disable_feature,
         } => {
+            // aptos_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
+            // aptos_types::on_chain_config::hack_disable_default_features_for_genesis(
+            //     disable_feature,
+            // );
+
             let transaction_mix = if transaction_type.is_empty() {
                 None
             } else {
@@ -378,6 +447,7 @@ where
                     &[],
                     module_working_set_size,
                     use_sender_account_pool,
+                    WorkflowProgress::MoveByPhases,
                 );
                 assert!(mix_per_phase.len() == 1);
                 Some(mix_per_phase[0].clone())
@@ -385,7 +455,9 @@ where
 
             if let Some(hotspot_probability) = opt.hotspot_probability {
                 if !(0.5..1.0).contains(&hotspot_probability) {
-                    panic!("Parameter hotspot-probability has to a decimal number in [0.5, 1.0).");
+                    panic!(
+                        "Parameter hotspot-probability has to be a decimal number in [0.5, 1.0)."
+                    );
                 }
             }
 
@@ -405,6 +477,7 @@ where
                 opt.pruner_opt.pruner_config(),
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
+                get_init_features(enable_feature, disable_feature),
             );
         },
         Command::AddAccounts {
@@ -423,6 +496,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
+                Features::default(),
             );
         },
     }
@@ -486,6 +560,9 @@ fn main() {
         execution_threads_per_shard = execution_threads;
     }
 
+    if opt.skip_paranoid_checks {
+        set_paranoid_type_checks(false);
+    }
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);

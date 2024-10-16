@@ -1,0 +1,25 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
++ processed 2 tasks
+= 
+- task 0 'publish'. lines 1-8:
+- Error: error[E07002]: mutable ownership violated
+-   ┌─ TEMPFILE:5:45
+-   │
+- 5 │         let (x, y): (&u64, &u64) = (&mut a, freeze(&mut a)); // bug in v1, works in v2
+-   │                                     ------  ^^^^^^^^^^^^^^ Invalid freeze.
+-   │                                     │        
+-   │                                     It is still being mutably borrowed by this reference
+- 
+- 
+- 
+= task 1 'run'. lines 10-10:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ return values: 2
+= 

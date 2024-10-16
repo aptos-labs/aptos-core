@@ -20,11 +20,12 @@ use aptos_network::{
     application::{
         interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
     },
-    peer_manager::PeerManagerNotification,
     protocols::{
-        network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
+        network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
+        wire::{
+            handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
+            messaging::v1::{NetworkMessage, RpcRequest},
+        },
     },
     transport::{ConnectionId, ConnectionMetadata},
 };
@@ -59,7 +60,6 @@ use aptos_types::{
     },
     PeerId,
 };
-use cfg_block::cfg_block;
 use futures::channel::oneshot;
 use maplit::btreemap;
 use mockall::mock;
@@ -135,7 +135,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -155,7 +155,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -183,7 +183,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -252,7 +252,7 @@ async fn test_get_network_information_validator() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -271,7 +271,7 @@ async fn test_get_network_information_validator() {
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -386,39 +386,6 @@ async fn test_latency_ping_request() {
     }
 }
 
-cfg_block! {
-    #[cfg(feature = "network-perf-test")] { // Disabled by default
-        #[tokio::test]
-        async fn test_performance_monitoring_request() {
-            // Create the peer monitoring client and server
-            let (mut mock_client, service, _, _) = MockClient::new(None, None, None);
-            tokio::spawn(service.start());
-
-            // Process several performance monitoring requests
-            for i in 0..10 {
-                let request = PeerMonitoringServiceRequest::PerformanceMonitoringRequest(
-                    aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest {
-                        request_counter: i,
-                        data: [0; 100].to_vec(), // 100 bytes of zero's
-                    },
-                );
-                let response = mock_client.send_request(request).await.unwrap();
-                match response {
-                    PeerMonitoringServiceResponse::PerformanceMonitoring(
-                        performance_monitoring_response,
-                    ) => {
-                        assert_eq!(performance_monitoring_response.response_counter, i);
-                    },
-                    _ => panic!(
-                        "Expected performance monitoring response but got: {:?}",
-                        response
-                    ),
-                }
-            }
-        }
-    }
-}
-
 /// A simple utility function to create a new connection metadata for tests
 fn create_connection_metadata(peer_id: AccountAddress, peer_role: PeerRole) -> ConnectionMetadata {
     ConnectionMetadata::new(
@@ -502,7 +469,7 @@ async fn verify_node_information(
 /// mock client requests to a peer monitoring service server.
 struct MockClient {
     peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -539,13 +506,8 @@ impl MockClient {
             .queue_style(QueueStyle::FIFO)
             .counters(&metrics::PENDING_PEER_MONITORING_SERVER_NETWORK_EVENTS);
             let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
-            let (_, connection_notification_receiver) = queue_cfg.build();
 
-            let network_events = NetworkEvents::new(
-                peer_manager_notification_receiver,
-                connection_notification_receiver,
-                None,
-            );
+            let network_events = NetworkEvents::new(peer_manager_notification_receiver, None, true);
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
         }
@@ -593,12 +555,17 @@ impl MockClient {
             .to_bytes(&PeerMonitoringServiceMessage::Request(request))
             .unwrap();
         let (request_sender, request_receiver) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
-            protocol_id,
-            data: request_data.into(),
-            res_tx: request_sender,
+        let request_notification = ReceivedMessage {
+            message: NetworkMessage::RpcRequest(RpcRequest {
+                protocol_id,
+                request_id: 42,
+                priority: 0,
+                raw_request: request_data.clone(),
+            }),
+            sender: PeerNetworkId::new(network_id, peer_id),
+            receive_timestamp_micros: 0,
+            rpc_replier: Some(Arc::new(request_sender)),
         };
-        let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Send the request to the peer monitoring service
         self.peer_manager_notifiers
@@ -714,7 +681,9 @@ mod database_mock {
 
             fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-            fn get_latest_version(&self) -> Result<Version>;
+            fn get_synced_version(&self) -> Result<Option<Version>>;
+
+            fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
             fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
@@ -766,7 +735,7 @@ mod database_mock {
                 ledger_version: Version,
             ) -> Result<TransactionAccumulatorSummary>;
 
-            fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+            fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
             fn get_state_value_chunk_with_proof(
                 &self,

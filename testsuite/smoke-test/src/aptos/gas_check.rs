@@ -12,7 +12,7 @@ use std::time::Duration;
 #[ignore]
 #[tokio::test]
 async fn test_gas_check() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     let account1 = info.random_account();

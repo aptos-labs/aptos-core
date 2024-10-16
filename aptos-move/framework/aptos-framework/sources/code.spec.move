@@ -116,4 +116,16 @@ spec aptos_framework::code {
         ensures [abstract] len(result) == len(pack.modules);
         ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
     }
+
+    spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
+        // TODO: Can't verify 'vector::for_each_mut' loop.
+        pragma aborts_if_is_partial;
+
+        let code_object_addr = code_object.inner;
+        aborts_if !exists<object::ObjectCore>(code_object_addr);
+        aborts_if !exists<PackageRegistry>(code_object_addr);
+        aborts_if !object::is_owner(code_object, signer::address_of(publisher));
+
+        modifies global<PackageRegistry>(code_object_addr);
+    }
 }

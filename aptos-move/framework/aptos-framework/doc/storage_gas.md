@@ -1172,6 +1172,47 @@ target utilization.
 ## Specification
 
 
+
+<a id="0x1_storage_gas_spec_calculate_gas"></a>
+
+
+<pre><code><b>fun</b> <a href="storage_gas.md#0x1_storage_gas_spec_calculate_gas">spec_calculate_gas</a>(max_usage: u64, current_usage: u64, curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a>): u64;
+</code></pre>
+
+
+
+
+<a id="0x1_storage_gas_NewGasCurveAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a> {
+    min_gas: u64;
+    max_gas: u64;
+    <b>aborts_if</b> max_gas &lt; min_gas;
+    <b>aborts_if</b> max_gas &gt; <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+}
+</code></pre>
+
+
+A non decreasing curve must ensure that next is greater than cur.
+
+
+<a id="0x1_storage_gas_ValidatePointsAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a> {
+    points: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_gas.md#0x1_storage_gas_Point">Point</a>&gt;;
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+    <b>aborts_if</b> <b>exists</b> i in 0..len(points) - 1: (
+        points[i].x &gt;= points[i + 1].x || points[i].y &gt; points[i + 1].y
+    );
+    <b>aborts_if</b> len(points) &gt; 0 && points[0].x == 0;
+    <b>aborts_if</b> len(points) &gt; 0 && points[len(points) - 1].x == <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+}
+</code></pre>
+
+
+
 <a id="@Specification_16_Point"></a>
 
 ### Struct `Point`
@@ -1267,7 +1308,7 @@ target utilization.
 <td>1</td>
 <td>The module's initialization guarantees the creation of the StorageGasConfig resource with a precise configuration, including accurate gas curves for per-item and per-byte operations.</td>
 <td>Medium</td>
-<td>The initialize function is responsible for setting up the initial state of the module, ensuring existence witqhin the module's context, and (2) the configuration of the StorageGasConfig resource includes the precise gas curves that define the behavior of per-item and per-byte operations.</td>
+<td>The initialize function is responsible for setting up the initial state of the module, ensuring the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its existence witqhin the module's context, and (2) the configuration of the StorageGasConfig resource includes the precise gas curves that define the behavior of per-item and per-byte operations.</td>
 <td>Formally verified via <a href="#high-level-req-1">initialize</a>. Moreover, the native gas logic has been manually audited.</td>
 </tr>
 
@@ -1416,7 +1457,8 @@ that is, the gas-curve is a monotonically increasing function.
 A non decreasing curve must ensure that next is greater than cur.
 
 
-<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
 <b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> result == <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a> {
@@ -1503,6 +1545,7 @@ and exists after the function is executed.
 
 
 <pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
+<b>pragma</b> verify_duration_estimate = 120;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@aptos_framework);
 // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
@@ -1587,47 +1630,6 @@ Address @aptos_framework must exist StorageGasConfig and StorageGas and StateSto
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">state_storage::StateStorageUsage</a>&gt;(@aptos_framework);
-</code></pre>
-
-
-
-
-<a id="0x1_storage_gas_spec_calculate_gas"></a>
-
-
-<pre><code><b>fun</b> <a href="storage_gas.md#0x1_storage_gas_spec_calculate_gas">spec_calculate_gas</a>(max_usage: u64, current_usage: u64, curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a>): u64;
-</code></pre>
-
-
-
-
-<a id="0x1_storage_gas_NewGasCurveAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a> {
-    min_gas: u64;
-    max_gas: u64;
-    <b>aborts_if</b> max_gas &lt; min_gas;
-    <b>aborts_if</b> max_gas &gt; <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
-}
-</code></pre>
-
-
-A non decreasing curve must ensure that next is greater than cur.
-
-
-<a id="0x1_storage_gas_ValidatePointsAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a> {
-    points: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_gas.md#0x1_storage_gas_Point">Point</a>&gt;;
-    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-    <b>aborts_if</b> <b>exists</b> i in 0..len(points) - 1: (
-        points[i].x &gt;= points[i + 1].x || points[i].y &gt; points[i + 1].y
-    );
-    <b>aborts_if</b> len(points) &gt; 0 && points[0].x == 0;
-    <b>aborts_if</b> len(points) &gt; 0 && points[len(points) - 1].x == <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
-}
 </code></pre>
 
 

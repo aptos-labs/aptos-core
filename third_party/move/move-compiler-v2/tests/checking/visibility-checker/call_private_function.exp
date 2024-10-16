@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: function `0xdeadbeef::M::foo` cannot be called from function `0xdeadbeef::N::calls_foo` because it is private to module `0xdeadbeef::M`
+  ┌─ tests/checking/visibility-checker/call_private_function.move:2:9
+  │
+2 │     fun foo(): u64 { 1 }
+  │         ^^^ callee
+  ·
+9 │         0xdeadbeef::M::foo() + my_foo()
+  │         -------------------- called here

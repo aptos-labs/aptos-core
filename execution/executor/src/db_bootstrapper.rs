@@ -4,17 +4,15 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::chunk_output::ChunkOutput;
+use crate::components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
     DbWriter, ExecutedTrees,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -27,7 +25,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use move_core_types::move_resource::MoveResource;
 use std::sync::Arc;
 
 pub fn generate_waypoint<V: VMExecutor>(
@@ -214,10 +211,9 @@ pub fn calculate_genesis<V: VMExecutor>(
 
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
-            CORE_CODE_ADDRESS,
-            TimestampResource::resource_path(),
-        )))?
+        .get_state_value_bytes(&StateKey::resource_typed::<TimestampResource>(
+            &CORE_CODE_ADDRESS,
+        )?)?
         .ok_or_else(|| format_err!("TimestampResource missing."))?;
     let rsrc = bcs::from_bytes::<TimestampResource>(rsrc_bytes)?;
     Ok(rsrc.timestamp.microseconds)
@@ -225,10 +221,7 @@ fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
 
 fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
-            CORE_CODE_ADDRESS,
-            ConfigurationResource::resource_path(),
-        )))?
+        .get_state_value_bytes(&StateKey::on_chain_config::<ConfigurationResource>()?)?
         .ok_or_else(|| format_err!("ConfigurationResource missing."))?;
     let rsrc = bcs::from_bytes::<ConfigurationResource>(rsrc_bytes)?;
     Ok(rsrc.epoch())

@@ -58,6 +58,7 @@ async fn network_list(
         "network_list",
     );
 
+    // Rosetta server always only supports one chain at a time
     let response = NetworkListResponse {
         network_identifiers: vec![server_context.chain_id.into()],
     };
@@ -91,6 +92,7 @@ async fn network_options(
         middleware_version: "0.1.0".to_string(),
     };
 
+    // Collect all possible responses allowed
     let operation_statuses = OperationStatusType::all()
         .into_iter()
         .map(|status| status.into())
@@ -108,10 +110,14 @@ async fn network_options(
         operation_statuses,
         operation_types,
         errors,
+        // Historical balances are allowed to be looked up (pruning is handled on the API)
         historical_balance_lookup: true,
+        // Timestamp starts on block 2 technically, since block 0 is genesis, and block 1 is the first block (without a timestamp)
         timestamp_start_index: 2,
+        // No call methods supported, possibly could be used for view functions in the future
         call_methods: vec![],
         balance_exemptions: vec![],
+        // Mempool lookup not supported
         mempool_coins: false,
     };
 
@@ -140,10 +146,14 @@ async fn network_status(
     let chain_id = server_context.chain_id;
     let rest_client = server_context.rest_client()?;
     let block_cache = server_context.block_cache()?;
+
+    // Retrieve the genesis block info
     let genesis_block_identifier = block_cache
         .get_block_info_by_height(0, chain_id)
         .await?
         .block_id;
+
+    // Retrieve current ledger state
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 

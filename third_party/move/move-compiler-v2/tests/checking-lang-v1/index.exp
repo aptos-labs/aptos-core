@@ -1,0 +1,91 @@
+
+Diagnostics:
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:11:17
+   │
+11 │         assert!((test::R[@0x1]).value == true, 0);
+   │                 ^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:15:9
+   │
+15 │         0x42::test::R[@0x1].value = false;
+   │         ^^^^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:16:17
+   │
+16 │         assert!(R[@0x1].value == false, 1);
+   │                 ^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:38:17
+   │
+38 │         assert!(test::Y<X<bool>>[@0x1].field.value == true, 0);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:43:22
+   │
+43 │         let y = &mut 0x42::test ::Y<X<bool>> [addr];
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:45:17
+   │
+45 │         assert!(Y<X<bool>>[addr].field.value == false, 1);
+   │                 ^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:53:17
+   │
+53 │         assert!(v[0].value == 2, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:70:17
+   │
+70 │         assert!(v[0].field.value == true, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:71:17
+   │
+71 │         assert!(v[1].field.value == false, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:88:17
+   │
+88 │         assert!(v[0].field.value == true, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:89:17
+   │
+89 │         assert!(v[1].field.value == false, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:90:9
+   │
+90 │         v[0].field.value = false;
+   │         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:91:9
+   │
+91 │         v[1].field.value = true;
+   │         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:92:17
+   │
+92 │         assert!(v[0].field.value == false, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/index.move:93:17
+   │
+93 │         assert!(v[1].field.value == true, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond

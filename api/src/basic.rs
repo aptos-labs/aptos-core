@@ -10,9 +10,14 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::AptosErrorCode;
-use poem_openapi::{param::Query, payload::Html, Object, OpenApi};
+use poem_openapi::{
+    param::Query,
+    payload::{Html, Json},
+    Object, OpenApi,
+};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     ops::Sub,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -60,6 +65,56 @@ impl BasicApi {
         Html(OPEN_API_HTML.to_string())
     }
 
+    /// Show some basic info of the node.
+    #[oai(
+        path = "/info",
+        method = "get",
+        operation_id = "info",
+        tag = "ApiTags::General"
+    )]
+    async fn info(&self) -> Json<HashMap<String, serde_json::Value>> {
+        let mut info = HashMap::new();
+        info.insert(
+            "bootstrapping_mode".to_string(),
+            serde_json::to_value(
+                self.context
+                    .node_config
+                    .state_sync
+                    .state_sync_driver
+                    .bootstrapping_mode,
+            )
+            .unwrap(),
+        );
+        info.insert(
+            "continuous_syncing_mode".to_string(),
+            serde_json::to_value(
+                self.context
+                    .node_config
+                    .state_sync
+                    .state_sync_driver
+                    .continuous_syncing_mode,
+            )
+            .unwrap(),
+        );
+        info.insert(
+            "new_storage_format".to_string(),
+            serde_json::to_value(
+                self.context
+                    .node_config
+                    .storage
+                    .rocksdb_configs
+                    .enable_storage_sharding,
+            )
+            .unwrap(),
+        );
+        info.insert(
+            "internal_indexer_config".to_string(),
+            serde_json::to_value(&self.context.node_config.indexer_db_config).unwrap(),
+        );
+
+        Json(info)
+    }
+
     /// Check basic node health
     ///
     /// By default this endpoint just checks that it can get the latest ledger
@@ -87,12 +142,10 @@ impl BasicApi {
         let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
 
         // If we have a duration, check that it's close to the current time, otherwise it's ok
-        if let Some(duration) = duration_secs.0 {
-            let timestamp = ledger_info.timestamp();
-
-            let timestamp = Duration::from_micros(timestamp);
-            let expectation = SystemTime::now()
-                .sub(Duration::from_secs(duration as u64))
+        if let Some(max_skew) = duration_secs.0 {
+            let ledger_timestamp = Duration::from_micros(ledger_info.timestamp());
+            let skew_threshold = SystemTime::now()
+                .sub(Duration::from_secs(max_skew as u64))
                 .duration_since(UNIX_EPOCH)
                 .context("Failed to determine absolute unix time based on given duration")
                 .map_err(|err| {
@@ -103,9 +156,9 @@ impl BasicApi {
                     )
                 })?;
 
-            if timestamp < expectation {
+            if ledger_timestamp < skew_threshold {
                 return Err(HealthCheckError::service_unavailable_with_code(
-                    "The latest ledger info timestamp is less than the expected timestamp",
+                    format!("The latest ledger info timestamp is {:?}, which is beyond the allowed skew ({}s).", ledger_timestamp, max_skew),
                     AptosErrorCode::HealthCheckFailed,
                     &ledger_info,
                 ));

@@ -1,22 +1,34 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(cond: bool,s: M::S) {
-        Borrow(Immutable)(select M::S.f(s));
-        Borrow(Mutable)(select M::S.f(s));
-        Borrow(Immutable)(select M::S.f(if cond {
+    private fun t0(cond: bool,s: S) {
+        Borrow(Immutable)(select M::S.f<S>(s));
+        Borrow(Mutable)(select M::S.f<S>(s));
+        Borrow(Immutable)(select M::S.f<S>(if cond {
           pack M::S(0)
         } else {
           pack M::S(1)
         }));
-        Borrow(Mutable)(select M::S.f(if cond {
+        Borrow(Mutable)(select M::S.f<S>(if cond {
           pack M::S(0)
         } else {
           pack M::S(1)
         }));
         Tuple()
     }
-    spec fun $t0(cond: bool,s: M::S);
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S has drop {
+        f: u64,
+    }
+    fun t0(cond: bool, s: S) {
+        &s.f;
+        &mut s.f;
+        &(if (cond) S{f: 0} else S{f: 1}).f;
+        &mut (if (cond) S{f: 0} else S{f: 1}).f;
+    }
+}

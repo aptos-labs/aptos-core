@@ -6,6 +6,8 @@ module aptos_std::string_utils {
     const EARGS_MISMATCH: u64 = 1;
     /// The format string is not valid.
     const EINVALID_FORMAT: u64 = 2;
+    /// Formatting is not possible because the value contains delayed fields such as aggregators.
+    const EUNABLE_TO_FORMAT_DELAYED_FIELD: u64 = 3;
 
     /// Format a move value as a human readable string,
     /// eg. `to_string(&1u64) == "1"`, `to_string(&false) == "false"`, `to_string(&@0x1) == "@0x1"`.

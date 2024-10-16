@@ -115,6 +115,7 @@ impl<'de> Deserialize<'de> for NetworkId {
         enum ConvertNetworkId {
             Validator,
             Public,
+            #[allow(dead_code)]
             Private(String),
             // These are here for migration, since both need to have their representation changed
             // in the 2nd step of migration, we can move to these identifiers

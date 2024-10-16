@@ -202,7 +202,7 @@ variable "utility_instance_enable_taint" {
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
   type        = string
-  default     = "c6i.8xlarge"
+  default     = "c6i.16xlarge"
 }
 
 variable "validator_instance_num" {
@@ -259,6 +259,30 @@ variable "fullnode_storage_class" {
     condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
     error_message = "Supported storage classes are gp3, io1, io2"
   }
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  type        = bool
+  default     = false
 }
 
 variable "manage_via_tf" {

@@ -1,0 +1,19 @@
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/unused_assign_to_param.move:3:9
+  │
+3 │         x = 42;
+  │         ^^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/unused_assign_to_param.move:8:13
+  │
+8 │             x = 42;
+  │             ^^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assign_to_param.move:10:9
+   │
+10 │         x = 42;
+   │         ^^^^^^

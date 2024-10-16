@@ -15,10 +15,7 @@ pub mod state;
 pub mod types;
 
 pub use crate::client_builder::{AptosBaseUrl, ClientBuilder};
-use crate::{
-    aptos::{AptosVersion, Balance},
-    error::RestError,
-};
+use crate::{aptos::AptosVersion, error::RestError};
 use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
@@ -34,12 +31,15 @@ use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
     state_store::state_key::StateKey,
     transaction::SignedTransaction,
 };
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, StructTag, TypeTag},
+};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client as ReqwestClient, StatusCode,
@@ -47,7 +47,7 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 pub use state::State;
-use std::{collections::BTreeMap, future::Future, time::Duration};
+use std::{collections::BTreeMap, future::Future, str::FromStr, time::Duration};
 use tokio::time::Instant;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 use url::Url;
@@ -204,55 +204,50 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
-    pub async fn get_account_balance(
-        &self,
-        address: AccountAddress,
-    ) -> AptosResult<Response<Balance>> {
-        let resp = self
-            .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
-            .await?;
-        resp.and_then(|resource| {
-            if let Some(res) = resource {
-                Ok(serde_json::from_value::<Balance>(res.data)?)
-            } else {
-                Err(anyhow!("No data returned").into())
-            }
-        })
-    }
-
-    pub async fn get_account_balance_bcs(
+    async fn view_account_balance_bcs_impl(
         &self,
         address: AccountAddress,
         coin_type: &str,
+        version: Option<u64>,
     ) -> AptosResult<Response<u64>> {
-        let resp = self
-            .get_account_resource_bcs::<CoinStoreResource>(
-                address,
-                &format!("0x1::coin::CoinStore<{}>", coin_type),
-            )
-            .await?;
-        resp.and_then(|resource| Ok(resource.coin()))
-    }
-
-    pub async fn get_account_balance_at_version(
-        &self,
-        address: AccountAddress,
-        version: u64,
-    ) -> AptosResult<Response<Balance>> {
-        let resp = self
-            .get_account_resource_at_version(
-                address,
-                "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        let resp: Response<Vec<u64>> = self
+            .view_bcs(
+                &ViewFunction {
+                    module: ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                    function: ident_str!("balance").into(),
+                    ty_args: vec![TypeTag::Struct(Box::new(
+                        StructTag::from_str(coin_type).unwrap(),
+                    ))],
+                    args: vec![bcs::to_bytes(&address).unwrap()],
+                },
                 version,
             )
             .await?;
-        resp.and_then(|resource| {
-            if let Some(res) = resource {
-                Ok(serde_json::from_value::<Balance>(res.data)?)
+
+        resp.and_then(|result| {
+            if result.len() != 1 {
+                Err(anyhow!("Wrong data size returned: {:?}", result).into())
             } else {
-                Err(anyhow!("No data returned").into())
+                Ok(result[0])
             }
         })
+    }
+
+    pub async fn view_apt_account_balance_at_version(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> AptosResult<Response<u64>> {
+        self.view_account_balance_bcs_impl(address, "0x1::aptos_coin::AptosCoin", Some(version))
+            .await
+    }
+
+    pub async fn view_apt_account_balance(
+        &self,
+        address: AccountAddress,
+    ) -> AptosResult<Response<u64>> {
+        self.view_account_balance_bcs_impl(address, "0x1::aptos_coin::AptosCoin", None)
+            .await
     }
 
     pub async fn get_index(&self) -> AptosResult<Response<IndexResponse>> {
@@ -329,6 +324,29 @@ impl Client {
 
         let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
+    pub async fn view_bcs_with_json_response(
+        &self,
+        request: &ViewFunction,
+        version: Option<u64>,
+    ) -> AptosResult<Response<Vec<serde_json::Value>>> {
+        let txn_payload = bcs::to_bytes(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+            .header(ACCEPT, JSON)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
     }
 
     pub async fn simulate(
@@ -560,7 +578,7 @@ impl Client {
     ) -> AptosResult<Response<Transaction>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash(
-            transaction.clone().committed_hash(),
+            transaction.committed_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
@@ -574,7 +592,7 @@ impl Client {
     ) -> AptosResult<Response<TransactionOnChainData>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash_bcs(
-            transaction.clone().committed_hash(),
+            transaction.committed_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
@@ -1582,7 +1600,7 @@ impl Client {
         base: &str,
         limit_per_request: u64,
         ledger_version: Option<u64>,
-        cursor: Option<String>,
+        cursor: &Option<String>,
     ) -> AptosResult<Url> {
         let mut path = format!("{}?limit={}", base, limit_per_request);
         if let Some(ledger_version) = ledger_version {
@@ -1614,11 +1632,11 @@ impl Client {
                 base_path,
                 limit_per_request,
                 ledger_version,
-                cursor,
+                &cursor,
             )?;
             let raw_response = self.inner.get(url).send().await?;
             let response: Response<Vec<T>> = self.json(raw_response).await?;
-            cursor = response.state().cursor.clone();
+            cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
                 break Ok(response.map(|mut v| {
                     result.append(&mut v);
@@ -1647,13 +1665,13 @@ impl Client {
                 base_path,
                 limit_per_request,
                 ledger_version,
-                cursor,
+                &cursor,
             )?;
             let response: Response<BTreeMap<T, Vec<u8>>> = self
                 .get_bcs(url)
                 .await?
                 .and_then(|inner| bcs::from_bytes(&inner))?;
-            cursor = response.state().cursor.clone();
+            cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
                 break Ok(response.map(|mut v| {
                     result.append(&mut v);

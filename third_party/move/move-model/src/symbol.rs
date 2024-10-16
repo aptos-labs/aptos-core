@@ -23,6 +23,12 @@ impl Symbol {
     }
 }
 
+impl AsRef<Symbol> for Symbol {
+    fn as_ref(&self) -> &Symbol {
+        self
+    }
+}
+
 /// A helper to support symbols in formatting.
 pub struct SymbolDisplay<'a> {
     sym: &'a Symbol,
@@ -91,5 +97,12 @@ impl SymbolPool {
 impl Default for SymbolPool {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+impl Symbol {
+    pub fn new(val: usize) -> Symbol {
+        Symbol(val)
     }
 }

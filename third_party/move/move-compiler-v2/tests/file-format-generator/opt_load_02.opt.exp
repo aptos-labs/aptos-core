@@ -1,0 +1,129 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+struct S {
+	x: u64
+}
+
+consume1(Arg0: &S, Arg1: u64, Arg2: u64, Arg3: u64, Arg4: u64, Arg5: u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &S)
+	1: Pop
+	2: Ret
+}
+consume2(Arg0: &S, Arg1: u64, Arg2: u64, Arg3: &S, Arg4: u64, Arg5: u64) /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: &S)
+	1: Pop
+	2: MoveLoc[3](Arg3: &S)
+	3: Pop
+	4: Ret
+}
+consume3(Arg0: &S, Arg1: u64, Arg2: u64, Arg3: u64, Arg4: &u64, Arg5: u64) /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: &S)
+	1: Pop
+	2: MoveLoc[4](Arg4: &u64)
+	3: Pop
+	4: Ret
+}
+public test01(Arg0: &S) /* def_idx: 3 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+L3:	loc2: u64
+L4:	loc3: u64
+L5:	loc4: u64
+B0:
+	0: MoveLoc[0](Arg0: &S)
+	1: LdU64(1)
+	2: LdU64(2)
+	3: LdU64(3)
+	4: LdU64(4)
+	5: LdU64(5)
+	6: Call consume1(&S, u64, u64, u64, u64, u64)
+	7: Ret
+}
+public test02(Arg0: &S) /* def_idx: 4 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+L3:	loc2: u64
+L4:	loc3: u64
+B0:
+	0: CopyLoc[0](Arg0: &S)
+	1: LdU64(1)
+	2: LdU64(2)
+	3: MoveLoc[0](Arg0: &S)
+	4: LdU64(4)
+	5: LdU64(5)
+	6: Call consume2(&S, u64, u64, &S, u64, u64)
+	7: Ret
+}
+public test03(Arg0: &S) /* def_idx: 5 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+L3:	loc2: u64
+L4:	loc3: u64
+L5:	loc4: u64
+B0:
+	0: CopyLoc[0](Arg0: &S)
+	1: LdU64(1)
+	2: LdU64(2)
+	3: LdU64(3)
+	4: LdU64(4)
+	5: LdU64(5)
+	6: Call consume1(&S, u64, u64, u64, u64, u64)
+	7: MoveLoc[0](Arg0: &S)
+	8: LdU64(1)
+	9: LdU64(2)
+	10: LdU64(3)
+	11: LdU64(4)
+	12: LdU64(5)
+	13: Call consume1(&S, u64, u64, u64, u64, u64)
+	14: Ret
+}
+public test04(Arg0: &S) /* def_idx: 6 */ {
+L1:	loc0: u64
+L2:	loc1: &u64
+L3:	loc2: u64
+L4:	loc3: u64
+L5:	loc4: u64
+L6:	loc5: u64
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: CopyLoc[0](Arg0: &S)
+	4: ImmBorrowField[0](S.x: u64)
+	5: StLoc[2](loc1: &u64)
+	6: StLoc[3](loc2: u64)
+	7: StLoc[4](loc3: u64)
+	8: StLoc[5](loc4: u64)
+	9: CopyLoc[0](Arg0: &S)
+	10: MoveLoc[5](loc4: u64)
+	11: MoveLoc[4](loc3: u64)
+	12: MoveLoc[3](loc2: u64)
+	13: MoveLoc[2](loc1: &u64)
+	14: LdU64(5)
+	15: Call consume3(&S, u64, u64, u64, &u64, u64)
+	16: LdU64(1)
+	17: LdU64(2)
+	18: LdU64(3)
+	19: CopyLoc[0](Arg0: &S)
+	20: ImmBorrowField[0](S.x: u64)
+	21: ReadRef
+	22: StLoc[1](loc0: u64)
+	23: StLoc[3](loc2: u64)
+	24: StLoc[4](loc3: u64)
+	25: StLoc[5](loc4: u64)
+	26: MoveLoc[0](Arg0: &S)
+	27: MoveLoc[5](loc4: u64)
+	28: MoveLoc[4](loc3: u64)
+	29: MoveLoc[3](loc2: u64)
+	30: MoveLoc[1](loc0: u64)
+	31: LdU64(5)
+	32: Call consume1(&S, u64, u64, u64, u64, u64)
+	33: Ret
+}
+}
+============ bytecode verification succeeded ========

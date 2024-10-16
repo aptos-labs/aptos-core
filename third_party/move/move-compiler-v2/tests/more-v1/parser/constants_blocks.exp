@@ -1,0 +1,76 @@
+
+Diagnostics:
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_blocks.move:5:23
+  │
+5 │     const C1: u64 = { u() };
+  │                       ^^^
+  │                       │
+  │                       Invalid call or operation in constant
+
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_blocks.move:7:24
+  │
+7 │     const C3: bool = { loop () };
+  │                        ^^^^^^^
+  │                        │
+  │                        Invalid statement or expression in constant
+
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_blocks.move:8:22
+  │
+8 │     const C4: u8 = { if (false) 0 else 1 };
+  │                      ^^^^^^^^^^^^^^^^^^^
+  │                      │
+  │                      Invalid statement or expression in constant
+
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_blocks.move:9:40
+  │
+9 │     const C5: vector<vector<bool>> = { abort 0 };
+  │                                        ^^^^^^^
+  │                                        │
+  │                                        Invalid call or operation in constant
+
+error: Not a valid constant expression.
+   ┌─ tests/more-v1/parser/constants_blocks.move:11:20
+   │
+11 │           const C7: () = {
+   │ ╭────────────────────────^
+   │ │ ╭──────────────────────'
+   │ │ │ ╭────────────────────'
+12 │ │ │ │         let x = 0;
+13 │ │ │ │         let y = 1;
+14 │ │ │ │         x + y;
+   │ │ │ │         -   - Invalid statement or expression in constant
+   │ │ │ │         │
+   │ │ │ │         Invalid statement or expression in constant
+15 │ │ │ │     };
+   │ ╰─│─│─────^
+   │   ╰─│─────' Invalid statement or expression in constant
+   │     ╰─────' Invalid statement or expression in constant
+
+error: Invalid type for constant
+   ┌─ tests/more-v1/parser/constants_blocks.move:11:20
+   │
+11 │   ╭     const C7: () = {
+   │ ╭──────────────────────^
+12 │ │ │         let x = 0;
+13 │ │ │         let y = 1;
+14 │ │ │         x + y;
+15 │ │ │     };
+   │ ╰─│─────^
+   │   ╰──────' Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+
+error: Not a valid constant expression.
+   ┌─ tests/more-v1/parser/constants_blocks.move:16:25
+   │
+16 │       const C8: address = {
+   │ ╭─────────────────────────^
+17 │ │         0;
+18 │ │         1 + 1;
+19 │ │         u();
+   │ │         --- Invalid call or operation in constant
+20 │ │         @0x0
+21 │ │     };
+   │ ╰─────^

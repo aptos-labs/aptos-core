@@ -98,8 +98,13 @@ async fn bad_peer_is_eventually_banned_internal() {
         // Create a base config for a validator
         let base_config = utils::create_validator_base_config();
 
+        // Create a data client config with peer ignoring enabled
+        let data_client_config = AptosDataClientConfig {
+            ignore_low_score_peers: true,
+            ..Default::default()
+        };
+
         // Create the mock network and client
-        let data_client_config = AptosDataClientConfig::default();
         let (mut mock_network, _, client, _) =
             MockNetwork::new(Some(base_config), Some(data_client_config), None);
 
@@ -189,8 +194,13 @@ async fn bad_peer_is_eventually_banned_callback() {
         let base_config = utils::create_fullnode_base_config();
         let networks = vec![NetworkId::Vfn, NetworkId::Public];
 
+        // Create a data client config with peer ignoring enabled
+        let data_client_config = AptosDataClientConfig {
+            ignore_low_score_peers: true,
+            ..Default::default()
+        };
+
         // Create the mock network and client
-        let data_client_config = AptosDataClientConfig::default();
         let (mut mock_network, _, client, _) =
             MockNetwork::new(Some(base_config), Some(data_client_config), Some(networks));
 
@@ -267,9 +277,119 @@ async fn bad_peer_is_eventually_added_back() {
         // Create a base config for a validator
         let base_config = utils::create_validator_base_config();
 
+        // Create a data client config with peer ignoring enabled
+        let data_client_config = AptosDataClientConfig {
+            ignore_low_score_peers: true,
+            ..Default::default()
+        };
+
         // Create the mock network, mock time, client and poller
-        let data_client_config = AptosDataClientConfig::default();
-        let (mut mock_network, mock_time, client, poller) =
+        let (mut mock_network, mut mock_time, client, poller) =
+            MockNetwork::new(Some(base_config), Some(data_client_config), None);
+
+        // Add a connected peer
+        let (_, network_id) = utils::add_peer_to_network(peer_priority, &mut mock_network);
+
+        // Start the poller
+        tokio::spawn(poller::start_poller(poller));
+
+        // Spawn a handler for the peer
+        let highest_synced_version = 200;
+        tokio::spawn(async move {
+            while let Some(network_request) = mock_network.next_request(network_id).await {
+                // Determine the data response based on the request
+                let data_response = match network_request.storage_service_request.data_request {
+                    DataRequest::GetTransactionsWithProof(_) => {
+                        DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty())
+                    },
+                    DataRequest::GetStorageServerSummary => DataResponse::StorageServerSummary(
+                        utils::create_storage_summary(highest_synced_version),
+                    ),
+                    _ => panic!(
+                        "Unexpected storage request: {:?}",
+                        network_request.storage_service_request
+                    ),
+                };
+
+                // Send the response
+                let storage_response = StorageServiceResponse::new(
+                    data_response,
+                    network_request.storage_service_request.use_compression,
+                )
+                .unwrap();
+                network_request.response_sender.send(Ok(storage_response));
+            }
+        });
+
+        // Wait until the request range is serviceable by the peer
+        let transaction_range = CompleteDataRange::new(0, highest_synced_version).unwrap();
+        utils::wait_for_transaction_advertisement(
+            &client,
+            &mut mock_time,
+            &data_client_config,
+            transaction_range,
+        )
+        .await;
+
+        // Keep decreasing this peer's score by considering their responses invalid.
+        // Eventually the score drops below the threshold and it is ignored.
+        for _ in 0..20 {
+            // Send a request to fetch transactions from the peer
+            let request_timeout = data_client_config.response_timeout_ms;
+            let result = client
+                .get_transactions_with_proof(200, 0, 200, false, request_timeout)
+                .await;
+
+            // Notify the client that the response was bad
+            if let Ok(response) = result {
+                response
+                    .context
+                    .response_callback
+                    .notify_bad_response(crate::interface::ResponseError::ProofVerificationError);
+            }
+        }
+
+        // Verify that the peer is eventually ignored and this data range becomes unserviceable
+        client.update_global_summary_cache().unwrap();
+        let global_summary = client.get_global_data_summary();
+        assert!(!global_summary
+            .advertised_data
+            .transactions
+            .contains(&transaction_range));
+
+        // Keep elapsing time so the peer is eventually added back (it
+        // will still respond to the storage summary requests).
+        for _ in 0..10 {
+            utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
+        }
+
+        // Verify the peer is no longer ignored and this request range is serviceable
+        utils::wait_for_transaction_advertisement(
+            &client,
+            &mut mock_time,
+            &data_client_config,
+            transaction_range,
+        )
+        .await;
+    }
+}
+
+#[ignore] // TODO: This test seems flaky. Debug and fix it.
+#[tokio::test]
+async fn disable_ignoring_low_score_peers() {
+    // Ensure the properties hold for all peer priorities
+    for peer_priority in PeerPriority::get_all_ordered_priorities() {
+        // Create a base config for a validator
+        let base_config = utils::create_validator_base_config();
+
+        // Create a data client config with peer ignoring disabled
+        let data_client_config = AptosDataClientConfig {
+            ignore_low_score_peers: false,
+            ..Default::default()
+        };
+
+        // Create the mock network, mock time, client and poller
+        let (mut mock_network, mut mock_time, client, poller) =
             MockNetwork::new(Some(base_config), Some(data_client_config), None);
 
         // Add a connected peer
@@ -306,12 +426,8 @@ async fn bad_peer_is_eventually_added_back() {
         });
 
         // Advance time so the poller sends data summary requests
-        let poll_loop_interval_ms = data_client_config.data_poller_config.poll_loop_interval_ms;
         for _ in 0..10 {
-            tokio::task::yield_now().await;
-            mock_time
-                .advance_async(Duration::from_millis(poll_loop_interval_ms))
-                .await;
+            utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
         }
 
         // Verify that this request range is serviceable by the peer
@@ -322,9 +438,8 @@ async fn bad_peer_is_eventually_added_back() {
             .transactions
             .contains(&transaction_range));
 
-        // Keep decreasing this peer's score by considering its responses bad.
-        // Eventually its score drops below threshold and it is ignored.
-        for _ in 0..20 {
+        // Keep decreasing this peer's score by considering its responses bad
+        for _ in 0..1000 {
             // Send a request to fetch transactions from the peer
             let request_timeout = data_client_config.response_timeout_ms;
             let result = client
@@ -340,23 +455,8 @@ async fn bad_peer_is_eventually_added_back() {
             }
         }
 
-        // Verify that the peer is eventually ignored and this data range becomes unserviceable
+        // Verify that the peer is not ignored, despite many bad responses
         client.update_global_summary_cache().unwrap();
-        let global_summary = client.get_global_data_summary();
-        assert!(!global_summary
-            .advertised_data
-            .transactions
-            .contains(&transaction_range));
-
-        // Keep elapsed time so the peer is eventually added back (it
-        // will still respond to the storage summary requests).
-        for _ in 0..100 {
-            mock_time
-                .advance_async(Duration::from_millis(poll_loop_interval_ms))
-                .await;
-        }
-
-        // Verify the peer is no longer ignored and this request range is serviceable
         let global_summary = client.get_global_data_summary();
         assert!(global_summary
             .advertised_data

@@ -4,20 +4,14 @@
 use crate::log::{FrameName, WriteOpType};
 use aptos_types::{
     access_path::Path,
-    state_store::{
-        state_key::{StateKey, StateKeyInner},
-        table::TableHandle,
-    },
+    state_store::{state_key::StateKey, table::TableHandle},
 };
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
 };
-use std::{
-    fmt::{self, Display},
-    ops::Deref,
-};
+use std::fmt::{self, Display};
 
 /// Wrapper to help render the underlying data in human readable formats that are
 /// desirable for textual outputs and flamegraphs.
@@ -106,9 +100,9 @@ impl<'a> Display for TableKey<'a> {
 
 impl<'a> Display for Render<'a, StateKey> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use StateKeyInner::*;
+        use aptos_types::state_store::state_key::inner::StateKeyInner::*;
 
-        match self.0.deref() {
+        match self.0.inner() {
             AccessPath(ap) => {
                 write!(f, "{}::{}", Render(&ap.address), Render(&ap.get_path()))
             },
@@ -131,5 +125,11 @@ impl<'a> Display for Render<'a, WriteOpType> {
             Modification => "modify",
             Deletion => "delete",
         })
+    }
+}
+
+impl<'a> Display for Render<'a, TypeTag> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

@@ -23,7 +23,6 @@ use std::sync::Arc;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
-
     #[test]
     fn test_txn_store_pruner(txns in vec(
         prop_oneof![

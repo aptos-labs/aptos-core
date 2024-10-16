@@ -285,7 +285,7 @@ impl FunderTrait for TransferFunder {
                 )
                 .await?;
             info!(
-                hash = txn.clone().committed_hash().to_hex_literal(),
+                hash = txn.committed_hash().to_hex_literal(),
                 address = receiver_address,
                 amount = amount,
                 event = "transaction_submitted"
@@ -314,7 +314,7 @@ impl FunderTrait for TransferFunder {
         let account_address = self.faucet_account.read().await.address();
         let funder_balance = match self
             .get_api_client()
-            .get_account_balance_bcs(account_address, "0x1::aptos_coin::AptosCoin")
+            .view_apt_account_balance(account_address)
             .await
         {
             Ok(response) => response.into_inner(),

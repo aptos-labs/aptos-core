@@ -13,6 +13,7 @@ use aptos_logger::{
 use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
 use aptos_network::{
     application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
+    peer_manager::ConnectionNotification,
     protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -25,7 +26,7 @@ use futures::{
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::{ops::DerefMut, sync::Arc, time::Duration};
+use std::{collections::HashSet, ops::DerefMut, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, select, sync::RwLock};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -180,13 +181,11 @@ async fn handle_rpc(
 
 /// handle work split out by source_loop()
 async fn handler_task(
-    node_config: NodeConfig,
     network_client: NetworkClient<NetbenchMessage>,
     work_rx: async_channel::Receiver<(NetworkId, Event<NetbenchMessage>)>,
     time_service: TimeService,
     shared: Arc<RwLock<NetbenchSharedState>>,
 ) {
-    let config = node_config.netbench.unwrap();
     loop {
         let (network_id, event) = match work_rx.recv().await {
             Ok(v) => v,
@@ -218,29 +217,6 @@ async fn handler_task(
                 )
                 .await;
             },
-            Event::NewPeer(wat) => {
-                if config.enable_direct_send_testing {
-                    Handle::current().spawn(direct_sender(
-                        node_config.clone(),
-                        network_client.clone(),
-                        time_service.clone(),
-                        network_id,
-                        wat.remote_peer_id,
-                        shared.clone(),
-                    ));
-                }
-                if config.enable_rpc_testing {
-                    Handle::current().spawn(rpc_sender(
-                        node_config.clone(),
-                        network_client.clone(),
-                        time_service.clone(),
-                        network_id,
-                        wat.remote_peer_id,
-                        shared.clone(),
-                    ));
-                }
-            },
-            Event::LostPeer(_) => {}, // don't care
         }
     }
 }
@@ -274,23 +250,89 @@ pub async fn run_netbench_service(
     };
     let (work_sender, work_receiver) = async_channel::bounded(num_threads * 2);
     let runtime_handle = Handle::current();
+    let listener_task = runtime_handle.spawn(connection_listener(
+        node_config.clone(),
+        network_client.clone(),
+        time_service.clone(),
+        shared.clone(),
+        runtime_handle.clone(),
+    ));
     let source_task = runtime_handle.spawn(source_loop(network_requests, work_sender));
     let mut handlers = vec![];
     for _ in 0..num_threads {
         handlers.push(runtime_handle.spawn(handler_task(
-            node_config.clone(),
             network_client.clone(),
             work_receiver.clone(),
             time_service.clone(),
             shared.clone(),
         )));
     }
+    let listener_task_result = listener_task.await;
+    info!("netbench listener_task exited {:?}", listener_task_result);
     if let Err(err) = source_task.await {
         warn!("benchmark source_thread join: {}", err);
     }
     for hai in handlers {
         if let Err(err) = hai.await {
             warn!("benchmark handler_thread join: {}", err);
+        }
+    }
+}
+
+async fn connection_listener(
+    node_config: NodeConfig,
+    network_client: NetworkClient<NetbenchMessage>,
+    time_service: TimeService,
+    shared: Arc<RwLock<NetbenchSharedState>>,
+    handle: Handle,
+) {
+    let config = node_config.netbench.unwrap();
+    let peers_and_metadata = network_client.get_peers_and_metadata();
+    let mut connected_peers = HashSet::new();
+    let mut connection_notifications = peers_and_metadata.subscribe();
+    loop {
+        match connection_notifications.recv().await {
+            None => {
+                info!("netbench connection_listener exit");
+                return;
+            },
+            Some(note) => match note {
+                ConnectionNotification::NewPeer(meta, network_id) => {
+                    let peer_network_id = PeerNetworkId::new(network_id, meta.remote_peer_id);
+                    if connected_peers.contains(&peer_network_id) {
+                        continue;
+                    }
+                    info!(
+                        "netbench connection_listener new {:?} {:?}",
+                        meta, network_id
+                    );
+                    if config.enable_direct_send_testing {
+                        handle.spawn(direct_sender(
+                            node_config.clone(),
+                            network_client.clone(),
+                            time_service.clone(),
+                            network_id,
+                            meta.remote_peer_id,
+                            shared.clone(),
+                        ));
+                    }
+                    if config.enable_rpc_testing {
+                        handle.spawn(rpc_sender(
+                            node_config.clone(),
+                            network_client.clone(),
+                            time_service.clone(),
+                            network_id,
+                            meta.remote_peer_id,
+                            shared.clone(),
+                        ));
+                    }
+                    connected_peers.insert(peer_network_id);
+                },
+                ConnectionNotification::LostPeer(meta, network_id) => {
+                    let peer_network_id = PeerNetworkId::new(network_id, meta.remote_peer_id);
+                    connected_peers.remove(&peer_network_id);
+                },
+            },
         }
     }
 }
@@ -487,8 +529,8 @@ impl NetbenchSharedState {
         self.sent_pos = (self.sent_pos + 1) % self.sent.capacity();
     }
 
-    /// return the record for the request_counter, or {0, oldest send_micros}
-    /// Option<SendRecord> might seem like it would make sense, but we use the send_micros field to return the oldest known message time when we don't find a request_counter match.
+    /// return the record for the request_counter, or `{0, oldest send_micros}`
+    /// `Option<SendRecord>` might seem like it would make sense, but we use the send_micros field to return the oldest known message time when we don't find a request_counter match.
     pub fn find(&self, request_counter: u64) -> SendRecord {
         if self.sent.is_empty() {
             return SendRecord {
