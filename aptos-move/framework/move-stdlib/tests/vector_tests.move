@@ -954,4 +954,14 @@ module std::vector_tests {
         let v = vector[MoveOnly {}];
         vector::destroy(v, |m| { let MoveOnly {} = m; })
     }
+
+    #[test]
+    fun test_range_move_ints() {
+        let v = vector[3, 4, 5, 6];
+        let w = vector[1, 2];
+
+        V::range_move(&mut v, 1, 2, &mut w, 1);
+        assert!(&v == &vector[3, 6], 0);
+        assert!(&w == &vector[1, 4, 5, 2], 0);
+    }
 }
