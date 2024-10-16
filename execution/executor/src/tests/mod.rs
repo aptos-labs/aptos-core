@@ -494,24 +494,24 @@ fn apply_transaction_by_writeset(
 
     let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
     let ExecutedChunk {
-        result_state,
-        ledger_info,
-        next_epoch_state: _,
-        ledger_update_output,
+        output,
+        ledger_info_opt,
     } = executed;
+    let output = output.expect_complete_result();
 
     db.writer
         .save_transactions(
-            &ledger_update_output.to_commit,
-            ledger_view.txn_accumulator().num_leaves(),
-            ledger_view.state().base_version,
-            ledger_info.as_ref(),
+            &output.ledger_update_output.to_commit,
+            output.ledger_update_output.first_version(),
+            output.parent_state.base_version,
+            ledger_info_opt.as_ref(),
             true, /* sync_commit */
-            &result_state,
-            ledger_update_output
+            &output.result_state,
+            output
+                .ledger_update_output
                 .state_updates_until_last_checkpoint
                 .as_ref(),
-            Some(&ledger_update_output.sharded_state_cache),
+            Some(&output.ledger_update_output.sharded_state_cache),
         )
         .unwrap();
 }
@@ -688,9 +688,9 @@ fn run_transactions_naive(
 ) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
+        let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn].into(),
             ledger_view
@@ -704,30 +704,32 @@ fn run_transactions_naive(
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
-        let next_ledger_view = executed.result_view();
         let ExecutedChunk {
-            result_state,
-            ledger_info,
-            next_epoch_state: _,
-            ledger_update_output,
+            output,
+            ledger_info_opt,
         } = executed;
+        let output = output.expect_complete_result();
         db.writer
             .save_transactions(
-                &ledger_update_output.to_commit,
-                ledger_view.txn_accumulator().num_leaves(),
-                ledger_view.state().base_version,
-                ledger_info.as_ref(),
+                &output.ledger_update_output.to_commit,
+                output.ledger_update_output.first_version(),
+                output.parent_state.base_version,
+                ledger_info_opt.as_ref(),
                 true, /* sync_commit */
-                &result_state,
-                ledger_update_output
+                &output.result_state,
+                output
+                    .ledger_update_output
                     .state_updates_until_last_checkpoint
                     .as_ref(),
-                Some(&ledger_update_output.sharded_state_cache),
+                Some(&output.ledger_update_output.sharded_state_cache),
             )
             .unwrap();
-        ledger_view = next_ledger_view;
     }
-    ledger_view.txn_accumulator().root_hash()
+    db.reader
+        .get_latest_executed_trees()
+        .unwrap()
+        .transaction_accumulator
+        .root_hash()
 }
 
 proptest! {

@@ -3,14 +3,12 @@
 
 #![forbid(unsafe_code)]
 
-use crate::state_compute_result::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
-    epoch_state::EpochState,
     proof::accumulator::InMemoryTransactionAccumulator,
     state_store::ShardedStateUpdates,
     transaction::{
@@ -36,11 +34,6 @@ impl LedgerUpdateOutput {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
         Self::new_impl(Inner::new_dummy_with_input_txns(txns))
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
-        Self::new_impl(Inner::new_dummy_with_txns_to_commit(txns))
     }
 
     pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
@@ -79,13 +72,6 @@ impl LedgerUpdateOutput {
         Self {
             inner: Arc::new(DropHelper::new(inner)),
         }
-    }
-
-    pub fn as_state_compute_result(
-        &self,
-        next_epoch_state: Option<EpochState>,
-    ) -> StateComputeResult {
-        StateComputeResult::new(self.clone(), next_epoch_state)
     }
 }
 
@@ -131,14 +117,6 @@ impl Inner {
                 );
                 num_txns
             ],
-            ..Default::default()
-        }
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
-        Self {
-            to_commit: txns,
             ..Default::default()
         }
     }

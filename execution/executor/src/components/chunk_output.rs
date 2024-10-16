@@ -154,7 +154,7 @@ impl ChunkOutput {
         self,
         parent_state: &StateDelta,
         block_id: HashValue,
-    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
+    ) -> Result<(Arc<StateDelta>, Option<EpochState>, StateCheckpointOutput)> {
         fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
                 "Injected error in into_state_checkpoint_output."
