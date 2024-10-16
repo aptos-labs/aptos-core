@@ -25,7 +25,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info};
 use aptos_storage_interface::DbReader;

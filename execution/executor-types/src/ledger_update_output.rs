@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::StateComputeResult;
+use crate::state_compute_result::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
