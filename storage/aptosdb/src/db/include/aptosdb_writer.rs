@@ -10,7 +10,7 @@ impl DbWriter for AptosDB {
         first_version: Version,
         base_state_version: Option<Version>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
+        latest_in_memory_state: &StateDelta,
         state_updates_until_last_checkpoint: Option<&ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
@@ -31,7 +31,7 @@ impl DbWriter for AptosDB {
                 txns_to_commit,
                 first_version,
                 base_state_version,
-                &latest_in_memory_state,
+                latest_in_memory_state,
             )?;
             let last_version = first_version + txns_to_commit.len() as u64 - 1;
 

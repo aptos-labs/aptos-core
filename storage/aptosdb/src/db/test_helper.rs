@@ -969,7 +969,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.state_store
         .buffered_state()
         .lock()
-        .update(None, in_memory_state, true)
+        .update(None, &in_memory_state, true)
         .unwrap();
 }
 
@@ -1005,7 +1005,7 @@ pub fn test_sync_transactions_impl(
                 base_state_version,
                 None,
                 false, /* sync_commit */
-                in_memory_state.clone(),
+                &in_memory_state,
                 gather_state_updates_until_last_checkpoint(
                     cur_ver,
                     &in_memory_state,
@@ -1025,7 +1025,7 @@ pub fn test_sync_transactions_impl(
             base_state_version,
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
             gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch)
                 .as_ref(),
             None,

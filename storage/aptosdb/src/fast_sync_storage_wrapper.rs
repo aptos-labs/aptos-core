@@ -175,7 +175,7 @@ impl DbWriter for FastSyncStorageWrapper {
         first_version: Version,
         base_state_version: Option<Version>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
+        latest_in_memory_state: &StateDelta,
         state_updates_until_last_checkpoint: Option<&ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {

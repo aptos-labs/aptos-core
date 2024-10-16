@@ -373,7 +373,7 @@ where
                 ledger_update.first_version(),
                 parent_block.output.state().base_version,
                 false,
-                result_in_memory_state,
+                &result_in_memory_state,
                 ledger_update.state_updates_until_last_checkpoint.as_ref(),
                 Some(&ledger_update.sharded_state_cache),
             )?;
