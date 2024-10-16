@@ -1047,6 +1047,17 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    VestingWithoutStakingCreateVestingContractWithAmounts {
+        shareholders: Vec<AccountAddress>,
+        amounts: Vec<u64>,
+        schedule_numerator: Vec<u64>,
+        schedule_denominator: u64,
+        start_timestamp_secs: u64,
+        period_duration: u64,
+        withdrawal_address: AccountAddress,
+        contract_creation_seed: Vec<u8>,
+    },
+
     /// Remove the lockup period for the vesting contract. This can only be called by the admin of the vesting contract.
     /// Example usage: If admin find shareholder suspicious, admin can remove it.
     VestingWithoutStakingRemoveShareholder {
@@ -1755,6 +1766,25 @@ impl EntryFunctionCall {
             VestingWithoutStakingAdminWithdraw { contract_address } => {
                 vesting_without_staking_admin_withdraw(contract_address)
             },
+            VestingWithoutStakingCreateVestingContractWithAmounts {
+                shareholders,
+                amounts,
+                schedule_numerator,
+                schedule_denominator,
+                start_timestamp_secs,
+                period_duration,
+                withdrawal_address,
+                contract_creation_seed,
+            } => vesting_without_staking_create_vesting_contract_with_amounts(
+                shareholders,
+                amounts,
+                schedule_numerator,
+                schedule_denominator,
+                start_timestamp_secs,
+                period_duration,
+                withdrawal_address,
+                contract_creation_seed,
+            ),
             VestingWithoutStakingRemoveShareholder {
                 contract_address,
                 shareholder_address,
@@ -4853,6 +4883,39 @@ pub fn vesting_without_staking_admin_withdraw(
     ))
 }
 
+pub fn vesting_without_staking_create_vesting_contract_with_amounts(
+    shareholders: Vec<AccountAddress>,
+    amounts: Vec<u64>,
+    schedule_numerator: Vec<u64>,
+    schedule_denominator: u64,
+    start_timestamp_secs: u64,
+    period_duration: u64,
+    withdrawal_address: AccountAddress,
+    contract_creation_seed: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting_without_staking").to_owned(),
+        ),
+        ident_str!("create_vesting_contract_with_amounts").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&shareholders).unwrap(),
+            bcs::to_bytes(&amounts).unwrap(),
+            bcs::to_bytes(&schedule_numerator).unwrap(),
+            bcs::to_bytes(&schedule_denominator).unwrap(),
+            bcs::to_bytes(&start_timestamp_secs).unwrap(),
+            bcs::to_bytes(&period_duration).unwrap(),
+            bcs::to_bytes(&withdrawal_address).unwrap(),
+            bcs::to_bytes(&contract_creation_seed).unwrap(),
+        ],
+    ))
+}
+
 /// Remove the lockup period for the vesting contract. This can only be called by the admin of the vesting contract.
 /// Example usage: If admin find shareholder suspicious, admin can remove it.
 pub fn vesting_without_staking_remove_shareholder(
@@ -6787,6 +6850,27 @@ mod decoder {
         }
     }
 
+    pub fn vesting_without_staking_create_vesting_contract_with_amounts(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::VestingWithoutStakingCreateVestingContractWithAmounts {
+                    shareholders: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    amounts: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    schedule_numerator: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    schedule_denominator: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    start_timestamp_secs: bcs::from_bytes(script.args().get(4)?).ok()?,
+                    period_duration: bcs::from_bytes(script.args().get(5)?).ok()?,
+                    withdrawal_address: bcs::from_bytes(script.args().get(6)?).ok()?,
+                    contract_creation_seed: bcs::from_bytes(script.args().get(7)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_without_staking_remove_shareholder(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7459,6 +7543,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_without_staking_admin_withdraw".to_string(),
             Box::new(decoder::vesting_without_staking_admin_withdraw),
+        );
+        map.insert(
+            "vesting_without_staking_create_vesting_contract_with_amounts".to_string(),
+            Box::new(decoder::vesting_without_staking_create_vesting_contract_with_amounts),
         );
         map.insert(
             "vesting_without_staking_remove_shareholder".to_string(),

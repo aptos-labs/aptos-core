@@ -287,6 +287,93 @@ module supra_framework::vesting_without_staking {
         }
     }
 
+    public entry fun create_vesting_contract_with_amounts (
+        admin: &signer,
+        shareholders: vector<address>,
+        shares: vector<u64>,
+        vesting_numerators: vector<u64>,
+        vesting_denominator: u64,
+        start_timestamp_secs: u64,
+        period_duration: u64,
+        withdrawal_address: address,
+        contract_creation_seed: vector<u8>,
+    ) acquires AdminStore {
+        assert!(!system_addresses::is_reserved_address(withdrawal_address),
+            error::invalid_argument(EINVALID_WITHDRAWAL_ADDRESS),);
+        assert_account_is_registered_for_supra(withdrawal_address);
+        assert!(vector::length(&shareholders) > 0,
+            error::invalid_argument(ENO_SHAREHOLDERS));
+        assert!(
+            vector::length(&shareholders) == vector::length(&shares),
+            error::invalid_argument(ESHARES_LENGTH_MISMATCH),
+        );
+
+        // If this is the first time this admin account has created a vesting contract, initialize the admin store.
+        let admin_address = signer::address_of(admin);
+        if (!exists<AdminStore>(admin_address)) {
+            move_to(admin,
+                AdminStore {
+                    vesting_contracts: vector::empty<address>(),
+                    nonce: 0,
+                    create_events: new_event_handle<CreateVestingContractEvent>(admin),
+                });
+        };
+
+        // Initialize the vesting contract in a new resource account. This allows the same admin to create multiple
+        // pools.
+        let (contract_signer, contract_signer_cap) = create_vesting_contract_account(admin,
+            contract_creation_seed);
+        let contract_signer_address = signer::address_of(&contract_signer);
+        let schedule = vector::map_ref(&vesting_numerators, |numerator| {
+            let event = fixed_point32::create_from_rational(*numerator, vesting_denominator);
+            event
+        });
+
+        let vesting_schedule = create_vesting_schedule(schedule, start_timestamp_secs, period_duration);
+        let shareholders_map = simple_map::create<address, VestingRecord>();
+        let grant_amount = 0;
+        vector::for_each_reverse(shares, |amount| {
+            let shareholder = vector::pop_back(&mut shareholders);
+            simple_map::add(&mut shareholders_map,
+                shareholder,
+                VestingRecord {
+                    init_amount: amount,
+                    left_amount: amount,
+                    last_vested_period: vesting_schedule.last_vested_period,
+                }
+            );
+            grant_amount = grant_amount + amount;
+        });
+        assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
+        coin::transfer<SupraCoin>(admin, contract_signer_address, grant_amount);
+
+        let admin_store = borrow_global_mut<AdminStore>(admin_address);
+        vector::push_back(&mut admin_store.vesting_contracts, contract_signer_address);
+        emit_event(&mut admin_store.create_events,
+            CreateVestingContractEvent {
+                withdrawal_address,
+                grant_amount,
+                vesting_contract_address: contract_signer_address,
+            },
+        );
+
+        move_to(&contract_signer,
+            VestingContract {
+                state: VESTING_POOL_ACTIVE,
+                admin: admin_address,
+                shareholders:shareholders_map,
+                beneficiaries: simple_map::create<address, address>(),
+                vesting_schedule,
+                withdrawal_address,
+                signer_cap: contract_signer_cap,
+                set_beneficiary_events: new_event_handle<SetBeneficiaryEvent>(&contract_signer),
+                vest_events: new_event_handle<VestEvent>(&contract_signer),
+                terminate_events: new_event_handle<TerminateEvent>(&contract_signer),
+                admin_withdraw_events: new_event_handle<AdminWithdrawEvent>(&contract_signer),
+                shareholder_removed_events: new_event_handle<ShareHolderRemovedEvent>(&contract_signer),
+            });
+    }
+
     /// Create a vesting contract with a given configurations.
     public fun create_vesting_contract(
         admin: &signer,
@@ -757,6 +844,22 @@ module supra_framework::vesting_without_staking {
         create_vesting_contract(admin, buy_ins, vesting_schedule, withdrawal_address, vector[],)
     }
 
+    #[test_only]
+    public fun setup_vesting_contract_with_amount_with_schedule(
+        admin: &signer,
+        shareholders: vector<address>,
+        shares: vector<u64>,
+        withdrawal_address: address,
+        vesting_numerators: vector<u64>,
+        vesting_denominator: u64
+    ):address acquires AdminStore {
+        create_vesting_contract_with_amounts(admin, shareholders, shares, vesting_numerators, vesting_denominator, timestamp::now_seconds()+ VESTING_SCHEDULE_CLIFF, VESTING_PERIOD, withdrawal_address, vector[]);
+        let admin_store = borrow_global<AdminStore>(signer::address_of(admin));
+        let contract_address = vector::borrow(&admin_store.vesting_contracts, vector::length(&admin_store.vesting_contracts) - 1);
+        *contract_address
+    }
+
+
     #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
     #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_termination_after_successful_vesting(
@@ -781,7 +884,6 @@ module supra_framework::vesting_without_staking {
                 withdrawal_address,
                 shareholder_1_address,
                 shareholder_2_address]);
-        // let contract_address = setup_vesting_contract(admin, shareholders, shares, withdrawal_address);
         let contract_address = setup_vesting_contract_with_schedule(admin, shareholders,
             shares, withdrawal_address, &vector[1], 1,);
         assert!(vector::length(&borrow_global<AdminStore>(admin_address).vesting_contracts) ==
@@ -797,6 +899,53 @@ module supra_framework::vesting_without_staking {
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + period_duration_secs(
                 contract_address
             ));
+        vest(contract_address);
+
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == shareholder_1_share, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == shareholder_2_share, 0);
+        vest(contract_address);
+    }
+
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
+    public entry fun entry_test_termination_after_successful_vesting(
+        supra_framework: &signer,
+        admin: &signer,
+        shareholder_1: &signer,
+        shareholder_2: &signer,
+        withdrawal: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let withdrawal_address = signer::address_of(withdrawal);
+        let shareholder_1_address = signer::address_of(shareholder_1);
+        let shareholder_2_address = signer::address_of(shareholder_2);
+        let shareholders = vector[shareholder_1_address, shareholder_2_address];
+        let shareholder_1_share = GRANT_AMOUNT / 4;
+        let shareholder_2_share = GRANT_AMOUNT * 3 / 4;
+        let shares = vector[shareholder_1_share, shareholder_2_share];
+        // Create the vesting contract.
+        setup(supra_framework,
+            vector[
+                admin_address,
+                withdrawal_address,
+                shareholder_1_address,
+                shareholder_2_address]);
+        stake::mint(admin, GRANT_AMOUNT);
+        let contract_address = setup_vesting_contract_with_amount_with_schedule(admin, shareholders,
+            shares, withdrawal_address, vector[1], 1);
+        assert!(vector::length(&borrow_global<AdminStore>(admin_address).vesting_contracts) ==
+            1, 0);
+        let vested_amount_1 = 0;
+        let vested_amount_2 = 0;
+        assert!(coin::balance<SupraCoin>(contract_address) == GRANT_AMOUNT, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
+
+
+        // Time is now at the start time, vest will unlock the first period, which is 2/10.
+        timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + period_duration_secs(
+            contract_address
+        ));
         vest(contract_address);
 
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == shareholder_1_share, 0);
@@ -1223,6 +1372,34 @@ module supra_framework::vesting_without_staking {
             // First vest = 3/4 but last vest should only be for the remaining 1/4.
             &vector[3], 4,);
 
+        // First vest is 3/4
+        timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + VESTING_PERIOD);
+        vest(contract_address);
+        let vested_amount = fraction(GRANT_AMOUNT, 3, 4);
+        let remaining_grant = GRANT_AMOUNT - vested_amount;
+        assert!(remaining_grant(contract_address, shareholder_address) == remaining_grant,
+            0);
+
+        timestamp::fast_forward_seconds(VESTING_PERIOD);
+        // Last vest should be the remaining amount (1/4).
+        vest(contract_address);
+        remaining_grant = 0;
+        assert!(remaining_grant(contract_address, shareholder_address) == remaining_grant,
+            0);
+    }
+
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    public entry fun entry_test_last_vest_should_distribute_remaining_amount(
+        supra_framework: &signer, admin: &signer, shareholder: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let shareholder_address = signer::address_of(shareholder);
+        setup(supra_framework, vector[admin_address, shareholder_address]);
+        stake::mint(admin, GRANT_AMOUNT);
+        let contract_address = setup_vesting_contract_with_amount_with_schedule(admin, vector[shareholder_address], vector[GRANT_AMOUNT],
+            admin_address,
+            // First vest = 3/4 but last vest should only be for the remaining 1/4.
+            vector[3], 4,);
         // First vest is 3/4
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + VESTING_PERIOD);
         vest(contract_address);
