@@ -135,7 +135,7 @@ impl MoveVM {
                     ),
                     &ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
                 )?;
-                Ok(module.compiled_module().clone())
+                Ok(module.compiled_module_arc().clone())
             },
             Loader::V2(_) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -149,29 +149,36 @@ impl MoveVM {
     /// outdated. This can happen if the adapter executed a particular code publishing transaction
     /// but decided to not commit the result to the data store. Because the code cache currently
     /// does not support deletion, the cache will, incorrectly, still contain this module.
+    #[deprecated]
     pub fn mark_loader_cache_as_invalid(&self) {
-        self.runtime.loader().mark_as_invalid()
+        #[allow(deprecated)]
+        self.runtime.loader().mark_v1_as_invalid()
     }
 
     /// Returns true if the loader cache has been invalidated (either by explicit call above
     /// or by the runtime)
+    #[deprecated]
     pub fn is_loader_cache_invalidated(&self) -> bool {
-        self.runtime.loader().is_invalidated()
+        #[allow(deprecated)]
+        self.runtime.loader().is_v1_invalidated()
     }
 
     /// If the loader cache has been invalidated (either by the above call or by internal logic)
     /// flush it so it is valid again. Notice that should only be called if there are no
     /// outstanding sessions created from this VM.
+    #[deprecated]
     pub fn flush_loader_cache_if_invalidated(&self) {
         // Flush the module cache inside the VMRuntime. This code is there for a legacy reason:
         // - In the old session api that we provide, MoveVM will hold a cache for loaded module and the session will be created against that cache.
         //   Thus if an module invalidation event happens (e.g, by upgrade request), we will need to flush this internal cache as well.
         // - If we can deprecate this session api, we will be able to get rid of this internal loaded cache and make the MoveVM "stateless" and
         //   invulnerable to module invalidation.
-        if self.runtime.loader().is_invalidated() {
+        #[allow(deprecated)]
+        if self.runtime.loader().is_v1_invalidated() {
             self.runtime.module_cache.flush();
         };
-        self.runtime.loader().flush_if_invalidated()
+        #[allow(deprecated)]
+        self.runtime.loader().flush_v1_if_invalidated()
     }
 
     /// DO NOT USE THIS API!
@@ -187,7 +194,7 @@ impl MoveVM {
             .runtime
             .module_cache
             .fetch_module(module)?
-            .module()
+            .compiled_module_ref()
             .metadata)
     }
 }

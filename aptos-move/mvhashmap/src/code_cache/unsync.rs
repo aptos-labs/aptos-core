@@ -57,11 +57,11 @@ where
     type Key = Q;
     type Script = S;
 
-    fn store_script(&self, key: Self::Key, script: Self::Script) {
+    fn insert_script(&self, key: Self::Key, script: Self::Script) {
         self.script_cache.borrow_mut().insert(key, script);
     }
 
-    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+    fn get_script(&self, key: &Self::Key) -> Option<Self::Script> {
         self.script_cache.borrow().get(key).cloned()
     }
 }
@@ -77,11 +77,11 @@ where
     type Key = K;
     type Module = M;
 
-    fn store_module(&self, key: Self::Key, module: Self::Module) {
+    fn insert_module(&self, key: Self::Key, module: Self::Module) {
         self.module_cache.borrow_mut().insert(key, module);
     }
 
-    fn fetch_module_or_store_with<F>(
+    fn get_module_or_insert_with<F>(
         &self,
         key: &Self::Key,
         default: F,
@@ -111,52 +111,52 @@ mod test {
     #[test]
     fn test_cache_misses() {
         let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
-        assert_eq!(code_cache.fetch_script(&1), None);
+        assert_eq!(code_cache.get_script(&1), None);
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok(None)),
+            code_cache.get_module_or_insert_with(&1, || Ok(None)),
             Ok(None)
         );
         assert_eq!(code_cache.num_modules(), 0);
 
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok(Some(77))),
+            code_cache.get_module_or_insert_with(&1, || Ok(Some(77))),
             Ok(Some(77))
         );
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
 
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok(Some(2))),
+            code_cache.get_module_or_insert_with(&1, || Ok(Some(2))),
             Ok(Some(77))
         );
 
-        assert_err!(code_cache.fetch_module_or_store_with(&2, || Err(())));
+        assert_err!(code_cache.get_module_or_insert_with(&2, || Err(())));
         assert_eq!(code_cache.num_modules(), 1);
     }
 
     #[test]
     fn test_script_cache() {
         let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
-        code_cache.store_script(1, 1);
+        code_cache.insert_script(1, 1);
 
         assert_eq!(code_cache.num_scripts(), 1);
         assert_eq!(code_cache.num_modules(), 0);
-        assert_eq!(code_cache.fetch_script(&1), Some(1));
+        assert_eq!(code_cache.get_script(&1), Some(1));
     }
 
     #[test]
     fn test_module_cache() {
         let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
-        code_cache.store_module(1, 1);
+        code_cache.insert_module(1, 1);
 
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok(None)),
+            code_cache.get_module_or_insert_with(&1, || Ok(None)),
             Ok(Some(1))
         );
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok(Some(10))),
+            code_cache.get_module_or_insert_with(&1, || Ok(Some(10))),
             Ok(Some(1))
         );
     }

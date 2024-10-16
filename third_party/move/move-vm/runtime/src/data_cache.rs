@@ -233,7 +233,7 @@ impl<'r> TransactionDataCache<'r> {
                 Loader::V1(_) => {
                     let maybe_module = module_store.module_at(&ty_tag.module_id());
                     let metadata: &[Metadata] = match &maybe_module {
-                        Some(m) => &m.module().metadata,
+                        Some(m) => &m.compiled_module_ref().metadata,
                         None => &[],
                     };
                     // If we need to process aggregator lifting, we pass type layout to remote.

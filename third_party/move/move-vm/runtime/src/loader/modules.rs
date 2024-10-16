@@ -69,10 +69,12 @@ impl Clone for ModuleCache {
 
 impl ModuleStorage for ModuleCache {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
-        self.0
-            .write()
-            .insert(module_id.clone(), Arc::new(binary))
-            .clone()
+        let mut cache = self.0.write();
+
+        if let Some(existing_binary) = cache.get(module_id) {
+            return existing_binary.clone();
+        }
+        cache.insert(module_id.clone(), Arc::new(binary)).clone()
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
@@ -112,14 +114,14 @@ impl ModuleStorageAdapter {
         natives: &NativeFunctions,
         id: ModuleId,
         module_size: usize,
-        module: Arc<CompiledModule>,
+        compiled_module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        let module = Module::new(natives, module_size, module, struct_name_index_map)
+        let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok(self.modules.store_module(&id, module))
     }
@@ -667,11 +669,11 @@ impl Module {
         self.struct_instantiations[idx as usize].field_count
     }
 
-    pub fn module(&self) -> &CompiledModule {
+    pub fn compiled_module_ref(&self) -> &CompiledModule {
         &self.module
     }
 
-    pub fn compiled_module(&self) -> &Arc<CompiledModule> {
+    pub fn compiled_module_arc(&self) -> &Arc<CompiledModule> {
         &self.module
     }
 

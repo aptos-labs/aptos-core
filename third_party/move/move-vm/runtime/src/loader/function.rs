@@ -134,8 +134,8 @@ impl LoadedFunction {
             LoadedFunctionOwner::Script(_) => "script::main".into(),
             LoadedFunctionOwner::Module(m) => format!(
                 "0x{}::{}::{}",
-                m.module().self_addr().to_hex(),
-                m.module().self_name().as_str(),
+                m.compiled_module_ref().self_addr().to_hex(),
+                m.compiled_module_ref().self_name().as_str(),
                 self.function.name()
             ),
         }

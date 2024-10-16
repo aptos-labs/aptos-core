@@ -1606,7 +1606,7 @@ mod test {
         let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
         let foo_entry =
             ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().store_module(
+        mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
             Arc::new(MaybeCommitted::new(foo_entry.clone(), None)),
         );
@@ -1647,7 +1647,7 @@ mod test {
         assert_matches!(miss, CacheRead::Miss);
 
         let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().store_module(
+        mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
             Arc::new(MaybeCommitted::new(foo_entry.clone(), None)),
         );
@@ -1669,7 +1669,7 @@ mod test {
         let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
         let foo_entry =
             ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().store_module(
+        mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
             Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10))),
         );
@@ -1686,7 +1686,7 @@ mod test {
         // Entry did not exist before --> now exists.
         let bar_entry =
             ModuleCacheEntry::deserialized_for_test("bar", vec![], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().store_module(
+        mvhashmap.code_cache().module_cache().insert_module(
             bar_id.clone(),
             Arc::new(MaybeCommitted::new(bar_entry.clone(), Some(12))),
         );
@@ -1696,7 +1696,7 @@ mod test {
         assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
 
         // Version has been republished, with a higher transaction index. Should fail validation.
-        mvhashmap.code_cache().module_cache().store_module(
+        mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
             Arc::new(MaybeCommitted::new(foo_entry, Some(20))),
         );
@@ -1721,7 +1721,7 @@ mod test {
 
         // Assume we republish this module: validation must fail.
         CrossBlockModuleCache::mark_invalid(&foo_id);
-        mvhashmap.code_cache().module_cache().store_module(
+        mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
             Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10))),
         );

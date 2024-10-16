@@ -79,11 +79,11 @@ impl<M: ModuleStorage> ScriptCache for UnsyncCodeStorage<M> {
     type Key = [u8; 32];
     type Script = CachedScript;
 
-    fn store_script(&self, key: Self::Key, script: Self::Script) {
+    fn insert_script(&self, key: Self::Key, script: Self::Script) {
         self.script_cache.borrow_mut().insert(key, script);
     }
 
-    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+    fn get_script(&self, key: &Self::Key) -> Option<Self::Script> {
         self.script_cache.borrow_mut().get(key).cloned()
     }
 }

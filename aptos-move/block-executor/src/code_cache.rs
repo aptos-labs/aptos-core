@@ -46,17 +46,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ScriptCache
     type Key = [u8; 32];
     type Script = CachedScript;
 
-    fn store_script(&self, key: Self::Key, script: Self::Script) {
+    fn insert_script(&self, key: Self::Key, script: Self::Script) {
         match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache().store_script(key, script),
-            ViewState::Unsync(state) => state.unsync_map.code_cache().store_script(key, script),
+            ViewState::Sync(state) => state.versioned_map.code_cache().insert_script(key, script),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().insert_script(key, script),
         }
     }
 
-    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+    fn get_script(&self, key: &Self::Key) -> Option<Self::Script> {
         match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache().fetch_script(key),
-            ViewState::Unsync(state) => state.unsync_map.code_cache().fetch_script(key),
+            ViewState::Sync(state) => state.versioned_map.code_cache().get_script(key),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().get_script(key),
         }
     }
 }
@@ -319,7 +319,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                         // The entry may not exist, in which case return early.
                         let module_id = ModuleId::new(*address, module_name.to_owned());
                         let entry = match module_cache
-                            .fetch_module_or_store_with(&module_id, || {
+                            .get_module_or_insert_with(&module_id, || {
                                 self.fetch_versioned_base_module_entry(&module_id)
                             })? {
                             Some(entry) => entry,
@@ -356,7 +356,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                             &|id| self.fetch_versioned_base_module_entry(id),
                         )?;
 
-                        let verified_entry = module_cache.fetch_module_or_store_with(&module_id, || self.fetch_versioned_base_module_entry(&module_id))?.ok_or_else(|| {
+                        let verified_entry = module_cache.get_module_or_insert_with(&module_id, || self.fetch_versioned_base_module_entry(&module_id))?.ok_or_else(|| {
                             let msg = format!("Verified module {}::{} should be cached after dependency traversal", module_id.address(), module_id.name());
                             panic_error!(msg).finish(Location::Undefined)
                         })?;
@@ -406,7 +406,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         let read = self
             .unsync_map
             .code_cache()
-            .fetch_module_or_store_with(&module_id, || {
+            .get_module_or_insert_with(&module_id, || {
                 init_func(&module_id).map(|v| v.map(Arc::new))
             })?;
         self.read_set.borrow_mut().capture_module_read(module_id);
@@ -514,7 +514,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         let entry = entry.make_verified(module.clone());
         self.unsync_map
             .code_cache()
-            .store_module(module_id, Arc::new(entry));
+            .insert_module(module_id, Arc::new(entry));
 
         Ok(module)
     }
@@ -539,7 +539,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .versioned_map
             .code_cache()
             .module_cache()
-            .fetch_module_or_store_with(&module_id, || {
+            .get_module_or_insert_with(&module_id, || {
                 init_func(&module_id).map(|e| e.map(|e| Arc::new(MaybeCommitted::new(e, None))))
             })?;
 
@@ -583,7 +583,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             let dependency_module_id = ModuleId::new(*addr, name.to_owned());
 
             let dependency = locked_module_cache
-                .fetch_module_or_store_with(&dependency_module_id, || {
+                .get_module_or_insert_with(&dependency_module_id, || {
                     init_func(&dependency_module_id)
                 })?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
@@ -615,7 +615,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .map(Arc::new)?;
         let new_entry = entry.make_verified(module.clone());
         let entry = Arc::new(MaybeCommitted::new(new_entry, entry.commit_idx()));
-        locked_module_cache.store_module(module_id.clone(), entry);
+        locked_module_cache.insert_module(module_id.clone(), entry);
 
         Ok(module)
     }

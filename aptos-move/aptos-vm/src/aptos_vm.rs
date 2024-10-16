@@ -720,12 +720,13 @@ impl AptosVM {
             module_storage,
         )?;
 
-        // We mark module cache invalid if transaction is successfully executed and has
+        // We mark loader V1 cache invalid if transaction is successfully executed and has
         // published modules. The reason is that epilogue loads the old version of code,
         // and so we need to make sure the next transaction sees the new code.
         // Note that we only do so for modules at special addresses - i.e., those that
         // could have actually been loaded in the epilogue.
-        if has_modules_published_to_special_address {
+        if has_modules_published_to_special_address && !self.features().is_loader_v2_enabled() {
+            #[allow(deprecated)]
             self.move_vm.mark_loader_cache_as_invalid();
         }
 
@@ -1229,12 +1230,13 @@ impl AptosVM {
 
         let (epilogue_session, has_modules_published_to_special_address) = match execution_result {
             Err(execution_error) => {
-                // Invalidate the loader cache in case there was a new module loaded from a module
-                // publish request that failed.
+                // Invalidate the loader V1 cache in case there was a new module loaded from a
+                // module publish request that failed.
                 // This is redundant with the logic in execute_user_transaction but unfortunately is
                 // necessary here as executing the underlying call can fail without this function
                 // returning an error to execute_user_transaction.
-                if *new_published_modules_loaded {
+                if *new_published_modules_loaded && !self.features().is_loader_v2_enabled() {
+                    #[allow(deprecated)]
                     self.move_vm.mark_loader_cache_as_invalid();
                 };
                 let epilogue_session = self.failure_multisig_payload_cleanup(
@@ -1868,12 +1870,13 @@ impl AptosVM {
         new_published_modules_loaded: bool,
         traversal_context: &mut TraversalContext,
     ) -> (VMStatus, VMOutput) {
-        // Invalidate the loader cache in case there was a new module loaded from a module
+        // Invalidate the loader V1 cache in case there was a new module loaded from a module
         // publish request that failed.
         // This ensures the loader cache is flushed later to align storage with the cache.
         // None of the modules in the bundle will be committed to storage,
         // but some of them may have ended up in the cache.
-        if new_published_modules_loaded {
+        if new_published_modules_loaded && !self.features().is_loader_v2_enabled() {
+            #[allow(deprecated)]
             self.move_vm.mark_loader_cache_as_invalid();
         };
 

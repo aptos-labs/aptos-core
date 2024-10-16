@@ -3358,7 +3358,7 @@ impl CompiledModule {
     }
 }
 
-/// Return the simplest module that will pass the bounds checker
+/// Return the simplest empty module stored at 0x0 that will pass the bounds checker.
 pub fn empty_module() -> CompiledModule {
     CompiledModule {
         version: file_format_common::VERSION_MAX,
@@ -3458,6 +3458,7 @@ pub fn empty_module_with_dependencies_and_friends<'a>(
     for name in dependencies {
         module.identifiers.push(Identifier::new(name).unwrap());
         module.module_handles.push(ModuleHandle {
+            // Empty module sets up this index to 0x0.
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
         });
@@ -3465,6 +3466,7 @@ pub fn empty_module_with_dependencies_and_friends<'a>(
     for name in friends {
         module.identifiers.push(Identifier::new(name).unwrap());
         module.friend_decls.push(ModuleHandle {
+            // Empty module sets up this index to 0x0.
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
         });

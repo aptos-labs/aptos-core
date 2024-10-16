@@ -51,6 +51,16 @@ impl CachedScript {
             Self::Verified(script) => script.compiled_script(),
         }
     }
+
+    /// Returns the verified script ([Script]). Panics if the cached script has not been verified.
+    pub fn script(&self) -> &Arc<Script> {
+        match self {
+            Self::Deserialized(_) => {
+                unreachable!("This function must be called on verified scripts only")
+            },
+            Self::Verified(script) => script,
+        }
+    }
 }
 
 impl<T> CodeStorage for T
@@ -64,14 +74,14 @@ where
         use CachedScript::*;
 
         let hash = compute_code_hash(serialized_script);
-        Ok(match self.fetch_script(&hash) {
+        Ok(match self.get_script(&hash) {
             Some(script) => script.compiled_script().clone(),
             None => {
                 let compiled_script = self
                     .runtime_environment()
                     .deserialize_into_script(serialized_script)
                     .map(Arc::new)?;
-                self.store_script(hash, Deserialized(compiled_script.clone()));
+                self.insert_script(hash, Deserialized(compiled_script.clone()));
                 compiled_script
             },
         })
@@ -81,7 +91,7 @@ where
         use CachedScript::*;
 
         let hash = compute_code_hash(serialized_script);
-        let compiled_script = match self.fetch_script(&hash) {
+        let compiled_script = match self.get_script(&hash) {
             Some(Verified(script)) => return Ok(script),
             Some(Deserialized(compiled_script)) => compiled_script,
             None => self
@@ -110,7 +120,7 @@ where
             .build_verified_script(locally_verified_script, &immediate_dependencies)
             .map(Arc::new)?;
 
-        self.store_script(hash, Verified(script.clone()));
+        self.insert_script(hash, Verified(script.clone()));
         Ok(script)
     }
 }
