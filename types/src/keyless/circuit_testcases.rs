@@ -38,7 +38,7 @@ pub(crate) static SAMPLE_JWT_HEADER_B64: Lazy<String> =
 
 /// The JWT payload, decoded as JSON
 
-static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
+pub static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     let config = Configuration::new_for_testing();
     OpenIdSig::reconstruct_oauth_nonce(
         SAMPLE_EPK_BLINDER.as_slice(),
@@ -49,9 +49,25 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
+pub const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
 
-pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
+pub fn sample_jwt_payload_json() -> String {
+    sample_jwt_payload_json_overrides(
+        SAMPLE_TEST_ISS_VALUE,
+        SAMPLE_UID_VAL,
+        SAMPLE_JWT_EXTRA_FIELD.as_str(),
+        SAMPLE_JWT_IAT,
+        SAMPLE_NONCE.as_str(),
+    )
+}
+
+pub fn sample_jwt_payload_json_overrides(
+    iss: &str,
+    uid_val: &str,
+    extra_field: &str,
+    iat: u64,
+    nonce: &str,
+) -> String {
     format!(
         r#"{{
             "iss":"{}",
@@ -67,27 +83,27 @@ pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
             "given_name":"Michael",
             {}
             "locale":"en",
-            "iat":1700255944,
+            "iat":{},
             "nonce":"{}",
             "exp":2700259544
          }}"#,
-        SAMPLE_TEST_ISS_VALUE,
-        SAMPLE_UID_VAL,
-        SAMPLE_JWT_EXTRA_FIELD.as_str(),
-        SAMPLE_NONCE.as_str()
+        iss, uid_val, extra_field, iat, nonce
     )
-});
+}
+
+/// An example IAT.
+pub const SAMPLE_JWT_IAT: u64 = 1700255944;
 
 /// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
 pub(crate) const SAMPLE_JWT_EXTRA_FIELD_KEY: &str = "family_name";
 
 /// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
-pub(crate) static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
+pub static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
     Lazy::new(|| format!(r#""{}":"Straka","#, SAMPLE_JWT_EXTRA_FIELD_KEY));
 
 /// The JWT parsed as a struct
 pub(crate) static SAMPLE_JWT_PARSED: Lazy<Claims> =
-    Lazy::new(|| serde_json::from_str(SAMPLE_JWT_PAYLOAD_JSON.as_str()).unwrap());
+    Lazy::new(|| serde_json::from_str(sample_jwt_payload_json().as_str()).unwrap());
 
 pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
 
@@ -97,10 +113,10 @@ pub(crate) static SAMPLE_JWK_SK: Lazy<&RsaKeyPair> = Lazy::new(|| &*INSECURE_TES
 
 pub(crate) const SAMPLE_UID_KEY: &str = "sub";
 
-pub(crate) const SAMPLE_UID_VAL: &str = "113990307082899718775";
+pub const SAMPLE_UID_VAL: &str = "113990307082899718775";
 
 /// The nonce-committed expiration date (not the JWT `exp`), 12/21/5490
-pub(crate) const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
+pub const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
 
 /// ~31,710 years
 pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = 999_999_999_999;

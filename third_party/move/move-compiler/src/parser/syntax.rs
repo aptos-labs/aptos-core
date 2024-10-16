@@ -101,7 +101,7 @@ fn require_language_version(
         loc,
         min_language_version,
         &format!(
-            "Move language construct `{}` is not enabled until version {}",
+            "{} not enabled before version {}",
             description, min_language_version
         ),
     )
@@ -1167,17 +1167,20 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
         Tok::Break => {
             context.tokens.advance()?;
+            let label = parse_optional_label(context)?;
+
             if at_start_of_exp(context) {
                 let mut diag = unexpected_token_error(context.tokens, "the end of an expression");
                 diag.add_note("'break' with a value is not yet supported");
                 return Err(diag);
             }
-            Exp_::Break
+            Exp_::Break(label)
         },
 
         Tok::Continue => {
             context.tokens.advance()?;
-            Exp_::Continue
+            let label = parse_optional_label(context)?;
+            Exp_::Continue(label)
         },
 
         Tok::Identifier
@@ -1323,7 +1326,7 @@ fn parse_cast_or_test_exp(
 fn is_control_exp(tok: Tok) -> bool {
     matches!(
         tok,
-        Tok::If | Tok::While | Tok::Loop | Tok::Return | Tok::Abort
+        Tok::If | Tok::While | Tok::Loop | Tok::Return | Tok::Abort | Tok::Label
     )
 }
 
@@ -1392,6 +1395,17 @@ fn parse_spec_loop_invariant(context: &mut Context) -> Result<SequenceItem, Box<
 // should be,     if (cond) e1 else (e2 + 1)
 fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
+    let label = parse_optional_label(context)?;
+    if label.is_some() {
+        consume_token(context.tokens, Tok::Colon)?;
+        // Check here whether a label is actually allowed
+        if !matches!(context.tokens.peek(), Tok::While | Tok::Loop) {
+            return Err(unexpected_token_error(
+                context.tokens,
+                "one of: `while` or `loop`",
+            ));
+        }
+    };
     let (exp_, ends_in_block) = match context.tokens.peek() {
         Tok::If => {
             context.tokens.advance()?;
@@ -1414,12 +1428,15 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
             consume_token(context.tokens, Tok::RParen)?;
             let (eloop, ends_in_block) = parse_exp_or_control_sequence(context)?;
             let (econd, ends_in_block) = parse_spec_while_loop(context, econd, ends_in_block)?;
-            (Exp_::While(Box::new(econd), Box::new(eloop)), ends_in_block)
+            (
+                Exp_::While(label, Box::new(econd), Box::new(eloop)),
+                ends_in_block,
+            )
         },
         Tok::Loop => {
             context.tokens.advance()?;
             let (eloop, ends_in_block) = parse_exp_or_control_sequence(context)?;
-            (Exp_::Loop(Box::new(eloop)), ends_in_block)
+            (Exp_::Loop(label, Box::new(eloop)), ends_in_block)
         },
         Tok::Return => {
             context.tokens.advance()?;
@@ -1441,6 +1458,25 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
     let end_loc = context.tokens.previous_end_loc();
     let exp = spanned(context.tokens.file_hash(), start_loc, end_loc, exp_);
     Ok((exp, ends_in_block))
+}
+
+fn parse_optional_label(context: &mut Context) -> Result<Option<Label>, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::Label {
+        require_language_version(
+            context,
+            current_token_loc(context.tokens),
+            LanguageVersion::V2_1,
+            "loop labels are",
+        );
+        let label = Label(Name::new(
+            current_token_loc(context.tokens),
+            Symbol::from(context.tokens.content()),
+        ));
+        context.tokens.advance()?;
+        Ok(Some(label))
+    } else {
+        Ok(None)
+    }
 }
 
 // "for (iter in lower_bound..upper_bound) loop_body" transforms into
@@ -1601,7 +1637,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     let loop_conditional = Exp_::IfElse(
         Box::new(loop_condition),
         Box::new(for_body),
-        Some(Box::new(sp(for_loc, Exp_::Break))),
+        Some(Box::new(sp(for_loc, Exp_::Break(None)))),
     );
     let loop_conditional = sp(
         for_loc,
@@ -1626,7 +1662,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     );
     let loop_body = sp(
         for_loc,
-        Exp_::While(Box::new(while_condition), Box::new(body)),
+        Exp_::While(None, Box::new(while_condition), Box::new(body)),
     );
     let loop_body = sp(for_loc, SequenceItem_::Seq(Box::new(loop_body)));
 
@@ -1914,7 +1950,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         context,
                         current_token_loc(context.tokens),
                         LanguageVersion::V2_1,
-                        &current_token.to_string(),
+                        "op-equal operators are",
                     );
                     let op_loc = context.tokens.advance_with_loc()?; // consume the "op="
                     let rhs = Box::new(parse_exp(context)?);

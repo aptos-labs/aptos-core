@@ -6,6 +6,8 @@ on:
   pull_request:  # Trigger on PR-level events
     branches:
       - main
+    paths:
+      - 'ecosystem/indexer-grpc/indexer-test-transactions/**'  # Only trigger if files under this path change
 
 # the required permissions to request the ID token
 permissions:
@@ -14,7 +16,7 @@ permissions:
 
 jobs:
   dispatch_event:
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=16,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
 
     steps:
       - name: Checkout the repository

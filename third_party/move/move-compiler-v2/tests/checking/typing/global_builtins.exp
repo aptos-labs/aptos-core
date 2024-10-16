@@ -4,7 +4,7 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun t0(a: &signer)
-        acquires 0x8675309::M::R(*)
+        acquires R(*)
      {
         {
           let _: bool = exists<R>(0x0);
@@ -24,7 +24,7 @@ module 0x8675309::M {
         }
     }
     private fun t1(a: &signer)
-        acquires 0x8675309::M::R(*)
+        acquires R(*)
      {
         {
           let _: bool = exists<R>(0x0);

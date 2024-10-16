@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use crate::{
     crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+        hash::CryptoHash,
         signing_message,
         traits::Uniform,
+        CryptoMaterialError,
     },
     transaction_builder::TransactionBuilder,
     types::{
@@ -15,7 +16,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_crypto::{ed25519::Ed25519Signature, PrivateKey, SigningKey};
+use aptos_crypto::{ed25519::Ed25519Signature, secp256r1_ecdsa, PrivateKey, SigningKey};
 use aptos_ledger::AptosLedgerError;
 pub use aptos_types::*;
 use aptos_types::{
@@ -28,6 +29,8 @@ use aptos_types::{
 };
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
+use keyless::FederatedKeylessPublicKey;
+use serde::{Deserialize, Serialize};
 use std::{
     str::FromStr,
     sync::atomic::{AtomicU64, Ordering},
@@ -38,7 +41,7 @@ use std::{
 enum LocalAccountAuthenticator {
     PrivateKey(AccountKey),
     Keyless(KeylessAccount),
-    // TODO: Add support for keyless authentication
+    FederatedKeyless(FederatedKeylessAccount),
 }
 
 impl LocalAccountAuthenticator {
@@ -49,26 +52,40 @@ impl LocalAccountAuthenticator {
                 .expect("Signing a txn can't fail")
                 .into_inner(),
             LocalAccountAuthenticator::Keyless(keyless_account) => {
-                let proof = keyless_account.zk_sig.proof;
-                let txn_and_zkp = TransactionAndProof {
-                    message: txn.clone(),
-                    proof: Some(proof),
-                };
-
-                let esk = &keyless_account.ephemeral_key_pair.private_key;
-                let ephemeral_signature =
-                    EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
-
-                let sig = KeylessSignature {
-                    cert: EphemeralCertificate::ZeroKnowledgeSig(keyless_account.zk_sig.clone()),
-                    jwt_header_json: keyless_account.jwt_header_json.clone(),
-                    exp_date_secs: keyless_account.ephemeral_key_pair.expiry_date_secs,
-                    ephemeral_pubkey: keyless_account.ephemeral_key_pair.public_key.clone(),
-                    ephemeral_signature,
-                };
-
+                let sig = self.build_keyless_signature(txn.clone(), &keyless_account);
                 SignedTransaction::new_keyless(txn, keyless_account.public_key.clone(), sig)
             },
+            LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account) => {
+                let sig = self.build_keyless_signature(txn.clone(), &federated_keyless_account);
+                SignedTransaction::new_federated_keyless(
+                    txn,
+                    federated_keyless_account.public_key.clone(),
+                    sig,
+                )
+            },
+        }
+    }
+
+    fn build_keyless_signature(
+        &self,
+        txn: RawTransaction,
+        account: &impl CommonKeylessAccount,
+    ) -> KeylessSignature {
+        let proof = account.zk_sig().proof;
+        let txn_and_zkp = TransactionAndProof {
+            message: txn,
+            proof: Some(proof),
+        };
+
+        let esk = account.ephem_private_key();
+        let ephemeral_signature = esk.sign(&txn_and_zkp).unwrap();
+
+        KeylessSignature {
+            cert: EphemeralCertificate::ZeroKnowledgeSig(account.zk_sig().clone()),
+            jwt_header_json: account.jwt_header_json().clone(),
+            exp_date_secs: account.expiry_date_secs(),
+            ephemeral_pubkey: account.ephem_public_key().clone(),
+            ephemeral_signature,
         }
     }
 }
@@ -119,6 +136,18 @@ impl LocalAccount {
         Self {
             address,
             auth: LocalAccountAuthenticator::Keyless(keyless_account),
+            sequence_number: AtomicU64::new(sequence_number),
+        }
+    }
+
+    pub fn new_federated_keyless(
+        address: AccountAddress,
+        federated_keyless_account: FederatedKeylessAccount,
+        sequence_number: u64,
+    ) -> Self {
+        Self {
+            address,
+            auth: LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account),
             sequence_number: AtomicU64::new(sequence_number),
         }
     }
@@ -242,6 +271,7 @@ impl LocalAccount {
         match &self.auth {
             LocalAccountAuthenticator::PrivateKey(key) => key.private_key(),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
+            LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
         }
     }
 
@@ -249,6 +279,7 @@ impl LocalAccount {
         match &self.auth {
             LocalAccountAuthenticator::PrivateKey(key) => key.public_key(),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
+            LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
         }
     }
 
@@ -257,6 +288,9 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => key.authentication_key(),
             LocalAccountAuthenticator::Keyless(keyless_account) => {
                 keyless_account.authentication_key()
+            },
+            LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account) => {
+                federated_keyless_account.authentication_key()
             },
         }
     }
@@ -282,6 +316,7 @@ impl LocalAccount {
         match &mut self.auth {
             LocalAccountAuthenticator::PrivateKey(key) => std::mem::replace(key, new_key.into()),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
+            LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
         }
     }
 
@@ -468,9 +503,56 @@ impl From<Ed25519PrivateKey> for AccountKey {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Deserialize)]
+pub enum EphemeralPrivateKey {
+    Ed25519 {
+        inner_private_key: Ed25519PrivateKey,
+    },
+    Secp256r1Ecdsa {
+        inner_private_key: secp256r1_ecdsa::PrivateKey,
+    },
+}
+
+impl EphemeralPrivateKey {
+    pub fn public_key(&self) -> EphemeralPublicKey {
+        match self {
+            EphemeralPrivateKey::Ed25519 { inner_private_key } => {
+                EphemeralPublicKey::ed25519(inner_private_key.public_key())
+            },
+            EphemeralPrivateKey::Secp256r1Ecdsa { inner_private_key } => {
+                EphemeralPublicKey::secp256r1_ecdsa(inner_private_key.public_key())
+            },
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for EphemeralPrivateKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<EphemeralPrivateKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+impl EphemeralPrivateKey {
+    pub fn sign<T: CryptoHash + Serialize>(
+        &self,
+        message: &T,
+    ) -> Result<EphemeralSignature, CryptoMaterialError> {
+        match self {
+            EphemeralPrivateKey::Ed25519 { inner_private_key } => Ok(EphemeralSignature::ed25519(
+                inner_private_key.sign(message)?,
+            )),
+            EphemeralPrivateKey::Secp256r1Ecdsa {
+                inner_private_key: _,
+            } => todo!(),
+        }
+    }
+}
 #[derive(Debug)]
 pub struct EphemeralKeyPair {
-    private_key: Ed25519PrivateKey,
+    private_key: EphemeralPrivateKey,
     public_key: EphemeralPublicKey,
     #[allow(dead_code)]
     nonce: String,
@@ -481,11 +563,11 @@ pub struct EphemeralKeyPair {
 
 impl EphemeralKeyPair {
     pub fn new(
-        private_key: Ed25519PrivateKey,
+        private_key: EphemeralPrivateKey,
         expiry_date_secs: u64,
         blinder: Vec<u8>,
     ) -> Result<Self> {
-        let epk = EphemeralPublicKey::ed25519(private_key.public_key());
+        let epk = private_key.public_key();
         let nonce = OpenIdSig::reconstruct_oauth_nonce(
             &blinder,
             expiry_date_secs,
@@ -507,14 +589,15 @@ impl EphemeralKeyPair {
 pub struct KeylessAccount {
     public_key: KeylessPublicKey,
     ephemeral_key_pair: EphemeralKeyPair,
-    #[allow(dead_code)]
-    uid_key: String,
-    #[allow(dead_code)]
-    uid_val: String,
-    #[allow(dead_code)]
-    aud: String,
-    #[allow(dead_code)]
-    pepper: Pepper,
+    zk_sig: ZeroKnowledgeSig,
+    jwt_header_json: String,
+    jwt: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct FederatedKeylessAccount {
+    public_key: FederatedKeylessPublicKey,
+    ephemeral_key_pair: EphemeralKeyPair,
     zk_sig: ZeroKnowledgeSig,
     jwt_header_json: String,
     jwt: Option<String>,
@@ -531,18 +614,10 @@ impl KeylessAccount {
         pepper: Pepper,
         zk_sig: ZeroKnowledgeSig,
     ) -> Result<Self> {
-        let idc = IdCommitment::new_from_preimage(&pepper, aud, uid_key, uid_val)?;
-        let public_key = KeylessPublicKey {
-            iss_val: iss.to_owned(),
-            idc,
-        };
+        let public_key = create_keyless_public_key(iss, aud, uid_key, uid_val, &pepper)?;
         Ok(Self {
             public_key,
             ephemeral_key_pair,
-            uid_key: uid_key.to_string(),
-            uid_val: uid_val.to_string(),
-            aud: aud.to_string(),
-            pepper,
             zk_sig,
             jwt_header_json: jwt_header_json.to_string(),
             jwt: None,
@@ -556,28 +631,23 @@ impl KeylessAccount {
         pepper: Option<Pepper>,
         zk_sig: Option<ZeroKnowledgeSig>,
     ) -> Result<Self> {
-        let parts: Vec<&str> = jwt.split('.').collect();
-        let header_bytes = base64::decode(parts.first().context("jwt malformed")?)?;
-        let jwt_header_json = String::from_utf8(header_bytes)?;
-        let jwt_payload_json =
-            base64::decode_config(parts.get(1).context("jwt malformed")?, base64::URL_SAFE)?;
-        let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
-
+        let claims = extract_claims_from_jwt(jwt)?;
         let uid_key = uid_key.unwrap_or("sub").to_string();
         let uid_val = claims.get_uid_val(&uid_key)?;
         let aud = claims.oidc_claims.aud;
 
-        let account = Self::new(
+        let mut account = Self::new(
             &claims.oidc_claims.iss,
             &aud,
             &uid_key,
             &uid_val,
-            &jwt_header_json,
+            &extract_header_json_from_jwt(jwt)?,
             ephemeral_key_pair,
             pepper.expect("pepper fetch not implemented"),
             zk_sig.expect("proof fetch not implemented"),
         )?;
-        Ok(account.set_jwt(jwt))
+        account.jwt = Some(jwt.to_string());
+        Ok(account)
     }
 
     pub fn authentication_key(&self) -> AuthenticationKey {
@@ -587,10 +657,164 @@ impl KeylessAccount {
     pub fn public_key(&self) -> &KeylessPublicKey {
         &self.public_key
     }
+}
 
-    pub fn set_jwt(mut self, jwt: &str) -> Self {
-        self.jwt = Some(jwt.to_string());
-        self
+impl FederatedKeylessAccount {
+    pub fn new(
+        iss: &str,
+        aud: &str,
+        uid_key: &str,
+        uid_val: &str,
+        jwt_header_json: &str,
+        ephemeral_key_pair: EphemeralKeyPair,
+        pepper: Pepper,
+        zk_sig: ZeroKnowledgeSig,
+        jwk_addr: AccountAddress,
+    ) -> Result<Self> {
+        let public_key =
+            create_federated_public_key(iss, aud, uid_key, uid_val, &pepper, jwk_addr)?;
+        Ok(Self {
+            public_key,
+            ephemeral_key_pair,
+            zk_sig,
+            jwt_header_json: jwt_header_json.to_string(),
+            jwt: None,
+        })
+    }
+
+    pub fn new_from_jwt(
+        jwt: &str,
+        ephemeral_key_pair: EphemeralKeyPair,
+        jwk_addr: AccountAddress,
+        uid_key: Option<&str>,
+        pepper: Option<Pepper>,
+        zk_sig: Option<ZeroKnowledgeSig>,
+    ) -> Result<Self> {
+        let claims = extract_claims_from_jwt(jwt)?;
+        let uid_key = uid_key.unwrap_or("sub").to_string();
+        let uid_val = claims.get_uid_val(&uid_key)?;
+        let aud = claims.oidc_claims.aud;
+
+        let mut account = Self::new(
+            &claims.oidc_claims.iss,
+            &aud,
+            &uid_key,
+            &uid_val,
+            &extract_header_json_from_jwt(jwt)?,
+            ephemeral_key_pair,
+            pepper.expect("pepper fetch not implemented"),
+            zk_sig.expect("proof fetch not implemented"),
+            jwk_addr,
+        )?;
+        account.jwt = Some(jwt.to_string());
+        Ok(account)
+    }
+
+    pub fn authentication_key(&self) -> AuthenticationKey {
+        AuthenticationKey::any_key(AnyPublicKey::federated_keyless(self.public_key.clone()))
+    }
+
+    pub fn public_key(&self) -> &FederatedKeylessPublicKey {
+        &self.public_key
+    }
+}
+
+fn create_keyless_public_key(
+    iss: &str,
+    aud: &str,
+    uid_key: &str,
+    uid_val: &str,
+    pepper: &Pepper,
+) -> Result<KeylessPublicKey> {
+    let idc = IdCommitment::new_from_preimage(pepper, aud, uid_key, uid_val)?;
+    Ok(KeylessPublicKey {
+        iss_val: iss.to_owned(),
+        idc,
+    })
+}
+
+fn create_federated_public_key(
+    iss: &str,
+    aud: &str,
+    uid_key: &str,
+    uid_val: &str,
+    pepper: &Pepper,
+    jwk_addr: AccountAddress,
+) -> Result<FederatedKeylessPublicKey> {
+    let idc = IdCommitment::new_from_preimage(pepper, aud, uid_key, uid_val)?;
+    Ok(FederatedKeylessPublicKey {
+        pk: KeylessPublicKey {
+            iss_val: iss.to_owned(),
+            idc,
+        },
+        jwk_addr,
+    })
+}
+
+pub fn extract_claims_from_jwt(jwt: &str) -> Result<Claims> {
+    let parts: Vec<&str> = jwt.split('.').collect();
+    let jwt_payload_json =
+        base64::decode_config(parts.get(1).context("jwt malformed")?, base64::URL_SAFE)?;
+    let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
+    Ok(claims)
+}
+
+pub fn extract_header_json_from_jwt(jwt: &str) -> Result<String> {
+    let parts: Vec<&str> = jwt.split('.').collect();
+    let header_bytes = base64::decode(parts.first().context("jwt malformed")?)?;
+
+    Ok(String::from_utf8(header_bytes)?)
+}
+
+trait CommonKeylessAccount {
+    fn zk_sig(&self) -> &ZeroKnowledgeSig;
+    fn ephem_private_key(&self) -> &EphemeralPrivateKey;
+    fn ephem_public_key(&self) -> &EphemeralPublicKey;
+    fn jwt_header_json(&self) -> &String;
+    fn expiry_date_secs(&self) -> u64;
+}
+
+impl CommonKeylessAccount for &KeylessAccount {
+    fn zk_sig(&self) -> &ZeroKnowledgeSig {
+        &self.zk_sig
+    }
+
+    fn ephem_private_key(&self) -> &EphemeralPrivateKey {
+        &self.ephemeral_key_pair.private_key
+    }
+
+    fn ephem_public_key(&self) -> &EphemeralPublicKey {
+        &self.ephemeral_key_pair.public_key
+    }
+
+    fn jwt_header_json(&self) -> &String {
+        &self.jwt_header_json
+    }
+
+    fn expiry_date_secs(&self) -> u64 {
+        self.ephemeral_key_pair.expiry_date_secs
+    }
+}
+
+impl CommonKeylessAccount for &FederatedKeylessAccount {
+    fn zk_sig(&self) -> &ZeroKnowledgeSig {
+        &self.zk_sig
+    }
+
+    fn ephem_private_key(&self) -> &EphemeralPrivateKey {
+        &self.ephemeral_key_pair.private_key
+    }
+
+    fn ephem_public_key(&self) -> &EphemeralPublicKey {
+        &self.ephemeral_key_pair.public_key
+    }
+
+    fn jwt_header_json(&self) -> &String {
+        &self.jwt_header_json
+    }
+
+    fn expiry_date_secs(&self) -> u64 {
+        self.ephemeral_key_pair.expiry_date_secs
     }
 }
 

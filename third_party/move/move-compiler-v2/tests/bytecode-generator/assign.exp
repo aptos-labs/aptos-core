@@ -5,7 +5,7 @@ module 0x42::assign {
     }
     struct S {
         f: u64,
-        g: 0x42::assign::T,
+        g: T,
     }
     private fun assign_field(s: &mut S,f: u64) {
         select assign::S.f<&mut S>(s) = f;

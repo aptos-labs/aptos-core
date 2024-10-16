@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
     struct R {
-        s: 0x42::M::S,
+        s: S,
     }
     spec {
       invariant M::less10(true, select M::S.x<0x42::M::S>(select M::R.s()));

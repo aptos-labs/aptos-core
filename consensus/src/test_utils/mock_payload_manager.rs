@@ -3,13 +3,12 @@
 
 use crate::{
     error::QuorumStoreError,
-    payload_client::{
-        user::quorum_store_client::QuorumStoreClient, PayloadClient, PayloadPullParameters,
-    },
+    payload_client::{user::quorum_store_client::QuorumStoreClient, PayloadClient},
 };
 use anyhow::Result;
 use aptos_consensus_types::{
-    block::block_test_utils::random_payload, common::Payload, request_response::GetPayloadCommand,
+    block::block_test_utils::random_payload, common::Payload,
+    payload_pull_params::PayloadPullParameters, request_response::GetPayloadCommand,
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},

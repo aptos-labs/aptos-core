@@ -62,7 +62,7 @@ fn proof_of_store_with_size(
 fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -149,7 +149,7 @@ fn test_proof_queue_sorting() {
 fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
@@ -409,7 +409,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
 fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
     let txns = vec![
@@ -660,7 +660,7 @@ fn test_proof_pull_proofs_with_duplicates() {
 fn test_proof_queue_soft_limit() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author = PeerId::random();
 
@@ -702,7 +702,7 @@ fn test_proof_queue_soft_limit() {
 fn test_proof_queue_insert_after_commit() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author = PeerId::random();
     let author_batches = vec![
@@ -734,7 +734,7 @@ fn test_proof_queue_insert_after_commit() {
 fn test_proof_queue_pull_full_utilization() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author = PeerId::random();
     let author_batches = vec![

@@ -2,10 +2,10 @@
 module 0x42::test {
     enum E1 {
         V1 {
-            0: 0x42::test::S0,
+            0: S0,
         }
         V2 {
-            0: 0x42::test::S1,
+            0: S1,
         }
     }
     struct S0 {
@@ -13,7 +13,7 @@ module 0x42::test {
     }
     struct S1 {
         0: bool,
-        1: 0x42::test::S0,
+        1: S0,
     }
     private fun match(x: E1) {
         match (x) {

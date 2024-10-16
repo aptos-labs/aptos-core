@@ -23,7 +23,7 @@ module 0x42::m {
     struct T {
         dummy_field: bool,
     }
-    struct G {
+    struct G<T> {
         dummy_field: bool,
     }
     struct R {
@@ -33,7 +33,7 @@ module 0x42::m {
         dummy_field: bool,
     }
     private fun f1()
-        acquires 0x42::m::S(*)
+        acquires S(*)
      {
         Tuple()
     }
@@ -53,17 +53,17 @@ module 0x42::m {
         Tuple()
     }
     private fun f2()
-        reads 0x42::m::S(*)
+        reads S(*)
      {
         Tuple()
     }
     private fun f3()
-        writes 0x42::m::S(*)
+        writes S(*)
      {
         Tuple()
     }
     private fun f4()
-        acquires 0x42::m::S(*)
+        acquires S(*)
      {
         Tuple()
     }
@@ -93,11 +93,11 @@ module 0x42::m {
         Tuple()
     }
     private fun f_multiple()
-        acquires 0x42::m::R(*)
-        reads 0x42::m::R(*)
-        writes 0x42::m::T(*)
-        writes 0x42::m::S(*)
-        reads 0x42::m::G<u64>(*)
+        acquires R(*)
+        reads R(*)
+        writes T(*)
+        writes S(*)
+        reads G<u64>(*)
      {
         Tuple()
     }

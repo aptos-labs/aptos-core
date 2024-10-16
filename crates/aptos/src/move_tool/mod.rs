@@ -1569,7 +1569,7 @@ async fn submit_chunked_publish_transactions(
         match result {
             Ok(tx_summary) => {
                 let tx_hash = tx_summary.transaction_hash.to_string();
-                let status = tx_summary.success.map_or("".to_string(), |success| {
+                let status = tx_summary.success.map_or_else(String::new, |success| {
                     if success {
                         "Success".to_string()
                     } else {

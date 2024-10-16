@@ -20,9 +20,9 @@ use crate::{
     intrinsics::process_intrinsic_declaration,
     model,
     model::{
-        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId,
-        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId, SpecFunId,
-        SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc, Loc,
+        ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -568,9 +568,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let def_loc = et.to_loc(&def.loc);
         let name_loc = et.to_loc(&name.loc());
+        let result_type_loc = et.to_loc(&def.signature.return_type.loc);
         et.parent.parent.define_fun(qsym.clone(), FunEntry {
             loc: def_loc.clone(),
             name_loc,
+            result_type_loc,
             module_id: et.parent.module_id,
             fun_id,
             visibility,
@@ -3683,8 +3685,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
-                loc: entry.loc.clone(),
-                id_loc: entry.name_loc.clone(),
+                loc: FunctionLoc {
+                    full: entry.loc.clone(),
+                    id_loc: entry.name_loc.clone(),
+                    result_type_loc: entry.result_type_loc.clone(),
+                },
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,

@@ -11,7 +11,10 @@ use std::time::Instant;
 /// Driver metric labels
 pub const DRIVER_CLIENT_NOTIFICATION: &str = "driver_client_notification";
 pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_notification";
-pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
+pub const DRIVER_CONSENSUS_SYNC_DURATION_NOTIFICATION: &str =
+    "driver_consensus_sync_duration_notification";
+pub const DRIVER_CONSENSUS_SYNC_TARGET_NOTIFICATION: &str =
+    "driver_consensus_sync_target_notification";
 
 /// Data notification metric labels
 pub const NOTIFICATION_CREATE_TO_APPLY: &str = "notification_create_to_apply";

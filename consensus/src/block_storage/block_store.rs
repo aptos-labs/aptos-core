@@ -18,6 +18,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -472,17 +473,18 @@ impl BlockStore {
         self.pending_blocks.clone()
     }
 
-    pub async fn wait_for_payload(&self, block: &Block) -> anyhow::Result<()> {
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            self.payload_manager.get_transactions(block),
-        )
-        .await??;
+    pub async fn wait_for_payload(&self, block: &Block, deadline: Duration) -> anyhow::Result<()> {
+        let duration = deadline.saturating_sub(self.time_service.get_current_timestamp());
+        tokio::time::timeout(duration, self.payload_manager.get_transactions(block)).await??;
         Ok(())
     }
 
-    pub fn check_payload(&self, proposal: &Block) -> bool {
+    pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
+    }
+
+    pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
+        self.inner.read().get_block_for_round(round)
     }
 }
 

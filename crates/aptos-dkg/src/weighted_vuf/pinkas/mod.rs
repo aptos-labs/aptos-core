@@ -246,7 +246,7 @@ impl WeightedVUF for PinkasWUF {
             pis.push(
                 apks[player.id]
                     .as_ref()
-                    .ok_or(anyhow!("Missing APK for player {}", player.get_id()))?
+                    .ok_or_else(|| anyhow!("Missing APK for player {}", player.get_id()))?
                     .0
                     .pi,
             );
@@ -299,7 +299,7 @@ impl PinkasWUF {
 
             let apk = apks[player.id]
                 .as_ref()
-                .ok_or(anyhow!("Missing APK for player {}", player.get_id()))?;
+                .ok_or_else(|| anyhow!("Missing APK for player {}", player.get_id()))?;
 
             rks.push(&apk.0.rks);
             shares.push(share);
