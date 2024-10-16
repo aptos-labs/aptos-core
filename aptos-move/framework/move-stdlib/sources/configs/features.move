@@ -605,7 +605,7 @@ module std::features {
 
     /// Whether converting staking contracts to delegation pools is enabled.
     /// Lifetime: transient
-    const STAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION: u64 = 50;
+    const STAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION: u64 = 80;
 
     public fun get_staking_contract_to_delegation_pool_conversion_feature(
     ): u64 { STAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION }
