@@ -16,7 +16,7 @@ use crate::{
         TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
     },
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
@@ -268,6 +268,7 @@ where
                     });
                     V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
                 };
+                debug!("chunk_output: block_id {:?}", block_id);
 
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
@@ -311,6 +312,10 @@ where
         let current_output = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
         if current_output.output.has_ledger_update() {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                "ledger_update_already_computed"
+            );
             return Ok(current_output
                 .output
                 .get_ledger_update()

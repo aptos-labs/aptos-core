@@ -7,8 +7,9 @@ use crate::{
     utils::PayloadTxnsSize,
 };
 use anyhow::Result;
+use aptos_types::transaction::SignedTransaction;
 use futures::channel::oneshot;
-use std::{fmt, fmt::Formatter, time::Duration};
+use std::{fmt::{self, Formatter}, sync::Arc, time::Duration};
 
 pub struct GetPayloadRequest {
     // max number of transactions in the block
@@ -29,6 +30,8 @@ pub struct GetPayloadRequest {
     pub callback: oneshot::Sender<Result<GetPayloadResponse>>,
     // block timestamp
     pub block_timestamp: Duration,
+    // whether to return all transactions in the block
+    pub return_all_txns: bool,
 }
 
 pub enum GetPayloadCommand {
@@ -50,6 +53,28 @@ impl fmt::Display for GetPayloadCommand {
 }
 
 #[derive(Debug)]
+pub struct PayloadTxns {
+    pub ref_txns: Vec<Arc<Option<Vec<SignedTransaction>>>>,
+    pub inline_txns: Vec<SignedTransaction>,
+}
+
+impl PayloadTxns {
+    pub fn new(ref_txns: Vec<Arc<Option<Vec<SignedTransaction>>>>, inline_txns: Vec<SignedTransaction>) -> Self {
+        Self {
+            ref_txns,
+            inline_txns,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            ref_txns: vec![],
+            inline_txns: vec![],
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum GetPayloadResponse {
-    GetPayloadResponse(Payload),
+    GetPayloadResponse((Payload, PayloadTxns)),
 }

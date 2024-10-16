@@ -3,13 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
-    counters::*,
-    data_cache::{AsMoveResolver, StorageAdapter},
-    errors::{discarded_output, expect_only_successful_execution},
-    gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
-    keyless_validation,
-    move_vm_ext::{
+    block_executor::{AptosTransactionOutput, BlockAptosVM}, counters::*, data_cache::{AsMoveResolver, StorageAdapter}, errors::{discarded_output, expect_only_successful_execution}, gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter}, keyless_validation, move_vm_ext::{
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession,
             epilogue::EpilogueSession,
@@ -18,13 +12,7 @@ use crate::{
             user::UserSession,
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
-    },
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    system_module_names::*,
-    transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier,
-    verifier::randomness::get_randomness_annotation,
-    VMExecutor, VMValidator,
+    }, sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor}, system_module_names::*, transaction_metadata::TransactionMetadata, transaction_validation, verifier::{self, randomness::get_randomness_annotation}, VMExecutor, VMValidator
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -2544,6 +2532,23 @@ impl AptosVM {
             },
         })
     }
+
+    pub fn check_randomness(
+        &self,
+        signed_transaction: &SignedTransaction,
+        resolver: &impl AptosMoveResolver,
+    ) -> bool {
+        let entry_fn = match signed_transaction.payload() {
+            TransactionPayload::EntryFunction(entry) => entry,
+            TransactionPayload::Multisig(_) => return false, // daniel todo fix
+            _ => return false,
+        };
+        let mut session = self.new_session(resolver, SessionId::Void, None);
+        match get_randomness_annotation(resolver, &mut session, entry_fn) {
+            Ok(annotation) => annotation.is_some(),
+            Err(_) => false,
+        }
+    }
 }
 
 // Executor external API
@@ -2587,6 +2592,11 @@ impl VMExecutor for AptosVM {
                 onchain: onchain_config,
             },
             None,
+        );
+        info!(
+            log_context,
+            "Finish Executing block, transaction count: {}",
+            transactions.len()
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

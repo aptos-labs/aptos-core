@@ -241,6 +241,15 @@ impl OnChainRandomnessConfig {
             OnChainRandomnessConfig::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
         }
     }
+
+    // daniel todo: fix on-chain config
+    pub fn skip_non_rand_blocks(&self) -> bool {
+        match self {
+            OnChainRandomnessConfig::Off => false,
+            OnChainRandomnessConfig::V1(_) => false,
+            OnChainRandomnessConfig::V2(_) => true,
+        }
+    }
 }
 
 impl OnChainConfig for RandomnessConfigMoveStruct {

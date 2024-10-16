@@ -19,6 +19,8 @@ use std::{
 };
 use tokio::time::timeout;
 
+use super::batch_store::BatchStore;
+
 pub(crate) struct Timeouts<T> {
     timeouts: VecDeque<(i64, T)>,
 }

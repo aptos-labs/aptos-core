@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::QuorumStoreError;
-use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};
+use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters, request_response::PayloadTxns};
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool::TransactionFilter;
 use futures::future::BoxFuture;
@@ -18,5 +18,5 @@ pub trait PayloadClient: Send + Sync {
         config: PayloadPullParameters,
         validator_txn_filter: TransactionFilter,
         wait_callback: BoxFuture<'static, ()>,
-    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError>;
+    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, PayloadTxns), QuorumStoreError>;
 }

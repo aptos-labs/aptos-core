@@ -10,7 +10,7 @@ use crate::{
     execution_pipeline::{ExecutionPipeline, PreCommitHook},
     monitor,
     payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest,
+    pipeline::{pipeline_phase::CountedRequest, pre_execution_phase::ExecutionType},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -20,25 +20,29 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock,
+    block::Block, block_data::BlockData, common::Round, pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{PipelinedBlock, SyncPreCommitResultFut},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata_ext::BlockMetadataExt, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::SignedTransaction,
 };
 use fail::fail_point;
-use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc, time::Instant};
+use futures::{future::{BoxFuture, Shared}, Future, FutureExt, SinkExt, StreamExt};
+use std::{boxed::Box, pin::Pin, sync::Arc, time::Instant};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
+
+pub type SyncBoxFuture<'a, T> = Shared<Pin<Box<dyn Future<Output = T> + Send + 'a>>>;
+pub type SyncStateComputeResultFut = SyncBoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
 type NotificationType = BoxFuture<'static, ()>;
 
@@ -75,6 +79,7 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
+    pre_execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
 }
 
@@ -97,6 +102,8 @@ impl ExecutionProxy {
 
         let execution_pipeline =
             ExecutionPipeline::spawn(executor.clone(), handle, enable_pre_commit);
+        let pre_execution_pipeline =
+            ExecutionPipeline::spawn(executor.clone(), handle, enable_pre_commit);
         Self {
             executor,
             txn_notifier,
@@ -106,6 +113,7 @@ impl ExecutionProxy {
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
+            pre_execution_pipeline,
             state: RwLock::new(None),
         }
     }
@@ -179,7 +187,8 @@ impl StateComputer for ExecutionProxy {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
         lifetime_guard: CountedRequest<()>,
-    ) -> StateComputeResultFut {
+        execution_type: ExecutionType,
+    ) -> SyncStateComputeResultFut {
         let block_id = block.id();
         debug!(
             block = %block,
@@ -218,8 +227,12 @@ impl StateComputer for ExecutionProxy {
         };
 
         let pipeline_entry_time = Instant::now();
-        let fut = self
-            .execution_pipeline
+
+        let pipeline = match execution_type {
+            ExecutionType::Execution => &self.execution_pipeline,
+            ExecutionType::PreExecution => &self.pre_execution_pipeline,
+        };
+        let fut = pipeline
             .queue(
                 block.clone(),
                 metadata.clone(),
@@ -228,13 +241,14 @@ impl StateComputer for ExecutionProxy {
                 block_executor_onchain_config,
                 self.pre_commit_hook(block, metadata, payload_manager),
                 lifetime_guard,
+                execution_type,
             )
             .await;
         observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);
         counters::PIPELINE_ENTRY_TO_INSERTED_TIME.observe_duration(pipeline_entry_time.elapsed());
         let pipeline_inserted_timestamp = Instant::now();
 
-        Box::pin(async move {
+        async move {
             let pipeline_execution_result = fut.await?;
             debug!(
                 block_id = block_id,
@@ -275,7 +289,7 @@ impl StateComputer for ExecutionProxy {
             }
 
             Ok(pipeline_execution_result)
-        })
+        }.boxed().shared()
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
@@ -322,6 +336,23 @@ impl StateComputer for ExecutionProxy {
 
         *latest_logical_time = logical_time;
         Ok(())
+    }
+
+    async fn schedule_pre_commit(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+        lifetime_guard: CountedRequest<()>,
+    ) -> SyncPreCommitResultFut {
+        let fut = self
+            .execution_pipeline
+            .pre_commit_queue(
+                block_id,
+                parent_block_id,
+                lifetime_guard,
+            )
+            .await;
+        fut
     }
 
     /// Synchronize to a commit that not present locally.

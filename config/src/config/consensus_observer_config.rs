@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // Useful constants for enabling consensus observer on different node types
-const ENABLE_ON_VALIDATORS: bool = false;
-const ENABLE_ON_VALIDATOR_FULLNODES: bool = false;
-const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
+const ENABLE_ON_VALIDATORS: bool = true;
+const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
+const ENABLE_ON_PUBLIC_FULLNODES: bool = true;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -34,6 +34,8 @@ pub struct ConsensusObserverConfig {
     pub max_concurrent_subscriptions: u64,
     /// Maximum number of blocks to keep in memory (e.g., pending blocks, ordered blocks, etc.)
     pub max_num_pending_blocks: u64,
+    /// Maximum number of proposals to keep in memory
+    pub max_num_pending_proposals: u64,
     /// Maximum timeout (in milliseconds) for active subscriptions
     pub max_subscription_timeout_ms: u64,
     /// Maximum timeout (in milliseconds) we'll wait for the synced version to
@@ -58,6 +60,7 @@ impl Default for ConsensusObserverConfig {
             garbage_collection_interval_ms: 60_000,            // 60 seconds
             max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
             max_num_pending_blocks: 100,                       // 100 blocks
+            max_num_pending_proposals: 100,                     // 100 proposals
             max_subscription_timeout_ms: 30_000,               // 30 seconds
             max_synced_version_timeout_ms: 60_000,             // 60 seconds
             progress_check_interval_ms: 5_000,                 // 5 seconds

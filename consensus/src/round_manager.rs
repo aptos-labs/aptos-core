@@ -6,76 +6,41 @@ use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore, NeedFetchResult,
-    },
-    counters::{
-        self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
-        ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS,
-        PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
-        QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
-    },
-    error::{error_kind, VerifyError},
-    liveness::{
+    }, consensus_observer::{network::observer_message::ConsensusObserverMessage, publisher::consensus_publisher::ConsensusPublisher}, counters::{
+        self, NUM_PRE_COMMIT_VOTED_BLOCKS, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS, PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT
+    }, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
         proposal_status_tracker::TPastProposalStatusTracker,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
-    },
-    logging::{LogEvent, LogSchema},
-    metrics_safety_rules::MetricsSafetyRules,
-    monitor,
-    network::NetworkSender,
-    network_interface::ConsensusMsg,
-    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
-    pending_votes::{VoteReceptionResult, VoteStatus},
-    persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg,
-    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
-    util::is_vtxn_expected,
+    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes}, pending_votes::{VoteReceptionResult, VoteStatus}, persistent_liveness_storage::PersistentLivenessStorage, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, state_computer::SyncStateComputeResultFut, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockType,
-    common::{Author, Round},
-    order_vote::OrderVote,
-    order_vote_msg::OrderVoteMsg,
-    pipelined_block::PipelinedBlock,
-    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    quorum_cert::QuorumCert,
-    round_timeout::{RoundTimeout, RoundTimeoutMsg, RoundTimeoutReason},
-    sync_info::SyncInfo,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
-    vote::Vote,
-    vote_data::VoteData,
-    vote_msg::VoteMsg,
-    wrapped_ledger_info::WrappedLedgerInfo,
+    block::Block, block_data::BlockType, common::{Author, Round}, order_vote::OrderVote, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, round_timeout::{RoundTimeout, RoundTimeoutMsg, RoundTimeoutReason}, sync_info::SyncInfo, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::{checked, Mutex};
+use aptos_executor_types::ExecutorError;
+use aptos_infallible::{checked, duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    block_info::BlockInfo,
-    epoch_state::EpochState,
-    on_chain_config::{
+    block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo, on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
-    },
-    randomness::RandMetadata,
-    validator_verifier::ValidatorVerifier,
-    PeerId,
+    }, randomness::RandMetadata, validator_verifier::ValidatorVerifier, PeerId
 };
+use dashmap::DashMap;
 use fail::fail_point;
-use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, StreamExt};
+use futures::{channel::oneshot, pin_mut, stream::FuturesUnordered, task::noop_waker, Future, FutureExt, StreamExt};
 use lru::LruCache;
 use serde::Serialize;
-use std::{mem::Discriminant, pin::Pin, sync::Arc, time::Duration};
+use std::{borrow::Borrow, mem::Discriminant, pin::Pin, sync::Arc, task::{self, Poll}, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -269,6 +234,8 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl RoundManager {
@@ -289,6 +256,8 @@ impl RoundManager {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -320,6 +289,8 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
+            execution_futures,
+            consensus_publisher,
         }
     }
 
@@ -555,6 +526,9 @@ impl RoundManager {
         let signed_proposal =
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
+
+        info!("[ProposalGeneration] In total took: {:?}, round {}", duration_since_epoch().checked_sub(Duration::from_micros(signed_proposal.timestamp_usecs())).unwrap(), signed_proposal.round());
+
         info!(
             Self::new_log_with_round_epoch(
                 LogEvent::Propose,
@@ -804,7 +778,7 @@ impl RoundManager {
                         "Planning to vote for a NIL block {}", nil_block
                     );
                     counters::VOTE_NIL_COUNT.inc();
-                    let nil_vote = self.vote_block(nil_block).await?;
+                    let (nil_vote, _) = self.vote_block(nil_block).await?;
                     (true, nil_vote)
                 },
             };
@@ -1086,9 +1060,9 @@ impl RoundManager {
         }
     }
 
-    async fn create_vote(&mut self, proposal: Block) -> anyhow::Result<Vote> {
-        let vote = self
-            .vote_block(proposal)
+    async fn create_vote(&mut self, proposal: Block) -> anyhow::Result<(Vote, Arc<PipelinedBlock>)> {
+        let (vote, pipelined_block) = self
+            .vote_block(proposal.clone())
             .await
             .context("[RoundManager] Process proposal")?;
 
@@ -1100,19 +1074,31 @@ impl RoundManager {
                 vote.ledger_info().clone(),
                 bls12381::Signature::dummy_signature(),
             );
-            Ok(faulty_vote)
+            Ok((faulty_vote, pipelined_block.clone()))
         });
-        Ok(vote)
+        Ok((vote, pipelined_block))
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
-        let vote = self.create_vote(proposal).await?;
+        let require_randomness = proposal.require_randomness();
+        let (vote, pipelined_block) = self.create_vote(proposal.clone()).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        self.broadcast_fast_shares(vote.ledger_info().commit_info())
+        if self.randomness_config.skip_non_rand_blocks() && !require_randomness {
+            self.block_store
+                .execution_client()
+                .pre_execute(&pipelined_block)
+                .await;
+            if let Some(consensus_publisher) = &self.consensus_publisher {
+                let message = ConsensusObserverMessage::new_block_proposal_message(proposal);
+                consensus_publisher.publish_message(message);
+            }
+        } else {
+            self.broadcast_fast_shares(vote.ledger_info().commit_info())
             .await;
+        }
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
@@ -1128,6 +1114,7 @@ impl RoundManager {
             );
             self.network.send_vote(vote_msg, vec![recipient]).await;
         }
+
         Ok(())
     }
 
@@ -1136,7 +1123,7 @@ impl RoundManager {
     /// * then verify the voting rules
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
-    async fn vote_block(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
+    async fn vote_block(&mut self, proposed_block: Block) -> anyhow::Result<(Vote, Arc<PipelinedBlock>)> {
         let block_arc = self
             .block_store
             .insert_block(proposed_block)
@@ -1172,7 +1159,7 @@ impl RoundManager {
             .save_vote(&vote)
             .context("[RoundManager] Fail to persist last vote")?;
 
-        Ok(vote)
+        Ok((vote, block_arc))
     }
 
     async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
@@ -1306,6 +1293,56 @@ impl RoundManager {
         Ok(())
     }
 
+    async fn broadcast_precommit_vote(&mut self, block_info: BlockInfo, consensus_data_hash: HashValue) {
+        if block_info.is_empty() {
+            return;
+        }
+        let block_id = block_info.id();
+        let author = self.proposal_generator.author();
+        let safety_rules = self.safety_rules.clone();
+        let network = self.network.clone();
+
+        match self.execution_futures.entry(block_id) {
+            dashmap::mapref::entry::Entry::Occupied(entry) => {
+                let fut = entry.get().clone();
+                tokio::spawn(async move {
+                    match fut.await {
+                        Ok(execution_result) => {
+                            let commit_info = BlockInfo::new(
+                                block_info.epoch(),
+                                block_info.round(),
+                                block_id,
+                                execution_result.result.root_hash(),
+                                execution_result.result.version(),
+                                block_info.timestamp_usecs(),
+                                execution_result.result.epoch_state().clone(),
+                            );
+
+                            info!("[PreExecution] broadcast commit vote for block of epoch {} round {} id {}", block_info.epoch(), block_info.round(), block_id);
+
+                            let commit_ledger_info = LedgerInfo::new(commit_info, consensus_data_hash);
+                            let signature = safety_rules.lock().sign_pre_commit_vote(commit_ledger_info.clone());
+                            match signature{
+                                Ok(signature) => {
+                                    let commit_vote = CommitVote::new_with_signature(author, commit_ledger_info, signature);
+                                    network.broadcast_commit_vote(commit_vote).await;
+                                    NUM_PRE_COMMIT_VOTED_BLOCKS.inc();
+                                },
+                                Err(e) => {
+                                    warn!("[PreExecution] Failed to sign commit vote: {:?}", e);
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            warn!("[PreExecution] Failed to execute block: {:?}", e);
+                        }
+                    };
+                });
+            }
+            dashmap::mapref::entry::Entry::Vacant(_) => {}
+        }
+    }
+
     /// Upon new vote:
     /// 1. Ensures we're processing the vote from the same round as local round
     /// 2. Filter out votes for rounds that should not be processed by this validator (to avoid
@@ -1428,7 +1465,17 @@ impl RoundManager {
                             qc, e
                         );
                     } else {
-                        self.broadcast_fast_shares(qc.certified_block()).await;
+                        if self.randomness_config.skip_non_rand_blocks() {
+                            if let Some(block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+                                if !block.require_randomness() {
+                                    self.broadcast_precommit_vote(vote.vote_data().proposed().clone(), HashValue::zero()).await;
+                                } else {
+                                    self.broadcast_fast_shares(qc.certified_block()).await;
+                                }
+                            }
+                        } else {
+                            self.broadcast_fast_shares(qc.certified_block()).await;
+                        }
                     }
                 }
                 Ok(())

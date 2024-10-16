@@ -32,6 +32,7 @@ pub enum SafetyRulesInput {
     ConstructAndSignVoteTwoChain(Box<VoteProposal>, Box<Option<TwoChainTimeoutCertificate>>),
     ConstructAndSignOrderVote(Box<OrderVoteProposal>),
     SignCommitVote(Box<LedgerInfoWithSignatures>, Box<LedgerInfo>),
+    SignPreCommitVote(Box<LedgerInfo>),
 }
 
 pub struct SerializerService {
@@ -77,6 +78,9 @@ impl SerializerService {
                     .internal
                     .sign_commit_vote(*ledger_info, *new_ledger_info),
             ),
+            SafetyRulesInput::SignPreCommitVote(ledger_info) => {
+                serde_json::to_vec(&self.internal.sign_pre_commit_vote(*ledger_info))
+            },
         };
 
         Ok(output?)
@@ -170,6 +174,17 @@ impl TSafetyRules for SerializerClient {
         let response = self.request(SafetyRulesInput::SignCommitVote(
             Box::new(ledger_info),
             Box::new(new_ledger_info),
+        ))?;
+        serde_json::from_slice(&response)?
+    }
+
+    fn sign_pre_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error> {
+        let _timer = counters::start_timer("external", LogEntry::SignPreCommitVote.as_str());
+        let response = self.request(SafetyRulesInput::SignPreCommitVote(
+            Box::new(ledger_info),
         ))?;
         serde_json::from_slice(&response)?
     }

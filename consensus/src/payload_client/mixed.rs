@@ -6,10 +6,10 @@ use crate::{
     payload_client::{user::UserPayloadClient, PayloadClient},
 };
 use aptos_consensus_types::{
-    common::Payload, payload_pull_params::PayloadPullParameters, utils::PayloadTxnsSize,
+    common::Payload, payload_pull_params::PayloadPullParameters, request_response::PayloadTxns, utils::PayloadTxnsSize,
 };
 use aptos_logger::debug;
-use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
+use aptos_types::{on_chain_config::ValidatorTxnConfig, transaction::SignedTransaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool::TransactionFilter;
 use fail::fail_point;
 use futures::future::BoxFuture;
@@ -61,7 +61,7 @@ impl PayloadClient for MixedPayloadClient {
         params: PayloadPullParameters,
         validator_txn_filter: TransactionFilter,
         wait_callback: BoxFuture<'static, ()>,
-    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
+    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, PayloadTxns), QuorumStoreError> {
         // Pull validator txns first.
         let validator_txn_pull_timer = Instant::now();
         let mut validator_txns = self
@@ -100,12 +100,12 @@ impl PayloadClient for MixedPayloadClient {
             .saturating_sub(validator_txn_pull_timer.elapsed());
 
         // Pull user payload.
-        let user_payload = self
+        let (user_payload, payload_txns) = self
             .user_payload_client
             .pull(user_txn_pull_params, wait_callback)
             .await?;
 
-        Ok((validator_txns, user_payload))
+        Ok((validator_txns, user_payload, payload_txns))
     }
 }
 

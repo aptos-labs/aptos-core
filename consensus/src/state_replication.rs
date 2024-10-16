@@ -4,13 +4,14 @@
 
 use crate::{
     error::StateSyncError, payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest, state_computer::StateComputeResultFut,
+    pipeline::{pipeline_phase::CountedRequest, pre_execution_phase::ExecutionType}, state_computer::{StateComputeResultFut, SyncStateComputeResultFut},
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{block::Block, pipelined_block::{PipelinedBlock, SyncPreCommitResultFut}};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
@@ -33,7 +34,17 @@ pub trait StateComputer: Send + Sync {
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
         _lifetime_guard: CountedRequest<()>,
-    ) -> StateComputeResultFut {
+        execution_type: ExecutionType,
+    ) -> SyncStateComputeResultFut {
+        unimplemented!();
+    }
+
+    async fn schedule_pre_commit(
+        &self,
+        _block_id: HashValue,
+        _parent_block_id: HashValue,
+        _lifetime_guard: CountedRequest<()>,
+    ) -> SyncPreCommitResultFut {
         unimplemented!();
     }
 
