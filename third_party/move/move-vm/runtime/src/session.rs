@@ -470,6 +470,42 @@ impl<'r, 'l> Session<'r, 'l> {
             )
     }
 
+    pub fn get_type_tag(
+        &self,
+        ty: &Type,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<TypeTag> {
+        self.move_vm
+            .runtime
+            .loader()
+            .type_to_type_tag(ty, module_storage)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    pub fn get_type_layout_from_ty(
+        &self,
+        ty: &Type,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<MoveTypeLayout> {
+        self.move_vm
+            .runtime
+            .loader()
+            .type_to_type_layout(ty, &self.module_store, module_storage)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    pub fn get_fully_annotated_type_layout_from_ty(
+        &self,
+        ty: &Type,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<MoveTypeLayout> {
+        self.move_vm
+            .runtime
+            .loader()
+            .type_to_fully_annotated_layout(ty, &self.module_store, module_storage)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
     /// Gets the underlying native extensions.
     pub fn get_native_extensions(&mut self) -> &mut NativeContextExtensions<'r> {
         &mut self.native_extensions
