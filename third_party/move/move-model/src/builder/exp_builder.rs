@@ -785,7 +785,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             .lookup_receiver_function(ty, name)
             .cloned()
         {
-            let type_inst = self.fresh_type_vars(entry.type_params.len());
+            let type_params = entry.type_params.clone();
+            let type_inst = self.fresh_type_vars(type_params.len());
             let arg_types = entry
                 .params
                 .iter()
@@ -794,6 +795,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             let result_type = entry.result_type.instantiate(&type_inst);
             Some(ReceiverFunctionInstance {
                 id: entry.module_id.qualified(entry.fun_id),
+                fun_name: name,
+                type_params,
                 type_inst,
                 arg_types,
                 result_type,
@@ -2159,8 +2162,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &inst.result_type,
                 )
                 .map_err(|_| ok = false);
-            // `type.inst` is now unified with the actual types,
-            // annotate the instance. Since this post processor
+            // `type_inst` is now unified with the actual types,
+            // annotate the instance.  Since this post processor
             // is run after type finalization, we need to finalize
             // it to report any un-inferred type errors. However,
             // to avoid follow-up errors, only do if unification
@@ -2173,6 +2176,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
                     .collect();
+                // Also need to evaluate type constraints on type parameters
+
                 self.env().set_node_instantiation(id, inst)
             }
         }
