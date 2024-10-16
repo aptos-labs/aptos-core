@@ -872,19 +872,31 @@ mod tests {
     ) -> (Vec<NetworkChaos>, Vec<StressChaos>) {
         let network_chaos = NetworkChaos {
             status: Some(ChaosStatus {
-                conditions: Some(vec![ChaosCondition {
-                    r#type: ChaosConditionType::AllInjected,
-                    status: network_status,
-                }]),
+                conditions: Some(vec![
+                    ChaosCondition {
+                        r#type: ChaosConditionType::AllInjected,
+                        status: network_status.clone(),
+                    },
+                    ChaosCondition {
+                        r#type: ChaosConditionType::Selected,
+                        status: network_status,
+                    },
+                ]),
             }),
             ..NetworkChaos::new("test", Default::default())
         };
         let stress_chaos = StressChaos {
             status: Some(ChaosStatus {
-                conditions: Some(vec![ChaosCondition {
-                    r#type: ChaosConditionType::AllInjected,
-                    status: stress_status,
-                }]),
+                conditions: Some(vec![
+                    ChaosCondition {
+                        r#type: ChaosConditionType::AllInjected,
+                        status: stress_status.clone(),
+                    },
+                    ChaosCondition {
+                        r#type: ChaosConditionType::Selected,
+                        status: stress_status,
+                    },
+                ]),
             }),
             ..StressChaos::new("test", Default::default())
         };
