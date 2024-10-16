@@ -43,8 +43,7 @@ impl ExecutorTask for AptosExecutorTask {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
-        code_storage: &impl AptosCodeStorage,
+        view: &(impl ExecutorView + ResourceGroupView + AptosCodeStorage),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
@@ -53,12 +52,10 @@ impl ExecutorTask for AptosExecutorTask {
         });
 
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
-        let resolver = self
-            .vm
-            .as_move_resolver_with_group_view(executor_with_group_view);
+        let resolver = self.vm.as_move_resolver_with_group_view(view);
         match self
             .vm
-            .execute_single_transaction(txn, &resolver, code_storage, &log_context)
+            .execute_single_transaction(txn, &resolver, view, &log_context)
         {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {

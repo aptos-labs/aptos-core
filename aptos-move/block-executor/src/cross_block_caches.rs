@@ -12,7 +12,7 @@ use bytes::Bytes;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_binary_format::{
-    errors::{Location, VMError, VMResult},
+    errors::{Location, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -35,6 +35,9 @@ const MAX_STRUCT_NAME_INDEX_MAP_SIZE: usize = 100_000;
 
 /// The maximum size of [CrossBlockModuleCache]. Checked at block boundaries.
 const MAX_CROSS_BLOCK_MODULE_CACHE_SIZE: usize = 100_000;
+
+static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<AptosEnvironment>>> =
+    Lazy::new(|| Mutex::new(None));
 
 /// A cached environment that can be persisted across blocks. Used by block executor only.
 pub struct CachedAptosEnvironment;
@@ -66,8 +69,8 @@ impl CachedAptosEnvironment {
             }
         }
 
-        // It is not, so we have to reset it. Also flush the framework cache because we need to
-        // re-load all the modules with new configs.
+        // It is not cached or has changed, so we have to reset it. As a result, we need to flush
+        // the cross-block cache because we need to reload all modules with new configs.
         *cross_block_environment = Some(current_env.clone());
         drop(cross_block_environment);
         CrossBlockModuleCache::flush_at_block_start();
@@ -75,9 +78,6 @@ impl CachedAptosEnvironment {
         Ok(current_env)
     }
 }
-
-static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<AptosEnvironment>>> =
-    Lazy::new(|| Mutex::new(None));
 
 /// An entry into immutable cross-block module cache.
 struct CrossBlockModuleCacheEntry {
@@ -104,7 +104,6 @@ impl CrossBlockModuleCacheEntry {
     }
 
     /// Returns true if the entry is valid.
-
     pub fn is_valid(&self) -> bool {
         self.valid.load(Ordering::Acquire)
     }
@@ -150,6 +149,10 @@ impl CrossBlockModuleCacheEntry {
     }
 }
 
+type SyncCrossBlockModuleCache = ExplicitSyncWrapper<HashMap<ModuleId, CrossBlockModuleCacheEntry>>;
+static CROSS_BLOCK_MODULE_CACHE: Lazy<SyncCrossBlockModuleCache> =
+    Lazy::new(|| ExplicitSyncWrapper::new(HashMap::new()));
+
 /// Represents an immutable cross-block cache. The size of the cache is fixed (entries cannot be
 /// added or removed) within a single block, so it is only mutated at block boundaries. At the
 /// same time, entries in this cache can be marked as "invalid" so that block executor can decide
@@ -171,7 +174,6 @@ impl CrossBlockModuleCache {
             Arc<MaybeCommitted<ModuleCacheEntry>>,
             [u8; 32],
             CachedScript,
-            VMError,
         >,
     ) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
@@ -206,10 +208,10 @@ impl CrossBlockModuleCache {
 
     /// Returns true if the module is stored in cross-block cache and is valid.
     pub(crate) fn is_valid(module_id: &ModuleId) -> bool {
-        match CROSS_BLOCK_MODULE_CACHE.acquire().get(module_id) {
-            Some(entry) => entry.is_valid(),
-            None => false,
-        }
+        CROSS_BLOCK_MODULE_CACHE
+            .acquire()
+            .get(module_id)
+            .is_some_and(|e| e.is_valid())
     }
 
     /// Marks the cached entry (if it exists) as invalid. As a result, all subsequent calls to the
@@ -324,10 +326,6 @@ impl CrossBlockModuleCache {
         CROSS_BLOCK_MODULE_CACHE.acquire().len()
     }
 }
-
-type SyncCrossBlockModuleCache = ExplicitSyncWrapper<HashMap<ModuleId, CrossBlockModuleCacheEntry>>;
-static CROSS_BLOCK_MODULE_CACHE: Lazy<SyncCrossBlockModuleCache> =
-    Lazy::new(|| ExplicitSyncWrapper::new(HashMap::new()));
 
 #[cfg(test)]
 mod test {
