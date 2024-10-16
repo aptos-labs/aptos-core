@@ -19,7 +19,7 @@ use move_vm_runtime::{
     ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
     WithRuntimeEnvironment,
 };
-use move_vm_types::{code_storage::ModuleBytesStorage, module_storage_error};
+use move_vm_types::{code::ModuleBytesStorage, module_storage_error};
 use std::sync::Arc;
 
 /// Avoids orphan rule to implement [ModuleBytesStorage] for [StateView].

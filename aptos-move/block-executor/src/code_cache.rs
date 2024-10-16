@@ -6,16 +6,12 @@ use crate::{
     cross_block_caches::CrossBlockModuleCache,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
-use aptos_mvhashmap::code_cache::{LockedModuleCache, MaybeCommitted};
+use aptos_mvhashmap::{code_cache::LockedSyncModuleCache, types::MaybeCommitted};
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::{
-        code_cache::{ModuleCache, ScriptCache},
-        modules::ModuleCacheEntry,
-        scripts::ScriptCacheEntry,
-    },
+    vm::modules::ModuleCacheEntry,
 };
 use aptos_vm_types::module_and_script_storage::{
     code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
@@ -23,8 +19,7 @@ use aptos_vm_types::module_and_script_storage::{
 use bytes::Bytes;
 use hashbrown::HashSet;
 use move_binary_format::{
-    errors::{Location, PartialVMResult, VMResult},
-    file_format::CompiledScript,
+    errors::{Location, PartialVMResult, VMError, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -32,10 +27,12 @@ use move_core_types::{
     metadata::Metadata,
 };
 use move_vm_runtime::{
-    compute_code_hash, logging::expect_no_verification_errors, CodeStorage, Module, ModuleStorage,
-    RuntimeEnvironment, Script, WithRuntimeEnvironment,
+    CachedScript, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_vm_types::{module_cyclic_dependency_error, module_linker_error, panic_error};
+use move_vm_types::{
+    code::{ModuleCache, ScriptCache},
+    module_cyclic_dependency_error, module_linker_error, panic_error,
+};
 use std::sync::Arc;
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosCodeStorage
@@ -43,68 +40,24 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosCodeSt
 {
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ScriptCache
     for LatestView<'a, T, S, X>
 {
-    fn deserialize_and_cache_script(
-        &self,
-        serialized_script: &[u8],
-    ) -> VMResult<Arc<CompiledScript>> {
-        use ScriptCacheEntry::*;
+    type Key = [u8; 32];
+    type Script = CachedScript;
 
-        let hash = compute_code_hash(serialized_script);
-        let script_cache = self.as_script_cache();
-
-        Ok(match script_cache.fetch_script(&hash) {
-            Some(script) => script.compiled_script().clone(),
-            None => {
-                let compiled_script = self
-                    .runtime_environment
-                    .deserialize_into_script(serialized_script)
-                    .map(Arc::new)?;
-                script_cache.store_script(hash, Deserialized(compiled_script.clone()));
-                compiled_script
-            },
-        })
+    fn store_script(&self, key: Self::Key, script: Self::Script) {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.versioned_map.code_cache().store_script(key, script),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().store_script(key, script),
+        }
     }
 
-    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        use ScriptCacheEntry::*;
-
-        let hash = compute_code_hash(serialized_script);
-        let script_cache = self.as_script_cache();
-
-        let compiled_script = match script_cache.fetch_script(&hash) {
-            Some(Verified(script)) => return Ok(script),
-            Some(Deserialized(compiled_script)) => compiled_script,
-            None => self
-                .runtime_environment
-                .deserialize_into_script(serialized_script)
-                .map(Arc::new)?,
-        };
-
-        // Locally verify the script.
-        let locally_verified_script = self
-            .runtime_environment
-            .build_locally_verified_script(compiled_script)?;
-
-        // Verify the script is correct w.r.t. its dependencies.
-        let immediate_dependencies = locally_verified_script
-            .immediate_dependencies_iter()
-            .map(|(addr, name)| {
-                // Since module is stored on-chain, we should not see any verification errors here.
-                self.fetch_verified_module(addr, name)
-                    .map_err(expect_no_verification_errors)?
-                    .ok_or_else(|| module_linker_error!(addr, name))
-            })
-            .collect::<VMResult<Vec<_>>>()?;
-        let script = self
-            .runtime_environment
-            .build_verified_script(locally_verified_script, &immediate_dependencies)
-            .map(Arc::new)?;
-
-        script_cache.store_script(hash, Verified(script.clone()));
-        Ok(script)
+    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.versioned_map.code_cache().fetch_script(key),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().fetch_script(key),
+        }
     }
 }
 
@@ -365,9 +318,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
 
                         // The entry may not exist, in which case return early.
                         let module_id = ModuleId::new(*address, module_name.to_owned());
-                        let entry = match module_cache.fetch_or_initialize(&module_id, &|id| {
-                            self.fetch_base_module_entry(id)
-                        })? {
+                        let entry = match module_cache
+                            .fetch_module_or_store_with(&module_id, || {
+                                self.fetch_versioned_base_module_entry(&module_id)
+                            })? {
                             Some(entry) => entry,
                             None => {
                                 state
@@ -399,11 +353,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                             &mut visited,
                             self.runtime_environment,
                             &mut module_cache,
-                            &|id| self.fetch_base_module_entry(id),
+                            &|id| self.fetch_versioned_base_module_entry(id),
                         )?;
 
-                        let verified_entry = module_cache.fetch_or_initialize(&module_id, &|id| self.fetch_base_module_entry(id))?.ok_or_else(|| {
-                            let msg = format!("Verified module {}::{} should be cached after, dependency traversal", module_id.address(), module_id.name());
+                        let verified_entry = module_cache.fetch_module_or_store_with(&module_id, || self.fetch_versioned_base_module_entry(&module_id))?.ok_or_else(|| {
+                            let msg = format!("Verified module {}::{} should be cached after dependency traversal", module_id.address(), module_id.name());
                             panic_error!(msg).finish(Location::Undefined)
                         })?;
 
@@ -585,7 +539,9 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .versioned_map
             .code_cache()
             .module_cache()
-            .fetch_or_initialize(&module_id, init_func)?;
+            .fetch_module_or_store_with(&module_id, || {
+                init_func(&module_id).map(|e| e.map(|e| Arc::new(MaybeCommitted::new(e, None))))
+            })?;
 
         let value = read_func(read.as_ref());
         self.captured_reads
@@ -599,11 +555,15 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         module_id: &ModuleId,
         visited: &mut HashSet<ModuleId>,
         runtime_environment: &RuntimeEnvironment,
-        locked_module_cache: &mut LockedModuleCache<ModuleId, ModuleCacheEntry>,
+        locked_module_cache: &mut LockedSyncModuleCache<
+            ModuleId,
+            Arc<MaybeCommitted<ModuleCacheEntry>>,
+            VMError,
+        >,
         init_func: &F,
     ) -> VMResult<Arc<Module>>
     where
-        F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
+        F: Fn(&ModuleId) -> VMResult<Option<Arc<MaybeCommitted<ModuleCacheEntry>>>>,
     {
         let compiled_module = entry.compiled_module();
 
@@ -623,7 +583,9 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             let dependency_module_id = ModuleId::new(*addr, name.to_owned());
 
             let dependency = locked_module_cache
-                .fetch_or_initialize(&dependency_module_id, init_func)?
+                .fetch_module_or_store_with(&dependency_module_id, || {
+                    init_func(&dependency_module_id)
+                })?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
             if dependency.is_verified() {
                 verified_dependencies.push(dependency.verified_module()?.clone());
@@ -652,22 +614,14 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .build_verified_module(locally_verified_module, &verified_dependencies)
             .map(Arc::new)?;
         let new_entry = entry.make_verified(module.clone());
-        let entry = Arc::new(MaybeCommitted::verified(new_entry, entry.commit_idx()));
-        locked_module_cache.store(module_id, entry)?;
+        let entry = Arc::new(MaybeCommitted::new(new_entry, entry.commit_idx()));
+        locked_module_cache.store_module(module_id.clone(), entry);
 
         Ok(module)
     }
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
-    /// Returns the script cache.
-    fn as_script_cache(&self) -> &dyn ScriptCache<Key = [u8; 32], Script = ScriptCacheEntry> {
-        match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache(),
-            ViewState::Unsync(state) => state.unsync_map.code_cache(),
-        }
-    }
-
     /// Records the read from [CrossBlockModuleCache] in the read-set.
     fn capture_global_cache_read(&self, address: &AccountAddress, module_name: &IdentStr) {
         let module_id = ModuleId::new(*address, module_name.to_owned());
@@ -688,5 +642,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .map_err(|e| e.finish(Location::Undefined))?
             .map(|s| ModuleCacheEntry::from_state_value(self.runtime_environment, s))
             .transpose()
+    }
+
+    /// Same as [Self::fetch_base_module_entry], but returns versioned module entry.
+    fn fetch_versioned_base_module_entry(
+        &self,
+        module_id: &ModuleId,
+    ) -> VMResult<Option<Arc<MaybeCommitted<ModuleCacheEntry>>>> {
+        Ok(self
+            .fetch_base_module_entry(module_id)?
+            .map(|e| Arc::new(MaybeCommitted::new(e, None))))
     }
 }

@@ -3,18 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache::SyncCodeCache, versioned_data::VersionedData,
+    code_cache::SyncCodeCache, types::MaybeCommitted, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
     versioned_modules::VersionedModules,
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
-    vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
+    vm::modules::ModuleCacheEntry,
     write_set::TransactionWrite,
 };
+use move_binary_format::errors::VMError;
 use move_core_types::language_storage::ModuleId;
+use move_vm_runtime::CachedScript;
 use serde::Serialize;
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 pub mod code_cache;
 pub mod types;
@@ -42,7 +44,13 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 
-    code_cache: SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry>,
+    code_cache: SyncCodeCache<
+        ModuleId,
+        Arc<MaybeCommitted<ModuleCacheEntry>>,
+        [u8; 32],
+        CachedScript,
+        VMError,
+    >,
 }
 
 impl<
@@ -72,7 +80,7 @@ impl<
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules: self.modules.num_keys() + self.code_cache.module_cache().num_keys(),
+            num_modules: self.modules.num_keys() + self.code_cache.module_cache().num_modules(),
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -99,7 +107,13 @@ impl<
 
     pub fn code_cache(
         &self,
-    ) -> &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry> {
+    ) -> &SyncCodeCache<
+        ModuleId,
+        Arc<MaybeCommitted<ModuleCacheEntry>>,
+        [u8; 32],
+        CachedScript,
+        VMError,
+    > {
         &self.code_cache
     }
 }
