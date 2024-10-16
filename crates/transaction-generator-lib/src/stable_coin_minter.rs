@@ -6,7 +6,15 @@ use crate::{
     call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator},
     RootAccountHandle,
 };
-use aptos_sdk::{bcs, transaction_builder::TransactionFactory, types::{transaction::SignedTransaction, LocalAccount}};
+use aptos_sdk::{
+    bcs,
+    move_types::{ident_str, language_storage::ModuleId},
+    transaction_builder::TransactionFactory,
+    types::{
+        transaction::{EntryFunction, SignedTransaction, TransactionPayload},
+        LocalAccount,
+    },
+};
 use async_trait::async_trait;
 use rand::rngs::StdRng;
 use std::sync::Arc;
