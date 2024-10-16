@@ -3,15 +3,18 @@
 
 use crate::{
     counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
+    monitor,
     payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{block::Block, pipelined_block::OrderedBlockWindow};
 use aptos_executor_types::ExecutorResult;
+use aptos_logger::info;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
+use futures::{stream::FuturesOrdered, StreamExt};
 use std::{sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
@@ -36,7 +39,43 @@ impl BlockPreparer {
         }
     }
 
-    pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
+    async fn get_transactions(
+        &self,
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+        let mut txns = vec![];
+        let mut futures = FuturesOrdered::new();
+        for block in block_window
+            .pipelined_blocks()
+            .iter()
+            .map(|b| b.block())
+            .chain(std::iter::once(block))
+        {
+            futures.push_back(async move { self.payload_manager.get_transactions(block).await });
+        }
+        let mut max_txns_from_block_to_execute = None;
+        loop {
+            match futures.next().await {
+                // TODO: we are turning off the max txns from block to execute feature for now
+                Some(Ok((block_txns, _max_txns))) => {
+                    txns.extend(block_txns);
+                    max_txns_from_block_to_execute = None;
+                },
+                Some(Err(e)) => {
+                    return Err(e);
+                },
+                None => break,
+            }
+        }
+        Ok((txns, max_txns_from_block_to_execute))
+    }
+
+    pub async fn prepare_block(
+        &self,
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> ExecutorResult<Vec<SignedTransaction>> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
             use std::{thread, time::Duration};
@@ -44,8 +83,19 @@ impl BlockPreparer {
             Err(ExecutorError::CouldNotGetData)
         });
         let start_time = Instant::now();
-        let (txns, max_txns_from_block_to_execute) =
-            self.payload_manager.get_transactions(block).await?;
+        info!(
+            "BlockPreparer: Preparing for block {} and window {:?}",
+            block.id(),
+            block_window
+                .blocks()
+                .iter()
+                .map(|b| b.id())
+                .collect::<Vec<_>>()
+        );
+
+        let (txns, max_txns_from_block_to_execute) = monitor!("get_transactions", {
+            self.get_transactions(block, block_window).await?
+        });
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();

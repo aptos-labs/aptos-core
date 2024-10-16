@@ -76,8 +76,8 @@ impl Debug for RootInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "RootInfo: [block: {}, quorum_cert: {}, ordered_cert: {}, commit_cert: {}]",
-            self.0, self.1, self.2, self.3
+            "RootInfo: [root block: {}, window block: {}, quorum_cert: {}, ordered_cert: {}, commit_cert: {}]",
+            self.0, self.1, self.2, self.3, self.4
         )
     }
 }
