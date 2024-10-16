@@ -263,7 +263,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 persisted_state.base_version,
                 chunk.ledger_info.as_ref(),
                 false, // sync_commit
-                chunk.result_state.clone(),
+                &chunk.result_state,
                 chunk
                     .ledger_update_output
                     .state_updates_until_last_checkpoint

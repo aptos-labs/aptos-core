@@ -507,7 +507,7 @@ fn apply_transaction_by_writeset(
             ledger_view.state().base_version,
             ledger_info.as_ref(),
             true, /* sync_commit */
-            result_state,
+            &result_state,
             ledger_update_output
                 .state_updates_until_last_checkpoint
                 .as_ref(),
@@ -718,7 +718,7 @@ fn run_transactions_naive(
                 ledger_view.state().base_version,
                 ledger_info.as_ref(),
                 true, /* sync_commit */
-                result_state,
+                &result_state,
                 ledger_update_output
                     .state_updates_until_last_checkpoint
                     .as_ref(),

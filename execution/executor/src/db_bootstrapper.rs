@@ -108,7 +108,7 @@ impl GenesisCommitter {
             self.base_state_version,
             self.output.ledger_info.as_ref(),
             true, /* sync_commit */
-            self.output.result_state.clone(),
+            &self.output.result_state,
             self.output
                 .ledger_update_output
                 .state_updates_until_last_checkpoint
