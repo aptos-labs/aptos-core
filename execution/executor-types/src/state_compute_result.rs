@@ -1,11 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::LedgerUpdateOutput;
+use crate::{ChunkCommitNotification, LedgerUpdateOutput};
 use aptos_crypto::{
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -24,24 +25,33 @@ use std::{cmp::max, sync::Arc};
 /// which is going to simply pass the results between StateComputer and PayloadClient.
 #[derive(Debug, Default, Clone)]
 pub struct StateComputeResult {
-    ledger_update_output: LedgerUpdateOutput,
+    pub parent_state: Arc<StateDelta>,
+    pub result_state: Arc<StateDelta>,
+    pub ledger_update_output: LedgerUpdateOutput,
     /// If set, this is the new epoch info that should be changed to if this is committed.
-    next_epoch_state: Option<EpochState>,
+    pub next_epoch_state: Option<EpochState>,
 }
 
 impl StateComputeResult {
     pub fn new(
+        parent_state: Arc<StateDelta>,
+        result_state: Arc<StateDelta>,
         ledger_update_output: LedgerUpdateOutput,
         next_epoch_state: Option<EpochState>,
     ) -> Self {
         Self {
+            parent_state,
+            result_state,
             ledger_update_output,
             next_epoch_state,
         }
     }
 
     pub fn new_empty(transaction_accumulator: Arc<InMemoryTransactionAccumulator>) -> Self {
+        let result_state = Arc::new(StateDelta::new_empty());
         Self {
+            parent_state: result_state.clone(),
+            result_state,
             ledger_update_output: LedgerUpdateOutput::new_empty(transaction_accumulator),
             next_epoch_state: None,
         }
@@ -51,7 +61,10 @@ impl StateComputeResult {
     /// this function is used in RandomComputeResultStateComputer to assert that the compute
     /// function is really called.
     pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
+        let result_state = Arc::new(StateDelta::new_empty());
         Self {
+            parent_state: result_state.clone(),
+            result_state,
             ledger_update_output: LedgerUpdateOutput::new_dummy_with_root_hash(root_hash),
             next_epoch_state: None,
         }
@@ -67,7 +80,10 @@ impl StateComputeResult {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_dummy_with_input_txns(txns: Vec<Transaction>) -> Self {
+        let result_state = Arc::new(StateDelta::new_empty());
         Self {
+            parent_state: result_state.clone(),
+            result_state,
             ledger_update_output: LedgerUpdateOutput::new_dummy_with_input_txns(txns),
             next_epoch_state: None,
         }
@@ -134,5 +150,13 @@ impl StateComputeResult {
 
     pub fn is_reconfiguration_suffix(&self) -> bool {
         self.has_reconfiguration() && self.compute_status_for_input_txns().is_empty()
+    }
+
+    pub fn make_chunk_commit_notification(&self) -> ChunkCommitNotification {
+        ChunkCommitNotification {
+            subscribable_events: self.ledger_update_output.subscribable_events.clone(),
+            committed_transactions: self.transactions_to_commit(),
+            reconfiguration_occurred: self.has_reconfiguration(),
+        }
     }
 }

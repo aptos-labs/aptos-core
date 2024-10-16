@@ -6,9 +6,8 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput,
-        block_tree::{block_output::BlockOutput, BlockTree},
-        chunk_output::ChunkOutput,
+        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+        partial_state_compute_result::PartialStateComputeResult,
     },
     logging::{LogEntry, LogSchema},
     metrics::{
@@ -279,7 +278,7 @@ where
         let _ = self.block_tree.add_block(
             parent_block_id,
             block_id,
-            BlockOutput::new(state, epoch_state),
+            PartialStateComputeResult::new(parent_output.result_state.clone(), state, epoch_state),
         )?;
         Ok(state_checkpoint_output)
     }
@@ -306,15 +305,12 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let parent_output = parent_block.output.get_ledger_update();
+        let parent_output = parent_block.output.expect_ledger_update_output();
         let parent_accumulator = parent_output.txn_accumulator();
-        let current_output = block_vec.pop().expect("Must exist").unwrap();
+        let block = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
-        if current_output.output.has_ledger_update() {
-            return Ok(current_output
-                .output
-                .get_ledger_update()
-                .as_state_compute_result(current_output.output.epoch_state().clone()));
+        if let Some(complete_result) = block.output.get_complete_result() {
+            return Ok(complete_result);
         }
 
         let output =
@@ -334,14 +330,12 @@ where
                 output
             };
 
-        if !current_output.output.has_reconfiguration() {
+        if !block.output.has_reconfiguration() {
             output.ensure_ends_with_state_checkpoint()?;
         }
 
-        let state_compute_result =
-            output.as_state_compute_result(current_output.output.epoch_state().clone());
-        current_output.output.set_ledger_update(output);
-        Ok(state_compute_result)
+        block.output.set_ledger_update_output(output);
+        Ok(block.output.expect_complete_result())
     }
 
     fn pre_commit_block(
@@ -365,7 +359,7 @@ where
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
         });
 
-        let ledger_update = block.output.get_ledger_update();
+        let ledger_update = block.output.expect_ledger_update_output();
         if !ledger_update.transactions_to_commit().is_empty() {
             let _timer = SAVE_TRANSACTIONS.start_timer();
             self.db.writer.pre_commit_ledger(

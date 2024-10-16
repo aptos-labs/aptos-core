@@ -9,6 +9,7 @@ use crate::{
         chunk_output::{update_counters_for_processed_chunk, ChunkOutput},
         executed_chunk::ExecutedChunk,
         in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
+        partial_state_compute_result::PartialStateComputeResult,
     },
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
@@ -48,7 +49,7 @@ impl ApplyChunkOutput {
         append_state_checkpoint_to_block: Option<HashValue>,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         is_block: bool,
-    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
+    ) -> Result<(Arc<StateDelta>, Option<EpochState>, StateCheckpointOutput)> {
         let ChunkOutput {
             state_cache,
             transactions,
@@ -107,7 +108,11 @@ impl ApplyChunkOutput {
                 .check_and_update_state_checkpoint_hashes(state_checkpoint_hashes)?;
         }
 
-        Ok((result_state, next_epoch_state, state_checkpoint_output))
+        Ok((
+            Arc::new(result_state),
+            next_epoch_state,
+            state_checkpoint_output,
+        ))
     }
 
     pub fn calculate_ledger_update(
@@ -182,13 +187,17 @@ impl ApplyChunkOutput {
             state_checkpoint_output,
             base_view.txn_accumulator().clone(),
         )?;
+        let output = PartialStateComputeResult::new(
+            base_view.state().clone(),
+            result_state,
+            next_epoch_state
+        );
+        output.set_ledger_update_output(ledger_update_output);
 
         Ok((
             ExecutedChunk {
-                result_state,
-                ledger_info: None,
-                next_epoch_state,
-                ledger_update_output,
+                output,
+                ledger_info_opt: None,
             },
             to_discard,
             to_retry,

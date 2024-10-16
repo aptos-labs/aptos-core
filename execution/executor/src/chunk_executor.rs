@@ -11,6 +11,7 @@ use crate::{
         chunk_output::ChunkOutput,
         chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier},
         executed_chunk::ExecutedChunk,
+        partial_state_compute_result::PartialStateComputeResult,
         transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk},
     },
     logging::{LogEntry, LogSchema},
@@ -252,23 +253,25 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             self.commit_queue.lock().next_chunk_to_commit()?
         };
 
-        if chunk.ledger_info.is_some() || !chunk.transactions_to_commit().is_empty() {
+        let output = chunk.output.expect_complete_result();
+        if chunk.ledger_info_opt.is_some() || !chunk.transactions_to_commit().is_empty() {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__save_txns"]);
             fail_point!("executor::commit_chunk", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_chunk"))
             });
+            let output = chunk.output.expect_complete_result();
             self.db.writer.save_transactions(
-                chunk.transactions_to_commit(),
-                persisted_state.next_version(),
-                persisted_state.base_version,
-                chunk.ledger_info.as_ref(),
+                &output.ledger_update_output.to_commit,
+                output.ledger_update_output.first_version(),
+                output.parent_state.base_version,
+                chunk.ledger_info_opt.as_ref(),
                 false, // sync_commit
-                &chunk.result_state,
-                chunk
+                &output.result_state,
+                output
                     .ledger_update_output
                     .state_updates_until_last_checkpoint
                     .as_ref(),
-                Some(&chunk.ledger_update_output.sharded_state_cache),
+                Some(&output.ledger_update_output.sharded_state_cache),
             )?;
         }
 
@@ -277,7 +280,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
         self.commit_queue
             .lock()
-            .dequeue_committed(chunk.result_state.clone())?;
+            .dequeue_committed(output.result_state.clone())?;
 
         Ok(chunk)
     }
@@ -322,9 +325,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         self.commit_queue
             .lock()
             .enqueue_for_ledger_update(ChunkToUpdateLedger {
-                result_state,
+                output: PartialStateComputeResult::new(parent_state.clone(), result_state, next_epoch_state),
                 state_checkpoint_output,
-                next_epoch_state,
                 chunk_verifier,
             })?;
 
@@ -347,9 +349,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             self.commit_queue.lock().next_chunk_to_update_ledger()?
         };
         let ChunkToUpdateLedger {
-            result_state,
+            output,
             state_checkpoint_output,
-            next_epoch_state,
             chunk_verifier,
         } = chunk;
 
@@ -368,16 +369,18 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         let ledger_info_opt = chunk_verifier.maybe_select_chunk_ending_ledger_info(
             &ledger_update_output,
-            next_epoch_state.as_ref(),
+            output.next_epoch_state.as_ref(),
         )?;
+        output.set_ledger_update_output(ledger_update_output);
 
         let executed_chunk = ExecutedChunk {
-            result_state,
-            ledger_info: ledger_info_opt,
-            next_epoch_state,
-            ledger_update_output,
+            output,
+            ledger_info_opt,
         };
-        let num_txns = executed_chunk.transactions_to_commit().len();
+        let num_txns = executed_chunk
+            .output
+            .expect_complete_result()
+            .transactions_to_commit_len();
 
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__save"]);
         self.commit_queue
@@ -400,7 +403,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let commit_notification = {
             let _timer =
                 CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk__into_chunk_commit_notification"]);
-            executed_chunk.into_chunk_commit_notification()
+            executed_chunk
+                .output
+                .expect_complete_result()
+                .make_chunk_commit_notification()
         };
 
         Ok(commit_notification)
@@ -505,6 +511,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         );
 
         Ok(chunk
+            .output
             .result_state
             .current_version
             .expect("Version must exist after commit."))

@@ -3,14 +3,12 @@
 
 #![forbid(unsafe_code)]
 
-use crate::state_compute_result::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
-    epoch_state::EpochState,
     proof::accumulator::InMemoryTransactionAccumulator,
     state_store::ShardedStateUpdates,
     transaction::{
@@ -79,13 +77,6 @@ impl LedgerUpdateOutput {
         Self {
             inner: Arc::new(DropHelper::new(inner)),
         }
-    }
-
-    pub fn as_state_compute_result(
-        &self,
-        next_epoch_state: Option<EpochState>,
-    ) -> StateComputeResult {
-        StateComputeResult::new(self.clone(), next_epoch_state)
     }
 }
 
