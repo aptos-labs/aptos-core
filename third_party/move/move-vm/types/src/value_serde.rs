@@ -9,8 +9,7 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    value::{IdentifierMappingKind, MoveTypeLayout},
-    vm_status::StatusCode,
+    account_address::AccountAddress, u256, value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout}, vm_status::StatusCode
 };
 use serde::{
     de::{DeserializeSeed, Error as DeError},
@@ -165,6 +164,50 @@ pub fn serialized_size_allowing_delayed_values(
         value: &value.0,
     };
     bcs::serialized_size(&value).map_err(|e| {
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+            "failed to compute serialized size of a value: {:?}",
+            e
+        ))
+    })
+}
+
+/// If given type has a constant serialized size (irrespective of the instance), it returns the serialized
+/// size in bytes any value would have.
+/// Otherwise it returns None.
+pub fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> PartialVMResult<Option<usize>> {
+    let bcs_size_result = match ty_layout {
+        MoveTypeLayout::Bool => bcs::serialized_size(&false).map(|size| Some(size)),
+        MoveTypeLayout::U8 => bcs::serialized_size(&0u8).map(|size| Some(size)),
+        MoveTypeLayout::U64 => bcs::serialized_size(&0u64).map(|size| Some(size)),
+        MoveTypeLayout::U128 => bcs::serialized_size(&0u128).map(|size| Some(size)),
+        MoveTypeLayout::Address => bcs::serialized_size(&AccountAddress::ZERO).map(|size| Some(size)),
+        // vectors have no constant size
+        MoveTypeLayout::Vector(_) => Ok(None),
+        // enums have no constant size
+        MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_)) => Ok(None),
+        MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
+            Ok(fields
+                .iter()
+                .map(|field| constant_serialized_size(field))
+                .collect::<Result<Option<Vec<_>>, _>>()
+                .map(|o| o.map(|v| v.iter().sum()))?)
+        },
+        MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields))
+        | MoveTypeLayout::Struct(MoveStructLayout::WithTypes{fields, ..}) => {
+            Ok(fields
+                .iter()
+                .map(|field| constant_serialized_size(&field.layout))
+                .collect::<Result<Option<Vec<_>>, _>>()
+                .map(|o| o.map(|v| v.iter().sum()))?)
+        },
+        // signer's size is VM implementation detail, and can change at will.
+        MoveTypeLayout::Signer => Ok(None),
+        MoveTypeLayout::U16 => bcs::serialized_size(&0u16).map(|size| Some(size)),
+        MoveTypeLayout::U32 => bcs::serialized_size(&0u32).map(|size| Some(size)),
+        MoveTypeLayout::U256 => bcs::serialized_size(&u256::U256::zero()).map(|size| Some(size)),
+        MoveTypeLayout::Native(_, inner) => Ok(constant_serialized_size(inner)?),
+    };
+    bcs_size_result.map_err(|e| {
         PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
             "failed to compute serialized size of a value: {:?}",
             e
