@@ -2,17 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use itertools::Itertools;
+use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
+        chunk: ChunkToCommit,
         sync_commit: bool,
-        latest_in_memory_state: &StateDelta,
-        state_updates_until_last_checkpoint: Option<&ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         gauged_api("pre_commit_ledger", || {
             // Pre-committing and committing in concurrency is allowed but not pre-committing at the
@@ -24,6 +20,15 @@ impl DbWriter for AptosDB {
                 .try_lock()
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
+
+            let ChunkToCommit {
+                txns_to_commit,
+                first_version,
+                base_state_version,
+                state_updates_until_last_checkpoint,
+                latest_in_memory_state,
+                sharded_state_cache,
+            } = chunk;
 
             latest_in_memory_state.current.log_generation("db_save");
 

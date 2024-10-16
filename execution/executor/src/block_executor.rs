@@ -351,27 +351,20 @@ where
 
         let mut blocks = self.block_tree.get_blocks(&[parent_block_id, block_id])?;
         let block = blocks.pop().expect("guaranteed");
-        let parent_block = blocks.pop().expect("guaranteed");
-
-        let result_in_memory_state = block.output.state().clone();
+        let _parent_block = blocks.pop().expect("guaranteed");
 
         fail_point!("executor::pre_commit_block", |_| {
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
         });
 
-        let ledger_update = block.output.expect_ledger_update_output();
-        if !ledger_update.transactions_to_commit().is_empty() {
+        let output = block.output.expect_complete_result();
+        let num_txns = output.transactions_to_commit_len();
+        if num_txns != 0 {
             let _timer = SAVE_TRANSACTIONS.start_timer();
-            self.db.writer.pre_commit_ledger(
-                ledger_update.transactions_to_commit(),
-                ledger_update.first_version(),
-                parent_block.output.state().base_version,
-                false,
-                &result_in_memory_state,
-                ledger_update.state_updates_until_last_checkpoint.as_ref(),
-                Some(&ledger_update.sharded_state_cache),
-            )?;
-            TRANSACTIONS_SAVED.observe(ledger_update.num_txns() as f64);
+            self.db
+                .writer
+                .pre_commit_ledger(output.as_chunk_to_commit(), false)?;
+            TRANSACTIONS_SAVED.observe(num_txns as f64);
         }
 
         Ok(())
