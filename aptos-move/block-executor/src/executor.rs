@@ -726,7 +726,7 @@ where
             versioned_cache
                 .code_cache()
                 .module_cache()
-                .store_module(id, Arc::new(MaybeCommitted::new(entry, Some(txn_idx))));
+                .insert_module(id, Arc::new(MaybeCommitted::new(entry, Some(txn_idx))));
         }
         Ok(())
     }
@@ -1163,7 +1163,7 @@ where
                     ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
 
                 CrossBlockModuleCache::mark_invalid(&id);
-                unsync_map.code_cache().store_module(id, Arc::new(entry));
+                unsync_map.code_cache().insert_module(id, Arc::new(entry));
             } else {
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());

@@ -57,11 +57,11 @@ where
     type Key = Q;
     type Script = S;
 
-    fn store_script(&self, key: Self::Key, script: Self::Script) {
+    fn insert_script(&self, key: Self::Key, script: Self::Script) {
         self.script_cache.insert(key, CachePadded::new(script));
     }
 
-    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+    fn get_script(&self, key: &Self::Key) -> Option<Self::Script> {
         Some(self.script_cache.get(key)?.clone().into_inner())
     }
 }
@@ -142,11 +142,11 @@ where
     type Key = K;
     type Module = M;
 
-    fn store_module(&self, key: Self::Key, module: Self::Module) {
+    fn insert_module(&self, key: Self::Key, module: Self::Module) {
         self.cache.insert(key, CachePadded::new(module));
     }
 
-    fn fetch_module_or_store_with<F>(
+    fn get_module_or_insert_with<F>(
         &self,
         key: &Self::Key,
         default: F,
@@ -210,7 +210,7 @@ where
     type Key = K;
     type Module = M;
 
-    fn store_module(&self, key: Self::Key, module: Self::Module) {
+    fn insert_module(&self, key: Self::Key, module: Self::Module) {
         let shard_idx = self.cache.determine_shard(self.cache.hash_usize(&key));
         let value = dashmap::SharedValue::new(CachePadded::new(module));
         self.locked_cache_shards
@@ -220,7 +220,7 @@ where
             .insert(key, value);
     }
 
-    fn fetch_module_or_store_with<F>(
+    fn get_module_or_insert_with<F>(
         &self,
         key: &Self::Key,
         default: F,

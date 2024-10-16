@@ -137,7 +137,7 @@ impl VMRuntime {
             #[allow(deprecated)]
             if data_store.exists_module(&module_id)? && compat.need_check_compat() {
                 let old_module_ref = loader.load_module(&module_id, data_store, module_store)?;
-                let old_module = old_module_ref.module();
+                let old_module = old_module_ref.compiled_module_ref();
                 if loader.vm_config().use_compatibility_checker_v2 {
                     compat
                         .check(old_module, module)
@@ -223,7 +223,8 @@ impl VMRuntime {
             if is_republishing {
                 // This is an upgrade, so invalidate the loader cache, which still contains the
                 // old module.
-                self.loader.mark_as_invalid();
+                #[allow(deprecated)]
+                self.loader.mark_v1_as_invalid();
             }
             #[allow(deprecated)]
             data_store.publish_module(&module.self_id(), blob, is_republishing)?;

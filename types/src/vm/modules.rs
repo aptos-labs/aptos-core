@@ -115,7 +115,7 @@ impl ModuleCacheEntry {
         use Representation::*;
         match &self.representation {
             Deserialized(m) => &m.metadata,
-            Verified(m) => &m.module().metadata,
+            Verified(m) => &m.compiled_module_ref().metadata,
         }
     }
 
@@ -124,7 +124,7 @@ impl ModuleCacheEntry {
         use Representation::*;
         match &self.representation {
             Deserialized(compiled_module) => compiled_module,
-            Verified(module) => module.compiled_module(),
+            Verified(module) => module.compiled_module_arc(),
         }
     }
 
@@ -197,7 +197,7 @@ impl ModuleCacheEntry {
     ) -> Self {
         let dep_names = dependencies
             .iter()
-            .map(|d| d.compiled_module().self_name().as_str());
+            .map(|d| d.compiled_module_arc().self_name().as_str());
         let entry = Self::deserialized_for_test(module_name, dep_names, runtime_environment);
         let locally_verified_module = runtime_environment
             .build_locally_verified_module(
