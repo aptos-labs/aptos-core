@@ -97,6 +97,7 @@ pub enum FeatureFlag {
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
     /// covers mem::swap and vector::move_range
+    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     ENABLE_LOADER_V2 = 81,
 }

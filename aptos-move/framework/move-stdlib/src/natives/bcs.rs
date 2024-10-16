@@ -11,17 +11,25 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use move_core_types::{
-    gas_algebra::NumBytes, vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
+    gas_algebra::{NumBytes, NumTypeNodes},
+    vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::PartialVMResult,
-    value_serde::serialized_size_allowing_delayed_values,
-    values::{values_impl::Reference, Value},
+    value_serde::{
+        constant_serialized_size, serialized_size_allowing_delayed_values,
+        type_visit_count_for_constant_serialized_size,
+    },
+    values::{values_impl::Reference, Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+
+pub fn create_option_u64(value: Option<u64>) -> Value {
+    Value::struct_(Struct::pack(vec![Value::vector_u64(value)]))
+}
 
 /***************************************************************************************************
  * native fun to_bytes
@@ -126,6 +134,38 @@ fn serialized_size_impl(
     serialized_size_allowing_delayed_values(&value, &ty_layout)
 }
 
+fn native_constant_serialized_size(
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+
+    context.charge(BCS_CONSTANT_SERIALIZED_SIZE_BASE)?;
+
+    let ty = ty_args.pop().unwrap();
+    let ty_layout = context.type_to_type_layout(&ty)?;
+
+    context.charge(
+        BCS_CONSTANT_SERIALIZED_SIZE_PER_TYPE_NODE
+            * NumTypeNodes::new(type_visit_count_for_constant_serialized_size(&ty_layout)),
+    )?;
+
+    let result = match constant_serialized_size(&ty_layout) {
+        Ok(value) => create_option_u64(value.map(|v| v as u64)),
+        Err(_) => {
+            context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
+
+            // Re-use the same abort code as bcs::to_bytes.
+            return Err(SafeNativeError::Abort {
+                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
+            });
+        },
+    };
+
+    Ok(smallvec![result])
+}
+
 /***************************************************************************************************
  * module
  **************************************************************************************************/
@@ -135,6 +175,7 @@ pub fn make_all(
     let funcs = [
         ("to_bytes", native_to_bytes as RawSafeNative),
         ("serialized_size", native_serialized_size),
+        ("constant_serialized_size", native_constant_serialized_size),
     ];
 
     builder.make_named_natives(funcs)
