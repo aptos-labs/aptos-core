@@ -95,8 +95,8 @@ where
     }
 
     fn insert(&mut self, key: K, binary: V) -> &V {
+        let idx = self.binaries.len();
         self.binaries.push(binary);
-        let idx = self.binaries.len() - 1;
         self.id_map.insert(key, idx);
         self.binaries
             .last()
@@ -164,29 +164,40 @@ impl Loader {
     }
 
     /// Flush this cache if it is marked as invalidated.
-    pub(crate) fn flush_if_invalidated(&self) {
-        if let Self::V1(loader) = self {
-            let mut invalidated = loader.invalidated.write();
-            if *invalidated {
-                *loader.scripts.write() = ScriptCache::new();
-                #[allow(deprecated)]
-                loader.type_cache.flush();
-                loader.name_cache.flush();
-                *invalidated = false;
-            }
+    #[deprecated]
+    pub(crate) fn flush_v1_if_invalidated(&self) {
+        match self {
+            Self::V1(loader) => {
+                let mut invalidated = loader.invalidated.write();
+                if *invalidated {
+                    *loader.scripts.write() = ScriptCache::new();
+                    loader.type_cache.flush();
+                    loader.name_cache.flush();
+                    *invalidated = false;
+                }
+            },
+            Self::V2(_) => unreachable!("Loader V2 cannot be flushed"),
         }
     }
 
     /// Mark this cache as invalidated.
-    pub(crate) fn mark_as_invalid(&self) {
-        if let Self::V1(loader) = self {
-            *loader.invalidated.write() = true;
+    #[deprecated]
+    pub(crate) fn mark_v1_as_invalid(&self) {
+        match self {
+            Self::V1(loader) => {
+                *loader.invalidated.write() = true;
+            },
+            Self::V2(_) => unreachable!("Loader V2 cannot be marked as invalid"),
         }
     }
 
     /// Check whether this cache is invalidated.
-    pub(crate) fn is_invalidated(&self) -> bool {
-        matches!(self, Self::V1(loader) if *loader.invalidated.read())
+    #[deprecated]
+    pub(crate) fn is_v1_invalidated(&self) -> bool {
+        match self {
+            Self::V1(loader) => *loader.invalidated.read(),
+            Self::V2(_) => unreachable!("Loader V2 is never invalidated"),
+        }
     }
 
     pub(crate) fn check_script_dependencies_and_check_gas(
@@ -316,12 +327,13 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<Arc<StructType>> {
-        // Ensure that the struct name index map is unlocked immediately by getting an arced
-        // struct name.
         let struct_name_index_map = match self {
             Self::V1(loader) => &loader.name_cache,
             Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
         };
+
+        // Ensure we do not return a guard here (still holding the lock) because loading the struct
+        // type below can fetch struct type by index recursively.
         let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx)?;
 
         match self {
@@ -513,7 +525,7 @@ impl LoaderV1 {
             .into_iter()
             .map(|module_id| self.load_module(&module_id, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.module()))?;
+        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.compiled_module_ref()))?;
         Ok(script)
     }
 
@@ -897,7 +909,7 @@ impl LoaderV1 {
 
         // verify that the transitive closure does not have cycles
         self.verify_module_cyclic_relations(
-            module_ref.module(),
+            module_ref.compiled_module_ref(),
             &BTreeMap::new(),
             &BTreeSet::new(),
             module_store,
@@ -1022,7 +1034,7 @@ impl LoaderV1 {
         // once all dependencies are loaded, do the linking check
         let all_imm_deps = bundle_deps
             .into_iter()
-            .chain(cached_deps.iter().map(|m| m.module()));
+            .chain(cached_deps.iter().map(|m| m.compiled_module_ref()));
         let result = dependencies::verify_module(module, all_imm_deps);
 
         // if dependencies loading is not allowed to fail, the linking should not fail as well

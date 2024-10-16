@@ -123,7 +123,9 @@ impl RuntimeEnvironment {
     ) -> VMResult<Script> {
         dependencies::verify_script(
             locally_verified_script.0.as_ref(),
-            immediate_dependencies.iter().map(|m| m.module()),
+            immediate_dependencies
+                .iter()
+                .map(|m| m.compiled_module_ref()),
         )?;
         Script::new(locally_verified_script.0, self.struct_name_index_map())
             .map_err(|e| e.finish(Location::Script))
@@ -163,7 +165,9 @@ impl RuntimeEnvironment {
     ) -> VMResult<Module> {
         dependencies::verify_module(
             locally_verified_module.0.as_ref(),
-            immediate_dependencies.iter().map(|m| m.module()),
+            immediate_dependencies
+                .iter()
+                .map(|m| m.compiled_module_ref()),
         )?;
         let result = Module::new(
             &self.natives,
