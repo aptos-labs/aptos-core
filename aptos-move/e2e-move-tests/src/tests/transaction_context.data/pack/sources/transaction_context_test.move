@@ -110,6 +110,10 @@ module admin::transaction_context_test {
                 ), type_info::type_name<T3>()],
                 13
             );
+
+            assert!(option::some(option::destroy_some(payload_opt)) == transaction_context::entry_function_payload(), 13);
+        } else {
+            assert!(option::none() == payload_opt, 14);
         }
     }
 
@@ -128,7 +132,10 @@ module admin::transaction_context_test {
                 store.function_name = transaction_context::function_name(entry);
                 store.type_arg_names = transaction_context::type_arg_names(entry);
                 store.args = transaction_context::args(entry);
-            }
+            };
+            assert!(option::some(option::destroy_some(multisig_opt)) == transaction_context::multisig_payload(), 1);
+        } else {
+            assert!(option::none() == multisig_opt, 2);
         }
     }
 

@@ -11,11 +11,13 @@ details on BCS.
 
 -  [Function `to_bytes`](#0x1_bcs_to_bytes)
 -  [Function `serialized_size`](#0x1_bcs_serialized_size)
+-  [Function `constant_serialized_size`](#0x1_bcs_constant_serialized_size)
 -  [Specification](#@Specification_0)
     -  [Function `serialized_size`](#@Specification_0_serialized_size)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="option.md#0x1_option">0x1::option</a>;
+</code></pre>
 
 
 
@@ -61,6 +63,31 @@ Aborts with <code>0x1c5</code> error code if there is a failure when calculating
 
 
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size">serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_constant_serialized_size"></a>
+
+## Function `constant_serialized_size`
+
+If the type has known constant (always the same, independent of instance) serialized size
+in BCS (Binary Canonical Serialization) format, returns it, otherwise returns None.
+Aborts with <code>0x1c5</code> error code if there is a failure when calculating serialized size.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): std::option::Option&lt;u64&gt;;
 </code></pre>
 
 
