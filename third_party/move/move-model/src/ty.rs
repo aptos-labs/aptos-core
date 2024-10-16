@@ -1513,6 +1513,10 @@ pub trait UnificationContext: AbilityContext {
 pub struct ReceiverFunctionInstance {
     /// Qualified id
     pub id: QualifiedId<FunId>,
+    /// Function name
+    pub fun_name: Symbol,
+    /// Type parameters
+    pub type_params: Vec<TypeParameter>,
     /// Type instantiation of the function
     pub type_inst: Vec<Type>,
     /// Types of the arguments, instantiated
@@ -1786,6 +1790,7 @@ impl Substitution {
                     if let Some(receiver) = context.get_receiver_function(ty, *name) {
                         self.eval_receiver_function_constraint(
                             context,
+                            loc,
                             variance,
                             ty_args_opt,
                             args_loc,
@@ -1951,6 +1956,7 @@ impl Substitution {
     fn eval_receiver_function_constraint(
         &mut self,
         context: &mut impl UnificationContext,
+        loc: &Loc,
         variance: Variance,
         ty_args_opt: &Option<(Vec<Loc>, Vec<Type>)>,
         args_loc: &[Loc],
@@ -1977,6 +1983,24 @@ impl Substitution {
                 &ty_args.1,
                 &receiver.type_inst,
             )?;
+        }
+        // Need to add any constraints for type parameters.
+        for (tparam, targ) in receiver.type_params.iter().zip(&receiver.type_inst) {
+            for ctr in Constraint::for_type_parameter(tparam) {
+                self.eval_constraint(
+                    context,
+                    loc,
+                    &self.specialize(targ),
+                    Variance::NoVariance,
+                    WideningOrder::LeftToRight,
+                    ctr,
+                    Some(ConstraintContext::default().for_type_param(
+                        false,
+                        receiver.fun_name,
+                        tparam.clone(),
+                    )),
+                )?
+            }
         }
         self.unify_vec(
             context,
