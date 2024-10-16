@@ -724,10 +724,10 @@ impl TransactionGenerator {
                     Err(mpsc::TrySendError::Full(_)) => {
                         info!("Block sender full, retrying after 10ms.");
                         std::thread::sleep(std::time::Duration::from_millis(10));
-                    }
+                    },
                     Err(mpsc::TrySendError::Disconnected(_)) => {
                         panic!("Block sender disconnected.");
-                    }
+                    },
                 }
             }
         }

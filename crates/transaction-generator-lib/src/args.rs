@@ -73,7 +73,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
     StableCoinMint,
-    StableCoinBatchMint,    
+    StableCoinBatchMint,
 }
 
 impl TransactionTypeArg {
@@ -272,22 +272,22 @@ impl TransactionTypeArg {
                 progress_type: workflow_progress_type,
             },
             TransactionTypeArg::StableCoinMint => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::StableCoinMint { 
-                    num_minter_accounts: 10000, 
-                    num_user_accounts: 600000, 
-                    batch_size: 1, 
-                    reuse_accounts: true,
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 10000,
+                    num_user_accounts: 600000,
+                    batch_size: 1,
+                    num_mint_transactions: 2_000_000,
                 },
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
             },
             TransactionTypeArg::StableCoinBatchMint => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::StableCoinMint { 
+                workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 10000,
                     num_user_accounts: 600000,
                     batch_size: 50,
-                    reuse_accounts: true,
+                    num_mint_transactions: 2_000_000,
                 },
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
