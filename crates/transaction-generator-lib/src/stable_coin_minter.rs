@@ -181,22 +181,20 @@ impl UserModuleTransactionGenerator for StableCoinMinterGenerator {
                         ],
                     ))),
                 )),
-                _ => Some(
-                    minter.first().unwrap().sign_with_transaction_builder(
-                        txn_factory.payload(TransactionPayload::EntryFunction(EntryFunction::new(
-                            ModuleId::new(publisher.address(), ident_str!("stablecoin").to_owned()),
-                            ident_str!("batch_mint").to_owned(),
-                            vec![],
-                            vec![
+                _ => Some(minter.first().unwrap().sign_with_transaction_builder(
+                    txn_factory.payload(TransactionPayload::EntryFunction(EntryFunction::new(
+                        ModuleId::new(publisher.address(), ident_str!("stablecoin").to_owned()),
+                        ident_str!("batch_mint").to_owned(),
+                        vec![],
+                        vec![
                                 bcs::to_bytes(
                                     &destinations.iter().map(|x| x.address()).collect::<Vec<_>>(),
                                 )
                                 .unwrap(),
                                 bcs::to_bytes(&mint_amounts).unwrap(),
                             ],
-                        ))),
-                    ),
-                ),
+                    ))),
+                )),
             };
             minter_accounts.add_to_pool(minter);
             destination_accounts.add_to_pool(destinations);
