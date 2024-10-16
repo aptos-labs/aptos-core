@@ -374,8 +374,7 @@ where
                 parent_block.output.state().base_version,
                 false,
                 result_in_memory_state,
-                // TODO(grao): Avoid this clone.
-                ledger_update.state_updates_until_last_checkpoint.clone(),
+                ledger_update.state_updates_until_last_checkpoint.as_ref(),
                 Some(&ledger_update.sharded_state_cache),
             )?;
             TRANSACTIONS_SAVED.observe(ledger_update.num_txns() as f64);

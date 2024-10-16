@@ -150,7 +150,7 @@ impl AptosDB {
             ledger_info_with_sigs,
             sync_commit,
             latest_in_memory_state,
-            state_updates_until_last_checkpoint,
+            state_updates_until_last_checkpoint.as_ref(),
             None,
         )
     }
