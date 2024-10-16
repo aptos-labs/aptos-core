@@ -718,7 +718,18 @@ impl TransactionGenerator {
             .inc_by(transactions.len() as u64);
 
         if let Some(sender) = &self.block_sender {
-            sender.send(transactions).unwrap();
+            loop {
+                match sender.try_send(transactions.clone()) {
+                    Ok(()) => break,
+                    Err(mpsc::TrySendError::Full(_)) => {
+                        info!("Block sender full, retrying after 10ms.");
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    Err(mpsc::TrySendError::Disconnected(_)) => {
+                        panic!("Block sender disconnected.");
+                    }
+                }
+            }
         }
         false
     }

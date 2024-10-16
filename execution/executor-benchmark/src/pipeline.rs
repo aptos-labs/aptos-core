@@ -68,9 +68,9 @@ where
 
         let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
             if config.delay_execution_start {
-                (num_blocks.unwrap() + 1).max(50)
+                (num_blocks.unwrap() + 1).max(100)
             } else {
-                10
+                100
             }, /* bound */
         );
 
@@ -95,14 +95,14 @@ where
         );
 
         let (start_execution_tx, start_execution_rx) = if config.delay_execution_start {
-            let (start_execution_tx, start_execution_rx) = mpsc::sync_channel::<()>(1);
+            let (start_execution_tx, start_execution_rx) = mpsc::sync_channel::<()>(3);
             (Some(start_execution_tx), Some(start_execution_rx))
         } else {
             (None, None)
         };
 
         let (start_commit_tx, start_commit_rx) = if config.split_stages {
-            let (start_commit_tx, start_commit_rx) = mpsc::sync_channel::<()>(1);
+            let (start_commit_tx, start_commit_rx) = mpsc::sync_channel::<()>(3);
             (Some(start_commit_tx), Some(start_commit_rx))
         } else {
             (None, None)
@@ -131,7 +131,7 @@ where
             LedgerUpdateStage::new(executor_2, commit_processing, version);
 
         let (executable_block_sender, executable_block_receiver) =
-            mpsc::sync_channel::<ExecuteBlockMessage>(3);
+            mpsc::sync_channel::<ExecuteBlockMessage>(100);
 
         let partitioning_thread = std::thread::Builder::new()
             .name("block_partitioning".to_string())
@@ -141,8 +141,22 @@ where
                         .with_label_values(&["partition"])
                         .inc_by(txns.len() as u64);
                     let exe_block_msg = partitioning_stage.process(txns);
-                    executable_block_sender.send(exe_block_msg).unwrap();
+                    info!("Finished partitioning block. Sending new message");
+                    loop {
+                        match executable_block_sender.try_send(exe_block_msg.clone()) {
+                            Ok(_) => break,
+                            Err(mpsc::TrySendError::Full(_)) => {
+                                info!("Partitioning thread waiting for space in executable block sender");
+                                std::thread::sleep(Duration::from_millis(10));
+                            },
+                            Err(mpsc::TrySendError::Disconnected(_)) => {
+                                info!("Partitioning thread disconnected");
+                                return;
+                            }
+                        }
+                    }
                 }
+                info!("Partitioning thread finished");
             })
             .expect("Failed to spawn block partitioner thread.");
         join_handles.push(partitioning_thread);
@@ -257,6 +271,7 @@ where
 }
 
 /// Message from partitioning stage to execution stage.
+#[derive(Clone)]
 pub struct ExecuteBlockMessage {
     pub current_block_start_time: Instant,
     pub partition_time: Duration,

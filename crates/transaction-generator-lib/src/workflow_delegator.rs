@@ -464,7 +464,7 @@ impl WorkflowTxnGeneratorCreator {
                         StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(num_user_accounts))),
                         StageStopCondition::WhenPoolBecomesEmpty(created_minter_pool),
                         StageStopCondition::WhenPoolBecomesEmpty(configured_minter_pool),
-                        StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(2000_000))),
+                        StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(2_000_000))),
                     ],
                 )
             },
