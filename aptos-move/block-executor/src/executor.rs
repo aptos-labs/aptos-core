@@ -31,7 +31,7 @@ use aptos_aggregator::{
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDelayedFieldsError, MaybeCommitted, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -45,7 +45,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
-    vm::{code_cache::ModuleCache, modules::ModuleCacheEntry},
+    vm::modules::ModuleCacheEntry,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -59,6 +59,7 @@ use core::panic;
 use fail::fail_point;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_types::code::ModuleCache;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -725,7 +726,7 @@ where
             versioned_cache
                 .code_cache()
                 .module_cache()
-                .store_committed_module(id, entry, txn_idx);
+                .store_module(id, Arc::new(MaybeCommitted::new(entry, Some(txn_idx))));
         }
         Ok(())
     }

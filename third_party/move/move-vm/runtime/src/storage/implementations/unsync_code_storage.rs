@@ -2,36 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    compute_code_hash,
-    logging::expect_no_verification_errors,
     storage::{
         environment::{ambassador_impl_WithRuntimeEnvironment, WithRuntimeEnvironment},
         implementations::unsync_module_storage::AsUnsyncModuleStorage,
         module_storage::ambassador_impl_ModuleStorage,
     },
-    CodeStorage, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncModuleStorage,
+    CachedScript, Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
-use move_binary_format::{
-    access::ScriptAccess, errors::VMResult, file_format::CompiledScript, CompiledModule,
-};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
-use move_vm_types::{code_storage::ModuleBytesStorage, module_linker_error};
+use move_vm_types::code::{ModuleBytesStorage, ScriptCache};
 #[cfg(test)]
 use std::collections::BTreeSet;
-use std::{
-    cell::RefCell,
-    collections::{hash_map, HashMap},
-    sync::Arc,
-};
-
-/// Represents an entry in script cache, either deserialized or verified.
-#[derive(Debug)]
-enum ScriptCacheEntry {
-    Deserialized(Arc<CompiledScript>),
-    Verified(Arc<Script>),
-}
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 /// Code storage that stores both modules and scripts (not thread-safe).
 #[derive(Delegate)]
@@ -42,7 +27,7 @@ enum ScriptCacheEntry {
 )]
 #[delegate(ModuleStorage, target = "module_storage", where = "M: ModuleStorage")]
 pub struct UnsyncCodeStorage<M> {
-    script_cache: RefCell<HashMap<[u8; 32], ScriptCacheEntry>>,
+    script_cache: RefCell<HashMap<[u8; 32], CachedScript>>,
     module_storage: M,
 }
 
@@ -88,102 +73,24 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
     pub fn module_storage(&self) -> &M {
         &self.module_storage
     }
-
-    /// Deserializes the script into its compiled representation. The deserialization is based on
-    /// the current environment configurations.
-    fn deserialize_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
-        let compiled_script = self
-            .module_storage
-            .runtime_environment()
-            .deserialize_into_script(serialized_script)?;
-        Ok(Arc::new(compiled_script))
-    }
-
-    /// Given a deserialized script, verifies it. The verification consists of three steps:
-    ///   1. Verify the script locally, e.g., using bytecode verifier.
-    ///   2. Load dependencies used by this script. How the dependencies are loaded is opaque to
-    ///      this code storage, and up to the module storage it uses. In any case, loading returns
-    ///      a vector of verified dependencies.
-    ///   3. Verify the script correctly imports its dependencies.
-    /// If any of this steps fail, an error is returned.
-    fn verify_deserialized_script(
-        &self,
-        compiled_script: Arc<CompiledScript>,
-    ) -> VMResult<Arc<Script>> {
-        let locally_verified_script = self
-            .module_storage
-            .runtime_environment()
-            .build_locally_verified_script(compiled_script.clone())?;
-        let immediate_dependencies = compiled_script
-            .immediate_dependencies_iter()
-            .map(|(addr, name)| {
-                self.module_storage
-                    .fetch_verified_module(addr, name)
-                    .map_err(expect_no_verification_errors)?
-                    .ok_or_else(|| module_linker_error!(addr, name))
-            })
-            .collect::<VMResult<Vec<_>>>()?;
-        Ok(Arc::new(
-            self.module_storage
-                .runtime_environment()
-                .build_verified_script(locally_verified_script, &immediate_dependencies)?,
-        ))
-    }
 }
 
-impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
-    fn deserialize_and_cache_script(
-        &self,
-        serialized_script: &[u8],
-    ) -> VMResult<Arc<CompiledScript>> {
-        use hash_map::Entry::*;
-        use ScriptCacheEntry::*;
+impl<M: ModuleStorage> ScriptCache for UnsyncCodeStorage<M> {
+    type Key = [u8; 32];
+    type Script = CachedScript;
 
-        let hash = compute_code_hash(serialized_script);
-        let mut script_cache = self.script_cache.borrow_mut();
-
-        Ok(match script_cache.entry(hash) {
-            Occupied(e) => match e.get() {
-                Deserialized(compiled_script) => compiled_script.clone(),
-                Verified(script) => script.script.clone(),
-            },
-            Vacant(e) => {
-                let compiled_script = self.deserialize_script(serialized_script)?;
-                e.insert(Deserialized(compiled_script.clone()));
-                compiled_script
-            },
-        })
+    fn store_script(&self, key: Self::Key, script: Self::Script) {
+        self.script_cache.borrow_mut().insert(key, script);
     }
 
-    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        use hash_map::Entry::*;
-        use ScriptCacheEntry::*;
-
-        let hash = compute_code_hash(serialized_script);
-        let mut script_cache = self.script_cache.borrow_mut();
-
-        Ok(match script_cache.entry(hash) {
-            Occupied(mut e) => match e.get() {
-                Deserialized(compiled_script) => {
-                    let script = self.verify_deserialized_script(compiled_script.clone())?;
-                    e.insert(Verified(script.clone()));
-                    script
-                },
-                Verified(script) => script.clone(),
-            },
-            Vacant(e) => {
-                let compiled_script = self.deserialize_script(serialized_script)?;
-                let script = self.verify_deserialized_script(compiled_script)?;
-                e.insert(Verified(script.clone()));
-                script
-            },
-        })
+    fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
+        self.script_cache.borrow_mut().get(key).cloned()
     }
 }
 
 #[cfg(test)]
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
-    fn matches<P: Fn(&ScriptCacheEntry) -> bool>(
+    fn matches<P: Fn(&CachedScript) -> bool>(
         &self,
         script_hashes: impl IntoIterator<Item = [u8; 32]>,
         predicate: P,
@@ -202,8 +109,12 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storage::implementations::unsync_module_storage::{
-        test::add_module_bytes, ModuleCacheEntry,
+    use crate::{
+        compute_code_hash,
+        storage::{
+            code_storage::CodeStorage,
+            implementations::unsync_module_storage::{test::add_module_bytes, ModuleCacheEntry},
+        },
     };
     use claims::assert_ok;
     use move_binary_format::{
@@ -222,7 +133,7 @@ mod test {
 
     #[test]
     fn test_deserialized_script_fetching() {
-        use ScriptCacheEntry::*;
+        use CachedScript::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
@@ -250,8 +161,8 @@ mod test {
 
     #[test]
     fn test_verified_script_fetching() {
+        use CachedScript as S;
         use ModuleCacheEntry as M;
-        use ScriptCacheEntry as S;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);

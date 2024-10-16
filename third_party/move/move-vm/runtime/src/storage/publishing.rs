@@ -19,7 +19,7 @@ use move_core_types::{
     metadata::Metadata,
     vm_status::StatusCode,
 };
-use move_vm_types::{code_storage::ModuleBytesStorage, module_linker_error};
+use move_vm_types::{code::ModuleBytesStorage, module_linker_error};
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,

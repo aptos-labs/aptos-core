@@ -19,7 +19,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
-    code_storage::ModuleBytesStorage,
+    code::ModuleBytesStorage,
     gas::UnmeteredGasMeter,
     resolver::{ModuleResolver, ResourceResolver},
 };

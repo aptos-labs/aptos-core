@@ -1,19 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm::code_cache::{ModuleCache, ScriptCache};
 use hashbrown::{hash_map::Entry, HashMap};
-use std::{cell::RefCell, hash::Hash};
+use move_vm_types::code::{ModuleCache, ScriptCache};
+use std::{cell::RefCell, hash::Hash, marker::PhantomData};
 
 /// A per-block code cache to be used for sequential transaction execution.
-pub struct UnsyncCodeCache<K, M, Q, S> {
+pub struct UnsyncCodeCache<K, M, Q, S, E> {
     /// Script cache, indexed by keys such as hashes.
     script_cache: RefCell<HashMap<Q, S>>,
     /// Module cache, indexed by keys such as address and module name pairs.
     module_cache: RefCell<HashMap<K, M>>,
+
+    phantom_data: PhantomData<E>,
 }
 
-impl<K, M, Q, S> UnsyncCodeCache<K, M, Q, S>
+impl<K, M, Q, S, E> UnsyncCodeCache<K, M, Q, S, E>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -25,7 +27,18 @@ where
         Self {
             script_cache: RefCell::new(HashMap::new()),
             module_cache: RefCell::new(HashMap::new()),
+            phantom_data: PhantomData,
         }
+    }
+
+    /// Returns the number of scripts stored in code cache.
+    pub fn num_scripts(&self) -> usize {
+        self.script_cache.borrow().len()
+    }
+
+    /// Returns the number of modules stored in code cache.
+    pub fn num_modules(&self) -> usize {
+        self.module_cache.borrow().len()
     }
 
     /// Returns all modules stored in the code cache.
@@ -34,7 +47,7 @@ where
     }
 }
 
-impl<K, M, Q, S> ScriptCache for UnsyncCodeCache<K, M, Q, S>
+impl<K, M, Q, S, E> ScriptCache for UnsyncCodeCache<K, M, Q, S, E>
 where
     K: Eq + Hash + Clone,
     M: Clone,
@@ -51,23 +64,16 @@ where
     fn fetch_script(&self, key: &Self::Key) -> Option<Self::Script> {
         self.script_cache.borrow().get(key).cloned()
     }
-
-    fn flush_scripts(&self) {
-        self.script_cache.borrow_mut().clear();
-    }
-
-    fn num_scripts(&self) -> usize {
-        self.script_cache.borrow().len()
-    }
 }
 
-impl<K, M, Q, S> ModuleCache for UnsyncCodeCache<K, M, Q, S>
+impl<K, M, Q, S, E> ModuleCache for UnsyncCodeCache<K, M, Q, S, E>
 where
     K: Eq + Hash + Clone,
     M: Clone,
     Q: Eq + Hash + Clone,
     S: Clone,
 {
+    type Error = E;
     type Key = K;
     type Module = M;
 
@@ -75,26 +81,18 @@ where
         self.module_cache.borrow_mut().insert(key, module);
     }
 
-    fn fetch_module_or_store_with<F, E>(
+    fn fetch_module_or_store_with<F>(
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, E>
+    ) -> Result<Option<Self::Module>, Self::Error>
     where
-        F: FnOnce() -> Result<Option<Self::Module>, E>,
+        F: FnOnce() -> Result<Option<Self::Module>, Self::Error>,
     {
         Ok(match self.module_cache.borrow_mut().entry(key.clone()) {
             Entry::Occupied(e) => Some(e.get().clone()),
             Entry::Vacant(e) => default()?.map(|m| e.insert(m).clone()),
         })
-    }
-
-    fn flush_modules(&self) {
-        self.module_cache.borrow_mut().clear()
-    }
-
-    fn num_modules(&self) -> usize {
-        self.module_cache.borrow().len()
     }
 }
 
@@ -105,30 +103,30 @@ mod test {
 
     #[test]
     fn test_empty() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 0);
     }
 
     #[test]
     fn test_cache_misses() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
         assert_eq!(code_cache.fetch_script(&1), None);
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(None)),
+            code_cache.fetch_module_or_store_with(&1, || Ok(None)),
             Ok(None)
         );
         assert_eq!(code_cache.num_modules(), 0);
 
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(Some(77))),
+            code_cache.fetch_module_or_store_with(&1, || Ok(Some(77))),
             Ok(Some(77))
         );
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
 
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(Some(2))),
+            code_cache.fetch_module_or_store_with(&1, || Ok(Some(2))),
             Ok(Some(77))
         );
 
@@ -138,7 +136,7 @@ mod test {
 
     #[test]
     fn test_script_cache() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
         code_cache.store_script(1, 1);
 
         assert_eq!(code_cache.num_scripts(), 1);
@@ -148,43 +146,18 @@ mod test {
 
     #[test]
     fn test_module_cache() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
+        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize, ()>::empty();
         code_cache.store_module(1, 1);
 
         assert_eq!(code_cache.num_scripts(), 0);
         assert_eq!(code_cache.num_modules(), 1);
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(None)),
+            code_cache.fetch_module_or_store_with(&1, || Ok(None)),
             Ok(Some(1))
         );
         assert_eq!(
-            code_cache.fetch_module_or_store_with(&1, || Ok::<_, ()>(Some(10))),
+            code_cache.fetch_module_or_store_with(&1, || Ok(Some(10))),
             Ok(Some(1))
         );
-    }
-
-    #[test]
-    fn test_flush() {
-        let code_cache = UnsyncCodeCache::<usize, usize, usize, usize>::empty();
-
-        code_cache.store_script(1, 1);
-        code_cache.store_module(2, 3);
-        code_cache.store_module(3, 3);
-        assert_eq!(code_cache.num_scripts(), 1);
-        assert_eq!(code_cache.num_modules(), 2);
-
-        code_cache.flush_modules();
-        assert_eq!(code_cache.num_scripts(), 1);
-        assert_eq!(code_cache.num_modules(), 0);
-
-        code_cache.store_script(4, 4);
-        code_cache.store_script(5, 5);
-        code_cache.store_module(6, 6);
-        assert_eq!(code_cache.num_scripts(), 3);
-        assert_eq!(code_cache.num_modules(), 1);
-
-        code_cache.flush_scripts();
-        assert_eq!(code_cache.num_scripts(), 0);
-        assert_eq!(code_cache.num_modules(), 1);
     }
 }
