@@ -102,25 +102,14 @@ pub fn create_empty_sharded_state_updates() -> ShardedStateUpdates {
     arr![HashMap::new(); 16]
 }
 
-pub fn combine_or_add_sharded_state_updates(
-    lhs: &mut Option<ShardedStateUpdates>,
-    rhs: ShardedStateUpdates,
-) {
-    if let Some(lhs) = lhs {
-        combine_sharded_state_updates(lhs, rhs);
-    } else {
-        *lhs = Some(rhs);
-    }
-}
-
-pub fn combine_sharded_state_updates(lhs: &mut ShardedStateUpdates, rhs: ShardedStateUpdates) {
+pub fn combine_sharded_state_updates(lhs: &mut ShardedStateUpdates, rhs: &ShardedStateUpdates) {
     use rayon::prelude::*;
 
     THREAD_MANAGER.get_exe_cpu_pool().install(|| {
         lhs.par_iter_mut()
-            .zip_eq(rhs.into_par_iter())
+            .zip_eq(rhs.par_iter())
             .for_each(|(l, r)| {
-                l.extend(r);
+                l.extend(r.clone());
             })
     })
 }

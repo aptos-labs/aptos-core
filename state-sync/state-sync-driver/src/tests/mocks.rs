@@ -332,7 +332,7 @@ mock! {
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
             sync_commit: bool,
             in_memory_state: StateDelta,
-            state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+            state_updates_until_last_checkpoint: Option<&'b ShardedStateUpdates>,
             sharded_state_cache: Option<&'b ShardedStateCache>,
         ) -> Result<()>;
     }

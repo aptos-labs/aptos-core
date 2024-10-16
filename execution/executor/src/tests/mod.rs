@@ -508,10 +508,9 @@ fn apply_transaction_by_writeset(
             ledger_info.as_ref(),
             true, /* sync_commit */
             result_state,
-            // TODO(aldenhu): avoid clone
             ledger_update_output
                 .state_updates_until_last_checkpoint
-                .clone(),
+                .as_ref(),
             Some(&ledger_update_output.sharded_state_cache),
         )
         .unwrap();
@@ -720,10 +719,9 @@ fn run_transactions_naive(
                 ledger_info.as_ref(),
                 true, /* sync_commit */
                 result_state,
-                // TODO(aldenhu): avoid clone
                 ledger_update_output
                     .state_updates_until_last_checkpoint
-                    .clone(),
+                    .as_ref(),
                 Some(&ledger_update_output.sharded_state_cache),
             )
             .unwrap();
