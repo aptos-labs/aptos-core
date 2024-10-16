@@ -24,7 +24,9 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
@@ -462,9 +464,7 @@ async fn test_commit_sync_race() {
     };
     use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
-    use aptos_executor_types::{
-        state_checkpoint_output::StateCheckpointOutput, StateComputeResult,
-    };
+    use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
