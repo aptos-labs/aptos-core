@@ -31,6 +31,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::math_fixed`](math_fixed.md#0x1_math_fixed)
 -  [`0x1::math_fixed64`](math_fixed64.md#0x1_math_fixed64)
 -  [`0x1::multi_ed25519`](multi_ed25519.md#0x1_multi_ed25519)
+-  [`0x1::ordered_map`](ordered_map.md#0x1_ordered_map)
 -  [`0x1::pool_u64`](pool_u64.md#0x1_pool_u64)
 -  [`0x1::pool_u64_unbound`](pool_u64_unbound.md#0x1_pool_u64_unbound)
 -  [`0x1::ristretto255`](ristretto255.md#0x1_ristretto255)
