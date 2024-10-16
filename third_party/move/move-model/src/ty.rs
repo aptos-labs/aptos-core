@@ -24,6 +24,7 @@ use move_core_types::{
 use num::BigInt;
 use num_traits::identities::Zero;
 use std::{
+    cell::RefCell,
     cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     fmt,
@@ -601,8 +602,21 @@ impl Constraint {
 
     /// Displays a constraint.
     pub fn display(&self, display_context: &TypeDisplayContext) -> String {
-        fn fmt_types<'a>(ctx: &TypeDisplayContext, tys: impl Iterator<Item = &'a Type>) -> String {
-            tys.map(|ty| ty.display(ctx)).join(",")
+        self.display_cont(display_context, &BTreeSet::new())
+    }
+
+    fn display_cont(
+        &self,
+        display_context: &TypeDisplayContext,
+        visiting_type_vars: &BTreeSet<u32>,
+    ) -> String {
+        fn fmt_types<'a>(
+            ctx: &TypeDisplayContext,
+            visiting_type_vars: &BTreeSet<u32>,
+            tys: impl Iterator<Item = &'a Type>,
+        ) -> String {
+            tys.map(|ty| ty.display_with(ctx, visiting_type_vars))
+                .join(",")
         }
         let pool = display_context.env.symbol_pool();
         match self {
@@ -619,12 +633,16 @@ impl Constraint {
                 } else {
                     options
                         .iter()
-                        .map(|p| Type::new_prim(*p).display(display_context).to_string())
+                        .map(|p| {
+                            Type::new_prim(*p)
+                                .display_with(display_context, visiting_type_vars)
+                                .to_string()
+                        })
                         .join("|")
                 }
             },
             Constraint::SomeReference(ty) => {
-                format!("&{}", ty.display(display_context))
+                format!("&{}", ty.display_with(display_context, visiting_type_vars))
             },
             Constraint::SomeStruct(field_map) => {
                 format!(
@@ -640,12 +658,15 @@ impl Constraint {
                     "fun self.{}{}({}):{}",
                     name.display(pool),
                     if let Some(inst) = inst {
-                        format!("<{}>", fmt_types(display_context, inst.1.iter()))
+                        format!(
+                            "<{}>",
+                            fmt_types(display_context, visiting_type_vars, inst.1.iter())
+                        )
                     } else {
                         "".to_owned()
                     },
-                    fmt_types(display_context, args.iter()),
-                    result.display(display_context)
+                    fmt_types(display_context, visiting_type_vars, args.iter()),
+                    result.display_with(display_context, visiting_type_vars)
                 )
             },
             Constraint::NoReference => "no-ref".to_string(),
@@ -3362,6 +3383,7 @@ impl<'a> TypeDisplayContext<'a> {
 pub struct TypeDisplay<'a> {
     type_: &'a Type,
     context: &'a TypeDisplayContext<'a>,
+    vars_visiting: RefCell<BTreeSet<u32>>,
 }
 
 impl Type {
@@ -3369,6 +3391,23 @@ impl Type {
         TypeDisplay {
             type_: self,
             context,
+            vars_visiting: Default::default(),
+        }
+    }
+
+    fn display_cont<'a>(&'a self, other: &'a TypeDisplay<'a>) -> TypeDisplay<'a> {
+        self.display_with(other.context, &other.vars_visiting.borrow())
+    }
+
+    fn display_with<'a>(
+        &'a self,
+        context: &'a TypeDisplayContext<'a>,
+        vars_visiting: &BTreeSet<u32>,
+    ) -> TypeDisplay<'a> {
+        TypeDisplay {
+            type_: self,
+            context,
+            vars_visiting: RefCell::new(vars_visiting.clone()),
         }
     }
 }
@@ -3384,7 +3423,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 } else {
                     f.write_str(", ")?;
                 }
-                write!(f, "{}", t.display(self.context))?;
+                write!(f, "{}", t.display_cont(self))?;
             }
             Ok(())
         };
@@ -3395,8 +3434,8 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 comma_list(f, ts)?;
                 f.write_str(")")
             },
-            Vector(t) => write!(f, "vector<{}>", t.display(self.context)),
-            TypeDomain(t) => write!(f, "domain<{}>", t.display(self.context)),
+            Vector(t) => write!(f, "vector<{}>", t.display_cont(self)),
+            TypeDomain(t) => write!(f, "domain<{}>", t.display_cont(self)),
             ResourceDomain(mid, sid, inst_opt) => {
                 write!(f, "resources<{}", self.struct_str(*mid, *sid))?;
                 if let Some(inst) = inst_opt {
@@ -3408,10 +3447,10 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Fun(a, t) => {
                 f.write_str("|")?;
-                write!(f, "{}", a.display(self.context))?;
+                write!(f, "{}", a.display_cont(self))?;
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))
+                    write!(f, "{}", t.display_cont(self))
                 } else {
                     Ok(())
                 }
@@ -3432,7 +3471,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                     ReferenceKind::Mutable => "mut ",
                 };
                 f.write_str(modifier)?;
-                write!(f, "{}", t.display(self.context))
+                write!(f, "{}", t.display_cont(self))
             },
             TypeParameter(idx) => {
                 if let Some(names) = &self.context.type_param_names {
@@ -3448,18 +3487,23 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Var(idx) => {
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
-                    write!(f, "{}", ty.display(self.context))
+                    write!(f, "{}", ty.display_cont(self))
                 } else if let Some(ctrs) =
                     self.context.subs_opt.and_then(|s| s.constraints.get(idx))
                 {
                     let ctrs = ctrs.iter().filter(|c| !c.2.hidden()).collect_vec();
-                    if ctrs.is_empty() {
+                    if ctrs.is_empty() || self.vars_visiting.borrow().contains(idx) {
                         f.write_str(&self.type_var_str(*idx))
                     } else {
+                        self.vars_visiting.borrow_mut().insert(*idx);
                         let out = ctrs
                             .iter()
-                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .map(|(_, _, c)| {
+                                c.display_cont(self.context, &self.vars_visiting.borrow())
+                                    .to_string()
+                            })
                             .join(" + ");
+                        self.vars_visiting.borrow_mut().remove(idx);
                         f.write_str(&out)
                     }
                 } else {

@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: undeclared receiver function `borrow` for type `vector<Entry<K, V>>`
+   ┌─ tests/checking/receiver/bug_14913_constraint_infinite_recursion.move:20:10
+   │
+20 │         &map.entries.borrow(self.index).key
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: undeclared receiver function `lower_bound` for type `OrderedMap<K, V>`
+   ┌─ tests/checking/receiver/bug_14913_constraint_infinite_recursion.move:23:27
+   │
+23 │         let lower_bound = self.lower_bound(key);
+   │                           ^^^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `*error*` is not suitable for receiver functions. Only structs and vectors can have receiver functions. Consider using a different name.
+   ┌─ tests/checking/receiver/bug_14913_constraint_infinite_recursion.move:32:16
+   │
+32 │     public fun borrow<K, V>(self: &OrderedMao<K, V>, key: &K): &V {
+   │                ^^^^^^
+
+error: type cannot have type arguments
+   ┌─ tests/checking/receiver/bug_14913_constraint_infinite_recursion.move:32:36
+   │
+32 │     public fun borrow<K, V>(self: &OrderedMao<K, V>, key: &K): &V {
+   │                                    ^^^^^^^^^^
+
+error: undeclared `0x815::ordered_map::OrderedMao`
+   ┌─ tests/checking/receiver/bug_14913_constraint_infinite_recursion.move:32:36
+   │
+32 │     public fun borrow<K, V>(self: &OrderedMao<K, V>, key: &K): &V {
+   │                                    ^^^^^^^^^^
+
+error: unable to infer instantiation of type `fun self.iter_borrow(_,&*error*):&V` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/bug_14913_constraint_infinite_recursion.move:33:9
+   │
+33 │         self.find(key).iter_borrow(self)
+   │         ^^^^^^^^^^^^^^
