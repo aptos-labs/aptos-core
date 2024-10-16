@@ -1396,11 +1396,13 @@ dependencies = [
  "aptos-executor-types",
  "aptos-experimental-ptx-executor",
  "aptos-experimental-runtimes",
+ "aptos-fanout-partitioner",
  "aptos-genesis",
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
+ "aptos-partitioner-benchmark",
  "aptos-profiler",
  "aptos-push-metrics",
  "aptos-sdk",
@@ -3104,6 +3106,22 @@ dependencies = [
  "move-command-line-common",
  "move-package",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-partitioner-benchmark"
+version = "0.1.0"
+dependencies = [
+ "aptos-block-partitioner",
+ "aptos-fanout-partitioner",
+ "aptos-logger",
+ "aptos-streaming-partitioner",
+ "aptos-transaction-orderer",
+ "aptos-types",
+ "clap 4.4.14",
+ "rand 0.8.5",
+ "rand_distr",
+ "rayon",
 ]
 
 [[package]]
@@ -11968,22 +11986,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
 dependencies = [
  "regex",
-]
-
-[[package]]
-name = "partitioner-benchmark"
-version = "0.1.0"
-dependencies = [
- "aptos-block-partitioner",
- "aptos-fanout-partitioner",
- "aptos-logger",
- "aptos-streaming-partitioner",
- "aptos-transaction-orderer",
- "aptos-types",
- "clap 4.4.14",
- "rand 0.8.5",
- "rand_distr",
- "rayon",
 ]
 
 [[package]]

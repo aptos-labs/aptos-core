@@ -85,6 +85,7 @@ fn main() {
         args.txns_per_user_relative_std_dev,
         args.fraction_of_external_txns,
         args.debug_logs,
+        true,
     );
 
     info!("Generating {} transactions", args.num_txns);

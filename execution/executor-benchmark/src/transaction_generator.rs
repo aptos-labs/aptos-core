@@ -8,6 +8,7 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
+use aptos_partitioner_benchmark::clustered_txns_generator::{ClusteredTxnsGenConfig, ClusteredTxnsGenerator};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
@@ -280,6 +281,7 @@ impl TransactionGenerator {
         num_transfer_blocks: usize,
         transactions_per_sender: usize,
         connected_tx_grps: usize,
+        clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
         shuffle_connected_txns: bool,
         hotspot_probability: Option<f32>,
     ) -> usize {
@@ -289,6 +291,7 @@ impl TransactionGenerator {
             num_transfer_blocks,
             transactions_per_sender,
             connected_tx_grps,
+            clustered_txns_gen_config,
             shuffle_connected_txns,
             hotspot_probability,
         );
@@ -620,6 +623,48 @@ impl TransactionGenerator {
         }
     }
 
+    fn gen_clustered_grps_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        config: ClusteredTxnsGenConfig,
+    ) {
+        let num_signer_accounts = self.main_signer_accounts.as_ref().unwrap().accounts.len();
+        assert!(num_signer_accounts * config.mean_txns_per_user >= 2 * block_size);
+        //let rng = &mut self.main_signer_accounts.as_mut().unwrap().rng;
+        let generator = ClusteredTxnsGenerator::new(
+            config.num_clusters,
+            0,
+            config.num_resource_addresses_per_cluster,
+            config.mean_txns_per_user,
+            config.cluster_size_relative_std_dev,
+            config.txns_per_user_relative_std_dev,
+            config.fraction_of_external_txns,
+            config.print_debug_stats,
+            false,
+        );
+
+        let max_sender_idx = block_size / config.mean_txns_per_user;
+        for i in 0..num_blocks {
+            info!("Generating Clustered groups of txns indices for block {}", i);
+            let txn_indices = generator.generate_txn_indices(block_size);
+
+            let transfer_indices: Vec<(usize, usize)> = txn_indices
+                .into_iter()
+                .map(|(sender_idx, (recvr_cluster, recvr_resource_idx))| {
+                    let recvr_idx = recvr_cluster * config.num_resource_addresses_per_cluster
+                        + recvr_resource_idx + max_sender_idx + 1;
+                    (sender_idx, recvr_idx)
+                })
+                .collect();
+
+            self.generate_and_send_transfer_block(
+                self.main_signer_accounts.as_ref().unwrap(),
+                transfer_indices,
+            );
+        }
+    }
+
     fn generate_and_send_transfer_block(
         &self,
         account_cache: &AccountCache,
@@ -729,6 +774,7 @@ impl TransactionGenerator {
         num_blocks: usize,
         transactions_per_sender: usize,
         connected_tx_grps: usize,
+        clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
         shuffle_connected_txns: bool,
         hotspot_probability: Option<f32>,
     ) {
@@ -744,6 +790,15 @@ impl TransactionGenerator {
                 num_blocks,
                 connected_tx_grps,
                 shuffle_connected_txns,
+            );
+        } else if clustered_txns_gen_config.is_some() {
+            info!("block_generation_mode=clustered_txns");
+            let config = clustered_txns_gen_config.unwrap();
+            info!("clustered_txns_gen_config={config:?}");
+            self.gen_clustered_grps_transfer_transactions(
+                block_size,
+                num_blocks,
+                config,
             );
         } else if hotspot_probability.is_some() {
             info!("block_generation_mode=sample_from_pool_with_hotspot");

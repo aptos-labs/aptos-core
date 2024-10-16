@@ -22,6 +22,7 @@ use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
+use aptos_partitioner_benchmark::clustered_txns_generator::ClusteredTxnsGenConfig;
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
@@ -33,6 +34,7 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_fanout_partitioner::fanout::V3FanoutPartitionerConfig;
 use aptos_streaming_partitioner::V3FennelBasedPartitionerConfig;
 use aptos_transaction_orderer::V3ReorderingPartitionerConfig;
 
@@ -162,6 +164,18 @@ struct ShardingOpt {
     partitioner_v2_num_threads: usize,
     #[clap(long, default_value = "64")]
     partitioner_v2_dashmap_num_shards: usize,
+    #[clap(long)]
+    pub v3_debug_logs: bool,
+    #[clap(long)]
+    pub fanout_detailed_debug_logs: bool,
+    #[clap(long, default_value_t = 10)]
+    pub fanout_num_iterations: usize,
+    #[clap(long)]
+    pub fanout_init_randomly: bool,
+    #[clap(long, default_value_t = 0.1)]
+    pub fanout_probability: f32,
+    #[clap(long, default_value_t = 1.0)]
+    pub fanout_move_probability: f64,
 }
 
 impl ShardingOpt {
@@ -189,6 +203,14 @@ impl ShardingOpt {
             Some("v3-naive") => Box::new(V3NaivePartitionerConfig {}),
             Some("v3-orderer") => Box::new(V3ReorderingPartitionerConfig {}),
             Some("v3-fennel") => Box::new(V3FennelBasedPartitionerConfig {}),
+            Some("v3-fanout") => Box::new(V3FanoutPartitionerConfig {
+                print_debug_stats: self.v3_debug_logs,
+                fanout_detailed_debug_logs: self.fanout_detailed_debug_logs,
+                fanout_num_iterations: self.fanout_num_iterations,
+                fanout_init_randomly: self.fanout_init_randomly,
+                fanout_move_probability: self.fanout_move_probability,
+                fanout_probability: self.fanout_probability,
+            }),
             None => Box::<PartitionerV2Config>::default(),
             _ => panic!(
                 "Unknown partitioner version: {:?}",
@@ -196,6 +218,49 @@ impl ShardingOpt {
             ),
         }
     }
+}
+
+#[derive(Debug, Parser)]
+struct ClusteredTxnsGeneratorOpt {
+    #[clap(long, default_value_t = 10)]
+    pub num_clusters: usize,
+
+    #[clap(long, default_value_t = 1000)]
+    pub total_user_accounts: usize,
+
+    #[clap(long, default_value_t = 100)]
+    pub num_resource_addresses_per_cluster: usize,
+
+    #[clap(long, default_value_t = 10)]
+    pub mean_txns_per_user: usize,
+
+    #[clap(long, default_value_t = 0.1)]
+    pub cluster_size_relative_std_dev: f64,
+
+    #[clap(long, default_value_t = 0.1)]
+    pub txns_per_user_relative_std_dev: f64,
+
+    #[clap(long, default_value_t = 0.1)]
+    pub fraction_of_external_txns: f64,
+
+    #[clap(long, default_value_t = 10000)]
+    pub num_txns: usize,
+}
+
+impl ClusteredTxnsGeneratorOpt {
+    fn clustered_txns_gen_config(&self, print_debug_stats: bool) -> ClusteredTxnsGenConfig {
+        ClusteredTxnsGenConfig {
+            num_clusters: self.num_clusters,
+            num_resource_addresses_per_cluster: self.num_resource_addresses_per_cluster,
+            mean_txns_per_user: self.mean_txns_per_user,
+            cluster_size_relative_std_dev: self.cluster_size_relative_std_dev,
+            txns_per_user_relative_std_dev: self.txns_per_user_relative_std_dev,
+            fraction_of_external_txns: self.fraction_of_external_txns,
+            print_debug_stats,
+            total_user_accounts: self.total_user_accounts,
+        }
+    }
+
 }
 
 #[derive(Parser, Debug)]
@@ -232,6 +297,9 @@ struct Opt {
     /// 'connected_tx_grps' should be less than 'block_size'
     #[clap(long, default_value_t = 0)]
     connected_tx_grps: usize,
+
+    #[clap(flatten)]
+    clustered_txns_gen_opt: ClusteredTxnsGeneratorOpt,
 
     #[clap(long)]
     shuffle_connected_txns: bool,
@@ -406,6 +474,7 @@ where
                 transaction_mix,
                 opt.transactions_per_sender,
                 opt.connected_tx_grps,
+                Some(opt.clustered_txns_gen_opt.clustered_txns_gen_config(opt.pipeline_opt.sharding_opt.v3_debug_logs)),
                 opt.shuffle_connected_txns,
                 opt.hotspot_probability,
                 main_signer_accounts,

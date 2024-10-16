@@ -36,6 +36,7 @@ impl BlockPreparationStage {
             None
         } else {
             let partitioner = partitioner_config.build();
+            println!("***************************************** Building a partitioner.");
             Some(partitioner)
         };
 

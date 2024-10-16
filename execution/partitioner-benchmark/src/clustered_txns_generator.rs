@@ -10,6 +10,18 @@ use rand_distr::{Distribution, LogNormal, Normal};
 use aptos_logger::info;
 use rayon::prelude::*;
 
+#[derive(Debug)]
+pub struct ClusteredTxnsGenConfig {
+    pub num_clusters: usize,
+    pub mean_txns_per_user: usize,
+    pub num_resource_addresses_per_cluster: usize,
+    pub cluster_size_relative_std_dev: f64,
+    pub txns_per_user_relative_std_dev: f64,
+    pub fraction_of_external_txns: f64,
+    pub print_debug_stats: bool,
+    pub total_user_accounts: usize,
+}
+
 pub struct ClusteredTxnsGenerator {
     num_clusters: usize,
     mean_txns_per_user: usize,
@@ -32,17 +44,26 @@ impl ClusteredTxnsGenerator {
         txns_per_user_relative_std_dev: f64,
         fraction_of_external_txns: f64,
         print_debug_stats: bool,
+        gen_accounts: bool,
     ) -> Self {
-        let all_user_accounts = (0..total_user_accounts)
-            .map(|_| generate_test_account())
-            .collect();
+        let all_user_accounts = if gen_accounts {
+            (0..total_user_accounts)
+                .map(|_| generate_test_account())
+                .collect()
+        } else {
+            vec![]
+        };
 
-        let cluster_resource_addresses = (0..num_clusters)
-            .map(|_| {
-                (0..num_resource_addresses_per_cluster)
-                    .map(|_| generate_test_account())
-                    .collect()
-            }).collect();
+        let cluster_resource_addresses = if gen_accounts {
+            (0..num_clusters)
+                .map(|_| {
+                    (0..num_resource_addresses_per_cluster)
+                        .map(|_| generate_test_account())
+                        .collect()
+                }).collect()
+        } else {
+            vec![]
+        };
 
         Self {
             num_clusters,
@@ -138,7 +159,7 @@ impl ClusteredTxnsGenerator {
         cluster_sizes
     }
 
-    fn generate_txn_indices(&self, num_txns: usize) -> Vec<(usize, (usize, usize))> {
+    pub fn generate_txn_indices(&self, num_txns: usize) -> Vec<(usize, (usize, usize))> {
         let mut indices = vec![];
 
         // distribute the user accounts among the clusters

@@ -36,6 +36,7 @@ use aptos_jellyfish_merkle::metrics::{
 };
 use aptos_logger::{info, warn};
 use aptos_metrics_core::Histogram;
+use aptos_partitioner_benchmark::clustered_txns_generator::ClusteredTxnsGenConfig;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
@@ -99,6 +100,7 @@ pub fn run_benchmark<V>(
     transaction_mix: Option<Vec<(TransactionType, usize)>>,
     mut transactions_per_sender: usize,
     connected_tx_grps: usize,
+    clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
     shuffle_connected_txns: bool,
     hotspot_probability: Option<f32>,
     num_main_signer_accounts: usize,
@@ -211,6 +213,7 @@ pub fn run_benchmark<V>(
             num_blocks,
             transactions_per_sender,
             connected_tx_grps,
+            clustered_txns_gen_config,
             shuffle_connected_txns,
             hotspot_probability,
         )
@@ -759,6 +762,7 @@ mod tests {
                 .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
+            None,
             false, /* shuffle the connected txns in a block */
             None,  /* maybe_hotspot_probability */
             25,    /* num_main_signer_accounts */

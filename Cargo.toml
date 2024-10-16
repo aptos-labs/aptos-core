@@ -399,6 +399,7 @@ aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server"
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
 aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
 aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
+aptos-partitioner-benchmark = { path = "execution/partitioner-benchmark"}
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }

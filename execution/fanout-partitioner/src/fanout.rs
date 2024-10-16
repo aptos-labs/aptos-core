@@ -3,7 +3,7 @@
 
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::BlockPartitioner;
+use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     state_store::state_key::StateKey,
@@ -23,22 +23,28 @@ pub enum InitStrategy {
     PriorityBfs,
 }
 
-// #[derive(Clone, Debug, Parser)]
-// pub struct V3FanoutPartitionerConfig {
-//     pub print_debug_stats: bool,
-//     pub num_iterations: usize,
-//     pub init_randomly: bool,
-// }
+#[derive(Clone, Debug)]
+pub struct V3FanoutPartitionerConfig {
+    pub print_debug_stats: bool,
+    pub fanout_detailed_debug_logs: bool,
+    pub fanout_num_iterations: usize,
+    pub fanout_init_randomly: bool,
+    pub fanout_move_probability: f64,
+    pub fanout_probability: f32,
+}
 
-// impl PartitionerConfig for V3FanoutPartitionerConfig {
-//     fn build(&self) -> Box<dyn BlockPartitioner> {
-//         Box::new(FanoutPartitioner {
-//             print_debug_stats: self.print_debug_stats,
-//             num_iterations: self.num_iterations,
-//             init_strategy: if self.init_randomly { InitStrategy::Random } else { InitStrategy::PriorityBfs },
-//         })
-//     }
-// }
+impl PartitionerConfig for V3FanoutPartitionerConfig {
+    fn build(&self) -> Box<dyn BlockPartitioner> {
+        Box::new(FanoutPartitioner {
+            print_debug_stats: self.print_debug_stats,
+            print_detailed_debug_stats: self.fanout_detailed_debug_logs,
+            num_iterations: self.fanout_num_iterations,
+            init_strategy: if self.fanout_init_randomly { InitStrategy::Random } else { InitStrategy::PriorityBfs },
+            move_probability: self.fanout_move_probability,
+            init_fanout_formula: FanoutFormula::new(self.fanout_probability),
+        })
+    }
+}
 
 /// A partitioner that does not reorder and assign txns to shards in a round-robin way.
 /// Only for testing the correctness or sharded execution V3.
@@ -239,7 +245,7 @@ impl CompressedGraph {
 
 const UNASSIGNED_SHARD: u16 = u16::MAX;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FanoutFormula {
     fanout_probability: f32,
     fanout_1_minus_p: f32,
