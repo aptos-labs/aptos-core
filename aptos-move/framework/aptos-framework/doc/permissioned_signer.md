@@ -360,7 +360,7 @@ permission handle has been revoked by the original signer.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">create_storable_permissioned_handle</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, expiration_time: u64): <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">permissioned_signer::StorablePermissionedHandle</a>
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">create_storable_permissioned_handle</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, expiration_time: u64): <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">permissioned_signer::StorablePermissionedHandle</a>
 </code></pre>
 
 
@@ -369,7 +369,7 @@ permission handle has been revoked by the original signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">create_storable_permissioned_handle</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, expiration_time: u64): <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">create_storable_permissioned_handle</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, expiration_time: u64): <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a> {
     <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">assert_master_signer</a>(master);
     <b>let</b> permission_addr = generate_auid_address();
     <b>let</b> master_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
@@ -391,7 +391,7 @@ permission handle has been revoked by the original signer.
     <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> {
         master_addr,
         permission_addr,
-        expiration_time,
+        expiration_time: expiration_time + <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>(),
     }
 }
 </code></pre>
@@ -1212,7 +1212,7 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned(create
 ### Function `create_storable_permissioned_handle`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">create_storable_permissioned_handle</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, expiration_time: u64): <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">permissioned_signer::StorablePermissionedHandle</a>
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">create_storable_permissioned_handle</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, expiration_time: u64): <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">permissioned_signer::StorablePermissionedHandle</a>
 </code></pre>
 
 

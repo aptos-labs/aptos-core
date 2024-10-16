@@ -111,7 +111,7 @@ module aptos_framework::lite_account {
                 error::invalid_argument(EAUTH_FUNCTION_SIGNATURE_MISMATCH)
             );
 
-            if (is_add) {
+            if (is_add && !exists<DispatchableAuthenticator>(resource_addr)) {
                 move_to(&create_signer::create_signer(resource_addr), DispatchableAuthenticator {
                     auth_functions: simple_map::new()
                 });

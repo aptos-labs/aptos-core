@@ -308,7 +308,7 @@ impl Account {
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
     pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
         // check account exists
-        self.verify_account_or_object_resource()?;
+        // self.verify_account_or_object_resource()?;
         let max_account_resources_page_size = self.context.max_account_resources_page_size();
         let (resources, next_state_key) = self
             .context

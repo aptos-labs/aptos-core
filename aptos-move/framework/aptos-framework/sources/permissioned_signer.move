@@ -86,7 +86,7 @@ module aptos_framework::permissioned_signer {
         }
     }
 
-    public(friend) fun create_storable_permissioned_handle(master: &signer, expiration_time: u64): StorablePermissionedHandle acquires GrantedPermissionHandles {
+    public fun create_storable_permissioned_handle(master: &signer, expiration_time: u64): StorablePermissionedHandle acquires GrantedPermissionHandles {
         assert_master_signer(master);
         let permission_addr = generate_auid_address();
         let master_addr = signer::address_of(master);
@@ -108,7 +108,7 @@ module aptos_framework::permissioned_signer {
         StorablePermissionedHandle {
             master_addr,
             permission_addr,
-            expiration_time,
+            expiration_time: expiration_time + timestamp::now_seconds(),
         }
     }
 

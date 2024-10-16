@@ -345,7 +345,7 @@ Note: it is a private entry function that can only be called directly from trans
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="lite_account.md#0x1_lite_account_EAUTH_FUNCTION_SIGNATURE_MISMATCH">EAUTH_FUNCTION_SIGNATURE_MISMATCH</a>)
         );
 
-        <b>if</b> (is_add) {
+        <b>if</b> (is_add && !<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
             <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> {
                 auth_functions: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>()
             });

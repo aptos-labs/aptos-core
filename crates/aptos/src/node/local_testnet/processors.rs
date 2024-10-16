@@ -120,6 +120,12 @@ impl ProcessorManager {
                 ProcessorConfig::TransactionMetadataProcessor
             },
             ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
+            &ProcessorName::ParquetFungibleAssetActivitiesProcessor => {
+                bail!("Not implemented yet")
+            },
+            &ProcessorName::ParquetUserTransactionsProcessor => {
+                bail!("Not implemented yet")
+            },
         };
         let config = IndexerGrpcProcessorConfig {
             processor_config,
