@@ -2,29 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_mvhashmap::code_cache::SyncCodeCache;
+use aptos_mvhashmap::{code_cache::SyncCodeCache, types::MaybeCommitted};
 use aptos_types::{
     state_store::{state_value::StateValueMetadata, StateView},
-    vm::{modules::ModuleCacheEntry, scripts::ScriptCacheEntry},
+    vm::modules::ModuleCacheEntry,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use bytes::Bytes;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_binary_format::{
-    errors::{Location, VMResult},
+    errors::{Location, VMError, VMResult},
     CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata, vm_status::VMStatus,
 };
-use move_vm_runtime::{Module, WithRuntimeEnvironment};
+use move_vm_runtime::{CachedScript, Module, WithRuntimeEnvironment};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    ops::Deref,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 /// The maximum size of struct name index map in runtime environment.
@@ -163,7 +166,13 @@ impl CrossBlockModuleCache {
     /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
     /// cache if its size is too large. Should only be called at block end.
     pub(crate) fn populate_from_sync_code_cache_at_block_end(
-        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], ScriptCacheEntry>,
+        code_cache: &SyncCodeCache<
+            ModuleId,
+            Arc<MaybeCommitted<ModuleCacheEntry>>,
+            [u8; 32],
+            CachedScript,
+            VMError,
+        >,
     ) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
@@ -173,7 +182,7 @@ impl CrossBlockModuleCache {
         code_cache.module_cache().filter_into(
             cache.dereference_mut(),
             |e| e.is_verified(),
-            |e| CrossBlockModuleCacheEntry::new(e.clone()),
+            |e| CrossBlockModuleCacheEntry::new(e.as_ref().deref().clone()),
         );
     }
 
