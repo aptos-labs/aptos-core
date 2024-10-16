@@ -92,19 +92,13 @@ impl GenesisCommitter {
     }
 
     pub fn commit(self) -> Result<()> {
-        let output = self.output.output.expect_complete_result();
         self.db.save_transactions(
-            &output.ledger_update_output.to_commit,
-            output.ledger_update_output.first_version(),
-            output.parent_state.base_version,
+            self.output
+                .output
+                .expect_complete_result()
+                .as_chunk_to_commit(),
             self.output.ledger_info_opt.as_ref(),
             true, /* sync_commit */
-            &output.result_state,
-            output
-                .ledger_update_output
-                .state_updates_until_last_checkpoint
-                .as_ref(),
-            Some(&output.ledger_update_output.sharded_state_cache),
         )?;
         info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.

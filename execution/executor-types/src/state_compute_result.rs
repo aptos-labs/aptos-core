@@ -6,7 +6,7 @@ use aptos_crypto::{
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_storage_interface::state_delta::StateDelta;
+use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, state_delta::StateDelta};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -157,6 +157,20 @@ impl StateComputeResult {
             subscribable_events: self.ledger_update_output.subscribable_events.clone(),
             committed_transactions: self.transactions_to_commit(),
             reconfiguration_occurred: self.has_reconfiguration(),
+        }
+    }
+
+    pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
+        ChunkToCommit {
+            first_version: self.ledger_update_output.first_version(),
+            base_state_version: self.parent_state.base_version,
+            txns_to_commit: &self.ledger_update_output.to_commit,
+            latest_in_memory_state: &self.result_state,
+            state_updates_until_last_checkpoint: self
+                .ledger_update_output
+                .state_updates_until_last_checkpoint
+                .as_ref(),
+            sharded_state_cache: Some(&self.ledger_update_output.sharded_state_cache),
         }
     }
 }

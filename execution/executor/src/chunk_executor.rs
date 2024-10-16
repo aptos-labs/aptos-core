@@ -261,17 +261,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             });
             let output = chunk.output.expect_complete_result();
             self.db.writer.save_transactions(
-                &output.ledger_update_output.to_commit,
-                output.ledger_update_output.first_version(),
-                output.parent_state.base_version,
+                output.as_chunk_to_commit(),
                 chunk.ledger_info_opt.as_ref(),
                 false, // sync_commit
-                &output.result_state,
-                output
-                    .ledger_update_output
-                    .state_updates_until_last_checkpoint
-                    .as_ref(),
-                Some(&output.ledger_update_output.sharded_state_cache),
             )?;
         }
 
