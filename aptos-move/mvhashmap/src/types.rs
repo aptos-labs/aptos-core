@@ -11,7 +11,10 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
-use std::sync::{atomic::AtomicU32, Arc};
+use std::{
+    ops::Deref,
+    sync::{atomic::AtomicU32, Arc},
+};
 
 pub type AtomicTxnIndex = AtomicU32;
 pub type TxnIndex = u32;
@@ -243,6 +246,36 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
 pub enum UnknownOrLayout<'a> {
     Unknown,
     Known(Option<&'a MoveTypeLayout>),
+}
+
+/// Represents a value, possibly committed by some transaction.
+pub struct MaybeCommitted<V> {
+    /// The actual value committed.
+    value: V,
+    /// Index of transaction in the block that committed this value. [None] if no transaction
+    /// committed the value, and it was instead initialized based on the state value.
+    commit_idx: Option<TxnIndex>,
+}
+
+impl<V> MaybeCommitted<V> {
+    /// Returns a new value with optional information about transaction index that committed it.
+    pub fn new(value: V, commit_idx: Option<TxnIndex>) -> Self {
+        Self { value, commit_idx }
+    }
+
+    /// Returns the index of transaction that committed this value. If the value has not been
+    /// committed and instead was taken from the state, returns [None].
+    pub fn commit_idx(&self) -> Option<TxnIndex> {
+        self.commit_idx
+    }
+}
+
+impl<V> Deref for MaybeCommitted<V> {
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
 }
 
 #[cfg(test)]

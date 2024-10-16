@@ -22,8 +22,7 @@ use move_core_types::{
     metadata::Metadata,
 };
 use move_vm_types::{
-    code_storage::ModuleBytesStorage, module_cyclic_dependency_error, module_linker_error,
-    panic_error,
+    code::ModuleBytesStorage, module_cyclic_dependency_error, module_linker_error, panic_error,
 };
 use std::{
     borrow::Borrow,

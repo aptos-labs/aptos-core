@@ -22,7 +22,7 @@ use move_core_types::{
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
 use move_vm_types::{
-    code_storage::ModuleBytesStorage,
+    code::ModuleBytesStorage,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
 };
 use std::{

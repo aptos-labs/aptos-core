@@ -1,9 +1,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::Script, ModuleStorage};
+use crate::{loader::Script, logging::expect_no_verification_errors, ModuleStorage};
 use ambassador::delegatable_trait;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript};
+use move_vm_types::{code::ScriptCache, module_linker_error};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -30,4 +31,86 @@ pub trait CodeStorage: ModuleStorage {
     /// Returns a verified script. If not yet cached, verified from scratch and cached. An error is
     /// returned if script fails to deserialize or verify.
     fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>>;
+}
+
+/// An entry for the script cache that can be used by the code cache. Entries can live in cache in
+/// different representations.
+#[derive(Debug, Clone)]
+pub enum CachedScript {
+    /// Deserialized script, not yet verified with bytecode verifier.
+    Deserialized(Arc<CompiledScript>),
+    /// Verified script.
+    Verified(Arc<Script>),
+}
+
+impl CachedScript {
+    /// Returns the deserialized script ([CompiledScript]).
+    pub fn compiled_script(&self) -> &Arc<CompiledScript> {
+        match self {
+            Self::Deserialized(compiled_script) => compiled_script,
+            Self::Verified(script) => script.compiled_script(),
+        }
+    }
+}
+
+impl<T> CodeStorage for T
+where
+    T: ModuleStorage + ScriptCache<Key = [u8; 32], Script = CachedScript>,
+{
+    fn deserialize_and_cache_script(
+        &self,
+        serialized_script: &[u8],
+    ) -> VMResult<Arc<CompiledScript>> {
+        use CachedScript::*;
+
+        let hash = compute_code_hash(serialized_script);
+        Ok(match self.fetch_script(&hash) {
+            Some(script) => script.compiled_script().clone(),
+            None => {
+                let compiled_script = self
+                    .runtime_environment()
+                    .deserialize_into_script(serialized_script)
+                    .map(Arc::new)?;
+                self.store_script(hash, Deserialized(compiled_script.clone()));
+                compiled_script
+            },
+        })
+    }
+
+    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
+        use CachedScript::*;
+
+        let hash = compute_code_hash(serialized_script);
+        let compiled_script = match self.fetch_script(&hash) {
+            Some(Verified(script)) => return Ok(script),
+            Some(Deserialized(compiled_script)) => compiled_script,
+            None => self
+                .runtime_environment()
+                .deserialize_into_script(serialized_script)
+                .map(Arc::new)?,
+        };
+
+        // Locally verify the script.
+        let locally_verified_script = self
+            .runtime_environment()
+            .build_locally_verified_script(compiled_script)?;
+
+        // Verify the script is correct w.r.t. its dependencies.
+        let immediate_dependencies = locally_verified_script
+            .immediate_dependencies_iter()
+            .map(|(addr, name)| {
+                // Since module is stored on-chain, we should not see any verification errors here.
+                self.fetch_verified_module(addr, name)
+                    .map_err(expect_no_verification_errors)?
+                    .ok_or_else(|| module_linker_error!(addr, name))
+            })
+            .collect::<VMResult<Vec<_>>>()?;
+        let script = self
+            .runtime_environment()
+            .build_verified_script(locally_verified_script, &immediate_dependencies)
+            .map(Arc::new)?;
+
+        self.store_script(hash, Verified(script.clone()));
+        Ok(script)
+    }
 }
