@@ -49,6 +49,8 @@ pub struct ConsensusObserverConfig {
 
     /// Duration (in milliseconds) to require state sync to synchronize when in fallback mode
     pub observer_fallback_duration_ms: u64,
+    /// Duration (in milliseconds) we'll wait on startup before considering fallback mode
+    pub observer_fallback_startup_period_ms: u64,
     /// Duration (in milliseconds) we'll wait for syncing progress before entering fallback mode
     pub observer_fallback_sync_threshold_ms: u64,
 }
@@ -70,6 +72,7 @@ impl Default for ConsensusObserverConfig {
             subscription_peer_change_interval_ms: 60_000,      // 1 minute
             subscription_refresh_interval_ms: 300_000,         // 5 minutes
             observer_fallback_duration_ms: 600_000,            // 10 minutes
+            observer_fallback_startup_period_ms: 90_000,       // 90 seconds
             observer_fallback_sync_threshold_ms: 30_000,       // 30 seconds
         }
     }
