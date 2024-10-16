@@ -11,7 +11,7 @@ use crate::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_executor_types::{ExecutorResult, StateComputeResult};
+use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorResult};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::{
