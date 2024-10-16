@@ -18,7 +18,7 @@ use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
@@ -132,6 +132,13 @@ pub struct FakeExecutor {
 pub enum GasMeterType {
     RegularGasMeter,
     UnmeteredGasMeter,
+}
+
+#[derive(Clone)]
+pub struct TimeAndGas {
+    pub elapsed_micros: u128,
+    pub execution_gas: u64,
+    pub io_gas: u64,
 }
 
 pub enum ExecFuncTimerDynamicArgs {
@@ -944,7 +951,7 @@ impl FakeExecutor {
         iterations: u64,
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
-    ) -> u128 {
+    ) -> TimeAndGas {
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
@@ -1041,18 +1048,30 @@ impl FakeExecutor {
                     println!("Shouldn't error, but ignoring for now... {}", err);
                 }
             }
-            times.push(elapsed.as_micros());
+            times.push(TimeAndGas {
+                elapsed_micros: elapsed.as_micros(),
+                execution_gas: regular
+                    .as_ref()
+                    .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
+                io_gas: regular
+                    .as_ref()
+                    .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+            });
             i += 1;
         }
 
         // take median of all running time iterations as a more robust measurement
-        times.sort();
+        times.sort_by_key(|v| v.elapsed_micros);
         let length = times.len();
         let mid = length / 2;
-        let mut running_time = times[mid];
+        let mut running_time = times[mid].clone();
 
         if length % 2 == 0 {
-            running_time = (times[mid - 1] + times[mid]) / 2;
+            running_time = TimeAndGas {
+                elapsed_micros: (times[mid - 1].elapsed_micros + times[mid].elapsed_micros) / 2,
+                execution_gas: (times[mid - 1].execution_gas + times[mid].execution_gas) / 2,
+                io_gas: (times[mid - 1].io_gas + times[mid].io_gas) / 2,
+            };
         }
 
         running_time
