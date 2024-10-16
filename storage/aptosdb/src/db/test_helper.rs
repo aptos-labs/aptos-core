@@ -384,7 +384,7 @@ pub fn test_save_blocks_impl(
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
 

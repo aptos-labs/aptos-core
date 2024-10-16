@@ -2,11 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::components::block_tree::{
-    block_output::BlockOutput, epoch_genesis_block_id, BlockLookup, BlockTree,
+use crate::components::{
+    block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree},
+    partial_state_compute_result::PartialStateComputeResult,
 };
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
-use aptos_executor_types::LedgerUpdateOutput;
 use aptos_infallible::Mutex;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
@@ -38,12 +38,12 @@ fn id(index: u64) -> HashValue {
     HashValue::new(buf)
 }
 
-fn empty_block() -> BlockOutput {
+fn empty_block() -> PartialStateComputeResult {
     let result_view = ExecutedTrees::new_empty();
-    BlockOutput::new_with_ledger_update(
+    PartialStateComputeResult::new_empty_completed(
         result_view.state().clone(),
+        result_view.transaction_accumulator.clone(),
         None,
-        LedgerUpdateOutput::new_empty(ExecutedTrees::new_empty().txn_accumulator().clone()),
     )
 }
 
