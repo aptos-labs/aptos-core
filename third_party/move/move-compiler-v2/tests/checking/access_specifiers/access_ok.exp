@@ -23,7 +23,7 @@ module 0x42::m {
     struct T {
         dummy_field: bool,
     }
-    struct G {
+    struct G<T> {
         dummy_field: bool,
     }
     struct R {
@@ -33,7 +33,7 @@ module 0x42::m {
         dummy_field: bool,
     }
     private fun f1()
-        acquires m::S(*)
+        acquires S(*)
      {
         Tuple()
     }
@@ -53,17 +53,17 @@ module 0x42::m {
         Tuple()
     }
     private fun f2()
-        reads m::S(*)
+        reads S(*)
      {
         Tuple()
     }
     private fun f3()
-        writes m::S(*)
+        writes S(*)
      {
         Tuple()
     }
     private fun f4()
-        acquires m::S(*)
+        acquires S(*)
      {
         Tuple()
     }
@@ -93,11 +93,11 @@ module 0x42::m {
         Tuple()
     }
     private fun f_multiple()
-        acquires m::R(*)
-        reads m::R(*)
-        writes m::T(*)
-        writes m::S(*)
-        reads m::G<u64>(*)
+        acquires R(*)
+        reads R(*)
+        writes T(*)
+        writes S(*)
+        reads G<u64>(*)
      {
         Tuple()
     }
@@ -105,3 +105,75 @@ module 0x42::m {
         0x42
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct T has store {
+    }
+    struct G<phantom T> has store {
+    }
+    struct R has store {
+    }
+    struct S has store {
+    }
+    fun f1()
+        acquires S
+    {
+    }
+    fun f10(x: u64)
+        acquires *(m::make_up_address(x))
+
+    {
+    }
+    fun f11()
+        !reads *(0x42)
+        !reads *(0x43)
+
+    {
+    }
+    fun f12()
+
+    {
+    }
+    fun f2()
+        reads S
+    {
+    }
+    fun f3()
+        writes S
+    {
+    }
+    fun f4()
+        acquires S
+    {
+    }
+    fun f5()
+        acquires 0x42::*
+    {
+    }
+    fun f6()
+        acquires 0x42::m::*
+    {
+    }
+    fun f7()
+        acquires *
+    {
+    }
+    fun f8()
+        acquires *(0x42)
+
+    {
+    }
+    fun f9(a: address)
+        acquires *(a)
+
+    {
+    }
+    fun f_multiple()
+        acquires Rreads Rwrites Twrites Sreads G<u64>
+    {
+    }
+    fun make_up_address(x: u64): address {
+        0x42
+    }
+}

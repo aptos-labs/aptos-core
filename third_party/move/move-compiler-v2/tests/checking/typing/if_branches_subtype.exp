@@ -49,3 +49,17 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    fun t0(cond: bool, u: &u64, u_mut: &mut u64) {
+        let _ = if (cond) u else /*freeze*/u_mut;
+        let _ = if (cond) /*freeze*/u_mut else u;
+        let _ = if (cond) /*freeze*/u_mut else /*freeze*/u_mut;
+    }
+    fun t1(cond: bool, u: &u64, u_mut: &mut u64) {
+        let (_,_) = if (cond) (u, u) else (/*freeze*/u_mut, /*freeze*/u_mut);
+        let (_,_) = if (cond) (/*freeze*/u_mut, u) else (u, /*freeze*/u_mut);
+        let (_,_) = if (cond) (u, /*freeze*/u_mut) else (/*freeze*/u_mut, u);
+    }
+}

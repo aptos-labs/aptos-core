@@ -854,6 +854,13 @@ RoundTimeoutReason:
       Unknown: UNIT
     1:
       ProposalNotReceived: UNIT
+    2:
+      PayloadUnavailable:
+        STRUCT:
+          - missing_authors:
+              TYPENAME: BitVec
+    3:
+      NoQC: UNIT
 Script:
   STRUCT:
     - code: BYTES

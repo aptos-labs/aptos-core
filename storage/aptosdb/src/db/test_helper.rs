@@ -67,6 +67,7 @@ pub(crate) fn update_store(
     store: &StateStore,
     input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
     first_version: Version,
+    enable_sharding: bool,
 ) -> HashValue {
     use aptos_storage_interface::{jmt_update_refs, jmt_updates};
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
@@ -94,7 +95,7 @@ pub(crate) fn update_store(
                 None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
-                /*put_state_value_indices=*/ false,
+                /*put_state_value_indices=*/ enable_sharding,
                 /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
             )

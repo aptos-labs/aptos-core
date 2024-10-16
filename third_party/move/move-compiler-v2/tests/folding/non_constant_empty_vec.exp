@@ -3,10 +3,10 @@ module 0x42::M {
     struct S {
         dummy_field: bool,
     }
-    public fun empty_generic_vec<T>(): vector<#0> {
+    public fun empty_generic_vec<T>(): vector<T> {
         Vector<T>()
     }
-    public fun empty_generic_vec_vec<T>(): vector<vector<#0>> {
+    public fun empty_generic_vec_vec<T>(): vector<vector<T>> {
         Vector<vector<T>>()
     }
     public fun empty_signer_vec(): vector<signer> {
@@ -15,13 +15,37 @@ module 0x42::M {
     public fun empty_signer_vec_vec(): vector<vector<signer>> {
         Vector<vector<signer>>()
     }
-    public fun empty_struct_vec(): vector<M::S> {
-        Vector<M::S>()
+    public fun empty_struct_vec(): vector<S> {
+        Vector<S>()
     }
-    public fun empty_struct_vec_vec(): vector<vector<M::S>> {
-        Vector<vector<M::S>>()
+    public fun empty_struct_vec_vec(): vector<vector<S>> {
+        Vector<vector<S>>()
     }
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct S {
+    }
+    public fun empty_generic_vec<T>(): vector<T> {
+        vector[]
+    }
+    public fun empty_generic_vec_vec<T>(): vector<vector<T>> {
+        vector[]
+    }
+    public fun empty_signer_vec(): vector<signer> {
+        vector[]
+    }
+    public fun empty_signer_vec_vec(): vector<vector<signer>> {
+        vector[]
+    }
+    public fun empty_struct_vec(): vector<S> {
+        vector[]
+    }
+    public fun empty_struct_vec_vec(): vector<vector<S>> {
+        vector[]
+    }
+}
 
 
 ============ bytecode verification succeeded ========

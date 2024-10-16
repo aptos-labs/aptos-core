@@ -245,6 +245,7 @@ impl Factory for K8sFactory {
             self.keep,
             new_era,
             self.use_port_forward,
+            self.enable_indexer,
         )
         .await
         .unwrap();

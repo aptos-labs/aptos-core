@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use aptos::node::local_testnet::HealthChecker;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, TableInfoServiceMode};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_node::{load_node_config, start_and_report_ports};
 use aptos_types::network_address::{NetworkAddress, Protocol};
@@ -59,7 +59,8 @@ async fn spawn_node(test_dir: &Path) -> Result<()> {
     zero_all_ports(&mut node_config);
     node_config.indexer_grpc.enabled = true;
     node_config.indexer_grpc.use_data_service_interface = true;
-    node_config.storage.enable_indexer = true;
+
+    node_config.indexer_table_info.table_info_service_mode = TableInfoServiceMode::IndexingOnly;
 
     node_config
         .api

@@ -13,3 +13,17 @@ module 0x42::bit_vector {
         }
     }
 } // end 0x42::bit_vector
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::bit_vector {
+    public fun new(_length: u64) {
+        let bit_field = 0x1::vector::empty<bool>();
+
+        /* spec {
+          assert Eq<num>(Len<bool>(bit_field), 0);
+        }
+         */
+        ;
+        0x1::vector::push_back<bool>(&mut bit_field, false);
+    }
+}

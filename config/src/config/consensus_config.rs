@@ -322,7 +322,7 @@ impl Default for ConsensusConfig {
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: false,
-            enable_round_timeout_msg: false,
+            enable_round_timeout_msg: true,
         }
     }
 }

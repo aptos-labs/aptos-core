@@ -1692,26 +1692,27 @@ impl<'env> Docgen<'env> {
     }
 
     /// Creates a type display context for a function.
-    fn type_display_context_for_fun(&self, func_env: &FunctionEnv<'_>) -> TypeDisplayContext<'_> {
-        let type_param_names = func_env
-            .get_type_parameters()
-            .iter()
-            .map(|TypeParameter(name, _, _)| *name)
-            .collect_vec();
-        TypeDisplayContext::new_with_params(self.env, type_param_names)
+    fn type_display_context_for_fun<'a>(
+        &self,
+        func_env: &'a FunctionEnv<'a>,
+    ) -> TypeDisplayContext<'a> {
+        TypeDisplayContext {
+            // For consistency in navigation links, always use module qualification
+            use_module_qualification: true,
+            ..func_env.get_type_display_ctx()
+        }
     }
 
     /// Creates a type display context for a struct.
-    fn type_display_context_for_struct(
+    fn type_display_context_for_struct<'a>(
         &self,
-        struct_env: &StructEnv<'_>,
-    ) -> TypeDisplayContext<'_> {
-        let type_param_names = struct_env
-            .get_type_parameters()
-            .iter()
-            .map(|TypeParameter(name, _, _)| *name)
-            .collect_vec();
-        TypeDisplayContext::new_with_params(self.env, type_param_names)
+        struct_env: &'a StructEnv<'a>,
+    ) -> TypeDisplayContext<'a> {
+        TypeDisplayContext {
+            // For consistency in navigation links, always use module qualification
+            use_module_qualification: true,
+            ..struct_env.get_type_display_ctx()
+        }
     }
 
     /// Increments section nest.

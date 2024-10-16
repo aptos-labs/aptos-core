@@ -8,6 +8,7 @@ use crate::{
     },
     payload_manager::TPayloadManager,
 };
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
@@ -26,7 +27,7 @@ impl TPayloadManager for MockPayloadManager {
 
     fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
 
-    fn check_payload_availability(&self, _block: &Block) -> bool {
+    fn check_payload_availability(&self, _block: &Block) -> Result<(), BitVec> {
         unimplemented!()
     }
 

@@ -592,6 +592,26 @@ pub static TIMEOUT_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the round timeout by reason and by whether the aggregator is the next proposer.
+pub static AGGREGATED_ROUND_TIMEOUT_REASON: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_agg_round_timeout_reason",
+        "Count of round timeouts by reason",
+        &["reason", "is_next_proposer"],
+    )
+    .unwrap()
+});
+
+/// Count of the missing authors if any reported in the round timeout reason
+pub static AGGREGATED_ROUND_TIMEOUT_REASON_MISSING_AUTHORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_agg_round_timeout_reason_missing_authors",
+        "Count of missing authors in round timeout reason",
+        &["author"],
+    )
+    .unwrap()
+});
+
 /// Count the number of timeouts a node experienced since last restart (close to 0 in happy path).
 /// This count is different from `TIMEOUT_ROUNDS_COUNT`, because not every time a node has
 /// a timeout there is an ultimate decision to move to the next round (it might take multiple
@@ -951,6 +971,14 @@ pub static PENDING_STATE_SYNC_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_pending_state_sync_notification",
         "Count of the pending state sync notification"
+    )
+    .unwrap()
+});
+
+pub static PENDING_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_pending_commit_notification",
+        "Count of the pending commit notification"
     )
     .unwrap()
 });

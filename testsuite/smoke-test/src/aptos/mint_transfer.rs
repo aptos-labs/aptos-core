@@ -36,11 +36,10 @@ async fn test_mint_transfer() {
     info.client().submit_and_wait(&transfer_txn).await.unwrap();
     assert_eq!(
         info.client()
-            .get_account_balance(account2.address())
+            .view_apt_account_balance(account2.address())
             .await
             .unwrap()
-            .into_inner()
-            .get(),
+            .into_inner(),
         40000
     );
 

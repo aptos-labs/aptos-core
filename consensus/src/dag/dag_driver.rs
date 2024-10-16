@@ -21,13 +21,14 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
-    payload_client::{PayloadClient, PayloadPullParameters},
+    payload_client::PayloadClient,
 };
 use anyhow::{bail, ensure};
 use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter},
+    payload_pull_params::PayloadPullParameters,
     utils::PayloadTxnsSize,
 };
 use aptos_crypto::hash::CryptoHash;
@@ -266,7 +267,7 @@ impl DagDriver {
                     max_txns_after_filtering: max_txns,
                     soft_max_txns_after_filtering: max_txns,
                     max_inline_txns: PayloadTxnsSize::new(100, 100 * 1024),
-                    opt_batch_txns_pct: 0,
+                    maybe_optqs_payload_pull_params: None,
                     user_txn_filter: payload_filter,
                     pending_ordering: false,
                     pending_uncommitted_blocks: 0,

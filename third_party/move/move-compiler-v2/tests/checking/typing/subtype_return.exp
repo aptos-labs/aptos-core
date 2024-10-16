@@ -6,7 +6,7 @@ module 0x8675309::M {
     private fun t0(u: &mut u64): &u64 {
         Freeze(false)(u)
     }
-    private fun t1(s: &mut M::S): &M::S {
+    private fun t1(s: &mut S): &S {
         Freeze(false)(s)
     }
     private fun t2(u1: &mut u64,u2: &mut u64): (&u64, &mut u64) {
@@ -19,3 +19,24 @@ module 0x8675309::M {
         Tuple(Freeze(false)(u1), Freeze(false)(u2))
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+    }
+    fun t0(u: &mut u64): &u64 {
+        /*freeze*/u
+    }
+    fun t1(s: &mut S): &S {
+        /*freeze*/s
+    }
+    fun t2(u1: &mut u64, u2: &mut u64): (&u64, &mut u64) {
+        (/*freeze*/u1, u2)
+    }
+    fun t3(u1: &mut u64, u2: &mut u64): (&mut u64, &u64) {
+        (u1, /*freeze*/u2)
+    }
+    fun t4(u1: &mut u64, u2: &mut u64): (&u64, &u64) {
+        (/*freeze*/u1, /*freeze*/u2)
+    }
+}

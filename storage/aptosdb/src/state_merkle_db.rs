@@ -19,8 +19,7 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_jellyfish_merkle::{
-    node_type::{NodeKey, NodeType},
-    JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
+    node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
@@ -677,20 +676,6 @@ impl StateMerkleDb {
     ) -> Result<Option<(NodeKey, LeafNode)>> {
         let mut ret = None;
 
-        if self.enable_sharding {
-            let mut iter = self.metadata_db().iter::<JellyfishMerkleNodeSchema>()?;
-            iter.seek(&(version, 0)).unwrap();
-            // early exit if no node is found for the target version
-            match iter.next().transpose()? {
-                Some((node_key, node)) => {
-                    if node.node_type() == NodeType::Null || node_key.version() != version {
-                        return Ok(None);
-                    }
-                },
-                None => return Ok(None),
-            };
-        }
-
         // traverse all shards in a naive way
         let shards = 0..self.hack_num_real_shards();
         let start_num_of_nibbles = if self.enable_sharding { 1 } else { 0 };
@@ -822,21 +807,6 @@ impl TreeReader<StateKey> for StateMerkleDb {
     }
 
     fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode)>> {
-        // Since everything has the same version during restore, we seek to the first node and get
-        // its version.
-
-        let mut iter = self.metadata_db().iter::<JellyfishMerkleNodeSchema>()?;
-        // get the root node corresponding to the version
-        iter.seek(&(version, 0))?;
-        match iter.next().transpose()? {
-            Some((node_key, node)) => {
-                if node.node_type() == NodeType::Null || node_key.version() != version {
-                    return Ok(None);
-                }
-            },
-            None => return Ok(None),
-        };
-
         let ret = None;
         let shards = 0..self.hack_num_real_shards();
 

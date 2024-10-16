@@ -2,16 +2,20 @@ use anyhow::bail;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::types::{AccountKey, EphemeralKeyPair, KeylessAccount, LocalAccount};
+use aptos_sdk::types::{
+    AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
+};
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
 use aptos_types::keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig};
 use async_trait::async_trait;
-use futures::future::try_join_all;
+use futures::StreamExt;
 use rand::rngs::StdRng;
 use std::{
     fs::File,
     io::{self, BufRead},
 };
+
+const QUERY_PARALLELISM: usize = 300;
 
 #[async_trait]
 pub trait LocalAccountGenerator: Send + Sync {
@@ -73,7 +77,13 @@ impl LocalAccountGenerator for PrivateKeyAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = account_keys
             .into_iter()
@@ -133,7 +143,9 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
 
             // Cloning is disabled outside #[cfg(test)]
             let serialized: &[u8] = &(self.ephemeral_secret_key.to_bytes());
-            let esk = Ed25519PrivateKey::try_from(serialized)?;
+            let esk = EphemeralPrivateKey::Ed25519 {
+                inner_private_key: Ed25519PrivateKey::try_from(serialized)?,
+            };
 
             let keyless_account = KeylessAccount::new(
                 &self.iss,
@@ -166,7 +178,13 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = keyless_accounts
             .into_iter()

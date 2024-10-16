@@ -10,9 +10,8 @@ use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
     proof::accumulator::InMemoryTransactionAccumulator,
-    state_store::{combine_or_add_sharded_state_updates, ShardedStateUpdates},
+    state_store::ShardedStateUpdates,
     transaction::{
         block_epilogue::BlockEndInfo, TransactionInfo, TransactionStatus, TransactionToCommit,
         Version,
@@ -72,66 +71,6 @@ impl LedgerUpdateOutput {
         Ok(())
     }
 
-    pub fn maybe_select_chunk_ending_ledger_info(
-        &self,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-        next_epoch_state: Option<&EpochState>,
-    ) -> Result<Option<LedgerInfoWithSignatures>> {
-        if verified_target_li.ledger_info().version() + 1
-            == self.transaction_accumulator.num_leaves()
-        {
-            // If the chunk corresponds to the target LI, the target LI can be added to storage.
-            ensure!(
-                verified_target_li
-                    .ledger_info()
-                    .transaction_accumulator_hash()
-                    == self.transaction_accumulator.root_hash(),
-                "Root hash in target ledger info does not match local computation. {:?} != {:?}",
-                verified_target_li,
-                self.transaction_accumulator,
-            );
-            Ok(Some(verified_target_li.clone()))
-        } else if let Some(epoch_change_li) = epoch_change_li {
-            // If the epoch change LI is present, it must match the version of the chunk:
-
-            // Verify that the given ledger info corresponds to the new accumulator.
-            ensure!(
-                epoch_change_li.ledger_info().transaction_accumulator_hash()
-                    == self.transaction_accumulator.root_hash(),
-                "Root hash of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li,
-                self.transaction_accumulator,
-            );
-            ensure!(
-                epoch_change_li.ledger_info().version() + 1
-                    == self.transaction_accumulator.num_leaves(),
-                "Version of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li,
-                self.transaction_accumulator,
-            );
-            ensure!(
-                epoch_change_li.ledger_info().ends_epoch(),
-                "Epoch change LI does not carry validator set. version:{}",
-                epoch_change_li.ledger_info().version(),
-            );
-            ensure!(
-                epoch_change_li.ledger_info().next_epoch_state() == next_epoch_state,
-                "New validator set of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li.ledger_info().next_epoch_state(),
-                next_epoch_state,
-            );
-            Ok(Some(epoch_change_li.clone()))
-        } else {
-            ensure!(
-                next_epoch_state.is_none(),
-                "End of epoch chunk based on local computation but no EoE LedgerInfo provided. version: {:?}",
-                self.transaction_accumulator.num_leaves().checked_sub(1),
-            );
-            Ok(None)
-        }
-    }
-
     pub fn ensure_transaction_infos_match(
         &self,
         transaction_infos: &[TransactionInfo],
@@ -178,35 +117,6 @@ impl LedgerUpdateOutput {
             self.subscribable_events.clone(),
             self.block_end_info.clone(),
         )
-    }
-
-    pub fn combine(&mut self, rhs: Self) {
-        assert!(self.block_end_info.is_none());
-        assert!(rhs.block_end_info.is_none());
-        let Self {
-            statuses_for_input_txns,
-            to_commit,
-            subscribable_events,
-            transaction_info_hashes,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator,
-            block_end_info: _block_end_info,
-        } = rhs;
-
-        if let Some(updates) = state_updates_before_last_checkpoint {
-            combine_or_add_sharded_state_updates(
-                &mut self.state_updates_until_last_checkpoint,
-                updates,
-            );
-        }
-
-        self.statuses_for_input_txns.extend(statuses_for_input_txns);
-        self.to_commit.extend(to_commit);
-        self.subscribable_events.extend(subscribable_events);
-        self.transaction_info_hashes.extend(transaction_info_hashes);
-        self.sharded_state_cache.combine(sharded_state_cache);
-        self.transaction_accumulator = transaction_accumulator;
     }
 
     pub fn next_version(&self) -> Version {

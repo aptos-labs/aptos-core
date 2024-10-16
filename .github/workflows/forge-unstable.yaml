@@ -8,6 +8,10 @@ permissions:
   id-token: write
   actions: write #required for workflow cancellation via check-aptos-core
 
+concurrency:
+  group: forge-unstable-${{ github.ref_name }}
+  cancel-in-progress: true
+
 on:
   # Allow triggering manually
   workflow_dispatch:
@@ -20,9 +24,14 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
+  # NOTE: to support testing different branches on different schedules, you need to specify the cron schedule in the 'determine-test-branch' step as well below
+  # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
+  schedule:
+    - cron: "30 */2 * * *" # Run this on an aggressive cadence to get signal on the tests. They should be fully evaluated (moved to forge stable or removed entirely) after baking
   pull_request:
     paths:
       - ".github/workflows/forge-unstable.yaml"
+      - "testsuite/find_latest_image.py"
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -38,22 +47,42 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
+      IMAGE_TAG_FOR_COMPAT_TEST: ${{ steps.get-last-released-image-tag-for-compat-test.outputs.IMAGE_TAG }}
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
+      BRANCH_HASH: ${{ steps.hash-branch.outputs.BRANCH_HASH }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Determine branch based on cadence
         id: determine-test-branch
+        # NOTE: the schedule cron MUST match the one in the 'on.schedule.cron' section above
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "Unknown schedule: ${{ github.event.schedule }}"
-            exit 1
+              echo "Branch: main"
+              echo "BRANCH=main" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+              echo "Branch: ${{ github.ref_name }}"
+              echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
             echo "Using GIT_SHA"
             # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
             # on pull_request, this will default to null and the following "checkout" step will use the PR's base branch
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
           fi
+
+      # Use the branch hash instead of the full branch name to stay under kubernetes namespace length limit
+      - name: Hash the branch
+        id: hash-branch
+        run: |
+          # If BRANCH is empty, default to "main"
+          if [[ -z "${{ steps.determine-test-branch.outputs.BRANCH }}" ]]; then
+            BRANCH="main"
+          else
+            BRANCH="${{ steps.determine-test-branch.outputs.BRANCH }}"
+          fi
+
+          # Hashing the branch name
+          echo "BRANCH_HASH=$(echo -n "$BRANCH" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
 
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
@@ -86,88 +115,19 @@ jobs:
           fi
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
 
-  forge-continuous:
+# Test definitions start below
+# To add a new Forge test, add a new job definition below. Copy all fields and change only the:
+# * job name
+# * "needs" dependency. You need "determine-test-metadata", and the previous job (jobs are run sequentially)
+# * with.FORGE_TEST_SUITE, change this to your test s uite
+# * with.FORGE_*, any features or customizations you need
+  forge-indexer:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      COMMENT_HEADER: forge-continuous
-      # This test suite is configured using the forge.py config test command
-      FORGE_TEST_SUITE: continuous
-
-  run-forge-state-sync-slow-processing-catching-up-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [ determine-test-metadata, forge-continuous ] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: state_sync_slow_processing_catching_up
-      POST_TO_SLACK: true
-      FORGE_ENABLE_FAILPOINTS: true
-
-  run-forge-twin-validator-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [ determine-test-metadata, run-forge-state-sync-slow-processing-catching-up-test ] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_NAMESPACE: forge-twin-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: twin_validator_test
-      POST_TO_SLACK: true
-
-  run-forge-state-sync-failures-catching-up-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [ determine-test-metadata, run-forge-twin-validator-test ] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: state_sync_failures_catching_up
-      FORGE_ENABLE_FAILPOINTS: true
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-  run-forge-validator-reboot-stress-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [ determine-test-metadata, run-forge-state-sync-failures-catching-up-test ] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_NAMESPACE: forge-validator-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 2400 # Run for 40 minutes
-      FORGE_TEST_SUITE: validator_reboot_stress_test
-      POST_TO_SLACK: true
-
-  run-forge-haproxy:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [ determine-test-metadata, run-forge-validator-reboot-stress-test ] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 600 # Run for 10 minutes
-      FORGE_ENABLE_HAPROXY: true
-      FORGE_TEST_SUITE: realistic_env_max_load
-      POST_TO_SLACK: true
+      COMMENT_HEADER: forge-indexer
+      FORGE_TEST_SUITE: indexer_test
+      FORGE_ENABLE_INDEXER: true

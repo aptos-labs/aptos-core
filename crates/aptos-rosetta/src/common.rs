@@ -19,7 +19,7 @@ use aptos_sdk::move_types::{
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
+use std::{collections::HashSet, convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
 /// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
@@ -149,12 +149,15 @@ const DEFAULT_COIN: &str = "APT";
 const DEFAULT_DECIMALS: u8 = 8;
 
 /// Provides the [Currency] for 0x1::aptos_coin::AptosCoin aka APT
+///
+/// Note that 0xA is the address for FA, but it has to be skipped in order to have backwards compatibility
 pub fn native_coin() -> Currency {
     Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag().to_string(),
+            move_type: Some(native_coin_tag().to_string()),
+            fa_address: None,
         }),
     }
 }
@@ -169,14 +172,52 @@ pub fn native_coin_tag() -> TypeTag {
     }))
 }
 
-/// Tells us whether the coin is APT and errors if it's not
-///
-/// TODO: This is the function that needs to be replaced to handle more coin types
-pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
-    if currency == &native_coin() {
-        Ok(())
+#[inline]
+pub fn is_native_coin(fa_address: AccountAddress) -> bool {
+    fa_address == AccountAddress::TEN
+}
+
+pub fn find_coin_currency(currencies: &HashSet<Currency>, type_tag: &TypeTag) -> Option<Currency> {
+    currencies
+        .iter()
+        .find(|currency| {
+            if let Some(CurrencyMetadata {
+                move_type: Some(ref move_type),
+                fa_address: _,
+            }) = currency.metadata
+            {
+                move_type == &type_tag.to_string()
+            } else {
+                false
+            }
+        })
+        .cloned()
+}
+pub fn find_fa_currency(
+    currencies: &HashSet<Currency>,
+    metadata_address: AccountAddress,
+) -> Option<Currency> {
+    if is_native_coin(metadata_address) {
+        Some(native_coin())
     } else {
-        Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
+        let val = currencies
+            .iter()
+            .find(|currency| {
+                if let Some(CurrencyMetadata {
+                    move_type: _,
+                    fa_address: Some(ref fa_address),
+                }) = currency.metadata
+                {
+                    // TODO: Probably want to cache this
+                    AccountAddress::from_str(fa_address)
+                        .map(|addr| addr == metadata_address)
+                        .unwrap_or(false)
+                } else {
+                    false
+                }
+            })
+            .cloned();
+        val
     }
 }
 
@@ -316,15 +357,27 @@ pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
 }
 
 /// Retrieves the currency from the given parameters
-/// TODO: What do do about the type params?
-/// TODO: Handle other currencies, will need to be passed in as a config file or something on startup
-pub fn parse_currency(address: AccountAddress, module: &str, name: &str) -> ApiResult<Currency> {
-    match (address, module, name) {
-        (AccountAddress::ONE, APTOS_COIN_MODULE, APTOS_COIN_RESOURCE) => Ok(native_coin()),
-        _ => Err(ApiError::TransactionParseError(Some(format!(
-            "Invalid coin for transfer {}::{}::{}",
-            address, module, name
-        )))),
+pub fn parse_coin_currency(
+    server_context: &RosettaContext,
+    struct_tag: &StructTag,
+) -> ApiResult<Currency> {
+    if let Some(currency) = server_context.currencies.iter().find(|currency| {
+        if let Some(move_type) = currency
+            .metadata
+            .as_ref()
+            .and_then(|inner| inner.move_type.as_ref())
+        {
+            struct_tag.to_string() == *move_type
+        } else {
+            false
+        }
+    }) {
+        Ok(currency.clone())
+    } else {
+        Err(ApiError::TransactionParseError(Some(format!(
+            "Invalid coin for transfer {}",
+            struct_tag
+        ))))
     }
 }
 

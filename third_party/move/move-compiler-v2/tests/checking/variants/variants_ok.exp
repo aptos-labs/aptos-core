@@ -32,7 +32,7 @@ module 0x815::m {
             other: u32,
         }
     }
-    private fun t1(self: m::Color): bool {
+    private fun t1(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
@@ -46,7 +46,7 @@ module 0x815::m {
         }
 
     }
-    private fun t1_address_qualified(self: m::Color): bool {
+    private fun t1_address_qualified(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
@@ -60,7 +60,7 @@ module 0x815::m {
         }
 
     }
-    private fun t1_field_named(self: m::Color): bool {
+    private fun t1_field_named(self: Color): bool {
         match (self) {
           m::Color::RGB{ red: r, green: g, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(r, g), blue), 0)
@@ -74,7 +74,7 @@ module 0x815::m {
         }
 
     }
-    private fun t1_module_qualified(self: m::Color): bool {
+    private fun t1_module_qualified(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
@@ -88,7 +88,7 @@ module 0x815::m {
         }
 
     }
-    private fun t1_uses_block(self: m::Color): bool {
+    private fun t1_uses_block(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
@@ -102,7 +102,7 @@ module 0x815::m {
         }
 
     }
-    private fun t1_uses_block_no_comma(self: m::Color): bool {
+    private fun t1_uses_block_no_comma(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
@@ -116,41 +116,41 @@ module 0x815::m {
         }
 
     }
-    private fun t2(self: m::Color): bool {
+    private fun t2(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
           }
-          _: m::Color => {
+          _: Color => {
             true
           }
         }
 
     }
-    private fun t3(self: m::Color): bool {
+    private fun t3(self: Color): bool {
         match (Borrow(Immutable)(self)) {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(Deref(red), Deref(green)), Deref(blue)), 0)
           }
-          _: &m::Color => {
+          _: &Color => {
             true
           }
         }
 
     }
-    private fun t4(self: m::Color): m::Color {
+    private fun t4(self: Color): Color {
         match (Borrow(Mutable)(self)) {
           m::Color::RGB{ red, green: _, blue: _ } => {
             red = 2
           }
-          _: &mut m::Color => {
+          _: &mut Color => {
             Tuple()
           }
         }
         ;
         self
     }
-    private fun t5_freeze(self: m::Color): u64 {
+    private fun t5_freeze(self: Color): u64 {
         {
           let x: u64 = 1;
           {
@@ -161,7 +161,7 @@ module 0x815::m {
               m::Color::Blue => {
                 Freeze(false)(Borrow(Mutable)(x))
               }
-              _: &mut m::Color => {
+              _: &mut Color => {
                 Freeze(false)(Borrow(Mutable)(x))
               }
             }
@@ -170,24 +170,24 @@ module 0x815::m {
           }
         }
     }
-    private fun t6_construct(self: m::Color): m::Color {
+    private fun t6_construct(self: Color): Color {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             pack m::Color::RGB(Add<u64>(red, 1), Sub<u64>(green, 1), blue)
           }
-          _: m::Color => {
+          _: Color => {
             self
           }
         }
 
     }
-    private fun t7_let_unpack(self: m::Color): u64 {
+    private fun t7_let_unpack(self: Color): u64 {
         {
           let m::Color::RGB{ red, green, blue } = self;
           Add<u64>(Add<u64>(red, green), blue)
         }
     }
-    private fun t8_unqualified_variant(self: m::Color): bool {
+    private fun t8_unqualified_variant(self: Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             And(Neq<u64>(red, green), Neq<u64>(green, blue))
@@ -201,10 +201,139 @@ module 0x815::m {
         }
 
     }
-    private fun t9_common_field(self: m::CommonFields): u64 {
-        select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<m::CommonFields>(self)
+    private fun t9_common_field(self: CommonFields): u64 {
+        select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<CommonFields>(self)
     }
-    private fun t9_common_field_ref(self: &m::CommonFields): &u64 {
-        Borrow(Immutable)(select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<&m::CommonFields>(self))
+    private fun t9_common_field_ref(self: &CommonFields): &u64 {
+        Borrow(Immutable)(select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<&CommonFields>(self))
     }
 } // end 0x815::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    use 0x815::m;
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    enum ColorUsesBlockNoComma {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            z: u32,
+        }
+        Baz {
+            other: u32,
+        }
+    }
+    fun t1(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t1_address_qualified(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t1_field_named(self: Color): bool {
+        match (self) {
+            Color::RGB{red: r,green: g,blue: blue} => r + g + blue > 0,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t1_module_qualified(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t1_uses_block(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t1_uses_block_no_comma(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t2(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            _ => true,
+        }
+    }
+    fun t3(self: Color): bool {
+        match (&self) {
+            Color::RGB{red: red,green: green,blue: blue} => *red + *green + *blue > 0,
+            _ => true,
+        }
+    }
+    fun t4(self: Color): Color {
+        match (&mut self) {
+            Color::RGB{red: red,green: _,blue: _} => *red = 2,
+            _ => (),
+        };
+        self
+    }
+    fun t5_freeze(self: Color): u64 {
+        let x = 1;
+        let r = match (&mut self) {
+            Color::Red{} => &x,
+            Color::Blue{} => /*freeze*/&mut x,
+            _ => /*freeze*/&mut x,
+        };
+        *r
+    }
+    fun t6_construct(self: Color): Color {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => Color::RGB{red: red + 1,green: green - 1,blue: blue},
+            _ => self,
+        }
+    }
+    fun t7_let_unpack(self: Color): u64 {
+        let Color::RGB{red: red,green: green,blue: blue} = self;
+        red + green + blue
+    }
+    fun t8_unqualified_variant(self: Color): bool {
+        match (self) {
+            Color::RGB{red: red,green: green,blue: blue} => red != green && green != blue,
+            Color::Red{} => true,
+            Color::Blue{} => false,
+        }
+    }
+    fun t9_common_field(self: CommonFields): u64 {
+        self.Foo.x
+    }
+    fun t9_common_field_ref(self: &CommonFields): &u64 {
+        &self.Foo.x
+    }
+}

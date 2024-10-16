@@ -124,7 +124,8 @@ impl DriverFactory {
             ClientNotificationListener::new(client_notification_receiver);
         let (commit_notification_sender, commit_notification_listener) =
             CommitNotificationListener::new();
-        let consensus_notification_handler = ConsensusNotificationHandler::new(consensus_listener);
+        let consensus_notification_handler =
+            ConsensusNotificationHandler::new(consensus_listener, time_service.clone());
         let (error_notification_sender, error_notification_listener) =
             ErrorNotificationListener::new();
         let mempool_notification_handler =
