@@ -2410,48 +2410,52 @@ fn indexer_test() -> ForgeConfig {
     // Define all the workloads and their corresponding success criteria upfront
     // The TransactionTypeArg is the workload per phase
     // The structure of the success criteria is generally (min_tps, latencies...). See below for the exact definition.
+    // NOTES on tuning these criteria:
+    // * The blockchain's TPS criteria are generally lower than that of other tests. This is because we want to only capture indexer performance regressions. Other tests with higher TPS requirements
+    //   for the blockchain would catch an earlier regression
+    // * The indexer latencies are inter-component within the indexer stack, but not that of the e2e wall-clock time vs the blockchain
     let workloads_and_criteria = vec![
         (
             TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
-            (7000, 0.5, 0.5, 0.5),
+            (7000, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
-            (8500, 0.5, 0.5, 0.5),
+            (8500, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
                 .with_transactions_per_account(1),
-            (2000, 0.5, 0.5, 0.5),
+            (2000, 0.5, 0.5, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
-            (2000, 0.5, 0.5, 0.5),
+            (2000, 1.0, 1.0, 0.5),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
                 .with_transactions_per_account(1),
-            (28, 0.5, 0.5, 0.5),
+            (28, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 100),
-            (100, 1.0, 1.0, 1.0),
+            (100, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture30KWith200Change, 100),
-            (100, 1.0, 1.0, 1.0),
+            (100, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(
                 TransactionTypeArg::TokenV1NFTMintAndTransferSequential,
                 1000,
             ),
-            (500, 0.5, 0.5, 0.5),
+            (500, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::TokenV1FTMintAndTransfer, 1000),
-            (500, 0.5, 0.5, 0.5),
+            (500, 0.5, 0.5, 0.1),
         ),
     ];
     let num_sweep = workloads_and_criteria.len();
