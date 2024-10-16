@@ -19,7 +19,7 @@ use aptos_vm_types::module_and_script_storage::{
 use bytes::Bytes;
 use hashbrown::HashSet;
 use move_binary_format::{
-    errors::{Location, PartialVMResult, VMError, VMResult},
+    errors::{Location, PartialVMResult, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -558,7 +558,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         locked_module_cache: &mut LockedSyncModuleCache<
             ModuleId,
             Arc<MaybeCommitted<ModuleCacheEntry>>,
-            VMError,
         >,
         init_func: &F,
     ) -> VMResult<Arc<Module>>

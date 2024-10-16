@@ -87,8 +87,7 @@ pub trait ExecutorTask: Sync {
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
-        >),
-        code_storage: &impl AptosCodeStorage,
+        > + AptosCodeStorage),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;

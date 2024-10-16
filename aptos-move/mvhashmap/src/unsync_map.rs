@@ -16,7 +16,6 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use move_binary_format::errors::VMError;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::CachedScript;
 use serde::Serialize;
@@ -50,7 +49,7 @@ pub struct UnsyncMap<
     module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
 
     // Code caches for loader V2 implementation: contains modules and scripts.
-    code_cache: UnsyncCodeCache<ModuleId, Arc<ModuleCacheEntry>, [u8; 32], CachedScript, VMError>,
+    code_cache: UnsyncCodeCache<ModuleId, Arc<ModuleCacheEntry>, [u8; 32], CachedScript>,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
@@ -91,7 +90,7 @@ impl<
     /// Returns the code cache for this [UnsyncMap].
     pub fn code_cache(
         &self,
-    ) -> &UnsyncCodeCache<ModuleId, Arc<ModuleCacheEntry>, [u8; 32], CachedScript, VMError> {
+    ) -> &UnsyncCodeCache<ModuleId, Arc<ModuleCacheEntry>, [u8; 32], CachedScript> {
         &self.code_cache
     }
 
