@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator,
-    call_custom_modules::CustomModulesDelegationGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator, EntryPoints, ObjectPool,
-    ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator, call_custom_modules::CustomModulesDelegationGeneratorCreator, entry_points::EntryPointTransactionGenerator, stable_coin_minter::{StableCoinConfigureControllerGenerator, StableCoinMinterGenerator, StableCoinSetMinterAllowanceGenerator}, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -14,7 +10,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use std::{
-    cmp,
+    fmt::Debug,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
@@ -70,7 +66,7 @@ impl StageTracking {
 ///
 /// pool_i is filled by gen_i, and consumed by gen_i+1, and so there is one less pools than generators.
 ///
-/// We start with stage 0, which calls gen_0 pool_per_stage times, which populates pool_0 with accounts.
+/// We start with stage 0, which calls gen_0 stop_condition_per_stage times, which populates pool_0 with accounts.
 ///
 /// After that, in stage 1, we call gen_1, which consumes accounts from pool_0, and moves them to pool_1.
 /// We do this until pool_0 is empty.
@@ -86,26 +82,20 @@ impl StageTracking {
 struct WorkflowTxnGenerator {
     stage: StageTracking,
     generators: Vec<Box<dyn TransactionGenerator>>,
-    pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
-    num_for_first_stage: usize,
+    stop_condition_per_stage: Vec<StageStopCondition>,
     // Internal counter, so multiple workers (WorkflowTxnGenerator) can coordinate how many times to execute the first stage
-    completed_for_first_stage: Arc<AtomicUsize>,
 }
 
 impl WorkflowTxnGenerator {
     fn new(
         stage: StageTracking,
         generators: Vec<Box<dyn TransactionGenerator>>,
-        pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
-        num_for_first_stage: usize,
-        completed_for_first_stage: Arc<AtomicUsize>,
+        stop_condition_per_stage: Vec<StageStopCondition>,
     ) -> Self {
         Self {
             stage,
             generators,
-            pool_per_stage,
-            num_for_first_stage,
-            completed_for_first_stage,
+            stop_condition_per_stage,
         }
     }
 }
@@ -114,7 +104,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
-        mut num_to_create: usize,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
         let stage = match self.stage.load_current_stage() {
@@ -128,42 +118,14 @@ impl TransactionGenerator for WorkflowTxnGenerator {
             },
         };
 
-        if stage == 0 {
-            // We can treat completed_for_first_stage as a stream of indices [0, +inf),
-            // where we want to execute only first num_for_first_stage (i.e. [0, num_for_first_stage) )
-            // So here we grab num_to_create "indices" from completed_for_first_stage counter,
-            // and then skip those that are in [num_for_first_stage, +inf) range.
-            let prev = self
-                .completed_for_first_stage
-                .fetch_add(num_to_create, Ordering::Relaxed);
-            num_to_create = cmp::min(num_to_create, self.num_for_first_stage.saturating_sub(prev));
-        }
-        // if stage is not 0, then grabing from the pool itself, inside of the generator.generate_transactions
-        // acts as coordinator, as it will generate as many transactions as number of accounts it could grab from the pool.
-
         match &self.stage {
             StageTracking::WhenDone {
                 stage_counter,
                 stage_start_time,
                 delay_between_stages,
             } => {
-                if stage == 0 {
-                    if num_to_create == 0 {
-                        info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.first().unwrap().len());
-                        stage_start_time.store(
-                            StageTracking::current_timestamp() + delay_between_stages.as_secs(),
-                            Ordering::Relaxed,
-                        );
-                        let _ = stage_counter.compare_exchange(
-                            0,
-                            1,
-                            Ordering::Relaxed,
-                            Ordering::Relaxed,
-                        );
-                        return Vec::new();
-                    }
-                } else if stage < self.pool_per_stage.len()
-                    && self.pool_per_stage.get(stage - 1).unwrap().len() == 0
+                if stage < self.stop_condition_per_stage.len()
+                    && self.stop_condition_per_stage.get(stage).unwrap().should_stop()
                 {
                     info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
                     stage_start_time.store(
@@ -180,7 +142,12 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                 }
             },
             StageTracking::ExternallySet(_) => {
-                if stage == 0 && num_to_create == 0 {
+                if stage >= self.stop_condition_per_stage.len() || 
+                    (
+                        stage < self.stop_condition_per_stage.len() 
+                        && self.stop_condition_per_stage.get(stage).unwrap().should_stop()
+                    ) {
+                    info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
                     return Vec::new();
                 }
             },
@@ -188,7 +155,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
 
         sample!(
             SampleRate::Duration(Duration::from_secs(2)),
-            info!("Cur stage: {}, pool sizes: {:?}", stage, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
+            info!("Cur stage: {}, stop conditions per stage: {:?}", stage, self.stop_condition_per_stage);
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
@@ -196,32 +163,65 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         } else {
             Vec::new()
         };
-
+        self.stop_condition_per_stage.get_mut(stage).unwrap().reduce_txn_count(result.len());
+        
         result
+    }
+}
+
+#[derive(Clone)]
+enum StageStopCondition {
+    WhenPoolBecomesEmpty(Arc<ObjectPool<LocalAccount>>),
+    MaxTransactions(Arc<AtomicUsize>),
+}
+
+impl StageStopCondition {
+    fn should_stop(&self) -> bool {
+        match self {
+            StageStopCondition::WhenPoolBecomesEmpty(pool) => pool.len() == 0,
+            StageStopCondition::MaxTransactions(max) => max.load(Ordering::Relaxed) == 0,
+        }
+    }
+
+    fn reduce_txn_count(&mut self, count: usize) {
+        match self {
+            StageStopCondition::WhenPoolBecomesEmpty(_) => {},
+            StageStopCondition::MaxTransactions(max) => {
+                let current = max.load(Ordering::Relaxed);
+                if count > current {
+                    max.store(0, Ordering::Relaxed);
+                } else {
+                    max.fetch_sub(count, Ordering::Relaxed);
+                }
+            },
+        }
+    }
+}
+impl Debug for StageStopCondition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StageStopCondition::WhenPoolBecomesEmpty(pool) => write!(f, "WhenPoolBecomesEmpty({})", pool.len()),
+            StageStopCondition::MaxTransactions(max) => write!(f, "MaxTransactions({})", max.load(Ordering::Relaxed)),
+        }
     }
 }
 
 pub struct WorkflowTxnGeneratorCreator {
     stage: StageTracking,
     creators: Vec<Box<dyn TransactionGeneratorCreator>>,
-    pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
-    num_for_first_stage: usize,
-    completed_for_first_stage: Arc<AtomicUsize>,
+    stop_condition_per_stage: Vec<StageStopCondition>,
 }
 
 impl WorkflowTxnGeneratorCreator {
     fn new(
         stage: StageTracking,
         creators: Vec<Box<dyn TransactionGeneratorCreator>>,
-        pool_per_stage: Vec<Arc<ObjectPool<LocalAccount>>>,
-        num_for_first_stage: usize,
+        stop_condition_per_stage: Vec<StageStopCondition>,
     ) -> Self {
         Self {
             stage,
             creators,
-            pool_per_stage,
-            num_for_first_stage,
-            completed_for_first_stage: Arc::new(AtomicUsize::new(0)),
+            stop_condition_per_stage,
         }
     }
 
@@ -330,47 +330,142 @@ impl WorkflowTxnGeneratorCreator {
                 Self::new(
                     stage_tracking,
                     creators,
-                    vec![created_pool, minted_pool, burnt_pool],
-                    count,
+                    vec![
+                        StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(count))),
+                        StageStopCondition::WhenPoolBecomesEmpty(created_pool), 
+                        StageStopCondition::WhenPoolBecomesEmpty(minted_pool),
+                        StageStopCondition::WhenPoolBecomesEmpty(burnt_pool)
+                    ],
                 )
             },
             WorkflowKind::StableCoinMint {
-                count,
-                creation_balance,
+                num_minter_accounts,
+                num_user_accounts,
+                batch_size,
+                reuse_accounts: _,
             } => {
-                let minter_pool = Arc::new(ObjectPool::new());
+                // Stages:
+                // 0. Create minter accounts
+                // 1. Create user accounts
+                // 2. For each minter account, add controller in the stablecoin module
+                // 3. For each minter account, set minter allowance in the stablecoin module
+                // 4. Let minter accounts mint transactions for the users
+                let created_minter_pool = Arc::new(ObjectPool::new());
                 let destination_pool = Arc::new(ObjectPool::new());
-
+                let configured_minter_pool = Arc::new(ObjectPool::new());
+                let minters_with_allowance_pool = Arc::new(ObjectPool::new());
+                
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
                     num_modules,
                     "stablecoin",
-                    Some(20_00000000),
+                    Some(20_0000_0000),
                 ).await;
 
-
-                let minter_creation = Box::new(AccountGeneratorCreator::new(
+                // Stage 0: Create minter accounts
+                let minter_account_creation_stage = Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
                     None,
-                    Some(minter_pool.clone()),
-                    count,
-                    creation_balance,
+                    Some(created_minter_pool.clone()),
+                    num_minter_accounts,
+                    1_0000_0000,
                 ));
-                let destination_creation = Box::new(AccountGeneratorCreator::new(
+
+                // Stage 1: Create user accounts
+                let destination_account_creation_stage = Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
                     None,
                     Some(destination_pool.clone()),
-                    count,
-                    creation_balance,
+                    num_user_accounts,
+                    1_0000_0000,
                 ));
-                let stages = vec![minter_creation, destination_creation];
+
+                // Stage 2: For each minter account, add controller in the stablecoin module
+                let configure_controllers_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut StableCoinConfigureControllerGenerator::default(),
+                ).await;
+
+                // Stage 3: For each minter account, set minter allowance in the stablecoin module
+                let set_minter_allowance_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut StableCoinSetMinterAllowanceGenerator::default(),
+                ).await;
+
+                // Stage 4: Let minter accounts mint transactions for the users
+                let mint_stage_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut StableCoinMinterGenerator::new(
+                        20,
+                        batch_size,
+                        minters_with_allowance_pool.clone(),
+                        destination_pool.clone(),
+                    ),
+                ).await;
+                
+                let packages = Arc::new(packages);
+                
+                let configure_controllers_stage = Box::new(
+                    AccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            configure_controllers_worker,
+                        )),
+                        created_minter_pool.clone(),
+                        Some(configured_minter_pool.clone()),
+                    )
+                );
+
+                let set_minter_allowance_stage = Box::new(
+                    AccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            set_minter_allowance_worker,
+                        )),
+                        configured_minter_pool.clone(),
+                        Some(minters_with_allowance_pool.clone()),
+                    )
+                );
+
+                let mint_stage = Box::new(
+                    CustomModulesDelegationGeneratorCreator::new_raw(
+                        txn_factory.clone(),
+                        packages.clone(),
+                        mint_stage_worker,
+                    )
+                );
+
+                let stages: Vec<Box<dyn TransactionGeneratorCreator>> = vec![
+                    minter_account_creation_stage,
+                    destination_account_creation_stage,
+                    configure_controllers_stage,
+                    set_minter_allowance_stage,
+                    mint_stage
+                ];
+
                 Self::new(
                     stage_tracking,
                     stages,
-                    vec![],
-                    count,
+                    vec![
+                        StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(num_minter_accounts))),
+                        StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(num_user_accounts))),
+                        StageStopCondition::WhenPoolBecomesEmpty(created_minter_pool),
+                        StageStopCondition::WhenPoolBecomesEmpty(configured_minter_pool),
+                        StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(2000_000))),
+                    ],
                 )
             },
         }
@@ -385,9 +480,7 @@ impl TransactionGeneratorCreator for WorkflowTxnGeneratorCreator {
                 .iter()
                 .map(|c| c.create_transaction_generator())
                 .collect(),
-            self.pool_per_stage.clone(),
-            self.num_for_first_stage,
-            self.completed_for_first_stage.clone(),
+            self.stop_condition_per_stage.clone(),
         ))
     }
 }

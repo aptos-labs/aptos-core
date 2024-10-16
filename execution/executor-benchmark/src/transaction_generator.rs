@@ -692,7 +692,7 @@ impl TransactionGenerator {
         if transactions.is_empty() {
             let val = phase.fetch_add(1, Ordering::Relaxed);
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
-            if val > last_generated_at + 2 {
+            if val > last_generated_at + 5 {
                 info!(
                     "Block generation: no transactions generated in phase {}, and since {}, ending execution",
                     val, last_generated_at

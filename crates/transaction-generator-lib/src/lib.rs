@@ -98,7 +98,14 @@ pub enum AccountType {
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateMintBurn { count: usize, creation_balance: u64 },
-    StableCoinMint { count: usize, creation_balance: u64 },
+    StableCoinMint {
+        num_minter_accounts: usize,
+        num_user_accounts: usize,
+        // If batch_size = 1, then mint function is called
+        // If batch_size > 1, then batch_mint function is called
+        batch_size: usize,
+        reuse_accounts: bool,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]

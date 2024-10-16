@@ -1,4 +1,4 @@
-module fa_config::ownable {
+module stablecoin::ownable {
     use std::option::{Self, Option};
     use std::signer;
     use aptos_framework::event;

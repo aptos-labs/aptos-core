@@ -39,7 +39,7 @@ pub struct PipelineConfig {
     #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
     pub use_global_executor: bool,
-    #[derivative(Default(value = "4"))]
+    #[derivative(Default(value = "1"))]
     pub num_generator_workers: usize,
     pub partitioner_config: PartitionerV2Config,
 }

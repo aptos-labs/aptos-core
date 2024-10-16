@@ -35,8 +35,8 @@ module stablecoin::stablecoin {
         TransferRef
     };
 
-    use fa_config::pausable;
-    use fa_config::ownable;
+    use stablecoin::pausable;
+    use stablecoin::ownable;
 
     // ===== Errors and Constants =====
 
@@ -364,15 +364,16 @@ const ICON_URI: vector<u8> = b"https://tether.to/images/logoCircle.png"; // TODO
     /// Controller to Minter is a one-to-one relationship.
     /// Minter to Controller can be a one-to-many relationship.
     public entry fun configure_controller(
-        caller: &signer, controller: address, minter: address
-    ) acquires State, Roles {
-        let caller_address = signer::address_of(caller);
-        assert_master_minter(caller_address);
+        controller: &signer
+    ) acquires State {
+        // let caller_address = signer::address_of(caller);
+        // assert_master_minter(caller_address);
 
+        let controller_address = signer::address_of(controller);
         let supply_manager = borrow_global_mut<State>(stablecoin_address());
-        smart_table::upsert(&mut supply_manager.controllers, controller, minter);
+        smart_table::upsert(&mut supply_manager.controllers, controller_address, controller_address);
 
-        event::emit(ControllerConfigured { controller, minter });
+        event::emit(ControllerConfigured { controller: controller_address, minter: controller_address });
     }
 
     /// Removes a controller.

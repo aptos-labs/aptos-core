@@ -1,9 +1,9 @@
-module fa_config::pausable {
+module stablecoin::pausable {
     use std::signer;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
 
-    use fa_config::ownable::{Self, OwnerRole};
+    use stablecoin::ownable::{Self, OwnerRole};
 
     // === Errors ===
 
