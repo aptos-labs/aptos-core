@@ -897,6 +897,7 @@ dependencies = [
  "aptos-safety-rules",
  "aptos-schemadb",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
