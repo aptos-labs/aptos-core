@@ -77,6 +77,10 @@ module aptos_framework::ethereum {
         output
     }
 
+    public fun get_inner(eth_address: &EthereumAddress): vector<u8> {
+        eth_address.inner
+    }
+
     /// Checks if an Ethereum address conforms to the EIP-55 checksum standard.
     ///
     /// @param ethereum_address A reference to a 40-character vector of an Ethereum address in hexadecimal format.
@@ -175,8 +179,7 @@ module aptos_framework::atomic_bridge_initiator {
     ) {
         let ethereum_address = ethereum::ethereum_address(recipient);
         let initiator_address = signer::address_of(initiator);
-        let time_lock = atomic_bridge_store::create_time_lock(
-            atomic_bridge_configuration::initiator_timelock_duration());
+        let time_lock = atomic_bridge_configuration::initiator_timelock_duration();
 
         let details =
             atomic_bridge_store::create_details(
@@ -523,6 +526,7 @@ module aptos_framework::atomic_bridge_store {
     use aptos_std::aptos_hash::keccak256;
     use aptos_std::smart_table;
     use aptos_std::smart_table::SmartTable;
+    use aptos_framework::atomic_bridge_configuration;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -534,6 +538,8 @@ module aptos_framework::atomic_bridge_store {
 
     #[test_only]
     use std::hash::sha3_256;
+    #[test_only]
+    use aptos_framework::ethereum;
 
     /// Error codes
     const EINVALID_PRE_IMAGE : u64 = 0x1;
@@ -822,6 +828,42 @@ module aptos_framework::atomic_bridge_store {
         keccak256(combined_bytes)
     }
 
+    /// Gets initiator bridge transfer details given a bridge transfer ID
+    ///
+    /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
+    /// @return A `BridgeTransferDetails` struct.
+    /// @abort If there is no transfer in the atomic bridge store.
+    #[view]
+    public fun get_bridge_transfer_details_initiator(
+        bridge_transfer_id: vector<u8>
+    ): BridgeTransferDetails<address, EthereumAddress> acquires SmartTableWrapper {
+        get_bridge_transfer_details(bridge_transfer_id)
+    }
+
+    /// Gets counterparty bridge transfer details given a bridge transfer ID
+    ///
+    /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
+    /// @return A `BridgeTransferDetails` struct.
+    /// @abort If there is no transfer in the atomic bridge store.
+    #[view]
+    public fun get_bridge_transfer_details_counterparty(
+        bridge_transfer_id: vector<u8>
+    ): BridgeTransferDetails<EthereumAddress, address> acquires SmartTableWrapper {
+        get_bridge_transfer_details(bridge_transfer_id)
+    }
+
+    fun get_bridge_transfer_details<Initiator: store + copy, Recipient: store + copy>(bridge_transfer_id: vector<u8>
+    ): BridgeTransferDetails<Initiator, Recipient> acquires SmartTableWrapper {
+        let table = borrow_global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
+
+        let details_ref = smart_table::borrow(
+            &table.inner,
+            bridge_transfer_id
+        );
+
+        *details_ref
+    }
+
     #[test_only]
     public fun valid_bridge_transfer_id() : vector<u8> {
         sha3_256(b"atomic bridge")
@@ -835,6 +877,104 @@ module aptos_framework::atomic_bridge_store {
     #[test_only]
     public fun valid_hash_lock() : vector<u8> {
         keccak256(plain_secret())
+    }
+
+
+    #[test(aptos_framework = @aptos_framework)]
+    public fun test_get_bridge_transfer_details_initiator(aptos_framework: &signer) acquires SmartTableWrapper {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_atomic_bridge_feature()],
+            vector[]
+        );
+        atomic_bridge_configuration::initialize(aptos_framework);
+        initialize(aptos_framework);
+
+        let initiator = signer::address_of(aptos_framework);
+        let recipient = ethereum::ethereum_address(ethereum::valid_eip55());
+        let amount = 1000;
+        let hash_lock = valid_hash_lock();
+        let time_lock = create_time_lock(3600);
+        let bridge_transfer_id = valid_bridge_transfer_id();
+
+        let details = create_details(
+            initiator, 
+            recipient, 
+            amount, 
+            hash_lock, 
+            time_lock
+        );
+
+        add(bridge_transfer_id, details);
+
+        let retrieved_details = get_bridge_transfer_details_initiator(bridge_transfer_id);
+
+        let BridgeTransferDetails {
+            addresses: AddressPair {
+                initiator: retrieved_initiator,
+                recipient: retrieved_recipient
+            },
+            amount: retrieved_amount,
+            hash_lock: retrieved_hash_lock,
+            time_lock: retrieved_time_lock,
+            state: retrieved_state
+        } = retrieved_details;
+
+        assert!(retrieved_initiator == initiator, 0);
+        assert!(retrieved_recipient == recipient, 1);
+        assert!(retrieved_amount == amount, 2);
+        assert!(retrieved_hash_lock == hash_lock, 3);
+        assert!(retrieved_time_lock == time_lock, 4);
+        assert!(retrieved_state == PENDING_TRANSACTION, 5);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    public fun test_get_bridge_transfer_details_counterparty(aptos_framework: &signer) acquires SmartTableWrapper {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_atomic_bridge_feature()],
+            vector[]
+        );
+        initialize(aptos_framework);
+
+        let initiator = ethereum::ethereum_address(ethereum::valid_eip55());
+        let recipient = signer::address_of(aptos_framework);
+        let amount = 500;
+        let hash_lock = valid_hash_lock();
+        let time_lock = create_time_lock(3600);
+        let bridge_transfer_id = valid_bridge_transfer_id();
+
+        let details = create_details(
+            initiator, 
+            recipient, 
+            amount, 
+            hash_lock, 
+            time_lock
+        );
+
+        add(bridge_transfer_id, details);
+
+        let retrieved_details = get_bridge_transfer_details_counterparty(bridge_transfer_id);
+
+        let BridgeTransferDetails {
+            addresses: AddressPair {
+                initiator: retrieved_initiator,
+                recipient: retrieved_recipient
+            },
+            amount: retrieved_amount,
+            hash_lock: retrieved_hash_lock,
+            time_lock: retrieved_time_lock,
+            state: retrieved_state
+        } = retrieved_details;
+
+        assert!(retrieved_initiator == initiator, 0);
+        assert!(retrieved_recipient == recipient, 1);
+        assert!(retrieved_amount == amount, 2);
+        assert!(retrieved_hash_lock == hash_lock, 3);
+        assert!(retrieved_time_lock == time_lock, 4);
+        assert!(retrieved_state == PENDING_TRANSACTION, 5);
     }
 }
 
@@ -1224,8 +1364,7 @@ module aptos_framework::atomic_bridge_counterparty {
     ) {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
         let ethereum_address = ethereum::ethereum_address(initiator);
-        let time_lock = atomic_bridge_store::create_time_lock(
-            atomic_bridge_configuration::counterparty_timelock_duration());
+        let time_lock = atomic_bridge_configuration::counterparty_timelock_duration();
         let details = atomic_bridge_store::create_details(
             ethereum_address,
             recipient,
