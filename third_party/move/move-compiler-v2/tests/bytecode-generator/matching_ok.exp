@@ -320,13 +320,13 @@ module 0xc0ffee::m {
         }
     }
     fun select_common_fields(s: CommonFields): u64 {
-        s.Foo.x + (match (s) {
+        s.x + (match (s) {
             CommonFields::Foo{x: _,y: y} => y,
             CommonFields::Bar{x: _,z: z} => z,
         })
     }
     fun select_common_fields_different_offset(s: CommonFieldsAtDifferentOffset): u64 {
-        s.Bar.z
+        s.z
     }
     fun test_common(s: CommonFields): bool {
         s is Foo | Bar
