@@ -16,11 +16,11 @@
 ///   once it contains enough keys
 module aptos_std::big_ordered_map {
     use std::error;
-    use std::option::{Self, Option};
+    use std::enum_option::{Self as option, Option};
     use std::bcs;
     use aptos_std::ordered_map::{Self, OrderedMap};
     use aptos_std::cmp;
-    use aptos_std::storage_slots_allocator::{Self, StorageSlotsAllocator};
+    use aptos_std::storage_slots_allocator::{Self, StorageSlotsAllocator, StoredSlot, RefToSlot};
     use aptos_std::math64::{max, min};
 
     /// Map key already exists
@@ -41,8 +41,7 @@ module aptos_std::big_ordered_map {
 
     // Internal constants.
 
-    const NULL_INDEX: u64 = 0;
-    const DEFAULT_TARGET_NODE_SIZE: u64 = 2048;
+    const DEFAULT_TARGET_NODE_SIZE: u64 = 4096;
     const DEFAULT_INNER_MIN_DEGREE: u16 = 4;
     // We rely on 1 being valid size only for root node,
     // so this cannot be below 3 (unless that is changed)
@@ -60,23 +59,23 @@ module aptos_std::big_ordered_map {
     struct Node<K: store, V: store> has store {
         // Whether this node is a leaf node.
         is_leaf: bool,
-        // The node index of its parent node, or NULL_INDEX if it doesn't have parent.
-        parent: u64,
+        // The node index of its parent node, or `null_ref()` if it doesn't have parent.
+        parent: RefToSlot,
         // The children of the nodes.
         // When node is inner node, K represents max_key within the child subtree, and values are Child::Inner.
         // When the node is leaf node, K represents key of the leaf, and values are Child::Leaf.
         children: OrderedMap<K, Child<V>>,
-        // The node index of its previous node at the same level, or NULL_INDEX if it doesn't have a previous node.
-        prev: u64,
-        // The node index of its next node at the same level, or NULL_INDEX if it doesn't have a next node.
-        next: u64,
+        // The node index of its previous node at the same level, or `null_ref()` if it doesn't have a previous node.
+        prev: RefToSlot,
+        // The node index of its next node at the same level, or `null_ref()` if it doesn't have a next node.
+        next: RefToSlot,
     }
 
     /// The metadata of a child of a node.
     enum Child<V: store> has store {
         Inner {
             // The node index of it's child
-            node_index: u64,
+            node_index: StoredSlot,
         },
         Leaf {
             // Value associated with the leaf node.
@@ -89,12 +88,12 @@ module aptos_std::big_ordered_map {
         End,
         Some {
             /// The node index of the iterator pointing to.
-            node_index: u64,
+            node_index: RefToSlot,
 
             /// Child iter it is pointing to
             child_iter: ordered_map::Iterator,
 
-            /// key (node_index, child_iter) are pointing to
+            /// `key` to which `(node_index, child_iter)` are pointing to
             /// cache to not require borrowing global resources to fetch again
             key: K,
         },
@@ -103,18 +102,21 @@ module aptos_std::big_ordered_map {
     /// The BigOrderedMap data structure.
     enum BigOrderedMap<K: store, V: store> has store {
         BPlusTreeMap {
-            // The node index of the root node.
-            root_index: u64,
-            // Mapping of node_index -> node.
+            /// The node index of the root node.
+            root_index: StoredSlot,
+            /// Mapping of node_index -> node.
             nodes: StorageSlotsAllocator<Node<K, V>>,
-            // The node index of the leftmost node.
-            min_leaf_index: u64,
-            // The node index of the rightmost node.
-            max_leaf_index: u64,
+            /// The node index of the leftmost node.
+            min_leaf_index: RefToSlot,
+            /// The node index of the rightmost node.
+            max_leaf_index: RefToSlot,
 
-            // The max number of children an inner node can have.
+            /// Whether Key and Value have constant serialized size, and if so
+            /// optimize out size checks on every insert, if so.
+            constant_kv_size: bool,
+            /// The max number of children an inner node can have.
             inner_max_degree: u16,
-            // The max number of children a leaf node can have.
+            /// The max number of children a leaf node can have.
             leaf_max_degree: u16,
         }
     }
@@ -123,34 +125,36 @@ module aptos_std::big_ordered_map {
 
     /// Returns a new BigOrderedMap with the default configuration.
     public fun new<K: store, V: store>(): BigOrderedMap<K, V> {
-        new_with_config(0, 0, false, 0)
+        new_with_config(0, 0, true, false, 0)
     }
 
     /// Returns a new BigOrderedMap with the provided max degree consts (the maximum # of children a node can have).
     /// If 0 is passed, then it is dynamically computed based on size of first key and value.
-    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, num_to_preallocate: u64): BigOrderedMap<K, V> {
+    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, root_inline: bool, reuse_slots: bool, num_to_preallocate: u32): BigOrderedMap<K, V> {
         assert!(inner_max_degree == 0 || inner_max_degree >= DEFAULT_INNER_MIN_DEGREE, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
         assert!(leaf_max_degree == 0 || leaf_max_degree >= DEFAULT_LEAF_MIN_DEGREE, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
-        let nodes = if (reuse_slots) {
-            storage_slots_allocator::new_reuse_storage_slots(num_to_preallocate)
-        } else {
-            assert!(num_to_preallocate == 0, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
-            storage_slots_allocator::new_storage_slots()
-        };
-        let root_index = nodes.add(new_node(/*is_leaf=*/true, /*parent=*/NULL_INDEX));
-        BigOrderedMap::BPlusTreeMap {
-            root_index: root_index,
+        assert!(reuse_slots || num_to_preallocate == 0, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
+
+        let nodes = storage_slots_allocator::new(storage_slots_allocator::new_config(root_inline, reuse_slots, num_to_preallocate));
+
+        let root_slot = nodes.add(new_node(/*is_leaf=*/true, /*parent=*/storage_slots_allocator::null_ref()));
+        let root_ref = root_slot.stored_as_ref();
+        let self = BigOrderedMap::BPlusTreeMap {
+            root_index: root_slot,
             nodes: nodes,
-            min_leaf_index: root_index,
-            max_leaf_index: root_index,
+            min_leaf_index: root_ref,
+            max_leaf_index: root_ref,
+            constant_kv_size: false,
             inner_max_degree: inner_max_degree,
             leaf_max_degree: leaf_max_degree
-        }
+        };
+        self.validate_static_size_and_init_max_degrees();
+        self
     }
 
     /// Destroys the map if it's empty, otherwise aborts.
     public fun destroy_empty<K: store, V: store>(self: BigOrderedMap<K, V>) {
-        let BigOrderedMap::BPlusTreeMap { nodes, root_index, min_leaf_index: _, max_leaf_index: _, inner_max_degree: _, leaf_max_degree: _ } = self;
+        let BigOrderedMap::BPlusTreeMap { nodes, root_index, min_leaf_index: _, max_leaf_index: _, constant_kv_size: _, inner_max_degree: _, leaf_max_degree: _ } = self;
         nodes.remove(root_index).destroy_empty_node();
         nodes.destroy();
     }
@@ -181,12 +185,12 @@ module aptos_std::big_ordered_map {
     /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K): V {
-        let iter = self.find(key);
-        assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
+        let leaf = self.find_leaf(key);
+        assert!(!leaf.ref_is_null(), error::invalid_argument(EKEY_NOT_FOUND));
 
         let Child::Leaf {
             value,
-        } = self.remove_at(iter.node_index, key);
+        } = self.remove_at(leaf, key);
 
         value
     }
@@ -197,7 +201,7 @@ module aptos_std::big_ordered_map {
     /// key, or an end iterator if such element doesn't exist.
     public fun lower_bound<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Iterator<K> {
         let leaf = self.find_leaf(key);
-        if (leaf == NULL_INDEX) {
+        if (leaf.ref_is_null()) {
             return self.new_end_iter()
         };
 
@@ -312,7 +316,7 @@ module aptos_std::big_ordered_map {
         };
 
         let next_index = node.next;
-        if (next_index != NULL_INDEX) {
+        if (!next_index.ref_is_null()) {
             let next_node = map.nodes.borrow(next_index);
 
             let child_iter = next_node.children.new_begin_iter();
@@ -341,7 +345,7 @@ module aptos_std::big_ordered_map {
             node.prev
         };
 
-        assert!(prev_index != NULL_INDEX, error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        assert!(!prev_index.ref_is_null(), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let prev_node = map.nodes.borrow(prev_index);
 
@@ -354,18 +358,17 @@ module aptos_std::big_ordered_map {
     // ====================== Internal Implementations ========================
 
     fun add_or_upsert_impl<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: K, value: V, allow_overwrite: bool): Option<Child<V>> {
-        // TODO cache the check if K and V have constant size
-        // if (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
-        self.validate_size_and_init_max_degrees(&key, &value);
-        // };
+        if (!self.constant_kv_size) {
+            self.validate_dynamic_size_and_init_max_degrees(&key, &value);
+        };
 
         let leaf = self.find_leaf(&key);
 
-        if (leaf == NULL_INDEX) {
+        if (leaf.ref_is_null()) {
             // In this case, the key is greater than all keys in the map.
             leaf = self.max_leaf_index;
             let current = self.nodes.borrow(leaf).parent;
-            while (current != NULL_INDEX) {
+            while (!current.ref_is_null()) {
                 let current_node = self.nodes.borrow_mut(current);
 
                 let last_value = current_node.children.new_end_iter().iter_prev(&current_node.children).iter_remove(&mut current_node.children);
@@ -377,9 +380,23 @@ module aptos_std::big_ordered_map {
         self.add_at(leaf, key, new_leaf_child(value), allow_overwrite)
     }
 
-    fun validate_size_and_init_max_degrees<K: store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, value: &V) {
+    fun validate_dynamic_size_and_init_max_degrees<K: store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, value: &V) {
         let key_size = bcs::serialized_size(key);
         let value_size = bcs::serialized_size(value);
+        self.validate_size_and_init_max_degrees(key_size, value_size)
+    }
+
+    fun validate_static_size_and_init_max_degrees<K: store, V: store>(self: &mut BigOrderedMap<K, V>) {
+        let key_size = bcs::constant_serialized_size<K>();
+        let value_size = bcs::constant_serialized_size<V>();
+
+        if (key_size.is_some() && value_size.is_some()) {
+            self.validate_size_and_init_max_degrees(key_size.destroy_some(), value_size.destroy_some());
+            self.constant_kv_size = true;
+        };
+    }
+
+    fun validate_size_and_init_max_degrees<K: store, V: store>(self: &mut BigOrderedMap<K, V>, key_size: u64, value_size: u64) {
         let entry_size = key_size + value_size;
 
         if (self.inner_max_degree == 0) {
@@ -387,17 +404,19 @@ module aptos_std::big_ordered_map {
         };
 
         if (self.leaf_max_degree == 0) {
-            self.leaf_max_degree = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / (key_size + value_size)), DEFAULT_LEAF_MIN_DEGREE as u64) as u16;
+            self.leaf_max_degree = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / entry_size), DEFAULT_LEAF_MIN_DEGREE as u64) as u16;
         };
 
         assert!(key_size * (self.inner_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE));
         assert!(entry_size * (self.leaf_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE));
     }
 
-    fun destroy_inner_child<V: store>(self: Child<V>) {
+    fun destroy_inner_child<V: store>(self: Child<V>): StoredSlot {
         let Child::Inner {
-            node_index: _,
+            node_index,
         } = self;
+
+        node_index
     }
 
     fun destroy_empty_node<K: store, V: store>(self: Node<K, V>) {
@@ -406,27 +425,27 @@ module aptos_std::big_ordered_map {
         children.destroy_empty();
     }
 
-    fun new_node<K: store, V: store>(is_leaf: bool, parent: u64): Node<K, V> {
+    fun new_node<K: store, V: store>(is_leaf: bool, parent: RefToSlot): Node<K, V> {
         Node {
             is_leaf: is_leaf,
             parent: parent,
             children: ordered_map::new(),
-            prev: NULL_INDEX,
-            next: NULL_INDEX,
+            prev: storage_slots_allocator::null_ref(),
+            next: storage_slots_allocator::null_ref(),
         }
     }
 
-    fun new_node_with_children<K: store, V: store>(is_leaf: bool, parent: u64, children: OrderedMap<K, Child<V>>): Node<K, V> {
+    fun new_node_with_children<K: store, V: store>(is_leaf: bool, parent: RefToSlot, children: OrderedMap<K, Child<V>>): Node<K, V> {
         Node {
             is_leaf: is_leaf,
             parent: parent,
             children: children,
-            prev: NULL_INDEX,
-            next: NULL_INDEX,
+            prev: storage_slots_allocator::null_ref(),
+            next: storage_slots_allocator::null_ref(),
         }
     }
 
-    fun new_inner_child<V: store>(node_index: u64): Child<V> {
+    fun new_inner_child<V: store>(node_index: StoredSlot): Child<V> {
         Child::Inner {
             node_index: node_index,
         }
@@ -438,7 +457,7 @@ module aptos_std::big_ordered_map {
         }
     }
 
-    fun new_iter<K>(node_index: u64, child_iter: ordered_map::Iterator, key: K): Iterator<K> {
+    fun new_iter<K>(node_index: RefToSlot, child_iter: ordered_map::Iterator, key: K): Iterator<K> {
         Iterator::Some {
             node_index: node_index,
             child_iter: child_iter,
@@ -446,23 +465,23 @@ module aptos_std::big_ordered_map {
         }
     }
 
-    fun find_leaf<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): u64 {
-        let current = self.root_index;
-        while (current != NULL_INDEX) {
+    fun find_leaf<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): RefToSlot {
+        let current = self.root_index.stored_as_ref();
+        while (!current.ref_is_null()) {
             let node = self.nodes.borrow(current);
             if (node.is_leaf) {
-                return current
+                return current;
             };
             let children = &node.children;
             let child_iter = children.lower_bound(key);
             if (child_iter.iter_is_end(children)) {
-                return NULL_INDEX;
+                return storage_slots_allocator::null_ref();
             } else {
-                current = child_iter.iter_borrow(children).node_index;
+                current = child_iter.iter_borrow(children).node_index.stored_as_ref();
             }
         };
 
-        NULL_INDEX
+        storage_slots_allocator::null_ref()
     }
 
     fun get_max_degree<K: store, V: store>(self: &BigOrderedMap<K, V>, leaf: bool): u64 {
@@ -473,7 +492,7 @@ module aptos_std::big_ordered_map {
         }
     }
 
-    fun add_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, key: K, child: Child<V>, allow_overwrite: bool): Option<Child<V>> {
+    fun add_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: RefToSlot, key: K, child: Child<V>, allow_overwrite: bool): Option<Child<V>> {
         {
             let node = self.nodes.borrow_mut(node_index);
             let children = &mut node.children;
@@ -506,29 +525,56 @@ module aptos_std::big_ordered_map {
         };
 
         // # of children in the current node exceeds the threshold, need to split into two nodes.
-        let (right_node_slot, node) = self.nodes.remove_and_reserve(node_index);
-        let parent_index = node.parent;
-        let is_leaf = &mut node.is_leaf;
-        let next = &mut node.next;
-        let prev = &mut node.prev;
-        let children = &mut node.children;
+        let (cur_node_slot, node) = self.nodes.remove_and_reserve(node_index);
+        // aptos_std::debug::print(&std::string::utf8(b"node that needs to be split"));
+        // aptos_std::debug::print(&node);
 
-        if (parent_index == NULL_INDEX) {
+        move node_index;
+        let is_leaf = node.is_leaf;
+        let children = &mut node.children;
+        let parent_index = &mut node.parent;
+
+        let right_node_slot = if (parent_index.ref_is_null()) {
+            // aptos_std::debug::print(&std::string::utf8(b"changing root"));
+
             // Splitting root now, need to create a new root.
-            let parent_node = new_node(/*is_leaf=*/false, /*parent=*/NULL_INDEX);
+            // We keep root_index always the same
+            let new_root_node = new_node(/*is_leaf=*/false, /*parent=*/storage_slots_allocator::null_ref());
+
+            let (replacement_node_stored_slot, replacement_node_slot) = self.nodes.reserve_slot();
+            // aptos_std::debug::print(&replacement_node_slot);
+
             let max_element = *children.new_end_iter().iter_prev(children).iter_borrow_key(children);
             if (cmp::compare(&max_element, &key).is_less_than()) {
                 max_element = key;
             };
-            parent_node.children.add(max_element, new_inner_child(node_index));
+            new_root_node.children.add(max_element, new_inner_child(replacement_node_stored_slot));
 
-            parent_index = self.nodes.add(parent_node);
-            node.parent = parent_index;
+            // aptos_std::debug::print(&cur_node_slot);
+            *parent_index = cur_node_slot.reserved_as_ref();
+            self.nodes.fill_reserved_slot(cur_node_slot, new_root_node);
 
-            self.root_index = parent_index;
+            let replacement_ref = replacement_node_slot.reserved_as_ref();
+            if (!is_leaf) {
+                self.nodes.borrow_mut(child.node_index.stored_as_ref()).parent = replacement_ref;
+                children.for_each_ref(|_key, child| {
+                    self.nodes.borrow_mut(child.node_index.stored_as_ref()).parent = replacement_ref;
+                });
+            } else {
+                self.min_leaf_index = replacement_ref;
+                self.max_leaf_index = replacement_ref;
+            };
+            replacement_node_slot
+        } else {
+            cur_node_slot
         };
 
-        let max_degree = if (*is_leaf) {
+        let right_node_ref = right_node_slot.reserved_as_ref();
+        let parent_index = *parent_index;
+        let next = &mut node.next;
+        let prev = &mut node.prev;
+
+        let max_degree = if (is_leaf) {
             self.leaf_max_degree as u64
         } else {
             self.inner_max_degree as u64
@@ -541,37 +587,45 @@ module aptos_std::big_ordered_map {
         assert!(children.length() <= max_degree, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         assert!(new_node_children.length() <= max_degree, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        let right_node = new_node_with_children(*is_leaf, parent_index, new_node_children);
+        let right_node = new_node_with_children(is_leaf, parent_index, new_node_children);
 
-        let left_node_slot = self.nodes.reserve_slot();
-        let left_node_index = left_node_slot.get_index();
+        let (left_node_stored_slot, left_node_slot) = self.nodes.reserve_slot();
+        let left_node_ref = left_node_stored_slot.stored_as_ref();
         right_node.next = *next;
-        *next = node_index;
-        right_node.prev = left_node_index;
-        if (*prev != NULL_INDEX) {
-            self.nodes.borrow_mut(*prev).next = left_node_index;
+        *next = right_node_ref;
+        right_node.prev = left_node_ref;
+        if (!prev.ref_is_null()) {
+            self.nodes.borrow_mut(*prev).next = left_node_ref;
         };
 
-        if (!*is_leaf) {
+        if (!is_leaf) {
             children.for_each_ref(|_key, child| {
-                self.nodes.borrow_mut(child.node_index).parent = left_node_index;
+                self.nodes.borrow_mut(child.node_index.stored_as_ref()).parent = left_node_ref;
             });
         };
 
         let split_key = *children.new_end_iter().iter_prev(children).iter_borrow_key(children);
 
+        // aptos_std::debug::print(&std::string::utf8(b"creating right node"));
+        // aptos_std::debug::print(&right_node_slot);
+        // aptos_std::debug::print(&right_node);
+
+        // aptos_std::debug::print(&std::string::utf8(b"updating left node"));
+        // aptos_std::debug::print(&left_node_slot);
+        // aptos_std::debug::print(&node);
+
         self.nodes.fill_reserved_slot(left_node_slot, node);
         self.nodes.fill_reserved_slot(right_node_slot, right_node);
 
-        if (node_index == self.min_leaf_index) {
-            self.min_leaf_index = left_node_index;
+        if (right_node_ref == self.min_leaf_index) {
+            self.min_leaf_index = left_node_ref;
         };
-        self.add_at(parent_index, split_key, new_inner_child(left_node_index), false).destroy_none();
+        self.add_at(parent_index, split_key, new_inner_child(left_node_stored_slot), false).destroy_none();
         option::none()
     }
 
-    fun update_key<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, old_key: &K, new_key: K) {
-        if (node_index == NULL_INDEX) {
+    fun update_key<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: RefToSlot, old_key: &K, new_key: K) {
+        if (node_index.ref_is_null()) {
             return
         };
 
@@ -584,49 +638,57 @@ module aptos_std::big_ordered_map {
         };
     }
 
-    fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, key: &K): Child<V> {
+    fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: RefToSlot, key: &K): Child<V> {
         let old_child = {
             let node = self.nodes.borrow_mut(node_index);
 
             let children = &mut node.children;
-            let current_size = children.length();
-
-            if (current_size == 1 && node_index == self.root_index) {
-                // Remove the only element at root node.
-                return children.remove(key);
-            };
 
             let is_leaf = node.is_leaf;
 
             let old_child = children.remove(key);
-            current_size = current_size - 1;
+            if (node_index == self.root_index.stored_as_ref()) {
+                // promote only child to root, and drop current root.
+                // keep the root index the same.
+                if (!is_leaf && children.length() == 1) {
+                    let Child::Inner {
+                        node_index: inner_child_index,
+                    } = children.new_end_iter().iter_prev(children).iter_remove(children);
+                    move children;
+                    move node;
 
-            let new_max_key = *children.new_end_iter().iter_prev(children).iter_borrow_key(children);
-            let max_key_updated = cmp::compare(&new_max_key, key).is_less_than();
+                    let inner_child = self.nodes.remove(inner_child_index);
+                    let root_ref = self.root_index.stored_as_ref();
+                    if (inner_child.is_leaf) {
+                        self.min_leaf_index = root_ref;
+                        self.max_leaf_index = root_ref;
+                    } else {
+                        inner_child.children.for_each_ref(|_key, child| {
+                            self.nodes.borrow_mut(child.node_index.stored_as_ref()).parent = root_ref;
+                        });
+                    };
+                    inner_child.parent = storage_slots_allocator::null_ref();
 
-            let max_degree = if (node.is_leaf) {
+                    let (root_slot, root_value) = self.nodes.remove_and_reserve(node_index);
+                    destroy_empty_node(root_value);
+
+                    self.nodes.fill_reserved_slot(root_slot, inner_child);
+                }; // else: nothing to change
+                return old_child;
+            };
+
+            let max_degree = if (is_leaf) {
                 self.leaf_max_degree as u64
             } else {
                 self.inner_max_degree as u64
             };
 
+            let current_size = children.length();
             let big_enough = current_size * 2 >= max_degree;
-            if (!max_key_updated && big_enough) {
-                return old_child;
-            };
 
-            if (!big_enough && node_index == self.root_index) {
-                // promote only child to root, and drop current root.
-                if (current_size == 1 && !is_leaf) {
-                    let Child::Inner {
-                        node_index: inner_child_index,
-                    } = children.new_end_iter().iter_prev(children).iter_remove(children);
-                    self.root_index = inner_child_index;
-                    self.nodes.borrow_mut(self.root_index).parent = NULL_INDEX;
-                    destroy_empty_node(self.nodes.remove(node_index));
-                } else {
-                    // nothing to change
-                };
+            let new_max_key = *children.new_end_iter().iter_prev(children).iter_borrow_key(children);
+            let max_key_updated = cmp::compare(&new_max_key, key).is_less_than();
+            if (!max_key_updated && big_enough) {
                 return old_child;
             };
 
@@ -660,7 +722,7 @@ module aptos_std::big_ordered_map {
         // Children size is below threshold, we need to rebalance
 
         let brother_index = next;
-        if (brother_index == NULL_INDEX || self.nodes.borrow(brother_index).parent != parent) {
+        if (brother_index.ref_is_null() || self.nodes.borrow(brother_index).parent != parent) {
             brother_index = prev;
         };
         let (brother_slot, brother_node) = self.nodes.remove_and_reserve(brother_index);
@@ -675,7 +737,7 @@ module aptos_std::big_ordered_map {
                 let borrowed_max_key = *brother_begin_iter.iter_borrow_key(brother_children);
                 let borrowed_element = brother_begin_iter.iter_remove(brother_children);
                 if (borrowed_element is Child::Inner<V>) {
-                    self.nodes.borrow_mut(borrowed_element.node_index).parent = node_index;
+                    self.nodes.borrow_mut(borrowed_element.node_index.stored_as_ref()).parent = node_index;
                 };
 
                 children.add(borrowed_max_key, borrowed_element);
@@ -686,7 +748,7 @@ module aptos_std::big_ordered_map {
                 let borrowed_element = brother_end_iter.iter_remove(brother_children);
 
                 if (borrowed_element is Child::Inner<V>) {
-                    self.nodes.borrow_mut(borrowed_element.node_index).parent = node_index;
+                    self.nodes.borrow_mut(borrowed_element.node_index.stored_as_ref()).parent = node_index;
                 };
 
                 children.add(borrowed_max_key, borrowed_element);
@@ -702,7 +764,7 @@ module aptos_std::big_ordered_map {
         if (brother_index == next) {
             if (!is_leaf) {
                 children.for_each_ref(|_key, child| {
-                    self.nodes.borrow_mut(child.node_index).parent = brother_index;
+                    self.nodes.borrow_mut(child.node_index.stored_as_ref()).parent = brother_index;
                 });
             };
             let Node { children: brother_children, is_leaf: _, parent: _, prev: _, next: brother_next } = brother_node;
@@ -712,26 +774,26 @@ module aptos_std::big_ordered_map {
 
             move children;
 
-            if (node.next != NULL_INDEX) {
+            if (!node.next.ref_is_null()) {
                 self.nodes.borrow_mut(node.next).prev = brother_index;
             };
-            if (node.prev != NULL_INDEX) {
+            if (!node.prev.ref_is_null()) {
                 self.nodes.borrow_mut(node.prev).next = brother_index;
             };
 
             self.nodes.fill_reserved_slot(brother_slot, node);
-            self.nodes.free_reserved_slot(node_slot);
+
             if (self.min_leaf_index == node_index) {
                 self.min_leaf_index = brother_index;
             };
 
-            if (parent != NULL_INDEX) {
-                destroy_inner_child(self.remove_at(parent, &key_to_remove));
-            };
+            assert!(!parent.ref_is_null(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+            let node_stored_slot = destroy_inner_child(self.remove_at(parent, &key_to_remove));
+            self.nodes.free_reserved_slot(node_slot, node_stored_slot);
         } else {
             if (!is_leaf) {
                 brother_children.for_each_ref(|_key, child| {
-                    self.nodes.borrow_mut(child.node_index).parent = node_index;
+                    self.nodes.borrow_mut(child.node_index.stored_as_ref()).parent = node_index;
                 });
             };
 
@@ -742,32 +804,32 @@ module aptos_std::big_ordered_map {
 
             move brother_children;
 
-            if (brother_node.next != NULL_INDEX) {
+            if (!brother_node.next.ref_is_null()) {
                 self.nodes.borrow_mut(brother_node.next).prev = node_index;
             };
-            if (brother_node.prev != NULL_INDEX) {
+            if (!brother_node.prev.ref_is_null()) {
                 self.nodes.borrow_mut(brother_node.prev).next = node_index;
             };
 
             self.nodes.fill_reserved_slot(node_slot, brother_node);
-            self.nodes.free_reserved_slot(brother_slot);
+
             if (self.min_leaf_index == brother_index) {
                 self.min_leaf_index = node_index;
             };
 
-            if (parent != NULL_INDEX) {
-                destroy_inner_child(self.remove_at(parent, &key_to_remove));
-            };
+            assert!(!parent.ref_is_null(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+            let node_stored_slot = destroy_inner_child(self.remove_at(parent, &key_to_remove));
+            self.nodes.free_reserved_slot(brother_slot, node_stored_slot);
         };
         old_child
     }
 
     /// Returns the number of elements in the BigOrderedMap.
     fun length<K: store, V: store>(self: &BigOrderedMap<K, V>): u64 {
-        self.length_for_node(self.root_index)
+        self.length_for_node(self.root_index.stored_as_ref())
     }
 
-    fun length_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64): u64 {
+    fun length_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: RefToSlot): u64 {
         let node = self.nodes.borrow(node_index);
         if (node.is_leaf) {
             node.children.length()
@@ -775,7 +837,7 @@ module aptos_std::big_ordered_map {
             let size = 0;
 
             node.children.for_each_ref(|_key, child| {
-                size = size + self.length_for_node(child.node_index);
+                size = size + self.length_for_node(child.node_index.stored_as_ref());
             });
             size
         }
@@ -793,11 +855,11 @@ module aptos_std::big_ordered_map {
     #[test_only]
     fun print_map<K: store, V: store>(self: &BigOrderedMap<K, V>) {
         aptos_std::debug::print(self);
-        self.print_map_for_node(self.root_index, 0);
+        self.print_map_for_node(self.root_index.stored_as_ref(), 0);
     }
 
     #[test_only]
-    fun print_map_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64, level: u64) {
+    fun print_map_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: RefToSlot, level: u64) {
         let node = self.nodes.borrow(node_index);
 
         aptos_std::debug::print(&level);
@@ -806,7 +868,7 @@ module aptos_std::big_ordered_map {
 
         if (!node.is_leaf) {
             node.children.for_each_ref(|_key, node| {
-                self.print_map_for_node(node.node_index, level + 1);
+                self.print_map_for_node(node.node_index.stored_as_ref(), level + 1);
             });
         };
     }
@@ -833,6 +895,7 @@ module aptos_std::big_ordered_map {
             num_elements = num_elements + 1;
             it = it.iter_next(self);
         };
+
         assert!(num_elements == expected_num_elements, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
         let num_elements = 0;
@@ -853,14 +916,14 @@ module aptos_std::big_ordered_map {
     }
 
     #[test_only]
-    fun validate_subtree<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64, expected_lower_bound_key: Option<K>, expected_max_key: Option<K>, expected_parent: u64) {
+    fun validate_subtree<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, node_index: RefToSlot, expected_lower_bound_key: Option<K>, expected_max_key: Option<K>, expected_parent: RefToSlot) {
         let node = self.nodes.borrow(node_index);
         let len = node.children.length();
         assert!(len <= self.get_max_degree(node.is_leaf), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        if (node_index != self.root_index) {
+        if (node_index != self.root_index.stored_as_ref()) {
             assert!(len >= 1, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
-            assert!(len * 2 >= self.get_max_degree(node.is_leaf) || node_index == self.root_index, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+            assert!(len * 2 >= self.get_max_degree(node.is_leaf) || node_index == self.root_index.stored_as_ref(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         };
 
         assert!(node.parent == expected_parent, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
@@ -870,7 +933,7 @@ module aptos_std::big_ordered_map {
         let previous_max_key = expected_lower_bound_key;
         node.children.for_each_ref(|key: &K, child: &Child<V>| {
             if (!node.is_leaf) {
-                self.validate_subtree(child.node_index, previous_max_key, option::some(*key), node_index);
+                self.validate_subtree(child.node_index.stored_as_ref(), previous_max_key, option::some(*key), node_index);
             } else {
                 assert!((child is Child::Leaf<V>), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
             };
@@ -890,13 +953,13 @@ module aptos_std::big_ordered_map {
 
     #[test_only]
     fun validate_map<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
-        self.validate_subtree(self.root_index, option::none(), option::none(), NULL_INDEX);
+        self.validate_subtree(self.root_index.stored_as_ref(), option::none(), option::none(), storage_slots_allocator::null_ref());
         self.validate_iteration();
     }
 
     #[test]
     fun test_small_example() {
-        let map = new_with_config(5, 3, true, 2);
+        let map = new_with_config(5, 3, true, true, 2);
         map.print_map(); map.validate_map();
         add(&mut map, 1, 1); map.print_map(); map.validate_map();
         add(&mut map, 2, 2); map.print_map(); map.validate_map();
@@ -920,7 +983,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_deleting_and_creating_nodes() {
-        let map = new_with_config(4, 3, true, 2);
+        let map = new_with_config(4, 3, true, true, 2);
 
         for (i in 0..50) {
             map.upsert(i, i);
@@ -967,7 +1030,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_iterator() {
-        let map = new_with_config(5, 5, true, 2);
+        let map = new_with_config(5, 5, true, true, 2);
 
         let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
         while (data.length() != 0) {
@@ -989,7 +1052,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_find() {
-        let map = new_with_config(5, 5, true, 2);
+        let map = new_with_config(5, 5, true, true, 2);
 
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 0, 10];
 
@@ -1018,7 +1081,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_lower_bound() {
-        let map = new_with_config(5, 5, true, 2);
+        let map = new_with_config(5, 5, true, true, 2);
 
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 12, 10];
 
@@ -1057,7 +1120,7 @@ module aptos_std::big_ordered_map {
     fun test_large_data_set_helper(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool) {
         use std::vector;
 
-        let map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots, if (reuse_slots) {4} else {0});
+        let map = new_with_config(inner_max_degree, leaf_max_degree, true, reuse_slots, if (reuse_slots) {4} else {0});
         let data = ordered_map::large_dataset();
         let shuffled_data = ordered_map::large_dataset_shuffled();
 

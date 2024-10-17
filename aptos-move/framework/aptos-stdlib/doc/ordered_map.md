@@ -76,6 +76,7 @@ allowing cleaner iterator APIs.
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/cmp.md#0x1_cmp">0x1::cmp</a>;
+<b>use</b> <a href="../../move-stdlib/doc/enum_option.md#0x1_enum_option">0x1::enum_option</a>;
 <b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -403,7 +404,7 @@ If the key doesn't exist in the map, inserts the key/value, and returns none.
 Otherwise, updates the value under the given key, and returns the old value.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_upsert">upsert</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: K, value: V): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_upsert">upsert</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: K, value: V): <a href="../../move-stdlib/doc/enum_option.md#0x1_enum_option_Option">enum_option::Option</a>&lt;V&gt;
 </code></pre>
 
 
