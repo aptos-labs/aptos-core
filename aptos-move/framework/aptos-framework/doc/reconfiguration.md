@@ -412,13 +412,14 @@ Signal validators to start using new configuration. Must be called from friend c
                 epoch: config_ref.epoch,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
+            &<b>mut</b> config_ref.events,
+            <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
+                epoch: config_ref.epoch,
+            },
+        );
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
-        &<b>mut</b> config_ref.events,
-        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
-            epoch: config_ref.epoch,
-        },
-    );
 
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">reconfiguration_state::on_reconfig_finish</a>();
 }
@@ -504,13 +505,14 @@ reconfiguration event.
                 epoch: config_ref.epoch,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
+            &<b>mut</b> config_ref.events,
+            <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
+                epoch: config_ref.epoch,
+            },
+        );
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
-        &<b>mut</b> config_ref.events,
-        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
-            epoch: config_ref.epoch,
-        },
-    );
 }
 </code></pre>
 

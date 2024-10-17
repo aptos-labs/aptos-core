@@ -136,15 +136,16 @@ module aptos_token::token_transfers {
                     amount,
                 }
             )
-        };
-        event::emit_event<TokenOfferEvent>(
-            &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
-            TokenOfferEvent {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
-        );
+        } else {
+            event::emit_event<TokenOfferEvent>(
+                &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
+                TokenOfferEvent {
+                    to_address: receiver,
+                    token_id,
+                    amount,
+                },
+            );
+        }
     }
 
     public entry fun claim_script(
@@ -182,15 +183,16 @@ module aptos_token::token_transfers {
                     amount,
                 }
             )
+        } else {
+            event::emit_event<TokenClaimEvent>(
+                &mut borrow_global_mut<PendingClaims>(sender).claim_events,
+                TokenClaimEvent {
+                    to_address: signer::address_of(receiver),
+                    token_id,
+                    amount,
+                },
+            );
         };
-        event::emit_event<TokenClaimEvent>(
-            &mut borrow_global_mut<PendingClaims>(sender).claim_events,
-            TokenClaimEvent {
-                to_address: signer::address_of(receiver),
-                token_id,
-                amount,
-            },
-        );
     }
 
     public entry fun cancel_offer_script(
@@ -229,15 +231,16 @@ module aptos_token::token_transfers {
                     amount,
                 },
             )
-        };
-        event::emit_event<TokenCancelOfferEvent>(
-            &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
-            TokenCancelOfferEvent {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
-        );
+        } else {
+            event::emit_event<TokenCancelOfferEvent>(
+                &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
+                TokenCancelOfferEvent {
+                    to_address: receiver,
+                    token_id,
+                    amount,
+                },
+            );
+        }
     }
 
     #[test(creator = @0x1, owner = @0x2)]

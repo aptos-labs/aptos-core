@@ -512,11 +512,12 @@ Can only be called as part of the Aptos governance proposal process established 
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="block.md#0x1_block_UpdateEpochInterval">UpdateEpochInterval</a> { old_epoch_interval, new_epoch_interval },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a>&gt;(
+            &<b>mut</b> block_resource.update_epoch_interval_events,
+            <a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a> { old_epoch_interval, new_epoch_interval },
+        );
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a>&gt;(
-        &<b>mut</b> block_resource.update_epoch_interval_events,
-        <a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a> { old_epoch_interval, new_epoch_interval },
-    );
 }
 </code></pre>
 
@@ -783,8 +784,9 @@ Emit the event and update height and global timestamp
     );
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(new_block_event_v2);
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(event_handle, new_block_event);
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(event_handle, new_block_event);
 }
 </code></pre>
 

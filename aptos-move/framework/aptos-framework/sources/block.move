@@ -136,11 +136,12 @@ module aptos_framework::block {
             event::emit(
                 UpdateEpochInterval { old_epoch_interval, new_epoch_interval },
             );
+        } else {
+            event::emit_event<UpdateEpochIntervalEvent>(
+                &mut block_resource.update_epoch_interval_events,
+                UpdateEpochIntervalEvent { old_epoch_interval, new_epoch_interval },
+            );
         };
-        event::emit_event<UpdateEpochIntervalEvent>(
-            &mut block_resource.update_epoch_interval_events,
-            UpdateEpochIntervalEvent { old_epoch_interval, new_epoch_interval },
-        );
     }
 
     #[view]
@@ -288,8 +289,9 @@ module aptos_framework::block {
         );
         if (std::features::module_event_migration_enabled()) {
             event::emit(new_block_event_v2);
+        } else {
+            event::emit_event<NewBlockEvent>(event_handle, new_block_event);
         };
-        event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
     /// Emit a `NewBlockEvent` event. This function will be invoked by genesis directly to generate the very first

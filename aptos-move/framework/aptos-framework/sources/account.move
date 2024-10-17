@@ -692,14 +692,15 @@ module aptos_framework::account {
                 old_authentication_key: account_resource.authentication_key,
                 new_authentication_key: new_auth_key_vector,
             });
+        } else {
+            event::emit_event<KeyRotationEvent>(
+                &mut account_resource.key_rotation_events,
+                KeyRotationEvent {
+                    old_authentication_key: account_resource.authentication_key,
+                    new_authentication_key: new_auth_key_vector,
+                }
+            );
         };
-        event::emit_event<KeyRotationEvent>(
-            &mut account_resource.key_rotation_events,
-            KeyRotationEvent {
-                old_authentication_key: account_resource.authentication_key,
-                new_authentication_key: new_auth_key_vector,
-            }
-        );
 
         // Update the account resource's authentication key.
         account_resource.authentication_key = new_auth_key_vector;
