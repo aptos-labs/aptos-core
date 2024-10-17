@@ -67,6 +67,7 @@ module aptos_std::from_bcs {
     public(friend) native fun from_bytes<T>(bytes: vector<u8>): T;
     friend aptos_std::any;
     friend aptos_std::copyable_any;
+    friend aptos_std::hot_potato_any;
 
 
     #[test_only]
