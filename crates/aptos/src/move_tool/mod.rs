@@ -644,14 +644,26 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
+        let compiler_version = if move_options.compiler_version.is_none() {
+            Some(CompilerVersion::latest_stable())
+        } else {
+            move_options.compiler_version
+        };
+
+        let language_version = if move_options.language_version.is_none() {
+            Some(LanguageVersion::latest_stable())
+        } else {
+            move_options.language_version
+        };
+
         let result = task::spawn_blocking(move || {
             prover_options.prove(
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
-                move_options.compiler_version,
-                move_options.language_version,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],

@@ -2866,6 +2866,7 @@ dependencies = [
  "aptos-vm",
  "clap 4.4.14",
  "move-cli",
+ "move-model",
  "move-package",
  "move-prover",
  "move-unit-test",
