@@ -128,6 +128,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-indexer-test-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       COMMENT_HEADER: forge-indexer
       FORGE_TEST_SUITE: indexer_test
       FORGE_ENABLE_INDEXER: true

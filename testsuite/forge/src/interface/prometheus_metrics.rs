@@ -115,7 +115,9 @@ pub enum LatencyBreakdownSlice {
     IndexerFullnodeProcessedBatch,
     IndexerCacheWorkerProcessedBatch,
     IndexerDataServiceAllChunksSent,
-    // TODO: add processor insertion into DB latency
+    // these two mesasure the same latency, but the metrics are different for the SDK
+    IndexerProcessorLatency,
+    IndexerProcessorSdkLatency,
 }
 
 #[derive(Clone, Debug)]
@@ -236,6 +238,13 @@ pub async fn fetch_latency_breakdown(
         let indexer_data_service_all_chunks_sent_query =
             r#"max(indexer_grpc_duration_in_secs{step="4", service_type="data_service"})"#;
 
+        // These are processor latencies for both original core processors and those written with the processor SDK: https://github.com/aptos-labs/aptos-indexer-processor-sdk
+        // Note the use of empty {}, where additional test-specific labels will be added by Forge
+        let indexer_processor_latency_query =
+            r#"max by (processor_name) (indexer_processor_data_processed_latency_in_secs{})"#;
+        let indexer_sdk_processor_latency_query =
+            "max by (step_name) (aptos_procsdk_step__processed_transaction_latency_secs{})";
+
         let indexer_fullnode_processed_batch_samples = swarm
             .query_range_metrics(
                 indexer_fullnode_processed_batch_query,
@@ -263,6 +272,24 @@ pub async fn fetch_latency_breakdown(
             )
             .await?;
 
+        let indexer_processor_latency_samples = swarm
+            .query_range_metrics(
+                indexer_processor_latency_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_processor_sdk_latency_samples = swarm
+            .query_range_metrics(
+                indexer_sdk_processor_latency_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
         samples.insert(
             LatencyBreakdownSlice::IndexerFullnodeProcessedBatch,
             MetricSamples::new(indexer_fullnode_processed_batch_samples),
@@ -274,6 +301,14 @@ pub async fn fetch_latency_breakdown(
         samples.insert(
             LatencyBreakdownSlice::IndexerDataServiceAllChunksSent,
             MetricSamples::new(indexer_data_service_all_chunks_sent_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerProcessorLatency,
+            MetricSamples::new(indexer_processor_latency_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerProcessorSdkLatency,
+            MetricSamples::new(indexer_processor_sdk_latency_samples),
         );
     }
     Ok(LatencyBreakdown::new(samples))
