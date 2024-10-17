@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub struct InternalIndexerDBConfig {
     pub enable_transaction: bool,
     pub enable_event: bool,
+    pub enable_event_translation: bool,
     pub enable_statekeys: bool,
     pub batch_size: usize,
 }
@@ -20,12 +21,14 @@ impl InternalIndexerDBConfig {
     pub fn new(
         enable_transaction: bool,
         enable_event: bool,
+        enable_event_translation: bool,
         enable_statekeys: bool,
         batch_size: usize,
     ) -> Self {
         Self {
             enable_transaction,
             enable_event,
+            enable_event_translation,
             enable_statekeys,
             batch_size,
         }
@@ -37,6 +40,10 @@ impl InternalIndexerDBConfig {
 
     pub fn enable_event(&self) -> bool {
         self.enable_event
+    }
+
+    pub fn enable_event_translation(&self) -> bool {
+        self.enable_event_translation
     }
 
     pub fn enable_statekeys(&self) -> bool {
@@ -57,6 +64,7 @@ impl Default for InternalIndexerDBConfig {
         Self {
             enable_transaction: false,
             enable_event: false,
+            enable_event_translation: false,
             enable_statekeys: false,
             batch_size: 10_000,
         }

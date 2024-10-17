@@ -3,7 +3,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    contract_event::EventWithVersion,
+    contract_event::{ContractEventV1, EventWithVersion},
     event::EventKey,
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
@@ -72,4 +72,9 @@ pub trait IndexerReader: Send + Sync {
 
         Ok(())
     }
+    fn get_translated_v1_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> anyhow::Result<ContractEventV1>;
 }
