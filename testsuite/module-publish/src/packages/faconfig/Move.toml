@@ -1,0 +1,13 @@
+[package]
+name = "FAConfig"
+version = "1.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+
+# testing exchanging of constant address works as well.
+[addresses]
+fa_config = "0x101"
+
+[dev-addresses]
+fa_config = "0x101"
