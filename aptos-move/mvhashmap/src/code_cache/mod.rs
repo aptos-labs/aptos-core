@@ -4,5 +4,5 @@
 mod sync;
 mod unsync;
 
-pub use sync::{LockedSyncModuleCache, SyncCodeCache};
+pub use sync::SyncCodeCache;
 pub use unsync::UnsyncCodeCache;

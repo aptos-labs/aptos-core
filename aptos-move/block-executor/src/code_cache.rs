@@ -6,7 +6,7 @@ use crate::{
     cross_block_caches::CrossBlockModuleCache,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
-use aptos_mvhashmap::{code_cache::LockedSyncModuleCache, types::MaybeCommitted};
+use aptos_mvhashmap::types::VersionedModule;
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_value::StateValueMetadata, TStateView},
@@ -31,7 +31,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::{
     code::{ModuleCache, ScriptCache},
-    module_cyclic_dependency_error, module_linker_error, panic_error,
+    module_cyclic_dependency_error, module_linker_error,
 };
 use std::sync::Arc;
 
@@ -96,7 +96,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
                 ViewState::Unsync(state) => {
                     let read = state
                         .read_module_entry(address, module_name, &|id| {
-                            self.fetch_base_module_entry(id)
+                            self.fetch_versioned_base_module_entry(id)
                         })
                         .map_err(|e| e.to_partial())?;
                     Ok(read.map(|e| e.state_value_metadata().clone()))
@@ -137,7 +137,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 )
             },
             ViewState::Unsync(state) => Ok(state
-                .read_module_entry(address, module_name, &|id| self.fetch_base_module_entry(id))?
+                .read_module_entry(address, module_name, &|id| {
+                    self.fetch_versioned_base_module_entry(id)
+                })?
                 .is_some()),
         }
     }
@@ -171,7 +173,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 },
                 ViewState::Unsync(state) => {
                     let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_base_module_entry(id)
+                        self.fetch_versioned_base_module_entry(id)
                     })?;
                     Ok(read.map(|v| v.bytes().clone()))
                 },
@@ -208,7 +210,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 },
                 ViewState::Unsync(state) => {
                     let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_base_module_entry(id)
+                        self.fetch_versioned_base_module_entry(id)
                     })?;
                     Ok(read.map(|v| v.size_in_bytes()))
                 },
@@ -245,7 +247,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 },
                 ViewState::Unsync(state) => {
                     let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_base_module_entry(id)
+                        self.fetch_versioned_base_module_entry(id)
                     })?;
                     Ok(read.map(|v| v.metadata().to_vec()))
                 },
@@ -282,7 +284,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 },
                 ViewState::Unsync(state) => {
                     let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_base_module_entry(id)
+                        self.fetch_versioned_base_module_entry(id)
                     })?;
                     Ok(read.map(|v| v.compiled_module().clone()))
                 },
@@ -300,83 +302,24 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 self.capture_global_cache_read(address, module_name);
                 Ok(Some(module))
             },
-            None => {
-                match &self.latest_view {
-                    ViewState::Sync(state) => {
-                        if let CacheRead::Hit(result) = state
-                            .captured_reads
-                            .borrow()
-                            .fetch_verified_module(address, module_name)
-                        {
-                            return result;
-                        }
+            None => match &self.latest_view {
+                ViewState::Sync(state) => {
+                    if let CacheRead::Hit(result) = state
+                        .captured_reads
+                        .borrow()
+                        .fetch_verified_module(address, module_name)
+                    {
+                        return result;
+                    }
 
-                        // This transaction has not read this module before, or the entry has not
-                        // yet been verified. For verification, lock the cache.
-                        let mut module_cache =
-                            state.versioned_map.code_cache().module_cache().lock();
-
-                        // The entry may not exist, in which case return early.
-                        let module_id = ModuleId::new(*address, module_name.to_owned());
-                        let entry = match module_cache
-                            .get_module_or_insert_with(&module_id, || {
-                                self.fetch_versioned_base_module_entry(&module_id)
-                            })? {
-                            Some(entry) => entry,
-                            None => {
-                                state
-                                    .captured_reads
-                                    .borrow_mut()
-                                    .capture_block_cache_read(module_id, None);
-                                module_cache.unlock();
-                                return Ok(None);
-                            },
-                        };
-
-                        // Also return early if the entry has already been verified.
-                        if entry.is_verified() {
-                            // We do not need to capture this read, because the other thread that
-                            // verified this module has put it there.
-                            // TODO(loader_v2): Add a paranoid check here.
-                            module_cache.unlock();
-                            return Ok(Some(entry.verified_module()?.clone()));
-                        }
-
-                        // Otherwise, we need to verify and load the transitive closure.
-
-                        let mut visited = HashSet::new();
-                        visited.insert(module_id.clone());
-
-                        let module = ParallelState::<T, X>::visit_dependencies_and_verify(
-                            entry.clone(),
-                            &module_id,
-                            &mut visited,
-                            self.runtime_environment,
-                            &mut module_cache,
-                            &|id| self.fetch_versioned_base_module_entry(id),
-                        )?;
-
-                        let verified_entry = module_cache.get_module_or_insert_with(&module_id, || self.fetch_versioned_base_module_entry(&module_id))?.ok_or_else(|| {
-                            let msg = format!("Verified module {}::{} should be cached after dependency traversal", module_id.address(), module_id.name());
-                            panic_error!(msg).finish(Location::Undefined)
-                        })?;
-
-                        // TODO(loader_2): paranoid check same commit index?
-                        state
-                            .captured_reads
-                            .borrow_mut()
-                            .capture_block_cache_read(module_id, Some(verified_entry));
-
-                        module_cache.unlock();
-                        Ok(Some(module))
-                    },
-                    ViewState::Unsync(state) => state.read_verified_module(
-                        address,
-                        module_name,
-                        self.runtime_environment,
-                        &|id| self.fetch_base_module_entry(id),
-                    ),
-                }
+                    unimplemented!()
+                },
+                ViewState::Unsync(state) => state.read_verified_module(
+                    address,
+                    module_name,
+                    self.runtime_environment,
+                    &|id| self.fetch_versioned_base_module_entry(id),
+                ),
             },
         }
     }
@@ -398,17 +341,15 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         address: &AccountAddress,
         module_name: &IdentStr,
         init_func: &F,
-    ) -> VMResult<Option<Arc<ModuleCacheEntry>>>
+    ) -> VMResult<Option<Arc<VersionedModule<ModuleCacheEntry>>>>
     where
-        F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
+        F: Fn(&ModuleId) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>>,
     {
         let module_id = ModuleId::new(*address, module_name.to_owned());
         let read = self
             .unsync_map
             .code_cache()
-            .get_module_or_insert_with(&module_id, || {
-                init_func(&module_id).map(|v| v.map(Arc::new))
-            })?;
+            .get_module_or_insert_with(&module_id, || init_func(&module_id))?;
         self.read_set.borrow_mut().capture_module_read(module_id);
         Ok(read)
     }
@@ -424,7 +365,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         init_func: &F,
     ) -> VMResult<Option<Arc<Module>>>
     where
-        F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
+        F: Fn(&ModuleId) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>>,
     {
         // Check if module exists, recording the read as well. If it does not, return early.
         let entry = match self.read_module_entry(address, module_name, &init_func)? {
@@ -456,14 +397,14 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
 
     fn visit_dependencies_and_verify<F>(
         &self,
-        entry: &ModuleCacheEntry,
+        entry: &VersionedModule<ModuleCacheEntry>,
         module_id: ModuleId,
         visited: &mut HashSet<ModuleId>,
         runtime_environment: &RuntimeEnvironment,
         init_func: &F,
     ) -> VMResult<Arc<Module>>
     where
-        F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
+        F: Fn(&ModuleId) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>>,
     {
         let compiled_module = entry.compiled_module();
 
@@ -511,10 +452,10 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
             .build_verified_module(locally_verified_module, &verified_dependencies)
             .map(Arc::new)?;
 
-        let entry = entry.make_verified(module.clone());
+        let mm = entry.make_verified(module.clone());
         self.unsync_map
             .code_cache()
-            .insert_module(module_id, Arc::new(entry));
+            .insert_module(module_id, VersionedModule::new(mm, entry.version()));
 
         Ok(module)
     }
@@ -531,7 +472,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         read_func: R,
     ) -> VMResult<V>
     where
-        R: Fn(Option<&Arc<MaybeCommitted<ModuleCacheEntry>>>) -> V,
+        R: Fn(Option<&Arc<VersionedModule<ModuleCacheEntry>>>) -> V,
         F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
     {
         let module_id = ModuleId::new(*address, module_name.to_owned());
@@ -540,7 +481,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .code_cache()
             .module_cache()
             .get_module_or_insert_with(&module_id, || {
-                init_func(&module_id).map(|e| e.map(|e| Arc::new(MaybeCommitted::new(e, None))))
+                init_func(&module_id).map(|e| e.map(|e| VersionedModule::new(e, None)))
             })?;
 
         let value = read_func(read.as_ref());
@@ -548,75 +489,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .borrow_mut()
             .capture_block_cache_read(module_id, read);
         Ok(value)
-    }
-
-    fn visit_dependencies_and_verify<F>(
-        entry: Arc<MaybeCommitted<ModuleCacheEntry>>,
-        module_id: &ModuleId,
-        visited: &mut HashSet<ModuleId>,
-        runtime_environment: &RuntimeEnvironment,
-        locked_module_cache: &mut LockedSyncModuleCache<
-            ModuleId,
-            Arc<MaybeCommitted<ModuleCacheEntry>>,
-        >,
-        init_func: &F,
-    ) -> VMResult<Arc<Module>>
-    where
-        F: Fn(&ModuleId) -> VMResult<Option<Arc<MaybeCommitted<ModuleCacheEntry>>>>,
-    {
-        let compiled_module = entry.compiled_module();
-
-        runtime_environment.paranoid_check_module_address_and_name(
-            compiled_module,
-            module_id.address(),
-            module_id.name(),
-        )?;
-        let locally_verified_module = runtime_environment.build_locally_verified_module(
-            compiled_module.clone(),
-            entry.size_in_bytes(),
-            entry.hash(),
-        )?;
-
-        let mut verified_dependencies = vec![];
-        for (addr, name) in locally_verified_module.immediate_dependencies_iter() {
-            let dependency_module_id = ModuleId::new(*addr, name.to_owned());
-
-            let dependency = locked_module_cache
-                .get_module_or_insert_with(&dependency_module_id, || {
-                    init_func(&dependency_module_id)
-                })?
-                .ok_or_else(|| module_linker_error!(addr, name))?;
-            if dependency.is_verified() {
-                verified_dependencies.push(dependency.verified_module()?.clone());
-                continue;
-            }
-
-            if visited.insert(dependency_module_id.clone()) {
-                let verified_dependency = Self::visit_dependencies_and_verify(
-                    dependency,
-                    &dependency_module_id,
-                    visited,
-                    runtime_environment,
-                    locked_module_cache,
-                    init_func,
-                )?;
-                verified_dependencies.push(verified_dependency);
-            } else {
-                return Err(module_cyclic_dependency_error!(
-                    module_id.address(),
-                    module_id.name()
-                ));
-            }
-        }
-
-        let module = runtime_environment
-            .build_verified_module(locally_verified_module, &verified_dependencies)
-            .map(Arc::new)?;
-        let new_entry = entry.make_verified(module.clone());
-        let entry = Arc::new(MaybeCommitted::new(new_entry, entry.commit_idx()));
-        locked_module_cache.insert_module(module_id.clone(), entry);
-
-        Ok(module)
     }
 }
 
@@ -647,9 +519,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn fetch_versioned_base_module_entry(
         &self,
         module_id: &ModuleId,
-    ) -> VMResult<Option<Arc<MaybeCommitted<ModuleCacheEntry>>>> {
+    ) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>> {
         Ok(self
             .fetch_base_module_entry(module_id)?
-            .map(|e| Arc::new(MaybeCommitted::new(e, None))))
+            .map(|e| VersionedModule::new(e, None)))
     }
 }

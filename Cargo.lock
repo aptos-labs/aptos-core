@@ -2955,7 +2955,6 @@ dependencies = [
  "crossbeam",
  "dashmap",
  "hashbrown 0.14.3",
- "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
