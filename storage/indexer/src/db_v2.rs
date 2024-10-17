@@ -187,11 +187,12 @@ impl IndexerAsyncV2 {
         self.db.get::<TableInfoSchema>(&handle).map_err(Into::into)
     }
 
-    pub fn get_table_info_with_retry(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+    /// Get table info with retry: until the table info is available without error.
+    pub fn get_table_info_with_retry(&self, handle: TableHandle) -> TableInfo {
         let mut retried = 0;
         loop {
             if let Ok(Some(table_info)) = self.get_table_info(handle) {
-                return Ok(Some(table_info));
+                return table_info;
             }
             retried += 1;
             info!(
