@@ -298,19 +298,20 @@ impl DelayedFieldRead {
 }
 
 /// Represents a module read, either from immutable cross-block cache, or from code [SyncCodeCache]
-/// used by block executor. This way, when transaction needs to read a module from [SyncCodeCache]
-/// it can first check the read-set here.
+/// used by block executor (per-block cache). This way, when transaction needs to read a module
+/// from [SyncCodeCache] it can first check the read-set here.
 enum ModuleRead {
-    /// Read from cross-block module cache.
+    /// Read from the cross-block module cache.
     GlobalCache,
-    /// Read from block-level cache ([SyncCodeCache]) used by parallel execution.
-    BlockCache(Option<Arc<VersionedModule<ModuleCacheEntry>>>),
+    /// Read from per-block cache ([SyncCodeCache]) used by parallel execution.
+    PerBlockCache(Option<Arc<VersionedModule<ModuleCacheEntry>>>),
 }
 
-/// Represents a result of a read from [CapturedReads] when they are used as a cache.
+/// Represents a result of a read from [CapturedReads] when they are used as the transaction-level
+/// cache.
 #[derive(Debug)]
-pub enum CacheRead<V> {
-    Hit(V),
+pub enum CacheRead<T> {
+    Hit(T),
     Miss,
 }
 
@@ -612,19 +613,19 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
-    /// Records the read to [CrossBlockModuleCache].
+    /// Records the read to global cache that spans across multiple blocks.
     pub(crate) fn capture_global_cache_read(&mut self, module_id: ModuleId) {
         self.module_reads.insert(module_id, ModuleRead::GlobalCache);
     }
 
-    /// Records the read to [SyncCodeCache].
-    pub(crate) fn capture_block_cache_read(
+    /// Records the read to per-block level cache.
+    pub(crate) fn capture_per_block_cache_read(
         &mut self,
         module_id: ModuleId,
         read: Option<Arc<VersionedModule<ModuleCacheEntry>>>,
     ) {
         self.module_reads
-            .insert(module_id, ModuleRead::BlockCache(read));
+            .insert(module_id, ModuleRead::PerBlockCache(read));
     }
 
     /// If the module has been previously read from [SyncCodeCache], allows to query information
@@ -639,7 +640,7 @@ impl<T: Transaction> CapturedReads<T> {
         F: Fn(Option<&Arc<VersionedModule<ModuleCacheEntry>>>) -> V,
     {
         match self.module_reads.get(&(address, module_name)) {
-            Some(ModuleRead::BlockCache(read)) => CacheRead::Hit(map_func(read.as_ref())),
+            Some(ModuleRead::PerBlockCache(read)) => CacheRead::Hit(map_func(read.as_ref())),
             None => CacheRead::Miss,
             Some(ModuleRead::GlobalCache) => unreachable!("Global cache reads are not cached"),
         }
@@ -712,7 +713,7 @@ impl<T: Transaction> CapturedReads<T> {
         module_name: &IdentStr,
     ) -> CacheRead<VMResult<Option<Arc<Module>>>> {
         match self.module_reads.get(&(address, module_name)) {
-            Some(ModuleRead::BlockCache(read)) => match read {
+            Some(ModuleRead::PerBlockCache(read)) => match read {
                 Some(v) => {
                     if v.is_verified() {
                         CacheRead::Hit(v.verified_module().map(|v| Some(v.clone())))
@@ -741,7 +742,7 @@ impl<T: Transaction> CapturedReads<T> {
 
         self.module_reads.iter().all(|(id, read)| match read {
             ModuleRead::GlobalCache => CrossBlockModuleCache::is_valid(id),
-            ModuleRead::BlockCache(previous) => match previous {
+            ModuleRead::PerBlockCache(previous) => match previous {
                 Some(previous) => code_cache
                     .module_cache()
                     .contains_and(id, |m| m.version() == previous.version()),
@@ -1601,13 +1602,13 @@ mod test {
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), None),
         );
-        captured_reads.capture_block_cache_read(
+        captured_reads.capture_per_block_cache_read(
             foo_id.clone(),
             Some(Arc::new(VersionedModule::new(foo_entry, None))),
         );
 
         let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
-        captured_reads.capture_block_cache_read(bar_id.clone(), None);
+        captured_reads.capture_per_block_cache_read(bar_id.clone(), None);
 
         let baz_id = ModuleId::new(AccountAddress::ONE, Identifier::new("baz").unwrap());
 
@@ -1642,7 +1643,7 @@ mod test {
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), None),
         );
-        captured_reads.capture_block_cache_read(
+        captured_reads.capture_per_block_cache_read(
             foo_id.clone(),
             Some(Arc::new(VersionedModule::new(foo_entry, None))),
         );
@@ -1664,13 +1665,13 @@ mod test {
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), Some(10)),
         );
-        captured_reads.capture_block_cache_read(
+        captured_reads.capture_per_block_cache_read(
             foo_id.clone(),
             Some(Arc::new(VersionedModule::new(foo_entry.clone(), Some(10)))),
         );
 
         let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
-        captured_reads.capture_block_cache_read(bar_id.clone(), None);
+        captured_reads.capture_per_block_cache_read(bar_id.clone(), None);
 
         assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
 
@@ -1719,7 +1720,7 @@ mod test {
         assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
 
         // Assume we re-read the new correct version. Then validation should pass again.
-        captured_reads.capture_block_cache_read(
+        captured_reads.capture_per_block_cache_read(
             foo_id.clone(),
             Some(Arc::new(VersionedModule::new(foo_entry.clone(), Some(10)))),
         );
