@@ -56,7 +56,10 @@ use futures::StreamExt;
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc::UnboundedSender, time::interval};
+use tokio::{
+    sync::mpsc::UnboundedSender,
+    time::{interval, Instant},
+};
 use tokio_stream::wrappers::IntervalStream;
 
 // Whether to log messages at the info level (useful for debugging)
@@ -87,6 +90,9 @@ pub struct ConsensusObserver {
 
     // The consensus observer subscription manager
     subscription_manager: SubscriptionManager,
+
+    // The current flag for dropping commit messages
+    drop_commit_messages: (bool, Instant),
 }
 
 impl ConsensusObserver {
@@ -149,6 +155,7 @@ impl ConsensusObserver {
             observer_fallback_manager,
             state_sync_manager,
             subscription_manager,
+            drop_commit_messages: (false, Instant::now()),
         }
     }
 
@@ -167,6 +174,12 @@ impl ConsensusObserver {
     async fn check_progress(&mut self) {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("Checking consensus observer progress!"));
+
+        // Update the commit drop flag every 45 seconds
+        let (drop_flag, drop_instant) = self.drop_commit_messages;
+        if drop_instant.elapsed() > Duration::from_secs(45) {
+            self.drop_commit_messages = (!drop_flag, Instant::now());
+        }
 
         // If we've fallen back to state sync, we should wait for it to complete
         if self.state_sync_manager.in_fallback_mode() {
@@ -592,7 +605,13 @@ impl ConsensusObserver {
                     .await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                self.process_commit_decision_message(peer_network_id, commit_decision);
+                // HACK: stop us from committing sometimes!!
+                let (drop_flag, _) = self.drop_commit_messages;
+                if drop_flag {
+                    return; // Drop the commit decision
+                } else {
+                    self.process_commit_decision_message(peer_network_id, commit_decision);
+                }
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
                 self.process_block_payload_message(peer_network_id, block_payload)
