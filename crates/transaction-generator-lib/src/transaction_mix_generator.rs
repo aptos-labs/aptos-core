@@ -4,7 +4,7 @@ use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicU64, AtomicUsize, Ordering},
     Arc,
 };
 
@@ -40,6 +40,8 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
+        _history: &[String],
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let phase = if self.txn_mix_per_phase.len() == 1 {
             // when only single txn_mix is passed, use it for all phases, for simplicity
@@ -51,7 +53,7 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         let mut picked = self.rng.gen_range(0, self.total_weight_per_phase[phase]);
         for (gen, weight) in &mut self.txn_mix_per_phase[phase] {
             if picked < *weight {
-                return gen.generate_transactions(account, num_to_create);
+                return gen.generate_transactions(account, num_to_create, &Vec::new(), false);
             }
             picked -= *weight;
         }
@@ -80,12 +82,18 @@ impl PhasedTxnMixGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for PhasedTxnMixGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(
+        &self,
+        txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator> {
         let mut txn_mix_per_phase = Vec::<Vec<(Box<dyn TransactionGenerator>, usize)>>::new();
         for txn_mix_creators in self.txn_mix_per_phase_creators.iter() {
             let mut txn_mix = Vec::<(Box<dyn TransactionGenerator>, usize)>::new();
             for (generator_creator, weight) in txn_mix_creators.iter() {
-                txn_mix.push((generator_creator.create_transaction_generator(), *weight));
+                txn_mix.push((
+                    generator_creator.create_transaction_generator(txn_counter.clone()),
+                    *weight,
+                ));
             }
             txn_mix_per_phase.push(txn_mix);
         }
