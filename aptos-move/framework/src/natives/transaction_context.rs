@@ -31,7 +31,7 @@ pub mod abort_codes {
 /// is accessible from natives of this extension.
 #[derive(Tid)]
 pub struct NativeTransactionContext {
-    txn_hash: Vec<u8>,
+    unique_session_hash: Vec<u8>,
     /// The number of AUIDs (Aptos unique identifiers) issued during the
     /// execution of this transaction.
     auid_counter: u64,
@@ -46,13 +46,13 @@ impl NativeTransactionContext {
     /// Create a new instance of a native transaction context. This must be passed in via an
     /// extension into VM session functions.
     pub fn new(
-        txn_hash: Vec<u8>,
+        unique_session_hash: Vec<u8>,
         script_hash: Vec<u8>,
         chain_id: u8,
         user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> Self {
         Self {
-            txn_hash,
+            unique_session_hash,
             auid_counter: 0,
             script_hash,
             chain_id,
@@ -66,12 +66,12 @@ impl NativeTransactionContext {
 }
 
 /***************************************************************************************************
- * native fun get_txn_hash
+ * native fun unique_session_hash_internal
  *
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-fn native_get_txn_hash(
+fn native_unique_session_hash_internal(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
@@ -80,7 +80,7 @@ fn native_get_txn_hash(
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
     Ok(smallvec![Value::vector_u8(
-        transaction_context.txn_hash.clone()
+        transaction_context.unique_session_hash.clone()
     )])
 }
 
@@ -103,7 +103,7 @@ fn native_generate_unique_address(
     transaction_context.auid_counter += 1;
 
     let auid = AuthenticationKey::auid(
-        transaction_context.txn_hash.clone(),
+        transaction_context.unique_session_hash.clone(),
         transaction_context.auid_counter,
     )
     .account_address();
@@ -368,6 +368,25 @@ fn native_multisig_payload_internal(
     }
 }
 
+fn native_raw_transaction_hash_internal(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_SENDER_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    if let Some(transaction_context) = user_transaction_context_opt {
+        Ok(smallvec![Value::vector_u8(
+            transaction_context.raw_txn_hash()
+        )])
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+        })
+    }
+}
+
 fn get_user_transaction_context_opt_from_context<'a>(
     context: &'a SafeNativeContext,
 ) -> &'a Option<UserTransactionContext> {
@@ -387,7 +406,10 @@ pub fn make_all(
     let natives = [
         ("get_script_hash", native_get_script_hash as RawSafeNative),
         ("generate_unique_address", native_generate_unique_address),
-        ("get_txn_hash", native_get_txn_hash),
+        (
+            "unique_session_hash_internal",
+            native_unique_session_hash_internal,
+        ),
         ("sender_internal", native_sender_internal),
         (
             "secondary_signers_internal",
@@ -404,6 +426,10 @@ pub fn make_all(
         (
             "multisig_payload_internal",
             native_multisig_payload_internal,
+        ),
+        (
+            "raw_transaction_hash_internal",
+            native_raw_transaction_hash_internal,
         ),
     ];
 

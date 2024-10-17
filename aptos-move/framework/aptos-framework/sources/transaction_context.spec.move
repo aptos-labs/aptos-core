@@ -1,10 +1,10 @@
 spec aptos_framework::transaction_context {
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: Fetching the transaction hash should return a vector with 32 bytes.
+    /// Requirement: Fetching the unique session hash should return a vector with 32 bytes.
     /// Criticality: Medium
-    /// Implementation: The get_transaction_hash function calls the native function get_txn_hash, which fetches the
-    /// NativeTransactionContext struct and returns the txn_hash field.
+    /// Implementation: The unique_session_hash function calls the native function unique_session_hash_internal, which fetches the
+    /// NativeTransactionContext struct and returns the unique_session_hash field.
     /// Enforcement: Audited that the native function returns the txn hash, whose size is 32 bytes. This has been
     /// modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via [high-level-req-1](get_txn_hash).
     ///
@@ -42,19 +42,26 @@ spec aptos_framework::transaction_context {
         ensures [abstract] len(result) == 32;
     }
     spec fun spec_get_script_hash(): vector<u8>;
-    spec get_txn_hash(): vector<u8> {
+    spec unique_session_hash_internal(): vector<u8> {
         pragma opaque;
         aborts_if [abstract] false;
-        ensures result == spec_get_txn_hash();
+        ensures [abstract] len(result) == 32;
+        ensures result == spec_unique_session_hash();
     }
-    spec fun spec_get_txn_hash(): vector<u8>;
-    spec get_transaction_hash(): vector<u8> {
+    spec fun spec_unique_session_hash(): vector<u8>;
+    spec unique_session_hash(): vector<u8> {
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures result == spec_get_txn_hash();
+        aborts_if false;
+        ensures result == spec_unique_session_hash();
         // property 1: Fetching the transaction hash should return a vector with 32 bytes, if the auid feature flag is enabled.
         /// [high-level-req-1]
-        ensures [abstract] len(result) == 32;
+        ensures len(result) == 32;
+    }
+    spec get_transaction_hash(): vector<u8> {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_unique_session_hash();
+        ensures len(result) == 32;
     }
     spec generate_unique_address(): address {
         pragma opaque;
@@ -101,8 +108,11 @@ spec aptos_framework::transaction_context {
         //TODO: temporary mockup
         pragma opaque;
     }
-
     spec multisig_payload_internal(): Option<MultisigPayload> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec raw_transaction_hash_internal(): vector<u8> {
         //TODO: temporary mockup
         pragma opaque;
     }

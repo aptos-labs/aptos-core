@@ -2,14 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        user_transaction_context::UserTransactionContext, EntryFunction, Multisig,
-        SignedTransaction, TransactionPayload,
+        authenticator::TransactionAuthenticator::{FeePayer, MultiAgent},
+        user_transaction_context::UserTransactionContext,
+        EntryFunction, Multisig, RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
 };
 
@@ -31,6 +32,7 @@ pub struct TransactionMetadata {
     pub is_keyless: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
+    pub raw_transaction_hash: Vec<u8>,
 }
 
 impl TransactionMetadata {
@@ -88,6 +90,34 @@ impl TransactionMetadata {
             multisig_payload: match txn.payload() {
                 TransactionPayload::Multisig(m) => Some(m.clone()),
                 _ => None,
+            },
+            raw_transaction_hash: match txn.authenticator_ref() {
+                MultiAgent {
+                    sender: _,
+                    secondary_signer_addresses,
+                    secondary_signers: _,
+                } => {
+                    let raw_txn = RawTransactionWithData::new_multi_agent(
+                        txn.clone().into_raw_transaction(),
+                        secondary_signer_addresses.clone(),
+                    );
+                    raw_txn.hash().to_vec()
+                },
+                FeePayer {
+                    sender: _,
+                    secondary_signer_addresses,
+                    secondary_signers: _,
+                    fee_payer_address,
+                    fee_payer_signer: _,
+                } => {
+                    let raw_txn = RawTransactionWithData::new_fee_payer(
+                        txn.clone().into_raw_transaction(),
+                        secondary_signer_addresses.clone(),
+                        *fee_payer_address,
+                    );
+                    raw_txn.hash().to_vec()
+                },
+                _ => txn.raw_transaction_ref().hash().to_vec(),
             },
         }
     }
@@ -158,6 +188,10 @@ impl TransactionMetadata {
         self.multisig_payload.clone()
     }
 
+    pub fn raw_transaction_hash(&self) -> Vec<u8> {
+        self.raw_transaction_hash.clone()
+    }
+
     pub fn as_user_transaction_context(&self) -> UserTransactionContext {
         UserTransactionContext::new(
             self.sender,
@@ -170,6 +204,7 @@ impl TransactionMetadata {
                 .map(|entry_func| entry_func.as_entry_function_payload()),
             self.multisig_payload()
                 .map(|multisig| multisig.as_multisig_payload()),
+            self.raw_transaction_hash(),
         )
     }
 }

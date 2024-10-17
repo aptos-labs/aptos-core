@@ -842,7 +842,7 @@ module aptos_framework::object {
     #[test(fx = @std)]
     fun test_correct_auid() {
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
-        let bytes = aptos_framework::transaction_context::get_transaction_hash();
+        let bytes = aptos_framework::transaction_context::unique_session_hash();
         std::vector::push_back(&mut bytes, 1);
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, 0);
