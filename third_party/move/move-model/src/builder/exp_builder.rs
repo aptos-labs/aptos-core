@@ -92,6 +92,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub placeholder_map: BTreeMap<NodeId, ExpPlaceholder>,
     /// A flag to indicate whether to insert freeze operation
     pub insert_freeze: bool,
+    /// A stack of open loops and their optional label
+    pub loop_stack: Vec<Option<PA::Label>>,
 }
 
 #[derive(Debug)]
@@ -159,6 +161,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             spec_block_map: BTreeMap::new(),
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
+            loop_stack: vec![],
         }
     }
 
@@ -417,13 +420,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         };
         ty.visit(&mut visitor);
         if incomplete {
-            self.error(
-                &loc,
-                &format!(
-                    "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
-                    ty.display(&self.type_display_context())
-                ),
-            );
+            let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
+            // Skip displaying the error message if there is already an error in the type; we must have another message about it already.
+            if !displayed_ty.contains("*error*") {
+                self.error(
+                    &loc,
+                    &format!(
+                        "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
+                        displayed_ty
+                    ),
+                );
+            }
         }
         ty
     }
@@ -1545,10 +1552,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Match(discriminator, arms) => {
                 self.translate_match(loc, context, expected_type, discriminator, arms)
             },
-            EA::Exp_::While(cond, body) => {
+            EA::Exp_::While(label, cond, body) => {
                 let cond = self.translate_exp(cond, &Type::new_prim(PrimitiveType::Bool));
                 let body_type = self.check_type(&loc, &Type::unit(), expected_type, context);
+                self.push_loop_label(label);
                 let body = self.translate_exp(body, &body_type);
+                self.pop_loop_label();
                 let id = self.new_node_id_with_type_loc(&body_type, &loc);
                 ExpData::Loop(
                     id,
@@ -1561,8 +1570,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .into_exp(),
                 )
             },
-            EA::Exp_::Loop(body) => {
+            EA::Exp_::Loop(label, body) => {
+                self.push_loop_label(label);
                 let body = self.translate_exp(body, &Type::unit());
+                self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
                 let loop_type = if body.has_loop_exit() {
@@ -1573,15 +1584,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&loop_type, &loc);
                 ExpData::Loop(id, body.into_exp())
             },
-            EA::Exp_::Break => {
+            EA::Exp_::Break(label) => {
+                let nest = self.find_loop_nest(label);
                 // Type of `break` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, 0, false)
+                ExpData::LoopCont(id, nest, false)
             },
-            EA::Exp_::Continue => {
+            EA::Exp_::Continue(label) => {
+                let nest = self.find_loop_nest(label);
                 // Type of `continue` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, 0, true)
+                ExpData::LoopCont(id, nest, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
             EA::Exp_::Lambda(bindings, exp) => {
@@ -1873,6 +1886,55 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.new_error_exp()
             },
         }
+    }
+
+    fn find_loop_nest(&self, label: &Option<PA::Label>) -> usize {
+        if let Some(label) = label {
+            let label_sym = label.value();
+            self.loop_stack
+                .iter()
+                .rev()
+                .position(|s| s.map(|s| s.value()) == Some(label_sym))
+                .unwrap_or_else(|| {
+                    self.error(
+                        &self.to_loc(&label.loc()),
+                        &format!("label `{}` undefined", label.value().as_str()),
+                    );
+                    0
+                })
+        } else {
+            0
+        }
+    }
+
+    fn push_loop_label(&mut self, label: &Option<PA::Label>) {
+        if let Some(label) = label {
+            let label_sym = label.value();
+            if let Some(Some(outer)) = self
+                .loop_stack
+                .iter()
+                .find(|s| s.map(|s| s.value()) == Some(label_sym))
+            {
+                self.error_with_labels(
+                    &self.to_loc(&label.loc()),
+                    &format!(
+                        "label `{}` already used by outer loop",
+                        label.value().as_str()
+                    ),
+                    vec![(
+                        self.to_loc(&outer.loc()),
+                        "outer definition of label".to_string(),
+                    )],
+                );
+            }
+        }
+        self.loop_stack.push(*label)
+    }
+
+    fn pop_loop_label(&mut self) {
+        self.loop_stack
+            .pop()
+            .expect("expected loop stack to be balanced");
     }
 
     /// Returns a map representing the current locals in scope and their associated declaration
@@ -2996,10 +3058,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        if !self.parent.check_no_variant(maccess) {
+        let (no_variant, maccess) = self.parent.check_no_variant_and_convert_maccess(maccess);
+        if !no_variant {
             return self.new_error_exp();
         }
-        let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
+        let (module_name, name, _) = self.parent.module_access_to_parts(&maccess);
 
         // Process `old(E)` scoping
         let is_old =

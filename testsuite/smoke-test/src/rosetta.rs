@@ -113,6 +113,7 @@ async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        HashSet::new(),
     )
     .await
     .unwrap();
@@ -593,13 +594,10 @@ async fn test_transfer() {
     let receiver = AccountAddress::from_hex_literal("0xBEEF").unwrap();
     let sender_private_key = cli.private_key(0);
     let sender_balance = client
-        .get_account_balance(sender)
+        .view_apt_account_balance(sender)
         .await
         .unwrap()
-        .into_inner()
-        .coin
-        .value
-        .0;
+        .into_inner();
     let network = NetworkIdentifier::from(chain_id);
     let node_clients = NodeClients {
         rosetta_client: &rosetta_client,
@@ -663,25 +661,19 @@ async fn test_transfer() {
     // Sender balance should be 0
     assert_eq!(
         client
-            .get_account_balance(sender)
+            .view_apt_account_balance(sender)
             .await
             .unwrap()
-            .into_inner()
-            .coin
-            .value
-            .0,
+            .into_inner(),
         0
     );
     // Receiver should be sent coins
     assert_eq!(
         client
-            .get_account_balance(receiver)
+            .view_apt_account_balance(receiver)
             .await
             .unwrap()
-            .into_inner()
-            .coin
-            .value
-            .0,
+            .into_inner(),
         max_sent
     );
 }
@@ -2152,6 +2144,7 @@ async fn transfer_and_wait(
                 sequence_number,
                 max_gas,
                 gas_unit_price,
+                native_coin(),
             )
         },
     )

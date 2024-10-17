@@ -2611,8 +2611,8 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 .collect::<Vec<_>>();
             EE::Match(discriminator, match_arms)
         },
-        PE::While(pb, ploop) => EE::While(exp(context, *pb), exp(context, *ploop)),
-        PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
+        PE::While(label, pb, ploop) => EE::While(label, exp(context, *pb), exp(context, *ploop)),
+        PE::Loop(label, ploop) => EE::Loop(label, exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
         PE::Lambda(pbs, pe) => {
             let tbs_opt = typed_bind_list(context, pbs);
@@ -2767,8 +2767,8 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::Return(ev)
         },
         PE::Abort(pe) => EE::Abort(exp(context, *pe)),
-        PE::Break => EE::Break,
-        PE::Continue => EE::Continue,
+        PE::Break(l) => EE::Break(l),
+        PE::Continue(l) => EE::Continue(l),
         PE::Dereference(pe) => EE::Dereference(exp(context, *pe)),
         PE::UnaryExp(op, pe) => EE::UnaryExp(op, exp(context, *pe)),
         PE::BinopExp(pl, op, pr) => {
@@ -3294,8 +3294,8 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
     use E::Exp_ as EE;
     match e_ {
         EE::Value(_)
-        | EE::Break
-        | EE::Continue
+        | EE::Break(_)
+        | EE::Continue(_)
         | EE::UnresolvedError
         | EE::Name(sp!(_, E::ModuleAccess_::ModuleAccess(..)), _)
         | EE::Unit { .. } => (),
@@ -3334,11 +3334,11 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
                 unbound_names_exp(unbound, &arm.value.2)
             }
         },
-        EE::While(econd, eloop) => {
+        EE::While(_, econd, eloop) => {
             unbound_names_exp(unbound, eloop);
             unbound_names_exp(unbound, econd)
         },
-        EE::Loop(eloop) => unbound_names_exp(unbound, eloop),
+        EE::Loop(_, eloop) => unbound_names_exp(unbound, eloop),
 
         EE::Block(seq) => unbound_names_sequence(unbound, seq),
         EE::Lambda(ls, er) => {

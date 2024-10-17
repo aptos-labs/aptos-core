@@ -104,7 +104,7 @@ impl FakeBufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
+        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
         new_state_after_checkpoint: StateDelta,
     ) -> Result<()> {
         ensure!(
@@ -1117,7 +1117,7 @@ mod tests {
         let signed_transaction = transaction_with_proof
             .transaction
             .try_as_signed_user_txn()
-            .ok_or(anyhow!("not user transaction"))?;
+            .ok_or_else(|| anyhow!("not user transaction"))?;
 
         ensure!(
             transaction_with_proof.version == version,

@@ -106,7 +106,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
         .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
-        .set_language_version(LanguageVersion::V2_0);
+        .set_language_version(LanguageVersion::V2_1);
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -127,9 +127,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
-            stop_after: StopAfter::BytecodeGen,
+            stop_after: StopAfter::BytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::None, // EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for checking v2 language features only supported if v2
@@ -169,15 +169,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
-                // Need to turn off usage checks because they complain about
-                // lambda parameters outside of inline functions. Other checks
-                // also turned off for now since they mess up baseline.
-                .set_experiment(Experiment::CHECKS, false)
-                .set_experiment(Experiment::OPTIMIZE, false)
-                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
-                .set_experiment(Experiment::INLINING, false)
-                .set_experiment(Experiment::RECURSIVE_TYPE_CHECK, false)
-                .set_experiment(Experiment::SPEC_REWRITE, false)
+                .set_experiment(Experiment::LAMBDA_FIELDS, true)
+                .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
+                .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
+                .set_experiment(Experiment::LAMBDA_VALUES, true)
                 .set_experiment(Experiment::LAMBDA_LIFTING, true),
             stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::AllStages,
@@ -723,7 +718,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/op-equal/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone().set_language_version(LanguageVersion::V2_1),
+            options: opts.clone(),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,

@@ -1875,8 +1875,11 @@ impl GlobalEnv {
         let called_funs = def.called_funs();
         let data = FunctionData {
             name,
-            loc: loc.clone(),
-            id_loc: loc,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
             def_idx: None,
             handle_idx: None,
             visibility,
@@ -2374,7 +2377,6 @@ impl GlobalEnv {
 
     pub fn internal_dump_env(&self, all: bool) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         for module in self.get_modules() {
             if !all && !module.is_target() {
@@ -2428,8 +2430,26 @@ impl GlobalEnv {
                 emitln!(writer, "{}", self.display(&*module_spec));
             }
             for str in module.get_structs() {
+                let tctx = str.get_type_display_ctx();
+                let type_params = str.get_type_parameters();
+                let type_params_str = if !type_params.is_empty() {
+                    format!(
+                        "<{}>",
+                        type_params
+                            .iter()
+                            .map(|p| p.0.display(spool).to_string())
+                            .join(",")
+                    )
+                } else {
+                    "".to_owned()
+                };
                 if str.has_variants() {
-                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "enum {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for variant in str.get_variants() {
                         emit!(writer, "{}", variant.display(spool));
@@ -2438,7 +2458,7 @@ impl GlobalEnv {
                             emitln!(writer, " {");
                             writer.indent();
                             for fld in fields {
-                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                                emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                             }
                             writer.unindent();
                             emitln!(writer, "}")
@@ -2447,10 +2467,15 @@ impl GlobalEnv {
                         }
                     }
                 } else {
-                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "struct {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for fld in str.get_fields() {
-                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                        emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                     }
                 }
                 writer.unindent();
@@ -2461,7 +2486,8 @@ impl GlobalEnv {
                 }
             }
             for fun in module.get_functions() {
-                self.dump_fun_internal(&writer, tctx, &fun);
+                let tctx = fun.get_type_display_ctx();
+                self.dump_fun_internal(&writer, &tctx, &fun);
             }
             for (_, fun) in module.get_spec_funs() {
                 emit!(
@@ -4009,16 +4035,26 @@ impl EqIgnoringLoc for Parameter {
     }
 }
 
+/// Represents source code locations associated with a function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionLoc {
+    /// Location of this function.
+    pub(crate) full: Loc,
+
+    /// Location of the function identifier, suitable for error messages alluding to the function.
+    pub(crate) id_loc: Loc,
+
+    /// Location of the function result type, suitable for error messages alluding to the result type.
+    pub(crate) result_type_loc: Loc,
+}
+
 #[derive(Debug)]
 pub struct FunctionData {
     /// Name of this function.
     pub(crate) name: Symbol,
 
-    /// Location of this function.
-    pub(crate) loc: Loc,
-
-    /// Location of the function identifier, suitable for error messages alluding to the function.
-    pub(crate) id_loc: Loc,
+    /// Locations of this function.
+    pub(crate) loc: FunctionLoc,
 
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
@@ -4139,7 +4175,7 @@ impl<'env> FunctionEnv<'env> {
 
     /// Get documentation associated with this function.
     pub fn get_doc(&self) -> &str {
-        self.module_env.env.get_doc(&self.data.loc)
+        self.module_env.env.get_doc(&self.data.loc.full)
     }
 
     /// Gets the definition index of this function.
@@ -4154,12 +4190,17 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
-        self.data.loc.clone()
+        self.data.loc.full.clone()
     }
 
     /// Returns the location of the function identifier.
     pub fn get_id_loc(&self) -> Loc {
-        self.data.id_loc.clone()
+        self.data.loc.id_loc.clone()
+    }
+
+    /// Returns the location of the function identifier.
+    pub fn get_result_type_loc(&self) -> Loc {
+        self.data.loc.result_type_loc.clone()
     }
 
     /// Returns the attributes of this function.

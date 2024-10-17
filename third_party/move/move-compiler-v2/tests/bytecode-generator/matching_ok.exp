@@ -39,20 +39,20 @@ module 0xc0ffee::m {
             y: u64,
         }
     }
-    enum Option {
+    enum Option<A> {
         None,
         Some {
-            value: #0,
+            value: A,
         }
     }
     enum Outer {
         None,
         One {
-            i: 0xc0ffee::m::Inner,
+            i: Inner,
         }
         Two {
-            i: 0xc0ffee::m::Inner,
-            b: 0xc0ffee::m::Box,
+            i: Inner,
+            b: Box,
         }
     }
     public fun inner_value(self: Inner): u64 {

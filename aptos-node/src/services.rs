@@ -19,7 +19,9 @@ use aptos_indexer_grpc_table_info::runtime::{
     bootstrap as bootstrap_indexer_table_info, bootstrap_internal_indexer_db,
 };
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
-use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
+use aptos_mempool::{
+    network::MempoolSyncMsg, MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
+};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
@@ -59,6 +61,7 @@ pub fn bootstrap_api_and_indexer(
     Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
+    MempoolClientSender,
 )> {
     // Create the mempool client and sender
     let (mempool_client_sender, mempool_client_receiver) =
@@ -120,7 +123,7 @@ pub fn bootstrap_api_and_indexer(
         node_config,
         chain_id,
         db_rw.reader.clone(),
-        mempool_client_sender,
+        mempool_client_sender.clone(),
     )?;
 
     Ok((
@@ -130,6 +133,7 @@ pub fn bootstrap_api_and_indexer(
         indexer_runtime,
         indexer_grpc,
         db_indexer_runtime,
+        mempool_client_sender,
     ))
 }
 

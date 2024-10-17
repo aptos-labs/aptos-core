@@ -81,7 +81,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/enum_abort.move:129:5
     │
 123 │                   abort 30 // aborts
-    │                   -------- abort happened here with code 0x1E
+    │                         -- abort happened here with code 0x1E
     ·
 129 │ ╭     spec test_match_abort {
 130 │ │         aborts_if false;
@@ -107,6 +107,5 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/enum_abort.move:122: test_match_abort
     =         <redacted> = <redacted>
     =     at tests/sources/functional/enum_abort.move:122: test_match_abort
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/enum_abort.move:123: test_match_abort
     =         ABORTED

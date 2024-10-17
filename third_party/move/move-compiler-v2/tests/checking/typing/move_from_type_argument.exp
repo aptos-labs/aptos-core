@@ -4,7 +4,7 @@ module 0x42::m {
         addr: address,
     }
     public fun foo(input: address): address
-        acquires 0x42::m::A(*)
+        acquires A(*)
      {
         {
           let a: A = MoveFrom<A>(input);

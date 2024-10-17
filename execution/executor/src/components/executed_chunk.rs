@@ -4,16 +4,13 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput};
-use aptos_drop_helper::DEFAULT_DROPPER;
+use aptos_executor_types::{
+    should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput,
+};
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
-#[cfg(test)]
-use aptos_types::account_config::NewEpochEvent;
-#[cfg(test)]
-use aptos_types::contract_event::ContractEvent;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
+    transaction::TransactionToCommit,
 };
 
 #[derive(Debug)]
@@ -26,53 +23,12 @@ pub struct ExecutedChunk {
 }
 
 impl ExecutedChunk {
-    pub fn reconfig_suffix(&self) -> Self {
-        assert!(self.next_epoch_state.is_some());
-        Self {
-            result_state: self.result_state.clone(),
-            ledger_info: None,
-            next_epoch_state: self.next_epoch_state.clone(),
-            ledger_update_output: self.ledger_update_output.reconfig_suffix(),
-        }
-    }
-
     pub fn transactions_to_commit(&self) -> &Vec<TransactionToCommit> {
         &self.ledger_update_output.to_commit
     }
 
     pub fn has_reconfiguration(&self) -> bool {
         self.next_epoch_state.is_some()
-    }
-
-    pub fn combine(&mut self, rhs: Self) {
-        assert_eq!(
-            self.ledger_update_output.next_version(),
-            rhs.ledger_update_output.first_version(),
-            "Chunks to be combined are not consecutive.",
-        );
-        let Self {
-            result_state,
-            ledger_info,
-            next_epoch_state,
-            ledger_update_output,
-        } = rhs;
-
-        let old_result_state = self.result_state.replace_with(result_state);
-        // TODO(aldenhu): This is very unfortunate. Will revisit soon by remodeling the state diff.
-        if self.result_state.base_version > old_result_state.base_version
-            && old_result_state.base_version != old_result_state.current_version
-        {
-            combine_or_add_sharded_state_updates(
-                &mut self
-                    .ledger_update_output
-                    .state_updates_until_last_checkpoint,
-                old_result_state.updates_since_base,
-            )
-        }
-
-        self.ledger_info = ledger_info;
-        self.next_epoch_state = next_epoch_state;
-        self.ledger_update_output.combine(ledger_update_output)
     }
 
     pub fn result_view(&self) -> ExecutedTrees {
@@ -89,24 +45,20 @@ impl ExecutedChunk {
             Vec::with_capacity(self.ledger_update_output.to_commit.len());
         let mut subscribable_events =
             Vec::with_capacity(self.ledger_update_output.to_commit.len() * 2);
-        let mut to_drop = Vec::with_capacity(self.ledger_update_output.to_commit.len());
-        for txn_to_commit in self.ledger_update_output.to_commit {
+        for txn_to_commit in &self.ledger_update_output.to_commit {
             let TransactionToCommit {
                 transaction,
                 events,
-                state_updates,
-                write_set,
                 ..
             } = txn_to_commit;
-            committed_transactions.push(transaction);
+            committed_transactions.push(transaction.clone());
             subscribable_events.extend(
                 events
-                    .into_iter()
-                    .filter(should_forward_to_subscription_service),
+                    .iter()
+                    .filter(|evt| should_forward_to_subscription_service(evt))
+                    .cloned(),
             );
-            to_drop.push((state_updates, write_set));
         }
-        DEFAULT_DROPPER.schedule_drop(to_drop);
 
         ChunkCommitNotification {
             committed_transactions,
@@ -128,6 +80,7 @@ impl ExecutedChunk {
 
 #[test]
 fn into_chunk_commit_notification_should_apply_event_filters() {
+    use aptos_types::{account_config::NewEpochEvent, contract_event::ContractEvent};
     let event_1 = ContractEvent::new_v2_with_type_tag_str(
         "0x2345::random_module::RandomEvent",
         b"random_data_x".to_vec(),
@@ -140,14 +93,11 @@ fn into_chunk_commit_notification_should_apply_event_filters() {
     );
     let event_4 = ContractEvent::from((1, NewEpochEvent::dummy()));
 
-    let ledger_update_output = LedgerUpdateOutput {
-        to_commit: vec![
-            TransactionToCommit::dummy_with_events(vec![event_1.clone()]),
-            TransactionToCommit::dummy_with_events(vec![event_2.clone(), event_3.clone()]),
-            TransactionToCommit::dummy_with_events(vec![event_4.clone()]),
-        ],
-        ..Default::default()
-    };
+    let ledger_update_output = LedgerUpdateOutput::new_dummy_with_txns_to_commit(vec![
+        TransactionToCommit::dummy_with_events(vec![event_1.clone()]),
+        TransactionToCommit::dummy_with_events(vec![event_2.clone(), event_3.clone()]),
+        TransactionToCommit::dummy_with_events(vec![event_4.clone()]),
+    ]);
 
     let chunk = ExecutedChunk {
         ledger_update_output,

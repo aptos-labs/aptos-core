@@ -4,7 +4,7 @@ module 0x1::m {
         value: bool,
     }
     private fun f1()
-        acquires 0x1::m::R(*)
+        acquires R(*)
      {
         {
           let x: &mut R = BorrowGlobal(Mutable)<R>(0x1);

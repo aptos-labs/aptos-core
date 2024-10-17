@@ -320,7 +320,14 @@ async fn process_common(
         return Err(BadRequest("epk expired".to_string()));
     }
 
-    if exp_date_secs >= claims.claims.iat + config.max_exp_horizon_secs {
+    let (max_exp_data_secs, overflowed) = claims
+        .claims
+        .iat
+        .overflowing_add(config.max_exp_horizon_secs);
+    if overflowed {
+        return Err(BadRequest("max_exp_data_secs overflowed".to_string()));
+    }
+    if exp_date_secs >= max_exp_data_secs {
         return Err(BadRequest("epk expiry date too far".to_string()));
     }
 
@@ -538,3 +545,6 @@ async fn update_account_recovery_db(input: &PepperInput) -> Result<(), Processin
         },
     }
 }
+
+#[cfg(test)]
+mod tests;

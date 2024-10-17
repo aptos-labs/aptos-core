@@ -4,14 +4,17 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
+use crate::{
+    components::{apply_chunk_output::ApplyChunkOutput, executed_chunk::ExecutedChunk},
+    metrics,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -113,12 +116,10 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_output(
-        transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
+        transactions: Vec<Transaction>,
+        transaction_outputs: Vec<TransactionOutput>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
-            transactions_and_outputs.into_iter().unzip();
-
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
 
         // collect all accounts touched and dedup

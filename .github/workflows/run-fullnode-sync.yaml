@@ -57,7 +57,7 @@ on:
 
 jobs:
   fullnode-sync:
-    runs-on: medium-perf-docker-with-local-ssd
+    runs-on: runs-on,cpu=16,ram=64,family=m5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }} # the default run is 300 minutes (5 hours). Specified here because workflow_dispatch uses string rather than number
     steps:
       - uses: actions/checkout@v4

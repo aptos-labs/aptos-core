@@ -18,6 +18,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -31,7 +32,9 @@ use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
+};
 use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
@@ -174,18 +177,14 @@ impl BlockStore {
             root_metadata.accu_hash,
         );
 
-        let result = StateComputeResult::new(
-            root_metadata.accu_hash,
-            root_metadata.frozen_root_hashes,
-            root_metadata.num_leaves, /* num_leaves */
-            vec![],                   /* parent_root_hashes */
-            0,                        /* parent_num_leaves */
-            None,                     /* epoch_state */
-            vec![],                   /* compute_status */
-            vec![],                   /* txn_infos */
-            vec![],                   /* reconfig_events */
-            None,                     // block end info
-        );
+        let result = StateComputeResult::new_empty(Arc::new(
+            InMemoryTransactionAccumulator::new(
+                root_metadata.frozen_root_hashes,
+                root_metadata.num_leaves,
+            )
+            .expect("Failed to recover accumulator."),
+        ));
+        assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
         let pipelined_root_block = PipelinedBlock::new(
             *root_block,
@@ -472,17 +471,18 @@ impl BlockStore {
         self.pending_blocks.clone()
     }
 
-    pub async fn wait_for_payload(&self, block: &Block) -> anyhow::Result<()> {
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            self.payload_manager.get_transactions(block),
-        )
-        .await??;
+    pub async fn wait_for_payload(&self, block: &Block, deadline: Duration) -> anyhow::Result<()> {
+        let duration = deadline.saturating_sub(self.time_service.get_current_timestamp());
+        tokio::time::timeout(duration, self.payload_manager.get_transactions(block)).await??;
         Ok(())
     }
 
-    pub fn check_payload(&self, proposal: &Block) -> bool {
+    pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
+    }
+
+    pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
+        self.inner.read().get_block_for_round(round)
     }
 }
 

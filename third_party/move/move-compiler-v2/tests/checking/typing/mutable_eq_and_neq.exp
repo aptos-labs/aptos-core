@@ -4,8 +4,8 @@ module 0x8675309::M {
         f: bool,
     }
     struct P {
-        b1: 0x8675309::M::B,
-        b2: 0x8675309::M::B,
+        b1: B,
+        b2: B,
     }
     struct S {
         f: u64,

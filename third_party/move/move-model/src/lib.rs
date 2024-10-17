@@ -1169,14 +1169,15 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             downgrade_exp_inlining_to_expansion(else_case).into(),
         ),
         UnannotatedExp_::While(cond, body) => Exp_::While(
+            None, // note that labels cannot be downgraded as they are not supported in v1
             downgrade_exp_inlining_to_expansion(cond).into(),
             downgrade_exp_inlining_to_expansion(body).into(),
         ),
         UnannotatedExp_::Loop { has_break: _, body } => {
-            Exp_::Loop(downgrade_exp_inlining_to_expansion(body).into())
+            Exp_::Loop(None, downgrade_exp_inlining_to_expansion(body).into())
         },
-        UnannotatedExp_::Break => Exp_::Break,
-        UnannotatedExp_::Continue => Exp_::Continue,
+        UnannotatedExp_::Break => Exp_::Break(None),
+        UnannotatedExp_::Continue => Exp_::Continue(None),
 
         UnannotatedExp_::Block(seq) => Exp_::Block(downgrade_sequence_inlining_to_expansion(seq)),
         UnannotatedExp_::Lambda(..) => {

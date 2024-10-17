@@ -1,12 +1,12 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct MyTable1 {
+    struct MyTable1<K,V> {
         dummy_field: bool,
     }
     spec {
     }
 
-    struct MyTable2 {
+    struct MyTable2<K,V> {
         dummy_field: bool,
     }
     spec {

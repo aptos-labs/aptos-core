@@ -3,19 +3,19 @@
 
 #![forbid(unsafe_code)]
 
-use crate::LedgerUpdateOutput;
+use aptos_executor_types::LedgerUpdateOutput;
 use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::epoch_state::EpochState;
 use once_cell::sync::OnceCell;
 
-pub struct ExecutionOutput {
+pub struct BlockOutput {
     state: StateDelta,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     next_epoch_state: Option<EpochState>,
     ledger_update_output: OnceCell<LedgerUpdateOutput>,
 }
 
-impl ExecutionOutput {
+impl BlockOutput {
     pub fn new(state: StateDelta, next_epoch_state: Option<EpochState>) -> Self {
         Self {
             state,

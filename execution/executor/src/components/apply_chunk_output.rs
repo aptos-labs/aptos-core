@@ -7,6 +7,7 @@
 use crate::{
     components::{
         chunk_output::{update_counters_for_processed_chunk, ChunkOutput},
+        executed_chunk::ExecutedChunk,
         in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     },
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
@@ -17,7 +18,7 @@ use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
     should_forward_to_subscription_service,
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
-    ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput,
+    LedgerUpdateOutput, ParsedTransactionOutput,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::error;
@@ -148,16 +149,17 @@ impl ApplyChunkOutput {
         let transaction_accumulator =
             Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
         Ok((
-            LedgerUpdateOutput {
+            LedgerUpdateOutput::new(
                 statuses_for_input_txns,
-                to_commit: txns_to_commit,
+                txns_to_commit,
                 subscribable_events,
                 transaction_info_hashes,
-                state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
+                state_updates_before_last_checkpoint,
                 sharded_state_cache,
                 transaction_accumulator,
+                base_txn_accumulator,
                 block_end_info,
-            },
+            ),
             to_discard.into_txns(),
             to_retry.into_txns(),
         ))

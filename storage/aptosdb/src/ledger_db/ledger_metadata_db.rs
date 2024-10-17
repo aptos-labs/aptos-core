@@ -107,15 +107,13 @@ impl LedgerMetadataDb {
     }
 
     pub(crate) fn get_ledger_commit_progress(&self) -> Result<Version> {
-        get_progress(&self.db, &DbMetadataKey::LedgerCommitProgress)?.ok_or(AptosDbError::NotFound(
-            "No LedgerCommitProgress in db.".to_string(),
-        ))
+        get_progress(&self.db, &DbMetadataKey::LedgerCommitProgress)?
+            .ok_or_else(|| AptosDbError::NotFound("No LedgerCommitProgress in db.".to_string()))
     }
 
     pub(crate) fn get_pruner_progress(&self) -> Result<Version> {
-        get_progress(&self.db, &DbMetadataKey::LedgerPrunerProgress)?.ok_or(AptosDbError::NotFound(
-            "No LedgerPrunerProgress in db.".to_string(),
-        ))
+        get_progress(&self.db, &DbMetadataKey::LedgerPrunerProgress)?
+            .ok_or_else(|| AptosDbError::NotFound("No LedgerPrunerProgress in db.".to_string()))
     }
 }
 
@@ -137,7 +135,7 @@ impl LedgerMetadataDb {
     /// Returns the latest ledger info, or NOT_FOUND if it doesn't exist.
     pub(crate) fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
-            .ok_or(AptosDbError::NotFound(String::from("Genesis LedgerInfo")))
+            .ok_or_else(|| AptosDbError::NotFound(String::from("Genesis LedgerInfo")))
     }
 
     /// Returns the latest ledger info for a given epoch.
@@ -147,9 +145,7 @@ impl LedgerMetadataDb {
     ) -> Result<LedgerInfoWithSignatures> {
         self.db
             .get::<LedgerInfoSchema>(&epoch)?
-            .ok_or(AptosDbError::NotFound(format!(
-                "Last LedgerInfo of epoch {epoch}"
-            )))
+            .ok_or_else(|| AptosDbError::NotFound(format!("Last LedgerInfo of epoch {epoch}")))
     }
 
     /// Returns an iterator that yields epoch ending ledger infos, starting from `start_epoch`, and
@@ -304,9 +300,10 @@ impl LedgerMetadataDb {
         let mut iter = self.db.iter::<BlockByVersionSchema>()?;
 
         iter.seek_for_prev(&version)?;
-        let (_, block_height) = iter.next().transpose()?.ok_or(anyhow!(
-            "Block is not found at version {version}, maybe pruned?"
-        ))?;
+        let (_, block_height) = iter
+            .next()
+            .transpose()?
+            .ok_or_else(|| anyhow!("Block is not found at version {version}, maybe pruned?"))?;
 
         Ok(block_height)
     }
@@ -320,7 +317,7 @@ impl LedgerMetadataDb {
         let (block_version, block_height) = iter
             .next()
             .transpose()?
-            .ok_or(anyhow!("Block is not found at or after version {version}"))?;
+            .ok_or_else(|| anyhow!("Block is not found at or after version {version}"))?;
 
         Ok((block_version, block_height))
     }

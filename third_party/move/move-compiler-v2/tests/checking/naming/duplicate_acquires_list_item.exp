@@ -7,20 +7,20 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun t0()
-        acquires 0x8675309::M::R(*)
-        acquires 0x8675309::M::X(*)
-        acquires 0x8675309::M::R(*)
+        acquires R(*)
+        acquires X(*)
+        acquires R(*)
      {
         BorrowGlobal(Mutable)<R>(0x1);
         BorrowGlobal(Mutable)<X>(0x1);
         Tuple()
     }
     private fun t1()
-        acquires 0x8675309::M::R(*)
-        acquires 0x8675309::M::X(*)
-        acquires 0x8675309::M::R(*)
-        acquires 0x8675309::M::R(*)
-        acquires 0x8675309::M::R(*)
+        acquires R(*)
+        acquires X(*)
+        acquires R(*)
+        acquires R(*)
+        acquires R(*)
      {
         BorrowGlobal(Mutable)<R>(0x1);
         BorrowGlobal(Mutable)<X>(0x1);

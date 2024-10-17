@@ -1,37 +1,37 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct HasAbilities {
-        a: #1,
+    struct HasAbilities<T1,T2> {
+        a: T2,
     }
-    struct HasCopy {
-        a: #1,
+    struct HasCopy<T1,T2> {
+        a: T2,
     }
-    struct HasDrop {
-        a: #1,
+    struct HasDrop<T1,T2> {
+        a: T2,
     }
-    struct HasKey {
-        a: #1,
+    struct HasKey<T1,T2> {
+        a: T2,
     }
-    struct HasStore {
-        a: #1,
+    struct HasStore<T1,T2> {
+        a: T2,
     }
     struct NoAbilities {
         a: bool,
     }
-    struct S1 {
-        a: #0,
+    struct S1<T> {
+        a: T,
     }
     struct S2 {
-        a: 0x42::M::S1<0x42::M::HasAbilities<0x42::M::NoAbilities, u64>>,
+        a: S1<HasAbilities<NoAbilities, u64>>,
     }
-    struct S3 {
-        a: #0,
-        b: #1,
-        c: #2,
-        d: #3,
+    struct S3<T1,T2,T3,T4> {
+        a: T1,
+        b: T2,
+        c: T3,
+        d: T4,
     }
     struct S4 {
-        a: 0x42::M::S3<0x42::M::HasDrop<0x42::M::NoAbilities, u64>, 0x42::M::HasCopy<0x42::M::NoAbilities, u64>, 0x42::M::HasStore<0x42::M::NoAbilities, u64>, 0x42::M::HasKey<0x42::M::NoAbilities, u64>>,
+        a: S3<HasDrop<NoAbilities, u64>, HasCopy<NoAbilities, u64>, HasStore<NoAbilities, u64>, HasKey<NoAbilities, u64>>,
     }
     private fun f1<T>() {
         Tuple()

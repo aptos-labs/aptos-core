@@ -5,7 +5,7 @@ module 0x42::fields {
     }
     struct S {
         f: u64,
-        g: 0x42::fields::T,
+        g: T,
     }
     private fun write_ref(x: &S) {
         select fields::T.h<T>(select fields::S.g<&S>(x)) = 42;

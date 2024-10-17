@@ -42,24 +42,24 @@ warning: unused type parameter
 
 // -- Model dump before bytecode pipeline
 module 0x42::test {
-    struct S0 {
+    struct S0<T> {
         dummy_field: bool,
     }
-    struct S1 {
+    struct S1<T1,T2> {
         dummy_field: bool,
     }
-    struct S2 {
-        f: 0x42::test::S3<#1>,
+    struct S2<T1,T2> {
+        f: S3<T2>,
     }
-    struct S3 {
+    struct S3<T> {
         dummy_field: bool,
     }
-    struct S4 {
-        f: vector<#0>,
+    struct S4<T,U> {
+        f: vector<T>,
     }
-    struct S5 {
-        f: vector<#0>,
-        g: vector<#1>,
+    struct S5<T,U> {
+        f: vector<T>,
+        g: vector<U>,
     }
 } // end 0x42::test
 

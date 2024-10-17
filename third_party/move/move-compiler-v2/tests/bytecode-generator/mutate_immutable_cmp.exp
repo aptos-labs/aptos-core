@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct T {
-        s: 0x8675309::M::S,
+        s: S,
     }
     struct G {
         dummy_field: bool,

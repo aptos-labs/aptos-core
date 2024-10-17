@@ -7,7 +7,7 @@ module 0x42::test {
         dummy_field: bool,
     }
     public entry fun test(addr: address)
-        acquires 0x42::test::R(*)
+        acquires R(*)
      {
         {
           let test::R{ dummy_field: _dummy_field } = MoveFrom<R>(addr);
@@ -21,7 +21,7 @@ module 0x42::test {
         }
     }
     public entry fun test3(addr: address)
-        acquires 0x42::test::T(*)
+        acquires T(*)
      {
         {
           let test::T{ dummy_field: _ } = MoveFrom<T>(addr);

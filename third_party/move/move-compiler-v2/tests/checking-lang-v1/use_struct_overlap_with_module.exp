@@ -7,8 +7,8 @@ module 0x2::X {
 module 0x2::M {
     use 0x2::X::{Self, S as X}; // resolved as: 0x2::X
     struct A {
-        f1: 0x2::X::S,
-        f2: 0x2::X::S,
+        f1: X::S,
+        f2: X::S,
     }
 } // end 0x2::M
 

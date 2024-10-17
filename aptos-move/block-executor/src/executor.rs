@@ -120,12 +120,12 @@ where
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
-            .modified_keys::<true>(idx_to_execute)
-            .map_or(HashMap::new(), |keys| keys.collect());
+            .modified_keys(idx_to_execute, true)
+            .map_or_else(HashMap::new, |keys| keys.collect());
 
         let mut prev_modified_delayed_fields = last_input_output
             .delayed_field_keys(idx_to_execute)
-            .map_or(HashSet::new(), |keys| keys.collect());
+            .map_or_else(HashSet::new, |keys| keys.collect());
 
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
@@ -398,7 +398,7 @@ where
         clear_speculative_txn_logs(txn_idx as usize);
 
         // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-        if let Some(keys) = last_input_output.modified_keys::<false>(txn_idx) {
+        if let Some(keys) = last_input_output.modified_keys(txn_idx, false) {
             for (k, kind) in keys {
                 use KeyKind::*;
                 match kind {
