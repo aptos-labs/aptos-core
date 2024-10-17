@@ -321,11 +321,11 @@ pub fn encode_genesis_change_set_for_testnet(
 
     create_accounts(&mut session, accounts);
 
-    create_multisig_accounts_with_balance(&mut session, multisig_account);
-
     if let Some(owner_group) = owner_group {
         create_multiple_multisig_accounts_with_schema(&mut session, owner_group);
     }
+
+    create_multisig_accounts_with_balance(&mut session, multisig_account);
 
     if validators.len() > 0 {
         create_and_initialize_validators(&mut session, validators);
