@@ -62,9 +62,7 @@ use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_model::metadata::{
-    CompilerVersion, LanguageVersion, DEFAULT_COMPILER_VERSION_FOR_V2, DEFAULT_LANG_VERSION_FOR_V2,
-};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
@@ -646,17 +644,12 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
-        let compiler_version = if move_options.compiler_version.is_none() {
-            Some(DEFAULT_COMPILER_VERSION_FOR_V2)
-        } else {
-            move_options.compiler_version
-        };
-
-        let language_version = if move_options.language_version.is_none() {
-            Some(DEFAULT_LANG_VERSION_FOR_V2)
-        } else {
-            move_options.language_version
-        };
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
 
         let result = task::spawn_blocking(move || {
             prover_options.prove(

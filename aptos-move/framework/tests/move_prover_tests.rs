@@ -3,7 +3,7 @@
 
 use aptos_framework::{extended_checks, prover::ProverOptions};
 use move_binary_format::file_format_common::VERSION_DEFAULT;
-use move_model::metadata::{DEFAULT_COMPILER_VERSION_FOR_V2, DEFAULT_LANG_VERSION_FOR_V2};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use std::{collections::BTreeMap, path::PathBuf};
 
 const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
@@ -60,8 +60,8 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
                 pkg_path.as_path(),
                 BTreeMap::default(),
                 Some(VERSION_DEFAULT),
-                Some(DEFAULT_COMPILER_VERSION_FOR_V2),
-                Some(DEFAULT_LANG_VERSION_FOR_V2),
+                Some(CompilerVersion::latest_stable()),
+                Some(LanguageVersion::latest_stable()),
                 skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],

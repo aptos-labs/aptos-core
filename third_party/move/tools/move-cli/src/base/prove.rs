@@ -6,7 +6,7 @@ use anyhow::bail;
 use clap::Parser;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use colored::Colorize;
-use move_model::metadata::{DEFAULT_COMPILER_VERSION_FOR_V2, DEFAULT_LANG_VERSION_FOR_V2};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{BuildConfig, ModelConfig};
 use move_prover::run_move_prover_with_model_v2;
 use std::{
@@ -129,8 +129,8 @@ impl ProverTest {
             options: Some(ProverOptions::Options(std::mem::take(&mut self.options))),
         };
         let mut build_config = BuildConfig::default();
-        build_config.compiler_config.language_version = Some(DEFAULT_LANG_VERSION_FOR_V2);
-        build_config.compiler_config.compiler_version = Some(DEFAULT_COMPILER_VERSION_FOR_V2);
+        build_config.compiler_config.language_version = Some(LanguageVersion::latest_stable());
+        build_config.compiler_config.compiler_version = Some(CompilerVersion::latest_stable());
         let res = cmd.execute(Some(pkg_path), build_config);
         std::env::set_current_dir(saved_cd).expect("restore current directory");
         res.unwrap()

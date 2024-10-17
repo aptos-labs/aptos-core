@@ -19,10 +19,6 @@ use std::{
 const UNSTABLE_MARKER: &str = "-unstable";
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
-pub static DEFAULT_COMPILER_VERSION_FOR_V1: CompilerVersion = CompilerVersion::V1;
-pub static DEFAULT_COMPILER_VERSION_FOR_V2: CompilerVersion = CompilerVersion::V2_0;
-pub static DEFAULT_LANG_VERSION_FOR_V1: LanguageVersion = LanguageVersion::V1;
-pub static DEFAULT_LANG_VERSION_FOR_V2: LanguageVersion = LanguageVersion::V2_0;
 
 // ================================================================================'
 // Metadata for compilation result (WORK IN PROGRESS)
@@ -149,6 +145,16 @@ impl CompilerVersion {
         }
     }
 
+    /// The latest compiler version.
+    pub fn latest() -> Self {
+        CompilerVersion::V2_1
+    }
+
+    /// The latest stable compiler version.
+    pub fn latest_stable() -> Self {
+        CompilerVersion::V2_0
+    }
+
     /// Check whether the compiler version supports the given language version,
     /// generates an error if not.
     pub fn check_language_support(self, version: LanguageVersion) -> anyhow::Result<()> {
@@ -238,6 +244,16 @@ impl LanguageVersion {
             LanguageVersion::V2_0 => false,
             LanguageVersion::V2_1 => true,
         }
+    }
+
+    /// The latest language version.
+    pub fn latest() -> Self {
+        LanguageVersion::V2_1
+    }
+
+    /// The latest stable language version.
+    pub fn latest_stable() -> Self {
+        LanguageVersion::V2_0
     }
 
     /// Whether the language version is equal to greater than `ver`
