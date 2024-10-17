@@ -41,6 +41,9 @@ pub enum ExecutorError {
 
     #[error("request timeout")]
     CouldNotGetData,
+
+    #[error("committed transactions get failed")]
+    CouldNotGetCommittedTransactions,
 }
 
 impl From<anyhow::Error> for ExecutorError {

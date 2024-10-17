@@ -129,17 +129,16 @@ impl ExecutionProxy {
 
     fn pre_commit_hook(
         &self,
-        block: &Block,
-        block_window: &OrderedBlockWindow,
+        block: &PipelinedBlock,
         metadata: BlockMetadataExt,
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> PreCommitHook {
         let mut pre_commit_notifier = self.pre_commit_notifier.clone();
         let state_sync_notifier = self.state_sync_notifier.clone();
-        let blocks = block_window.pipelined_blocks().clone();
         let timestamp = block.timestamp_usecs();
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
         let block_id = block.id();
+        let block_cloned = block.clone();
         Box::new(
             move |user_txns: &[SignedTransaction], state_compute_result: &StateComputeResult| {
                 let input_txns = Block::combine_to_input_transactions(
@@ -161,7 +160,7 @@ impl ExecutionProxy {
                                 error!(error = ?e, "Failed to notify state synchronizer");
                             }
 
-                            payload_manager.notify_commit(timestamp, &blocks);
+                            payload_manager.notify_commit(timestamp, Some(block_cloned));
                         }))
                         .await
                         .expect("Failed to send pre-commit notification");
@@ -176,13 +175,15 @@ impl StateComputer for ExecutionProxy {
     async fn schedule_compute(
         &self,
         // The block to be executed.
-        block: &Block,
+        block: &PipelinedBlock,
         block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
+        block.init_committed_transactions();
+
         let block_id = block.id();
         debug!(
             block = %block,
@@ -215,9 +216,11 @@ impl StateComputer for ExecutionProxy {
 
         let timestamp = block.timestamp_usecs();
         let metadata = if is_randomness_enabled {
-            block.new_metadata_with_randomness(&validators, randomness)
+            block
+                .block()
+                .new_metadata_with_randomness(&validators, randomness)
         } else {
-            block.new_block_metadata(&validators).into()
+            block.block().new_block_metadata(&validators).into()
         };
 
         let pipeline_entry_time = Instant::now();
@@ -230,7 +233,7 @@ impl StateComputer for ExecutionProxy {
                 parent_block_id,
                 transaction_generator,
                 block_executor_onchain_config,
-                self.pre_commit_hook(block, block_window, metadata, payload_manager),
+                self.pre_commit_hook(block, metadata, payload_manager),
                 lifetime_guard,
             )
             .await;
@@ -238,8 +241,19 @@ impl StateComputer for ExecutionProxy {
         counters::PIPELINE_ENTRY_TO_INSERTED_TIME.observe_duration(pipeline_entry_time.elapsed());
         let pipeline_inserted_timestamp = Instant::now();
 
+        let block_cloned = block.clone();
         Box::pin(async move {
-            let pipeline_execution_result = fut.await?;
+            let pipeline_execution_result = match fut.await {
+                Ok(result) => result,
+                Err(e) => {
+                    error!(
+                        error = ?e,
+                        "Failed to execute block in pipeline",
+                    );
+                    block_cloned.cancel_committed_transactions();
+                    return Err(e);
+                },
+            };
             debug!(
                 block_id = block_id,
                 "Got state compute result, post processing."
@@ -352,7 +366,7 @@ impl StateComputer for ExecutionProxy {
         // so it can set batches expiration accordingly.
         // Might be none if called in the recovery path, or between epoch stop and start.
         if let Some(inner) = self.state.read().as_ref() {
-            inner.payload_manager.notify_commit(block_timestamp, &[]);
+            inner.payload_manager.notify_commit(block_timestamp, None);
         }
 
         fail_point!("consensus::sync_to", |_| {

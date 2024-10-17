@@ -7,7 +7,7 @@ use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
 mod sender_aware;
-mod use_case_aware;
+pub mod use_case_aware;
 
 /// Interface to shuffle transactions
 pub trait TransactionShuffler: Send + Sync {

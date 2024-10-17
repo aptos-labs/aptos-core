@@ -200,6 +200,7 @@ mod test_utils {
             signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
             TransactionOutput,
         },
+        txn_provider::default::DefaultTxnProvider,
     };
     use aptos_vm::{
         sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -307,8 +308,9 @@ mod test_utils {
                 .into_iter()
                 .map(|t| t.into_txn())
                 .collect();
+        let txn_provider = Arc::new(DefaultTxnProvider::new(ordered_txns));
         let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&ordered_txns, executor.data_store()).unwrap();
+            AptosVM::execute_block_no_limit(txn_provider, executor.data_store()).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -356,9 +358,9 @@ mod test_utils {
             )
             .unwrap();
 
+        let txn_provider = Arc::new(DefaultTxnProvider::new(execution_ordered_txns));
         let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
-                .unwrap();
+            AptosVM::execute_block_no_limit(txn_provider, executor.data_store()).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -410,9 +412,9 @@ mod test_utils {
             )
             .unwrap();
 
+        let txn_provider = Arc::new(DefaultTxnProvider::new(execution_ordered_txns));
         let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
-                .unwrap();
+            AptosVM::execute_block_no_limit(txn_provider, executor.data_store()).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 }

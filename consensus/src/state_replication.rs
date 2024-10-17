@@ -8,10 +8,7 @@ use crate::{
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{
-    block::Block,
-    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
-};
+use aptos_consensus_types::pipelined_block::{OrderedBlockWindow, PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
@@ -31,7 +28,7 @@ pub trait StateComputer: Send + Sync {
     async fn schedule_compute(
         &self,
         // The block that will be computed.
-        _block: &Block,
+        _block: &PipelinedBlock,
         _block_window: &OrderedBlockWindow,
         // The parent block root hash.
         _parent_block_id: HashValue,

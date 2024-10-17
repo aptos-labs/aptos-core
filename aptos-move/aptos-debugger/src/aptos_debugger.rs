@@ -16,6 +16,7 @@ use aptos_types::{
         SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
         Version,
     },
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
     vm_status::VMStatus,
 };
 use aptos_validator_interface::{
@@ -59,9 +60,10 @@ impl AptosDebugger {
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
+        let txn_provider = Arc::new(DefaultTxnProvider::new(sig_verified_txns));
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
-        print_transaction_stats(&sig_verified_txns, version);
+        print_transaction_stats(txn_provider.get_txns(), version);
 
         let mut result = None;
 
@@ -69,12 +71,12 @@ impl AptosDebugger {
             for i in 0..repeat_execution_times {
                 let start_time = Instant::now();
                 let cur_result =
-                    execute_block_no_limit(&sig_verified_txns, &state_view, *concurrency_level)
+                    execute_block_no_limit(txn_provider.clone(), &state_view, *concurrency_level)
                         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
                 println!(
                     "[{} txns from {}] Finished execution round {}/{} with concurrency_level={} in {}ms",
-                    sig_verified_txns.len(),
+                    txn_provider.num_txns(),
                     version,
                     i + 1,
                     repeat_execution_times,
@@ -98,7 +100,7 @@ impl AptosDebugger {
         }
 
         let result = result.unwrap();
-        assert_eq!(sig_verified_txns.len(), result.len());
+        assert_eq!(txn_provider.num_txns(), result.len());
         Ok(result)
     }
 
@@ -350,7 +352,7 @@ impl AptosDebugger {
     }
 }
 
-fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], version: u64) {
+fn print_transaction_stats(sig_verified_txns: &[Arc<SignatureVerifiedTransaction>], version: u64) {
     let transaction_types = sig_verified_txns
         .iter()
         .map(|txn| txn.expect_valid().type_name().to_string())
@@ -420,12 +422,16 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 }
 
 fn execute_block_no_limit(
-    sig_verified_txns: &[SignatureVerifiedTransaction],
+    txn_provider: Arc<dyn TxnProvider<SignatureVerifiedTransaction>>,
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
-    BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
-        sig_verified_txns,
+    BlockAptosVM::execute_block::<
+        _,
+        NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        dyn TxnProvider<SignatureVerifiedTransaction>,
+    >(
+        txn_provider,
         state_view,
         BlockExecutorConfig {
             local: BlockExecutorLocalConfig {

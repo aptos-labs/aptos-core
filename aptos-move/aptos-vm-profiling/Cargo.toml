@@ -35,7 +35,7 @@ move-vm-types = { workspace = true }
 
 [[bin]]
 name = "main"
-path  = "src/main.rs"
+path = "src/main.rs"
 
 [[bin]]
 name = "run-move"

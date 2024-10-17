@@ -79,7 +79,11 @@ impl MockExecutionClient {
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
-        let _ = self.state_sync_client.unbounded_send(txns);
+        let _ = self.state_sync_client.unbounded_send(
+            txns.into_iter()
+                .flat_map(|(txns, _)| txns.as_ref().clone().into_iter())
+                .collect(),
+        );
 
         callback(
             &ordered_blocks.into_iter().map(Arc::new).collect::<Vec<_>>(),

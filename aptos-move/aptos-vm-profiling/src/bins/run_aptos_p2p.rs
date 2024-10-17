@@ -5,12 +5,14 @@ use anyhow::Result;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
 use aptos_types::{
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    txn_provider::default::DefaultTxnProvider,
     write_set::WriteSet,
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use std::{
     collections::HashMap,
     io::{self, Read},
+    sync::Arc,
 };
 
 fn main() -> Result<()> {
@@ -48,7 +50,8 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let res = AptosVM::execute_block_no_limit(&txns, &state_store)?;
+    let txn_provider = Arc::new(DefaultTxnProvider::new(txns));
+    let res = AptosVM::execute_block_no_limit(txn_provider, &state_store)?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

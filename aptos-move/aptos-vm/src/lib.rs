@@ -135,6 +135,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         SignedTransaction, TransactionOutput, VMValidatorResult,
     },
+    txn_provider::TxnProvider,
     vm_status::VMStatus,
 };
 use std::{marker::Sync, sync::Arc};
@@ -159,7 +160,7 @@ pub trait VMExecutor: Send + Sync {
 
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: Arc<dyn TxnProvider<SignatureVerifiedTransaction>>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
@@ -167,11 +168,11 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them,
     /// Without applying any block limit
     fn execute_block_no_limit(
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: Arc<dyn TxnProvider<SignatureVerifiedTransaction>>,
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Self::execute_block(
-            transactions,
+            txn_provider,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )

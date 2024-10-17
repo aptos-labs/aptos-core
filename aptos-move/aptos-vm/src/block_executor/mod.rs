@@ -28,6 +28,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
+    txn_provider::TxnProvider,
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
@@ -392,15 +393,16 @@ impl BlockAptosVM {
     pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync + ?Sized,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        signature_verified_block: &[SignatureVerifiedTransaction],
+        signature_verified_block: Arc<TP>,
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-        let num_txns = signature_verified_block.len();
+        let num_txns = signature_verified_block.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -414,6 +416,7 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
+            TP,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
         let environment =
@@ -453,13 +456,14 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync + ?Sized,
     >(
-        signature_verified_block: &[SignatureVerifiedTransaction],
+        signature_verified_block: Arc<TP>,
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Self::execute_block_on_thread_pool::<S, L>(
+        Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,

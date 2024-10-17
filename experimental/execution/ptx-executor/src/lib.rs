@@ -38,6 +38,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
     },
+    txn_provider::TxnProvider,
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -50,7 +51,7 @@ pub struct PtxBlockExecutor;
 
 impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: Arc<dyn TxnProvider<SignatureVerifiedTransaction>>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -73,7 +74,7 @@ impl VMExecutor for PtxBlockExecutor {
         let ret = Arc::new(Mutex::new(None));
         let ret_clone = ret.clone();
         THREAD_MANAGER.get_exe_cpu_pool().scope(move |scope| {
-            let num_txns = transactions.len();
+            let num_txns = txn_provider.num_txns();
             let (result_tx, result_rx) = channel();
 
             // Spawn all the components.
@@ -86,8 +87,10 @@ impl VMExecutor for PtxBlockExecutor {
             let analyzer = PtxAnalyzer::spawn(scope, sorter);
 
             // Feed the transactions down the pipeline.
-            for txn in transactions {
-                analyzer.analyze_transaction(txn.clone());
+            //for txn in transactions {
+            for idx in 0..num_txns {
+                let txn = txn_provider.get_txn(idx as u32);
+                analyzer.analyze_transaction((*txn).clone());
             }
             analyzer.finish_block();
 

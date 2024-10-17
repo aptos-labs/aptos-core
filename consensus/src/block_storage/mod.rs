@@ -34,6 +34,8 @@ pub trait BlockReader: Send + Sync {
     /// Get the current commit root block of the BlockTree.
     fn commit_root(&self) -> Arc<PipelinedBlock>;
 
+    fn window_root(&self) -> Arc<PipelinedBlock>;
+
     fn get_quorum_cert_for_block(&self, block_id: HashValue) -> Option<Arc<QuorumCert>>;
 
     /// Returns all the blocks between the ordered/commit root and the given block, including the given block
@@ -46,6 +48,8 @@ pub trait BlockReader: Send + Sync {
     fn path_from_ordered_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>>;
 
     fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>>;
+
+    fn path_from_window_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>>;
 
     /// Return the certified block with the highest round.
     #[cfg(test)]
