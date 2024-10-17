@@ -13,8 +13,8 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     code_cache::SyncCodeCache,
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, MaybeCommitted,
-        StorageVersion, TxnIndex, ValueWithLayout, Version,
+        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
+        ValueWithLayout, Version, VersionedModule,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -304,7 +304,7 @@ enum ModuleRead {
     /// Read from cross-block module cache.
     GlobalCache,
     /// Read from block-level cache ([SyncCodeCache]) used by parallel execution.
-    BlockCache(Option<Arc<MaybeCommitted<ModuleCacheEntry>>>),
+    BlockCache(Option<Arc<VersionedModule<ModuleCacheEntry>>>),
 }
 
 /// Represents a result of a read from [CapturedReads] when they are used as a cache.
@@ -621,7 +621,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_block_cache_read(
         &mut self,
         module_id: ModuleId,
-        read: Option<Arc<MaybeCommitted<ModuleCacheEntry>>>,
+        read: Option<Arc<VersionedModule<ModuleCacheEntry>>>,
     ) {
         self.module_reads
             .insert(module_id, ModuleRead::BlockCache(read));
@@ -636,7 +636,7 @@ impl<T: Transaction> CapturedReads<T> {
         map_func: F,
     ) -> CacheRead<V>
     where
-        F: Fn(Option<&Arc<MaybeCommitted<ModuleCacheEntry>>>) -> V,
+        F: Fn(Option<&Arc<VersionedModule<ModuleCacheEntry>>>) -> V,
     {
         match self.module_reads.get(&(address, module_name)) {
             Some(ModuleRead::BlockCache(read)) => CacheRead::Hit(map_func(read.as_ref())),
@@ -733,12 +733,7 @@ impl<T: Transaction> CapturedReads<T> {
     ///   3. Entries that were in block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
-        code_cache: &SyncCodeCache<
-            ModuleId,
-            Arc<MaybeCommitted<ModuleCacheEntry>>,
-            [u8; 32],
-            CachedScript,
-        >,
+        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
             return false;
@@ -749,7 +744,7 @@ impl<T: Transaction> CapturedReads<T> {
             ModuleRead::BlockCache(previous) => match previous {
                 Some(previous) => code_cache
                     .module_cache()
-                    .contains_and(id, |m| m.commit_idx() == previous.commit_idx()),
+                    .contains_and(id, |m| m.version() == previous.version()),
                 None => !code_cache.module_cache().contains(id),
             },
         })
@@ -1604,11 +1599,11 @@ mod test {
             ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
         mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
-            Arc::new(MaybeCommitted::new(foo_entry.clone(), None)),
+            VersionedModule::new(foo_entry.clone(), None),
         );
         captured_reads.capture_block_cache_read(
             foo_id.clone(),
-            Some(Arc::new(MaybeCommitted::new(foo_entry, None))),
+            Some(Arc::new(VersionedModule::new(foo_entry, None))),
         );
 
         let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
@@ -1645,11 +1640,11 @@ mod test {
         let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
         mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
-            Arc::new(MaybeCommitted::new(foo_entry.clone(), None)),
+            VersionedModule::new(foo_entry.clone(), None),
         );
         captured_reads.capture_block_cache_read(
             foo_id.clone(),
-            Some(Arc::new(MaybeCommitted::new(foo_entry, None))),
+            Some(Arc::new(VersionedModule::new(foo_entry, None))),
         );
 
         let hit = captured_reads.fetch_verified_module(foo_id.address(), foo_id.name());
@@ -1667,11 +1662,11 @@ mod test {
             ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
         mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
-            Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10))),
+            VersionedModule::new(foo_entry.clone(), Some(10)),
         );
         captured_reads.capture_block_cache_read(
             foo_id.clone(),
-            Some(Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10)))),
+            Some(Arc::new(VersionedModule::new(foo_entry.clone(), Some(10)))),
         );
 
         let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
@@ -1684,7 +1679,7 @@ mod test {
             ModuleCacheEntry::deserialized_for_test("bar", vec![], &RUNTIME_ENVIRONMENT);
         mvhashmap.code_cache().module_cache().insert_module(
             bar_id.clone(),
-            Arc::new(MaybeCommitted::new(bar_entry.clone(), Some(12))),
+            VersionedModule::new(bar_entry.clone(), Some(12)),
         );
         assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
 
@@ -1692,10 +1687,10 @@ mod test {
         assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
 
         // Version has been republished, with a higher transaction index. Should fail validation.
-        mvhashmap.code_cache().module_cache().insert_module(
-            foo_id.clone(),
-            Arc::new(MaybeCommitted::new(foo_entry, Some(20))),
-        );
+        mvhashmap
+            .code_cache()
+            .module_cache()
+            .insert_module(foo_id.clone(), VersionedModule::new(foo_entry, Some(20)));
         assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
     }
 
@@ -1719,14 +1714,14 @@ mod test {
         CrossBlockModuleCache::mark_invalid(&foo_id);
         mvhashmap.code_cache().module_cache().insert_module(
             foo_id.clone(),
-            Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10))),
+            VersionedModule::new(foo_entry.clone(), Some(10)),
         );
         assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
 
         // Assume we re-read the new correct version. Then validation should pass again.
         captured_reads.capture_block_cache_read(
             foo_id.clone(),
-            Some(Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10)))),
+            Some(Arc::new(VersionedModule::new(foo_entry.clone(), Some(10)))),
         );
         assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
         assert!(!CrossBlockModuleCache::is_valid(&foo_id));

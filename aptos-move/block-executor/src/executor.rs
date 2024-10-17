@@ -31,7 +31,7 @@ use aptos_aggregator::{
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, MaybeCommitted, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout, VersionedModule},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -725,7 +725,7 @@ where
             versioned_cache
                 .code_cache()
                 .module_cache()
-                .insert_module(id, Arc::new(MaybeCommitted::new(entry, Some(txn_idx))));
+                .insert_module(id, VersionedModule::new(entry, Some(txn_idx)));
         }
         Ok(())
     }
@@ -1135,6 +1135,7 @@ where
     }
 
     fn apply_output_sequential(
+        txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         output: &E::Output,
@@ -1158,11 +1159,13 @@ where
         for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
                 let (id, write_op) = write.unpack();
-                let entry =
+                let module =
                     ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
 
                 CrossBlockModuleCache::mark_invalid(&id);
-                unsync_map.code_cache().insert_module(id, Arc::new(entry));
+                unsync_map
+                    .code_cache()
+                    .insert_module(id, VersionedModule::from_txn_idx(module, txn_idx));
             } else {
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());
@@ -1437,6 +1440,7 @@ where
                     // Apply the writes.
                     let resource_write_set = output.resource_write_set();
                     Self::apply_output_sequential(
+                        idx as TxnIndex,
                         runtime_environment,
                         &unsync_map,
                         &output,
@@ -1526,9 +1530,7 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
         CrossBlockModuleCache::populate_from_unsync_code_cache_at_block_end(
-            unsync_map
-                .into_modules_iter()
-                .map(|(k, v)| (k, v.as_ref().clone())),
+            unsync_map.into_modules_iter(),
         );
 
         let block_end_info = if self
