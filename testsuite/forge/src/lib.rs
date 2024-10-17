@@ -6,6 +6,9 @@
 
 pub use anyhow::Result;
 
+pub mod errors;
+pub use errors::*;
+
 mod interface;
 pub use interface::*;
 
