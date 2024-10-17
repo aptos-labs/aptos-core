@@ -145,18 +145,14 @@ where
             .ledger_update(block_id, parent_block_id, state_checkpoint_output)
     }
 
-    fn pre_commit_block(
-        &self,
-        block_id: HashValue,
-        parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "pre_commit_block"]);
 
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .pre_commit_block(block_id, parent_block_id)
+            .pre_commit_block(block_id)
     }
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
@@ -338,20 +334,14 @@ where
         Ok(block.output.expect_complete_result())
     }
 
-    fn pre_commit_block(
-        &self,
-        block_id: HashValue,
-        parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
         let _timer = COMMIT_BLOCKS.start_timer();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "pre_commit_block",
         );
 
-        let mut blocks = self.block_tree.get_blocks(&[parent_block_id, block_id])?;
-        let block = blocks.pop().expect("guaranteed");
-        let _parent_block = blocks.pop().expect("guaranteed");
+        let block = self.block_tree.get_block(block_id)?;
 
         fail_point!("executor::pre_commit_block", |_| {
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())

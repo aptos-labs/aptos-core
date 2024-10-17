@@ -516,11 +516,7 @@ async fn test_commit_sync_race() {
             todo!()
         }
 
-        fn pre_commit_block(
-            &self,
-            _block_id: HashValue,
-            _parent_block_id: HashValue,
-        ) -> ExecutorResult<()> {
+        fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
             todo!()
         }
 

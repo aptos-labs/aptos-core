@@ -291,9 +291,7 @@ fn test_executor_commit_twice() {
         )
         .unwrap();
     let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
-    executor
-        .pre_commit_block(block1_id, executor.committed_block_id())
-        .unwrap();
+    executor.pre_commit_block(block1_id).unwrap();
     executor.commit_ledger(ledger_info.clone()).unwrap();
     executor.commit_ledger(ledger_info).unwrap();
 }
@@ -388,9 +386,7 @@ fn create_blocks_and_chunks(
             )
             .unwrap();
         assert_eq!(output.version(), version);
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
+        block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
         out_blocks.push((txns, ledger_info));
         parent_block_id = block_id;
