@@ -803,8 +803,7 @@ impl Interpreter {
             res.is_ok(),
         )?;
         self.check_access(
-            resolver.loader(),
-            resolver.module_storage(),
+            resolver,
             if is_mut {
                 AccessKind::Writes
             } else {
@@ -821,8 +820,7 @@ impl Interpreter {
 
     fn check_access(
         &self,
-        loader: &Loader,
-        module_storage: &dyn ModuleStorage,
+        resolver: &Resolver,
         kind: AccessKind,
         ty: &Type,
         addr: AccountAddress,
@@ -837,9 +835,12 @@ impl Interpreter {
                 )
             },
         };
-        let struct_name_index_map = match loader {
+        let struct_name_index_map = match resolver.loader() {
             Loader::V1(loader) => &loader.name_cache,
-            Loader::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+            Loader::V2(_) => resolver
+                .module_storage()
+                .runtime_environment()
+                .struct_name_index_map(),
         };
         let struct_name = struct_name_index_map.idx_to_struct_name(struct_idx)?;
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
@@ -861,13 +862,7 @@ impl Interpreter {
         let gv = Self::load_resource(resolver, data_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, resolver }, exists)?;
-        self.check_access(
-            resolver.loader(),
-            resolver.module_storage(),
-            AccessKind::Reads,
-            ty,
-            addr,
-        )?;
+        self.check_access(resolver, AccessKind::Reads, ty, addr)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
     }
@@ -891,13 +886,7 @@ impl Interpreter {
                     TypeWithLoader { ty, resolver },
                     Some(&resource),
                 )?;
-                self.check_access(
-                    resolver.loader(),
-                    resolver.module_storage(),
-                    AccessKind::Writes,
-                    ty,
-                    addr,
-                )?;
+                self.check_access(resolver, AccessKind::Writes, ty, addr)?;
                 resource
             },
             Err(err) => {
@@ -932,13 +921,7 @@ impl Interpreter {
                     gv.view().unwrap(),
                     true,
                 )?;
-                self.check_access(
-                    resolver.loader(),
-                    resolver.module_storage(),
-                    AccessKind::Writes,
-                    ty,
-                    addr,
-                )?;
+                self.check_access(resolver, AccessKind::Writes, ty, addr)?;
                 Ok(())
             },
             Err((err, resource)) => {
