@@ -4,7 +4,7 @@
 use aptos_framework::extended_checks;
 use aptos_types::account_address::AccountAddress;
 use move_cli::base::prove::run_move_prover;
-use move_model::metadata::{DEFAULT_COMPILER_VERSION_FOR_V2, DEFAULT_LANG_VERSION_FOR_V2};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::CompilerConfig;
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
@@ -29,8 +29,8 @@ pub fn run_prover_for_pkg(
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
         compiler_config: CompilerConfig {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            compiler_version: Some(DEFAULT_COMPILER_VERSION_FOR_V2),
-            language_version: Some(DEFAULT_LANG_VERSION_FOR_V2),
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            language_version: Some(LanguageVersion::latest_stable()),
             ..Default::default()
         },
         ..Default::default()
