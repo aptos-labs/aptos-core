@@ -290,7 +290,7 @@ enum Command {
         #[clap(long, default_value_t = 1000000)]
         num_accounts: usize,
 
-        #[clap(long, default_value_t = 10000000000)]
+        #[clap(long, default_value_t = 100_0000_0000_0000)]
         init_account_balance: u64,
 
         #[clap(

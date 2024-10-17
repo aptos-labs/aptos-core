@@ -49,19 +49,20 @@ if SOURCE not in ["ADHOC", "CI", "LOCAL"]:
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "20000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "200000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=300))
 NUM_BLOCKS_DETAILED = 10
-NUM_ACCOUNTS = max(
-    [
-        int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
-        (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
-    ]
-)
+NUM_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS))
+# NUM_ACCOUNTS = max(
+#     [
+#         int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
+#         (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
+#     ]
+# )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8

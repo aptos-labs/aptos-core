@@ -692,7 +692,7 @@ impl TransactionGenerator {
         if transactions.is_empty() {
             let val = phase.fetch_add(1, Ordering::Relaxed);
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
-            if val > last_generated_at + 5 {
+            if val > last_generated_at + 2 {
                 info!(
                     "Block generation: no transactions generated in phase {}, and since {}, ending execution",
                     val, last_generated_at
@@ -718,18 +718,7 @@ impl TransactionGenerator {
             .inc_by(transactions.len() as u64);
 
         if let Some(sender) = &self.block_sender {
-            loop {
-                match sender.try_send(transactions.clone()) {
-                    Ok(()) => break,
-                    Err(mpsc::TrySendError::Full(_)) => {
-                        info!("Block sender full, retrying after 10ms.");
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                    },
-                    Err(mpsc::TrySendError::Disconnected(_)) => {
-                        panic!("Block sender disconnected.");
-                    },
-                }
-            }
+            sender.send(transactions).unwrap();
         }
         false
     }
