@@ -1,69 +1,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::code::Code;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use std::{cell::RefCell, hash::Hash, ops::Deref, sync::Arc};
-
-/// An entry for the script cache that can be used by the code cache. Entries can live in cache in
-/// different representations.
-pub enum CachedScript<D, V> {
-    /// Deserialized script, not yet verified with bytecode verifier.
-    Deserialized(Arc<D>),
-    /// Verified script.
-    Verified(Arc<V>),
-}
-
-impl<D, V> CachedScript<D, V>
-where
-    V: Deref<Target = Arc<D>>,
-{
-    /// Returns new deserialized script.
-    pub fn deserialized(deserialized_script: D) -> Self {
-        Self::Deserialized(Arc::new(deserialized_script))
-    }
-
-    /// Returns new verified script.
-    pub fn verified(verified_script: V) -> Self {
-        Self::Verified(Arc::new(verified_script))
-    }
-
-    /// Returns true if the entry is verified.
-    pub fn is_verified(&self) -> bool {
-        match self {
-            Self::Deserialized(_) => false,
-            Self::Verified(_) => true,
-        }
-    }
-
-    /// Returns the deserialized script.
-    pub fn deserialized_script(&self) -> &Arc<D> {
-        match self {
-            Self::Deserialized(compiled_script) => compiled_script,
-            Self::Verified(script) => script.deref(),
-        }
-    }
-
-    /// Returns the verified script. Panics if the cached script has not been verified.
-    pub fn verified_script(&self) -> &Arc<V> {
-        match self {
-            Self::Deserialized(_) => {
-                unreachable!("This function must be called on verified scripts only")
-            },
-            Self::Verified(script) => script,
-        }
-    }
-}
-
-impl<D, V> Clone for CachedScript<D, V> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Deserialized(d) => Self::Deserialized(d.clone()),
-            Self::Verified(v) => Self::Verified(v.clone()),
-        }
-    }
-}
 
 /// Interface used by any script cache implementation.
 pub trait ScriptCache {
@@ -90,10 +32,7 @@ pub trait ScriptCache {
     ) -> Arc<Self::Verified>;
 
     /// Returns the script if it has been cached before, or [None] otherwise.
-    fn get_script(
-        &self,
-        key: &Self::Key,
-    ) -> Option<CachedScript<Self::Deserialized, Self::Verified>>;
+    fn get_script(&self, key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>>;
 
     /// Returns the number of scripts stored in cache.
     fn num_scripts(&self) -> usize;
@@ -101,7 +40,7 @@ pub trait ScriptCache {
 
 /// Non-[Sync] implementation of script cache suitable for single-threaded execution.
 pub struct UnsyncScriptCache<K, D, V> {
-    script_cache: RefCell<HashMap<K, CachedScript<D, V>>>,
+    script_cache: RefCell<HashMap<K, Code<D, V>>>,
 }
 
 impl<K, D, V> UnsyncScriptCache<K, D, V>
@@ -134,10 +73,10 @@ where
         use hashbrown::hash_map::Entry::*;
 
         match self.script_cache.borrow_mut().entry(key) {
-            Occupied(entry) => entry.get().deserialized_script().clone(),
+            Occupied(entry) => entry.get().deserialized().clone(),
             Vacant(entry) => entry
-                .insert(CachedScript::deserialized(deserialized_script))
-                .deserialized_script()
+                .insert(Code::from_deserialized(deserialized_script))
+                .deserialized()
                 .clone(),
         }
     }
@@ -152,25 +91,22 @@ where
         match self.script_cache.borrow_mut().entry(key) {
             Occupied(mut entry) => {
                 if !entry.get().is_verified() {
-                    let new_script = CachedScript::verified(verified_script);
-                    let verified_script = new_script.verified_script().clone();
+                    let new_script = Code::from_verified(verified_script);
+                    let verified_script = new_script.verified().clone();
                     entry.insert(new_script);
                     verified_script
                 } else {
-                    entry.get().verified_script().clone()
+                    entry.get().verified().clone()
                 }
             },
             Vacant(entry) => entry
-                .insert(CachedScript::verified(verified_script))
-                .verified_script()
+                .insert(Code::from_verified(verified_script))
+                .verified()
                 .clone(),
         }
     }
 
-    fn get_script(
-        &self,
-        key: &Self::Key,
-    ) -> Option<CachedScript<Self::Deserialized, Self::Verified>> {
+    fn get_script(&self, key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>> {
         self.script_cache.borrow().get(key).cloned()
     }
 
@@ -181,7 +117,7 @@ where
 
 /// [Sync] implementation of script cache suitable for multithreaded execution.
 pub struct SyncScriptCache<K, D, V> {
-    script_cache: DashMap<K, CachePadded<CachedScript<D, V>>>,
+    script_cache: DashMap<K, CachePadded<Code<D, V>>>,
 }
 
 impl<K, D, V> SyncScriptCache<K, D, V>
@@ -214,12 +150,12 @@ where
         use dashmap::mapref::entry::Entry::*;
 
         match self.script_cache.entry(key) {
-            Occupied(entry) => entry.get().deserialized_script().clone(),
+            Occupied(entry) => entry.get().deserialized().clone(),
             Vacant(entry) => entry
-                .insert(CachePadded::new(CachedScript::deserialized(
+                .insert(CachePadded::new(Code::from_deserialized(
                     deserialized_script,
                 )))
-                .deserialized_script()
+                .deserialized()
                 .clone(),
         }
     }
@@ -234,25 +170,22 @@ where
         match self.script_cache.entry(key) {
             Occupied(mut entry) => {
                 if !entry.get().is_verified() {
-                    let new_script = CachedScript::verified(verified_script);
-                    let verified_script = new_script.verified_script().clone();
+                    let new_script = Code::from_verified(verified_script);
+                    let verified_script = new_script.verified().clone();
                     entry.insert(CachePadded::new(new_script));
                     verified_script
                 } else {
-                    entry.get().verified_script().clone()
+                    entry.get().verified().clone()
                 }
             },
             Vacant(entry) => entry
-                .insert(CachePadded::new(CachedScript::verified(verified_script)))
-                .verified_script()
+                .insert(CachePadded::new(Code::from_verified(verified_script)))
+                .verified()
                 .clone(),
         }
     }
 
-    fn get_script(
-        &self,
-        key: &Self::Key,
-    ) -> Option<CachedScript<Self::Deserialized, Self::Verified>> {
+    fn get_script(&self, key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>> {
         let script = &**self.script_cache.get(key)?;
         Some(script.clone())
     }
@@ -265,56 +198,38 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::cache::types::{MockDeserializedCode, MockVerifiedCode};
     use claims::{assert_ok, assert_some};
     use std::collections::BTreeSet;
-
-    struct MockDeserializedScript(usize);
-
-    impl MockDeserializedScript {
-        fn value(&self) -> usize {
-            self.0
-        }
-    }
-
-    struct MockVerifiedScript(Arc<MockDeserializedScript>);
-
-    impl Deref for MockVerifiedScript {
-        type Target = Arc<MockDeserializedScript>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
 
     fn insert_deserialized_test_case(
         script_cache: &impl ScriptCache<
             Key = usize,
-            Deserialized = MockDeserializedScript,
-            Verified = MockVerifiedScript,
+            Deserialized = MockDeserializedCode,
+            Verified = MockVerifiedCode,
         >,
     ) {
         // New entries.
         let deserialized_script_1 =
-            script_cache.insert_deserialized_script(1, MockDeserializedScript(1));
+            script_cache.insert_deserialized_script(1, MockDeserializedCode::new(1));
         let deserialized_script_2 =
-            script_cache.insert_deserialized_script(2, MockDeserializedScript(2));
+            script_cache.insert_deserialized_script(2, MockDeserializedCode::new(2));
         assert_eq!(script_cache.num_scripts(), 2);
         assert_eq!(deserialized_script_1.value(), 1);
         assert_eq!(deserialized_script_2.value(), 2);
 
         // Script cache already stores a deserialized script.
         let deserialized_script =
-            script_cache.insert_deserialized_script(1, MockDeserializedScript(100));
+            script_cache.insert_deserialized_script(1, MockDeserializedCode::new(100));
         assert_eq!(script_cache.num_scripts(), 2);
         assert_eq!(deserialized_script.value(), 1);
 
-        script_cache
-            .insert_verified_script(3, MockVerifiedScript(Arc::new(MockDeserializedScript(3))));
+        script_cache.insert_verified_script(3, MockVerifiedCode::new(3));
         assert_eq!(script_cache.num_scripts(), 3);
 
         // Script cache already stores a verified script.
         let deserialized_script =
-            script_cache.insert_deserialized_script(3, MockDeserializedScript(300));
+            script_cache.insert_deserialized_script(3, MockDeserializedCode::new(300));
         assert_eq!(script_cache.num_scripts(), 3);
         assert_eq!(deserialized_script.value(), 3);
 
@@ -322,39 +237,35 @@ mod tests {
         let script_1 = assert_some!(script_cache.get_script(&1));
         let script_2 = assert_some!(script_cache.get_script(&2));
         let script_3 = assert_some!(script_cache.get_script(&3));
-        assert!(matches!(script_1, CachedScript::Deserialized(s) if s.value() == 1));
-        assert!(matches!(script_2, CachedScript::Deserialized(s) if s.value() == 2));
-        assert!(matches!(script_3, CachedScript::Verified(s) if s.value() == 3));
+        assert!(matches!(script_1, Code::Deserialized(s) if s.value() == 1));
+        assert!(matches!(script_2, Code::Deserialized(s) if s.value() == 2));
+        assert!(matches!(script_3, Code::Verified(s) if s.value() == 3));
     }
 
     fn insert_verified_test_case(
         script_cache: &impl ScriptCache<
             Key = usize,
-            Deserialized = MockDeserializedScript,
-            Verified = MockVerifiedScript,
+            Deserialized = MockDeserializedCode,
+            Verified = MockVerifiedCode,
         >,
     ) {
         // New entries.
-        let verified_script_1 = script_cache
-            .insert_verified_script(1, MockVerifiedScript(Arc::new(MockDeserializedScript(1))));
-        let verified_script_2 = script_cache
-            .insert_verified_script(2, MockVerifiedScript(Arc::new(MockDeserializedScript(2))));
+        let verified_script_1 = script_cache.insert_verified_script(1, MockVerifiedCode::new(1));
+        let verified_script_2 = script_cache.insert_verified_script(2, MockVerifiedCode::new(2));
         assert_eq!(script_cache.num_scripts(), 2);
         assert_eq!(verified_script_1.value(), 1);
         assert_eq!(verified_script_2.value(), 2);
 
         // Script cache already stores a verified script.
-        let verified_script = script_cache
-            .insert_verified_script(1, MockVerifiedScript(Arc::new(MockDeserializedScript(100))));
+        let verified_script = script_cache.insert_verified_script(1, MockVerifiedCode::new(100));
         assert_eq!(script_cache.num_scripts(), 2);
         assert_eq!(verified_script.value(), 1);
 
-        script_cache.insert_deserialized_script(3, MockDeserializedScript(300));
+        script_cache.insert_deserialized_script(3, MockDeserializedCode::new(300));
         assert_eq!(script_cache.num_scripts(), 3);
 
         // Script cache only has a deserialized script, it is fine to override it.
-        let verified_script = script_cache
-            .insert_verified_script(3, MockVerifiedScript(Arc::new(MockDeserializedScript(3))));
+        let verified_script = script_cache.insert_verified_script(3, MockVerifiedCode::new(3));
         assert_eq!(script_cache.num_scripts(), 3);
         assert_eq!(verified_script.value(), 3);
 
@@ -362,58 +273,30 @@ mod tests {
         let script_1 = assert_some!(script_cache.get_script(&1));
         let script_2 = assert_some!(script_cache.get_script(&2));
         let script_3 = assert_some!(script_cache.get_script(&3));
-        assert!(matches!(script_1, CachedScript::Verified(s) if s.value() == 1));
-        assert!(matches!(script_2, CachedScript::Verified(s) if s.value() == 2));
-        assert!(matches!(script_3, CachedScript::Verified(s) if s.value() == 3));
+        assert!(matches!(script_1, Code::Verified(s) if s.value() == 1));
+        assert!(matches!(script_2, Code::Verified(s) if s.value() == 2));
+        assert!(matches!(script_3, Code::Verified(s) if s.value() == 3));
     }
 
     fn test_get_script_test_case(
         script_cache: &impl ScriptCache<
             Key = usize,
-            Deserialized = MockDeserializedScript,
-            Verified = MockVerifiedScript,
+            Deserialized = MockDeserializedCode,
+            Verified = MockVerifiedCode,
         >,
     ) {
         assert_eq!(script_cache.num_scripts(), 0);
         assert!(script_cache.get_script(&1).is_none());
 
-        script_cache.insert_deserialized_script(1, MockDeserializedScript(1));
-        script_cache
-            .insert_verified_script(2, MockVerifiedScript(Arc::new(MockDeserializedScript(2))));
+        script_cache.insert_deserialized_script(1, MockDeserializedCode::new(1));
+        script_cache.insert_verified_script(2, MockVerifiedCode::new(2));
         assert_eq!(script_cache.num_scripts(), 2);
 
         let script_1 = assert_some!(script_cache.get_script(&1));
-        assert!(matches!(script_1, CachedScript::Deserialized(s) if s.value() == 1));
+        assert!(matches!(script_1, Code::Deserialized(s) if s.value() == 1));
 
         let script_2 = assert_some!(script_cache.get_script(&2));
-        assert!(matches!(script_2, CachedScript::Verified(s) if s.value() == 2));
-    }
-
-    #[test]
-    fn test_deserialized_cached_script() {
-        let script: CachedScript<_, MockVerifiedScript> =
-            CachedScript::deserialized(MockDeserializedScript(1));
-        assert!(!script.is_verified());
-        assert_eq!(script.deserialized_script().value(), 1);
-        assert!(matches!(script, CachedScript::Deserialized(..)));
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_deserialized_cached_script_panics() {
-        let script: CachedScript<_, MockVerifiedScript> =
-            CachedScript::deserialized(MockDeserializedScript(1));
-        script.verified_script();
-    }
-
-    #[test]
-    fn test_verified_cached_script() {
-        let script =
-            CachedScript::verified(MockVerifiedScript(Arc::new(MockDeserializedScript(1))));
-        assert!(script.is_verified());
-        assert_eq!(script.deserialized_script().value(), 1);
-        assert_eq!(script.verified_script().value(), 1);
-        assert!(matches!(script, CachedScript::Verified(..)));
+        assert!(matches!(script_2, Code::Verified(s) if s.value() == 2));
     }
 
     #[test]
@@ -436,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_sync_insert_deserialized_multithreaded() {
-        let script_cache = Arc::new(SyncScriptCache::<usize, _, MockVerifiedScript>::empty());
+        let script_cache = Arc::new(SyncScriptCache::<usize, _, MockVerifiedCode>::empty());
         let key = 1;
 
         // Each thread tries to cache the same script.
@@ -446,7 +329,7 @@ mod tests {
                 let script_cache = script_cache.clone();
                 move || {
                     script_cache
-                        .insert_deserialized_script(key, MockDeserializedScript(i))
+                        .insert_deserialized_script(key, MockDeserializedCode::new(i))
                         .value()
                 }
             });
@@ -465,7 +348,7 @@ mod tests {
 
         assert_eq!(script_cache.num_scripts(), 1);
         let script = assert_some!(script_cache.get_script(&key));
-        assert!(matches!(script, CachedScript::Deserialized(s) if s.value() == value));
+        assert!(matches!(script, Code::Deserialized(s) if s.value() == value));
     }
 
     #[test]
@@ -481,11 +364,10 @@ mod tests {
                     // Have one thread caching verified script. This script should be in the final
                     // cache.
                     if i == 8 {
-                        let verified_script =
-                            MockVerifiedScript(Arc::new(MockDeserializedScript(i)));
+                        let verified_script = MockVerifiedCode::new(i);
                         script_cache.insert_verified_script(key, verified_script);
                     } else {
-                        script_cache.insert_deserialized_script(key, MockDeserializedScript(i));
+                        script_cache.insert_deserialized_script(key, MockDeserializedCode::new(i));
                     }
                 }
             });
@@ -498,6 +380,6 @@ mod tests {
 
         assert_eq!(script_cache.num_scripts(), 1);
         let script = assert_some!(script_cache.get_script(&key));
-        assert!(matches!(script, CachedScript::Verified(s) if s.value() == 8));
+        assert!(matches!(script, Code::Verified(s) if s.value() == 8));
     }
 }

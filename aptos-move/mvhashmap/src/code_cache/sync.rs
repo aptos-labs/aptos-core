@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::VersionedModule;
+use crate::types::{TxnIndex, VersionedModule};
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use hashbrown::HashMap;
 use move_vm_types::code::ModuleCache;
-use std::{hash::Hash, ops::Deref, sync::Arc};
+use std::{hash::Hash, mem, ops::Deref, sync::Arc};
 
 /// A per-block module cache to be used for parallel transaction execution.
 pub struct SyncModuleCache<K, M> {
@@ -34,14 +34,24 @@ where
         self.cache.contains_key(key)
     }
 
-    /// Returns true if the module cache contains an entry that satisfies the predicate.
-    pub fn contains_and<P>(&self, key: &K, p: P) -> bool
-    where
-        P: FnOnce(&VersionedModule<M>) -> bool,
-    {
-        self.cache
-            .get(key)
-            .is_some_and(|current| p(current.value()))
+    /// Returns the version of the module the cache contains. Returns [None] if cache does not have
+    /// the module.
+    pub fn get_module_version(&self, key: &K) -> Option<Option<TxnIndex>> {
+        self.cache.get(key).map(|module| module.version())
+    }
+
+    pub(crate) fn take_modules_iter(&mut self) -> impl Iterator<Item = (K, M)> {
+        // TODO(loader_v2): Use panic error instead?
+        mem::take(&mut self.cache)
+            .into_iter()
+            .map(|(key, versioned_module)| {
+                (
+                    key,
+                    Arc::into_inner(versioned_module.into_inner())
+                        .expect("Should be uniquely owned")
+                        .into_module(),
+                )
+            })
     }
 
     pub fn filter_into<T, P, F>(&self, collector: &mut HashMap<K, T>, p: P, f: F)

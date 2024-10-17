@@ -587,21 +587,19 @@ where
                     ),
                 )?;
 
-                // Make sure we publish modules here before we wake up subsequent dependent
-                // transactions and decrease the validation index so that they observe new module
-                // writes as well.
+                // Publish modules before we decrease validation index so that validations observe
+                // the new module writes as well.
                 if runtime_environment.vm_config().use_loader_v2 {
-                    if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
-                        if !module_write_set.is_empty() {
-                            executed_at_commit = true;
-                            Self::publish_module_writes(
-                                txn_idx,
-                                module_write_set,
-                                versioned_cache,
-                                scheduler,
-                                runtime_environment,
-                            )?;
-                        }
+                    let module_write_set = last_input_output.module_write_set(txn_idx);
+                    if !module_write_set.is_empty() {
+                        executed_at_commit = true;
+                        Self::publish_module_writes(
+                            txn_idx,
+                            module_write_set,
+                            versioned_cache,
+                            scheduler,
+                            runtime_environment,
+                        )?;
                     }
                 }
 
@@ -629,17 +627,16 @@ where
             // re-execution, we make the published modules visible here. As a result, we need to
             // decrease the validation index to make sure the subsequent transactions see changes.
             if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
-                if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
-                    if !module_write_set.is_empty() {
-                        Self::publish_module_writes(
-                            txn_idx,
-                            module_write_set,
-                            versioned_cache,
-                            scheduler,
-                            runtime_environment,
-                        )?;
-                        scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
-                    }
+                let module_write_set = last_input_output.module_write_set(txn_idx);
+                if !module_write_set.is_empty() {
+                    Self::publish_module_writes(
+                        txn_idx,
+                        module_write_set,
+                        versioned_cache,
+                        scheduler,
+                        runtime_environment,
+                    )?;
+                    scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
                 }
             }
 
@@ -1048,7 +1045,7 @@ where
             "Must use sequential execution"
         );
 
-        let versioned_cache = MVHashMap::new();
+        let mut versioned_cache = MVHashMap::new();
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
@@ -1121,9 +1118,12 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
-        CrossBlockModuleCache::populate_from_sync_code_cache_at_block_end(
-            versioned_cache.module_cache(),
-        );
+        CrossBlockModuleCache::populate_from_code_cache_at_block_end(
+            versioned_cache.take_modules_iter(),
+        )
+        .map_err(|err| {
+            alert!("[BlockSTM] Encountered panic error: {:?}", err);
+        })?;
 
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1539,9 +1539,9 @@ where
         ret.resize_with(num_txns, E::Output::skip_output);
 
         counters::update_state_counters(unsync_map.stats(), false);
-        CrossBlockModuleCache::populate_from_unsync_code_cache_at_block_end(
+        CrossBlockModuleCache::populate_from_code_cache_at_block_end(
             unsync_map.into_modules_iter(),
-        );
+        )?;
 
         let block_end_info = if self
             .config
