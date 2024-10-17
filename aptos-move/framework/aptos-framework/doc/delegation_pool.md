@@ -2976,18 +2976,18 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
                 should_pass,
             }
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> governance_records.vote_events,
+            <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> {
+                voter: voter_address,
+                proposal_id,
+                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
+                num_votes: voting_power,
+                should_pass,
+            }
+        );
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> governance_records.vote_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> {
-            voter: voter_address,
-            proposal_id,
-            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-            num_votes: voting_power,
-            should_pass,
-        }
-    );
 }
 </code></pre>
 
@@ -3053,16 +3053,16 @@ voting power in THIS delegation pool must be not less than the minimum required 
                 <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
             }
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> governance_records.create_proposal_events,
+            <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> {
+                proposal_id,
+                voter: voter_addr,
+                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
+            }
+        );
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> governance_records.create_proposal_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> {
-            proposal_id,
-            voter: voter_addr,
-            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-        }
-    );
 }
 </code></pre>
 
@@ -4020,13 +4020,13 @@ this change won't take effects until the next lockup period.
             delegator: delegator_address,
             voter: new_voter,
         })
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> governance_records.delegate_voting_power_events, <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> {
+            pool_address,
+            delegator: delegator_address,
+            voter: new_voter,
+        });
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> governance_records.delegate_voting_power_events, <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> {
-        pool_address,
-        delegator: delegator_address,
-        voter: new_voter,
-    });
 }
 </code></pre>
 
@@ -4277,17 +4277,17 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
                 add_stake_fee,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> pool.add_stake_events,
+            <a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">AddStakeEvent</a> {
+                pool_address,
+                delegator_address,
+                amount_added: amount,
+                add_stake_fee,
+            },
+        );
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> pool.add_stake_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">AddStakeEvent</a> {
-            pool_address,
-            delegator_address,
-            amount_added: amount,
-            add_stake_fee,
-        },
-    );
 }
 </code></pre>
 
@@ -4380,16 +4380,16 @@ at most how much active stake there is on the stake pool.
                 amount_unlocked: amount,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> pool.unlock_stake_events,
+            <a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">UnlockStakeEvent</a> {
+                pool_address,
+                delegator_address,
+                amount_unlocked: amount,
+            },
+        );
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> pool.unlock_stake_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">UnlockStakeEvent</a> {
-            pool_address,
-            delegator_address,
-            amount_unlocked: amount,
-        },
-    );
 }
 </code></pre>
 
@@ -4450,16 +4450,16 @@ Move <code>amount</code> of coins from pending_inactive to active.
                 amount_reactivated: amount,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> pool.reactivate_stake_events,
+            <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">ReactivateStakeEvent</a> {
+                pool_address,
+                delegator_address,
+                amount_reactivated: amount,
+            },
+        );
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> pool.reactivate_stake_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">ReactivateStakeEvent</a> {
-            pool_address,
-            delegator_address,
-            amount_reactivated: amount,
-        },
-    );
 }
 </code></pre>
 
@@ -4575,16 +4575,16 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
                 amount_withdrawn: amount,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> pool.withdraw_stake_events,
+            <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">WithdrawStakeEvent</a> {
+                pool_address,
+                delegator_address,
+                amount_withdrawn: amount,
+            },
+        );
     };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> pool.withdraw_stake_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">WithdrawStakeEvent</a> {
-            pool_address,
-            delegator_address,
-            amount_withdrawn: amount,
-        },
-    );
 }
 </code></pre>
 

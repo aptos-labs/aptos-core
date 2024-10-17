@@ -155,10 +155,11 @@ module aptos_framework::aptos_account {
 
             if (std::features::module_event_migration_enabled()) {
                 emit(DirectCoinTransferConfigUpdated { account: addr, new_allow_direct_transfers: allow });
+            } else {
+                emit_event(
+                    &mut direct_transfer_config.update_coin_transfer_events,
+                    DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });
             };
-            emit_event(
-                &mut direct_transfer_config.update_coin_transfer_events,
-                DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });
         } else {
             let direct_transfer_config = DirectTransferConfig {
                 allow_arbitrary_coin_transfers: allow,
@@ -166,10 +167,11 @@ module aptos_framework::aptos_account {
             };
             if (std::features::module_event_migration_enabled()) {
                 emit(DirectCoinTransferConfigUpdated { account: addr, new_allow_direct_transfers: allow });
+            } else {
+                emit_event(
+                    &mut direct_transfer_config.update_coin_transfer_events,
+                    DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });
             };
-            emit_event(
-                &mut direct_transfer_config.update_coin_transfer_events,
-                DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });
             move_to(account, direct_transfer_config);
         };
     }

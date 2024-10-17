@@ -240,16 +240,17 @@ module aptos_framework::aptos_governance {
                     voting_duration_secs
                 },
             )
+        } else {
+            let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
+            event::emit_event<UpdateConfigEvent>(
+                &mut events.update_config_events,
+                UpdateConfigEvent {
+                    min_voting_threshold,
+                    required_proposer_stake,
+                    voting_duration_secs
+                },
+            );
         };
-        let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
-        event::emit_event<UpdateConfigEvent>(
-            &mut events.update_config_events,
-            UpdateConfigEvent {
-                min_voting_threshold,
-                required_proposer_stake,
-                voting_duration_secs
-            },
-        );
     }
 
     /// Initializes the state for Aptos Governance partial voting. Can only be called through Aptos governance
@@ -434,18 +435,19 @@ module aptos_framework::aptos_governance {
                     proposal_metadata,
                 },
             );
+        } else {
+            let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
+            event::emit_event<CreateProposalEvent>(
+                &mut events.create_proposal_events,
+                CreateProposalEvent {
+                    proposal_id,
+                    proposer: proposer_address,
+                    stake_pool,
+                    execution_hash,
+                    proposal_metadata,
+                },
+            );
         };
-        let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
-        event::emit_event<CreateProposalEvent>(
-            &mut events.create_proposal_events,
-            CreateProposalEvent {
-                proposal_id,
-                proposer: proposer_address,
-                stake_pool,
-                execution_hash,
-                proposal_metadata,
-            },
-        );
         proposal_id
     }
 
@@ -562,18 +564,19 @@ module aptos_framework::aptos_governance {
                     should_pass,
                 },
             );
+        } else {
+            let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
+            event::emit_event<VoteEvent>(
+                &mut events.vote_events,
+                VoteEvent {
+                    proposal_id,
+                    voter: voter_address,
+                    stake_pool,
+                    num_votes: voting_power,
+                    should_pass,
+                },
+            );
         };
-        let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
-        event::emit_event<VoteEvent>(
-            &mut events.vote_events,
-            VoteEvent {
-                proposal_id,
-                voter: voter_address,
-                stake_pool,
-                num_votes: voting_power,
-                should_pass,
-            },
-        );
 
         let proposal_state = voting::get_proposal_state<GovernanceProposal>(@aptos_framework, proposal_id);
         if (proposal_state == PROPOSAL_STATE_SUCCEEDED) {

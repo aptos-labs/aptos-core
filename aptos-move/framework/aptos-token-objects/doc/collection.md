@@ -1222,13 +1222,14 @@ Called by token on mint to increment supply if there's an appropriate Supply str
                     <a href="token.md#0x4_token">token</a>,
                 },
             );
+        } <b>else</b> {
+            <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> supply.mint_events,
+                <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
+                    index: supply.total_minted,
+                    <a href="token.md#0x4_token">token</a>,
+                },
+            );
         };
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> supply.mint_events,
-            <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
-                index: supply.total_minted,
-                <a href="token.md#0x4_token">token</a>,
-            },
-        );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>&lt;u64&gt;(supply.total_minted))
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr)) {
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr);
@@ -1242,14 +1243,15 @@ Called by token on mint to increment supply if there's an appropriate Supply str
                     <a href="token.md#0x4_token">token</a>,
                 },
             );
+        } <b>else</b> {
+            <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+                &<b>mut</b> supply.mint_events,
+                <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
+                    index: supply.total_minted,
+                    <a href="token.md#0x4_token">token</a>,
+                },
+            );
         };
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> supply.mint_events,
-            <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
-                index: supply.total_minted,
-                <a href="token.md#0x4_token">token</a>,
-            },
-        );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>&lt;u64&gt;(supply.total_minted))
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -1308,14 +1310,15 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
                     previous_owner,
                 },
             );
+        } <b>else</b> {
+            <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+                &<b>mut</b> supply.burn_events,
+                <a href="collection.md#0x4_collection_BurnEvent">BurnEvent</a> {
+                    index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
+                    <a href="token.md#0x4_token">token</a>,
+                },
+            );
         };
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> supply.burn_events,
-            <a href="collection.md#0x4_collection_BurnEvent">BurnEvent</a> {
-                index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
-                <a href="token.md#0x4_token">token</a>,
-            },
-        );
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr)) {
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr);
         supply.current_supply = supply.current_supply - 1;
@@ -1328,14 +1331,15 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
                     previous_owner,
                 },
             );
+        } <b>else</b> {
+            <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+                &<b>mut</b> supply.burn_events,
+                <a href="collection.md#0x4_collection_BurnEvent">BurnEvent</a> {
+                    index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
+                    <a href="token.md#0x4_token">token</a>,
+                },
+            );
         };
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> supply.burn_events,
-            <a href="collection.md#0x4_collection_BurnEvent">BurnEvent</a> {
-                index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
-                <a href="token.md#0x4_token">token</a>,
-            },
-        );
     }
 }
 </code></pre>
@@ -1718,6 +1722,7 @@ After changing the collection's name, to create tokens - only call functions tha
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_description">set_description</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, description: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&description) &lt;= <a href="collection.md#0x4_collection_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_EDESCRIPTION_TOO_LONG">EDESCRIPTION_TOO_LONG</a>));
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="collection.md#0x4_collection_borrow_mut">borrow_mut</a>(mutator_ref);
+    <a href="collection.md#0x4_collection">collection</a>.description = description;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="collection.md#0x4_collection_Mutation">Mutation</a> {
             mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"description"),
@@ -1725,12 +1730,12 @@ After changing the collection's name, to create tokens - only call functions tha
             old_value: <a href="collection.md#0x4_collection">collection</a>.description,
             new_value: description,
         });
+    } <b>else</b> {
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="collection.md#0x4_collection">collection</a>.mutation_events,
+            <a href="collection.md#0x4_collection_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"description") },
+        );
     };
-    <a href="collection.md#0x4_collection">collection</a>.description = description;
-    <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="collection.md#0x4_collection">collection</a>.mutation_events,
-        <a href="collection.md#0x4_collection_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"description") },
-    );
 }
 </code></pre>
 
@@ -1756,6 +1761,7 @@ After changing the collection's name, to create tokens - only call functions tha
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_uri">set_uri</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, uri: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&uri) &lt;= <a href="collection.md#0x4_collection_MAX_URI_LENGTH">MAX_URI_LENGTH</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_EURI_TOO_LONG">EURI_TOO_LONG</a>));
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="collection.md#0x4_collection_borrow_mut">borrow_mut</a>(mutator_ref);
+    <a href="collection.md#0x4_collection">collection</a>.uri = uri;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="collection.md#0x4_collection_Mutation">Mutation</a> {
             mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri"),
@@ -1763,12 +1769,12 @@ After changing the collection's name, to create tokens - only call functions tha
             old_value: <a href="collection.md#0x4_collection">collection</a>.uri,
             new_value: uri,
         });
+    } <b>else</b> {
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="collection.md#0x4_collection">collection</a>.mutation_events,
+            <a href="collection.md#0x4_collection_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri") },
+        );
     };
-    <a href="collection.md#0x4_collection">collection</a>.uri = uri;
-    <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="collection.md#0x4_collection">collection</a>.mutation_events,
-        <a href="collection.md#0x4_collection_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri") },
-    );
 }
 </code></pre>
 
