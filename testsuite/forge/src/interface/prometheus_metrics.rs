@@ -241,9 +241,9 @@ pub async fn fetch_latency_breakdown(
         // These are processor latencies for both original core processors and those written with the processor SDK: https://github.com/aptos-labs/aptos-indexer-processor-sdk
         // Note the use of empty {}, where additional test-specific labels will be added by Forge
         let indexer_processor_latency_query =
-            r#"max by (processor_name) (indexer_processor_data_processed_latency_in_secs{})"#;
+            r#"max(indexer_processor_data_processed_latency_in_secs{})"#;
         let indexer_sdk_processor_latency_query =
-            "max by (step_name) (aptos_procsdk_step__processed_transaction_latency_secs{})";
+            "max(aptos_procsdk_step__processed_transaction_latency_secs{})";
 
         let indexer_fullnode_processed_batch_samples = swarm
             .query_range_metrics(
