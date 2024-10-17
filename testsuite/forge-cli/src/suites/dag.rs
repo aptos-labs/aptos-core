@@ -60,7 +60,7 @@ fn dag_realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 50000,

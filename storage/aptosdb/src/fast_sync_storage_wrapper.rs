@@ -176,7 +176,7 @@ impl DbWriter for FastSyncStorageWrapper {
         base_state_version: Option<Version>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        state_updates_until_last_checkpoint: Option<&ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         self.get_aptos_db_write_ref().pre_commit_ledger(

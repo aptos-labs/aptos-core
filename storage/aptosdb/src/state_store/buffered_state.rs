@@ -154,7 +154,7 @@ impl BufferedState {
     /// This method updates the buffered state with new data.
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
+        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
         new_state_after_checkpoint: StateDelta,
         sync_commit: bool,
     ) -> Result<()> {

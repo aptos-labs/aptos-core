@@ -724,13 +724,18 @@ impl<'env> SpecTranslator<'env> {
                 // Single-element sequence is just a wrapped value.
                 self.translate_exp(exp_vec.first().expect("list has an element"));
             },
-            ExpData::Return(..)
-            | ExpData::Sequence(..)
-            | ExpData::Loop(..)
-            | ExpData::Assign(..)
-            | ExpData::Mutate(..)
-            | ExpData::SpecBlock(..)
-            | ExpData::LoopCont(..) => panic!("imperative expressions not supported"),
+            ExpData::Return(id, ..)
+            | ExpData::Sequence(id, ..)
+            | ExpData::Loop(id, ..)
+            | ExpData::Assign(id, ..)
+            | ExpData::Mutate(id, ..)
+            | ExpData::SpecBlock(id, ..)
+            | ExpData::LoopCont(id, ..) => {
+                self.env.error(
+                    &self.env.get_node_loc(*id),
+                    "imperative expressions not supported in specs",
+                );
+            },
         }
     }
 
@@ -991,15 +996,31 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_call(node_id, oper, &[args[args.len() - 1].clone()]);
                 emit!(self.writer, &")".repeat(count));
             },
+            Operation::Abort => {
+                let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+                emit!(
+                    self.writer,
+                    &format!(
+                        "$Arbitrary_value_of'{}'()",
+                        boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+                    )
+                );
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::Abort
             | Operation::Old => {
-                panic!("operation unexpected: {}", oper.display(self.env, node_id))
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    &format!(
+                        "bug: operation {} is not supported \
+                in the current context",
+                        oper.display(self.env, node_id)
+                    ),
+                );
             },
         }
     }

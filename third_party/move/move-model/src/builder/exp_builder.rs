@@ -3054,10 +3054,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        if !self.parent.check_no_variant(maccess) {
+        let (no_variant, maccess) = self.parent.check_no_variant_and_convert_maccess(maccess);
+        if !no_variant {
             return self.new_error_exp();
         }
-        let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
+        let (module_name, name, _) = self.parent.module_access_to_parts(&maccess);
 
         // Process `old(E)` scoping
         let is_old =
