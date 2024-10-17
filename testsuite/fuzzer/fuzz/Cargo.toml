@@ -41,8 +41,25 @@ path = "fuzz_targets/move/bytecode_verifier_mixed.rs"
 test = false
 doc = false
 
-#[[bin]]
-#name = "move_value_deserialize"
+[[bin]]
+name = "move_aptosvm_publish_and_run"
+path = "fuzz_targets/move/aptosvm_publish_and_run.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_aptosvm_publish"
+path = "fuzz_targets/move/aptosvm_publish.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_aptosvm_authenticators"
+path = "fuzz_targets/move/aptosvm_authenticators.rs"
+test = false
+doc = false
+
+#[[bin]]#name = "move_value_deserialize"
 #path = "fuzz_targets/move/value_deserialize.rs"
 #test = false
 #doc = false
@@ -68,21 +85,3 @@ doc = false
 #test = false
 #doc = false
 #required-features = ["disabled"]
-
-[[bin]]
-name = "move_aptosvm_publish_and_run"
-path = "fuzz_targets/move/aptosvm_publish_and_run.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "move_aptosvm_publish"
-path = "fuzz_targets/move/aptosvm_publish.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "move_aptosvm_authenticators"
-path = "fuzz_targets/move/aptosvm_authenticators.rs"
-test = false
-doc = false
