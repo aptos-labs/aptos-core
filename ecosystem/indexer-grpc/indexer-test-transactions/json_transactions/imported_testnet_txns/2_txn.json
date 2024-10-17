@@ -1,0 +1,128 @@
+{
+  "timestamp": {
+    "seconds": "1662686657",
+    "nanos": 332551000
+  },
+  "version": "2",
+  "info": {
+    "hash": "SsoNQKOBgAio6uhktBo/4d5fcJXq9G54n8LrnutVO2Y=",
+    "stateChangeHash": "DuRumQT500xtevY2M6uxcF4eEy3+JdSVqYw4il6LpFc=",
+    "eventRootHash": "YkVwDmErwHmygLUAbEOjqtOD4yHXwEvXw7PrcMHCttc=",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "eeJ/lMn9FILk1P2HB4gbw4BsU7gMRKUkHMYdXgkVNlg=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
+          "type": {
+            "address": "0x1",
+            "module": "block",
+            "name": "BlockResource"
+          },
+          "typeStr": "0x1::block::BlockResource",
+          "data": "{\"epoch_interval\":\"7200000000\",\"height\":\"2\",\"new_block_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"3\"}}},\"update_epoch_interval_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"4\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "gEjJVCIYFLBFM6nwqZRsOo1HKsYt9azLn0fAl+JW6LY=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorPerformance"
+          },
+          "typeStr": "0x1::stake::ValidatorPerformance",
+          "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"},{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"},{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"},{\"failed_proposals\":\"0\",\"successful_proposals\":\"1\"}]}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "exYVvwEtPJQiPz92KH7i973zHTZAcRKLJWrv8IQbYm0=",
+          "type": {
+            "address": "0x1",
+            "module": "timestamp",
+            "name": "CurrentTimeMicroseconds"
+          },
+          "typeStr": "0x1::timestamp::CurrentTimeMicroseconds",
+          "data": "{\"microseconds\":\"1662686657332551\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "rLamyj9FTcXOT+7oZEgHwwg1WcI7RCxO2qR8/D4viSk=",
+          "type": {
+            "address": "0x1",
+            "module": "state_storage",
+            "name": "StateStorageUsage"
+          },
+          "typeStr": "0x1::state_storage::StateStorageUsage",
+          "data": "{\"epoch\":\"2\",\"usage\":{\"bytes\":\"273204\",\"items\":\"128\"}}"
+        }
+      }
+    ]
+  },
+  "epoch": "2",
+  "blockHeight": "2",
+  "type": "TRANSACTION_TYPE_BLOCK_METADATA",
+  "sizeInfo": {
+    "transactionBytes": 92,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 54,
+        "totalBytes": 201
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 88,
+        "valueBytes": 112
+      },
+      {
+        "keyBytes": 95,
+        "valueBytes": 65
+      },
+      {
+        "keyBytes": 102,
+        "valueBytes": 8
+      },
+      {
+        "keyBytes": 100,
+        "valueBytes": 24
+      }
+    ]
+  },
+  "blockMetadata": {
+    "id": "0x7155ede2ab87b66e7beba3210b43367eb90daff8891d44ed05eed20a71b9b55a",
+    "round": "1",
+    "events": [
+      {
+        "key": {
+          "creationNumber": "3",
+          "accountAddress": "0x1"
+        },
+        "sequenceNumber": "2",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "block",
+            "name": "NewBlockEvent"
+          }
+        },
+        "typeStr": "0x1::block::NewBlockEvent",
+        "data": "{\"epoch\":\"2\",\"failed_proposer_indices\":[],\"hash\":\"0x7155ede2ab87b66e7beba3210b43367eb90daff8891d44ed05eed20a71b9b55a\",\"height\":\"2\",\"previous_block_votes_bitvec\":\"0x00\",\"proposer\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"round\":\"1\",\"time_microseconds\":\"1662686657332551\"}"
+      }
+    ],
+    "previousBlockVotesBitvec": "AA==",
+    "proposer": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f"
+  }
+}
