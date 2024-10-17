@@ -259,11 +259,6 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
-        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
-            if indexer_reader.is_internal_indexer_enabled() {
-                return self.get_latest_internal_indexer_ledger_info();
-            }
-        }
         self.get_latest_storage_ledger_info()
     }
 
