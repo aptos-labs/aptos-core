@@ -812,11 +812,12 @@ module aptos_framework::coin {
                 event::emit(
                     CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value }
                 );
+            } else {
+                event::emit_event<DepositEvent>(
+                    &mut coin_store.deposit_events,
+                    DepositEvent { amount: coin.value },
+                );
             };
-            event::emit_event<DepositEvent>(
-                &mut coin_store.deposit_events,
-                DepositEvent { amount: coin.value },
-            );
             merge(&mut coin_store.coin, coin);
         } else {
             let metadata = paired_metadata<CoinType>();
@@ -1096,11 +1097,12 @@ module aptos_framework::coin {
                         coin_type: type_name<CoinType>(), account: account_addr, amount: coin_amount_to_withdraw
                     }
                 );
+            } else {
+                event::emit_event<WithdrawEvent>(
+                    &mut coin_store.withdraw_events,
+                    WithdrawEvent { amount: coin_amount_to_withdraw },
+                );
             };
-            event::emit_event<WithdrawEvent>(
-                &mut coin_store.withdraw_events,
-                WithdrawEvent { amount: coin_amount_to_withdraw },
-            );
             extract(&mut coin_store.coin, coin_amount_to_withdraw)
         } else {
             zero()
