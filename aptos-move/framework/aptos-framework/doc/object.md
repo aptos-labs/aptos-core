@@ -1897,15 +1897,16 @@ Transfer to the destination address using a LinearTransferRef.
                 <b>to</b>,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
+            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                <a href="object.md#0x1_object">object</a>: ref.self,
+                from: <a href="object.md#0x1_object">object</a>.owner,
+                <b>to</b>,
+            },
+        );
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
-        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-            <a href="object.md#0x1_object">object</a>: ref.self,
-            from: <a href="object.md#0x1_object">object</a>.owner,
-            <b>to</b>,
-        },
-    );
     <a href="object.md#0x1_object">object</a>.owner = <b>to</b>;
 }
 </code></pre>
@@ -2033,15 +2034,16 @@ hierarchy.
                     <b>to</b>,
                 },
             );
+        } <b>else</b> {
+            <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+                &<b>mut</b> object_core.transfer_events,
+                <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                    <a href="object.md#0x1_object">object</a>,
+                    from: object_core.owner,
+                    <b>to</b>,
+                },
+            );
         };
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> object_core.transfer_events,
-            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-                <a href="object.md#0x1_object">object</a>,
-                from: object_core.owner,
-                <b>to</b>,
-            },
-        );
         object_core.owner = <b>to</b>;
     };
 }
@@ -2444,33 +2446,6 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_user_derived_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_guid_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
 </code></pre>
 
 
@@ -3396,6 +3371,33 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_user_derived_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_guid_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
 </code></pre>
 
 
