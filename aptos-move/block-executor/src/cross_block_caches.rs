@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_mvhashmap::code_cache::SyncCodeCache;
+use aptos_mvhashmap::code_cache::SyncModuleCache;
 use aptos_types::{
     state_store::{state_value::StateValueMetadata, StateView},
     vm::modules::ModuleCacheEntry,
@@ -19,7 +19,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata, vm_status::VMStatus,
 };
-use move_vm_runtime::{CachedScript, Module, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, WithRuntimeEnvironment};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::sync::{
@@ -166,14 +166,14 @@ impl CrossBlockModuleCache {
     /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
     /// cache if its size is too large. Should only be called at block end.
     pub(crate) fn populate_from_sync_code_cache_at_block_end(
-        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript>,
+        module_cache: &SyncModuleCache<ModuleId, ModuleCacheEntry>,
     ) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
             cache.clear();
         }
 
-        code_cache.module_cache().filter_into(
+        module_cache.filter_into(
             cache.dereference_mut(),
             |e| e.is_verified(),
             |e| CrossBlockModuleCacheEntry::new(e.clone()),

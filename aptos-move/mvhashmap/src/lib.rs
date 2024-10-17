@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache::SyncCodeCache, versioned_data::VersionedData,
+    code_cache::SyncModuleCache, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
     versioned_modules::VersionedModules,
 };
@@ -12,8 +12,10 @@ use aptos_types::{
     vm::modules::ModuleCacheEntry,
     write_set::TransactionWrite,
 };
+use move_binary_format::file_format::CompiledScript;
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::CachedScript;
+use move_vm_runtime::Script;
+use move_vm_types::code::SyncScriptCache;
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
 
@@ -43,7 +45,8 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 
-    code_cache: SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript>,
+    module_cache: SyncModuleCache<ModuleId, ModuleCacheEntry>,
+    script_cache: SyncScriptCache<[u8; 32], CompiledScript, Script>,
 }
 
 impl<
@@ -64,7 +67,8 @@ impl<
             delayed_fields: VersionedDelayedFields::empty(),
             modules: VersionedModules::empty(),
 
-            code_cache: SyncCodeCache::empty(),
+            module_cache: SyncModuleCache::empty(),
+            script_cache: SyncScriptCache::empty(),
         }
     }
 
@@ -73,7 +77,7 @@ impl<
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules: self.modules.num_keys() + self.code_cache.module_cache().num_modules(),
+            num_modules: self.modules.num_keys() + self.module_cache.num_modules(),
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -98,8 +102,12 @@ impl<
         &self.modules
     }
 
-    pub fn code_cache(&self) -> &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript> {
-        &self.code_cache
+    pub fn module_cache(&self) -> &SyncModuleCache<ModuleId, ModuleCacheEntry> {
+        &self.module_cache
+    }
+
+    pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], CompiledScript, Script> {
+        &self.script_cache
     }
 }
 

@@ -11,7 +11,7 @@ use aptos_aggregator::{
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_mvhashmap::{
-    code_cache::SyncCodeCache,
+    code_cache::SyncModuleCache,
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
         ValueWithLayout, Version, VersionedModule,
@@ -36,7 +36,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata, value::MoveTypeLayout,
 };
-use move_vm_runtime::{CachedScript, Module};
+use move_vm_runtime::Module;
 use std::{
     collections::{
         hash_map::{
@@ -734,7 +734,7 @@ impl<T: Transaction> CapturedReads<T> {
     ///   3. Entries that were in block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
-        code_cache: &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript>,
+        module_cache: &SyncModuleCache<ModuleId, ModuleCacheEntry>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
             return false;
@@ -743,10 +743,10 @@ impl<T: Transaction> CapturedReads<T> {
         self.module_reads.iter().all(|(id, read)| match read {
             ModuleRead::GlobalCache => CrossBlockModuleCache::is_valid(id),
             ModuleRead::PerBlockCache(previous) => match previous {
-                Some(previous) => code_cache
-                    .module_cache()
-                    .contains_and(id, |m| m.version() == previous.version()),
-                None => !code_cache.module_cache().contains(id),
+                Some(previous) => {
+                    module_cache.contains_and(id, |m| m.version() == previous.version())
+                },
+                None => !module_cache.contains(id),
             },
         })
     }
@@ -1532,11 +1532,11 @@ mod test {
         let mvhashmap =
             MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
 
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
         captured_reads.mark_failure(true);
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
         captured_reads.mark_failure(false);
-        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
     }
 
     #[test]
@@ -1573,20 +1573,20 @@ mod test {
         CrossBlockModuleCache::add_to_to_cross_block_module_cache(bar_id.clone(), bar_entry);
         captured_reads.capture_global_cache_read(bar_id.clone());
 
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Now, mark one of the cross-module entries invalid. Validations should fail!
         CrossBlockModuleCache::mark_invalid(&bar_id);
-        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Without invalid module (and if it is not captured), validation should pass.
         CrossBlockModuleCache::remove_from_cross_block_module_cache(&bar_id);
         captured_reads.module_reads.remove(&bar_id);
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Validation fails if we captured a cross-block module which does not exist anymore.
         CrossBlockModuleCache::remove_from_cross_block_module_cache(&foo_id);
-        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
     }
 
     #[test]
@@ -1598,7 +1598,7 @@ mod test {
         let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
         let foo_entry =
             ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().insert_module(
+        mvhashmap.module_cache().insert_module(
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), None),
         );
@@ -1639,7 +1639,7 @@ mod test {
         assert_matches!(miss, CacheRead::Miss);
 
         let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().insert_module(
+        mvhashmap.module_cache().insert_module(
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), None),
         );
@@ -1661,7 +1661,7 @@ mod test {
         let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
         let foo_entry =
             ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().insert_module(
+        mvhashmap.module_cache().insert_module(
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), Some(10)),
         );
@@ -1673,26 +1673,25 @@ mod test {
         let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
         captured_reads.capture_per_block_cache_read(bar_id.clone(), None);
 
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Entry did not exist before --> now exists.
         let bar_entry =
             ModuleCacheEntry::deserialized_for_test("bar", vec![], &RUNTIME_ENVIRONMENT);
-        mvhashmap.code_cache().module_cache().insert_module(
+        mvhashmap.module_cache().insert_module(
             bar_id.clone(),
             VersionedModule::new(bar_entry.clone(), Some(12)),
         );
-        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         captured_reads.module_reads.remove(&bar_id);
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Version has been republished, with a higher transaction index. Should fail validation.
         mvhashmap
-            .code_cache()
             .module_cache()
             .insert_module(foo_id.clone(), VersionedModule::new(foo_entry, Some(20)));
-        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
     }
 
     #[test]
@@ -1709,22 +1708,22 @@ mod test {
             foo_entry.clone(),
         );
         captured_reads.capture_global_cache_read(foo_id.clone());
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Assume we republish this module: validation must fail.
         CrossBlockModuleCache::mark_invalid(&foo_id);
-        mvhashmap.code_cache().module_cache().insert_module(
+        mvhashmap.module_cache().insert_module(
             foo_id.clone(),
             VersionedModule::new(foo_entry.clone(), Some(10)),
         );
-        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
 
         // Assume we re-read the new correct version. Then validation should pass again.
         captured_reads.capture_per_block_cache_read(
             foo_id.clone(),
             Some(Arc::new(VersionedModule::new(foo_entry.clone(), Some(10)))),
         );
-        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
         assert!(!CrossBlockModuleCache::is_valid(&foo_id));
     }
 }

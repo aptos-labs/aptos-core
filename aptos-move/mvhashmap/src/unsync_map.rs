@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache::UnsyncCodeCache,
+    code_cache::UnsyncModuleCache,
     types::{GroupReadResult, UnsyncGroupError, ValueWithLayout},
     BlockStateStats,
 };
@@ -16,8 +16,10 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use move_binary_format::file_format::CompiledScript;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
-use move_vm_runtime::CachedScript;
+use move_vm_runtime::Script;
+use move_vm_types::code::UnsyncScriptCache;
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -46,10 +48,11 @@ pub struct UnsyncMap<
     // Optional hash can store the hash of the module to avoid re-computations. This map is used by
     // V1 loader and will be removed in the future.
     #[deprecated]
-    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
+    deprecated_module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
 
     // Code caches for loader V2 implementation: contains modules and scripts.
-    code_cache: UnsyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript>,
+    module_cache: UnsyncModuleCache<ModuleId, ModuleCacheEntry>,
+    script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
@@ -66,8 +69,9 @@ impl<
         #[allow(deprecated)]
         Self {
             resource_map: RefCell::new(HashMap::new()),
-            module_map: RefCell::new(HashMap::new()),
-            code_cache: UnsyncCodeCache::empty(),
+            deprecated_module_map: RefCell::new(HashMap::new()),
+            module_cache: UnsyncModuleCache::empty(),
+            script_cache: UnsyncScriptCache::empty(),
             group_cache: RefCell::new(HashMap::new()),
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
@@ -87,21 +91,25 @@ impl<
         Self::default()
     }
 
-    /// Returns the code cache for this [UnsyncMap].
-    pub fn code_cache(
-        &self,
-    ) -> &UnsyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript> {
-        &self.code_cache
+    /// Returns the module cache for this [UnsyncMap].
+    pub fn module_cache(&self) -> &UnsyncModuleCache<ModuleId, ModuleCacheEntry> {
+        &self.module_cache
+    }
+
+    /// Returns the script cache for this [UnsyncMap].
+    pub fn script_cache(&self) -> &UnsyncScriptCache<[u8; 32], CompiledScript, Script> {
+        &self.script_cache
     }
 
     /// Returns all modules stored inside the [UnsyncMap].
     pub fn into_modules_iter(self) -> impl Iterator<Item = (ModuleId, ModuleCacheEntry)> {
-        self.code_cache.into_modules_iter()
+        self.module_cache.into_modules_iter()
     }
 
     pub fn stats(&self) -> BlockStateStats {
         #[allow(deprecated)]
-        let num_modules = self.module_map.borrow().len() + self.code_cache.num_modules();
+        let num_modules =
+            self.deprecated_module_map.borrow().len() + self.module_cache.num_modules();
         BlockStateStats {
             num_resources: self.resource_map.borrow().len(),
             num_resource_groups: self.group_cache.borrow().len(),
@@ -287,7 +295,7 @@ impl<
     #[deprecated]
     pub fn fetch_module_for_loader_v1(&self, key: &K) -> Option<Arc<V>> {
         #[allow(deprecated)]
-        self.module_map
+        self.deprecated_module_map
             .borrow()
             .get(key)
             .map(|entry| entry.0.clone())
@@ -306,7 +314,7 @@ impl<
     #[deprecated]
     pub fn write_module(&self, key: K, value: V) {
         #[allow(deprecated)]
-        self.module_map
+        self.deprecated_module_map
             .borrow_mut()
             .insert(key, (Arc::new(value), None));
     }

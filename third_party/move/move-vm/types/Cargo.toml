@@ -12,7 +12,10 @@ edition = "2021"
 [dependencies]
 bcs = { workspace = true }
 bytes = { workspace = true }
+crossbeam = { workspace = true }
+dashmap = { workspace = true }
 derivative = { workspace = true }
+hashbrown = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive", "rc"] }
