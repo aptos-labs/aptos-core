@@ -60,13 +60,16 @@ impl ExecutingComponent {
     }
 }
 
-/// An enum of storage synchronizer operations performed by state sync
+/// An enum of storage synchronizer operations performed by
+/// state sync. Each of these is a metric label to track.
 pub enum StorageSynchronizerOperations {
-    AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
-    ExecutedTransactions,      // Executed a chunk of transactions.
-    Synced,                    // Wrote a chunk of transactions and outputs to storage.
-    SyncedStates,              // Wrote a chunk of state values to storage.
-    SyncedEpoch, // Wrote a chunk of transactions and outputs to storage that resulted in a new epoch.
+    AppliedTransactionOutputs, // The total number of applied transaction outputs
+    ExecutedTransactions,      // The total number of executed transactions
+    Synced,                    // The latest synced version (as read from storage)
+    SyncedIncremental, // The latest synced version (calculated as the sum of all processed transactions)
+    SyncedStates,      // The total number of synced states
+    SyncedEpoch,       // The latest synced epoch (as read from storage)
+    SyncedEpochIncremental, // The latest synced epoch (calculated as the sum of all processed epochs)
 }
 
 impl StorageSynchronizerOperations {
@@ -77,8 +80,10 @@ impl StorageSynchronizerOperations {
             },
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
-            StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedIncremental => "synced_incremental",
             StorageSynchronizerOperations::SyncedStates => "synced_states",
+            StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedEpochIncremental => "synced_epoch_incremental",
         }
     }
 }
