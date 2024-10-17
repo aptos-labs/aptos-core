@@ -408,7 +408,7 @@ where
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
             && (scheduler.skip_module_reads_validation()
-                || read_set.validate_module_reads(versioned_cache.code_cache()))
+                || read_set.validate_module_reads(versioned_cache.module_cache()))
     }
 
     fn update_transaction_on_abort(
@@ -734,7 +734,6 @@ where
 
             CrossBlockModuleCache::mark_invalid(&id);
             versioned_cache
-                .code_cache()
                 .module_cache()
                 .insert_module(id, VersionedModule::new(entry, Some(txn_idx)));
         }
@@ -1123,7 +1122,7 @@ where
 
         counters::update_state_counters(versioned_cache.stats(), true);
         CrossBlockModuleCache::populate_from_sync_code_cache_at_block_end(
-            versioned_cache.code_cache(),
+            versioned_cache.module_cache(),
         );
 
         // Explicit async drops.
@@ -1175,7 +1174,7 @@ where
 
                 CrossBlockModuleCache::mark_invalid(&id);
                 unsync_map
-                    .code_cache()
+                    .module_cache()
                     .insert_module(id, VersionedModule::from_txn_idx(module, txn_idx));
             } else {
                 #[allow(deprecated)]
