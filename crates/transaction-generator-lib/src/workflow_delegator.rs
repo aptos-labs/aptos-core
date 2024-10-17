@@ -390,7 +390,7 @@ impl WorkflowTxnGeneratorCreator {
                     None,
                     Some(created_minter_pool.clone()),
                     num_minter_accounts,
-                    100_0000_0000,
+                    5_0000_0000,
                 ));
 
                 // Stage 1: Create user accounts
@@ -399,7 +399,7 @@ impl WorkflowTxnGeneratorCreator {
                     None,
                     Some(destination_pool.clone()),
                     num_user_accounts,
-                    100_0000,
+                    10_0000,
                 ));
 
                 // Stage 2: For each minter account, add controller in the stablecoin module

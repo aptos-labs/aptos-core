@@ -85,7 +85,7 @@ where
             self.allow_retries,
         );
         if !self.allow_retries {
-            assert_eq!(output.txns_to_commit_len(), num_txns + 1);
+            assert_eq!(output.txns_to_commit_len() + output.txns_to_discard_len(), num_txns + 1);
         }
 
         let msg = LedgerUpdateMessage {

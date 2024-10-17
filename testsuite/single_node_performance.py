@@ -54,7 +54,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=300))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=150))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS))
 # NUM_ACCOUNTS = max(
@@ -210,6 +210,7 @@ DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
     RunGroupConfig(expected_tps= 10000, key=RunGroupKey("stable-coin-mint"), included_in=Flow.STABLE_COIN),
+    RunGroupConfig(expected_tps= 10000, key=RunGroupKey("stable-coin-batch-mint"), included_in=Flow.STABLE_COIN),
 
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),

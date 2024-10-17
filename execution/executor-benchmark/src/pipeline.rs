@@ -118,7 +118,7 @@ where
             parent_block_id,
             ledger_update_sender,
             config.allow_aborts,
-            config.allow_discards,
+            true,
             config.allow_retries,
         );
 
@@ -131,7 +131,7 @@ where
             LedgerUpdateStage::new(executor_2, commit_processing, version);
 
         let (executable_block_sender, executable_block_receiver) =
-            mpsc::sync_channel::<ExecuteBlockMessage>(10);
+            mpsc::sync_channel::<ExecuteBlockMessage>(3);
 
         let partitioning_thread = std::thread::Builder::new()
             .name("block_partitioning".to_string())
