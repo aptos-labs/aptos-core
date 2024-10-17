@@ -665,11 +665,12 @@ module aptos_token::token {
         let token_store = borrow_global_mut<TokenStore>(owner);
         if (std::features::module_event_migration_enabled()) {
             event::emit(Burn { account: owner, id: token_id, amount: burned_amount });
+        } else {
+            event::emit_event<BurnTokenEvent>(
+                &mut token_store.burn_events,
+                BurnTokenEvent { id: token_id, amount: burned_amount }
+            );
         };
-        event::emit_event<BurnTokenEvent>(
-            &mut token_store.burn_events,
-            BurnTokenEvent { id: token_id, amount: burned_amount }
-        );
 
         if (token_data.maximum > 0) {
             token_data.supply = token_data.supply - burned_amount;
@@ -734,11 +735,12 @@ module aptos_token::token {
         let token_store = borrow_global_mut<TokenStore>(signer::address_of(owner));
         if (std::features::module_event_migration_enabled()) {
             event::emit(Burn { account: signer::address_of(owner), id: token_id, amount: burned_amount });
+        } else {
+            event::emit_event<BurnTokenEvent>(
+                &mut token_store.burn_events,
+                BurnTokenEvent { id: token_id, amount: burned_amount }
+            );
         };
-        event::emit_event<BurnTokenEvent>(
-            &mut token_store.burn_events,
-            BurnTokenEvent { id: token_id, amount: burned_amount }
-        );
 
         // Decrease the supply correspondingly by the amount of tokens burned.
         let token_data = table::borrow_mut(
@@ -964,17 +966,18 @@ module aptos_token::token {
                     values,
                     types
                 });
+            } else {
+                event::emit_event<MutateTokenPropertyMapEvent>(
+                    &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
+                    MutateTokenPropertyMapEvent {
+                        old_id: token_id,
+                        new_id: new_token_id,
+                        keys,
+                        values,
+                        types
+                    },
+                );
             };
-            event::emit_event<MutateTokenPropertyMapEvent>(
-                &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
-                MutateTokenPropertyMapEvent {
-                    old_id: token_id,
-                    new_id: new_token_id,
-                    keys,
-                    values,
-                    types
-                },
-            );
 
             token_data.largest_property_version = cur_property_version;
             // burn the orignial property_version 0 token after mutation
@@ -992,17 +995,18 @@ module aptos_token::token {
                     values,
                     types
                 });
+            } else {
+                event::emit_event<MutateTokenPropertyMapEvent>(
+                    &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
+                    MutateTokenPropertyMapEvent {
+                        old_id: token_id,
+                        new_id: token_id,
+                        keys,
+                        values,
+                        types
+                    },
+                );
             };
-            event::emit_event<MutateTokenPropertyMapEvent>(
-                &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
-                MutateTokenPropertyMapEvent {
-                    old_id: token_id,
-                    new_id: token_id,
-                    keys,
-                    values,
-                    types
-                },
-            );
             token_id
         }
     }
@@ -1219,17 +1223,18 @@ module aptos_token::token {
                     maximum,
                 }
             );
+        } else {
+            event::emit_event<CreateCollectionEvent>(
+                &mut collection_handle.create_collection_events,
+                CreateCollectionEvent {
+                    creator: account_addr,
+                    collection_name: name,
+                    uri,
+                    description,
+                    maximum,
+                }
+            );
         };
-        event::emit_event<CreateCollectionEvent>(
-            &mut collection_handle.create_collection_events,
-            CreateCollectionEvent {
-                creator: account_addr,
-                collection_name: name,
-                uri,
-                description,
-                maximum,
-            }
-        );
     }
 
     public fun check_collection_exists(creator: address, name: String): bool acquires Collections {
@@ -1334,25 +1339,26 @@ module aptos_token::token {
                     property_types,
                 }
             );
+        } else {
+            event::emit_event<CreateTokenDataEvent>(
+                &mut collections.create_token_data_events,
+                CreateTokenDataEvent {
+                    id: token_data_id,
+                    description,
+                    maximum,
+                    uri,
+                    royalty_payee_address,
+                    royalty_points_denominator,
+                    royalty_points_numerator,
+                    name,
+                    mutability_config: token_mutate_config,
+                    property_keys,
+                    property_values,
+                    property_types,
+                },
+            );
         };
 
-        event::emit_event<CreateTokenDataEvent>(
-            &mut collections.create_token_data_events,
-            CreateTokenDataEvent {
-                id: token_data_id,
-                description,
-                maximum,
-                uri,
-                royalty_payee_address,
-                royalty_points_denominator,
-                royalty_points_numerator,
-                name,
-                mutability_config: token_mutate_config,
-                property_keys,
-                property_values,
-                property_types,
-            },
-        );
         token_data_id
     }
 
@@ -1459,14 +1465,15 @@ module aptos_token::token {
         let token_id = create_token_id(token_data_id, 0);
         if (std::features::module_event_migration_enabled()) {
             event::emit(Mint { creator: creator_addr, id: token_data_id, amount })
+        } else {
+            event::emit_event<MintTokenEvent>(
+                &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
+                MintTokenEvent {
+                    id: token_data_id,
+                    amount,
+                }
+            );
         };
-        event::emit_event<MintTokenEvent>(
-            &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
-            MintTokenEvent {
-                id: token_data_id,
-                amount,
-            }
-        );
 
         deposit_token(account,
             Token {
@@ -1506,14 +1513,15 @@ module aptos_token::token {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(Mint { creator: creator_addr, id: token_data_id, amount })
+        } else {
+            event::emit_event<MintTokenEvent>(
+                &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
+                MintTokenEvent {
+                    id: token_data_id,
+                    amount,
+                }
+            );
         };
-        event::emit_event<MintTokenEvent>(
-            &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
-            MintTokenEvent {
-                id: token_data_id,
-                amount,
-            }
-        );
 
         direct_deposit(receiver,
             Token {
@@ -1776,11 +1784,13 @@ module aptos_token::token {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
         if (std::features::module_event_migration_enabled()) {
             event::emit(TokenWithdraw { account: account_addr, id, amount })
+        } else {
+            event::emit_event<WithdrawEvent>(
+                &mut token_store.withdraw_events,
+                WithdrawEvent { id, amount }
+            );
         };
-        event::emit_event<WithdrawEvent>(
-            &mut token_store.withdraw_events,
-            WithdrawEvent { id, amount }
-        );
+
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
         assert!(
             table::contains(tokens, id),
@@ -1818,11 +1828,12 @@ module aptos_token::token {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(TokenDeposit { account: account_addr, id: token.id, amount: token.amount });
+        } else {
+            event::emit_event<DepositEvent>(
+                &mut token_store.deposit_events,
+                DepositEvent { id: token.id, amount: token.amount },
+            );
         };
-        event::emit_event<DepositEvent>(
-            &mut token_store.deposit_events,
-            DepositEvent { id: token.id, amount: token.amount },
-        );
 
         assert!(
             exists<TokenStore>(account_addr),
