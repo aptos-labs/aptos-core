@@ -64,9 +64,9 @@ impl EntryABI {
 #[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Script {
     #[serde(with = "serde_bytes")]
-    code: Vec<u8>,
-    ty_args: Vec<TypeTag>,
-    args: Vec<TransactionArgument>,
+    pub code: Vec<u8>,
+    pub ty_args: Vec<TypeTag>,
+    pub args: Vec<TransactionArgument>,
 }
 
 impl Script {
@@ -108,11 +108,11 @@ impl fmt::Debug for Script {
 /// Call a Move entry function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EntryFunction {
-    module: ModuleId,
-    function: Identifier,
-    ty_args: Vec<TypeTag>,
+    pub module: ModuleId,
+    pub function: Identifier,
+    pub ty_args: Vec<TypeTag>,
     #[serde(with = "vec_bytes")]
-    args: Vec<Vec<u8>>,
+    pub args: Vec<Vec<u8>>,
 }
 
 impl EntryFunction {
