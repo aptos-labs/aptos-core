@@ -14,7 +14,7 @@ use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
     runtime_types::{StructIdentifier, Type},
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
 // more appropriate to execution.
@@ -170,10 +170,6 @@ impl Script {
         })
     }
 
-    pub fn compiled_script(&self) -> &Arc<CompiledScript> {
-        &self.script
-    }
-
     pub(crate) fn entry_point(&self) -> Arc<Function> {
         self.main.clone()
     }
@@ -192,6 +188,14 @@ impl Script {
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
+    }
+}
+
+impl Deref for Script {
+    type Target = Arc<CompiledScript>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.script
     }
 }
 

@@ -20,17 +20,16 @@ use bytes::Bytes;
 use hashbrown::HashSet;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
+    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
-use move_vm_runtime::{
-    CachedScript, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
-};
+use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::{
-    code::{ModuleCache, ScriptCache},
+    code::{CachedScript, ModuleCache, ScriptCache},
     module_cyclic_dependency_error, module_linker_error,
 };
 use std::sync::Arc;
@@ -43,20 +42,58 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosCodeSt
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ScriptCache
     for LatestView<'a, T, S, X>
 {
+    type Deserialized = CompiledScript;
     type Key = [u8; 32];
-    type Script = CachedScript;
+    type Verified = Script;
 
-    fn insert_script(&self, key: Self::Key, script: Self::Script) {
+    fn insert_deserialized_script(
+        &self,
+        key: Self::Key,
+        deserialized_script: Self::Deserialized,
+    ) -> Arc<Self::Deserialized> {
         match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache().insert_script(key, script),
-            ViewState::Unsync(state) => state.unsync_map.code_cache().insert_script(key, script),
+            ViewState::Sync(state) => state
+                .versioned_map
+                .script_cache()
+                .insert_deserialized_script(key, deserialized_script),
+            ViewState::Unsync(state) => state
+                .unsync_map
+                .script_cache()
+                .insert_deserialized_script(key, deserialized_script),
         }
     }
 
-    fn get_script(&self, key: &Self::Key) -> Option<Self::Script> {
+    fn insert_verified_script(
+        &self,
+        key: Self::Key,
+        verified_script: Self::Verified,
+    ) -> Arc<Self::Verified> {
         match &self.latest_view {
-            ViewState::Sync(state) => state.versioned_map.code_cache().get_script(key),
-            ViewState::Unsync(state) => state.unsync_map.code_cache().get_script(key),
+            ViewState::Sync(state) => state
+                .versioned_map
+                .script_cache()
+                .insert_verified_script(key, verified_script),
+            ViewState::Unsync(state) => state
+                .unsync_map
+                .script_cache()
+                .insert_verified_script(key, verified_script),
+        }
+    }
+
+    fn get_script(
+        &self,
+        key: &Self::Key,
+    ) -> Option<CachedScript<Self::Deserialized, Self::Verified>> {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.versioned_map.script_cache().get_script(key),
+            ViewState::Unsync(state) => state.unsync_map.script_cache().get_script(key),
+        }
+    }
+
+    fn num_scripts(&self) -> usize {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.versioned_map.script_cache().num_scripts(),
+            ViewState::Unsync(state) => state.unsync_map.script_cache().num_scripts(),
         }
     }
 }
@@ -348,7 +385,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         let module_id = ModuleId::new(*address, module_name.to_owned());
         let read = self
             .unsync_map
-            .code_cache()
+            .module_cache()
             .get_module_or_insert_with(&module_id, || init_func(&module_id))?;
         self.read_set.borrow_mut().capture_module_read(module_id);
         Ok(read)
@@ -454,7 +491,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
 
         let mm = entry.make_verified(module.clone());
         self.unsync_map
-            .code_cache()
+            .module_cache()
             .insert_module(module_id, VersionedModule::new(mm, entry.version()));
 
         Ok(module)
@@ -478,7 +515,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         let module_id = ModuleId::new(*address, module_name.to_owned());
         let read = self
             .versioned_map
-            .code_cache()
             .module_cache()
             .get_module_or_insert_with(&module_id, || init_func(&module_id))?;
 
