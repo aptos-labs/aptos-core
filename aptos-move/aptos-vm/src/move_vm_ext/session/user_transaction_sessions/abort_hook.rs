@@ -12,7 +12,10 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     AptosVM,
 };
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use aptos_vm_types::{
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    storage::change_set_configs::ChangeSetConfigs,
+};
 use derive_more::{Deref, DerefMut};
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
@@ -47,10 +50,11 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
     pub fn finish(
         self,
         change_set_configs: &ChangeSetConfigs,
+        module_storage: &impl AptosModuleStorage,
     ) -> Result<SystemSessionChangeSet, VMStatus> {
         let Self { session } = self;
         let (change_set, empty_module_write_set) =
-            session.finish_with_squashed_change_set(change_set_configs, false)?;
+            session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
         let abort_hook_session_change_set =
             SystemSessionChangeSet::new(change_set, change_set_configs)?;
 

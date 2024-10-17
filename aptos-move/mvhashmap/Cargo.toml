@@ -21,13 +21,18 @@ aptos-vm-types = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
-dashmap = { workspace = true }
+dashmap = { workspace = true, features = ["raw-api"] }
+hashbrown = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+parking_lot = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
+move-vm-runtime = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }

@@ -28,8 +28,8 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     fee_statement::FeeStatement,
     transaction::{EntryFunction, TransactionPayload},
-    vm::configs::set_paranoid_type_checks,
 };
+use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use rand::{rngs::StdRng, SeedableRng};
 use sha3::{Digest, Sha3_512};

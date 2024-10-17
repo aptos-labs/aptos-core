@@ -6,6 +6,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::{ChangeSetInterface, VMChangeSet, WriteOpInfo},
+    module_and_script_storage::module_storage::AptosModuleStorage,
     module_write_set::ModuleWriteSet,
     resolver::ExecutorView,
     storage::change_set_configs::ChangeSetConfigs,
@@ -37,6 +38,10 @@ impl UserSessionChangeSet {
         self.module_write_set.has_writes_to_special_address()
     }
 
+    pub(crate) fn module_write_set_is_empty_or_invariant_violation(&self) -> PartialVMResult<()> {
+        self.module_write_set.is_empty_or_invariant_violation()
+    }
+
     pub(crate) fn unpack(self) -> (VMChangeSet, ModuleWriteSet) {
         (self.change_set, self.module_write_set)
     }
@@ -56,10 +61,14 @@ impl ChangeSetInterface for UserSessionChangeSet {
     fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
+        module_storage: &'a impl AptosModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.change_set
-            .write_op_info_iter_mut(executor_view)
-            .chain(self.module_write_set.write_op_info_iter_mut(executor_view))
+            .write_op_info_iter_mut(executor_view, module_storage)
+            .chain(
+                self.module_write_set
+                    .write_op_info_iter_mut(executor_view, module_storage),
+            )
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
@@ -105,8 +114,10 @@ impl ChangeSetInterface for SystemSessionChangeSet {
     fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
+        module_storage: &'a impl AptosModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.change_set.write_op_info_iter_mut(executor_view)
+        self.change_set
+            .write_op_info_iter_mut(executor_view, module_storage)
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
