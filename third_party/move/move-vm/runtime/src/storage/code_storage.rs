@@ -5,7 +5,7 @@ use crate::{loader::Script, logging::expect_no_verification_errors, ModuleStorag
 use ambassador::delegatable_trait;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use move_vm_types::{
-    code::{CachedScript, ScriptCache},
+    code::{Code, ScriptCache},
     module_linker_error,
 };
 use sha3::{Digest, Sha3_256};
@@ -47,7 +47,7 @@ where
     ) -> VMResult<Arc<CompiledScript>> {
         let hash = compute_code_hash(serialized_script);
         Ok(match self.get_script(&hash) {
-            Some(script) => script.deserialized_script().clone(),
+            Some(script) => script.deserialized().clone(),
             None => {
                 let deserialized_script = self
                     .runtime_environment()
@@ -58,7 +58,7 @@ where
     }
 
     fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        use CachedScript::*;
+        use Code::*;
 
         let hash = compute_code_hash(serialized_script);
         let deserialized_script = match self.get_script(&hash) {

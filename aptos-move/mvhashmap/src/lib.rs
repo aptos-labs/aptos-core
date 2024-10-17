@@ -106,6 +106,10 @@ impl<
         &self.module_cache
     }
 
+    pub fn take_modules_iter(&mut self) -> impl Iterator<Item = (ModuleId, ModuleCacheEntry)> {
+        self.module_cache.take_modules_iter()
+    }
+
     pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], CompiledScript, Script> {
         &self.script_cache
     }
