@@ -11,6 +11,7 @@ pub mod chunk_output;
 pub mod in_memory_state_calculator_v2;
 
 pub mod chunk_result_verifier;
+pub mod do_ledger_update;
 pub mod executed_chunk;
 pub mod partial_state_compute_result;
 pub mod transaction_chunk;
