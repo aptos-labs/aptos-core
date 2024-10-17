@@ -96,18 +96,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         proposals.push(proposal);
     }
 
-    let compute_result = StateComputeResult::new(
-        executed_hash,
-        vec![], // dummy subtree
-        0,
-        vec![],
-        0,
-        None,
-        vec![],
-        vec![],
-        vec![],
-        None, // block end info
-    );
+    let compute_result = StateComputeResult::new_dummy_with_root_hash(executed_hash);
 
     let li = LedgerInfo::new(
         proposals.last().unwrap().block().gen_block_info(

@@ -6,8 +6,8 @@ use super::GENESIS_HELM_RELEASE_NAME;
 use crate::{
     get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck,
     wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
-    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE,
-    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
+    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
+    DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
     FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
     FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
     NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
@@ -569,6 +569,7 @@ pub async fn install_testnet_resources(
     use_port_forward: bool,
     enable_haproxy: bool,
     enable_indexer: bool,
+    deployer_profile: String,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
     // If true, skip collecting running nodes after installing the testnet. This is useful when we only care about creating resources
@@ -624,7 +625,7 @@ pub async fn install_testnet_resources(
     }
 
     let config: serde_json::Value = serde_json::from_value(serde_json::json!({
-        "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+        "profile": deployer_profile,
         "era": new_era,
         "namespace": kube_namespace.clone(),
         "testnet-values": aptos_node_helm_values,

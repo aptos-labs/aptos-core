@@ -1150,6 +1150,7 @@ impl TryFrom<&[u8]> for AnyPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralSignature {
     Ed25519 {
         signature: Ed25519Signature,
@@ -1162,6 +1163,10 @@ pub enum EphemeralSignature {
 impl EphemeralSignature {
     pub fn ed25519(signature: Ed25519Signature) -> Self {
         Self::Ed25519 { signature }
+    }
+
+    pub fn web_authn(signature: PartialAuthenticatorAssertionResponse) -> Self {
+        Self::WebAuthn { signature }
     }
 
     pub fn verify<T: Serialize + CryptoHash>(
@@ -1214,6 +1219,7 @@ impl TryFrom<&[u8]> for EphemeralSignature {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralPublicKey {
     Ed25519 {
         public_key: Ed25519PublicKey,
@@ -1226,6 +1232,10 @@ pub enum EphemeralPublicKey {
 impl EphemeralPublicKey {
     pub fn ed25519(public_key: Ed25519PublicKey) -> Self {
         Self::Ed25519 { public_key }
+    }
+
+    pub fn secp256r1_ecdsa(public_key: secp256r1_ecdsa::PublicKey) -> Self {
+        Self::Secp256r1Ecdsa { public_key }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

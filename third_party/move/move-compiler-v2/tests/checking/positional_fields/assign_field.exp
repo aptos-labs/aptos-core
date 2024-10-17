@@ -6,7 +6,7 @@ module 0x42::test {
             1: bool,
         }
         V2 {
-            0: 0x42::test::S3,
+            0: S3,
         }
     }
     struct S0 {
@@ -17,13 +17,13 @@ module 0x42::test {
         1: bool,
     }
     struct S2 {
-        0: 0x42::test::S0,
+        0: S0,
         1: u8,
     }
     struct S3 {
-        0: 0x42::test::S2,
-        1: 0x42::test::S0,
-        2: 0x42::test::S2,
+        0: S2,
+        1: S0,
+        2: S2,
     }
     private fun assign0(a: u64,b: bool) {
         {

@@ -120,7 +120,7 @@ impl DbWriter for FakeDb {
         _base_state_version: Option<Version>,
         _sync_commit: bool,
         _latest_in_memory_state: StateDelta,
-        _state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        _state_updates_until_last_checkpoint: Option<&ShardedStateUpdates>,
         _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> aptos_storage_interface::Result<()> {
         Ok(())

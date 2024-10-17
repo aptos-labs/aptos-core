@@ -735,8 +735,8 @@ trait ChaosExperimentOps {
     async fn list_stress_chaos(&self) -> Result<Vec<StressChaos>>;
 
     async fn ensure_chaos_experiments_active(&self) -> Result<()> {
-        let timeout_duration = Duration::from_secs(300); // 5 minutes
-        let polling_interval = Duration::from_secs(5);
+        let timeout_duration = Duration::from_secs(600); // 10 minutes
+        let polling_interval = Duration::from_secs(10);
 
         tokio::time::timeout(timeout_duration, async {
             loop {
@@ -793,6 +793,8 @@ fn check_all_injected(status: &Option<ChaosStatus>) -> bool {
         .map_or(false, |conditions| {
             conditions.iter().any(|c| {
                 c.r#type == ChaosConditionType::AllInjected && c.status == ConditionStatus::True
+            }) && conditions.iter().any(|c| {
+                c.r#type == ChaosConditionType::Selected && c.status == ConditionStatus::True
             })
         })
 }
@@ -870,19 +872,31 @@ mod tests {
     ) -> (Vec<NetworkChaos>, Vec<StressChaos>) {
         let network_chaos = NetworkChaos {
             status: Some(ChaosStatus {
-                conditions: Some(vec![ChaosCondition {
-                    r#type: ChaosConditionType::AllInjected,
-                    status: network_status,
-                }]),
+                conditions: Some(vec![
+                    ChaosCondition {
+                        r#type: ChaosConditionType::AllInjected,
+                        status: network_status.clone(),
+                    },
+                    ChaosCondition {
+                        r#type: ChaosConditionType::Selected,
+                        status: network_status,
+                    },
+                ]),
             }),
             ..NetworkChaos::new("test", Default::default())
         };
         let stress_chaos = StressChaos {
             status: Some(ChaosStatus {
-                conditions: Some(vec![ChaosCondition {
-                    r#type: ChaosConditionType::AllInjected,
-                    status: stress_status,
-                }]),
+                conditions: Some(vec![
+                    ChaosCondition {
+                        r#type: ChaosConditionType::AllInjected,
+                        status: stress_status.clone(),
+                    },
+                    ChaosCondition {
+                        r#type: ChaosConditionType::Selected,
+                        status: stress_status,
+                    },
+                ]),
             }),
             ..StressChaos::new("test", Default::default())
         };

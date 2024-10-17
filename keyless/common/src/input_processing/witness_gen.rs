@@ -12,7 +12,9 @@ pub trait PathStr {
 
 impl PathStr for NamedTempFile {
     fn path_str(&self) -> Result<&str> {
-        self.path().to_str().ok_or(anyhow!("tempfile path error"))
+        self.path()
+            .to_str()
+            .ok_or_else(|| anyhow!("tempfile path error"))
     }
 }
 

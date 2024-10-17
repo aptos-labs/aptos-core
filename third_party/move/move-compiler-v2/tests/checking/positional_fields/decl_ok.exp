@@ -15,10 +15,10 @@ module 0x42::test {
         0: u8,
         1: bool,
     }
-    struct S3 {
-        0: #1,
+    struct S3<T1,T2> {
+        0: T2,
         1: u8,
-        2: #0,
+        2: T1,
     }
     private fun bar(x: S2) {
         select test::S2.0<S2>(x);

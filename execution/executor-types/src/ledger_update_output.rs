@@ -6,23 +6,91 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
+use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
     proof::accumulator::InMemoryTransactionAccumulator,
-    state_store::{combine_or_add_sharded_state_updates, ShardedStateUpdates},
+    state_store::ShardedStateUpdates,
     transaction::{
         block_epilogue::BlockEndInfo, TransactionInfo, TransactionStatus, TransactionToCommit,
         Version,
     },
 };
+use derive_more::Deref;
 use itertools::zip_eq;
 use std::sync::Arc;
 
-#[derive(Default, Debug)]
+#[derive(Clone, Debug, Default, Deref)]
 pub struct LedgerUpdateOutput {
+    #[deref]
+    inner: Arc<DropHelper<Inner>>,
+}
+
+impl LedgerUpdateOutput {
+    pub fn new_empty(transaction_accumulator: Arc<InMemoryTransactionAccumulator>) -> Self {
+        Self::new_impl(Inner::new_empty(transaction_accumulator))
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
+        Self::new_impl(Inner::new_dummy_with_input_txns(txns))
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
+        Self::new_impl(Inner::new_dummy_with_txns_to_commit(txns))
+    }
+
+    pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
+        Self::new_impl(Inner::new_dummy_with_root_hash(root_hash))
+    }
+
+    pub fn reconfig_suffix(&self) -> Self {
+        Self::new_impl(Inner::new_empty(self.transaction_accumulator.clone()))
+    }
+
+    pub fn new(
+        statuses_for_input_txns: Vec<TransactionStatus>,
+        to_commit: Vec<TransactionToCommit>,
+        subscribable_events: Vec<ContractEvent>,
+        transaction_info_hashes: Vec<HashValue>,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: ShardedStateCache,
+        transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
+        parent_accumulator: Arc<InMemoryTransactionAccumulator>,
+        block_end_info: Option<BlockEndInfo>,
+    ) -> Self {
+        Self::new_impl(Inner {
+            statuses_for_input_txns,
+            to_commit,
+            subscribable_events,
+            transaction_info_hashes,
+            state_updates_until_last_checkpoint,
+            sharded_state_cache,
+            transaction_accumulator,
+            parent_accumulator,
+            block_end_info,
+        })
+    }
+
+    fn new_impl(inner: Inner) -> Self {
+        Self {
+            inner: Arc::new(DropHelper::new(inner)),
+        }
+    }
+
+    pub fn as_state_compute_result(
+        &self,
+        next_epoch_state: Option<EpochState>,
+    ) -> StateComputeResult {
+        StateComputeResult::new(self.clone(), next_epoch_state)
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct Inner {
     pub statuses_for_input_txns: Vec<TransactionStatus>,
     pub to_commit: Vec<TransactionToCommit>,
     pub subscribable_events: Vec<ContractEvent>,
@@ -32,20 +100,56 @@ pub struct LedgerUpdateOutput {
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
+    pub parent_accumulator: Arc<InMemoryTransactionAccumulator>,
     pub block_end_info: Option<BlockEndInfo>,
 }
 
-impl LedgerUpdateOutput {
+impl Inner {
     pub fn new_empty(transaction_accumulator: Arc<InMemoryTransactionAccumulator>) -> Self {
         Self {
+            parent_accumulator: transaction_accumulator.clone(),
             transaction_accumulator,
             ..Default::default()
         }
     }
 
-    pub fn reconfig_suffix(&self) -> Self {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
+        let num_txns = txns.len();
+        let to_commit = txns
+            .into_iter()
+            .chain(std::iter::once(
+                aptos_types::transaction::Transaction::StateCheckpoint(HashValue::zero()),
+            ))
+            .map(TransactionToCommit::dummy_with_transaction)
+            .collect();
         Self {
-            transaction_accumulator: Arc::clone(&self.transaction_accumulator),
+            to_commit,
+            statuses_for_input_txns: vec![
+                TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::Success
+                );
+                num_txns
+            ],
+            ..Default::default()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
+        Self {
+            to_commit: txns,
+            ..Default::default()
+        }
+    }
+
+    pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
+        let transaction_accumulator = Arc::new(
+            InMemoryTransactionAccumulator::new_empty_with_root_hash(root_hash),
+        );
+        Self {
+            parent_accumulator: transaction_accumulator.clone(),
+            transaction_accumulator,
             ..Default::default()
         }
     }
@@ -70,66 +174,6 @@ impl LedgerUpdateOutput {
             "Block not ending with a state checkpoint.",
         );
         Ok(())
-    }
-
-    pub fn maybe_select_chunk_ending_ledger_info(
-        &self,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-        next_epoch_state: Option<&EpochState>,
-    ) -> Result<Option<LedgerInfoWithSignatures>> {
-        if verified_target_li.ledger_info().version() + 1
-            == self.transaction_accumulator.num_leaves()
-        {
-            // If the chunk corresponds to the target LI, the target LI can be added to storage.
-            ensure!(
-                verified_target_li
-                    .ledger_info()
-                    .transaction_accumulator_hash()
-                    == self.transaction_accumulator.root_hash(),
-                "Root hash in target ledger info does not match local computation. {:?} != {:?}",
-                verified_target_li,
-                self.transaction_accumulator,
-            );
-            Ok(Some(verified_target_li.clone()))
-        } else if let Some(epoch_change_li) = epoch_change_li {
-            // If the epoch change LI is present, it must match the version of the chunk:
-
-            // Verify that the given ledger info corresponds to the new accumulator.
-            ensure!(
-                epoch_change_li.ledger_info().transaction_accumulator_hash()
-                    == self.transaction_accumulator.root_hash(),
-                "Root hash of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li,
-                self.transaction_accumulator,
-            );
-            ensure!(
-                epoch_change_li.ledger_info().version() + 1
-                    == self.transaction_accumulator.num_leaves(),
-                "Version of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li,
-                self.transaction_accumulator,
-            );
-            ensure!(
-                epoch_change_li.ledger_info().ends_epoch(),
-                "Epoch change LI does not carry validator set. version:{}",
-                epoch_change_li.ledger_info().version(),
-            );
-            ensure!(
-                epoch_change_li.ledger_info().next_epoch_state() == next_epoch_state,
-                "New validator set of a given epoch LI does not match local computation. {:?} vs {:?}",
-                epoch_change_li.ledger_info().next_epoch_state(),
-                next_epoch_state,
-            );
-            Ok(Some(epoch_change_li.clone()))
-        } else {
-            ensure!(
-                next_epoch_state.is_none(),
-                "End of epoch chunk based on local computation but no EoE LedgerInfo provided. version: {:?}",
-                self.transaction_accumulator.num_leaves().checked_sub(1),
-            );
-            Ok(None)
-        }
     }
 
     pub fn ensure_transaction_infos_match(
@@ -157,56 +201,6 @@ impl LedgerUpdateOutput {
             version += 1;
         }
         Ok(())
-    }
-
-    pub fn as_state_compute_result(
-        &self,
-        parent_accumulator: &Arc<InMemoryTransactionAccumulator>,
-        next_epoch_state: Option<EpochState>,
-    ) -> StateComputeResult {
-        let txn_accu = self.txn_accumulator();
-
-        StateComputeResult::new(
-            txn_accu.root_hash(),
-            txn_accu.frozen_subtree_roots().clone(),
-            txn_accu.num_leaves(),
-            parent_accumulator.frozen_subtree_roots().clone(),
-            parent_accumulator.num_leaves(),
-            next_epoch_state,
-            self.statuses_for_input_txns.clone(),
-            self.transaction_info_hashes.clone(),
-            self.subscribable_events.clone(),
-            self.block_end_info.clone(),
-        )
-    }
-
-    pub fn combine(&mut self, rhs: Self) {
-        assert!(self.block_end_info.is_none());
-        assert!(rhs.block_end_info.is_none());
-        let Self {
-            statuses_for_input_txns,
-            to_commit,
-            subscribable_events,
-            transaction_info_hashes,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator,
-            block_end_info: _block_end_info,
-        } = rhs;
-
-        if let Some(updates) = state_updates_before_last_checkpoint {
-            combine_or_add_sharded_state_updates(
-                &mut self.state_updates_until_last_checkpoint,
-                updates,
-            );
-        }
-
-        self.statuses_for_input_txns.extend(statuses_for_input_txns);
-        self.to_commit.extend(to_commit);
-        self.subscribable_events.extend(subscribable_events);
-        self.transaction_info_hashes.extend(transaction_info_hashes);
-        self.sharded_state_cache.combine(sharded_state_cache);
-        self.transaction_accumulator = transaction_accumulator;
     }
 
     pub fn next_version(&self) -> Version {

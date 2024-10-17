@@ -112,7 +112,7 @@ impl GenesisCommitter {
             self.output
                 .ledger_update_output
                 .state_updates_until_last_checkpoint
-                .clone(),
+                .as_ref(),
             Some(&self.output.ledger_update_output.sharded_state_cache),
         )?;
         info!("Genesis commited.");

@@ -11,9 +11,10 @@ use crate::{
         ConstructionParseRequest, ConstructionParseResponse, ConstructionPayloadsRequest,
         ConstructionPayloadsResponse, ConstructionPreprocessRequest,
         ConstructionPreprocessResponse, ConstructionSubmitRequest, ConstructionSubmitResponse,
-        Error, MetadataRequest, NetworkIdentifier, NetworkListResponse, NetworkOptionsResponse,
-        NetworkRequest, NetworkStatusResponse, Operation, PreprocessMetadata, PublicKey, Signature,
-        SignatureType, TransactionIdentifier, TransactionIdentifierResponse,
+        Currency, Error, MetadataRequest, NetworkIdentifier, NetworkListResponse,
+        NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse, Operation,
+        PreprocessMetadata, PublicKey, Signature, SignatureType, TransactionIdentifier,
+        TransactionIdentifierResponse,
     },
 };
 use anyhow::anyhow;
@@ -190,6 +191,7 @@ impl RosettaClient {
         sequence_number: Option<u64>,
         max_gas: Option<u64>,
         gas_unit_price: Option<u64>,
+        currency: Currency,
     ) -> anyhow::Result<TransactionIdentifier> {
         let sender = self
             .get_account_address(network_identifier.clone(), private_key)
@@ -203,14 +205,14 @@ impl RosettaClient {
                 0,
                 None,
                 AccountIdentifier::base_account(sender),
-                native_coin(),
+                currency.clone(),
                 amount,
             ),
             Operation::deposit(
                 1,
                 None,
                 AccountIdentifier::base_account(receiver),
-                native_coin(),
+                currency,
                 amount,
             ),
         ];

@@ -85,10 +85,14 @@ where
     }
 
     pub fn new_empty() -> Self {
+        Self::new_empty_with_root_hash(*ACCUMULATOR_PLACEHOLDER_HASH)
+    }
+
+    pub fn new_empty_with_root_hash(root_hash: HashValue) -> Self {
         Self {
             frozen_subtree_roots: Vec::new(),
             num_leaves: 0,
-            root_hash: *ACCUMULATOR_PLACEHOLDER_HASH,
+            root_hash,
             phantom: PhantomData,
         }
     }

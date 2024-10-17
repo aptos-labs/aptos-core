@@ -724,13 +724,18 @@ impl<'env> SpecTranslator<'env> {
                 // Single-element sequence is just a wrapped value.
                 self.translate_exp(exp_vec.first().expect("list has an element"));
             },
-            ExpData::Return(..)
-            | ExpData::Sequence(..)
-            | ExpData::Loop(..)
-            | ExpData::Assign(..)
-            | ExpData::Mutate(..)
-            | ExpData::SpecBlock(..)
-            | ExpData::LoopCont(..) => panic!("imperative expressions not supported"),
+            ExpData::Return(id, ..)
+            | ExpData::Sequence(id, ..)
+            | ExpData::Loop(id, ..)
+            | ExpData::Assign(id, ..)
+            | ExpData::Mutate(id, ..)
+            | ExpData::SpecBlock(id, ..)
+            | ExpData::LoopCont(id, ..) => {
+                self.env.error(
+                    &self.env.get_node_loc(*id),
+                    "imperative expressions not supported in specs",
+                );
+            },
         }
     }
 
@@ -973,16 +978,49 @@ impl<'env> SpecTranslator<'env> {
                 // Skip freeze operation
                 self.translate_exp(&args[0])
             },
+            Operation::Vector if args.is_empty() => {
+                self.translate_primitive_inst_call(node_id, "$EmptyVec", args)
+            },
+            Operation::Vector if args.len() == 1 => self.translate_primitive_call("MakeVec1", args),
+            Operation::Vector if args.len() == 2 => self.translate_primitive_call("MakeVec2", args),
+            Operation::Vector if args.len() == 3 => self.translate_primitive_call("MakeVec3", args),
+            Operation::Vector if args.len() == 4 => self.translate_primitive_call("MakeVec4", args),
+            Operation::Vector => {
+                let mut count = 0;
+                for arg in &args[0..args.len() - 1] {
+                    emit!(self.writer, "ConcatVec(");
+                    self.translate_call(node_id, oper, &[arg.clone()]);
+                    emit!(self.writer, ",");
+                    count += 1;
+                }
+                self.translate_call(node_id, oper, &[args[args.len() - 1].clone()]);
+                emit!(self.writer, &")".repeat(count));
+            },
+            Operation::Abort => {
+                let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+                emit!(
+                    self.writer,
+                    &format!(
+                        "$Arbitrary_value_of'{}'()",
+                        boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+                    )
+                );
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::Abort
-            | Operation::Vector
             | Operation::Old => {
-                panic!("operation unexpected: {}", oper.display(self.env, node_id))
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    &format!(
+                        "bug: operation {} is not supported \
+                in the current context",
+                        oper.display(self.env, node_id)
+                    ),
+                );
             },
         }
     }

@@ -5,7 +5,7 @@ module 0x42::m {
         k: u8,
     }
     struct S {
-        data: vector<0x42::m::E>,
+        data: vector<E>,
     }
     public fun foo(v: &S): u8 {
         select m::E.k<&E>(vector::borrow<E>(Borrow(Immutable)(select m::S.data<&S>(v)), 0))

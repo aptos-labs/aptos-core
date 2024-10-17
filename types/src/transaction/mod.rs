@@ -1568,6 +1568,15 @@ impl TransactionToCommit {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction(transaction: Transaction) -> Self {
+        Self {
+            transaction,
+            transaction_info: TransactionInfo::dummy(),
+            ..Self::dummy()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_with_transaction_auxiliary_data(
         transaction_auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {

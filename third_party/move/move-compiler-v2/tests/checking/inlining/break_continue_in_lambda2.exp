@@ -1,0 +1,72 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    private inline fun brk2(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    private inline fun brk3() {
+        loop {
+          if true {
+            break;
+            Tuple()
+          } else {
+            break
+          }
+        }
+    }
+    private inline fun brk4() {
+        loop {
+          if true {
+            continue;
+            Tuple()
+          } else {
+            break
+          }
+        }
+    }
+    private fun broken() {
+        break;
+        Tuple()
+    }
+    private fun continued() {
+        continue;
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    inline fun brk2(f: |()|) {
+        f();
+    }
+    inline fun brk3() {
+        while (true) {
+            break;
+        }
+    }
+    inline fun brk4() {
+        while (true) {
+            continue;
+        }
+    }
+    fun broken() {
+        break;
+    }
+    fun continued() {
+        continue;
+    }
+}
+
+
+Diagnostics:
+error: missing enclosing loop statement
+   ┌─ tests/checking/inlining/break_continue_in_lambda2.move:20:2
+   │
+20 │     break;
+   │     ^^^^^
+
+error: missing enclosing loop statement
+   ┌─ tests/checking/inlining/break_continue_in_lambda2.move:24:2
+   │
+24 │     continue;
+   │     ^^^^^^^^

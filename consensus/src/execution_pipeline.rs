@@ -35,11 +35,8 @@ use std::{
 };
 use tokio::sync::{mpsc, oneshot};
 
-pub type PreCommitHook = Box<
-    dyn 'static
-        + FnOnce(&[SignedTransaction], &StateComputeResult) -> BoxFuture<'static, ()>
-        + Send,
->;
+pub type PreCommitHook =
+    Box<dyn 'static + FnOnce(&StateComputeResult) -> BoxFuture<'static, ()> + Send>;
 
 #[allow(clippy::unwrap_used)]
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -287,7 +284,7 @@ impl ExecutionPipeline {
             }
             .await;
             let pipeline_res = res.map(|(output, execution_duration)| {
-                let pre_commit_hook_fut = pre_commit_hook(&input_txns, &output);
+                let pre_commit_hook_fut = pre_commit_hook(&output);
                 let pre_commit_fut: BoxFuture<'static, ExecutorResult<()>> =
                     if output.epoch_state().is_some() || !enable_pre_commit {
                         // hack: it causes issue if pre-commit is finished at an epoch ending, and

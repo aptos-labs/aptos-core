@@ -149,16 +149,17 @@ impl ApplyChunkOutput {
         let transaction_accumulator =
             Arc::new(base_txn_accumulator.append(&transaction_info_hashes));
         Ok((
-            LedgerUpdateOutput {
+            LedgerUpdateOutput::new(
                 statuses_for_input_txns,
-                to_commit: txns_to_commit,
+                txns_to_commit,
                 subscribable_events,
                 transaction_info_hashes,
-                state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
+                state_updates_before_last_checkpoint,
                 sharded_state_cache,
                 transaction_accumulator,
+                base_txn_accumulator,
                 block_end_info,
-            },
+            ),
             to_discard.into_txns(),
             to_retry.into_txns(),
         ))

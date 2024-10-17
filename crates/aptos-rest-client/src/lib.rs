@@ -15,10 +15,7 @@ pub mod state;
 pub mod types;
 
 pub use crate::client_builder::{AptosBaseUrl, ClientBuilder};
-use crate::{
-    aptos::{AptosVersion, Balance},
-    error::RestError,
-};
+use crate::{aptos::AptosVersion, error::RestError};
 use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
@@ -34,13 +31,15 @@ use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
     state_store::state_key::StateKey,
     transaction::SignedTransaction,
-    CoinType,
 };
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, StructTag, TypeTag},
+};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client as ReqwestClient, StatusCode,
@@ -48,7 +47,7 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 pub use state::State;
-use std::{collections::BTreeMap, future::Future, time::Duration};
+use std::{collections::BTreeMap, future::Future, str::FromStr, time::Duration};
 use tokio::time::Instant;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 use url::Url;
@@ -205,51 +204,50 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
-    pub async fn get_account_balance(
+    async fn view_account_balance_bcs_impl(
         &self,
         address: AccountAddress,
-    ) -> AptosResult<Response<Balance>> {
-        let resp = self
-            .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
-            .await?;
-        resp.and_then(|resource| {
-            if let Some(res) = resource {
-                Ok(serde_json::from_value::<Balance>(res.data)?)
-            } else {
-                Err(anyhow!("No data returned").into())
-            }
-        })
-    }
-
-    pub async fn get_account_balance_bcs<C: CoinType>(
-        &self,
-        address: AccountAddress,
+        coin_type: &str,
+        version: Option<u64>,
     ) -> AptosResult<Response<u64>> {
-        let resp = self
-            .get_account_resource_bcs::<CoinStoreResource<C>>(address, &C::type_tag().to_string())
-            .await?;
-        resp.and_then(|resource| Ok(resource.coin()))
-    }
-
-    pub async fn get_account_balance_at_version(
-        &self,
-        address: AccountAddress,
-        version: u64,
-    ) -> AptosResult<Response<Balance>> {
-        let resp = self
-            .get_account_resource_at_version(
-                address,
-                "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        let resp: Response<Vec<u64>> = self
+            .view_bcs(
+                &ViewFunction {
+                    module: ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                    function: ident_str!("balance").into(),
+                    ty_args: vec![TypeTag::Struct(Box::new(
+                        StructTag::from_str(coin_type).unwrap(),
+                    ))],
+                    args: vec![bcs::to_bytes(&address).unwrap()],
+                },
                 version,
             )
             .await?;
-        resp.and_then(|resource| {
-            if let Some(res) = resource {
-                Ok(serde_json::from_value::<Balance>(res.data)?)
+
+        resp.and_then(|result| {
+            if result.len() != 1 {
+                Err(anyhow!("Wrong data size returned: {:?}", result).into())
             } else {
-                Err(anyhow!("No data returned").into())
+                Ok(result[0])
             }
         })
+    }
+
+    pub async fn view_apt_account_balance_at_version(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> AptosResult<Response<u64>> {
+        self.view_account_balance_bcs_impl(address, "0x1::aptos_coin::AptosCoin", Some(version))
+            .await
+    }
+
+    pub async fn view_apt_account_balance(
+        &self,
+        address: AccountAddress,
+    ) -> AptosResult<Response<u64>> {
+        self.view_account_balance_bcs_impl(address, "0x1::aptos_coin::AptosCoin", None)
+            .await
     }
 
     pub async fn get_index(&self) -> AptosResult<Response<IndexResponse>> {

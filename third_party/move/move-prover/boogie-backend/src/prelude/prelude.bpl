@@ -24,6 +24,18 @@ options provided to the prover.
 {% include "custom-natives" %}
 {%- endif %}
 
+
+// Uninterpreted function for all types
+
+{% for instance in uninterpreted_instances %}
+
+{%- set S = "'" ~ instance.suffix ~ "'" -%}
+{%- set T = instance.name -%}
+
+function $Arbitrary_value_of{{S}}(): {{T}};
+
+{% endfor %}
+
 // ============================================================================================
 // Primitive Types
 
