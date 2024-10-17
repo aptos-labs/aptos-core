@@ -98,6 +98,10 @@ impl StateCheckpointOutput {
         self.txns.to_commit.len()
     }
 
+    pub fn txns_to_discard_len(&self) -> usize {
+        self.txns.to_discard.len()
+    }
+
     pub fn into_inner(
         self,
     ) -> (

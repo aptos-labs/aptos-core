@@ -35,8 +35,10 @@ mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
+mod stable_coin_minter;
 mod transaction_mix_generator;
 mod workflow_delegator;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
@@ -95,7 +97,18 @@ pub enum AccountType {
 
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
-    CreateMintBurn { count: usize, creation_balance: u64 },
+    CreateMintBurn {
+        count: usize,
+        creation_balance: u64,
+    },
+    StableCoinMint {
+        num_minter_accounts: usize,
+        num_user_accounts: usize,
+        // If batch_size = 1, then mint function is called
+        // If batch_size > 1, then batch_mint function is called
+        batch_size: usize,
+        num_mint_transactions: usize,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -114,7 +127,7 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::CoinTransfer.materialize_default()
+        TransactionTypeArg::StableCoinMint.materialize_default()
     }
 }
 

@@ -143,8 +143,11 @@ impl NumAccountsMode {
             (None, Some(transactions_per_account)) => {
                 Self::TransactionsPerAccount(transactions_per_account)
             },
+            (None, None) => panic!(
+                "Either num_accounts or transactions_per_account should be set"
+            ),
             _ => panic!(
-                "Either num_accounts or transactions_per_account should be set, but not both"
+                "Both num_accounts or transactions_per_account should not be set"
             ),
         }
     }
