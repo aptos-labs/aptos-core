@@ -19,6 +19,7 @@ module aptos_framework::gas_schedule {
 
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     /// The provided gas schedule bytes are empty or invalid
     const EINVALID_GAS_SCHEDULE: u64 = 1;

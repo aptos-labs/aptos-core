@@ -95,6 +95,7 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    ASYNC_RECONFIG_FRAMEWORK = 80,
 }
 
 impl FeatureFlag {
@@ -172,6 +173,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::ASYNC_RECONFIG_FRAMEWORK,
         ]
     }
 }

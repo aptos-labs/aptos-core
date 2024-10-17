@@ -3,7 +3,7 @@
 
 # Module `0x1::dkg`
 
-DKG on-chain states and helper functions.
+Some states and helper functions of the group-element DKG that supports on-chain randomness.
 
 
 -  [Struct `DKGSessionMetadata`](#0x1_dkg_DKGSessionMetadata)
@@ -13,6 +13,9 @@ DKG on-chain states and helper functions.
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_dkg_initialize)
 -  [Function `start`](#0x1_dkg_start)
+-  [Function `on_async_reconfig_start`](#0x1_dkg_on_async_reconfig_start)
+-  [Function `ready_for_next_epoch`](#0x1_dkg_ready_for_next_epoch)
+-  [Function `on_new_epoch`](#0x1_dkg_on_new_epoch)
 -  [Function `finish`](#0x1_dkg_finish)
 -  [Function `try_clear_incomplete_session`](#0x1_dkg_try_clear_incomplete_session)
 -  [Function `incomplete_session`](#0x1_dkg_incomplete_session)
@@ -29,6 +32,8 @@ DKG on-chain states and helper functions.
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="randomness_config.md#0x1_randomness_config">0x1::randomness_config</a>;
+<b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info">0x1::validator_consensus_info</a>;
@@ -289,6 +294,132 @@ Abort if a DKG is already in progress.
         start_time_us,
         session_metadata: new_session_metadata,
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dkg_on_async_reconfig_start"></a>
+
+## Function `on_async_reconfig_start`
+
+Mark on-chain DKG state as in-progress. Notify validators to start DKG.
+
+Called by async reconfig framework at the beginning of a reconfig.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_on_async_reconfig_start">on_async_reconfig_start</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_on_async_reconfig_start">on_async_reconfig_start</a>() <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>if</b> (<a href="randomness_config.md#0x1_randomness_config_enabled">randomness_config::enabled</a>()) {
+        <b>let</b> dealer_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
+        <b>let</b> <a href="randomness_config.md#0x1_randomness_config">randomness_config</a> = <a href="randomness_config.md#0x1_randomness_config_current">randomness_config::current</a>();
+        <b>let</b> dealer_validator_set = <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>();
+        <b>let</b> target_validator_set = <a href="stake.md#0x1_stake_next_validator_consensus_infos">stake::next_validator_consensus_infos</a>();
+        <b>let</b> new_session_metadata = <a href="dkg.md#0x1_dkg_DKGSessionMetadata">DKGSessionMetadata</a> {
+            dealer_epoch,
+            <a href="randomness_config.md#0x1_randomness_config">randomness_config</a>,
+            dealer_validator_set,
+            target_validator_set,
+        };
+        <b>let</b> start_time_us = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
+        <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+        dkg_state.in_progress = std::option::some(<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a> {
+            metadata: new_session_metadata,
+            start_time_us,
+            transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+        });
+
+        emit(<a href="dkg.md#0x1_dkg_DKGStartEvent">DKGStartEvent</a> {
+            start_time_us,
+            session_metadata: new_session_metadata,
+        });
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dkg_ready_for_next_epoch"></a>
+
+## Function `ready_for_next_epoch`
+
+Return whether there's still ongoing DKG work and the reconfig should wait for it.
+
+Used by async reconfig framework.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_ready_for_next_epoch">ready_for_next_epoch</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_ready_for_next_epoch">ready_for_next_epoch</a>(): bool <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    // If <a href="randomness.md#0x1_randomness">randomness</a> is not enabled, no processing is required.
+    <b>if</b> (!<a href="randomness_config.md#0x1_randomness_config_enabled">randomness_config::enabled</a>()) {
+        <b>return</b> <b>true</b>
+    };
+
+    // We say DKG is ready only when we see a transcript for the next epoch.
+    {
+        <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+            <b>return</b> <b>false</b>
+        };
+
+        <b>let</b> maybe_session = &<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).last_completed;
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(maybe_session)) {
+            <b>return</b> <b>false</b>
+        };
+
+        <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_session);
+        <b>if</b> (session.metadata.dealer_epoch != <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>()) {
+            <b>return</b> <b>false</b>
+        };
+    };
+
+    <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dkg_on_new_epoch"></a>
+
+## Function `on_new_epoch`
+
+DKG on-chain state clean-up.
+
+Called by Async reconfig framework right before epoch change.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <a href="dkg.md#0x1_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(framework);
 }
 </code></pre>
 
