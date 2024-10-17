@@ -490,7 +490,10 @@ where
         }
     }
 
-    fn validate_commit_ready(
+    /// Validates delayed fields read-set. If validation is successful, commits delayed field
+    /// changes to multi-version data structure and returns true. If validation or commit fails,
+    /// returns false (indicating that transaction needs to be re-executed).
+    fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -550,7 +553,11 @@ where
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
             let mut executed_at_commit = false;
-            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
+            if !Self::validate_and_commit_delayed_fields(
+                txn_idx,
+                versioned_cache,
+                last_input_output,
+            )? {
                 // Transaction needs to be re-executed, one final time.
 
                 Self::update_transaction_on_abort(
@@ -598,13 +605,17 @@ where
                     }
                 }
 
-                scheduler.finish_execution_during_commit(txn_idx)?;
+                scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
 
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache, scheduler);
                 if !validation_result
-                    || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
-                        .unwrap_or(false)
+                    || !Self::validate_and_commit_delayed_fields(
+                        txn_idx,
+                        versioned_cache,
+                        last_input_output,
+                    )
+                    .unwrap_or(false)
                 {
                     return Err(code_invariant_error(format!(
                         "Validation after re-execution failed for {} txn, validate() = {}",
@@ -627,7 +638,7 @@ where
                             scheduler,
                             runtime_environment,
                         )?;
-                        scheduler.finish_execution_during_commit(txn_idx)?;
+                        scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
                     }
                 }
             }

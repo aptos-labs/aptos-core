@@ -88,7 +88,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
                         .read_module_entry(
                             address,
                             module_name,
-                            &|id| self.fetch_base_module_entry(id),
+                            &|id| self.fetch_versioned_base_module_entry(id),
                             |r| r.map(|v| v.state_value_metadata().clone()),
                         )
                         .map_err(|e| e.to_partial())
@@ -132,7 +132,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 state.read_module_entry(
                     address,
                     module_name,
-                    &|id| self.fetch_base_module_entry(id),
+                    &|id| self.fetch_versioned_base_module_entry(id),
                     |r| r.is_some(),
                 )
             },
@@ -167,7 +167,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                     state.read_module_entry(
                         address,
                         module_name,
-                        &|id| self.fetch_base_module_entry(id),
+                        &|id| self.fetch_versioned_base_module_entry(id),
                         |r| r.map(|v| v.bytes().clone()),
                     )
                 },
@@ -204,7 +204,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                     state.read_module_entry(
                         address,
                         module_name,
-                        &|id| self.fetch_base_module_entry(id),
+                        &|id| self.fetch_versioned_base_module_entry(id),
                         |r| r.map(|v| v.size_in_bytes()),
                     )
                 },
@@ -241,7 +241,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                     state.read_module_entry(
                         address,
                         module_name,
-                        &|id| self.fetch_base_module_entry(id),
+                        &|id| self.fetch_versioned_base_module_entry(id),
                         |r| r.map(|v| v.metadata().to_vec()),
                     )
                 },
@@ -278,7 +278,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                     state.read_module_entry(
                         address,
                         module_name,
-                        &|id| self.fetch_base_module_entry(id),
+                        &|id| self.fetch_versioned_base_module_entry(id),
                         |r| r.map(|v| v.compiled_module().clone()),
                     )
                 },
@@ -473,21 +473,19 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     ) -> VMResult<V>
     where
         R: Fn(Option<&Arc<VersionedModule<ModuleCacheEntry>>>) -> V,
-        F: Fn(&ModuleId) -> VMResult<Option<ModuleCacheEntry>>,
+        F: Fn(&ModuleId) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>>,
     {
         let module_id = ModuleId::new(*address, module_name.to_owned());
         let read = self
             .versioned_map
             .code_cache()
             .module_cache()
-            .get_module_or_insert_with(&module_id, || {
-                init_func(&module_id).map(|e| e.map(|e| VersionedModule::new(e, None)))
-            })?;
+            .get_module_or_insert_with(&module_id, || init_func(&module_id))?;
 
         let value = read_func(read.as_ref());
         self.captured_reads
             .borrow_mut()
-            .capture_block_cache_read(module_id, read);
+            .capture_per_block_cache_read(module_id, read);
         Ok(value)
     }
 }
@@ -505,23 +503,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    /// Returns the module entry created from the base (storage) view. The error is returned if
-    /// creation fails or storage returns an error.
-    fn fetch_base_module_entry(&self, module_id: &ModuleId) -> VMResult<Option<ModuleCacheEntry>> {
-        let key = T::Key::from_address_and_module_name(module_id.address(), module_id.name());
-        self.get_raw_base_value(&key)
-            .map_err(|e| e.finish(Location::Undefined))?
-            .map(|s| ModuleCacheEntry::from_state_value(self.runtime_environment, s))
-            .transpose()
-    }
-
-    /// Same as [Self::fetch_base_module_entry], but returns versioned module entry.
+    /// Returns the module created from the pre-block state. The error is returned when the module
+    /// creation fails (e.g., failed to deserialize bytes into the module), or when the underlying
+    /// storage returns an error.
     fn fetch_versioned_base_module_entry(
         &self,
         module_id: &ModuleId,
     ) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>> {
-        Ok(self
-            .fetch_base_module_entry(module_id)?
-            .map(|e| VersionedModule::new(e, None)))
+        let key = T::Key::from_address_and_module_name(module_id.address(), module_id.name());
+        self.get_raw_base_value(&key)
+            .map_err(|err| err.finish(Location::Undefined))?
+            .map(|state_value| {
+                ModuleCacheEntry::from_state_value(self.runtime_environment, state_value)
+                    .map(VersionedModule::from_pre_block_state)
+            })
+            .transpose()
     }
 }

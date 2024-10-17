@@ -561,7 +561,12 @@ impl Scheduler {
         Ok(SchedulerTask::Retry)
     }
 
-    pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+    /// Wakes up dependencies of the specified transaction, and decreases validation index so that
+    /// all transactions above are re-validated.
+    pub fn wake_dependencies_and_decrease_validation_idx(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<(), PanicError> {
         // We have exclusivity on this transaction.
         self.wake_dependencies_after_execution(txn_idx)?;
 
