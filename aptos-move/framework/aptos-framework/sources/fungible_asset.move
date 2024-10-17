@@ -472,6 +472,9 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the current supply from the `metadata` object.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::derived_supply`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
         let metadata_address = object::object_address(&metadata);
         if (exists<ConcurrentSupply>(metadata_address)) {
@@ -577,6 +580,9 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the balance of a given store.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::derived_balance`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
         let store_addr = object::object_address(&store);
         if (store_exists_inline(store_addr)) {
@@ -716,6 +722,9 @@ module aptos_framework::fungible_asset {
 
     /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
     /// Note: it does not move the underlying object.
+    ///
+    ///       This function can be in-place replaced by `dispatchable_fungible_asset::transfer`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public entry fun transfer<T: key>(
         sender: &signer,
         from: Object<T>,
@@ -779,6 +788,9 @@ module aptos_framework::fungible_asset {
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::withdraw`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun withdraw<T: key>(
         owner: &signer,
         store: Object<T>,
@@ -817,6 +829,9 @@ module aptos_framework::fungible_asset {
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::deposit`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         deposit_sanity_check(store, true);
         deposit_internal(object::object_address(&store), fa);
