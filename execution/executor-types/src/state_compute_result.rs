@@ -104,17 +104,7 @@ impl StateComputeResult {
     }
 
     pub fn transactions_to_commit_len(&self) -> usize {
-        self.ledger_update_output.to_commit.len()
-    }
-
-    /// On top of input transactions (which contain BlockMetadata and Validator txns),
-    /// filter out those that should be committed, and add StateCheckpoint/BlockEpilogue if needed.
-    pub fn transactions_to_commit(&self) -> Vec<Transaction> {
-        self.ledger_update_output
-            .to_commit
-            .iter()
-            .map(|t| t.transaction.clone())
-            .collect()
+        self.ledger_update_output.transactions.len()
     }
 
     pub fn epoch_state(&self) -> &Option<EpochState> {
@@ -155,7 +145,7 @@ impl StateComputeResult {
     pub fn make_chunk_commit_notification(&self) -> ChunkCommitNotification {
         ChunkCommitNotification {
             subscribable_events: self.ledger_update_output.subscribable_events.clone(),
-            committed_transactions: self.transactions_to_commit(),
+            committed_transactions: self.ledger_update_output.transactions.clone(),
             reconfiguration_occurred: self.has_reconfiguration(),
         }
     }
@@ -163,14 +153,18 @@ impl StateComputeResult {
     pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
+            transactions: &self.ledger_update_output.transactions,
+            transaction_outputs: &self.ledger_update_output.transaction_outputs,
+            transaction_infos: &self.ledger_update_output.transaction_infos,
+            per_version_state_updates: &self.ledger_update_output.per_version_state_updates,
             base_state_version: self.parent_state.base_version,
-            txns_to_commit: &self.ledger_update_output.to_commit,
             latest_in_memory_state: &self.result_state,
             state_updates_until_last_checkpoint: self
                 .ledger_update_output
                 .state_updates_until_last_checkpoint
                 .as_ref(),
             sharded_state_cache: Some(&self.ledger_update_output.sharded_state_cache),
+            is_reconfig: self.ledger_update_output.block_end_info.is_some(),
         }
     }
 }

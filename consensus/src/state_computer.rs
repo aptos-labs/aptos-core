@@ -144,7 +144,10 @@ impl ExecutionProxy {
             Box::pin(async move {
                 pre_commit_notifier
                     .send(Box::pin(async move {
-                        let txns = state_compute_result.transactions_to_commit();
+                        let txns = state_compute_result
+                            .ledger_update_output
+                            .transactions
+                            .clone();
                         let subscribable_events =
                             state_compute_result.subscribable_events().to_vec();
                         if let Err(e) = monitor!(
