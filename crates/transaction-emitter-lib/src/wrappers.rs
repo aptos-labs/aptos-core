@@ -17,7 +17,7 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
-use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::{transaction_builder::TransactionFactory, types::AccountKey};
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType, WorkflowProgress};
 use aptos_types::keyless::test_utils::get_sample_esk;
 use rand::{rngs::StdRng, SeedableRng};
@@ -126,7 +126,19 @@ pub async fn emit_transactions_with_cluster(
                 .keyless_jwt
                 .as_ref()
                 .expect("jwt should be set"),
-        )
+        );
+        if let Some(addr) = args.account_type_args.federated_jwk_addr {
+            emit_job_request = emit_job_request.federated_jwk_addr(addr);
+        }
+        if let Some(key) = &args.account_type_args.federated_jwk_owner_secret_key {
+            emit_job_request = emit_job_request
+                .federated_jwk_addr(
+                    AccountKey::from(key.private_key())
+                        .authentication_key()
+                        .account_address(),
+                )
+                .federated_jwk_owner_secret_key(key.private_key());
+        }
     }
 
     let num_accounts =
@@ -231,11 +243,21 @@ pub async fn create_accounts_command(
     let account_generator = if let Some(jwt) = &create_accounts_args.keyless_jwt {
         emit_job_request = emit_job_request.keyless_jwt(jwt);
 
+        let federated_jwk_addr = create_accounts_args
+            .federated_jwk_owner_secret_key
+            .as_ref()
+            .map(|key| {
+                AccountKey::from(key.private_key())
+                    .authentication_key()
+                    .account_address()
+            });
+        // This generator will only be used to create accounts, the esk and expiry can be arbitrarily set
         create_keyless_account_generator(
             get_sample_esk(),
             0,
             jwt,
             create_accounts_args.proof_file_path.as_deref(),
+            federated_jwk_addr,
         )?
     } else {
         Box::new(PrivateKeyAccountGenerator)
