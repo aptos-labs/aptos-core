@@ -29,7 +29,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::{
-    code::{CachedScript, ModuleCache, ScriptCache},
+    code::{Code, ModuleCache, ScriptCache},
     module_cyclic_dependency_error, module_linker_error,
 };
 use std::sync::Arc;
@@ -80,10 +80,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ScriptCache
         }
     }
 
-    fn get_script(
-        &self,
-        key: &Self::Key,
-    ) -> Option<CachedScript<Self::Deserialized, Self::Verified>> {
+    fn get_script(&self, key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>> {
         match &self.latest_view {
             ViewState::Sync(state) => state.versioned_map.script_cache().get_script(key),
             ViewState::Unsync(state) => state.unsync_map.script_cache().get_script(key),
@@ -113,28 +110,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
             },
             None => match &self.latest_view {
                 ViewState::Sync(state) => {
-                    if let CacheRead::Hit(result) = state
+                    if let CacheRead::Hit(read) = state
                         .captured_reads
                         .borrow()
-                        .fetch_state_value_metadata(address, module_name)
+                        .fetch_module_read(address, module_name)?
                     {
-                        return Ok(result);
+                        return Ok(read.map(|module| module.state_value_metadata().clone()));
                     }
 
-                    state
-                        .read_module_entry(
-                            address,
-                            module_name,
-                            &|id| self.fetch_versioned_base_module_entry(id),
-                            |r| r.map(|v| v.state_value_metadata().clone()),
-                        )
-                        .map_err(|e| e.to_partial())
+                    let read = state
+                        .read_module(address, module_name, &|id| self.get_base_module(id))
+                        .map_err(|e| e.to_partial())?;
+                    Ok(read.map(|v| v.state_value_metadata().clone()))
                 },
                 ViewState::Unsync(state) => {
                     let read = state
-                        .read_module_entry(address, module_name, &|id| {
-                            self.fetch_versioned_base_module_entry(id)
-                        })
+                        .read_module(address, module_name, &|id| self.get_base_module(id))
                         .map_err(|e| e.to_partial())?;
                     Ok(read.map(|e| e.state_value_metadata().clone()))
                 },
@@ -156,29 +147,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             return Ok(true);
         }
 
-        match &self.latest_view {
-            ViewState::Sync(state) => {
-                if let CacheRead::Hit(result) = state
-                    .captured_reads
-                    .borrow()
-                    .check_module_exists(address, module_name)
-                {
-                    return Ok(result);
-                }
-
-                state.read_module_entry(
-                    address,
-                    module_name,
-                    &|id| self.fetch_versioned_base_module_entry(id),
-                    |r| r.is_some(),
-                )
-            },
-            ViewState::Unsync(state) => Ok(state
-                .read_module_entry(address, module_name, &|id| {
-                    self.fetch_versioned_base_module_entry(id)
-                })?
-                .is_some()),
-        }
+        Ok(self.read_module(address, module_name)?.is_some())
     }
 
     fn fetch_module_bytes(
@@ -186,36 +155,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        match CrossBlockModuleCache::fetch_module_bytes(address, module_name) {
-            Some(bytes) => {
-                self.capture_global_cache_read(address, module_name);
-                Ok(Some(bytes))
-            },
-            None => match &self.latest_view {
-                ViewState::Sync(state) => {
-                    if let CacheRead::Hit(maybe_bytes) = state
-                        .captured_reads
-                        .borrow()
-                        .fetch_module_bytes(address, module_name)
-                    {
-                        return Ok(maybe_bytes);
-                    }
-
-                    state.read_module_entry(
-                        address,
-                        module_name,
-                        &|id| self.fetch_versioned_base_module_entry(id),
-                        |r| r.map(|v| v.bytes().clone()),
-                    )
+        Ok(
+            match CrossBlockModuleCache::fetch_module_bytes(address, module_name) {
+                Some(bytes) => {
+                    self.capture_global_cache_read(address, module_name);
+                    Some(bytes)
                 },
-                ViewState::Unsync(state) => {
-                    let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_versioned_base_module_entry(id)
-                    })?;
-                    Ok(read.map(|v| v.bytes().clone()))
-                },
+                None => self
+                    .read_module(address, module_name)?
+                    .map(|module| module.bytes().clone()),
             },
-        }
+        )
     }
 
     fn fetch_module_size_in_bytes(
@@ -223,36 +173,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
-        match CrossBlockModuleCache::fetch_module_size_in_bytes(address, module_name) {
-            Some(size) => {
-                self.capture_global_cache_read(address, module_name);
-                Ok(Some(size))
-            },
-            None => match &self.latest_view {
-                ViewState::Sync(state) => {
-                    if let CacheRead::Hit(maybe_size) = state
-                        .captured_reads
-                        .borrow()
-                        .fetch_module_size_in_bytes(address, module_name)
-                    {
-                        return Ok(maybe_size);
-                    }
-
-                    state.read_module_entry(
-                        address,
-                        module_name,
-                        &|id| self.fetch_versioned_base_module_entry(id),
-                        |r| r.map(|v| v.size_in_bytes()),
-                    )
+        Ok(
+            match CrossBlockModuleCache::fetch_module_size_in_bytes(address, module_name) {
+                Some(size) => {
+                    self.capture_global_cache_read(address, module_name);
+                    Some(size)
                 },
-                ViewState::Unsync(state) => {
-                    let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_versioned_base_module_entry(id)
-                    })?;
-                    Ok(read.map(|v| v.size_in_bytes()))
-                },
+                None => self
+                    .read_module(address, module_name)?
+                    .map(|module| module.size_in_bytes()),
             },
-        }
+        )
     }
 
     fn fetch_module_metadata(
@@ -260,36 +191,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
-        match CrossBlockModuleCache::fetch_module_metadata(address, module_name) {
-            Some(metadata) => {
-                self.capture_global_cache_read(address, module_name);
-                Ok(Some(metadata))
-            },
-            None => match &self.latest_view {
-                ViewState::Sync(state) => {
-                    if let CacheRead::Hit(maybe_metadata) = state
-                        .captured_reads
-                        .borrow()
-                        .fetch_module_metadata(address, module_name)
-                    {
-                        return Ok(maybe_metadata);
-                    }
-
-                    state.read_module_entry(
-                        address,
-                        module_name,
-                        &|id| self.fetch_versioned_base_module_entry(id),
-                        |r| r.map(|v| v.metadata().to_vec()),
-                    )
+        Ok(
+            match CrossBlockModuleCache::fetch_module_metadata(address, module_name) {
+                Some(metadata) => {
+                    self.capture_global_cache_read(address, module_name);
+                    Some(metadata)
                 },
-                ViewState::Unsync(state) => {
-                    let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_versioned_base_module_entry(id)
-                    })?;
-                    Ok(read.map(|v| v.metadata().to_vec()))
-                },
+                None => self
+                    .read_module(address, module_name)?
+                    .map(|module| module.metadata().to_vec()),
             },
-        }
+        )
     }
 
     fn fetch_deserialized_module(
@@ -297,36 +209,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        match CrossBlockModuleCache::fetch_deserialized_module(address, module_name) {
-            Some(compiled_module) => {
-                self.capture_global_cache_read(address, module_name);
-                Ok(Some(compiled_module))
-            },
-            None => match &self.latest_view {
-                ViewState::Sync(state) => {
-                    if let CacheRead::Hit(maybe_compiled_module) = state
-                        .captured_reads
-                        .borrow()
-                        .fetch_deserialized_module(address, module_name)
-                    {
-                        return Ok(maybe_compiled_module);
-                    }
-
-                    state.read_module_entry(
-                        address,
-                        module_name,
-                        &|id| self.fetch_versioned_base_module_entry(id),
-                        |r| r.map(|v| v.compiled_module().clone()),
-                    )
+        Ok(
+            match CrossBlockModuleCache::fetch_deserialized_module(address, module_name) {
+                Some(compiled_module) => {
+                    self.capture_global_cache_read(address, module_name);
+                    Some(compiled_module)
                 },
-                ViewState::Unsync(state) => {
-                    let read = state.read_module_entry(address, module_name, &|id| {
-                        self.fetch_versioned_base_module_entry(id)
-                    })?;
-                    Ok(read.map(|v| v.compiled_module().clone()))
-                },
+                None => self
+                    .read_module(address, module_name)?
+                    .map(|module| module.compiled_module().clone()),
             },
-        }
+        )
     }
 
     fn fetch_verified_module(
@@ -341,12 +234,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             },
             None => match &self.latest_view {
                 ViewState::Sync(state) => {
-                    if let CacheRead::Hit(result) = state
+                    if let CacheRead::Hit(read) = state
                         .captured_reads
                         .borrow()
-                        .fetch_verified_module(address, module_name)
+                        .fetch_verified_module(address, module_name)?
                     {
-                        return result;
+                        return Ok(read);
                     }
 
                     unimplemented!()
@@ -355,7 +248,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                     address,
                     module_name,
                     self.runtime_environment,
-                    &|id| self.fetch_versioned_base_module_entry(id),
+                    &|id| self.get_base_module(id),
                 ),
             },
         }
@@ -373,7 +266,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntime
 impl<'a, T: Transaction> SequentialState<'a, T> {
     /// Returns the module entry stored in the code cache, and if it is not there, initializes it.
     /// Also, records the read in the read-set.
-    fn read_module_entry<F>(
+    fn read_module<F>(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -405,7 +298,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         F: Fn(&ModuleId) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>>,
     {
         // Check if module exists, recording the read as well. If it does not, return early.
-        let entry = match self.read_module_entry(address, module_name, &init_func)? {
+        let entry = match self.read_module(address, module_name, &init_func)? {
             Some(entry) => entry,
             None => return Ok(None),
         };
@@ -459,7 +352,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         let mut verified_dependencies = vec![];
         for (addr, name) in locally_verified_module.immediate_dependencies_iter() {
             let dependency = self
-                .read_module_entry(addr, name, init_func)?
+                .read_module(addr, name, init_func)?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
 
             if dependency.is_verified() {
@@ -499,17 +392,15 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
 }
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
-    /// Returns the specified information from the module stored in the code cache. If the module
-    /// has not been cached, initializes it. The read is recorded in the read-set.
-    fn read_module_entry<F, R, V>(
+    /// Returns the module stored in the code cache. If the module has not been cached, initializes
+    /// it. The read is recorded in the read-set.
+    fn read_module<F>(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
         init_func: &F,
-        read_func: R,
-    ) -> VMResult<V>
+    ) -> VMResult<Option<Arc<VersionedModule<ModuleCacheEntry>>>>
     where
-        R: Fn(Option<&Arc<VersionedModule<ModuleCacheEntry>>>) -> V,
         F: Fn(&ModuleId) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>>,
     {
         let module_id = ModuleId::new(*address, module_name.to_owned());
@@ -517,12 +408,10 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .versioned_map
             .module_cache()
             .get_module_or_insert_with(&module_id, || init_func(&module_id))?;
-
-        let value = read_func(read.as_ref());
         self.captured_reads
             .borrow_mut()
-            .capture_per_block_cache_read(module_id, read);
-        Ok(value)
+            .capture_per_block_cache_read(module_id, read.clone());
+        Ok(read)
     }
 }
 
@@ -539,10 +428,34 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
+    fn read_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<VersionedModule<ModuleCacheEntry>>>> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                match state
+                    .captured_reads
+                    .borrow()
+                    .fetch_module_read(address, module_name)?
+                {
+                    CacheRead::Hit(read) => Ok(read),
+                    CacheRead::Miss => {
+                        state.read_module(address, module_name, &|id| self.get_base_module(id))
+                    },
+                }
+            },
+            ViewState::Unsync(state) => {
+                state.read_module(address, module_name, &|id| self.get_base_module(id))
+            },
+        }
+    }
+
     /// Returns the module created from the pre-block state. The error is returned when the module
     /// creation fails (e.g., failed to deserialize bytes into the module), or when the underlying
     /// storage returns an error.
-    fn fetch_versioned_base_module_entry(
+    fn get_base_module(
         &self,
         module_id: &ModuleId,
     ) -> VMResult<Option<VersionedModule<ModuleCacheEntry>>> {

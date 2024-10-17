@@ -7,18 +7,13 @@ use crate::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    access::ModuleAccess,
-    errors::{Location, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{access::ModuleAccess, errors::VMResult, CompiledModule};
 #[cfg(any(test, feature = "testing"))]
 use move_binary_format::{
     file_format::empty_module_with_dependencies_and_friends, file_format_common::VERSION_MAX,
 };
 use move_core_types::metadata::Metadata;
 use move_vm_runtime::{Module, RuntimeEnvironment};
-use move_vm_types::panic_error;
 use std::{fmt::Debug, sync::Arc};
 
 /// Different kinds of representation a module can be in. The code cache can implement different
@@ -130,17 +125,17 @@ impl ModuleCacheEntry {
 
     /// Returns the verified (i.e., a [Module]) representation of the current entry. If the entry
     /// is not verified, returns a panic error.
-    pub fn verified_module(&self) -> VMResult<&Arc<Module>> {
+    pub fn verified_module(&self) -> Result<&Arc<Module>, PanicError> {
         use Representation::*;
         match &self.representation {
             Verified(module) => Ok(module),
             Deserialized(compiled_module) => {
                 let msg = format!(
-                    "Module entry for {}::{} is not verified",
+                    "Module {}::{} should be verified, but is not",
                     compiled_module.address(),
                     compiled_module.name()
                 );
-                Err(panic_error!(msg).finish(Location::Undefined))
+                Err(PanicError::CodeInvariantError(msg))
             },
         }
     }

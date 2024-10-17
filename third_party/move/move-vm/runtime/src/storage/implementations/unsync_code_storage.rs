@@ -13,7 +13,7 @@ use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
-use move_vm_types::code::{CachedScript, ModuleBytesStorage, ScriptCache, UnsyncScriptCache};
+use move_vm_types::code::{Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache};
 use std::sync::Arc;
 
 /// Code storage that stores both modules and scripts (not thread-safe).
@@ -96,10 +96,7 @@ impl<M: ModuleStorage> ScriptCache for UnsyncCodeStorage<M> {
             .insert_verified_script(key, verified_script)
     }
 
-    fn get_script(
-        &self,
-        key: &Self::Key,
-    ) -> Option<CachedScript<Self::Deserialized, Self::Verified>> {
+    fn get_script(&self, key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>> {
         self.script_cache.get_script(key)
     }
 
@@ -135,7 +132,7 @@ mod test {
 
     #[test]
     fn test_deserialized_script_caching() {
-        use CachedScript::*;
+        use Code::*;
 
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
@@ -168,7 +165,7 @@ mod test {
 
     #[test]
     fn test_verified_script_caching() {
-        use CachedScript as S;
+        use Code as S;
         use ModuleCacheEntry as M;
 
         let mut module_bytes_storage = InMemoryStorage::new();

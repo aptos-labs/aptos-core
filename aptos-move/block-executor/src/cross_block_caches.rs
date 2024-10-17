@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_mvhashmap::code_cache::SyncModuleCache;
 use aptos_types::{
+    error::PanicError,
     state_store::{state_value::StateValueMetadata, StateView},
     vm::modules::ModuleCacheEntry,
 };
@@ -11,10 +11,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use bytes::Bytes;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
-use move_binary_format::{
-    errors::{Location, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata, vm_status::VMStatus,
@@ -87,12 +84,21 @@ struct CrossBlockModuleCacheEntry {
 
 impl CrossBlockModuleCacheEntry {
     /// Returns a new valid cache entry. Panics if provided module entry is not verified.
-    fn new(entry: ModuleCacheEntry) -> Self {
-        assert!(entry.is_verified());
-        Self {
+    fn new(entry: ModuleCacheEntry) -> Result<Self, PanicError> {
+        if !entry.is_verified() {
+            let address = entry.compiled_module().self_addr();
+            let module_name = entry.compiled_module().self_name();
+            let msg = format!(
+                "Module {}::{} is created for the cross-block module cache, but is not verified",
+                address, module_name
+            );
+            return Err(PanicError::CodeInvariantError(msg));
+        }
+
+        Ok(Self {
             valid: CachePadded::new(AtomicBool::new(true)),
             verified_entry: entry,
-        }
+        })
     }
 
     /// Marks the entry as invalid.
@@ -133,16 +139,14 @@ impl CrossBlockModuleCacheEntry {
             .then(|| self.verified_entry.compiled_module().clone())
     }
 
-    /// Returns the verified module if the entry is valid, and [None] otherwise. Panics if the
-    /// entry is not verified.
-    fn verified_module(&self) -> VMResult<Option<Arc<Module>>> {
-        if self.is_valid() {
-            self.verified_entry
-                .verified_module()
-                .map(|v| Some(v.clone()))
+    /// Returns the verified module if the entry is valid, and [None] otherwise. Returns an error
+    /// if the entry is not verified.
+    fn verified_module(&self) -> Result<Option<Arc<Module>>, PanicError> {
+        Ok(if self.is_valid() {
+            Some(self.verified_entry.verified_module()?.clone())
         } else {
-            Ok(None)
-        }
+            None
+        })
     }
 }
 
@@ -165,37 +169,22 @@ impl CrossBlockModuleCache {
 
     /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
     /// cache if its size is too large. Should only be called at block end.
-    pub(crate) fn populate_from_sync_code_cache_at_block_end(
-        module_cache: &SyncModuleCache<ModuleId, ModuleCacheEntry>,
-    ) {
-        let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
-            cache.clear();
-        }
-
-        module_cache.filter_into(
-            cache.dereference_mut(),
-            |e| e.is_verified(),
-            |e| CrossBlockModuleCacheEntry::new(e.clone()),
-        );
-    }
-
-    /// Same as [Self::populate_from_sync_code_cache_at_block_end], but only used by sequential
-    /// execution.
-    pub(crate) fn populate_from_unsync_code_cache_at_block_end(
+    pub(crate) fn populate_from_code_cache_at_block_end(
         modules: impl Iterator<Item = (ModuleId, ModuleCacheEntry)>,
-    ) {
+    ) -> Result<(), PanicError> {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
-            cache.clear();
-        }
-
-        for (id, entry) in modules {
-            if entry.is_verified() {
-                let entry = CrossBlockModuleCacheEntry::new(entry);
-                cache.insert(id, entry);
+        for (id, module) in modules {
+            if module.is_verified() {
+                let module = CrossBlockModuleCacheEntry::new(module)?;
+                cache.insert(id, module);
             }
         }
+
+        if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
+            cache.clear();
+        }
+
+        Ok(())
     }
 
     /// Returns true if the module is stored in cross-block cache and is valid.
@@ -207,7 +196,8 @@ impl CrossBlockModuleCache {
     }
 
     /// Marks the cached entry (if it exists) as invalid. As a result, all subsequent calls to the
-    /// cache will result in a cache miss.
+    /// cache will result in a cache miss. It is fine for an entry not to exist: e.g., when a new
+    /// module is published one can try to invalidate global cache (that does not have the module).
     pub(crate) fn mark_invalid(module_id: &ModuleId) {
         if let Some(entry) = CROSS_BLOCK_MODULE_CACHE.acquire().get(module_id) {
             entry.mark_invalid();
@@ -290,7 +280,7 @@ impl CrossBlockModuleCache {
     pub(crate) fn fetch_verified_module(
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
+    ) -> Result<Option<Arc<Module>>, PanicError> {
         let cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         match cache.get(&(address, module_name)) {
             Some(v) => v.verified_module(),
@@ -302,7 +292,7 @@ impl CrossBlockModuleCache {
     #[cfg(test)]
     pub fn add_to_to_cross_block_module_cache(module_id: ModuleId, entry: ModuleCacheEntry) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        cache.insert(module_id, CrossBlockModuleCacheEntry::new(entry));
+        cache.insert(module_id, CrossBlockModuleCacheEntry::new(entry).unwrap());
     }
 
     /// Removes the specified entry from cross-block module cache. Used for tests only.
