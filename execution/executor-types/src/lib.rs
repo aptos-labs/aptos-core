@@ -160,19 +160,13 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> ExecutorResult<()> {
-        let mut parent_block_id = self.committed_block_id();
         for block_id in block_ids {
-            self.pre_commit_block(block_id, parent_block_id)?;
-            parent_block_id = block_id;
+            self.pre_commit_block(block_id)?;
         }
         self.commit_ledger(ledger_info_with_sigs)
     }
 
-    fn pre_commit_block(
-        &self,
-        block_id: HashValue,
-        parent_block_id: HashValue,
-    ) -> ExecutorResult<()>;
+    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()>;
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 

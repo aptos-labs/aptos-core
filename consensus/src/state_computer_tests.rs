@@ -144,11 +144,7 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         Ok(StateComputeResult::new_dummy_with_input_txns(txns))
     }
 
-    fn pre_commit_block(
-        &self,
-        _block_id: HashValue,
-        _parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
         Ok(())
     }
 
