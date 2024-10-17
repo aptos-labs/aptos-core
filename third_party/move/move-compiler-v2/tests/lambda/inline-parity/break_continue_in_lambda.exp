@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::brk2` has a function parameter:
+  ┌─ tests/lambda/inline-parity/break_continue_in_lambda.move:6:9
+  │
+6 │     fun brk2(f: | |) {
+  │         ^^^^ - Parameter `f` has function-valued type `|()|`.

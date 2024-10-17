@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `map_opt::map` has a function parameter:
+  ┌─ tests/lambda/inline-parity/options.move:5:16
+  │
+5 │     public fun map<Element, OtherElement>(t: option::Option<Element>, f: |Element|OtherElement): option::Option<OtherElement> {
+  │                ^^^                                                    - Parameter `f` has function-valued type `|Element|OtherElement`.
