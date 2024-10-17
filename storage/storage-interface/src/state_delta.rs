@@ -74,7 +74,7 @@ impl StateDelta {
 
     pub fn merge(&mut self, other: StateDelta) {
         assert!(other.follow(self));
-        combine_sharded_state_updates(&mut self.updates_since_base, other.updates_since_base);
+        combine_sharded_state_updates(&mut self.updates_since_base, &other.updates_since_base);
 
         self.current = other.current;
         self.current_version = other.current_version;

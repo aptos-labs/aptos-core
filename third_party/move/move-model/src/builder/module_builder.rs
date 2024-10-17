@@ -48,7 +48,10 @@ use move_compiler::{
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
-use move_ir_types::{ast::ConstantName, location::Spanned};
+use move_ir_types::{
+    ast::ConstantName,
+    location::{sp, Spanned},
+};
 use regex::Regex;
 use std::{
     cell::RefCell,
@@ -250,8 +253,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Converts a ModuleAccess into a qualified symbol which can be used for lookup of
     /// types or functions. If the access has a struct variant, an error is produced.
     pub fn module_access_to_qualified(&self, access: &EA::ModuleAccess) -> QualifiedSymbol {
-        self.check_no_variant(access);
-        let (qsym, _) = self.module_access_to_qualified_with_variant(access);
+        let (_, access) = self.check_no_variant_and_convert_maccess(access);
+        let (qsym, _) = self.module_access_to_qualified_with_variant(&access);
         qsym
     }
 
@@ -262,15 +265,46 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         )
     }
 
-    pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
-        if Self::is_variant(maccess) {
-            self.parent.env.error(
-                &self.parent.to_loc(&maccess.loc),
-                "variants not allowed in this context",
-            );
-            false
+    /// If `maccess` takes the form `ModuleAccess(M, _, Some(V))`,
+    /// check `M::V` is a struct/enum, constant or schema,
+    /// if so, return the form `ModuleAccess(M, V, None)`,
+    /// see how `maccess` is created by
+    /// function `name_access_chain` in `expansion/translate.rs`
+    pub fn check_no_variant_and_convert_maccess(
+        &self,
+        maccess: &EA::ModuleAccess,
+    ) -> (bool, EA::ModuleAccess) {
+        if let EA::ModuleAccess_::ModuleAccess(mident, _, Some(var_name)) = &maccess.value {
+            let addr = self
+                .parent
+                .resolve_address(&self.parent.to_loc(&mident.loc), &mident.value.address);
+            let name = self
+                .symbol_pool()
+                .make(mident.value.module.0.value.as_str());
+            let module_name = ModuleName::from_address_bytes_and_name(addr, name);
+            let var_name_sym = self.symbol_pool().make(var_name.value.as_str());
+            let qualitifed_name = QualifiedSymbol {
+                module_name,
+                symbol: var_name_sym,
+            };
+            if self.parent.struct_table.contains_key(&qualitifed_name)
+                || self.parent.spec_schema_table.contains_key(&qualitifed_name)
+                || self.parent.const_table.contains_key(&qualitifed_name)
+            {
+                let new_maccess = sp(
+                    maccess.loc,
+                    EA::ModuleAccess_::ModuleAccess(*mident, *var_name, None),
+                );
+                (true, new_maccess)
+            } else {
+                self.parent.env.error(
+                    &self.parent.to_loc(&maccess.loc),
+                    "variants not allowed in this context",
+                );
+                (false, maccess.clone())
+            }
         } else {
-            true
+            (true, maccess.clone())
         }
     }
 
@@ -410,7 +444,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             self.symbol_pool().make(n.value.as_str()),
                         ),
                         EA::ModuleAccess_::ModuleAccess(mident, n, _) => {
-                            self.check_no_variant(macc);
+                            let (_, macc) = self.check_no_variant_and_convert_maccess(macc);
                             let addr_bytes = self.parent.resolve_address(
                                 &self.parent.to_loc(&macc.loc),
                                 &mident.value.address,

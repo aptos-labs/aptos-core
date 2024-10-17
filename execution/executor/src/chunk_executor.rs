@@ -264,11 +264,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 chunk.ledger_info.as_ref(),
                 false, // sync_commit
                 chunk.result_state.clone(),
-                // TODO(aldenhu): avoid cloning
                 chunk
                     .ledger_update_output
                     .state_updates_until_last_checkpoint
-                    .clone(),
+                    .as_ref(),
                 Some(&chunk.ledger_update_output.sharded_state_cache),
             )?;
         }

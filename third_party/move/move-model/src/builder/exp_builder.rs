@@ -420,13 +420,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         };
         ty.visit(&mut visitor);
         if incomplete {
-            self.error(
-                &loc,
-                &format!(
-                    "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
-                    ty.display(&self.type_display_context())
-                ),
-            );
+            let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
+            // Skip displaying the error message if there is already an error in the type; we must have another message about it already.
+            if !displayed_ty.contains("*error*") {
+                self.error(
+                    &loc,
+                    &format!(
+                        "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
+                        displayed_ty
+                    ),
+                );
+            }
         }
         ty
     }
@@ -3054,10 +3058,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        if !self.parent.check_no_variant(maccess) {
+        let (no_variant, maccess) = self.parent.check_no_variant_and_convert_maccess(maccess);
+        if !no_variant {
             return self.new_error_exp();
         }
-        let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
+        let (module_name, name, _) = self.parent.module_access_to_parts(&maccess);
 
         // Process `old(E)` scoping
         let is_old =
