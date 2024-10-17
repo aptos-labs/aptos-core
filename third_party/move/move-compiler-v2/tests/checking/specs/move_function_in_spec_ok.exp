@@ -35,7 +35,7 @@ module 0x42::move_function_in_spec {
         }
     }
     spec fun $type_of<T>(): TypeInfo {
-        Tuple()
+        Abort(1)
     }
 } // end 0x42::move_function_in_spec
 

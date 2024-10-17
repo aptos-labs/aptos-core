@@ -1,0 +1,13 @@
+Move prover returns: exiting with condition generation errors
+error: imperative expressions not supported in specs
+   ┌─ tests/sources/functional/spec_fun_imperative_expression_err.move:2:27
+   │
+ 2 │       fun sequential(): u64 {
+   │ ╭───────────────────────────^
+ 3 │ │         let _x = 2;
+ 4 │ │         let _y = 3;
+ 5 │ │         while(_y > 0) {
+   · │
+16 │ │         _x
+17 │ │     }
+   │ ╰─────^

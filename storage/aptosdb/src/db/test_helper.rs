@@ -1010,7 +1010,8 @@ pub fn test_sync_transactions_impl(
                     cur_ver,
                     &in_memory_state,
                     txns_to_commit_batch,
-                ),
+                )
+                .as_ref(),
                 None,
             )
             .unwrap();
@@ -1025,7 +1026,8 @@ pub fn test_sync_transactions_impl(
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
             in_memory_state.clone(),
-            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch),
+            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch)
+                .as_ref(),
             None,
         )
         .unwrap();

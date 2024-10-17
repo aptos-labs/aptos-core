@@ -9,6 +9,7 @@ use aptos_config::config::{ApiConfig, DEFAULT_MAX_PAGE_SIZE};
 use aptos_logger::prelude::*;
 use aptos_node::AptosNodeArgs;
 use aptos_rosetta::{bootstrap, common::native_coin, types::Currency};
+use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use std::{
@@ -16,6 +17,7 @@ use std::{
     fs::File,
     net::SocketAddr,
     path::PathBuf,
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -243,9 +245,28 @@ impl ServerArgs for OfflineArgs {
         if let Some(ref filepath) = self.currency_config_file {
             let file = File::open(filepath).unwrap();
             let currencies: Vec<Currency> = serde_json::from_reader(file).unwrap();
-            currencies.into_iter().for_each(|item| {
-                supported_currencies.insert(item);
-            });
+            for item in currencies.into_iter() {
+                // Do a safety check on possible currencies on startup
+                if item.symbol.as_str() == "" {
+                    warn!(
+                        "Currency {:?} has an empty symbol, and is being skipped",
+                        item
+                    );
+                } else if let Some(metadata) = item.metadata.as_ref() {
+                    if let Some(move_type) = metadata.move_type.as_ref() {
+                        if StructTag::from_str(move_type).is_ok() {
+                            supported_currencies.insert(item);
+                            continue;
+                        }
+                    }
+                    warn!(
+                        "Currency {:?} has an invalid metadata coin type, and is being skipped",
+                        item
+                    );
+                } else {
+                    supported_currencies.insert(item);
+                }
+            }
         }
 
         supported_currencies
