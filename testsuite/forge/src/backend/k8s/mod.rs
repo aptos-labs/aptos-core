@@ -11,7 +11,7 @@ use aptos_logger::info;
 use futures::{future, FutureExt};
 use rand::rngs::StdRng;
 use serde_json::json;
-use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
+use std::{convert::TryInto, env, num::NonZeroUsize, time::Duration};
 
 pub mod chaos;
 pub mod chaos_schema;
