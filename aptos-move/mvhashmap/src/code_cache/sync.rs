@@ -1,16 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::VersionedModule;
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use hashbrown::HashMap;
 use move_vm_types::code::{ModuleCache, ScriptCache};
-use parking_lot::lock_api;
-use std::{
-    cell::RefCell,
-    hash::{Hash, RandomState},
-    ops::Deref,
-};
+use std::{hash::Hash, ops::Deref, sync::Arc};
 
 /// A per-block code cache to be used for parallel transaction execution.
 pub struct SyncCodeCache<K, M, Q, S> {
@@ -22,7 +18,6 @@ pub struct SyncCodeCache<K, M, Q, S> {
 impl<K, M, Q, S> SyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
-    M: Clone,
     Q: Eq + Hash + Clone,
     S: Clone,
 {
@@ -48,7 +43,6 @@ where
 impl<K, M, Q, S> ScriptCache for SyncCodeCache<K, M, Q, S>
 where
     K: Eq + Hash + Clone,
-    M: Clone,
     Q: Eq + Hash + Clone,
     S: Clone,
 {
@@ -66,13 +60,12 @@ where
 
 /// A per-block module cache to be used for parallel transaction execution.
 pub struct SyncModuleCache<K, M> {
-    cache: DashMap<K, CachePadded<M>>,
+    cache: DashMap<K, CachePadded<Arc<VersionedModule<M>>>>,
 }
 
 impl<K, M> SyncModuleCache<K, M>
 where
     K: Eq + Hash + Clone,
-    M: Clone,
 {
     /// Returns a new empty module cache.
     fn empty() -> Self {
@@ -94,26 +87,11 @@ where
     /// Returns true if the module cache contains an entry that satisfies the predicate.
     pub fn contains_and<P>(&self, key: &K, p: P) -> bool
     where
-        P: FnOnce(&M) -> bool,
+        P: FnOnce(&VersionedModule<M>) -> bool,
     {
         self.cache
             .get(key)
             .is_some_and(|current| p(current.value()))
-    }
-
-    /// Locks the module cache, and returns a guard.
-    pub fn lock(&self) -> LockedSyncModuleCache<K, M> {
-        let mut locked_cache_shards = vec![];
-        for shard in self.cache.shards() {
-            let lock = shard.write();
-            locked_cache_shards.push(lock);
-        }
-
-        // At this point all shards are locked. Only one thread can manipulate the locked cache.
-        LockedSyncModuleCache {
-            cache: &self.cache,
-            locked_cache_shards: RefCell::new(locked_cache_shards),
-        }
     }
 
     pub fn filter_into<T, P, F>(&self, collector: &mut HashMap<K, T>, p: P, f: F)
@@ -130,20 +108,19 @@ where
 impl<K, M> ModuleCache for SyncModuleCache<K, M>
 where
     K: Eq + Hash + Clone,
-    M: Clone,
 {
     type Key = K;
-    type Module = M;
+    type Module = VersionedModule<M>;
 
     fn insert_module(&self, key: Self::Key, module: Self::Module) {
-        self.cache.insert(key, CachePadded::new(module));
+        self.cache.insert(key, CachePadded::new(Arc::new(module)));
     }
 
     fn get_module_or_insert_with<F, E>(
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, E>
+    ) -> Result<Option<Arc<Self::Module>>, E>
     where
         F: FnOnce() -> Result<Option<Self::Module>, E>,
     {
@@ -161,76 +138,8 @@ where
             },
             Entry::Vacant(entry) => match default()? {
                 Some(m) => {
+                    let m = Arc::new(m);
                     entry.insert(CachePadded::new(m.clone()));
-                    Ok(Some(m))
-                },
-                None => Ok(None),
-            },
-        }
-    }
-}
-
-pub type HashMapShard<K, M> = HashMap<K, dashmap::SharedValue<CachePadded<M>>, RandomState>;
-pub type HashMapShardWriteGuard<'a, K, M> =
-    lock_api::RwLockWriteGuard<'a, dashmap::RawRwLock, HashMapShard<K, M>>;
-
-pub struct LockedSyncModuleCache<'a, K, M> {
-    // Note: the reference to the dashmap is used ONLY to calculate the shard index!
-    cache: &'a DashMap<K, CachePadded<M>>,
-    locked_cache_shards: RefCell<Vec<HashMapShardWriteGuard<'a, K, M>>>,
-}
-
-impl<'a, K, M> LockedSyncModuleCache<'a, K, M>
-where
-    K: Eq + Hash + Clone,
-    M: Clone,
-{
-    /// Unlocks the module cache.
-    pub fn unlock(self) {
-        for lock in self.locked_cache_shards.into_inner() {
-            drop(lock)
-        }
-    }
-}
-
-impl<K, M> ModuleCache for LockedSyncModuleCache<'_, K, M>
-where
-    K: Eq + Hash + Clone,
-    M: Clone,
-{
-    type Key = K;
-    type Module = M;
-
-    fn insert_module(&self, key: Self::Key, module: Self::Module) {
-        let shard_idx = self.cache.determine_shard(self.cache.hash_usize(&key));
-        let value = dashmap::SharedValue::new(CachePadded::new(module));
-        self.locked_cache_shards
-            .borrow_mut()
-            .get_mut(shard_idx)
-            .expect("Shard index when storing module should always be within bounds")
-            .insert(key, value);
-    }
-
-    fn get_module_or_insert_with<F, E>(
-        &self,
-        key: &Self::Key,
-        default: F,
-    ) -> Result<Option<Self::Module>, E>
-    where
-        F: FnOnce() -> Result<Option<Self::Module>, E>,
-    {
-        let shard_idx = self.cache.determine_shard(self.cache.hash_usize(key));
-        let mut locked_cache_shards = self.locked_cache_shards.borrow_mut();
-        let shard = locked_cache_shards
-            .get_mut(shard_idx)
-            .expect("Shard index when fetching modules should always be within bounds");
-
-        match shard.get(key) {
-            Some(s) => Ok(Some(s.get().deref().clone())),
-            None => match default()? {
-                Some(m) => {
-                    let value = dashmap::SharedValue::new(CachePadded::new(m.clone()));
-                    shard.insert(key.clone(), value);
                     Ok(Some(m))
                 },
                 None => Ok(None),

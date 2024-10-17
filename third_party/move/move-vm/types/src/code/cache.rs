@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::hash::Hash;
+use std::{hash::Hash, sync::Arc};
 
 /// Interface used by any script cache implementation.
 pub trait ScriptCache {
@@ -19,7 +19,7 @@ pub trait ScriptCache {
 /// Interface used by any module cache implementation.
 pub trait ModuleCache {
     type Key: Eq + Hash + Clone;
-    type Module: Clone;
+    type Module;
 
     /// Inserts the module to the code cache.
     // TODO(loader_v2): Document the return type and when we insert, when not.
@@ -31,7 +31,7 @@ pub trait ModuleCache {
         &self,
         key: &Self::Key,
         default: F,
-    ) -> Result<Option<Self::Module>, E>
+    ) -> Result<Option<Arc<Self::Module>>, E>
     where
         F: FnOnce() -> Result<Option<Self::Module>, E>;
 }

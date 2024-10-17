@@ -21,9 +21,8 @@ aptos-vm-types = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
-dashmap = { workspace = true, features = ["raw-api"] }
+dashmap = { workspace = true }
 hashbrown = { workspace = true }
-move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
 move-vm-runtime = { workspace = true }

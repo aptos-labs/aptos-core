@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache::SyncCodeCache, types::MaybeCommitted, versioned_data::VersionedData,
+    code_cache::SyncCodeCache, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
     versioned_modules::VersionedModules,
 };
@@ -15,7 +15,7 @@ use aptos_types::{
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::CachedScript;
 use serde::Serialize;
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{fmt::Debug, hash::Hash};
 
 pub mod code_cache;
 pub mod types;
@@ -43,8 +43,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 
-    code_cache:
-        SyncCodeCache<ModuleId, Arc<MaybeCommitted<ModuleCacheEntry>>, [u8; 32], CachedScript>,
+    code_cache: SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript>,
 }
 
 impl<
@@ -99,10 +98,7 @@ impl<
         &self.modules
     }
 
-    pub fn code_cache(
-        &self,
-    ) -> &SyncCodeCache<ModuleId, Arc<MaybeCommitted<ModuleCacheEntry>>, [u8; 32], CachedScript>
-    {
+    pub fn code_cache(&self) -> &SyncCodeCache<ModuleId, ModuleCacheEntry, [u8; 32], CachedScript> {
         &self.code_cache
     }
 }
