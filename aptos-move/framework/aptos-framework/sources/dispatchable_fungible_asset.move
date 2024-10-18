@@ -222,7 +222,7 @@ module aptos_framework::dispatchable_fungible_asset {
     ): u64;
 
     native fun dispatchable_derived_supply<T: key>(
-        store: Object<T>,
+        metadata: Object<T>,
         function: &FunctionInfo,
     ): Option<u128>;
 }
