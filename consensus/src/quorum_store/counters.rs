@@ -204,6 +204,15 @@ pub static KNOWN_DUPLICATE_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static NUM_EXPIRED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_expired_txns_when_pull",
+        "Histogram for the number of expired transactions in a block when pulled for consensus",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static NUM_INLINE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_inline_batches_in_block_proposal",
