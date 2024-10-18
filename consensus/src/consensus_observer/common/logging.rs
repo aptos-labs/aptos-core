@@ -49,6 +49,7 @@ pub enum LogEntry {
 #[serde(rename_all = "snake_case")]
 pub enum LogEvent {
     InvalidRpcResponse,
+    LatencyMonitoring,
     NetworkError,
     SendDirectSendMessage,
     SendRpcRequest,

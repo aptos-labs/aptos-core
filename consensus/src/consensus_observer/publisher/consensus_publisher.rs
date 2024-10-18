@@ -287,7 +287,10 @@ fn spawn_message_serializer_and_sender(
         // Create the message serialization task
         let consensus_observer_client_clone = consensus_observer_client.clone();
         let serialization_task =
-            outbound_message_receiver.map(move |(peer_network_id, message)| {
+            outbound_message_receiver.map(move |(peer_network_id, mut message)| {
+                // Update the message send time
+                message.set_send_time();
+
                 // Spawn a new blocking task to serialize the message
                 let consensus_observer_client_clone = consensus_observer_client_clone.clone();
                 tokio::task::spawn_blocking(move || {
