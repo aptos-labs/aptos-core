@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    network::PeerMonitoringServiceClient,
     peer_states::{
         latency_info::LatencyInfoState, network_info::NetworkInfoState, node_info::NodeInfoState,
         request_tracker::RequestTracker,
@@ -10,10 +11,11 @@ use crate::{
 };
 use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::PeerMonitoringServiceResponse,
+    PeerMonitoringServiceMessage,
 };
 use aptos_time_service::TimeService;
 use enum_dispatch::enum_dispatch;
@@ -111,12 +113,20 @@ impl PeerStateValue {
         node_config: NodeConfig,
         time_service: TimeService,
         peer_state_key: &PeerStateKey,
+        peer_monitoring_service_client: &PeerMonitoringServiceClient<
+            NetworkClient<PeerMonitoringServiceMessage>,
+        >,
     ) -> Self {
         match peer_state_key {
             PeerStateKey::LatencyInfo => {
                 let latency_monitoring_config =
                     node_config.peer_monitoring_service.latency_monitoring;
-                LatencyInfoState::new(latency_monitoring_config, time_service).into()
+                LatencyInfoState::new(
+                    latency_monitoring_config,
+                    time_service,
+                    peer_monitoring_service_client,
+                )
+                .into()
             },
             PeerStateKey::NetworkInfo => NetworkInfoState::new(node_config, time_service).into(),
             PeerStateKey::NodeInfo => {

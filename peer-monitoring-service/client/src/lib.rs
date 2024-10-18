@@ -137,6 +137,7 @@ async fn start_peer_monitor_with_state(
             &peer_monitor_state,
             &time_service,
             &connected_peers_and_metadata,
+            &peer_monitoring_client,
         );
 
         // Refresh the peer states
@@ -162,6 +163,9 @@ fn create_states_for_new_peers(
     peer_monitor_state: &PeerMonitorState,
     time_service: &TimeService,
     connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    peer_monitoring_service_client: &PeerMonitoringServiceClient<
+        NetworkClient<PeerMonitoringServiceMessage>,
+    >,
 ) {
     for peer_network_id in connected_peers_and_metadata.keys() {
         let state_exists = peer_monitor_state
@@ -171,7 +175,11 @@ fn create_states_for_new_peers(
         if !state_exists {
             peer_monitor_state.peer_states.write().insert(
                 *peer_network_id,
-                PeerState::new(node_config.clone(), time_service.clone()),
+                PeerState::new(
+                    node_config.clone(),
+                    time_service.clone(),
+                    peer_monitoring_service_client,
+                ),
             );
         }
     }
