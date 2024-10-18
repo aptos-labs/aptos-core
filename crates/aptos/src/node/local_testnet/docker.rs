@@ -30,7 +30,8 @@ pub const CONTAINER_NETWORK_NAME: &str = "aptos-local-testnet-network";
 /// there no second location, there is just the one named pipe.
 pub async fn get_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()
-        .context(format!("{} (init_default)", ERROR_MESSAGE))?;
+        .context(format!("{} (init_default)", ERROR_MESSAGE))
+        .inspect_err(|e| eprintln!("{:#}", e))?;
 
     // We have to specify the type because the compiler can't figure out the error
     // in the case where the system is Unix.
