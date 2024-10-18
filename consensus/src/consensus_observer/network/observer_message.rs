@@ -15,6 +15,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::SignedTransaction,
 };
+use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -36,17 +37,16 @@ impl ConsensusObserverMessage {
         blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: LedgerInfoWithSignatures,
     ) -> ConsensusObserverDirectSend {
-        ConsensusObserverDirectSend::OrderedBlock(OrderedBlock {
-            blocks,
-            ordered_proof,
-        })
+        let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+        ConsensusObserverDirectSend::OrderedBlock(ordered_block)
     }
 
     /// Creates and returns a new commit decision message using the given commit decision
     pub fn new_commit_decision_message(
         commit_proof: LedgerInfoWithSignatures,
     ) -> ConsensusObserverDirectSend {
-        ConsensusObserverDirectSend::CommitDecision(CommitDecision { commit_proof })
+        let commit_decision = CommitDecision::new(commit_proof);
+        ConsensusObserverDirectSend::CommitDecision(commit_decision)
     }
 
     /// Creates and returns a new block payload message using the given block, transactions and limit
@@ -54,10 +54,8 @@ impl ConsensusObserverMessage {
         block: BlockInfo,
         transaction_payload: BlockTransactionPayload,
     ) -> ConsensusObserverDirectSend {
-        ConsensusObserverDirectSend::BlockPayload(BlockPayload {
-            block,
-            transaction_payload,
-        })
+        let block_payload = BlockPayload::new(block, transaction_payload);
+        ConsensusObserverDirectSend::BlockPayload(block_payload)
     }
 }
 
@@ -140,6 +138,15 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
         }
     }
+
+    /// Returns the nonce of the direct send
+    pub fn get_nonce(&self) -> u64 {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block) => ordered_block.nonce,
+            ConsensusObserverDirectSend::CommitDecision(commit_decision) => commit_decision.nonce,
+            ConsensusObserverDirectSend::BlockPayload(block_payload) => block_payload.nonce,
+        }
+    }
 }
 
 impl Display for ConsensusObserverDirectSend {
@@ -170,6 +177,7 @@ impl Display for ConsensusObserverDirectSend {
 pub struct OrderedBlock {
     blocks: Vec<Arc<PipelinedBlock>>,
     ordered_proof: LedgerInfoWithSignatures,
+    pub nonce: u64,
 }
 
 impl OrderedBlock {
@@ -177,6 +185,7 @@ impl OrderedBlock {
         Self {
             blocks,
             ordered_proof,
+            nonce: get_random_nonce(),
         }
     }
 
@@ -266,15 +275,24 @@ impl OrderedBlock {
     }
 }
 
+fn get_random_nonce() -> u64 {
+    let mut rng = OsRng;
+    rng.gen()
+}
+
 /// CommitDecision message contains the commit decision proof
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CommitDecision {
     commit_proof: LedgerInfoWithSignatures,
+    pub nonce: u64,
 }
 
 impl CommitDecision {
     pub fn new(commit_proof: LedgerInfoWithSignatures) -> Self {
-        Self { commit_proof }
+        Self {
+            commit_proof,
+            nonce: get_random_nonce(),
+        }
     }
 
     /// Returns a reference to the commit proof
@@ -631,6 +649,7 @@ impl BlockTransactionPayload {
 pub struct BlockPayload {
     block: BlockInfo,
     transaction_payload: BlockTransactionPayload,
+    pub nonce: u64,
 }
 
 impl BlockPayload {
@@ -638,6 +657,7 @@ impl BlockPayload {
         Self {
             block,
             transaction_payload,
+            nonce: get_random_nonce(),
         }
     }
 

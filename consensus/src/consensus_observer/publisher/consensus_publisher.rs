@@ -215,6 +215,17 @@ impl ConsensusPublisher {
 
         // Send the message to all active subscribers
         for peer_network_id in &active_subscribers {
+            // Log the message time and send
+            info!(LogSchema::new(LogEntry::ConsensusPublisher)
+                .event(LogEvent::LatencyMonitoring)
+                .message(&format!(
+                    "Sending direct message to peer {:?}! Message: {:?}. Time: {:?}. Nonce: {:?}",
+                    peer_network_id,
+                    message.get_label(),
+                    std::time::Instant::now(),
+                    message.get_nonce(),
+                )));
+
             // Send the message to the outbound receiver for publishing
             let mut outbound_message_sender = self.outbound_message_sender.clone();
             if let Err(error) =
