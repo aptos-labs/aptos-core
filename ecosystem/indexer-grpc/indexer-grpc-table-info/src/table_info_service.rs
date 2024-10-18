@@ -263,23 +263,26 @@ impl TableInfoService {
     /// if pending on items are not empty
     /// TODO: better error handling with retry.
     async fn process_transactions(
-        context: Arc<ApiContext>,
-        indexer_async_v2: Arc<IndexerAsyncV2>,
+        _context: Arc<ApiContext>,
+        _indexer_async_v2: Arc<IndexerAsyncV2>,
         raw_txns: Vec<TransactionOnChainData>,
-        end_early_if_pending_on_empty: bool,
+        _end_early_if_pending_on_empty: bool,
     ) -> EndVersion {
         let start_time = std::time::Instant::now();
         let start_version = raw_txns[0].version;
         let end_version = raw_txns.last().unwrap().version;
         let num_transactions = raw_txns.len();
 
-        Self::parse_table_info(
-            context.clone(),
-            raw_txns.clone(),
-            indexer_async_v2,
-            end_early_if_pending_on_empty,
-        )
-        .expect("[Table Info] Failed to parse table info");
+        // Stop the table info parsing and see if it blocks the grpc serving.
+        tokio::time::sleep(Duration::from_secs(3000)).await;
+
+        // Self::parse_table_info(
+        //     context.clone(),
+        //     raw_txns.clone(),
+        //     indexer_async_v2,
+        //     end_early_if_pending_on_empty,
+        // )
+        // .expect("[Table Info] Failed to parse table info");
 
         log_grpc_step(
             SERVICE_TYPE,
@@ -335,6 +338,7 @@ impl TableInfoService {
     /// Parse table info from write sets,
     /// end_early_if_pending_on_empty flag will be true if we couldn't parse all table infos in the first try with multithread,
     /// in the second try with sequential looping, to make parsing efficient, we end early if all table infos are parsed
+    #[allow(dead_code)]
     fn parse_table_info(
         context: Arc<ApiContext>,
         raw_txns: Vec<TransactionOnChainData>,
