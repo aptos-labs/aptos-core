@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{components::chunk_output::update_counters_for_processed_chunk, metrics::OTHER_TIMERS};
+use crate::{
+    components::do_get_execution_output::update_counters_for_processed_chunk, metrics::OTHER_TIMERS,
+};
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{

@@ -5,9 +5,13 @@
 #[cfg(test)]
 mod mock_vm_test;
 
-use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
+use crate::{
+    block_executor::TransactionBlockExecutor,
+    components::do_get_execution_output::DoGetExecutionOutput,
+};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
@@ -65,8 +69,12 @@ impl TransactionBlockExecutor for MockVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view, onchain_config)
+    ) -> Result<ExecutionOutput> {
+        DoGetExecutionOutput::by_transaction_execution::<MockVM>(
+            transactions,
+            state_view,
+            onchain_config,
+        )
     }
 }
 

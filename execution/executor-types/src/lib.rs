@@ -36,6 +36,7 @@ use std::{
 };
 
 mod error;
+pub mod execution_output;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;

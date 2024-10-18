@@ -4,7 +4,10 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk};
+use crate::components::{
+    apply_chunk_output::ApplyChunkOutput, do_get_execution_output::DoGetExecutionOutput,
+    executed_chunk::ExecutedChunk,
+};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -128,13 +131,14 @@ pub fn calculate_genesis<V: VMExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let (mut chunk, _, _) = ChunkOutput::by_transaction_execution::<V>(
+    let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
-    )?
-    .apply_to_ledger(&executed_trees, None)?;
-    let output = &chunk.output;
+    )?;
+
+    let (output, _, _) = ApplyChunkOutput::apply_chunk(execution_output, &executed_trees, None)?;
+
     ensure!(
         output.expect_ledger_update_output().num_txns() != 0,
         "Genesis txn execution failed."
@@ -163,7 +167,6 @@ pub fn calculate_genesis<V: VMExecutor>(
         "Genesis txn didn't output reconfig event."
     );
 
-    let output = output.expect_complete_result();
     let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
         LedgerInfo::new(
             BlockInfo::new(
@@ -171,7 +174,7 @@ pub fn calculate_genesis<V: VMExecutor>(
                 GENESIS_ROUND,
                 genesis_block_id(),
                 output
-                    .ledger_update_output
+                    .expect_ledger_update_output()
                     .transaction_accumulator
                     .root_hash(),
                 genesis_version,
@@ -182,9 +185,12 @@ pub fn calculate_genesis<V: VMExecutor>(
         ),
         AggregateSignature::empty(), /* signatures */
     );
-    chunk.ledger_info_opt = Some(ledger_info_with_sigs);
+    let executed_chunk = ExecutedChunk {
+        output,
+        ledger_info_opt: Some(ledger_info_with_sigs),
+    };
 
-    let committer = GenesisCommitter::new(db.writer.clone(), chunk)?;
+    let committer = GenesisCommitter::new(db.writer.clone(), executed_chunk)?;
     info!(
         "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",
         &committer.output.ledger_info_opt, committer.waypoint,

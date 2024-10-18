@@ -4,7 +4,9 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk},
+    components::{
+        apply_chunk_output::ApplyChunkOutput, do_get_execution_output::DoGetExecutionOutput,
+    },
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -486,18 +488,15 @@ fn apply_transaction_by_writeset(
         )
         .unwrap();
 
-    let chunk_output = ChunkOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
+    let chunk_output =
+        DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
-    let ExecutedChunk {
-        output,
-        ledger_info_opt,
-    } = executed;
+    let (output, _, _) = ApplyChunkOutput::apply_chunk(chunk_output, &ledger_view, None).unwrap();
 
     db.writer
         .save_transactions(
             output.expect_complete_result().as_chunk_to_commit(),
-            ledger_info_opt.as_ref(),
+            None,
             true, /* sync_commit */
         )
         .unwrap();
@@ -678,7 +677,7 @@ fn run_transactions_naive(
 
     for txn in transactions {
         let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
-        let out = ChunkOutput::by_transaction_execution::<MockVM>(
+        let out = DoGetExecutionOutput::by_transaction_execution::<MockVM>(
             vec![txn].into(),
             ledger_view
                 .verified_state_view(
@@ -690,15 +689,11 @@ fn run_transactions_naive(
             block_executor_onchain_config.clone(),
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
-        let ExecutedChunk {
-            output,
-            ledger_info_opt,
-        } = executed;
+        let (output, _, _) = ApplyChunkOutput::apply_chunk(out, &ledger_view, None).unwrap();
         db.writer
             .save_transactions(
                 output.expect_complete_result().as_chunk_to_commit(),
-                ledger_info_opt.as_ref(),
+                None,
                 true, /* sync_commit */
             )
             .unwrap();
