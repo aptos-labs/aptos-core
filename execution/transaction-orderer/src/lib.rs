@@ -57,8 +57,10 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
         //     }
         // }
         let block_size = transactions.len();
-        let min_ordered_transaction_before_execution = std::env::var("V3B__MIN_ORDERED_BEFORE_EXECUTION").ok().map(|v|v.parse::<usize>().unwrap_or(100)).unwrap_or(100);
-        let max_window_size = std::env::var("V3B__MAX_WINDOW_SIZE").ok().map(|v|v.parse::<usize>().unwrap_or(1000)).unwrap_or(1000);
+        let min_ordered_transaction_before_execution = self.min_ordered_transaction_before_execution;
+        let max_window_size = self.max_window_size;
+       // let min_ordered_transaction_before_execution = std::env::var("V3B__MIN_ORDERED_BEFORE_EXECUTION").ok().map(|v|v.parse::<usize>().unwrap_or(100)).unwrap_or(100);
+       // let max_window_size = std::env::var("V3B__MAX_WINDOW_SIZE").ok().map(|v|v.parse::<usize>().unwrap_or(1000)).unwrap_or(1000);
         info!("V3ReorderingPartitioner started with configs: max_window_size={}, min_ordered_transaction_before_execution={}", max_window_size, min_ordered_transaction_before_execution);
 
         let block_orderer = BatchedBlockOrdererWithWindow::new(
