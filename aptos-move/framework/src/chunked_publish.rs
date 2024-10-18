@@ -5,7 +5,7 @@ use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 pub const LARGE_PACKAGES_MODULE_ADDRESS: &str =
-    "0xa29df848eebfe5d981f708c2a5b06d31af2be53bbd8ddc94c8523f4b903f7adb"; // mainnet and testnet
+    "0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7"; // mainnet and testnet
 
 /// Maximum code & metadata chunk size to be included in a transaction
 pub const MAX_CHUNK_SIZE_IN_BYTES: usize = 60_000;
@@ -76,7 +76,7 @@ pub fn chunk_package_and_create_payloads(
             metadata_chunk,
             code_indices,
             code_chunks,
-            object_address,
+            object_address.expect("ObjectAddress is missing"),
         ),
     };
     payloads.push(payload);
@@ -159,7 +159,7 @@ fn large_packages_stage_code_chunk_and_upgrade_object_code(
     metadata_chunk: Vec<u8>,
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
-    code_object: Option<AccountAddress>,
+    code_object: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
