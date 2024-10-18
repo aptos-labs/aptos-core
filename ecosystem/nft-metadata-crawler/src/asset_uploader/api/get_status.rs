@@ -32,7 +32,7 @@ pub fn get_status(
         } else {
             status_response.insert(row.asset_uri, GetStatusResponseSuccess::Error {
                 status_code: row.status_code as u16,
-                error_message: row.error_message,
+                error_message: row.error_messages,
             });
         };
     }

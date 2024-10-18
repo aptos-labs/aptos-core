@@ -15,7 +15,7 @@ pub struct AssetUploaderRequestStatusesQuery {
     pub asset_uri: String,
     pub application_id: Uuid,
     pub status_code: i64,
-    pub error_message: Option<String>,
+    pub error_messages: Option<Vec<Option<String>>>,
     pub cdn_image_uri: Option<String>,
     pub num_failures: i64,
     pub request_received_at: chrono::NaiveDateTime,

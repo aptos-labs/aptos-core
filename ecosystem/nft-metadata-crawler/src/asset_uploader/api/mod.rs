@@ -50,7 +50,7 @@ pub enum GetStatusResponseSuccess {
     },
     Error {
         status_code: u16,
-        error_message: Option<String>,
+        error_message: Option<Vec<Option<String>>>,
     },
 }
 

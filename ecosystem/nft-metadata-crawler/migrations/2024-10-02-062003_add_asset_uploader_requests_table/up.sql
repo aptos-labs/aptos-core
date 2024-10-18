@@ -3,7 +3,7 @@ CREATE TABLE nft_metadata_crawler.asset_uploader_request_statuses (
   asset_uri VARCHAR NOT NULL,
   application_id UUID NOT NULL,
   status_code BIGINT NOT NULL DEFAULT 202,
-  error_message VARCHAR,
+  error_messages TEXT[],
   cdn_image_uri VARCHAR,
   num_failures BIGINT NOT NULL DEFAULT 0,
   request_received_at TIMESTAMP NOT NULL DEFAULT NOW(),
