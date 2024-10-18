@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides reusable helpers in tests.
+use super::gather_state_updates_until_last_checkpoint;
 #[cfg(test)]
 use crate::state_store::StateStore;
 #[cfg(test)]
@@ -18,7 +19,9 @@ use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 #[cfg(test)]
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, Order, Result};
+use aptos_storage_interface::{
+    chunk_to_commit::ChunkToCommit, state_delta::StateDelta, DbReader, DbWriter, Order, Result,
+};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -88,7 +91,7 @@ pub(crate) fn update_store(
         let schema_batch = SchemaBatch::new();
         store
             .put_value_sets(
-                &[sharded_value_state_set],
+                vec![&sharded_value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
                 None,
@@ -915,8 +918,14 @@ pub(crate) fn put_transaction_infos(
     version: Version,
     txn_infos: &[TransactionInfo],
 ) -> HashValue {
-    db.commit_transaction_infos(version, txn_infos).unwrap();
-    db.commit_transaction_accumulator(version, txn_infos)
+    let txns_to_commit: Vec<_> = txn_infos
+        .iter()
+        .cloned()
+        .map(TransactionToCommit::dummy_with_transaction_info)
+        .collect();
+    db.commit_transaction_infos(&txns_to_commit, version)
+        .unwrap();
+    db.commit_transaction_accumulator(&txns_to_commit, version)
         .unwrap()
 }
 
@@ -926,7 +935,12 @@ pub(crate) fn put_transaction_auxiliary_data(
     version: Version,
     auxiliary_data: &[TransactionAuxiliaryData],
 ) {
-    db.commit_transaction_auxiliary_data(version, auxiliary_data)
+    let txns_to_commit: Vec<_> = auxiliary_data
+        .iter()
+        .cloned()
+        .map(TransactionToCommit::dummy_with_transaction_auxiliary_data)
+        .collect();
+    db.commit_transaction_auxiliary_data(&txns_to_commit, version)
         .unwrap();
 }
 
@@ -987,26 +1001,39 @@ pub fn test_sync_transactions_impl(
         if batch1_len > 0 {
             let txns_to_commit_batch = &txns_to_commit[..batch1_len];
             update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-            db.save_transactions_for_test(
-                txns_to_commit_batch,
-                cur_ver, /* first_version */
-                base_state_version,
-                None,  /* ledger_info_with_sigs */
-                false, /* sync_commit */
+            let state_updates = gather_state_updates_until_last_checkpoint(
+                cur_ver,
                 &in_memory_state,
-            )
-            .unwrap();
+                txns_to_commit_batch,
+            );
+            let chunk = ChunkToCommit {
+                first_version: cur_ver,
+                base_state_version,
+                txns_to_commit: txns_to_commit_batch,
+                latest_in_memory_state: &in_memory_state,
+                state_updates_until_last_checkpoint: state_updates.as_ref(),
+                sharded_state_cache: None,
+            };
+            db.save_transactions(chunk, None, false /* sync_commit */)
+                .unwrap();
         }
         let ver = cur_ver + batch1_len as Version;
         let txns_to_commit_batch = &txns_to_commit[batch1_len..];
         update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-        db.save_transactions_for_test(
-            txns_to_commit_batch,
-            ver,
+        let state_updates =
+            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch);
+        let chunk = ChunkToCommit {
+            first_version: ver,
             base_state_version,
+            txns_to_commit: txns_to_commit_batch,
+            latest_in_memory_state: &in_memory_state,
+            state_updates_until_last_checkpoint: state_updates.as_ref(),
+            sharded_state_cache: None,
+        };
+        db.save_transactions(
+            chunk,
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            &in_memory_state,
         )
         .unwrap();
 

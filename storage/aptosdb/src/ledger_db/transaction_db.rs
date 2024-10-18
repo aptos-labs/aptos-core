@@ -14,7 +14,7 @@ use aptos_crypto::hash::{CryptoHash, HashValue};
 use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::transaction::{Transaction, TransactionToCommit, Version};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -79,33 +79,32 @@ impl TransactionDb {
 
     pub(crate) fn commit_transactions(
         &self,
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
-        transactions: &[Transaction],
         skip_index: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transactions"])
             .start_timer();
         let chunk_size = 512;
-        let batches = transactions
+        let batches = txns_to_commit
             .par_chunks(chunk_size)
             .enumerate()
             .map(|(chunk_index, txns_in_chunk)| -> Result<SchemaBatch> {
                 let batch = SchemaBatch::new();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
-                txns_in_chunk
-                    .iter()
-                    .enumerate()
-                    .try_for_each(|(i, txn)| -> Result<()> {
+                txns_in_chunk.iter().enumerate().try_for_each(
+                    |(i, txn_to_commit)| -> Result<()> {
                         self.put_transaction(
                             chunk_first_version + i as u64,
-                            txn,
+                            txn_to_commit.transaction(),
                             skip_index,
                             &batch,
                         )?;
 
                         Ok(())
-                    })?;
+                    },
+                )?;
                 Ok(batch)
             })
             .collect::<Result<Vec<_>>>()?;

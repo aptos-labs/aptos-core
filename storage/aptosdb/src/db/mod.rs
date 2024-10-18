@@ -82,7 +82,6 @@ use std::{
     time::Instant,
 };
 use tokio::sync::watch::Sender;
-
 #[cfg(test)]
 mod aptosdb_test;
 #[cfg(any(test, feature = "fuzzing"))]

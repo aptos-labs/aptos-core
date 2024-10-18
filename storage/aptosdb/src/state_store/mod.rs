@@ -614,7 +614,8 @@ impl StateStore {
             .with_label_values(&["put_writesets"])
             .start_timer();
 
-        let value_state_sets: Vec<ShardedStateUpdates> = write_sets
+        // convert value state sets to hash map reference
+        let value_state_sets_raw: Vec<ShardedStateUpdates> = write_sets
             .iter()
             .map(|ws| {
                 let mut sharded_state_updates = create_empty_sharded_state_updates();
@@ -626,8 +627,10 @@ impl StateStore {
             })
             .collect::<Vec<_>>();
 
+        let value_state_sets = value_state_sets_raw.iter().collect::<Vec<_>>();
+
         self.put_stats_and_indices(
-            &value_state_sets,
+            value_state_sets.as_slice(),
             first_version,
             StateStorageUsage::new_untracked(),
             None,
@@ -639,7 +642,7 @@ impl StateStore {
         )?;
 
         self.put_state_values(
-            &value_state_sets,
+            value_state_sets.to_vec(),
             first_version,
             sharded_state_kv_batches,
             enable_sharding,
@@ -651,7 +654,7 @@ impl StateStore {
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,
-        value_state_sets: &[ShardedStateUpdates],
+        value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
         expected_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
@@ -666,7 +669,7 @@ impl StateStore {
             .start_timer();
 
         self.put_stats_and_indices(
-            value_state_sets,
+            &value_state_sets,
             first_version,
             expected_usage,
             sharded_state_cache,
@@ -691,7 +694,7 @@ impl StateStore {
 
     pub fn put_state_values(
         &self,
-        value_state_sets: &[ShardedStateUpdates],
+        value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
@@ -740,7 +743,7 @@ impl StateStore {
     /// extra stale index as 1 cover the latter case.
     pub fn put_stats_and_indices(
         &self,
-        value_state_sets: &[ShardedStateUpdates],
+        value_state_sets: &[&ShardedStateUpdates],
         first_version: Version,
         expected_usage: StateStorageUsage,
         // If not None, it must contains all keys in the value_state_sets.

@@ -9,7 +9,7 @@ use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
 use aptos_types::{
     proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen},
-    transaction::{Transaction, Version},
+    transaction::{Transaction, TransactionToCommit, Version},
 };
 use proptest::{collection::vec, prelude::*};
 
@@ -145,7 +145,17 @@ pub(crate) fn init_db(
     assert!(transaction_db.get_transaction(0).is_err());
 
     transaction_db
-        .commit_transactions(0, &txns, /*skip_index=*/ false)
+        .commit_transactions(
+            &txns
+                .iter()
+                .map(|transaction| TransactionToCommit {
+                    transaction: transaction.clone(),
+                    ..TransactionToCommit::dummy()
+                })
+                .collect::<Vec<_>>(),
+            0,
+            /*skip_index=*/ false,
+        )
         .unwrap();
 
     txns

@@ -5,9 +5,11 @@ use crate::{ledger_db::WriteSetDb, AptosDB};
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
-use aptos_types::{transaction::Version, write_set::WriteSet};
+use aptos_types::{
+    transaction::{TransactionToCommit, Version},
+    write_set::WriteSet,
+};
 use proptest::{collection::vec, prelude::*};
-use rayon::prelude::*;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -111,6 +113,15 @@ fn init_db(write_sets: &[WriteSet], write_set_db: &WriteSetDb) {
     assert!(write_set_db.get_write_set(0).is_err());
 
     write_set_db
-        .commit_write_sets(0, write_sets.par_iter())
+        .commit_write_sets(
+            &write_sets
+                .iter()
+                .map(|write_set| TransactionToCommit {
+                    write_set: write_set.clone(),
+                    ..TransactionToCommit::dummy()
+                })
+                .collect::<Vec<_>>(),
+            0,
+        )
         .unwrap();
 }

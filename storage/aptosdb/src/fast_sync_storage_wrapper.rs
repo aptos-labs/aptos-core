@@ -13,7 +13,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{TransactionOutputListWithProof, Version},
+    transaction::{TransactionOutputListWithProof, TransactionToCommit, Version},
 };
 use either::Either;
 use std::sync::Arc;
@@ -40,7 +40,7 @@ pub struct FastSyncStorageWrapper {
 
 impl FastSyncStorageWrapper {
     /// If the db is empty and configured to do fast sync, we return a FastSyncStorageWrapper
-    /// Otherwise, we return AptosDB directly and the FastSyncStorageWrapper is None
+    /// Otherwise, we returns AptosDB directly and the FastSyncStorageWrapper is None
     pub fn initialize_dbs(
         config: &NodeConfig,
         internal_indexer_db: Option<InternalIndexerDB>,
@@ -177,10 +177,10 @@ impl DbWriter for FastSyncStorageWrapper {
         &self,
         version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        chunk_opt: Option<ChunkToCommit>,
+        txns_to_commit: Option<&[TransactionToCommit]>,
     ) -> Result<()> {
         self.get_aptos_db_write_ref()
-            .commit_ledger(version, ledger_info_with_sigs, chunk_opt)
+            .commit_ledger(version, ledger_info_with_sigs, txns_to_commit)
     }
 }
 

@@ -160,11 +160,8 @@ impl TransactionsWithParsedOutput {
         self.transactions
     }
 
-    pub fn into_inner(self) -> (Vec<Transaction>, Vec<TransactionOutput>) {
-        (
-            self.transactions,
-            self.parsed_output.into_iter().map(|t| t.output).collect(),
-        )
+    pub fn into_inner(self) -> (Vec<Transaction>, Vec<ParsedTransactionOutput>) {
+        (self.transactions, self.parsed_output)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &ParsedTransactionOutput)> {

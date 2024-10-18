@@ -10,7 +10,6 @@ use crate::{
         chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
         chunk_output::ChunkOutput,
         chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier},
-        do_ledger_update::DoLedgerUpdate,
         executed_chunk::ExecutedChunk,
         partial_state_compute_result::PartialStateComputeResult,
         transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk},
@@ -350,7 +349,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let first_version = parent_accumulator.num_leaves();
         let (ledger_update_output, to_discard, to_retry) = {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__calculate"]);
-            DoLedgerUpdate::run(state_checkpoint_output, parent_accumulator.clone())?
+            ApplyChunkOutput::calculate_ledger_update(
+                state_checkpoint_output,
+                parent_accumulator.clone(),
+            )?
         };
 
         ensure!(to_discard.is_empty(), "Unexpected discard.");
@@ -492,16 +494,19 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let started = Instant::now();
 
         let chunk = self.commit_chunk_impl()?;
-        let output = chunk.output.expect_complete_result();
 
-        let num_committed = output.transactions_to_commit_len();
+        let num_committed = chunk.transactions_to_commit().len();
         info!(
             num_committed = num_committed,
             tps = num_committed as f64 / started.elapsed().as_secs_f64(),
             "TransactionReplayer::commit() OK"
         );
 
-        Ok(output.version())
+        Ok(chunk
+            .output
+            .result_state
+            .current_version
+            .expect("Version must exist after commit."))
     }
 
     /// Remove `end_version - begin_version` transactions from the mutable input arguments and replay.
