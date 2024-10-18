@@ -23,7 +23,7 @@ use crate::{
 };
 use aptos_executor::{
     block_executor::TransactionBlockExecutor,
-    components::do_get_execution_output::DoGetExecutionOutput,
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;

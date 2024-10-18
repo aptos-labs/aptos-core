@@ -2,9 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::components::{
-    block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree},
-    partial_state_compute_result::PartialStateComputeResult,
+use crate::{
+    block_executor::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree},
+    types::partial_state_compute_result::PartialStateComputeResult,
 };
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
 use aptos_infallible::Mutex;

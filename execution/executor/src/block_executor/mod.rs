@@ -5,15 +5,15 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        block_tree::BlockTree, do_get_execution_output::DoGetExecutionOutput,
-        do_ledger_update::DoLedgerUpdate, do_state_checkpoint::DoStateCheckpoint,
-        partial_state_compute_result::PartialStateComputeResult,
-    },
     logging::{LogEntry, LogSchema},
     metrics::{
         COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
         TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
+    },
+    types::partial_state_compute_result::PartialStateComputeResult,
+    workflow::{
+        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
+        do_state_checkpoint::DoStateCheckpoint,
     },
 };
 use anyhow::Result;
@@ -39,8 +39,11 @@ use aptos_types::{
     state_store::{state_value::StateValue, StateViewId},
 };
 use aptos_vm::AptosVM;
+use block_tree::BlockTree;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
+
+pub mod block_tree;
 
 pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(

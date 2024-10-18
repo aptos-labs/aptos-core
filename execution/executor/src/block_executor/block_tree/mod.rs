@@ -8,8 +8,8 @@
 mod test;
 
 use crate::{
-    components::partial_state_compute_result::PartialStateComputeResult,
     logging::{LogEntry, LogSchema},
+    types::partial_state_compute_result::PartialStateComputeResult,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;

@@ -4,9 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{
-    apply_chunk_output::ApplyChunkOutput, do_get_execution_output::DoGetExecutionOutput,
-    executed_chunk::ExecutedChunk,
+use crate::{
+    types::executed_chunk::ExecutedChunk,
+    workflow::{do_get_execution_output::DoGetExecutionOutput, ApplyExecutionOutput},
 };
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
@@ -137,7 +137,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )?;
 
-    let (output, _, _) = ApplyChunkOutput::apply_chunk(execution_output, &executed_trees, None)?;
+    let output = ApplyExecutionOutput::run(execution_output, &executed_trees, None)?;
 
     ensure!(
         output.expect_ledger_update_output().num_txns() != 0,
