@@ -6,7 +6,7 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+        block_tree::BlockTree, chunk_output::ChunkOutput, do_ledger_update::DoLedgerUpdate,
         partial_state_compute_result::PartialStateComputeResult,
     },
     logging::{LogEntry, LogSchema},
@@ -318,10 +318,7 @@ where
                 parent_output.reconfig_suffix()
             } else {
                 let (output, _, _) = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                    ApplyChunkOutput::calculate_ledger_update(
-                        state_checkpoint_output,
-                        parent_accumulator.clone(),
-                    )
+                    DoLedgerUpdate::run(state_checkpoint_output, parent_accumulator.clone())
                 })?;
                 output
             };
