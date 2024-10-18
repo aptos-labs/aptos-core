@@ -24,11 +24,12 @@ use itertools::Itertools;
 use rand::SeedableRng;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
 use rayon::{
-    iter::{IntoParallelRefIterator, IntoParallelIterator, ParallelIterator},
-    // ThreadPool, ThreadPoolBuilder,
+    iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator},
+    ThreadPool, ThreadPoolBuilder,
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::{BTreeMap, HashMap},
     // cell::RefCell,
     fs::File,
     io::{Read, Write},
@@ -36,7 +37,7 @@ use std::{
     sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc, Mutex}
 };
 #[cfg(test)]
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 // use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
@@ -104,7 +105,7 @@ pub struct TransactionGenerator {
     num_workers: usize,
     // TODO(grao): Use a different pool, and pin threads to dedicate cores to avoid affecting the
     // rest parts of benchmark.
-    // worker_pool: ThreadPool,
+    worker_pool: ThreadPool,
 }
 
 impl TransactionGenerator {
@@ -196,10 +197,10 @@ impl TransactionGenerator {
             block_sender: Some(block_sender),
             transaction_factory: Self::create_transaction_factory(),
             num_workers,
-            // worker_pool: ThreadPoolBuilder::new()
-            //     .num_threads(num_workers)
-            //     .build()
-            //     .unwrap(),
+            worker_pool: ThreadPoolBuilder::new()
+                .num_threads(num_workers)
+                .build()
+                .unwrap(),
         }
     }
 
@@ -334,7 +335,10 @@ impl TransactionGenerator {
                         txns.push(txn);
                     }
                 };
-                let terminate = self.send_block(txns, phase.clone(), last_non_empty_phase.clone());
+                let (terminate, phase_changed) = self.send_block(txns, phase.clone(), last_non_empty_phase.clone());
+                if phase_changed {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
                 if terminate {
                     return i + 1;
                 }
@@ -439,7 +443,8 @@ impl TransactionGenerator {
                             ),
                     );
                     Some(Transaction::UserTransaction(txn))
-                }
+                },
+                |(sender_idx, _)| *sender_idx,
             );
             bar.inc(block_size as u64);
         }
@@ -636,35 +641,88 @@ impl TransactionGenerator {
                 );
                 Some(Transaction::UserTransaction(txn))
             },
+            |(sender_idx, _)| *sender_idx,
         );
     }
 
-    fn generate_and_send_block<T, F>(
+    fn generate_and_send_block<T, F, S>(
         &self,
         account_cache: &AccountCache,
         inputs: Vec<T>,
         phase: Arc<AtomicUsize>,
         last_non_empty_phase: Arc<AtomicUsize>,
         func: F,
-    ) -> bool
+        sender_func: S,
+    ) -> (bool, bool)
     where
         T: Send,
         F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
+        S: Fn(&T) -> usize,
     {
         let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
-        let txns = inputs
-                .into_par_iter()
-                .flat_map(|input| func(input, account_cache))
-                .collect();
-        self.send_block(txns, phase, last_non_empty_phase)
+        let block_size = inputs.len();
+        let mut jobs = Vec::new();
+        jobs.resize_with(self.num_workers, BTreeMap::new);
+        inputs.into_iter().enumerate().for_each(|(i, input)| {
+            let sender_idx = sender_func(&input);
+            jobs[sender_idx % self.num_workers].insert(i, || func(input, account_cache));
+        });
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.worker_pool.scope(move |scope| {
+            for per_worker_jobs in jobs.into_iter() {
+                let tx = tx.clone();
+                scope.spawn(move |_| {
+                    for (index, job) in per_worker_jobs {
+                        if let Some(txn) = job() {
+                            tx.send((index, txn)).unwrap();
+                        }
+                    }
+                });
+            }
+        });
+
+        let mut transactions_by_index = HashMap::new();
+        while let Ok((index, txn)) = rx.recv() {
+            transactions_by_index.insert(index, txn);
+        }
+
+        let mut transactions = Vec::new();
+        for i in 0..block_size {
+            if let Some(txn) = transactions_by_index.get(&i) {
+                transactions.push(txn.clone());
+            }
+        }
+
+        self.send_block(transactions, phase, last_non_empty_phase)
     }
+
+
+    // fn generate_and_send_block<T, F>(
+    //     &self,
+    //     account_cache: &AccountCache,
+    //     inputs: Vec<T>,
+    //     phase: Arc<AtomicUsize>,
+    //     last_non_empty_phase: Arc<AtomicUsize>,
+    //     func: F,
+    // ) -> (bool, bool)
+    // where
+    //     T: Send,
+    //     F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
+    // {
+    //     let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
+    //     let txns = inputs
+    //             .into_par_iter()
+    //             .flat_map(|input| func(input, account_cache))
+    //             .collect();
+    //     self.send_block(txns, phase, last_non_empty_phase)
+    // }
 
     fn send_block(
         &self,
         transactions: Vec<Transaction>,
         phase: Arc<AtomicUsize>,
         last_non_empty_phase: Arc<AtomicUsize>,
-    ) -> bool {
+    ) -> (bool, bool) {
         // let mut jobs = Vec::new();
         // jobs.resize_with(self.num_workers, BTreeMap::new);
         // inputs.into_iter().enumerate().for_each(|(i, input)| {
@@ -691,15 +749,17 @@ impl TransactionGenerator {
         //     transactions_by_index.insert(index, txn);
         // }
 
+        let mut phase_changed = false;
         if transactions.is_empty() {
             let val = phase.fetch_add(1, Ordering::Relaxed);
+            phase_changed = true;
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
             if val > last_generated_at + 2 {
                 info!(
                     "Block generation: no transactions generated in phase {}, and since {}, ending execution",
                     val, last_generated_at
                 );
-                return true;
+                return (true, phase_changed);
             }
             info!(
                 "Block generation: no transactions generated in phase {}, moving to next phase",
@@ -722,7 +782,7 @@ impl TransactionGenerator {
         if let Some(sender) = &self.block_sender {
             sender.send(transactions).unwrap();
         }
-        false
+        (false, phase_changed)
     }
 
     pub fn gen_transfer_transactions(
