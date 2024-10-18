@@ -23,6 +23,7 @@ use crate::{
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
+    peer::{DisconnectReason, PingDisconnectContext},
     peer_manager::ConnectionNotification,
     protocols::{
         health_checker::interface::HealthCheckNetworkInterface,
@@ -372,7 +373,13 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         PeerNetworkId::new(self.network_context.network_id(), peer_id);
                     if let Err(err) = timeout(
                         Duration::from_millis(50),
-                        self.network_interface.disconnect_peer(peer_network_id),
+                        self.network_interface.disconnect_peer(
+                            peer_network_id,
+                            DisconnectReason::FailedHealthCheckPing(PingDisconnectContext::new(
+                                failures,
+                                self.ping_failures_tolerated,
+                            )),
+                        ),
                     )
                     .await
                     {
