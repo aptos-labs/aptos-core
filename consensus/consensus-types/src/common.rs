@@ -646,41 +646,44 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             }
             PayloadFilter::DirectMempool(exclude_txns)
         } else {
-            let mut exclude_proofs = HashSet::new();
+            let mut exclude_batches = HashSet::new();
             for payload in exclude_payloads {
                 match payload {
                     Payload::InQuorumStore(proof_with_status) => {
                         for proof in &proof_with_status.proofs {
-                            exclude_proofs.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone());
                         }
                     },
                     Payload::InQuorumStoreWithLimit(proof_with_status) => {
                         for proof in &proof_with_status.proof_with_data.proofs {
-                            exclude_proofs.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone());
                         }
                     },
                     Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
                         for proof in &proof_with_data.proofs {
-                            exclude_proofs.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone());
                         }
                         for (batch_info, _) in inline_batches {
-                            exclude_proofs.insert(batch_info.clone());
+                            exclude_batches.insert(batch_info.clone());
                         }
                     },
                     Payload::DirectMempool(_) => {
                         error!("DirectMempool payload in InQuorumStore filter");
                     },
                     Payload::OptQuorumStore(opt_qs_payload) => {
+                        for batch in opt_qs_payload.inline_batches().iter() {
+                            exclude_batches.insert(batch.info().clone());
+                        }
                         for batch_info in &opt_qs_payload.opt_batches().batch_summary {
-                            exclude_proofs.insert(batch_info.clone());
+                            exclude_batches.insert(batch_info.clone());
                         }
                         for proof in &opt_qs_payload.proof_with_data().batch_summary {
-                            exclude_proofs.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone());
                         }
                     },
                 }
             }
-            PayloadFilter::InQuorumStore(exclude_proofs)
+            PayloadFilter::InQuorumStore(exclude_batches)
         }
     }
 }

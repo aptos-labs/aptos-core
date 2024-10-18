@@ -178,6 +178,10 @@ impl InlineBatch {
             transactions,
         }
     }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.batch_info
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

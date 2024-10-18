@@ -180,7 +180,7 @@ pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
 pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_block_size_when_pull",
-        "Histogram for the number of transactions per block when pulled for consensus.",
+        "Histogram for the number of unique transactions per block when pulled for consensus.",
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
@@ -189,8 +189,40 @@ pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
 pub static TOTAL_BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_total_block_size_when_pull",
-        "Histogram for the total size of transactions per block when pulled for consensus.",
+        "Histogram for the total number of transactions including duplicates per block when pulled for consensus.",
         BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of transactions per block when pulled for consensus.
+pub static CONSENSUS_PULL_NUM_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_txns",
+        "Histogram for the number of transactions including duplicates when pulled for consensus.",
+        &["pull_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of transactions per block when pulled for consensus.
+pub static CONSENSUS_PULL_NUM_UNIQUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_unique_txns",
+        "Histogram for the number of unique transactions when pulled for consensus.",
+        &["pull_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PULL_SIZE_IN_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_size_in_bytes",
+        "Histogram for the size of the pulled transactions for consensus.",
+        &["pull_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });

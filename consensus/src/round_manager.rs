@@ -403,17 +403,19 @@ impl RoundManager {
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
-                if let Err(e) = Self::generate_and_send_proposal(
-                    epoch_state,
-                    new_round_event,
-                    network,
-                    sync_info,
-                    proposal_generator,
-                    safety_rules,
-                    proposer_election,
-                )
-                .await
-                {
+                if let Err(e) = monitor!(
+                    "generate_and_send_proposal",
+                    Self::generate_and_send_proposal(
+                        epoch_state,
+                        new_round_event,
+                        network,
+                        sync_info,
+                        proposal_generator,
+                        safety_rules,
+                        proposer_election,
+                    )
+                    .await
+                ) {
                     warn!("Error generating and sending proposal: {}", e);
                 }
             });
