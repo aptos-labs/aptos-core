@@ -1,16 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
+use crate::{
+    cross_block_caches::CrossBlockModuleCache, types::InputOutputKey,
+    value_exchange::filter_value_for_exchange,
+};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_mvhashmap::{
+    code_cache::SyncCodeCache,
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        ValueWithLayout, Version,
+        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, MaybeCommitted,
+        StorageVersion, TxnIndex, ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -18,13 +22,24 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
+    executable::ModulePath,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::ModuleCacheEntry,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
+use bytes::Bytes;
 use derivative::Derivative;
-use move_core_types::value::MoveTypeLayout;
+use move_binary_format::{
+    errors::{VMError, VMResult},
+    CompiledModule,
+};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    metadata::Metadata, value::MoveTypeLayout,
+};
+use move_vm_runtime::{CachedScript, Module};
 use std::{
     collections::{
         hash_map::{
@@ -285,6 +300,23 @@ impl DelayedFieldRead {
     }
 }
 
+/// Represents a module read, either from immutable cross-block cache, or from code [SyncCodeCache]
+/// used by block executor. This way, when transaction needs to read a module from [SyncCodeCache]
+/// it can first check the read-set here.
+enum ModuleRead {
+    /// Read from cross-block module cache.
+    GlobalCache,
+    /// Read from block-level cache ([SyncCodeCache]) used by parallel execution.
+    BlockCache(Option<Arc<MaybeCommitted<ModuleCacheEntry>>>),
+}
+
+/// Represents a result of a read from [CapturedReads] when they are used as a cache.
+#[derive(Debug)]
+pub enum CacheRead<V> {
+    Hit(V),
+    Miss,
+}
+
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
@@ -297,11 +329,11 @@ impl DelayedFieldRead {
 pub(crate) struct CapturedReads<T: Transaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
-    // Currently, we record paths for triggering module R/W fallback.
-    // TODO: implement a general functionality once the fallback is removed.
-    pub(crate) module_reads: Vec<T::Key>,
-
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
+
+    #[deprecated]
+    pub(crate) deprecated_module_reads: Vec<T::Key>,
+    module_reads: hashbrown::HashMap<ModuleId, ModuleRead>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -583,6 +615,150 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
+    /// Records the read to [CrossBlockModuleCache].
+    pub(crate) fn capture_global_cache_read(&mut self, module_id: ModuleId) {
+        self.module_reads.insert(module_id, ModuleRead::GlobalCache);
+    }
+
+    /// Records the read to [SyncCodeCache].
+    pub(crate) fn capture_block_cache_read(
+        &mut self,
+        module_id: ModuleId,
+        read: Option<Arc<MaybeCommitted<ModuleCacheEntry>>>,
+    ) {
+        self.module_reads
+            .insert(module_id, ModuleRead::BlockCache(read));
+    }
+
+    /// If the module has been previously read from [SyncCodeCache], allows to query information
+    /// about it.
+    fn fetch_from_module_read<F, V>(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        map_func: F,
+    ) -> CacheRead<V>
+    where
+        F: Fn(Option<&Arc<MaybeCommitted<ModuleCacheEntry>>>) -> V,
+    {
+        match self.module_reads.get(&(address, module_name)) {
+            Some(ModuleRead::BlockCache(read)) => CacheRead::Hit(map_func(read.as_ref())),
+            None => CacheRead::Miss,
+            Some(ModuleRead::GlobalCache) => unreachable!("Global cache reads are not cached"),
+        }
+    }
+
+    /// If the module has been previously read, returns the state value metadata.
+    pub(crate) fn fetch_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<Option<StateValueMetadata>> {
+        self.fetch_from_module_read(address, module_name, |v| {
+            v.map(|e| e.state_value_metadata().clone())
+        })
+    }
+
+    /// If the module has been previously read, returns the state value metadata.
+    pub(crate) fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<bool> {
+        self.fetch_from_module_read(address, module_name, |v| v.is_some())
+    }
+
+    /// If the module has been previously read, returns its bytes.
+    pub(crate) fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<Option<Bytes>> {
+        self.fetch_from_module_read(address, module_name, |v| v.map(|e| e.bytes().clone()))
+    }
+
+    /// If the module has been previously read, returns its size in bytes.
+    pub(crate) fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<Option<usize>> {
+        self.fetch_from_module_read(address, module_name, |v| v.map(|e| e.size_in_bytes()))
+    }
+
+    /// If the module has been previously read, returns its metadata.
+    pub(crate) fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<Option<Vec<Metadata>>> {
+        self.fetch_from_module_read(address, module_name, |v| v.map(|e| e.metadata().to_vec()))
+    }
+
+    /// If the module has been previously read, returns its deserialized representation.
+    pub(crate) fn fetch_deserialized_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<Option<Arc<CompiledModule>>> {
+        self.fetch_from_module_read(address, module_name, |v| {
+            v.map(|e| e.compiled_module().clone())
+        })
+    }
+
+    /// If the module has been previously read, and has been verified, returns it. The important
+    /// difference from other APIs is that existing non-verified entries are treated as a cache
+    /// miss.
+    pub(crate) fn fetch_verified_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> CacheRead<VMResult<Option<Arc<Module>>>> {
+        match self.module_reads.get(&(address, module_name)) {
+            Some(ModuleRead::BlockCache(read)) => match read {
+                Some(v) => {
+                    if v.is_verified() {
+                        CacheRead::Hit(v.verified_module().map(|v| Some(v.clone())))
+                    } else {
+                        CacheRead::Miss
+                    }
+                },
+                None => CacheRead::Hit(Ok(None)),
+            },
+            None => CacheRead::Miss,
+            Some(ModuleRead::GlobalCache) => unreachable!("Global cache reads are not cached"),
+        }
+    }
+
+    /// For every module read that was captured, checks if the reads are still the same:
+    ///   1. Entries read from cross-block module cache are still valid.
+    ///   2. Entries that were not in block cache before are still not there.
+    ///   3. Entries that were in block cache have the same commit index.
+    pub(crate) fn validate_module_reads(
+        &self,
+        code_cache: &SyncCodeCache<
+            ModuleId,
+            Arc<MaybeCommitted<ModuleCacheEntry>>,
+            [u8; 32],
+            CachedScript,
+            VMError,
+        >,
+    ) -> bool {
+        if self.non_delayed_field_speculative_failure {
+            return false;
+        }
+
+        self.module_reads.iter().all(|(id, read)| match read {
+            ModuleRead::GlobalCache => CrossBlockModuleCache::is_valid(id),
+            ModuleRead::BlockCache(previous) => match previous {
+                Some(previous) => code_cache
+                    .module_cache()
+                    .contains_and(id, |m| m.commit_idx() == previous.commit_idx()),
+                None => !code_cache.module_cache().contains(id),
+            },
+        })
+    }
+
     pub(crate) fn validate_group_reads(
         &self,
         group_map: &VersionedGroupData<T::Key, T::Tag, T::Value>,
@@ -691,8 +867,14 @@ impl<T: Transaction> CapturedReads<T> {
             }
         }
 
-        for key in &self.module_reads {
+        // TODO(loader_v2): Test summaries are the same.
+        #[allow(deprecated)]
+        for key in &self.deprecated_module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+        for id in self.module_reads.keys() {
+            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+            ret.insert(InputOutputKey::Resource(key));
         }
 
         for (key, read) in &self.delayed_field_reads {
@@ -721,12 +903,20 @@ impl<T: Transaction> CapturedReads<T> {
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct UnsyncReadSet<T: Transaction> {
     pub(crate) resource_reads: HashSet<T::Key>,
-    pub(crate) module_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<T::Identifier>,
+
+    #[deprecated]
+    pub(crate) deprecated_module_reads: HashSet<T::Key>,
+    module_reads: HashSet<ModuleId>,
 }
 
 impl<T: Transaction> UnsyncReadSet<T> {
+    /// Captures the module read for sequential execution.
+    pub(crate) fn capture_module_read(&mut self, module_id: ModuleId) {
+        self.module_reads.insert(module_id);
+    }
+
     pub(crate) fn get_read_summary(
         &self,
     ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
@@ -741,8 +931,14 @@ impl<T: Transaction> UnsyncReadSet<T> {
             }
         }
 
-        for key in &self.module_reads {
+        // TODO(loader_v2): Test summaries are the same if we switch.
+        #[allow(deprecated)]
+        for key in &self.deprecated_module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+        for id in &self.module_reads {
+            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+            ret.insert(InputOutputKey::Resource(key));
         }
 
         for key in &self.delayed_field_reads {
@@ -762,7 +958,10 @@ mod test {
     use claims::{
         assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
-    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+    use move_core_types::identifier::Identifier;
+    use move_vm_runtime::RuntimeEnvironment;
+    use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
+    use once_cell::sync::Lazy;
     use test_case::test_case;
 
     #[test]
@@ -1333,5 +1532,207 @@ mod test {
         captured_reads.mark_failure(true);
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(captured_reads.delayed_field_speculative_failure);
+    }
+
+    #[test]
+    fn test_speculative_failure_for_module_reads() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        captured_reads.mark_failure(true);
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        captured_reads.mark_failure(false);
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_global_cache_module_reads_are_not_recorded() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        captured_reads.capture_global_cache_read(module_id.clone());
+
+        // Panics because we never should be calling this: global reads are resolved through the
+        // read-only cache directly.
+        let _ =
+            captured_reads.fetch_from_module_read(module_id.address(), module_id.name(), |_| ());
+    }
+
+    // Mock runtime environment for tests.
+    static RUNTIME_ENVIRONMENT: Lazy<RuntimeEnvironment> =
+        Lazy::new(|| RuntimeEnvironment::new(vec![]));
+
+    #[test]
+    fn test_global_cache_module_reads() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
+        CrossBlockModuleCache::add_to_to_cross_block_module_cache(foo_id.clone(), foo_entry);
+        captured_reads.capture_global_cache_read(foo_id.clone());
+
+        let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
+        let bar_entry = ModuleCacheEntry::verified_for_test("bar", &[], &RUNTIME_ENVIRONMENT);
+        CrossBlockModuleCache::add_to_to_cross_block_module_cache(bar_id.clone(), bar_entry);
+        captured_reads.capture_global_cache_read(bar_id.clone());
+
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Now, mark one of the cross-module entries invalid. Validations should fail!
+        CrossBlockModuleCache::mark_invalid(&bar_id);
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Without invalid module (and if it is not captured), validation should pass.
+        CrossBlockModuleCache::remove_from_cross_block_module_cache(&bar_id);
+        captured_reads.module_reads.remove(&bar_id);
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Validation fails if we captured a cross-block module which does not exist anymore.
+        CrossBlockModuleCache::remove_from_cross_block_module_cache(&foo_id);
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+    }
+
+    #[test]
+    fn test_block_cache_module_reads_are_recorded() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry =
+            ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
+        mvhashmap.code_cache().module_cache().store_module(
+            foo_id.clone(),
+            Arc::new(MaybeCommitted::new(foo_entry.clone(), None)),
+        );
+        captured_reads.capture_block_cache_read(
+            foo_id.clone(),
+            Some(Arc::new(MaybeCommitted::new(foo_entry, None))),
+        );
+
+        let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
+        captured_reads.capture_block_cache_read(bar_id.clone(), None);
+
+        let baz_id = ModuleId::new(AccountAddress::ONE, Identifier::new("baz").unwrap());
+
+        // We  have 3 modules:
+        //   1. 'foo' exists and is captured.
+        //   2. 'bar' does not exist and is captured.
+        //   3. 'baz' is not captured.
+
+        let miss = captured_reads.fetch_module_bytes(baz_id.address(), baz_id.name());
+        assert_matches!(miss, CacheRead::Miss);
+        let miss = captured_reads.fetch_verified_module(baz_id.address(), baz_id.name());
+        assert_matches!(miss, CacheRead::Miss);
+
+        let hit = captured_reads.check_module_exists(bar_id.address(), bar_id.name());
+        assert_matches!(hit, CacheRead::Hit(false));
+        let hit = captured_reads.fetch_module_size_in_bytes(bar_id.address(), bar_id.name());
+        assert_matches!(hit, CacheRead::Hit(None));
+        let hit = captured_reads.fetch_verified_module(bar_id.address(), bar_id.name());
+        assert_matches!(hit, CacheRead::Hit(Ok(None)));
+
+        let hit = captured_reads.check_module_exists(foo_id.address(), foo_id.name());
+        assert_matches!(hit, CacheRead::Hit(true));
+        let hit = captured_reads.fetch_deserialized_module(foo_id.address(), foo_id.name());
+        assert_matches!(hit, CacheRead::Hit(Some(_)));
+
+        // We do not have a verified module captured, so it is a miss.
+        let miss = captured_reads.fetch_verified_module(foo_id.address(), foo_id.name());
+        assert_matches!(miss, CacheRead::Miss);
+
+        let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
+        mvhashmap.code_cache().module_cache().store_module(
+            foo_id.clone(),
+            Arc::new(MaybeCommitted::new(foo_entry.clone(), None)),
+        );
+        captured_reads.capture_block_cache_read(
+            foo_id.clone(),
+            Some(Arc::new(MaybeCommitted::new(foo_entry, None))),
+        );
+
+        let hit = captured_reads.fetch_verified_module(foo_id.address(), foo_id.name());
+        assert_matches!(hit, CacheRead::Hit(Ok(Some(_))));
+    }
+
+    #[test]
+    fn test_block_cache_module_reads() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry =
+            ModuleCacheEntry::deserialized_for_test("foo", vec![], &RUNTIME_ENVIRONMENT);
+        mvhashmap.code_cache().module_cache().store_module(
+            foo_id.clone(),
+            Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10))),
+        );
+        captured_reads.capture_block_cache_read(
+            foo_id.clone(),
+            Some(Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10)))),
+        );
+
+        let bar_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").unwrap());
+        captured_reads.capture_block_cache_read(bar_id.clone(), None);
+
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Entry did not exist before --> now exists.
+        let bar_entry =
+            ModuleCacheEntry::deserialized_for_test("bar", vec![], &RUNTIME_ENVIRONMENT);
+        mvhashmap.code_cache().module_cache().store_module(
+            bar_id.clone(),
+            Arc::new(MaybeCommitted::new(bar_entry.clone(), Some(12))),
+        );
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        captured_reads.module_reads.remove(&bar_id);
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Version has been republished, with a higher transaction index. Should fail validation.
+        mvhashmap.code_cache().module_cache().store_module(
+            foo_id.clone(),
+            Arc::new(MaybeCommitted::new(foo_entry, Some(20))),
+        );
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+    }
+
+    #[test]
+    fn test_global_and_block_cache_module_reads() {
+        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mvhashmap =
+            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+
+        // Module exists in global cache.
+        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let foo_entry = ModuleCacheEntry::verified_for_test("foo", &[], &RUNTIME_ENVIRONMENT);
+        CrossBlockModuleCache::add_to_to_cross_block_module_cache(
+            foo_id.clone(),
+            foo_entry.clone(),
+        );
+        captured_reads.capture_global_cache_read(foo_id.clone());
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Assume we republish this module: validation must fail.
+        CrossBlockModuleCache::mark_invalid(&foo_id);
+        mvhashmap.code_cache().module_cache().store_module(
+            foo_id.clone(),
+            Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10))),
+        );
+        assert!(!captured_reads.validate_module_reads(mvhashmap.code_cache()));
+
+        // Assume we re-read the new correct version. Then validation should pass again.
+        captured_reads.capture_block_cache_read(
+            foo_id.clone(),
+            Some(Arc::new(MaybeCommitted::new(foo_entry.clone(), Some(10)))),
+        );
+        assert!(captured_reads.validate_module_reads(mvhashmap.code_cache()));
+        assert!(!CrossBlockModuleCache::is_valid(&foo_id));
     }
 }
