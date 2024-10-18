@@ -136,7 +136,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     .apply_to_ledger(&executed_trees, None)?;
     let output = &chunk.output;
     ensure!(
-        !chunk.transactions_to_commit().is_empty(),
+        output.expect_ledger_update_output().num_txns() != 0,
         "Genesis txn execution failed."
     );
 

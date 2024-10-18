@@ -25,7 +25,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
+        BlockOutput, Transaction, TransactionOutput, Version,
     },
     vm_status::VMStatus,
 };
@@ -124,7 +124,7 @@ impl DbWriter for FakeDb {
         &self,
         _version: Version,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        _txns_to_commit: Option<&[TransactionToCommit]>,
+        _chunk: Option<ChunkToCommit>,
     ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }

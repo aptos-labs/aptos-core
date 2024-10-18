@@ -546,24 +546,19 @@ pub trait DbWriter: Send + Sync {
         sync_commit: bool,
     ) -> Result<()> {
         // For reconfig suffix.
-        if ledger_info_with_sigs.is_none() && chunk.txns_to_commit.is_empty() {
+        if ledger_info_with_sigs.is_none() && chunk.is_empty() {
             return Ok(());
         }
 
-        if !chunk.txns_to_commit.is_empty() {
+        if !chunk.is_empty() {
             self.pre_commit_ledger(chunk, sync_commit)?;
         }
         let version_to_commit = if let Some(ledger_info_with_sigs) = ledger_info_with_sigs {
             ledger_info_with_sigs.ledger_info().version()
         } else {
-            // here txns_to_commit is known to be non-empty
-            chunk.first_version + chunk.txns_to_commit.len() as u64 - 1
+            chunk.expect_last_version()
         };
-        self.commit_ledger(
-            version_to_commit,
-            ledger_info_with_sigs,
-            Some(chunk.txns_to_commit),
-        )
+        self.commit_ledger(version_to_commit, ledger_info_with_sigs, Some(chunk))
     }
 
     /// Optimistically persist transactions to the ledger.
@@ -587,7 +582,7 @@ pub trait DbWriter: Send + Sync {
         &self,
         version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        txns_to_commit: Option<&[TransactionToCommit]>,
+        chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
         unimplemented!()
     }
