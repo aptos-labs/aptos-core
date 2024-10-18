@@ -10,6 +10,7 @@ module aptos_framework::version {
 
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     struct Version has drop, key, store {
         major: u64,
