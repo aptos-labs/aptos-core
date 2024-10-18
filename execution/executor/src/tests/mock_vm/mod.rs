@@ -10,7 +10,7 @@ use crate::{
     workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
@@ -70,11 +70,13 @@ impl TransactionBlockExecutor for MockVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         DoGetExecutionOutput::by_transaction_execution::<MockVM>(
             transactions,
             state_view,
             onchain_config,
+            append_state_checkpoint_to_block,
         )
     }
 }

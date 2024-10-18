@@ -543,6 +543,7 @@ impl StateStore {
                 .freeze(&buffered_state.current_state().base);
             let latest_snapshot_state_view = CachedStateView::new_impl(
                 StateViewId::Miscellaneous,
+                num_transactions,
                 snapshot,
                 speculative_state,
                 Arc::new(AsyncProofFetcher::new(state_db.clone())),
@@ -565,18 +566,21 @@ impl StateStore {
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
 
-            let (updates_until_last_checkpoint, state_after_last_checkpoint) =
+            let state_checkpoint_output =
                 InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
-                    buffered_state.current_state(),
-                    latest_snapshot_state_view.into_state_cache(),
+                    // TODO(aldenhu): avoid cloning the HashMap inside.
+                    &Arc::new(buffered_state.current_state().clone()),
+                    &latest_snapshot_state_view.into_state_cache(),
                     last_checkpoint_index,
                     &write_sets,
                 )?;
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(
-                updates_until_last_checkpoint.as_ref(),
-                &state_after_last_checkpoint,
+                state_checkpoint_output
+                    .state_updates_before_last_checkpoint
+                    .as_ref(),
+                &state_checkpoint_output.result_state,
                 true, /* sync_commit */
             )?;
         }

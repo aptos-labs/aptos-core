@@ -26,7 +26,6 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
@@ -36,7 +35,7 @@ use aptos_types::{
         partitioner::{ExecutableBlock, ExecutableTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_value::StateValue, StateViewId},
+    state_store::StateViewId,
 };
 use aptos_vm::AptosVM;
 use block_tree::BlockTree;
@@ -50,6 +49,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput>;
 }
 
@@ -58,11 +58,13 @@ impl TransactionBlockExecutor for AptosVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         DoGetExecutionOutput::by_transaction_execution::<AptosVM>(
             transactions,
             state_view,
             onchain_config,
+            append_state_checkpoint_to_block,
         )
     }
 }
@@ -81,14 +83,6 @@ where
             db,
             inner: RwLock::new(None),
         }
-    }
-
-    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
-        self.inner
-            .read()
-            .as_ref()
-            .expect("BlockExecutor is not reset")
-            .root_smt()
     }
 
     fn maybe_initialize(&self) -> Result<()> {
@@ -198,10 +192,6 @@ where
             phantom: PhantomData,
         })
     }
-
-    fn root_smt(&self) -> SparseMerkleTree<StateValue> {
-        self.block_tree.root_block().output.state().current.clone()
-    }
 }
 
 impl<V> BlockExecutorInner<V>
@@ -232,11 +222,12 @@ where
             .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
         let parent_output = &parent_block.output;
         info!(
-            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            block_id = block_id,
+            first_version = parent_output.execution_output.next_version(),
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
-        let (state, epoch_state, state_checkpoint_output) =
+        let (execution_output, state_checkpoint_output) =
             if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
                 // ignore reconfiguration suffix, even if the block is non-empty
                 info!(
@@ -244,56 +235,59 @@ where
                     "reconfig_descendant_block_received"
                 );
                 (
-                    parent_output.state().clone(),
-                    parent_output.epoch_state().clone(),
-                    StateCheckpointOutput::default(),
+                    parent_output.execution_output.reconfig_suffix(),
+                    parent_output
+                        .expect_state_checkpoint_output()
+                        .reconfig_suffix(),
                 )
             } else {
                 let state_view = {
                     let _timer = OTHER_TIMERS.timer_with(&["verified_state_view"]);
 
-                    info!("next_version: {}", parent_output.next_version());
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.next_version(),
-                        parent_output.state().current.clone(),
+                        parent_output.execution_output.next_version(),
+                        parent_output.expect_result_state().current.clone(),
                         Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
                     )?
                 };
 
-                let chunk_output = {
+                let execution_output = {
                     let _timer = VM_EXECUTE_BLOCK.start_timer();
                     fail_point!("executor::vm_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
                             "Injected error in vm_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
+                    V::execute_transaction_block(
+                        transactions,
+                        state_view,
+                        onchain_config.clone(),
+                        Some(block_id),
+                    )?
                 };
 
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
-                THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                let state_checkpoint_output = THREAD_MANAGER.get_exe_cpu_pool().install(|| {
                     fail_point!("executor::block_state_checkpoint", |_| {
                         Err(anyhow::anyhow!("Injected error in block state checkpoint."))
                     });
-
                     DoStateCheckpoint::run(
-                        chunk_output,
-                        parent_output.state(),
-                        Some(block_id),
-                        None,
-                        /*is_block=*/ true,
+                        &execution_output,
+                        parent_output.expect_result_state(),
+                        Option::<Vec<_>>::None,
                     )
-                })?
+                })?;
+                (execution_output, state_checkpoint_output)
             };
+        let output = PartialStateComputeResult::new(execution_output);
+        output.set_state_checkpoint_output(state_checkpoint_output.clone());
 
-        let _ = self.block_tree.add_block(
-            parent_block_id,
-            block_id,
-            PartialStateComputeResult::new(parent_output.result_state.clone(), state, epoch_state),
-        )?;
+        let _ = self
+            .block_tree
+            .add_block(parent_block_id, block_id, output)?;
         Ok(state_checkpoint_output)
     }
 
@@ -301,7 +295,7 @@ where
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
+        _state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = UPDATE_LEDGER.start_timer();
         info!(
@@ -322,6 +316,7 @@ where
         let parent_output = parent_block.output.expect_ledger_update_output();
         let parent_accumulator = parent_output.txn_accumulator();
         let block = block_vec.pop().expect("Must exist").unwrap();
+        let output = &block.output;
         parent_block.ensure_has_child(block_id)?;
         if let Some(complete_result) = block.output.get_complete_result() {
             return Ok(complete_result);
@@ -335,15 +330,14 @@ where
                 );
                 parent_output.reconfig_suffix()
             } else {
-                let (output, _, _) = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                    DoLedgerUpdate::run(state_checkpoint_output, parent_accumulator.clone())
-                })?;
-                output
+                THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                    DoLedgerUpdate::run(
+                        &output.execution_output,
+                        output.expect_state_checkpoint_output(),
+                        parent_accumulator.clone(),
+                    )
+                })?
             };
-
-        if !block.output.has_reconfiguration() {
-            output.ensure_ends_with_state_checkpoint()?;
-        }
 
         block.output.set_ledger_update_output(output);
         Ok(block.output.expect_complete_result())
@@ -363,7 +357,7 @@ where
         });
 
         let output = block.output.expect_complete_result();
-        let num_txns = output.transactions_to_commit_len();
+        let num_txns = output.num_transactions_to_commit();
         if num_txns != 0 {
             let _timer = SAVE_TRANSACTIONS.start_timer();
             self.db

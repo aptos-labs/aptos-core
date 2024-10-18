@@ -24,6 +24,7 @@ bcs = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
 itertools = { workspace = true }
+once_cell = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

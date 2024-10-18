@@ -1558,6 +1558,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "itertools 0.13.0",
+ "once_cell",
  "serde",
  "thiserror",
 ]
@@ -1602,6 +1603,7 @@ name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-executor",
  "aptos-executor-types",
  "aptos-experimental-runtimes",

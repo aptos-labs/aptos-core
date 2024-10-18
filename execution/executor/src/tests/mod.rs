@@ -61,7 +61,7 @@ fn execute_and_commit_block(
         )
         .unwrap();
     let version = 2 * (txn_index + 1);
-    assert_eq!(output.version(), version);
+    assert_eq!(output.expect_last_version(), version);
 
     let ledger_info = gen_ledger_info(version, output.root_hash(), id, txn_index + 1);
     executor.commit_blocks(vec![id], ledger_info).unwrap();
@@ -218,7 +218,7 @@ fn test_executor_one_block() {
         )
         .unwrap();
     let version = num_user_txns + 1;
-    assert_eq!(output.version(), version);
+    assert_eq!(output.expect_last_version(), version);
     let block_root_hash = output.root_hash();
 
     let ledger_info = gen_ledger_info(version, block_root_hash, block_id, 1);
@@ -387,7 +387,7 @@ fn create_blocks_and_chunks(
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
             .unwrap();
-        assert_eq!(output.version(), version);
+        assert_eq!(output.expect_last_version(), version);
         block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
         out_blocks.push((txns, ledger_info));
@@ -491,7 +491,7 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let output = ApplyExecutionOutput::run(chunk_output, &ledger_view, None).unwrap();
+    let output = ApplyExecutionOutput::run(chunk_output, &ledger_view).unwrap();
 
     db.writer
         .save_transactions(
@@ -687,9 +687,10 @@ fn run_transactions_naive(
                 )
                 .unwrap(),
             block_executor_onchain_config.clone(),
+            None,
         )
         .unwrap();
-        let output = ApplyExecutionOutput::run(out, &ledger_view, None).unwrap();
+        let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();
         db.writer
             .save_transactions(
                 output.expect_complete_result().as_chunk_to_commit(),
