@@ -156,8 +156,8 @@ impl AssetUploaderThrottlerContext {
         &self,
         asset: AssetUploaderRequestStatuses,
     ) -> anyhow::Result<AssetUploaderRequestStatuses> {
-        // Make a request to the worker to look up the asset
-        info!(asset_uri = ?asset.asset_uri, "Requesting worker to look up asset");
+        // Make a request to the worker to lookup the asset
+        info!(asset_uri = ?asset.asset_uri, "Requesting worker to lookup asset");
         let mut asset_uploader_worker_uri = Url::parse(&self.config.asset_uploader_worker_uri)?;
         asset_uploader_worker_uri.set_path("get_existing");
         let res = self
@@ -226,7 +226,7 @@ impl AssetUploaderThrottlerContext {
             // Upload the asset in a separate task
             // If successful, remove the asset from the in-progress set and continue to next asset
             // If rate limited, sleep for 5 minutes then notify
-            // If unsuccessful due to conflict, attempt to look up the asset in Cloudflare
+            // If unsuccessful due to conflict, attempt to lookup the asset in Cloudflare
             // If unsuccessful for other reason, add the asset back to the queue
             let self_clone = self_arc.clone();
             tokio::spawn(async move {
