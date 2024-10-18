@@ -1,0 +1,31 @@
+
+Diagnostics:
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/warnings-are-errors/unused_var.move:6:26
+  │
+6 │     fun unused_arg<T: drop>(x: T) {
+  │                             ^
+
+// -- Model dump before bytecode pipeline
+module 0x42::explicate_drop {
+    private fun id<T>(x: #0): #0 {
+        x
+    }
+    private fun unused_arg<T>(x: #0) {
+        Tuple()
+    }
+    private fun unused_call_assign() {
+        {
+          let _x: u64 = explicate_drop::id<u64>(42);
+          Tuple()
+        }
+    }
+    private fun unused_var() {
+        Tuple()
+    }
+} // end 0x42::explicate_drop
+
+
+============ bytecode verification succeeded ========
+
+Error: Warnings found, and configuration indicates that warnings should be treated as errors

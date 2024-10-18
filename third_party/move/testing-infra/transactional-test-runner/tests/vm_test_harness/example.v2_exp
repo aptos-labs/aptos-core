@@ -17,6 +17,8 @@ Error: compilation errors:
    │           - Module previously defined here, with '(A=0x42)::N'
 
 
+Exiting with checking errors
+
 
 task 5 'run'. lines 37-37:
 Error: Function execution failed with VMError: {
@@ -35,6 +37,8 @@ Error: compilation errors:
 42 │         A::N::give(&s)
    │         ^^^^^^^^^^^^^^
 
+
+Exiting with checking errors
 
 
 task 7 'view'. lines 47-49:

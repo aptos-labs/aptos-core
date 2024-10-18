@@ -124,6 +124,7 @@ impl ProverOptions {
         skip_attribute_checks: bool,
         known_attributes: &BTreeSet<String>,
         experiments: &[String],
+        warnings_are_errors: bool,
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
@@ -138,6 +139,7 @@ impl ProverOptions {
             skip_attribute_checks,
             known_attributes.clone(),
             experiments.to_vec(),
+            warnings_are_errors,
         )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test

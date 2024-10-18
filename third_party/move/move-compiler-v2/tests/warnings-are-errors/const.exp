@@ -1,0 +1,183 @@
+
+Diagnostics:
+warning: Unused local variable `const_true`. Consider removing or prefixing with an underscore: `_const_true`
+  ┌─ tests/warnings-are-errors/const.move:3:13
+  │
+3 │         let const_true = u(true);
+  │             ^^^^^^^^^^
+
+warning: Unused local variable `const_false`. Consider removing or prefixing with an underscore: `_const_false`
+  ┌─ tests/warnings-are-errors/const.move:4:13
+  │
+4 │         let const_false = u(false);
+  │             ^^^^^^^^^^^
+
+warning: Unused local variable `hex_u8`. Consider removing or prefixing with an underscore: `_hex_u8`
+  ┌─ tests/warnings-are-errors/const.move:5:13
+  │
+5 │         let hex_u8: u8 = u(0x1);
+  │             ^^^^^^
+
+warning: Unused local variable `hex_u16`. Consider removing or prefixing with an underscore: `_hex_u16`
+  ┌─ tests/warnings-are-errors/const.move:6:13
+  │
+6 │         let hex_u16: u16 = u(0x1BAE);
+  │             ^^^^^^^
+
+warning: Unused local variable `hex_u32`. Consider removing or prefixing with an underscore: `_hex_u32`
+  ┌─ tests/warnings-are-errors/const.move:7:13
+  │
+7 │         let hex_u32: u32 = u(0xDEAD80);
+  │             ^^^^^^^
+
+warning: Unused local variable `hex_u64`. Consider removing or prefixing with an underscore: `_hex_u64`
+  ┌─ tests/warnings-are-errors/const.move:8:13
+  │
+8 │         let hex_u64: u64 = u(0xCAFE);
+  │             ^^^^^^^
+
+warning: Unused local variable `hex_u128`. Consider removing or prefixing with an underscore: `_hex_u128`
+  ┌─ tests/warnings-are-errors/const.move:9:13
+  │
+9 │         let hex_u128: u128 = u(0xDEADBEEF);
+  │             ^^^^^^^^
+
+warning: Unused local variable `hex_u256`. Consider removing or prefixing with an underscore: `_hex_u256`
+   ┌─ tests/warnings-are-errors/const.move:10:13
+   │
+10 │         let hex_u256: u256 = u(0x1123_456A_BCDE_F);
+   │             ^^^^^^^^
+
+warning: Unused local variable `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/warnings-are-errors/const.move:11:13
+   │
+11 │         let a = u(@0x42);
+   │             ^
+
+warning: Unused local variable `vec`. Consider removing or prefixing with an underscore: `_vec`
+   ┌─ tests/warnings-are-errors/const.move:12:13
+   │
+12 │         let vec = u(vector[1, 2, 3]);
+   │             ^^^
+
+warning: Unused local variable `s`. Consider removing or prefixing with an underscore: `_s`
+   ┌─ tests/warnings-are-errors/const.move:13:13
+   │
+13 │         let s = u(b"Hello!\n");
+   │             ^
+
+// -- Model dump before bytecode pipeline
+module 0x42::constant {
+    private fun test_constans() {
+        {
+          let const_true: bool = constant::u<bool>(true);
+          {
+            let const_false: bool = constant::u<bool>(false);
+            {
+              let hex_u8: u8 = constant::u<u8>(1);
+              {
+                let hex_u16: u16 = constant::u<u16>(7086);
+                {
+                  let hex_u32: u32 = constant::u<u32>(14593408);
+                  {
+                    let hex_u64: u64 = constant::u<u64>(51966);
+                    {
+                      let hex_u128: u128 = constant::u<u128>(3735928559);
+                      {
+                        let hex_u256: u256 = constant::u<u256>(301490978409967);
+                        {
+                          let a: address = constant::u<address>(0x42);
+                          {
+                            let vec: vector<u64> = constant::u<vector<u64>>([Number(1), Number(2), Number(3)]);
+                            {
+                              let s: vector<u8> = constant::u<vector<u8>>([72, 101, 108, 108, 111, 33, 10]);
+                              Tuple()
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun u<T>(x: #0): #0 {
+        x
+    }
+} // end 0x42::constant
+
+
+Diagnostics:
+warning: Unused assignment to `const_true`. Consider removing or prefixing with an underscore: `_const_true`
+  ┌─ tests/warnings-are-errors/const.move:3:26
+  │
+3 │         let const_true = u(true);
+  │                          ^^^^^^^
+
+warning: Unused assignment to `const_false`. Consider removing or prefixing with an underscore: `_const_false`
+  ┌─ tests/warnings-are-errors/const.move:4:27
+  │
+4 │         let const_false = u(false);
+  │                           ^^^^^^^^
+
+warning: Unused assignment to `hex_u8`. Consider removing or prefixing with an underscore: `_hex_u8`
+  ┌─ tests/warnings-are-errors/const.move:5:26
+  │
+5 │         let hex_u8: u8 = u(0x1);
+  │                          ^^^^^^
+
+warning: Unused assignment to `hex_u16`. Consider removing or prefixing with an underscore: `_hex_u16`
+  ┌─ tests/warnings-are-errors/const.move:6:28
+  │
+6 │         let hex_u16: u16 = u(0x1BAE);
+  │                            ^^^^^^^^^
+
+warning: Unused assignment to `hex_u32`. Consider removing or prefixing with an underscore: `_hex_u32`
+  ┌─ tests/warnings-are-errors/const.move:7:28
+  │
+7 │         let hex_u32: u32 = u(0xDEAD80);
+  │                            ^^^^^^^^^^^
+
+warning: Unused assignment to `hex_u64`. Consider removing or prefixing with an underscore: `_hex_u64`
+  ┌─ tests/warnings-are-errors/const.move:8:28
+  │
+8 │         let hex_u64: u64 = u(0xCAFE);
+  │                            ^^^^^^^^^
+
+warning: Unused assignment to `hex_u128`. Consider removing or prefixing with an underscore: `_hex_u128`
+  ┌─ tests/warnings-are-errors/const.move:9:30
+  │
+9 │         let hex_u128: u128 = u(0xDEADBEEF);
+  │                              ^^^^^^^^^^^^^
+
+warning: Unused assignment to `hex_u256`. Consider removing or prefixing with an underscore: `_hex_u256`
+   ┌─ tests/warnings-are-errors/const.move:10:30
+   │
+10 │         let hex_u256: u256 = u(0x1123_456A_BCDE_F);
+   │                              ^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/warnings-are-errors/const.move:11:17
+   │
+11 │         let a = u(@0x42);
+   │                 ^^^^^^^^
+
+warning: Unused assignment to `vec`. Consider removing or prefixing with an underscore: `_vec`
+   ┌─ tests/warnings-are-errors/const.move:12:19
+   │
+12 │         let vec = u(vector[1, 2, 3]);
+   │                   ^^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `s`. Consider removing or prefixing with an underscore: `_s`
+   ┌─ tests/warnings-are-errors/const.move:13:17
+   │
+13 │         let s = u(b"Hello!\n");
+   │                 ^^^^^^^^^^^^^^
+
+
+============ bytecode verification succeeded ========
+
+Error: Warnings found, and configuration indicates that warnings should be treated as errors
