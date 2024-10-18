@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::test` has a function parameter:
+  ┌─ tests/lambda/inline-parity/unused_lambda_param.move:2:9
+  │
+2 │     fun test(p: u64, f: |u64| u64): u64 {
+  │         ^^^^         - Parameter `f` has function-valued type `|u64|u64`.
+
+warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/lambda/inline-parity/unused_lambda_param.move:7:18
+  │
+7 │         test(0, |x| 1);
+  │                  ^

@@ -160,23 +160,24 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
-        // Tests for lambda lifting
+        // Tests for lambda lifting and lambdas -- with full lambda support
         TestConfig {
-            name: "lambda-lifting",
-            runner: |p| run_test(p, get_config_by_name("lambda-lifting")),
-            include: vec!["/lambda-lifting/"],
+            name: "lambda",
+            runner: |p| run_test(p, get_config_by_name("lambda")),
+            include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
-            exp_suffix: None,
+            exp_suffix: Some("lambda.exp"),
             options: opts
                 .clone()
+                // .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_experiment(Experiment::LAMBDA_FIELDS, true)
                 .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
                 .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
                 .set_experiment(Experiment::LAMBDA_VALUES, true)
                 .set_experiment(Experiment::LAMBDA_LIFTING, true),
-            stop_after: StopAfter::AstPipeline,
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::AllStages,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for simplifier in full mode, with code elimination
@@ -213,7 +214,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/"],
+            include: vec!["/inlining/", "/folding/", "/simplifier/", "/lambda/"],
             exclude: vec!["/more-v1/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
