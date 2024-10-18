@@ -58,7 +58,11 @@ async fn test_peer_updater_loop_multiple_peers() {
     let node_config = NodeConfig::default();
     let all_peers = vec![validator_peer, vfn_peer, fullnode_peer];
     for peer in &all_peers {
-        let peer_state = PeerState::new(node_config.clone(), time_service.clone());
+        let peer_state = PeerState::new(
+            node_config.clone(),
+            time_service.clone(),
+            &peer_monitoring_client,
+        );
         peer_monitor_state
             .peer_states
             .write()
