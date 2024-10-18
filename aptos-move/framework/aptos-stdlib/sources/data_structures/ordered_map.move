@@ -27,7 +27,7 @@ module aptos_std::ordered_map {
 
     use std::vector;
 
-    use std::enum_option::{Self as option, Option};
+    use std::option::{Self, Option};
     use std::cmp;
     use std::error;
     use std::mem;
