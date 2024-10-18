@@ -7,6 +7,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Add `aptos update prover-dependencies`, which installs the dependency of Move prover, boogie, z3 and cvc5.
 - Update the default version of `movefmt` to be installed from 1.0.4 to 1.0.5
 - Update the local-testnet logs to use `println` for regular output and reserve `eprintln` for errors.
+- Set compiler V2 as default when using `aptos move prove`.
 
 ## [4.2.3] - 2024/09/20
 - Fix the broken indexer in localnet in 4.2.2, which migrates table info from sycn to async ways.
