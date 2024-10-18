@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::chunk_output::ChunkOutput,
+    components::do_get_execution_output::DoGetExecutionOutput,
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
 };
 use anyhow::Result;
+use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
@@ -37,7 +38,7 @@ pub trait TransactionChunk {
         self.len() == 0
     }
 
-    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ChunkOutput>;
+    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ExecutionOutput>;
 }
 
 pub struct ChunkToExecute {
@@ -54,7 +55,7 @@ impl TransactionChunk for ChunkToExecute {
         self.transactions.len()
     }
 
-    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ChunkOutput> {
+    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ExecutionOutput> {
         let ChunkToExecute {
             transactions,
             first_version: _,
@@ -76,7 +77,7 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
-        ChunkOutput::by_transaction_execution::<V>(
+        DoGetExecutionOutput::by_transaction_execution::<V>(
             sig_verified_txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -99,13 +100,13 @@ impl TransactionChunk for ChunkToApply {
         self.transactions.len()
     }
 
-    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ChunkOutput> {
+    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ExecutionOutput> {
         let Self {
             transactions,
             transaction_outputs,
             first_version: _,
         } = self;
 
-        ChunkOutput::by_transaction_output(transactions, transaction_outputs, state_view)
+        DoGetExecutionOutput::by_transaction_output(transactions, transaction_outputs, state_view)
     }
 }
