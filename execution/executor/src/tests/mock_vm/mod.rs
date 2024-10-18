@@ -7,7 +7,7 @@ mod mock_vm_test;
 
 use crate::{
     block_executor::TransactionBlockExecutor,
-    components::do_get_execution_output::DoGetExecutionOutput,
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};

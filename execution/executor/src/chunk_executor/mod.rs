@@ -5,18 +5,15 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
-        chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier},
-        do_get_execution_output::DoGetExecutionOutput,
-        do_ledger_update::DoLedgerUpdate,
-        do_state_checkpoint::DoStateCheckpoint,
-        executed_chunk::ExecutedChunk,
-        partial_state_compute_result::PartialStateComputeResult,
-        transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk},
-    },
     logging::{LogEntry, LogSchema},
     metrics::{APPLY_CHUNK, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE, EXECUTE_CHUNK},
+    types::{
+        executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
+    },
+    workflow::{
+        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
+        do_state_checkpoint::DoStateCheckpoint,
+    },
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{
@@ -44,6 +41,8 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::VMExecutor;
+use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
+use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
 use fail::fail_point;
 use itertools::multizip;
 use std::{
@@ -55,6 +54,11 @@ use std::{
     },
     time::Instant,
 };
+use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
+
+pub mod chunk_commit_queue;
+pub mod chunk_result_verifier;
+pub mod transaction_chunk;
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,

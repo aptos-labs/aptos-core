@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::do_get_execution_output::DoGetExecutionOutput,
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;

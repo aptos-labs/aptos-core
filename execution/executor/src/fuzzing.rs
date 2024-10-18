@@ -4,7 +4,7 @@
 
 use crate::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
-    components::do_get_execution_output::DoGetExecutionOutput,
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};

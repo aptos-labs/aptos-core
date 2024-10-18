@@ -4,14 +4,8 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    components::{
-        apply_chunk_output::ApplyChunkOutput, do_get_execution_output::DoGetExecutionOutput,
-    },
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{
-        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-        MockVM, DISCARD_STATUS, KEEP_STATUS,
-    },
+    workflow::{do_get_execution_output::DoGetExecutionOutput, ApplyExecutionOutput},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
@@ -40,10 +34,16 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use itertools::Itertools;
+use mock_vm::{
+    encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
+    MockVM, DISCARD_STATUS, KEEP_STATUS,
+};
 use proptest::prelude::*;
 use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
+#[cfg(test)]
+mod mock_vm;
 
 fn execute_and_commit_block(
     executor: &TestExecutor,
@@ -491,7 +491,7 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let (output, _, _) = ApplyChunkOutput::apply_chunk(chunk_output, &ledger_view, None).unwrap();
+    let output = ApplyExecutionOutput::run(chunk_output, &ledger_view, None).unwrap();
 
     db.writer
         .save_transactions(
@@ -689,7 +689,7 @@ fn run_transactions_naive(
             block_executor_onchain_config.clone(),
         )
         .unwrap();
-        let (output, _, _) = ApplyChunkOutput::apply_chunk(out, &ledger_view, None).unwrap();
+        let output = ApplyExecutionOutput::run(out, &ledger_view, None).unwrap();
         db.writer
             .save_transactions(
                 output.expect_complete_result().as_chunk_to_commit(),

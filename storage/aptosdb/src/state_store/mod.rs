@@ -40,7 +40,7 @@ use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
-use aptos_executor::components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
+use aptos_executor::types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;

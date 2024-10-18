@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::do_get_execution_output::update_counters_for_processed_chunk, metrics::OTHER_TIMERS,
+    metrics::OTHER_TIMERS, workflow::do_get_execution_output::update_counters_for_processed_chunk,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
