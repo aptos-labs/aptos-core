@@ -4,7 +4,7 @@
 use crate::{
     consensus_observer::{
         common::{
-            logging::{LogEntry, LogSchema},
+            logging::{LogEntry, LogEvent, LogSchema},
             metrics,
         },
         network::{
@@ -416,6 +416,15 @@ impl ConsensusObserver {
             false // We can't verify the signatures yet
         };
 
+        // Log payload processing time
+        info!(LogSchema::new(LogEntry::ConsensusPublisher)
+            .event(LogEvent::LatencyMonitoring)
+            .message(&format!(
+                "Processing block payload message! Time: {:?}. Nonce: {:?}",
+                std::time::Instant::now(),
+                block_payload.nonce,
+            )));
+
         // Update the payload store with the payload
         self.block_payload_store
             .lock()
@@ -513,6 +522,15 @@ impl ConsensusObserver {
     /// the commit decision was successfully processed. Note: this function
     /// assumes the commit decision has already been verified.
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
+        // Log commit processing time
+        info!(LogSchema::new(LogEntry::ConsensusPublisher)
+            .event(LogEvent::LatencyMonitoring)
+            .message(&format!(
+                "Processing commit decision message! Time: {:?}. Nonce: {:?}",
+                std::time::Instant::now(),
+                commit_decision.nonce,
+            )));
+
         // Get the pending block for the commit decision
         let pending_block = self
             .ordered_block_store
@@ -555,6 +573,17 @@ impl ConsensusObserver {
     async fn process_network_message(&mut self, network_message: ConsensusObserverNetworkMessage) {
         // Unpack the network message
         let (peer_network_id, message) = network_message.into_parts();
+
+        // Log the message receipt
+        info!(LogSchema::new(LogEntry::ConsensusObserver)
+            .event(LogEvent::LatencyMonitoring)
+            .message(&format!(
+                "Received direct message from peer {:?}! Message: {:?}. Time: {:?}. Nonce: {:?}",
+                peer_network_id,
+                message.get_label(),
+                std::time::Instant::now(),
+                message.get_nonce(),
+            )));
 
         // Verify the message is from the peers we've subscribed to
         if let Err(error) = self
@@ -702,6 +731,15 @@ impl ConsensusObserver {
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
         if self.get_last_ordered_block().id() == ordered_block.first_block().parent_id() {
+            // Log ordered block processing time
+            info!(LogSchema::new(LogEntry::ConsensusPublisher)
+                .event(LogEvent::LatencyMonitoring)
+                .message(&format!(
+                    "Processing ordered block message! Time: {:?}. Nonce: {:?}",
+                    std::time::Instant::now(),
+                    ordered_block.nonce,
+                )));
+
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
