@@ -25,12 +25,12 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_db::{backup::restore_handler::RestoreHandler, AptosDB};
+use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_types::{ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::{cached_state_view::{CachedDbStateView, CachedStateView}, DbReaderWriter};
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -711,31 +711,4 @@ impl TransactionRestoreBatchController {
             .await?;
         Ok(())
     }
-}
-
-#[test]
-fn test_replay_with_no_commit() {
-    use aptos_storage_interface::DbReader;
-    use aptos_executor::components::chunk_output::ChunkOutput;
-    let db_root_path = "/tmp/aptosdb_test";
-    let aptos_db = AptosDB::new_readonly_for_test(db_root_path);
-    let start_version = 1000;
-    let limit = 1000;
-    // fetch transactions from aptos_db
-    let txn_info_iter = aptos_db.get_transaction_info_iterator(start_version, limit).unwrap();
-    let txn_iter = aptos_db.get_transaction_iterator(start_version, limit).unwrap();
-    // create batch of 100 transactions
-    let state_view = CachedStateView::new_impl(id, snapshot, speculative_state, proof_fetcher)
-    for chunk in izip!(txn_info_iter, txn_iter).chunks(100) {
-        let (txn_info_batch, txn_batch) = chunk.map(|(txn_info, txn)| (txn_info.unwrap(), txn.unwrap())).unzip();
-        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
-            txn_batch,
-            state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        )?;
-    }
-
-    // execute transaction against the aptos db
-
-
 }
