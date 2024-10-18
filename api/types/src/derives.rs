@@ -221,7 +221,7 @@ impl_poem_type!(
                   - `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
 
                 Struct type value examples:
-                  - `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+                  - `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
                   - `0x1::account::Account`
 
                 Note:
