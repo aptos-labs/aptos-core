@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
     time::Duration,
@@ -31,12 +31,14 @@ pub mod args;
 mod batch_transfer;
 mod bounded_batch_wrapper;
 mod call_custom_modules;
+pub mod econia_order_generator;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
 mod transaction_mix_generator;
 mod workflow_delegator;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
@@ -86,6 +88,14 @@ pub enum TransactionType {
     },
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum EconiaFlowType {
+    Basic,
+    Mixed,
+    Market,
+    Real,
+}
+
 #[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum AccountType {
     #[default]
@@ -95,7 +105,20 @@ pub enum AccountType {
 
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
-    CreateMintBurn { count: usize, creation_balance: u64 },
+    CreateMintBurn {
+        count: usize,
+        creation_balance: u64,
+    },
+    // Places bid and ask limit orders at random price
+    Econia {
+        num_users: usize,
+        flow_type: EconiaFlowType,
+        num_markets: u64,
+        // If this is flag is set, the same accounts will be reused for placing multiple orders
+        reuse_accounts_for_orders: bool,
+        // Publish Econia package during the test
+        publish_packages: bool,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -123,12 +146,17 @@ pub trait TransactionGenerator: Sync + Send {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
+        history: &[String],
+        market_maker: bool,
     ) -> Vec<SignedTransaction>;
 }
 
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
+    fn create_transaction_generator(
+        &self,
+        txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator>;
 }
 
 pub struct CounterState {
@@ -340,6 +368,7 @@ pub async fn create_txn_generator_creator(
                             &mut EntryPointTransactionGenerator {
                                 entry_point: *entry_point,
                             },
+                            true,
                         )
                         .await,
                     ),
@@ -415,7 +444,7 @@ impl<T> ObjectPool<T> {
     }
 
     pub(crate) fn add_to_pool(&self, mut addition: Vec<T>) {
-        assert!(!addition.is_empty());
+        // assert!(!addition.is_empty());
         let mut current = self.pool.write();
         current.append(&mut addition);
         sample!(

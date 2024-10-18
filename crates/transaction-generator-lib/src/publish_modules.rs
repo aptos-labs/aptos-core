@@ -9,7 +9,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 pub struct PublishPackageGenerator {
     rng: StdRng,
@@ -36,6 +36,8 @@ impl TransactionGenerator for PublishPackageGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
+        _history: &[String],
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
 
@@ -81,7 +83,10 @@ impl PublishPackageCreator {
 }
 
 impl TransactionGeneratorCreator for PublishPackageCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(
+        &self,
+        _txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator> {
         Box::new(PublishPackageGenerator::new(
             StdRng::from_entropy(),
             self.package_handler.clone(),
