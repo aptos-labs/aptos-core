@@ -18,13 +18,13 @@ module aptos_std::storage_slots_allocator {
     friend aptos_std::big_ordered_map;
 
     use aptos_std::table::{Self, Table};
-    use std::enum_option::{Self as option, Option};
+    use std::option::{Self, Option};
 
     const EINVALID_ARGUMENT: u64 = 1;
     const EINTERNAL_INVARIANT_BROKEN: u64 = 7;
 
     const NULL_INDEX: u64 = 0;
-    const INLINE_SLOT_INDEX: u64 = 1;
+    const SPECIAL_SLOT_INDEX: u64 = 1;
     const FIRST_INDEX: u64 = 10; // keeping space for new special values
 
     /// Data stored in an individual slot
@@ -42,7 +42,6 @@ module aptos_std::storage_slots_allocator {
 
     enum StorageSlotsAllocatorConfig has copy, drop {
         V1 {
-            should_inline: bool,
             should_reuse: bool,
             num_to_preallocate: u32,
         }
@@ -55,7 +54,6 @@ module aptos_std::storage_slots_allocator {
             should_reuse: bool,
             reuse_head_index: u64,
             reuse_spare_count: u32,
-            inline_slot: Option<Link<T>>, // Optionally put one slot directly inline
         },
     }
 
@@ -87,7 +85,6 @@ module aptos_std::storage_slots_allocator {
             should_reuse: config.should_reuse,
             reuse_head_index: NULL_INDEX,
             reuse_spare_count: 0,
-            inline_slot: option::none(),
         };
 
         for (i in 0..config.num_to_preallocate) {
@@ -95,24 +92,18 @@ module aptos_std::storage_slots_allocator {
             result.maybe_push_to_reuse_queue(slot_index);
         };
 
-        if (config.should_inline) {
-            result.maybe_push_to_reuse_queue(INLINE_SLOT_INDEX);
-        };
-
         result
     }
 
     public fun new_default_config(): StorageSlotsAllocatorConfig {
         StorageSlotsAllocatorConfig::V1 {
-            should_inline: true,
             should_reuse: false,
             num_to_preallocate: 0,
         }
     }
 
-    public fun new_config(should_inline: bool, should_reuse: bool, num_to_preallocate: u32): StorageSlotsAllocatorConfig {
+    public fun new_config(should_reuse: bool, num_to_preallocate: u32): StorageSlotsAllocatorConfig {
         StorageSlotsAllocatorConfig::V1 {
-            should_inline,
             should_reuse,
             num_to_preallocate,
         }
@@ -144,9 +135,7 @@ module aptos_std::storage_slots_allocator {
                 should_reuse: _,
                 reuse_head_index,
                 reuse_spare_count: _,
-                inline_slot,
             } => {
-                inline_slot.destroy_none();
                 assert!(reuse_head_index == NULL_INDEX, EINTERNAL_INVARIANT_BROKEN);
                 slots.destroy_some().destroy();
             },
@@ -154,22 +143,11 @@ module aptos_std::storage_slots_allocator {
     }
 
     public fun borrow<T: store>(self: &StorageSlotsAllocator<T>, slot: RefToSlot): &T {
-        let slot_index = slot.slot_index;
-
-        if (slot_index == INLINE_SLOT_INDEX) {
-            return &self.inline_slot.borrow().value;
-        };
-
-        &self.slots.borrow().borrow(slot_index).value
+        &self.slots.borrow().borrow(slot.slot_index).value
     }
 
     public fun borrow_mut<T: store>(self: &mut StorageSlotsAllocator<T>, slot: RefToSlot): &mut T {
-        let slot_index = slot.slot_index;
-        if (slot_index == INLINE_SLOT_INDEX) {
-            return &mut self.inline_slot.borrow_mut().value;
-        };
-
-        &mut self.slots.borrow_mut().borrow_mut(slot_index).value
+        &mut self.slots.borrow_mut().borrow_mut(slot.slot_index).value
     }
 
     // We also provide here operations where `add()` is split into `reserve_slot`,
@@ -222,6 +200,10 @@ module aptos_std::storage_slots_allocator {
         RefToSlot { slot_index: NULL_INDEX }
     }
 
+    public fun special_ref(): RefToSlot {
+        RefToSlot { slot_index: SPECIAL_SLOT_INDEX }
+    }
+
     public fun ref_is_null(self: &RefToSlot): bool {
         self.slot_index == NULL_INDEX
     }
@@ -239,7 +221,7 @@ module aptos_std::storage_slots_allocator {
     }
 
     fun maybe_push_to_reuse_queue<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64) {
-        if (self.should_reuse || slot_index == INLINE_SLOT_INDEX) {
+        if (self.should_reuse) {
             self.add_link(slot_index, Link::Vacant { next: self.reuse_head_index });
             self.reuse_head_index = slot_index;
             self.reuse_spare_count = self.reuse_spare_count + 1;
@@ -256,18 +238,10 @@ module aptos_std::storage_slots_allocator {
     }
 
     fun add_link<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64, link: Link<T>) {
-        if (slot_index == INLINE_SLOT_INDEX) {
-            self.inline_slot.fill(link)
-        } else {
-            self.slots.borrow_mut().add(slot_index, link);
-        }
+        self.slots.borrow_mut().add(slot_index, link);
     }
 
     fun remove_link<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): Link<T> {
-        if (slot_index == INLINE_SLOT_INDEX) {
-            self.inline_slot.extract()
-        } else {
-            self.slots.borrow_mut().remove(slot_index)
-        }
+        self.slots.borrow_mut().remove(slot_index)
     }
 }
