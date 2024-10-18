@@ -17,3 +17,5 @@ return values: 5
 
 task 6 'run'. lines 101-101:
 return values: 1
+
+==> Compiler v2 delivered same results!
