@@ -17,7 +17,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{runtime::Handle, sync::watch::Receiver as WatchReceiver};
+use aptos_logger::error;
+use tokio::{runtime::Handle, sync::{broadcast::error, watch::Receiver as WatchReceiver}};
 
 const SERVICE_TYPE: &str = "internal_indexer_db_service";
 const INTERNAL_INDEXER_DB: &str = "internal_indexer_db";
@@ -146,6 +147,7 @@ impl InternalIndexerDBService {
         loop {
             let start_time: std::time::Instant = std::time::Instant::now();
             let next_version = self.db_indexer.process_a_batch(start_version)?;
+            error!("bowu start_version {}, next_version: {}",start_version, next_version);
 
             if next_version == start_version {
                 if let Ok(recv_res) =
