@@ -18,6 +18,7 @@ use std::{
 };
 
 // Reliable/retrying transaction executor, used for initializing
+#[derive(Clone)]
 pub struct RestApiReliableTransactionSubmitter {
     rest_clients: Vec<RestClient>,
     max_retries: usize,

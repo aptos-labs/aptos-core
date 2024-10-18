@@ -24,24 +24,20 @@ use itertools::Itertools;
 use rand::SeedableRng;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
 use rayon::{
-    iter::{IntoParallelRefIterator, ParallelIterator},
-    ThreadPool, ThreadPoolBuilder,
+    iter::{IntoParallelRefIterator, IntoParallelIterator, ParallelIterator},
+    // ThreadPool, ThreadPoolBuilder,
 };
 use serde::{Deserialize, Serialize};
-#[cfg(test)]
-use std::collections::HashSet;
 use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashMap},
+    // cell::RefCell,
     fs::File,
     io::{Read, Write},
     path::Path,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        mpsc, Arc, Mutex,
-    },
+    sync::{atomic::{AtomicUsize, Ordering}, mpsc, Arc, Mutex}
 };
-use thread_local::ThreadLocal;
+#[cfg(test)]
+use std::collections::{HashMap, HashSet};
+// use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -108,7 +104,7 @@ pub struct TransactionGenerator {
     num_workers: usize,
     // TODO(grao): Use a different pool, and pin threads to dedicate cores to avoid affecting the
     // rest parts of benchmark.
-    worker_pool: ThreadPool,
+    // worker_pool: ThreadPool,
 }
 
 impl TransactionGenerator {
@@ -200,10 +196,10 @@ impl TransactionGenerator {
             block_sender: Some(block_sender),
             transaction_factory: Self::create_transaction_factory(),
             num_workers,
-            worker_pool: ThreadPoolBuilder::new()
-                .num_threads(num_workers)
-                .build()
-                .unwrap(),
+            // worker_pool: ThreadPoolBuilder::new()
+            //     .num_threads(num_workers)
+            //     .build()
+            //     .unwrap(),
         }
     }
 
@@ -295,7 +291,7 @@ impl TransactionGenerator {
         num_transfer_blocks
     }
 
-    pub fn run_workload(
+    pub async fn run_workload(
         &mut self,
         block_size: usize,
         num_blocks: usize,
@@ -308,10 +304,11 @@ impl TransactionGenerator {
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
-        let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
-        let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
+        let account_cache = self.main_signer_accounts.as_ref().unwrap();
+        let account_pool_size = account_cache.accounts.len();
+        // let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for i in 0..num_blocks {
-            let sender_indices = rand::seq::index::sample(
+            let sender_indices: Vec<_> = rand::seq::index::sample(
                 &mut thread_rng(),
                 account_pool_size,
                 num_senders_per_block,
@@ -319,27 +316,28 @@ impl TransactionGenerator {
             .into_iter()
             .flat_map(|sender_idx| vec![sender_idx; transactions_per_sender])
             .collect();
-            let terminate = self.generate_and_send_block(
-                self.main_signer_accounts.as_ref().unwrap(),
-                sender_indices,
-                phase.clone(),
-                last_non_empty_phase.clone(),
-                |sender_idx, _| {
-                    let sender = &self.main_signer_accounts.as_ref().unwrap().accounts[sender_idx];
-                    let mut transaction_generator = transaction_generator
-                        .get_or(|| {
-                            RefCell::new(transaction_generators.lock().unwrap().pop().unwrap())
-                        })
-                        .borrow_mut();
-                    transaction_generator
+            {
+                let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
+                let mut txns = Vec::new();
+                for sender_idx in sender_indices {
+                    let sender = &account_cache.accounts[sender_idx];
+                    // let mut transaction_generator = transaction_generator
+                    //     .get_or(|| {
+                    //         RefCell::new(transaction_generators.lock().unwrap().pop().unwrap())
+                    //     })
+                    //     .borrow_mut();
+                    if let Some(txn) = transaction_generators.lock().unwrap().first_mut().unwrap()
                         .generate_transactions(sender, 1)
+                        .await
                         .pop()
-                        .map(Transaction::UserTransaction)
-                },
-                |sender_idx| *sender_idx,
-            );
-            if terminate {
-                return i + 1;
+                        .map(Transaction::UserTransaction) {
+                        txns.push(txn);
+                    }
+                };
+                let terminate = self.send_block(txns, phase.clone(), last_non_empty_phase.clone());
+                if terminate {
+                    return i + 1;
+                }
             }
         }
         num_blocks
@@ -441,8 +439,7 @@ impl TransactionGenerator {
                             ),
                     );
                     Some(Transaction::UserTransaction(txn))
-                },
-                |(sender_idx, _)| *sender_idx,
+                }
             );
             bar.inc(block_size as u64);
         }
@@ -639,57 +636,60 @@ impl TransactionGenerator {
                 );
                 Some(Transaction::UserTransaction(txn))
             },
-            |(sender_idx, _)| *sender_idx,
         );
     }
 
-    fn generate_and_send_block<T, F, S>(
+    fn generate_and_send_block<T, F>(
         &self,
         account_cache: &AccountCache,
         inputs: Vec<T>,
         phase: Arc<AtomicUsize>,
         last_non_empty_phase: Arc<AtomicUsize>,
         func: F,
-        sender_func: S,
     ) -> bool
     where
         T: Send,
         F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
-        S: Fn(&T) -> usize,
     {
         let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
-        let block_size = inputs.len();
-        let mut jobs = Vec::new();
-        jobs.resize_with(self.num_workers, BTreeMap::new);
-        inputs.into_iter().enumerate().for_each(|(i, input)| {
-            let sender_idx = sender_func(&input);
-            jobs[sender_idx % self.num_workers].insert(i, || func(input, account_cache));
-        });
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.worker_pool.scope(move |scope| {
-            for per_worker_jobs in jobs.into_iter() {
-                let tx = tx.clone();
-                scope.spawn(move |_| {
-                    for (index, job) in per_worker_jobs {
-                        if let Some(txn) = job() {
-                            tx.send((index, txn)).unwrap();
-                        }
-                    }
-                });
-            }
-        });
+        let txns = inputs
+                .into_par_iter()
+                .flat_map(|input| func(input, account_cache))
+                .collect();
+        self.send_block(txns, phase, last_non_empty_phase)
+    }
 
-        let mut transactions_by_index = HashMap::new();
-        while let Ok((index, txn)) = rx.recv() {
-            transactions_by_index.insert(index, txn);
-        }
+    fn send_block(
+        &self,
+        transactions: Vec<Transaction>,
+        phase: Arc<AtomicUsize>,
+        last_non_empty_phase: Arc<AtomicUsize>,
+    ) -> bool {
+        // let mut jobs = Vec::new();
+        // jobs.resize_with(self.num_workers, BTreeMap::new);
+        // inputs.into_iter().enumerate().for_each(|(i, input)| {
+        //     let sender_idx = sender_func(&input);
+        //     jobs[sender_idx % self.num_workers].insert(i, || func(input, account_cache));
+        // });
 
-        let mut transactions = Vec::new();
-        for i in 0..block_size {
-            if let Some(txn) = transactions_by_index.get(&i) {
-                transactions.push(txn.clone());
-            }
-        }
+        // let (tx, rx) = std::sync::mpsc::channel();
+        // self.worker_pool.scope(move |scope| {
+        //     for per_worker_jobs in jobs.into_iter() {
+        //         let tx = tx.clone();
+        //         scope.spawn(move |_| {
+        //             for (index, job) in per_worker_jobs {
+        //                 if let Some(txn) = job() {
+        //                     tx.send((index, txn)).unwrap();
+        //                 }
+        //             }
+        //         });
+        //     }
+        // });
+
+        // let mut transactions_by_index = HashMap::new();
+        // while let Ok((index, txn)) = rx.recv() {
+        //     transactions_by_index.insert(index, txn);
+        // }
 
         if transactions.is_empty() {
             let val = phase.fetch_add(1, Ordering::Relaxed);
@@ -817,7 +817,7 @@ fn rand_with_hotspot<R: Rng>(rng: &mut R, n: usize, h: usize) -> usize {
 #[test]
 fn test_get_conflicting_grps_transfer_indices() {
     let mut rng = StdRng::from_entropy();
-
+    use std::collections::{HashMap, HashSet};
     fn dfs(node: usize, adj_list: &HashMap<usize, HashSet<usize>>, visited: &mut HashSet<usize>) {
         visited.insert(node);
         for &n in adj_list.get(&node).unwrap() {

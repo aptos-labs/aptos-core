@@ -48,7 +48,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
         &self,
         root_account: &dyn RootAccountHandle,
         txn_factory: &TransactionFactory,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let entry_point = self.entry_point;

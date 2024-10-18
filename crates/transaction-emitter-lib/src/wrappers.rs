@@ -243,7 +243,7 @@ pub async fn create_accounts_command(
 
     bulk_create_accounts(
         coin_source_account,
-        &RestApiReliableTransactionSubmitter::new(rest_clients, 6, Duration::from_secs(10)),
+        Arc::new(RestApiReliableTransactionSubmitter::new(rest_clients, 6, Duration::from_secs(10))),
         &txn_factory,
         account_generator,
         (&emit_job_request).into(),

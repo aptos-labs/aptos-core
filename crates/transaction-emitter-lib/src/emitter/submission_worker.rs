@@ -108,7 +108,7 @@ impl SubmissionWorker {
             // always add expected cycle duration, to not drift from expected pace.
             wait_until += wait_duration;
 
-            let requests = self.gen_requests();
+            let requests = self.gen_requests().await;
             if !requests.is_empty() {
                 let mut account_to_start_and_end_seq_num = HashMap::new();
                 for req in requests.iter() {
@@ -306,7 +306,7 @@ impl SubmissionWorker {
         }
     }
 
-    fn gen_requests(&mut self) -> Vec<SignedTransaction> {
+    async fn gen_requests(&mut self) -> Vec<SignedTransaction> {
         let batch_size = max(
             1,
             min(
@@ -319,13 +319,13 @@ impl SubmissionWorker {
             .iter()
             .choose_multiple(&mut self.rng, batch_size);
 
-        accounts
-            .into_iter()
-            .flat_map(|account| {
-                self.txn_generator
-                    .generate_transactions(account.borrow(), self.params.transactions_per_account)
-            })
-            .collect()
+        let mut txns = Vec::new();
+        for account in accounts {
+            txns.append(&mut self.txn_generator
+                .generate_transactions(account.borrow(), self.params.transactions_per_account)
+                .await);
+        }
+        txns
     }
 }
 

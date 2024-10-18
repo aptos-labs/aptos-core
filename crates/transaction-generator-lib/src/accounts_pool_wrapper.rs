@@ -5,6 +5,7 @@ use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
+use async_trait::async_trait;
 
 /// Wrapper that allows inner transaction generator to have unique accounts
 /// for all transactions (instead of having 5-20 transactions per account, as default)
@@ -34,8 +35,9 @@ impl AccountsPoolWrapperGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for AccountsPoolWrapperGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         _account: &LocalAccount,
         num_to_create: usize,
@@ -46,10 +48,11 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         if accounts_to_use.is_empty() {
             return Vec::new();
         }
-        let txns = accounts_to_use
-            .iter()
-            .flat_map(|account| self.generator.generate_transactions(account, 1))
-            .collect();
+
+        let mut txns = Vec::new();
+        for account in &accounts_to_use {
+            txns.append(&mut self.generator.generate_transactions(account, 1).await);
+        }
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
             destination_accounts_pool.add_to_pool(accounts_to_use);
         }

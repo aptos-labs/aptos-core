@@ -3,6 +3,7 @@
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use async_trait::async_trait;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -35,8 +36,9 @@ impl PhasedTxnMixGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for PhasedTxnMixGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
@@ -51,7 +53,7 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         let mut picked = self.rng.gen_range(0, self.total_weight_per_phase[phase]);
         for (gen, weight) in &mut self.txn_mix_per_phase[phase] {
             if picked < *weight {
-                return gen.generate_transactions(account, num_to_create);
+                return gen.generate_transactions(account, num_to_create).await;
             }
             picked -= *weight;
         }

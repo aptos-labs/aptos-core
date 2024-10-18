@@ -93,7 +93,7 @@ fn create_checkpoint(
 
 /// Runs the benchmark with given parameters.
 #[allow(clippy::too_many_arguments)]
-pub fn run_benchmark<V>(
+pub async fn run_benchmark<V>(
     block_size: usize,
     num_blocks: usize,
     transaction_mix: Option<Vec<(TransactionType, usize)>>,
@@ -207,7 +207,7 @@ pub fn run_benchmark<V>(
             transaction_generators,
             phase,
             transactions_per_sender,
-        )
+        ).await
     } else {
         generator.run_transfer(
             block_size,
@@ -282,7 +282,7 @@ where
             AlwaysApproveRootAccountHandle { root_account },
             &mut main_signer_accounts,
             burner_accounts,
-            &db_gen_init_transaction_executor,
+            Arc::new(db_gen_init_transaction_executor),
             &transaction_factory,
             &transaction_factory,
             phase_clone,
@@ -736,7 +736,7 @@ mod tests {
     use aptos_types::on_chain_config::Features;
     use aptos_vm::AptosVM;
 
-    fn test_generic_benchmark<E>(
+    async fn test_generic_benchmark<E>(
         transaction_type: Option<TransactionTypeArg>,
         verify_sequence_numbers: bool,
     ) where
@@ -782,16 +782,16 @@ mod tests {
             false,
             PipelineConfig::default(),
             Features::default(),
-        );
+        ).await;
     }
 
-    #[test]
-    fn test_benchmark_default() {
-        test_generic_benchmark::<AptosVM>(None, true);
+    #[tokio::test]
+    async fn test_benchmark_default() {
+        test_generic_benchmark::<AptosVM>(None, true).await;
     }
 
-    #[test]
-    fn test_benchmark_transaction() {
+    #[tokio::test]
+    async fn test_benchmark_transaction() {
         AptosVM::set_num_shards_once(1);
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
@@ -799,12 +799,12 @@ mod tests {
         test_generic_benchmark::<AptosVM>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
             true,
-        );
+        ).await;
     }
 
-    #[test]
-    fn test_native_benchmark() {
+    #[tokio::test]
+    async fn test_native_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
-        test_generic_benchmark::<NativeExecutor>(None, false);
+        test_generic_benchmark::<NativeExecutor>(None, false).await;
     }
 }

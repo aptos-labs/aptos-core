@@ -2,22 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator,
-    accounts_pool_wrapper::AccountsPoolWrapperCreator,
-    call_custom_modules::CustomModulesDelegationGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator,
-    stable_coin_minter::{
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator, call_custom_modules::CustomModulesDelegationGeneratorCreator, entry_points::EntryPointTransactionGenerator, reliable_execution_wrapper::ReliableExecutionWrapperCreator, stable_coin_minter::{
         StableCoinConfigureControllerGenerator, StableCoinMinterGenerator,
         StableCoinSetMinterAllowanceGenerator,
-    },
-    EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
+    }, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use std::{
     fmt::Debug,
     sync::{
@@ -109,8 +104,9 @@ impl WorkflowTxnGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for WorkflowTxnGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
@@ -175,7 +171,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
-            generator.generate_transactions(account, num_to_create)
+            generator.generate_transactions(account, num_to_create).await
         } else {
             Vec::new()
         };
@@ -253,7 +249,7 @@ impl WorkflowTxnGeneratorCreator {
         txn_factory: TransactionFactory,
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         num_modules: usize,
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
@@ -293,7 +289,7 @@ impl WorkflowTxnGeneratorCreator {
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),
                     root_account,
-                    txn_executor,
+                    txn_executor.clone(),
                     num_modules,
                     mint_entry_point.package_name(),
                     Some(20_00000000),
@@ -303,7 +299,7 @@ impl WorkflowTxnGeneratorCreator {
                 let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
-                    txn_executor,
+                    txn_executor.clone(),
                     &mut packages,
                     &mut EntryPointTransactionGenerator {
                         entry_point: mint_entry_point,
@@ -313,7 +309,7 @@ impl WorkflowTxnGeneratorCreator {
                 let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
-                    txn_executor,
+                    txn_executor.clone(),
                     &mut packages,
                     &mut EntryPointTransactionGenerator {
                         entry_point: burn_entry_point,
@@ -377,7 +373,7 @@ impl WorkflowTxnGeneratorCreator {
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),
                     root_account,
-                    txn_executor,
+                    txn_executor.clone(),
                     num_modules,
                     "stablecoin",
                     Some(20_0000_0000),
@@ -407,7 +403,7 @@ impl WorkflowTxnGeneratorCreator {
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
                         root_account,
-                        txn_executor,
+                        txn_executor.clone(),
                         &mut packages,
                         &mut StableCoinConfigureControllerGenerator::default(),
                     )
@@ -418,7 +414,7 @@ impl WorkflowTxnGeneratorCreator {
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
                         root_account,
-                        txn_executor,
+                        txn_executor.clone(),
                         &mut packages,
                         &mut StableCoinSetMinterAllowanceGenerator::default(),
                     )
@@ -428,7 +424,7 @@ impl WorkflowTxnGeneratorCreator {
                 let mint_stage_worker = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
-                    txn_executor,
+                    txn_executor.clone(),
                     &mut packages,
                     &mut StableCoinMinterGenerator::new(
                         20,
@@ -441,24 +437,30 @@ impl WorkflowTxnGeneratorCreator {
 
                 let packages = Arc::new(packages);
 
-                let configure_controllers_stage = Box::new(AccountsPoolWrapperCreator::new(
+                let configure_controllers_stage = Box::new(ReliableExecutionWrapperCreator::new(
+                Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                        txn_factory.clone(),
-                        packages.clone(),
-                        configure_controllers_worker,
+                            txn_factory.clone(),
+                            packages.clone(),
+                            configure_controllers_worker,
+                        )),
+                        created_minter_pool.clone(),
+                        Some(configured_minter_pool.clone()),
                     )),
-                    created_minter_pool.clone(),
-                    Some(configured_minter_pool.clone()),
+                    txn_executor.clone(),
                 ));
 
-                let set_minter_allowance_stage = Box::new(AccountsPoolWrapperCreator::new(
-                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                        txn_factory.clone(),
-                        packages.clone(),
-                        set_minter_allowance_worker,
+                let set_minter_allowance_stage = Box::new(ReliableExecutionWrapperCreator::new(
+                    Box::new(AccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            set_minter_allowance_worker,
+                        )),
+                        configured_minter_pool.clone(),
+                        Some(minters_with_allowance_pool.clone()),
                     )),
-                    configured_minter_pool.clone(),
-                    Some(minters_with_allowance_pool.clone()),
+                    txn_executor.clone(),
                 ));
 
                 let mint_stage = Box::new(CustomModulesDelegationGeneratorCreator::new_raw(

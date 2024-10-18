@@ -19,6 +19,24 @@ use async_trait::async_trait;
 use rand::{rngs::StdRng, Rng};
 use std::sync::Arc;
 
+// pub async fn configure_mint_accounts_reliably(
+//     init_txn_factory: TransactionFactory,
+//     packages: &mut Vec<(Package, LocalAccount)>,
+//     txn_executor: &dyn ReliableTransactionSubmitter,
+// ) {
+//     let mut requests = vec![];
+//     for (package, publisher) in packages {
+//         let builder = init_txn_factory.payload(
+//             register_market(
+//                 package.get_module_id("stablecoin"),
+//                 num_markets,
+//             )
+//         );
+//         requests.push(publisher.sign_with_transaction_builder(builder));
+//     }
+//     txn_executor.execute_transactions(&requests).await.unwrap();
+// }
+
 pub struct StableCoinConfigureControllerGenerator {}
 impl StableCoinConfigureControllerGenerator {
     pub fn new() -> Self {
@@ -48,7 +66,7 @@ impl UserModuleTransactionGenerator for StableCoinConfigureControllerGenerator {
         &self,
         _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
-        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         Arc::new(|minter_account, package, _publisher, txn_factory, _rng| {
@@ -94,7 +112,7 @@ impl UserModuleTransactionGenerator for StableCoinSetMinterAllowanceGenerator {
         &self,
         _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
-        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         Arc::new(|minter_account, package, _publisher, txn_factory, _rng| {
@@ -151,14 +169,14 @@ impl UserModuleTransactionGenerator for StableCoinMinterGenerator {
         &self,
         _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
-        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let minter_accounts = self.minter_accounts.clone();
         let destination_accounts = self.destination_accounts.clone();
         let max_mint_amount = self.max_mint_amount;
         let batch_size = self.batch_size;
-        Arc::new(move |_fee_payer, _package, publisher, txn_factory, rng| {
+        Arc::new(move |_account, _package, publisher, txn_factory, rng| {
             let minter = minter_accounts.take_from_pool(1, true, rng);
             let destinations = destination_accounts.take_from_pool(batch_size, true, rng);
             if minter.is_empty() || destinations.is_empty() {

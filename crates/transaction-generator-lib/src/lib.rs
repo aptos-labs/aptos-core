@@ -27,6 +27,7 @@ use std::{
 
 mod account_generator;
 mod accounts_pool_wrapper;
+mod reliable_execution_wrapper;
 pub mod args;
 mod batch_transfer;
 mod bounded_batch_wrapper;
@@ -131,8 +132,9 @@ impl Default for TransactionType {
     }
 }
 
+#[async_trait]
 pub trait TransactionGenerator: Sync + Send {
-    fn generate_transactions(
+    async fn generate_transactions (
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
@@ -250,7 +252,7 @@ pub async fn create_txn_generator_creator(
     root_account: impl RootAccountHandle,
     source_accounts: &mut [LocalAccount],
     initial_burner_accounts: Vec<LocalAccount>,
-    txn_executor: &dyn ReliableTransactionSubmitter,
+    txn_executor: Arc<dyn ReliableTransactionSubmitter>,
     txn_factory: &TransactionFactory,
     init_txn_factory: &TransactionFactory,
     cur_phase: Arc<AtomicUsize>,
@@ -347,7 +349,7 @@ pub async fn create_txn_generator_creator(
                             txn_factory.clone(),
                             init_txn_factory.clone(),
                             &root_account,
-                            txn_executor,
+                            txn_executor.clone(),
                             *num_modules,
                             entry_point.package_name(),
                             &mut EntryPointTransactionGenerator {
@@ -378,7 +380,7 @@ pub async fn create_txn_generator_creator(
                         txn_factory.clone(),
                         init_txn_factory.clone(),
                         &root_account,
-                        txn_executor,
+                        txn_executor.clone(),
                         *num_modules,
                         use_account_pool.then(|| accounts_pool.clone()),
                         cur_phase.clone(),

@@ -8,6 +8,7 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
@@ -31,8 +32,9 @@ impl PublishPackageGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for PublishPackageGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,

@@ -10,6 +10,7 @@ use aptos_sdk::{
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
+use async_trait::async_trait;
 
 pub struct AccountGenerator {
     rng: StdRng,
@@ -40,8 +41,9 @@ impl AccountGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for AccountGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
