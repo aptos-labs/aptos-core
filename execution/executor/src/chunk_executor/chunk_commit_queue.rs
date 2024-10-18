@@ -4,9 +4,11 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{
-    chunk_result_verifier::ChunkResultVerifier, executed_chunk::ExecutedChunk,
-    partial_state_compute_result::PartialStateComputeResult,
+use crate::{
+    chunk_executor::chunk_result_verifier::ChunkResultVerifier,
+    types::{
+        executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
+    },
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;

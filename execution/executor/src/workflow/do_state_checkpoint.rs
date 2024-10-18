@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
+    types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{

@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::partial_state_compute_result::PartialStateComputeResult;
+use crate::types::partial_state_compute_result::PartialStateComputeResult;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
 #[derive(Debug)]
