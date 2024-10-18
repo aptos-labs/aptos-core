@@ -6,11 +6,11 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput,
         chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
         chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier},
         do_get_execution_output::DoGetExecutionOutput,
         do_ledger_update::DoLedgerUpdate,
+        do_state_checkpoint::DoStateCheckpoint,
         executed_chunk::ExecutedChunk,
         partial_state_compute_result::PartialStateComputeResult,
         transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk},
@@ -301,14 +301,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let chunk_output = chunk.into_output::<V>(state_view)?;
 
         // Calculate state snapshot
-        let (result_state, next_epoch_state, state_checkpoint_output) =
-            ApplyChunkOutput::calculate_state_checkpoint(
-                chunk_output,
-                &self.commit_queue.lock().latest_state(),
-                None, // append_state_checkpoint_to_block
-                Some(chunk_verifier.state_checkpoint_hashes()),
-                false, // is_block
-            )?;
+        let (result_state, next_epoch_state, state_checkpoint_output) = DoStateCheckpoint::run(
+            chunk_output,
+            &self.commit_queue.lock().latest_state(),
+            None, // append_state_checkpoint_to_block
+            Some(chunk_verifier.state_checkpoint_hashes()),
+            false, // is_block
+        )?;
 
         // Enqueue for next stage.
         self.commit_queue
