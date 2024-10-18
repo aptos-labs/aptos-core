@@ -6,7 +6,8 @@
 
 use crate::{
     components::{
-        block_tree::BlockTree, chunk_output::ChunkOutput, do_ledger_update::DoLedgerUpdate,
+        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree,
+        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
         partial_state_compute_result::PartialStateComputeResult,
     },
     logging::{LogEntry, LogSchema},
@@ -18,8 +19,8 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, state_compute_result::StateComputeResult,
-    BlockExecutorTrait, ExecutorError, ExecutorResult,
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -46,7 +47,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput>;
+    ) -> Result<ExecutionOutput>;
 }
 
 impl TransactionBlockExecutor for AptosVM {
@@ -54,8 +55,12 @@ impl TransactionBlockExecutor for AptosVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, onchain_config)
+    ) -> Result<ExecutionOutput> {
+        DoGetExecutionOutput::by_transaction_execution::<AptosVM>(
+            transactions,
+            state_view,
+            onchain_config,
+        )
     }
 }
 
@@ -267,7 +272,17 @@ where
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
+                    fail_point!("executor::block_state_checkpoint", |_| {
+                        Err(anyhow::anyhow!("Injected error in block state checkpoint."))
+                    });
+
+                    ApplyChunkOutput::calculate_state_checkpoint(
+                        chunk_output,
+                        parent_output.state(),
+                        Some(block_id),
+                        None,
+                        /*is_block=*/ true,
+                    )
                 })?
             };
 

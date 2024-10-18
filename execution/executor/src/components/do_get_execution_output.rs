@@ -1,66 +1,40 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
-use crate::{
-    components::{apply_chunk_output::ApplyChunkOutput, executed_chunk::ExecutedChunk},
-    metrics,
-};
+use crate::metrics;
 use anyhow::Result;
-use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
-use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
-use aptos_logger::{sample, sample::SampleRate, warn};
-use aptos_storage_interface::{
-    cached_state_view::{CachedStateView, StateCache},
-    state_delta::StateDelta,
-    ExecutedTrees,
-};
+use aptos_executor_types::execution_output::ExecutionOutput;
+use aptos_logger::prelude::*;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS,
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     contract_event::ContractEvent,
-    epoch_state::EpochState,
     transaction::{
         authenticator::AccountAuthenticator,
-        block_epilogue::BlockEndInfo,
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
     },
 };
 use aptos_vm::{AptosVM, VMExecutor};
-use fail::fail_point;
-use move_core_types::vm_status::StatusCode;
-use std::{ops::Deref, sync::Arc, time::Duration};
+use move_core_types::{language_storage::CORE_CODE_ADDRESS, vm_status::StatusCode};
+use std::{sync::Arc, time::Duration};
 
-pub struct ChunkOutput {
-    /// Input transactions.
-    pub transactions: Vec<Transaction>,
-    /// Raw VM output.
-    pub transaction_outputs: Vec<TransactionOutput>,
-    /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
-    /// execution result is processed; as well as all the accounts touched during execution, together
-    /// with their proofs.
-    pub state_cache: StateCache,
-    /// Optional StateCheckpoint payload
-    pub block_end_info: Option<BlockEndInfo>,
-}
+pub struct DoGetExecutionOutput;
 
-impl ChunkOutput {
+impl DoGetExecutionOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Self> {
+    ) -> Result<ExecutionOutput> {
         match transactions {
             ExecutableTransactions::Unsharded(txns) => {
                 Self::by_transaction_execution_unsharded::<V>(txns, state_view, onchain_config)
@@ -75,11 +49,11 @@ impl ChunkOutput {
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Self> {
+    ) -> Result<ExecutionOutput> {
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
         let (transaction_outputs, block_end_info) = block_output.into_inner();
-        Ok(Self {
+        Ok(ExecutionOutput {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
@@ -91,7 +65,7 @@ impl ChunkOutput {
         transactions: PartitionedTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Self> {
+    ) -> Result<ExecutionOutput> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
@@ -104,7 +78,7 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-        Ok(Self {
+        Ok(ExecutionOutput {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
                 .map(|t| t.into_txn().into_inner())
@@ -119,7 +93,7 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
         state_view: CachedStateView,
-    ) -> Result<Self> {
+    ) -> Result<ExecutionOutput> {
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
 
         // collect all accounts touched and dedup
@@ -131,45 +105,12 @@ impl ChunkOutput {
         // prime the state cache by fetching all touched accounts
         state_view.prime_cache_by_write_set(write_set)?;
 
-        Ok(Self {
+        Ok(ExecutionOutput {
             transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
         })
-    }
-
-    pub fn apply_to_ledger(
-        self,
-        base_view: &ExecutedTrees,
-        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::apply_to_ledger", |_| {
-            Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
-        });
-        ApplyChunkOutput::apply_chunk(self, base_view, known_state_checkpoint_hashes)
-    }
-
-    pub fn into_state_checkpoint_output(
-        self,
-        parent_state: &StateDelta,
-        block_id: HashValue,
-    ) -> Result<(Arc<StateDelta>, Option<EpochState>, StateCheckpointOutput)> {
-        fail_point!("executor::into_state_checkpoint_output", |_| {
-            Err(anyhow::anyhow!(
-                "Injected error in into_state_checkpoint_output."
-            ))
-        });
-
-        // TODO(msmouse): If this code path is only used by block_executor, consider move it to the
-        // caller side.
-        ApplyChunkOutput::calculate_state_checkpoint(
-            self,
-            parent_state,
-            Some(block_id),
-            None,
-            /*is_block=*/ true,
-        )
     }
 
     fn execute_block_sharded<V: VMExecutor>(
@@ -179,14 +120,14 @@ impl ChunkOutput {
     ) -> Result<Vec<TransactionOutput>> {
         if !get_remote_addresses().is_empty() {
             Ok(V::execute_block_sharded(
-                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                &REMOTE_SHARDED_BLOCK_EXECUTOR.lock(),
                 partitioned_txns,
                 state_view,
                 onchain_config,
             )?)
         } else {
             Ok(V::execute_block_sharded(
-                SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                &SHARDED_BLOCK_EXECUTOR.lock(),
                 partitioned_txns,
                 state_view,
                 onchain_config,

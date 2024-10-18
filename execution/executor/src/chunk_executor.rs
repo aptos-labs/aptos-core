@@ -8,8 +8,8 @@ use crate::{
     components::{
         apply_chunk_output::ApplyChunkOutput,
         chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
-        chunk_output::ChunkOutput,
         chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier},
+        do_get_execution_output::DoGetExecutionOutput,
         do_ledger_update::DoLedgerUpdate,
         executed_chunk::ExecutedChunk,
         partial_state_compute_result::PartialStateComputeResult,
@@ -597,7 +597,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
-        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
+        let chunk_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

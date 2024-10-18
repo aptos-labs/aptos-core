@@ -6,9 +6,8 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
-use aptos_executor::{
-    block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
-};
+use aptos_executor::block_executor::TransactionBlockExecutor;
+use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
@@ -351,7 +350,7 @@ impl TransactionBlockExecutor for NativeExecutor {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
+    ) -> Result<ExecutionOutput> {
         let transactions = match transactions {
             ExecutableTransactions::Unsharded(txns) => txns,
             _ => todo!("sharded execution not yet supported"),
@@ -422,7 +421,7 @@ impl TransactionBlockExecutor for NativeExecutor {
                 })
                 .collect::<Result<Vec<_>>>()
         })?;
-        Ok(ChunkOutput {
+        Ok(ExecutionOutput {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),

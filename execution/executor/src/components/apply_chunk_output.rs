@@ -6,8 +6,7 @@
 
 use crate::{
     components::{
-        chunk_output::ChunkOutput, do_ledger_update::DoLedgerUpdate, executed_chunk::ExecutedChunk,
-        in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
+        do_ledger_update::DoLedgerUpdate, in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
         partial_state_compute_result::PartialStateComputeResult,
     },
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
@@ -15,6 +14,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
+    execution_output::ExecutionOutput,
     parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
     ParsedTransactionOutput,
@@ -37,13 +37,13 @@ pub struct ApplyChunkOutput;
 
 impl ApplyChunkOutput {
     pub fn calculate_state_checkpoint(
-        chunk_output: ChunkOutput,
+        chunk_output: ExecutionOutput,
         parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         is_block: bool,
     ) -> Result<(Arc<StateDelta>, Option<EpochState>, StateCheckpointOutput)> {
-        let ChunkOutput {
+        let ExecutionOutput {
             state_cache,
             transactions,
             transaction_outputs,
@@ -109,10 +109,14 @@ impl ApplyChunkOutput {
     }
 
     pub fn apply_chunk(
-        chunk_output: ChunkOutput,
+        chunk_output: ExecutionOutput,
         base_view: &ExecutedTrees,
         known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
+    ) -> Result<(
+        PartialStateComputeResult,
+        Vec<Transaction>,
+        Vec<Transaction>,
+    )> {
         let (result_state, next_epoch_state, state_checkpoint_output) =
             Self::calculate_state_checkpoint(
                 chunk_output,
@@ -130,14 +134,7 @@ impl ApplyChunkOutput {
         );
         output.set_ledger_update_output(ledger_update_output);
 
-        Ok((
-            ExecutedChunk {
-                output,
-                ledger_info_opt: None,
-            },
-            to_discard,
-            to_retry,
-        ))
+        Ok((output, to_discard, to_retry))
     }
 
     fn sort_transactions_with_state_checkpoint(
