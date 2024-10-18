@@ -44,9 +44,11 @@ impl IndexerReader for IndexerReaders {
         self.db_indexer_reader.is_some()
     }
 
+    /// A blocking call that waits for the internal indexer to catch up to the given version
+    /// if requested handle is ahead of the internal indexer.
     fn get_table_info(&self, handle: TableHandle) -> anyhow::Result<Option<TableInfo>> {
         if let Some(table_info_reader) = &self.table_info_reader {
-            return Ok(table_info_reader.get_table_info_with_retry(handle)?);
+            return Ok(Some(table_info_reader.get_table_info_with_retry(handle)));
         }
         anyhow::bail!("Table info reader is not available")
     }
