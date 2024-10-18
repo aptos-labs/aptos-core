@@ -6,9 +6,8 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput,
-        block_tree::{block_output::BlockOutput, BlockTree},
-        chunk_output::ChunkOutput,
+        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+        partial_state_compute_result::PartialStateComputeResult,
     },
     logging::{LogEntry, LogSchema},
     metrics::{
@@ -19,8 +18,8 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
-    ExecutorResult, StateComputeResult,
+    state_checkpoint_output::StateCheckpointOutput, state_compute_result::StateComputeResult,
+    BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -146,18 +145,14 @@ where
             .ledger_update(block_id, parent_block_id, state_checkpoint_output)
     }
 
-    fn pre_commit_block(
-        &self,
-        block_id: HashValue,
-        parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "pre_commit_block"]);
 
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .pre_commit_block(block_id, parent_block_id)
+            .pre_commit_block(block_id)
     }
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
@@ -279,7 +274,7 @@ where
         let _ = self.block_tree.add_block(
             parent_block_id,
             block_id,
-            BlockOutput::new(state, epoch_state),
+            PartialStateComputeResult::new(parent_output.result_state.clone(), state, epoch_state),
         )?;
         Ok(state_checkpoint_output)
     }
@@ -306,15 +301,12 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let parent_output = parent_block.output.get_ledger_update();
+        let parent_output = parent_block.output.expect_ledger_update_output();
         let parent_accumulator = parent_output.txn_accumulator();
-        let current_output = block_vec.pop().expect("Must exist").unwrap();
+        let block = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
-        if current_output.output.has_ledger_update() {
-            return Ok(current_output
-                .output
-                .get_ledger_update()
-                .as_state_compute_result(current_output.output.epoch_state().clone()));
+        if let Some(complete_result) = block.output.get_complete_result() {
+            return Ok(complete_result);
         }
 
         let output =
@@ -334,50 +326,35 @@ where
                 output
             };
 
-        if !current_output.output.has_reconfiguration() {
+        if !block.output.has_reconfiguration() {
             output.ensure_ends_with_state_checkpoint()?;
         }
 
-        let state_compute_result =
-            output.as_state_compute_result(current_output.output.epoch_state().clone());
-        current_output.output.set_ledger_update(output);
-        Ok(state_compute_result)
+        block.output.set_ledger_update_output(output);
+        Ok(block.output.expect_complete_result())
     }
 
-    fn pre_commit_block(
-        &self,
-        block_id: HashValue,
-        parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
         let _timer = COMMIT_BLOCKS.start_timer();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "pre_commit_block",
         );
 
-        let mut blocks = self.block_tree.get_blocks(&[parent_block_id, block_id])?;
-        let block = blocks.pop().expect("guaranteed");
-        let parent_block = blocks.pop().expect("guaranteed");
-
-        let result_in_memory_state = block.output.state().clone();
+        let block = self.block_tree.get_block(block_id)?;
 
         fail_point!("executor::pre_commit_block", |_| {
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
         });
 
-        let ledger_update = block.output.get_ledger_update();
-        if !ledger_update.transactions_to_commit().is_empty() {
+        let output = block.output.expect_complete_result();
+        let num_txns = output.transactions_to_commit_len();
+        if num_txns != 0 {
             let _timer = SAVE_TRANSACTIONS.start_timer();
-            self.db.writer.pre_commit_ledger(
-                ledger_update.transactions_to_commit(),
-                ledger_update.first_version(),
-                parent_block.output.state().base_version,
-                false,
-                result_in_memory_state,
-                ledger_update.state_updates_until_last_checkpoint.as_ref(),
-                Some(&ledger_update.sharded_state_cache),
-            )?;
-            TRANSACTIONS_SAVED.observe(ledger_update.num_txns() as f64);
+            self.db
+                .writer
+                .pre_commit_ledger(output.as_chunk_to_commit(), false)?;
+            TRANSACTIONS_SAVED.observe(num_txns as f64);
         }
 
         Ok(())

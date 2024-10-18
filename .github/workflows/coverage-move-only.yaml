@@ -10,12 +10,12 @@ on:
       - 'aptos-move/e2e-move-tests/**'
       - 'aptos-move/framework/**'
       - '.github/workflows/coverage-move-only.yaml'
-  pull_request:
-    paths:
-      - 'third_party/move/**'
-      - 'aptos-move/e2e-move-tests/**'
-      - 'aptos-move/framework/**'
-      - '.github/workflows/coverage-move-only.yaml'
+  # pull_request:
+  # paths:
+  #   - 'third_party/move/**'
+  #   - 'aptos-move/e2e-move-tests/**'
+  #   - 'aptos-move/framework/**'
+  #   - '.github/workflows/coverage-move-only.yaml'
 
 env:
   CARGO_INCREMENTAL: "0"

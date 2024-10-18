@@ -16,8 +16,8 @@ use aptos_data_streaming_service::{
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbReaderWriter,
-    DbWriter, ExecutedTrees, Order, Result, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
+    Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -34,11 +34,10 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
-        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionToCommit, TransactionWithProof, Version,
+        TransactionWithProof, Version,
     },
 };
 use async_trait::async_trait;
@@ -326,14 +325,9 @@ mock! {
 
         fn save_transactions<'a, 'b>(
             &self,
-            txns_to_commit: &[TransactionToCommit],
-            first_version: Version,
-            base_state_version: Option<Version>,
+            chunk: ChunkToCommit<'b>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
             sync_commit: bool,
-            in_memory_state: StateDelta,
-            state_updates_until_last_checkpoint: Option<&'b ShardedStateUpdates>,
-            sharded_state_cache: Option<&'b ShardedStateCache>,
         ) -> Result<()>;
     }
 }

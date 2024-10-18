@@ -677,23 +677,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
+        let is_lang_version_2 = self
+            .env()
+            .language_version
+            .is_at_least(LanguageVersion::V2_0);
         params
             .iter()
             .enumerate()
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
-                let sym = self.symbol_pool().make(v.0.value.as_str());
+                let var_str = v.0.value.as_str();
+                let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
-                self.define_local(
-                    &loc,
-                    sym,
-                    ty.clone(),
-                    None,
-                    // If this is for a proper Move function (not spec function), add the
-                    // index so we can resolve this to a `Temporary` expression instead of
-                    // a `LocalVar`.
-                    if for_move_fun { Some(idx) } else { None },
-                );
+
+                if !is_lang_version_2 || var_str != "_" {
+                    self.define_local(
+                        &loc,
+                        sym,
+                        ty.clone(),
+                        None,
+                        // If this is for a proper Move function (not spec function), add the
+                        // index so we can resolve this to a `Temporary` expression instead of
+                        // a `LocalVar`.
+                        if for_move_fun { Some(idx) } else { None },
+                    );
+                }
                 Parameter(sym, ty, loc)
             })
             .collect_vec()

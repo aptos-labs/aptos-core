@@ -4,21 +4,22 @@
 
 #![forbid(unsafe_code)]
 
-pub mod block_output;
 #[cfg(test)]
 mod test;
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::partial_state_compute_result::PartialStateComputeResult,
+    logging::{LogEntry, LogSchema},
+};
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::{ExecutorError, LedgerUpdateOutput};
+use aptos_executor_types::ExecutorError;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
-use block_output::BlockOutput;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{mpsc::Receiver, Arc, Weak},
@@ -26,7 +27,7 @@ use std::{
 
 pub struct Block {
     pub id: HashValue,
-    pub output: BlockOutput,
+    pub output: PartialStateComputeResult,
     children: Mutex<Vec<Arc<Block>>>,
     block_lookup: Arc<BlockLookup>,
 }
@@ -48,7 +49,7 @@ impl Block {
 
     pub fn num_persisted_transactions(&self) -> LeafCount {
         self.output
-            .get_ledger_update()
+            .expect_ledger_update_output()
             .txn_accumulator()
             .num_leaves()
     }
@@ -94,7 +95,7 @@ impl BlockLookupInner {
     fn fetch_or_add_block(
         &mut self,
         id: HashValue,
-        output: BlockOutput,
+        output: PartialStateComputeResult,
         parent_id: Option<HashValue>,
         block_lookup: &Arc<BlockLookup>,
     ) -> Result<(Arc<Block>, bool, Option<Arc<Block>>)> {
@@ -150,7 +151,7 @@ impl BlockLookup {
     fn fetch_or_add_block(
         self: &Arc<Self>,
         id: HashValue,
-        output: BlockOutput,
+        output: PartialStateComputeResult,
         parent_id: Option<HashValue>,
     ) -> Result<Arc<Block>> {
         let (block, existing, parent_block) = self
@@ -226,10 +227,10 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let output = BlockOutput::new_with_ledger_update(
+        let output = PartialStateComputeResult::new_empty_completed(
             ledger_view.state().clone(),
+            ledger_view.txn_accumulator().clone(),
             None,
-            LedgerUpdateOutput::new_empty(ledger_view.txn_accumulator().clone()),
         );
 
         block_lookup.fetch_or_add_block(id, output, None)
@@ -252,16 +253,14 @@ impl BlockTree {
                     .original_reconfiguration_block_id(committed_block_id),
                 "Updated with a new root block as a virtual block of reconfiguration block"
             );
-            let output = BlockOutput::new_with_ledger_update(
-                last_committed_block.output.state().clone(),
+            let commited_output = last_committed_block.output.expect_complete_result();
+            let output = PartialStateComputeResult::new_empty_completed(
+                commited_output.result_state.clone(),
+                commited_output
+                    .ledger_update_output
+                    .transaction_accumulator
+                    .clone(),
                 None,
-                LedgerUpdateOutput::new_empty(
-                    last_committed_block
-                        .output
-                        .get_ledger_update()
-                        .txn_accumulator()
-                        .clone(),
-                ),
             );
             self.block_lookup
                 .fetch_or_add_block(epoch_genesis_id, output, None)?
@@ -291,7 +290,7 @@ impl BlockTree {
         &self,
         parent_block_id: HashValue,
         id: HashValue,
-        output: BlockOutput,
+        output: PartialStateComputeResult,
     ) -> Result<Arc<Block>> {
         self.block_lookup
             .fetch_or_add_block(id, output, Some(parent_block_id))

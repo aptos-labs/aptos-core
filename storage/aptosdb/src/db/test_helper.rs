@@ -19,7 +19,9 @@ use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 #[cfg(test)]
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order, Result};
+use aptos_storage_interface::{
+    chunk_to_commit::ChunkToCommit, state_delta::StateDelta, DbReader, DbWriter, Order, Result,
+};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -384,7 +386,7 @@ pub fn test_save_blocks_impl(
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
 
@@ -969,7 +971,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.state_store
         .buffered_state()
         .lock()
-        .update(None, in_memory_state, true)
+        .update(None, &in_memory_state, true)
         .unwrap();
 }
 
@@ -999,36 +1001,39 @@ pub fn test_sync_transactions_impl(
         if batch1_len > 0 {
             let txns_to_commit_batch = &txns_to_commit[..batch1_len];
             update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-            db.save_transactions(
+            let state_updates = gather_state_updates_until_last_checkpoint(
+                cur_ver,
+                &in_memory_state,
                 txns_to_commit_batch,
-                cur_ver, /* first_version */
+            );
+            let chunk = ChunkToCommit {
+                first_version: cur_ver,
                 base_state_version,
-                None,
-                false, /* sync_commit */
-                in_memory_state.clone(),
-                gather_state_updates_until_last_checkpoint(
-                    cur_ver,
-                    &in_memory_state,
-                    txns_to_commit_batch,
-                )
-                .as_ref(),
-                None,
-            )
-            .unwrap();
+                txns_to_commit: txns_to_commit_batch,
+                latest_in_memory_state: &in_memory_state,
+                state_updates_until_last_checkpoint: state_updates.as_ref(),
+                sharded_state_cache: None,
+            };
+            db.save_transactions(chunk, None, false /* sync_commit */)
+                .unwrap();
         }
         let ver = cur_ver + batch1_len as Version;
         let txns_to_commit_batch = &txns_to_commit[batch1_len..];
         update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-        db.save_transactions(
-            txns_to_commit_batch,
-            ver,
+        let state_updates =
+            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch);
+        let chunk = ChunkToCommit {
+            first_version: ver,
             base_state_version,
+            txns_to_commit: txns_to_commit_batch,
+            latest_in_memory_state: &in_memory_state,
+            state_updates_until_last_checkpoint: state_updates.as_ref(),
+            sharded_state_cache: None,
+        };
+        db.save_transactions(
+            chunk,
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
-            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch)
-                .as_ref(),
-            None,
         )
         .unwrap();
 

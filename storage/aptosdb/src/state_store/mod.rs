@@ -542,7 +542,7 @@ impl StateStore {
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(
                 updates_until_last_checkpoint.as_ref(),
-                state_after_last_checkpoint,
+                &state_after_last_checkpoint,
                 true, /* sync_commit */
             )?;
         }
