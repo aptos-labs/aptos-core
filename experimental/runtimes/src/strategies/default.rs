@@ -19,13 +19,13 @@ impl DefaultThreadManager {
         // This needs to be revisited once we resolve the scalability issues.
         let exe_threads = spawn_rayon_thread_pool(
             "exe".into(),
-            Some(min(num_cpus::get(), MAX_THREAD_POOL_SIZE)),
+            Some(64),
         );
         let non_exe_threads = spawn_rayon_thread_pool(
             "non_exe".into(),
-            Some(min(num_cpus::get(), MAX_THREAD_POOL_SIZE)),
+            Some(64),
         );
-        let io_threads = spawn_rayon_thread_pool("io".into(), Some(64));
+        let io_threads = spawn_rayon_thread_pool("io".into(), Some(128));
         let background_threads =
             spawn_rayon_thread_pool("background".into(), Some(MAX_THREAD_POOL_SIZE));
         Self {
