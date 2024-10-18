@@ -250,8 +250,11 @@ where
     }
 
     pub fn join(self) {
-        for handle in self.join_handles {
-            handle.join().unwrap()
+        info!("Joining threads {}", self.join_handles.len());
+        for (count, handle) in self.join_handles.into_iter().enumerate() {
+            info!("Joining thread {}", count);
+            handle.join().unwrap();
+            info!("Joined thread {}", count);
         }
     }
 }

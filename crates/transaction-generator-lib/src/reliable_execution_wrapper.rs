@@ -47,7 +47,7 @@ impl TransactionGenerator for ReliableExecutionWrapperGenerator {
                 .await {
                     warn!("Error executing transactions reliably: {:?}", e);
                     continue;
-                }                
+                }
         }
     }
 }

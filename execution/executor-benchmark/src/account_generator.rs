@@ -5,7 +5,7 @@ use crate::transaction_generator::get_progress_bar;
 use aptos_sdk::types::LocalAccount;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{collections::VecDeque, sync::mpsc};
-
+use aptos_logger::info;
 type Seed = [u8; 32];
 
 pub struct AccountGenerator {
@@ -69,6 +69,7 @@ impl AccountCache {
     const SEED: Seed = [1; 32];
 
     pub fn new(mut generator: AccountGenerator, num_accounts: usize) -> Self {
+        info!("Generating {} accounts in Account Cache", num_accounts);
         let bar = get_progress_bar(num_accounts);
         let accounts = (0..num_accounts)
             .map(|_| {
@@ -78,6 +79,7 @@ impl AccountCache {
             })
             .collect();
         bar.finish();
+        info!("Generated {} accounts in Account Cache", num_accounts);
         Self {
             accounts,
             rng: StdRng::from_seed(Self::SEED),

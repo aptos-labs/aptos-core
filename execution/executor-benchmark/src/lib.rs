@@ -44,14 +44,15 @@ use aptos_transaction_generator_lib::{
 use aptos_types::on_chain_config::Features;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
+use tokio::time::sleep;
 use std::{
     collections::HashMap,
     fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
-    time::Instant,
+    time::{Duration, Instant},
 };
-use tokio::runtime::Runtime;
+// use tokio::runtime::Runtime;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -126,7 +127,7 @@ pub async fn run_benchmark<V>(
     let (db, executor) = init_db_and_executor::<V>(&config);
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
-    let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
+    let transaction_generators = if let Some(transaction_mix) = transaction_mix.clone() {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
             num_existing_accounts,
@@ -150,7 +151,7 @@ pub async fn run_benchmark<V>(
             TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_accounts_to_be_loaded, num_accounts_to_skip);
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
-
+        info!("Created main signer accounts: {}", main_signer_accounts.len());
         let (transaction_generator_creator, phase) = init_workload::<V>(
             transaction_mix,
             root_account.clone(),
@@ -160,16 +161,22 @@ pub async fn run_benchmark<V>(
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
             &PipelineConfig::default(),
-        );
+        ).await;
+        info!("init_workload done");
         // need to initialize all workers and finish with all transactions before we start the timer:
-        ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
-    });
+        Some(((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase))
+    } else {
+        None
+    };
+    info!("Created transaction generators");
+    // let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
+    //     });
 
     let version = db.reader.expect_synced_version();
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
-
+    info!("Created new pipeline");
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
         for (transaction_type, _) in mix {
@@ -189,6 +196,7 @@ pub async fn run_benchmark<V>(
         }
     }
     let root_account = Arc::into_inner(root_account).unwrap();
+    info!("Staring new with existing db");
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         root_account,
@@ -197,10 +205,12 @@ pub async fn run_benchmark<V>(
         Some(num_accounts_to_load),
         pipeline_config.num_generator_workers,
     );
+    info!("Finished new with existing db");
 
     let mut overall_measuring = OverallMeasuring::start();
 
     let num_blocks_created = if let Some((transaction_generators, phase)) = transaction_generators {
+        info!("Running workload via txn generator");
         generator.run_workload(
             block_size,
             num_blocks,
@@ -248,7 +258,7 @@ pub async fn run_benchmark<V>(
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
 }
 
-fn init_workload<V>(
+async fn init_workload<V>(
     transaction_mix: Vec<(TransactionType, usize)>,
     root_account: Arc<LocalAccount>,
     mut main_signer_accounts: Vec<LocalAccount>,
@@ -267,17 +277,17 @@ where
         None,
     );
 
-    let runtime = Runtime::new().unwrap();
+    // let runtime = Runtime::new().unwrap();
     let transaction_factory = TransactionGenerator::create_transaction_factory();
     let phase = Arc::new(AtomicUsize::new(0));
     let phase_clone = phase.clone();
-    let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
+    // let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),
             block_sender,
         };
 
-        create_txn_generator_creator(
+        let (txn_generator_creator, _address_pool, _account_pool) = create_txn_generator_creator(
             &[transaction_mix],
             AlwaysApproveRootAccountHandle { root_account },
             &mut main_signer_accounts,
@@ -287,10 +297,12 @@ where
             &transaction_factory,
             phase_clone,
         )
-        .await
-    });
-
-    pipeline.join();
+        .await;
+    info!("Transaction generator creator initialized");
+    // });
+    sleep(Duration::from_secs(5));
+    // pipeline.join();
+    info!("Pipeline joined");
 
     (txn_generator_creator, phase)
 }

@@ -374,7 +374,7 @@ pub async fn create_txn_generator_creator(
                     use_account_pool,
                     workflow_kind,
                     progress_type,
-                } => Box::new(
+                } => {let result = Box::new(
                     WorkflowTxnGeneratorCreator::create_workload(
                         *workflow_kind,
                         txn_factory.clone(),
@@ -387,7 +387,9 @@ pub async fn create_txn_generator_creator(
                         *progress_type,
                     )
                     .await,
-                ),
+                );
+                info!("Created workflow workload");
+                result},
             };
             txn_generator_creator_mix.push((txn_generator_creator, *weight));
         }

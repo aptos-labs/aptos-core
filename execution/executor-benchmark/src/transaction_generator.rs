@@ -308,6 +308,7 @@ impl TransactionGenerator {
         let account_cache = self.main_signer_accounts.as_ref().unwrap();
         let account_pool_size = account_cache.accounts.len();
         // let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
+        info!("Starting block generation.");
         for i in 0..num_blocks {
             let sender_indices: Vec<_> = rand::seq::index::sample(
                 &mut thread_rng(),

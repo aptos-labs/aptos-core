@@ -71,6 +71,7 @@ where
         info!("Start with version: {}", start_version);
 
         while let Ok(msg) = self.block_receiver.recv() {
+            info!("Received commit block message: {:?}. num_txns: {:?}.", msg.block_id, msg.num_txns);
             let CommitBlockMessage {
                 block_id,
                 root_hash,
@@ -91,8 +92,9 @@ where
             self.executor
                 .pre_commit_block(block_id, parent_block_id)
                 .unwrap();
+            info!("pre_commit_block");
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
-
+            info!("commit_ledger");
             report_block(
                 start_version,
                 self.version,
@@ -103,6 +105,7 @@ where
                 Instant::now().duration_since(commit_start),
                 num_txns,
             );
+            info!("report_block");
         }
     }
 }

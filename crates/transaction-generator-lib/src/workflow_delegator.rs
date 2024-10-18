@@ -409,6 +409,10 @@ impl WorkflowTxnGeneratorCreator {
                     )
                     .await;
 
+                info!("Created configure controller worker");
+
+
+
                 // Stage 3: For each minter account, set minter allowance in the stablecoin module
                 let set_minter_allowance_worker =
                     CustomModulesDelegationGeneratorCreator::create_worker(
@@ -419,6 +423,8 @@ impl WorkflowTxnGeneratorCreator {
                         &mut StableCoinSetMinterAllowanceGenerator::default(),
                     )
                     .await;
+
+                info!("Set minter allowance worker");
 
                 // Stage 4: Let minter accounts mint transactions for the users
                 let mint_stage_worker = CustomModulesDelegationGeneratorCreator::create_worker(
@@ -434,6 +440,7 @@ impl WorkflowTxnGeneratorCreator {
                     ),
                 )
                 .await;
+                info!("Mint stage worker");
 
                 let packages = Arc::new(packages);
 
@@ -450,6 +457,8 @@ impl WorkflowTxnGeneratorCreator {
                     txn_executor.clone(),
                 ));
 
+                info!("Configure controllers stage");
+
                 let set_minter_allowance_stage = Box::new(ReliableExecutionWrapperCreator::new(
                     Box::new(AccountsPoolWrapperCreator::new(
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -463,12 +472,13 @@ impl WorkflowTxnGeneratorCreator {
                     txn_executor.clone(),
                 ));
 
+                info!("Set minter allowance stage");
                 let mint_stage = Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                     txn_factory.clone(),
                     packages.clone(),
                     mint_stage_worker,
                 ));
-
+                info!("Mint stage");
                 let stages: Vec<Box<dyn TransactionGeneratorCreator>> = vec![
                     minter_account_creation_stage,
                     destination_account_creation_stage,
