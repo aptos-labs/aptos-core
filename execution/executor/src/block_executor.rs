@@ -6,8 +6,8 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree,
-        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
+        block_tree::BlockTree, do_get_execution_output::DoGetExecutionOutput,
+        do_ledger_update::DoLedgerUpdate, do_state_checkpoint::DoStateCheckpoint,
         partial_state_compute_result::PartialStateComputeResult,
     },
     logging::{LogEntry, LogSchema},
@@ -276,7 +276,7 @@ where
                         Err(anyhow::anyhow!("Injected error in block state checkpoint."))
                     });
 
-                    ApplyChunkOutput::calculate_state_checkpoint(
+                    DoStateCheckpoint::run(
                         chunk_output,
                         parent_output.state(),
                         Some(block_id),
