@@ -149,8 +149,9 @@ pub enum Constraint {
     /// The type must not be a phantom type. A phantom type is only allowed
     /// as a type argument for a phantom type parameter.
     NoPhantom,
-    /// The type must have the given set of abilities.
-    HasAbilities(AbilitySet),
+    /// The type must have the given set of abilities. The boolean indicates whether
+    /// type parameters are exempted.
+    HasAbilities(AbilitySet, bool),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
@@ -403,7 +404,7 @@ impl Constraint {
     pub fn accumulating(&self) -> bool {
         matches!(
             self,
-            Constraint::HasAbilities(_)
+            Constraint::HasAbilities(..)
                 | Constraint::WithDefault(_)
                 | Constraint::NoPhantom
                 | Constraint::NoTuple
@@ -519,7 +520,10 @@ impl Constraint {
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
             (Constraint::NoPhantom, Constraint::NoPhantom) => Ok(true),
-            (Constraint::HasAbilities(a1), Constraint::HasAbilities(a2)) => {
+            (
+                Constraint::HasAbilities(a1, params_exempted1),
+                Constraint::HasAbilities(a2, params_exempted2),
+            ) if params_exempted1 == params_exempted2 => {
                 *a1 = a1.union(*a2);
                 Ok(true)
             },
@@ -556,7 +560,7 @@ impl Constraint {
             result.push(Constraint::NoPhantom)
         }
         if !abilities.is_empty() {
-            result.push(Constraint::HasAbilities(*abilities));
+            result.push(Constraint::HasAbilities(*abilities, false));
         }
         result
     }
@@ -573,23 +577,19 @@ impl Constraint {
 
     /// Returns the constraints which need to be satisfied for a field type,
     /// given a struct with declared abilities.
-    pub fn for_field(struct_abilities: AbilitySet, field_ty: &Type) -> Vec<Constraint> {
+    pub fn for_field(struct_abilities: AbilitySet, _field_ty: &Type) -> Vec<Constraint> {
         let mut result = vec![
             Constraint::NoPhantom,
             Constraint::NoTuple,
             Constraint::NoReference,
             Constraint::NoFunction,
         ];
-        let abilities = if !field_ty.depends_from_type_parameter() {
-            if struct_abilities.has_ability(Ability::Key) {
-                struct_abilities.remove(Ability::Key).add(Ability::Store)
-            } else {
-                struct_abilities
-            }
+        let abilities = if struct_abilities.has_ability(Ability::Key) {
+            struct_abilities.remove(Ability::Key).add(Ability::Store)
         } else {
-            AbilitySet::EMPTY
+            struct_abilities
         };
-        result.push(Constraint::HasAbilities(abilities));
+        result.push(Constraint::HasAbilities(abilities, true));
         result
     }
 
@@ -652,7 +652,7 @@ impl Constraint {
             Constraint::NoFunction => "no-func".to_string(),
             Constraint::NoTuple => "no-tuple".to_string(),
             Constraint::NoPhantom => "no-phantom".to_string(),
-            Constraint::HasAbilities(required_abilities) => {
+            Constraint::HasAbilities(required_abilities, _) => {
                 format!("{}", required_abilities)
             },
             Constraint::WithDefault(_ty) => "".to_owned(),
@@ -798,20 +798,6 @@ impl Type {
     /// Determines whether this is a type parameter.
     pub fn is_type_parameter(&self) -> bool {
         matches!(self, Type::TypeParameter(..))
-    }
-
-    /// Returns true if the type depends on type parameters.
-    pub fn depends_from_type_parameter(&self) -> bool {
-        use Type::*;
-        match self {
-            TypeParameter(_) => true,
-            Tuple(ts) | Struct(_, _, ts) | ResourceDomain(_, _, Some(ts)) => {
-                ts.iter().any(|t| t.depends_from_type_parameter())
-            },
-            Vector(t) | Reference(_, t) | TypeDomain(t) => t.depends_from_type_parameter(),
-            Fun(t, r) => t.depends_from_type_parameter() || r.depends_from_type_parameter(),
-            _ => false,
-        }
     }
 
     /// Determines whether this is a primitive.
@@ -1797,9 +1783,15 @@ impl Substitution {
                         constraint_unsatisfied_error()
                     }
                 },
-                (Constraint::HasAbilities(required_abilities), ty) => {
-                    self.eval_ability_constraint(context, loc, *required_abilities, ty, ctx_opt)
-                },
+                (Constraint::HasAbilities(required_abilities, type_params_exempted), ty) => self
+                    .eval_ability_constraint(
+                        context,
+                        loc,
+                        *required_abilities,
+                        *type_params_exempted,
+                        ty,
+                        ctx_opt,
+                    ),
                 (Constraint::NoReference, ty) => {
                     if ty.is_reference() {
                         constraint_unsatisfied_error()
@@ -1838,6 +1830,7 @@ impl Substitution {
         context: &mut impl UnificationContext,
         loc: &Loc,
         required_abilities: AbilitySet,
+        type_params_exempted: bool,
         ty: &Type,
         ctx_opt: Option<ConstraintContext>,
     ) -> Result<(), TypeUnificationError> {
@@ -1865,6 +1858,7 @@ impl Substitution {
                         context,
                         loc,
                         required_abilities,
+                        type_params_exempted,
                         t,
                         ctx_opt.clone().map(|ctx| ctx.derive_tuple_element(i)),
                     )?;
@@ -1877,6 +1871,7 @@ impl Substitution {
                     context,
                     loc,
                     required_abilities,
+                    type_params_exempted,
                     t,
                     ctx_opt.map(|ctx| ctx.derive_vector_type_param()),
                 )
@@ -1900,6 +1895,7 @@ impl Substitution {
                             context,
                             loc,
                             required,
+                            type_params_exempted,
                             t,
                             ctx_opt
                                 .clone()
@@ -1926,8 +1922,12 @@ impl Substitution {
                 Ok(())
             },
             TypeParameter(idx) => {
-                let tparam = context.type_param(*idx);
-                check(tparam.1.abilities)
+                if !type_params_exempted {
+                    let tparam = context.type_param(*idx);
+                    check(tparam.1.abilities)
+                } else {
+                    Ok(())
+                }
             },
             Fun(_, _) => check(AbilitySet::FUNCTIONS),
             Reference(_, _) => check(AbilitySet::REFERENCES),
@@ -1941,7 +1941,7 @@ impl Substitution {
                     *idx,
                     loc.clone(),
                     WideningOrder::LeftToRight,
-                    Constraint::HasAbilities(required_abilities),
+                    Constraint::HasAbilities(required_abilities, type_params_exempted),
                     ctx_opt,
                 )
             },
@@ -2997,7 +2997,7 @@ impl TypeUnificationError {
                             ty.display(display_context)
                         )
                     },
-                    Constraint::HasAbilities(_) | Constraint::WithDefault(_) => {
+                    Constraint::HasAbilities(..) | Constraint::WithDefault(_) => {
                         unreachable!("unexpected constraint in error message")
                     },
                 };
