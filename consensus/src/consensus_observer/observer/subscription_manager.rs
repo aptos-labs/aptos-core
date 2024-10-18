@@ -254,6 +254,13 @@ impl SubscriptionManager {
         *self.active_subscription_creation_task.lock() = Some(subscription_creation_task);
     }
 
+    /// Terminates all active subscriptions
+    pub fn terminate_all_subscriptions(&mut self) {
+        for peer_network_id in self.get_active_subscription_peers() {
+            self.unsubscribe_from_peer(peer_network_id);
+        }
+    }
+
     /// Terminates any unhealthy subscriptions and returns the list of terminated subscriptions
     fn terminate_unhealthy_subscriptions(
         &mut self,
@@ -622,7 +629,7 @@ mod test {
         // Elapse time to simulate a DB progress error
         let mock_time_service = time_service.clone().into_mock();
         mock_time_service.advance(Duration::from_millis(
-            consensus_observer_config.max_synced_version_timeout_ms + 1,
+            consensus_observer_config.max_subscription_sync_timeout_ms + 1,
         ));
 
         // Check the active subscription and verify that it is unhealthy (the DB is not syncing)
@@ -695,7 +702,7 @@ mod test {
         let consensus_observer_config = ConsensusObserverConfig {
             max_subscription_timeout_ms: 100_000_000, // Use a large value so that we don't time out
             max_concurrent_subscriptions: 1,          // Only allow one subscription
-            max_synced_version_timeout_ms: 100_000_000, // Use a large value so that we don't get DB progress errors
+            max_subscription_sync_timeout_ms: 100_000_000, // Use a large value so that we don't get DB progress errors
             ..ConsensusObserverConfig::default()
         };
 
@@ -831,6 +838,57 @@ mod test {
         {
             assert!(!active_task.is_finished());
         };
+    }
+
+    #[tokio::test]
+    async fn test_terminate_all_subscriptions() {
+        // Create a consensus observer client
+        let network_id = NetworkId::Public;
+        let (peers_and_metadata, consensus_observer_client) =
+            create_consensus_observer_client(&[network_id]);
+
+        // Create a new subscription manager
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let db_reader = create_mock_db_reader();
+        let time_service = TimeService::mock();
+        let mut subscription_manager = SubscriptionManager::new(
+            consensus_observer_client,
+            consensus_observer_config,
+            None,
+            db_reader.clone(),
+            time_service.clone(),
+        );
+
+        // Verify that no subscriptions are active
+        verify_active_subscription_peers(&subscription_manager, vec![]);
+
+        // Create two new subscriptions
+        let subscription_peer_1 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
+        let subscription_peer_2 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
+        for peer in &[subscription_peer_1, subscription_peer_2] {
+            // Create the subscription
+            create_observer_subscription(
+                &mut subscription_manager,
+                consensus_observer_config,
+                db_reader.clone(),
+                *peer,
+                time_service.clone(),
+            );
+        }
+
+        // Verify the subscriptions are active
+        verify_active_subscription_peers(&subscription_manager, vec![
+            subscription_peer_1,
+            subscription_peer_2,
+        ]);
+
+        // Terminate all subscriptions
+        subscription_manager.terminate_all_subscriptions();
+
+        // Verify that no subscriptions are active
+        verify_active_subscription_peers(&subscription_manager, vec![]);
     }
 
     #[tokio::test]

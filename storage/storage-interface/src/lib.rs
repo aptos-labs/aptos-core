@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::cached_state_view::ShardedStateCache;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 pub use aptos_types::indexer::indexer_db_reader::Order;
 use aptos_types::{
@@ -23,7 +22,6 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
-        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
@@ -39,6 +37,7 @@ use thiserror::Error;
 pub mod async_proof_fetcher;
 pub mod block_info;
 pub mod cached_state_view;
+pub mod chunk_to_commit;
 pub mod errors;
 mod executed_trees;
 mod metrics;
@@ -47,7 +46,7 @@ pub mod mock;
 pub mod state_delta;
 pub mod state_view;
 
-use crate::state_delta::StateDelta;
+use crate::chunk_to_commit::ChunkToCommit;
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
@@ -542,41 +541,28 @@ pub trait DbWriter: Send + Sync {
     /// Persist transactions. Called by state sync to save verified transactions to the DB.
     fn save_transactions(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
+        chunk: ChunkToCommit,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         // For reconfig suffix.
-        if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
+        if ledger_info_with_sigs.is_none() && chunk.txns_to_commit.is_empty() {
             return Ok(());
         }
 
-        if !txns_to_commit.is_empty() {
-            self.pre_commit_ledger(
-                txns_to_commit,
-                first_version,
-                base_state_version,
-                sync_commit,
-                latest_in_memory_state,
-                state_updates_until_last_checkpoint,
-                sharded_state_cache,
-            )?;
+        if !chunk.txns_to_commit.is_empty() {
+            self.pre_commit_ledger(chunk, sync_commit)?;
         }
         let version_to_commit = if let Some(ledger_info_with_sigs) = ledger_info_with_sigs {
             ledger_info_with_sigs.ledger_info().version()
         } else {
             // here txns_to_commit is known to be non-empty
-            first_version + txns_to_commit.len() as u64 - 1
+            chunk.first_version + chunk.txns_to_commit.len() as u64 - 1
         };
         self.commit_ledger(
             version_to_commit,
             ledger_info_with_sigs,
-            Some(txns_to_commit),
+            Some(chunk.txns_to_commit),
         )
     }
 
@@ -589,16 +575,7 @@ pub trait DbWriter: Send + Sync {
     ///       called with a `LedgerInfoWithSignatures`.
     ///   If not, the consensus needs to panic, resulting in a reboot of the node where the DB will
     ///       truncate the unconfirmed data.
-    fn pre_commit_ledger(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
-    ) -> Result<()> {
+    fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
         unimplemented!()
     }
 

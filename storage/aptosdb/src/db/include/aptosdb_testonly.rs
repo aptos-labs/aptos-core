@@ -136,22 +136,25 @@ impl AptosDB {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
+        latest_in_memory_state: &StateDelta,
     ) -> Result<()> {
         let state_updates_until_last_checkpoint = gather_state_updates_until_last_checkpoint(
             first_version,
-            &latest_in_memory_state,
+            latest_in_memory_state,
             txns_to_commit,
         );
-        self.save_transactions(
-            txns_to_commit,
+        let chunk = ChunkToCommit {
             first_version,
             base_state_version,
+            txns_to_commit,
+            latest_in_memory_state,
+            state_updates_until_last_checkpoint: state_updates_until_last_checkpoint.as_ref(),
+            sharded_state_cache: None,
+        };
+        self.save_transactions(
+            chunk,
             ledger_info_with_sigs,
             sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
-            None,
         )
     }
 }

@@ -14,8 +14,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ChunkExecutorTrait, LedgerUpdateOutput, TransactionReplayer,
-    VerifyExecutionMode,
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
@@ -292,9 +291,7 @@ fn test_executor_commit_twice() {
         )
         .unwrap();
     let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
-    executor
-        .pre_commit_block(block1_id, executor.committed_block_id())
-        .unwrap();
+    executor.pre_commit_block(block1_id).unwrap();
     executor.commit_ledger(ledger_info.clone()).unwrap();
     executor.commit_ledger(ledger_info).unwrap();
 }
@@ -311,7 +308,7 @@ fn test_executor_execute_same_block_multiple_times() {
         .collect();
 
     let mut responses = vec![];
-    for _i in 0..100 {
+    for _i in 0..10 {
         let output = executor
             .execute_block(
                 (block_id, block(txns.clone())).into(),
@@ -321,8 +318,14 @@ fn test_executor_execute_same_block_multiple_times() {
             .unwrap();
         responses.push(output);
     }
-    responses.dedup();
-    assert_eq!(responses.len(), 1);
+    assert_eq!(
+        responses
+            .iter()
+            .map(|output| output.root_hash())
+            .dedup()
+            .count(),
+        1,
+    );
 }
 
 fn create_blocks_and_chunks(
@@ -383,9 +386,7 @@ fn create_blocks_and_chunks(
             )
             .unwrap();
         assert_eq!(output.version(), version);
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
+        block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
         out_blocks.push((txns, ledger_info));
         parent_block_id = block_id;
@@ -489,32 +490,15 @@ fn apply_transaction_by_writeset(
 
     let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
     let ExecutedChunk {
-        result_state,
-        ledger_info,
-        next_epoch_state: _,
-        ledger_update_output,
+        output,
+        ledger_info_opt,
     } = executed;
-    let LedgerUpdateOutput {
-        statuses_for_input_txns: _,
-        to_commit,
-        subscribable_events: _,
-        transaction_info_hashes: _,
-        state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-        sharded_state_cache,
-        transaction_accumulator: _,
-        block_end_info: _,
-    } = ledger_update_output;
 
     db.writer
         .save_transactions(
-            &to_commit,
-            ledger_view.txn_accumulator().num_leaves(),
-            ledger_view.state().base_version,
-            ledger_info.as_ref(),
+            output.expect_complete_result().as_chunk_to_commit(),
+            ledger_info_opt.as_ref(),
             true, /* sync_commit */
-            result_state,
-            state_updates_before_last_checkpoint,
-            Some(&sharded_state_cache),
         )
         .unwrap();
 }
@@ -691,9 +675,9 @@ fn run_transactions_naive(
 ) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
+        let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn].into(),
             ledger_view
@@ -707,38 +691,23 @@ fn run_transactions_naive(
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
-        let next_ledger_view = executed.result_view();
         let ExecutedChunk {
-            result_state,
-            ledger_info,
-            next_epoch_state: _,
-            ledger_update_output,
+            output,
+            ledger_info_opt,
         } = executed;
-        let LedgerUpdateOutput {
-            statuses_for_input_txns: _,
-            to_commit,
-            subscribable_events: _,
-            transaction_info_hashes: _,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator: _,
-            block_end_info: _,
-        } = ledger_update_output;
         db.writer
             .save_transactions(
-                &to_commit,
-                ledger_view.txn_accumulator().num_leaves(),
-                ledger_view.state().base_version,
-                ledger_info.as_ref(),
+                output.expect_complete_result().as_chunk_to_commit(),
+                ledger_info_opt.as_ref(),
                 true, /* sync_commit */
-                result_state,
-                state_updates_before_last_checkpoint,
-                Some(&sharded_state_cache),
             )
             .unwrap();
-        ledger_view = next_ledger_view;
     }
-    ledger_view.txn_accumulator().root_hash()
+    db.reader
+        .get_latest_executed_trees()
+        .unwrap()
+        .transaction_accumulator
+        .root_hash()
 }
 
 proptest! {

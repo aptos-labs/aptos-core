@@ -4,7 +4,6 @@
 use crate::metrics::OTHER_TIMERS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{parsed_transaction_output::TransactionsWithParsedOutput, ProofReader};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
@@ -28,7 +27,7 @@ use arr_macro::arr;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 struct StateCacheView<'a> {
     base: &'a ShardedStateCache,
@@ -235,12 +234,11 @@ impl InMemoryStateCalculatorV2 {
             .smt
         };
 
-        DEFAULT_DROPPER.schedule_drop(frozen_base);
-
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint
         } else {
-            let mut updates_since_latest_checkpoint = base.updates_since_base.clone();
+            let mut updates_since_latest_checkpoint =
+                base.updates_since_base.deref().deref().clone();
             zip_eq(
                 updates_since_latest_checkpoint.iter_mut(),
                 updates_after_last_checkpoint,

@@ -897,6 +897,7 @@ dependencies = [
  "aptos-safety-rules",
  "aptos-schemadb",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
@@ -1347,6 +1348,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
+ "derive_more",
  "once_cell",
  "threadpool",
 ]
@@ -1546,12 +1548,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
  "criterion",
+ "derive_more",
  "itertools 0.13.0",
  "once_cell",
  "serde",
@@ -3871,6 +3875,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-experimental-runtimes",
  "aptos-logger",
  "aptos-metrics-core",

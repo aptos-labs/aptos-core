@@ -420,13 +420,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         };
         ty.visit(&mut visitor);
         if incomplete {
-            self.error(
-                &loc,
-                &format!(
-                    "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
-                    ty.display(&self.type_display_context())
-                ),
-            );
+            let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
+            // Skip displaying the error message if there is already an error in the type; we must have another message about it already.
+            if !displayed_ty.contains("*error*") {
+                self.error(
+                    &loc,
+                    &format!(
+                        "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
+                        displayed_ty
+                    ),
+                );
+            }
         }
         ty
     }
@@ -673,23 +677,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
+        let is_lang_version_2 = self
+            .env()
+            .language_version
+            .is_at_least(LanguageVersion::V2_0);
         params
             .iter()
             .enumerate()
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
-                let sym = self.symbol_pool().make(v.0.value.as_str());
+                let var_str = v.0.value.as_str();
+                let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
-                self.define_local(
-                    &loc,
-                    sym,
-                    ty.clone(),
-                    None,
-                    // If this is for a proper Move function (not spec function), add the
-                    // index so we can resolve this to a `Temporary` expression instead of
-                    // a `LocalVar`.
-                    if for_move_fun { Some(idx) } else { None },
-                );
+
+                if !is_lang_version_2 || var_str != "_" {
+                    self.define_local(
+                        &loc,
+                        sym,
+                        ty.clone(),
+                        None,
+                        // If this is for a proper Move function (not spec function), add the
+                        // index so we can resolve this to a `Temporary` expression instead of
+                        // a `LocalVar`.
+                        if for_move_fun { Some(idx) } else { None },
+                    );
+                }
                 Parameter(sym, ty, loc)
             })
             .collect_vec()
@@ -3054,10 +3066,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        if !self.parent.check_no_variant(maccess) {
+        let (no_variant, maccess) = self.parent.check_no_variant_and_convert_maccess(maccess);
+        if !no_variant {
             return self.new_error_exp();
         }
-        let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
+        let (module_name, name, _) = self.parent.module_access_to_parts(&maccess);
 
         // Process `old(E)` scoping
         let is_old =

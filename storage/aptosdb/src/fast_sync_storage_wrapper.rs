@@ -8,12 +8,11 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
-    StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{TransactionOutputListWithProof, TransactionToCommit, Version},
 };
 use either::Either;
@@ -169,25 +168,9 @@ impl DbWriter for FastSyncStorageWrapper {
         Ok(())
     }
 
-    fn pre_commit_ledger(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
-    ) -> Result<()> {
-        self.get_aptos_db_write_ref().pre_commit_ledger(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
-            sharded_state_cache,
-        )
+    fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
+        self.get_aptos_db_write_ref()
+            .pre_commit_ledger(chunk, sync_commit)
     }
 
     fn commit_ledger(
