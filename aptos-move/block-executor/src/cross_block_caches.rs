@@ -2,26 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_types::{
-    error::PanicError,
-    state_store::{state_value::StateValueMetadata, StateView},
-    vm::modules::ModuleCacheEntry,
-};
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::{error::PanicError, state_store::StateView, vm::modules::AptosModuleExtension};
 use aptos_vm_environment::environment::AptosEnvironment;
-use bytes::Bytes;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_binary_format::{errors::Location, CompiledModule};
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    metadata::Metadata, vm_status::VMStatus,
-};
+use move_core_types::{language_storage::ModuleId, vm_status::VMStatus};
 use move_vm_runtime::{Module, WithRuntimeEnvironment};
+use move_vm_types::code::ModuleCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    ops::Deref,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 /// The maximum size of struct name index map in runtime environment.
@@ -40,7 +37,7 @@ impl CachedAptosEnvironment {
     /// Returns the cached environment if it exists and has the same configuration as if it was
     /// created based on the current state, or creates a new one and caches it. Should only be
     /// called at the block boundaries.
-    pub fn fetch_with_delayed_field_optimization_enabled(
+    pub fn get_with_delayed_field_optimization_enabled(
         state_view: &impl StateView,
     ) -> Result<AptosEnvironment, VMStatus> {
         // Create a new environment.
@@ -73,91 +70,66 @@ impl CachedAptosEnvironment {
     }
 }
 
-/// An entry into immutable cross-block module cache.
-struct CrossBlockModuleCacheEntry {
-    /// True if this entry is valid within the block execution context. If not, executor needs to
-    /// read the module information from the state instead. Used when modules are published.
+/// Module code stored in cross-block module cache.
+struct ImmutableModuleCode<DC, VC, E> {
+    /// True if this code is "valid" within the block execution context (i.e, there has been no
+    /// republishing of this module so far). If false, executor needs to read the module from the
+    /// sync/unsync module caches.
     valid: CachePadded<AtomicBool>,
-    /// Cached verified module entry.
-    verified_entry: ModuleCacheEntry,
+    /// Cached verified module. While [ModuleCode] type is used, the following invariants always
+    /// hold:
+    ///    1. Module's version is [None] (storage version).
+    ///    2. Module's code is always verified.
+    module: CachePadded<Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>>,
 }
 
-impl CrossBlockModuleCacheEntry {
-    /// Returns a new valid cache entry. Panics if provided module entry is not verified.
-    fn new(entry: ModuleCacheEntry) -> Result<Self, PanicError> {
-        if !entry.is_verified() {
-            let address = entry.compiled_module().self_addr();
-            let module_name = entry.compiled_module().self_name();
+impl<DC, VC, E> ImmutableModuleCode<DC, VC, E>
+where
+    VC: Deref<Target = Arc<DC>>,
+{
+    /// Returns a new valid module. Returns a (panic) error if the module is not verified or has
+    /// non-storage version.
+    fn new(module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) -> Result<Self, PanicError> {
+        if !module.code().is_verified() || module.version().is_some() {
             let msg = format!(
-                "Module {}::{} is created for the cross-block module cache, but is not verified",
-                address, module_name
+                "Invariant violated for immutable module code : verified ({}), version({:?})",
+                module.code().is_verified(),
+                module.version()
             );
             return Err(PanicError::CodeInvariantError(msg));
         }
 
         Ok(Self {
             valid: CachePadded::new(AtomicBool::new(true)),
-            verified_entry: entry,
+            module: CachePadded::new(module),
         })
     }
 
-    /// Marks the entry as invalid.
+    /// Marks the module as invalid.
     fn mark_invalid(&self) {
         self.valid.store(false, Ordering::Release)
     }
 
-    /// Returns true if the entry is valid.
-    pub fn is_valid(&self) -> bool {
+    /// Returns true if the module is valid.
+    pub(crate) fn is_valid(&self) -> bool {
         self.valid.load(Ordering::Acquire)
     }
 
-    /// Returns the state value metadata if the entry is valid, and [None] otherwise.
-    fn state_value_metadata(&self) -> Option<StateValueMetadata> {
-        self.is_valid()
-            .then(|| self.verified_entry.state_value_metadata().clone())
-    }
-
-    /// Returns the module bytes if the entry is valid, and [None] otherwise.
-    fn bytes(&self) -> Option<Bytes> {
-        self.is_valid().then(|| self.verified_entry.bytes().clone())
-    }
-
-    /// Returns the module size in bytes if the entry is valid, and [None] otherwise.
-    fn size_in_bytes(&self) -> Option<usize> {
-        self.is_valid().then(|| self.verified_entry.size_in_bytes())
-    }
-
-    /// Returns the module metadata if the entry is valid, and [None] otherwise.
-    fn module_metadata(&self) -> Option<Vec<Metadata>> {
-        self.is_valid()
-            .then(|| self.verified_entry.metadata().to_vec())
-    }
-
-    /// Returns the deserialized module if the entry is valid, and [None] otherwise.
-    fn deserialized_module(&self) -> Option<Arc<CompiledModule>> {
-        self.is_valid()
-            .then(|| self.verified_entry.compiled_module().clone())
-    }
-
-    /// Returns the verified module if the entry is valid, and [None] otherwise. Returns an error
-    /// if the entry is not verified.
-    fn verified_module(&self) -> Result<Option<Arc<Module>>, PanicError> {
-        Ok(if self.is_valid() {
-            Some(self.verified_entry.verified_module()?.clone())
-        } else {
-            None
-        })
+    /// Returns the module code stored is this [ImmutableModuleCode].
+    fn inner(&self) -> &Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>> {
+        self.module.deref()
     }
 }
 
-type SyncCrossBlockModuleCache = ExplicitSyncWrapper<HashMap<ModuleId, CrossBlockModuleCacheEntry>>;
+type AptosImmutableModuleCode = ImmutableModuleCode<CompiledModule, Module, AptosModuleExtension>;
+type SyncCrossBlockModuleCache = ExplicitSyncWrapper<HashMap<ModuleId, AptosImmutableModuleCode>>;
 static CROSS_BLOCK_MODULE_CACHE: Lazy<SyncCrossBlockModuleCache> =
     Lazy::new(|| ExplicitSyncWrapper::new(HashMap::new()));
 
-/// Represents an immutable cross-block cache. The size of the cache is fixed (entries cannot be
-/// added or removed) within a single block, so it is only mutated at block boundaries. At the
-/// same time, entries in this cache can be marked as "invalid" so that block executor can decide
-/// on whether to read the module from cache or from the storage.
+/// Represents an immutable cross-block cache. The size of the cache is fixed (modules cannot be
+/// added or removed) within a single block, so it is only mutated at the block boundaries. At the
+/// same time, modules in this cache can be marked as "invalid" so that block executor can decide
+/// on whether to read the module from this cache or from elsewhere.
 pub struct CrossBlockModuleCache;
 
 impl CrossBlockModuleCache {
@@ -167,19 +139,39 @@ impl CrossBlockModuleCache {
         cache.clear();
     }
 
-    /// Adds new verified entries from block-level cache to the cross-block cache. Flushes the
+    /// Adds new verified modules from block-level cache to the cross-block cache. Flushes the
     /// cache if its size is too large. Should only be called at block end.
     pub(crate) fn populate_from_code_cache_at_block_end(
-        modules: impl Iterator<Item = (ModuleId, ModuleCacheEntry)>,
+        modules: impl Iterator<
+            Item = (
+                ModuleId,
+                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>,
+            ),
+        >,
     ) -> Result<(), PanicError> {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
+
+        // For all modules that are verified, add them to cache. Also reset version to storage
+        // version. Note that at this point it should be the case that all arced modules have the
+        // reference count of exactly 1.
         for (id, module) in modules {
-            if module.is_verified() {
-                let module = CrossBlockModuleCacheEntry::new(module)?;
-                cache.insert(id, module);
+            if module.code().is_verified() {
+                let mut module = Arc::into_inner(module).ok_or_else(|| {
+                    let msg = format!(
+                        "Module {}::{} has more than one strong reference count",
+                        id.address(),
+                        id.name()
+                    );
+                    PanicError::CodeInvariantError(msg)
+                })?;
+
+                module.set_version(None);
+                cache.insert(id, ImmutableModuleCode::new(Arc::new(module))?);
             }
         }
 
+        // To protect against running out of memory, keep the size limited to some constant. If it
+        // is too large, flush the cache.
         if cache.len() > MAX_CROSS_BLOCK_MODULE_CACHE_SIZE {
             cache.clear();
         }
@@ -192,112 +184,49 @@ impl CrossBlockModuleCache {
         CROSS_BLOCK_MODULE_CACHE
             .acquire()
             .get(module_id)
-            .is_some_and(|e| e.is_valid())
+            .is_some_and(|module| module.is_valid())
     }
 
     /// Marks the cached entry (if it exists) as invalid. As a result, all subsequent calls to the
     /// cache will result in a cache miss. It is fine for an entry not to exist: e.g., when a new
     /// module is published one can try to invalidate global cache (that does not have the module).
     pub(crate) fn mark_invalid(module_id: &ModuleId) {
-        if let Some(entry) = CROSS_BLOCK_MODULE_CACHE.acquire().get(module_id) {
-            entry.mark_invalid();
+        if let Some(module) = CROSS_BLOCK_MODULE_CACHE.acquire().get(module_id) {
+            module.mark_invalid();
         }
     }
 
-    /// Returns the state value metadata from the cross module cache. If the module has not been
-    /// cached, or is no longer valid due to module publishing, [None] is returned.
-    pub(crate) fn fetch_state_value_metadata(
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<StateValueMetadata> {
+    /// Returns the module from the cross module cache. If the module has not been cached, or is
+    /// no longer valid due to module publishing, [None] is returned.
+    pub(crate) fn get(
+        module_id: &ModuleId,
+    ) -> Option<Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>>
+    {
         CROSS_BLOCK_MODULE_CACHE
             .acquire()
-            .get(&(address, module_name))?
-            .state_value_metadata()
+            .get(module_id)
+            .and_then(|module| {
+                if module.is_valid() {
+                    Some(module.inner().clone())
+                } else {
+                    None
+                }
+            })
     }
 
-    /// Returns the true if the module exists in the cross module framework cache. If the module
-    /// has not been cached, false is returned. Note that even if a module has been republished, we
-    /// can still check the cache because modules cannot be deleted.
-    pub(crate) fn check_module_exists(address: &AccountAddress, module_name: &IdentStr) -> bool {
-        CROSS_BLOCK_MODULE_CACHE
-            .acquire()
-            .contains_key(&(address, module_name))
-    }
-
-    /// Returns the module size in bytes from the cross module cache. If the module has not been
-    /// cached, or is no longer valid due to module publishing, [None] is returned.
-    pub(crate) fn fetch_module_size_in_bytes(
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<usize> {
-        CROSS_BLOCK_MODULE_CACHE
-            .acquire()
-            .get(&(address, module_name))?
-            .size_in_bytes()
-    }
-
-    /// Returns the module bytes from the cross module cache. If the module has not been cached, or
-    /// is no longer valid due to module publishing, [None] is returned.
-    pub(crate) fn fetch_module_bytes(
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<Bytes> {
-        CROSS_BLOCK_MODULE_CACHE
-            .acquire()
-            .get(&(address, module_name))?
-            .bytes()
-    }
-
-    /// Returns the module metadata from the cross module cache. If the module has not been cached,
-    /// or is no longer valid due to module publishing, [None] is returned.
-    pub(crate) fn fetch_module_metadata(
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<Vec<Metadata>> {
-        CROSS_BLOCK_MODULE_CACHE
-            .acquire()
-            .get(&(address, module_name))?
-            .module_metadata()
-    }
-
-    /// Returns the deserialized module from the cross module cache. If the module has not been
-    /// cached, or is no longer valid due to module publishing, [None] is returned.
-    pub(crate) fn fetch_deserialized_module(
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<Arc<CompiledModule>> {
-        CROSS_BLOCK_MODULE_CACHE
-            .acquire()
-            .get(&(address, module_name))?
-            .deserialized_module()
-    }
-
-    /// Returns the verified module from the cross module cache. If the module has not been cached,
-    /// or is no longer valid due to module publishing, [None] is returned.
-    ///
-    /// The panic error is returned when the entry turns out to be not verified.
-    pub(crate) fn fetch_verified_module(
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Result<Option<Arc<Module>>, PanicError> {
-        let cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        match cache.get(&(address, module_name)) {
-            Some(v) => v.verified_module(),
-            None => Ok(None),
-        }
-    }
-
-    /// Adds an entry to the cross-block module cache. Used for tests only.
+    /// Inserts a module to the cross-block module cache. Used for tests only.
     #[cfg(test)]
-    pub fn add_to_to_cross_block_module_cache(module_id: ModuleId, entry: ModuleCacheEntry) {
+    pub fn insert(
+        module_id: ModuleId,
+        module: Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>,
+    ) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
-        cache.insert(module_id, CrossBlockModuleCacheEntry::new(entry).unwrap());
+        cache.insert(module_id, ImmutableModuleCode::new(module).unwrap());
     }
 
-    /// Removes the specified entry from cross-block module cache. Used for tests only.
+    /// Removes the specified module from cross-block module cache. Used for tests only.
     #[cfg(test)]
-    pub fn remove_from_cross_block_module_cache(module_id: &ModuleId) {
+    pub fn remove(module_id: &ModuleId) {
         let mut cache = CROSS_BLOCK_MODULE_CACHE.acquire();
         cache.remove(module_id);
     }
@@ -312,6 +241,7 @@ impl CrossBlockModuleCache {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::types::test_types::{module_id, verified_code};
     use aptos_types::{
         on_chain_config::{FeatureFlag, Features},
         state_store::{
@@ -319,8 +249,57 @@ mod test {
             state_value::StateValue, StateViewId, TStateView,
         },
     };
-    use move_core_types::identifier::Identifier;
-    use move_vm_runtime::RuntimeEnvironment;
+    use claims::assert_ok;
+    use move_vm_types::code::{MockDeserializedCode, MockVerifiedCode};
+
+    #[test]
+    fn test_immutable_module_code() {
+        let module_code: ModuleCode<_, MockVerifiedCode, _, _> =
+            ModuleCode::from_deserialized(MockDeserializedCode::new(0), Arc::new(()), None);
+        assert!(ImmutableModuleCode::new(Arc::new(module_code)).is_err());
+
+        let module_code =
+            ModuleCode::from_verified(MockVerifiedCode::new(0), Arc::new(()), Some(22));
+        assert!(ImmutableModuleCode::new(Arc::new(module_code)).is_err());
+
+        let module_code = ModuleCode::from_verified(MockVerifiedCode::new(0), Arc::new(()), None);
+        assert!(ImmutableModuleCode::new(Arc::new(module_code)).is_ok());
+    }
+
+    #[test]
+    fn test_immutable_module_code_validity() {
+        let module_code = ModuleCode::from_verified(MockVerifiedCode::new(0), Arc::new(()), None);
+        let module_code = assert_ok!(ImmutableModuleCode::new(Arc::new(module_code)));
+        assert!(module_code.is_valid());
+
+        module_code.mark_invalid();
+        assert!(!module_code.is_valid());
+    }
+
+    #[test]
+    fn test_cross_block_module_cache() {
+        let valid_module_id = module_id("a");
+        let valid_module_code = verified_code("a", None);
+        CrossBlockModuleCache::insert(valid_module_id.clone(), valid_module_code);
+
+        let invalid_module_id = module_id("b");
+        let invalid_module_code = verified_code("b", None);
+        CrossBlockModuleCache::insert(invalid_module_id.clone(), invalid_module_code);
+        CrossBlockModuleCache::mark_invalid(&invalid_module_id);
+
+        assert_eq!(CrossBlockModuleCache::size(), 2);
+        assert!(CrossBlockModuleCache::is_valid(&valid_module_id));
+        assert!(!CrossBlockModuleCache::is_valid(&invalid_module_id));
+
+        assert!(CrossBlockModuleCache::get(&valid_module_id).is_some());
+        assert!(CrossBlockModuleCache::get(&invalid_module_id).is_none());
+
+        let non_existing_id = module_id("c");
+        assert!(CrossBlockModuleCache::get(&non_existing_id).is_none());
+
+        CrossBlockModuleCache::remove(&valid_module_id);
+        CrossBlockModuleCache::remove(&invalid_module_id);
+    }
 
     #[derive(Default)]
     struct HashMapView {
@@ -348,10 +327,8 @@ mod test {
 
     #[test]
     fn test_cross_block_module_cache_flush() {
-        let foo_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
-        let foo_entry =
-            ModuleCacheEntry::verified_for_test("foo", &[], &RuntimeEnvironment::new(vec![]));
-        CrossBlockModuleCache::add_to_to_cross_block_module_cache(foo_id, foo_entry);
+        let c_id = module_id("c");
+        CrossBlockModuleCache::insert(c_id.clone(), verified_code("c", None));
         assert_eq!(CrossBlockModuleCache::size(), 1);
 
         CrossBlockModuleCache::flush_at_block_start();
@@ -362,17 +339,9 @@ mod test {
         let env_old = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
 
         for i in 0..10 {
-            let module_name = format!("foo_{}", i);
-            let id = ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::new(module_name.clone()).unwrap(),
-            );
-            let entry = ModuleCacheEntry::verified_for_test(
-                &module_name,
-                &[],
-                &RuntimeEnvironment::new(vec![]),
-            );
-            CrossBlockModuleCache::add_to_to_cross_block_module_cache(id.clone(), entry);
+            let name = format!("m_{}", i);
+            let id = module_id(&name);
+            CrossBlockModuleCache::insert(id.clone(), verified_code(&name, None));
         }
         assert_eq!(CrossBlockModuleCache::size(), 10);
 
@@ -386,7 +355,9 @@ mod test {
 
         // New environment means we need to also flush global caches - to invalidate struct name
         // indices.
-        let env_new = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
+        let env_new = assert_ok!(
+            CachedAptosEnvironment::get_with_delayed_field_optimization_enabled(&state_view)
+        );
         assert!(env_old != env_new);
         assert_eq!(CrossBlockModuleCache::size(), 0);
     }

@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::module_and_script_storage::{
-    code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
-};
+use crate::module_and_script_storage::module_storage::AptosModuleStorage;
 use ambassador::Delegate;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
 use bytes::Bytes;
@@ -52,12 +50,15 @@ pub struct AptosCodeStorageAdapter<'s, S> {
 }
 
 impl<'s, S: StateView> AptosCodeStorageAdapter<'s, S> {
+    /// Creates new instance of [AptosCodeStorageAdapter] built on top of the passed state view and
+    /// the provided runtime environment.
     fn new(state_view: &'s S, runtime_environment: &'s RuntimeEnvironment) -> Self {
         let adapter = StateViewAdapter { state_view };
         let storage = adapter.into_unsync_code_storage(runtime_environment);
         Self { storage }
     }
 
+    /// Returns the state view used by [UnsyncCodeStorage] as the raw byte storage.
     fn state_view(&self) -> &'s S {
         self.storage.module_storage().byte_storage().state_view
     }
@@ -73,12 +74,10 @@ impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
         Ok(self
             .state_view()
             .get_state_value(&state_key)
-            .map_err(|e| module_storage_error!(address, module_name, e).to_partial())?
-            .map(|s| s.into_metadata()))
+            .map_err(|err| module_storage_error!(address, module_name, err).to_partial())?
+            .map(|state_value| state_value.into_metadata()))
     }
 }
-
-impl<'s, S: StateView> AptosCodeStorage for AptosCodeStorageAdapter<'s, S> {}
 
 /// Allows to treat the state view as a code storage with scripts and modules. The main use case is
 /// when a transaction or a Move function has to be executed outside the long-living environment or

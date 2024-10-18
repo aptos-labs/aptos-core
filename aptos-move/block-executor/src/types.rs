@@ -55,3 +55,72 @@ impl<T: Transaction> fmt::Debug for ReadWriteSummary<T> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+pub(crate) mod test_types {
+    use aptos_mvhashmap::types::TxnIndex;
+    use aptos_types::{state_store::state_value::StateValue, vm::modules::AptosModuleExtension};
+    use bytes::Bytes;
+    use move_binary_format::{
+        file_format::empty_module_with_dependencies_and_friends, CompiledModule,
+    };
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    };
+    use move_vm_runtime::{Module, RuntimeEnvironment};
+    use move_vm_types::code::ModuleCode;
+    use std::sync::Arc;
+
+    /// Returns a dummy [ModuleCode] in deserialized state.
+    pub(crate) fn deserialized_code(
+        module_name: &str,
+        version: Option<TxnIndex>,
+    ) -> Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>> {
+        let compiled_module =
+            empty_module_with_dependencies_and_friends(module_name, vec![], vec![]);
+        let extension = Arc::new(AptosModuleExtension::new(StateValue::new_legacy(
+            Bytes::new(),
+        )));
+        Arc::new(ModuleCode::from_deserialized(
+            compiled_module,
+            extension,
+            version,
+        ))
+    }
+
+    /// Returns a dummy [ModuleCode] in verified state.
+    pub(crate) fn verified_code(
+        module_name: &str,
+        version: Option<TxnIndex>,
+    ) -> Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>> {
+        let compiled_module = Arc::new(empty_module_with_dependencies_and_friends(
+            module_name,
+            vec![],
+            vec![],
+        ));
+        let extension = Arc::new(AptosModuleExtension::new(StateValue::new_legacy(
+            Bytes::new(),
+        )));
+
+        // The actual cintents of the module do not matter for tests, but we cannot mock it because
+        // we have a static global cache for now.
+        let dummy_runtime_environment = RuntimeEnvironment::new(vec![]);
+        let locally_verified_module = dummy_runtime_environment
+            .build_locally_verified_module(compiled_module, 0, &[0; 32])
+            .unwrap();
+        let verified_module = dummy_runtime_environment
+            .build_verified_module(locally_verified_module, &[])
+            .unwrap();
+
+        Arc::new(ModuleCode::from_verified(
+            verified_module,
+            extension,
+            version,
+        ))
+    }
+
+    /// Returns a [ModuleId] for the given name.
+    pub(crate) fn module_id(name: &str) -> ModuleId {
+        ModuleId::new(AccountAddress::ONE, Identifier::new(name).unwrap())
+    }
+}

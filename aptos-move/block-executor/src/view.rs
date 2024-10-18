@@ -473,8 +473,10 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .borrow_mut()
             .deprecated_module_reads
             .push(key.clone());
-
-        self.versioned_map.modules().fetch_module(key, txn_idx)
+        #[allow(deprecated)]
+        self.versioned_map
+            .deprecated_modules()
+            .fetch_module(key, txn_idx)
     }
 
     fn read_group_size(
