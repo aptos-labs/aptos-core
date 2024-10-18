@@ -1,7 +1,20 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use bytes::Bytes;
 use std::{ops::Deref, sync::Arc};
+
+pub trait WithBytes {
+    fn bytes(&self) -> &Bytes;
+
+    fn size_in_bytes(&self) -> usize {
+        self.bytes().len()
+    }
+}
+
+pub trait WithHash {
+    fn hash(&self) -> &[u8; 32];
+}
 
 /// An entry for the code cache that can have multiple different representations.
 pub enum Code<D, V> {
@@ -61,31 +74,31 @@ impl<D, V> Clone for Code<D, V> {
     }
 }
 
-#[cfg(test)]
-pub(crate) struct MockDeserializedCode(usize);
+#[cfg(any(test, feature = "testing"))]
+pub struct MockDeserializedCode(usize);
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl MockDeserializedCode {
-    pub(crate) fn new(value: usize) -> Self {
+    pub fn new(value: usize) -> Self {
         Self(value)
     }
 
-    pub(crate) fn value(&self) -> usize {
+    pub fn value(&self) -> usize {
         self.0
     }
 }
 
-#[cfg(test)]
-pub(crate) struct MockVerifiedCode(Arc<MockDeserializedCode>);
+#[cfg(any(test, feature = "testing"))]
+pub struct MockVerifiedCode(Arc<MockDeserializedCode>);
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl MockVerifiedCode {
-    pub(crate) fn new(value: usize) -> Self {
+    pub fn new(value: usize) -> Self {
         Self(Arc::new(MockDeserializedCode(value)))
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl Deref for MockVerifiedCode {
     type Target = Arc<MockDeserializedCode>;
 

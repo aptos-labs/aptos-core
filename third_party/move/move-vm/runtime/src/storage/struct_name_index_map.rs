@@ -239,7 +239,7 @@ mod test {
 
     proptest! {
         #[test]
-        fn test_index_map_concurrent_arvitrary_struct_names(struct_names in vec(struct_name_strategy(), 30..100),
+        fn test_index_map_concurrent_arbitrary_struct_names(struct_names in vec(struct_name_strategy(), 30..100),
         ) {
             let struct_name_idx_map = Arc::new(StructNameIndexMap::empty());
 

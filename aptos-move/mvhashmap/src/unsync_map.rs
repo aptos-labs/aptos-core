@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache::UnsyncModuleCache,
-    types::{GroupReadResult, UnsyncGroupError, ValueWithLayout},
+    types::{GroupReadResult, TxnIndex, UnsyncGroupError, ValueWithLayout},
     BlockStateStats,
 };
 use anyhow::anyhow;
@@ -12,14 +11,14 @@ use aptos_crypto::hash::HashValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     executable::ModulePath,
-    vm::modules::ModuleCacheEntry,
+    vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use move_binary_format::file_format::CompiledScript;
+use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
-use move_vm_runtime::Script;
-use move_vm_types::code::UnsyncScriptCache;
+use move_vm_runtime::{Module, Script};
+use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache};
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -51,7 +50,8 @@ pub struct UnsyncMap<
     deprecated_module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
 
     // Code caches for loader V2 implementation: contains modules and scripts.
-    module_cache: UnsyncModuleCache<ModuleId, ModuleCacheEntry>,
+    module_cache:
+        UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
     script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
 
     total_base_resource_size: AtomicU64,
@@ -92,7 +92,10 @@ impl<
     }
 
     /// Returns the module cache for this [UnsyncMap].
-    pub fn module_cache(&self) -> &UnsyncModuleCache<ModuleId, ModuleCacheEntry> {
+    pub fn module_cache(
+        &self,
+    ) -> &UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
+    {
         &self.module_cache
     }
 
@@ -101,8 +104,15 @@ impl<
         &self.script_cache
     }
 
-    /// Returns all modules stored inside the [UnsyncMap].
-    pub fn into_modules_iter(self) -> impl Iterator<Item = (ModuleId, ModuleCacheEntry)> {
+    /// Returns all modules stored inside [UnsyncMap].
+    pub fn into_modules_iter(
+        self,
+    ) -> impl Iterator<
+        Item = (
+            ModuleId,
+            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>,
+        ),
+    > {
         self.module_cache.into_modules_iter()
     }
 

@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+ambassador = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -54,6 +55,7 @@ aptos-types = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 fail = { workspace = true, features = ["failpoints"] }
 itertools = { workspace = true }
+move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }

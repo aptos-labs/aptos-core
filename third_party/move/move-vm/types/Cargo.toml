@@ -10,6 +10,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
+ambassador = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 crossbeam = { workspace = true }
@@ -34,4 +35,5 @@ rand = { workspace = true }
 
 [features]
 default = []
+testing = []
 fuzzing = ["proptest", "move-binary-format/fuzzing"]

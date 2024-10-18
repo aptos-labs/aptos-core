@@ -2,21 +2,58 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    loader::{Module, Script},
     storage::{
-        environment::{ambassador_impl_WithRuntimeEnvironment, WithRuntimeEnvironment},
-        implementations::unsync_module_storage::AsUnsyncModuleStorage,
-        module_storage::ambassador_impl_ModuleStorage,
+        code_storage::{ambassador_impl_CodeStorage, CodeStorage},
+        environment::{
+            ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
+        },
+        implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
+        module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
-    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
-use move_vm_types::code::{Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache};
+use move_vm_types::code::{
+    ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache,
+};
 use std::sync::Arc;
 
 /// Code storage that stores both modules and scripts (not thread-safe).
+#[derive(Delegate)]
+#[delegate(WithRuntimeEnvironment, where = "M: ModuleStorage")]
+#[delegate(ModuleStorage, where = "M: ModuleStorage")]
+#[delegate(CodeStorage, where = "M: ModuleStorage")]
+pub struct UnsyncCodeStorage<M>(UnsyncCodeStorageImpl<M>);
+
+impl<M: ModuleStorage> UnsyncCodeStorage<M> {
+    /// Returns the underlying module storage used by this code storage.
+    pub fn module_storage(&self) -> &M {
+        &self.0.module_storage
+    }
+
+    /// Test-only method that checks the state of the script cache.
+    #[cfg(test)]
+    pub(crate) fn assert_cached_state<'b>(
+        &self,
+        deserialized: Vec<&'b [u8; 32]>,
+        verified: Vec<&'b [u8; 32]>,
+    ) {
+        assert_eq!(self.0.num_scripts(), deserialized.len() + verified.len());
+        for hash in deserialized {
+            let script = claims::assert_some!(self.0.get_script(hash));
+            assert!(!script.is_verified())
+        }
+        for hash in verified {
+            let script = claims::assert_some!(self.0.get_script(hash));
+            assert!(script.is_verified())
+        }
+    }
+}
+
+/// Private implementation of code storage based on non-[Sync] script cache.
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,
@@ -24,9 +61,21 @@ use std::sync::Arc;
     where = "M: ModuleStorage"
 )]
 #[delegate(ModuleStorage, target = "module_storage", where = "M: ModuleStorage")]
-pub struct UnsyncCodeStorage<M> {
+#[delegate(ScriptCache, target = "script_cache", where = "M: ModuleStorage")]
+pub struct UnsyncCodeStorageImpl<M> {
     script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
     module_storage: M,
+}
+
+impl<M: ModuleStorage> UnsyncCodeStorageImpl<M> {
+    /// Creates a new storage with no scripts. There are no constraints on which modules exist in
+    /// module storage.
+    fn new(module_storage: M) -> Self {
+        Self {
+            script_cache: UnsyncScriptCache::empty(),
+            module_storage,
+        }
+    }
 }
 
 pub trait AsUnsyncCodeStorage<'a, S> {
@@ -46,82 +95,36 @@ impl<'a, S: ModuleBytesStorage> AsUnsyncCodeStorage<'a, S> for S {
         &'a self,
         env: &'a RuntimeEnvironment,
     ) -> UnsyncCodeStorage<UnsyncModuleStorage<'a, S>> {
-        UnsyncCodeStorage::new(self.as_unsync_module_storage(env))
+        UnsyncCodeStorage(UnsyncCodeStorageImpl::new(
+            self.as_unsync_module_storage(env),
+        ))
     }
 
     fn into_unsync_code_storage(
         self,
         env: &'a RuntimeEnvironment,
     ) -> UnsyncCodeStorage<UnsyncModuleStorage<'a, S>> {
-        UnsyncCodeStorage::new(self.into_unsync_module_storage(env))
-    }
-}
-
-impl<M: ModuleStorage> UnsyncCodeStorage<M> {
-    /// Creates a new storage with no scripts. There are no constraints on which modules exist in
-    /// module storage.
-    fn new(module_storage: M) -> Self {
-        Self {
-            script_cache: UnsyncScriptCache::empty(),
-            module_storage,
-        }
-    }
-
-    /// Returns the underlying module storage used by this code storage.
-    pub fn module_storage(&self) -> &M {
-        &self.module_storage
-    }
-}
-
-impl<M: ModuleStorage> ScriptCache for UnsyncCodeStorage<M> {
-    type Deserialized = CompiledScript;
-    type Key = [u8; 32];
-    type Verified = Script;
-
-    fn insert_deserialized_script(
-        &self,
-        key: Self::Key,
-        deserialized_script: Self::Deserialized,
-    ) -> Arc<Self::Deserialized> {
-        self.script_cache
-            .insert_deserialized_script(key, deserialized_script)
-    }
-
-    fn insert_verified_script(
-        &self,
-        key: Self::Key,
-        verified_script: Self::Verified,
-    ) -> Arc<Self::Verified> {
-        self.script_cache
-            .insert_verified_script(key, verified_script)
-    }
-
-    fn get_script(&self, key: &Self::Key) -> Option<Code<Self::Deserialized, Self::Verified>> {
-        self.script_cache.get_script(key)
-    }
-
-    fn num_scripts(&self) -> usize {
-        self.script_cache.num_scripts()
+        UnsyncCodeStorage(UnsyncCodeStorageImpl::new(
+            self.into_unsync_module_storage(env),
+        ))
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        compute_code_hash,
-        storage::{
-            code_storage::CodeStorage,
-            implementations::unsync_module_storage::{test::add_module_bytes, ModuleCacheEntry},
-        },
+    use crate::storage::{
+        code_storage::{compute_code_hash, CodeStorage},
+        implementations::unsync_module_storage::test::add_module_bytes,
     };
-    use claims::{assert_ok, assert_some};
+    use claims::assert_ok;
     use move_binary_format::{
         file_format::empty_script_with_dependencies, file_format_common::VERSION_DEFAULT,
     };
+    use move_core_types::{identifier::Identifier, language_storage::ModuleId};
     use move_vm_test_utils::InMemoryStorage;
 
-    fn new_script<'a>(dependencies: impl IntoIterator<Item = &'a str>) -> Vec<u8> {
+    fn make_script<'a>(dependencies: impl IntoIterator<Item = &'a str>) -> Vec<u8> {
         let mut script = empty_script_with_dependencies(dependencies);
         script.version = VERSION_DEFAULT;
 
@@ -132,8 +135,6 @@ mod test {
 
     #[test]
     fn test_deserialized_script_caching() {
-        use Code::*;
-
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
@@ -142,33 +143,25 @@ mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
 
-        let serialized_script = new_script(vec!["a"]);
+        let serialized_script = make_script(vec!["a"]);
         let hash_1 = compute_code_hash(&serialized_script);
-
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
 
-        assert_eq!(code_storage.script_cache.num_scripts(), 1);
-        let script = assert_some!(code_storage.script_cache.get_script(&hash_1));
-        assert!(matches!(script, Deserialized(..)));
-
-        let serialized_script = new_script(vec!["b"]);
+        let serialized_script = make_script(vec!["b"]);
         let hash_2 = compute_code_hash(&serialized_script);
-
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
 
-        assert_eq!(code_storage.script_cache.num_scripts(), 2);
-        let script_1 = assert_some!(code_storage.script_cache.get_script(&hash_1));
-        assert!(matches!(script_1, Deserialized(..)));
-        let script_2 = assert_some!(code_storage.script_cache.get_script(&hash_2));
-        assert!(matches!(script_2, Deserialized(..)));
+        code_storage.assert_cached_state(vec![&hash_1, &hash_2], vec![]);
     }
 
     #[test]
     fn test_verified_script_caching() {
-        use Code as S;
-        use ModuleCacheEntry as M;
-
         let mut module_bytes_storage = InMemoryStorage::new();
+
+        let a_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("a").unwrap());
+        let b_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("b").unwrap());
+        let c_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("c").unwrap());
+
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
@@ -176,26 +169,22 @@ mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
 
-        let serialized_script = new_script(vec!["a"]);
+        let serialized_script = make_script(vec!["a"]);
         let hash = compute_code_hash(&serialized_script);
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
-        assert!(code_storage.module_storage().does_not_have_cached_modules());
 
-        assert_eq!(code_storage.script_cache.num_scripts(), 1);
-        let script = assert_some!(code_storage.script_cache.get_script(&hash));
-        assert!(matches!(script, S::Deserialized(..)));
+        // Nothing gets loaded into module cache.
+        code_storage
+            .module_storage()
+            .assert_cached_state(vec![], vec![]);
+        code_storage.assert_cached_state(vec![&hash], vec![]);
 
         assert_ok!(code_storage.verify_and_cache_script(&serialized_script));
 
-        assert_eq!(code_storage.script_cache.num_scripts(), 1);
-        let script = assert_some!(code_storage.script_cache.get_script(&hash));
-        assert!(matches!(script, S::Verified(..)));
-
-        assert!(code_storage
+        // Script is verified, so its dependencies are loaded into cache.
+        code_storage
             .module_storage()
-            .matches(vec![], |e| matches!(e, M::Deserialized { .. })));
-        assert!(code_storage
-            .module_storage()
-            .matches(vec!["a", "b", "c"], |e| matches!(e, M::Verified { .. })));
+            .assert_cached_state(vec![], vec![&a_id, &b_id, &c_id]);
+        code_storage.assert_cached_state(vec![], vec![&hash]);
     }
 }

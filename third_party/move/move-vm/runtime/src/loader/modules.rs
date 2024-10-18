@@ -35,6 +35,7 @@ use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
+    ops::Deref,
     sync::Arc,
 };
 
@@ -698,5 +699,13 @@ impl Module {
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
+    }
+}
+
+impl Deref for Module {
+    type Target = Arc<CompiledModule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.module
     }
 }

@@ -11,10 +11,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
-use std::{
-    ops::Deref,
-    sync::{atomic::AtomicU32, Arc},
-};
+use std::sync::{atomic::AtomicU32, Arc};
 
 pub type AtomicTxnIndex = AtomicU32;
 pub type TxnIndex = u32;
@@ -246,53 +243,6 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
 pub enum UnknownOrLayout<'a> {
     Unknown,
     Known(Option<&'a MoveTypeLayout>),
-}
-
-/// Module value associated with a version.
-pub struct VersionedModule<M> {
-    module: M,
-    /// Index of transaction in the block that committed this module. [None] if no transaction
-    /// committed the value, and it was instead initialized based on the pre-block state value.
-    version: Option<TxnIndex>,
-}
-
-impl<M> VersionedModule<M> {
-    /// Returns a new value with optional information about transaction index that committed it.
-    pub fn new(module: M, version: Option<TxnIndex>) -> Self {
-        Self { module, version }
-    }
-
-    pub fn from_txn_idx(module: M, txn_idx: TxnIndex) -> Self {
-        Self {
-            module,
-            version: Some(txn_idx),
-        }
-    }
-
-    pub fn from_pre_block_state(module: M) -> Self {
-        Self {
-            module,
-            version: None,
-        }
-    }
-
-    pub fn into_module(self) -> M {
-        self.module
-    }
-
-    /// Returns the index of transaction that committed this value. If the value has not been
-    /// committed and instead was taken from the state, returns [None].
-    pub fn version(&self) -> Option<TxnIndex> {
-        self.version
-    }
-}
-
-impl<M> Deref for VersionedModule<M> {
-    type Target = M;
-
-    fn deref(&self) -> &Self::Target {
-        &self.module
-    }
 }
 
 #[cfg(test)]
