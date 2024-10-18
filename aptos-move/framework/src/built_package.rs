@@ -484,6 +484,15 @@ impl BuiltPackage {
                 },
                 CompiledUnit::Script(_) => None,
             })
+            .chain(
+                self.package
+                    .bytecode_deps
+                    .iter()
+                    .map(|(name, address)| PackageDep {
+                        account: address.into_inner(),
+                        package_name: name.as_str().to_string(),
+                    }),
+            )
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
