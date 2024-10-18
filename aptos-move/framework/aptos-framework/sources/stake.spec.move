@@ -118,13 +118,6 @@ spec aptos_framework::stake {
     // Function specifications
     // -----------------------
 
-    spec initialize_validator_fees(aptos_framework: &signer) {
-        let aptos_addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-        aborts_if exists<ValidatorFees>(aptos_addr);
-        ensures exists<ValidatorFees>(aptos_addr);
-    }
-
     spec initialize_validator(
         account: &signer,
         consensus_pubkey: vector<u8>,
@@ -496,17 +489,10 @@ spec aptos_framework::stake {
         let post post_stake_pool = global<StakePool>(pool_address);
         let post post_active_value = post_stake_pool.active.value;
         let post post_pending_inactive_value = post_stake_pool.pending_inactive.value;
-        let fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
-        let post post_fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
         let post post_inactive_value = post_stake_pool.inactive.value;
         ensures post_stake_pool.pending_active.value == 0;
         // the amount stored in the stake pool should not changed after the update
-        ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(fees_table, pool_address)) {
-            !table::spec_contains(post_fees_table, pool_address) &&
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(fees_table, pool_address).value
-        } else {
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value
-        };
+        ensures post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value;
         // when current lockup cycle has expired, pending inactive should be fully unlocked and moved into inactive
         ensures if (spec_get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
             post_pending_inactive_value == 0 &&
@@ -527,7 +513,6 @@ spec aptos_framework::stake {
         aborts_if global<ValidatorConfig>(pool_address).validator_index >= len(validator_perf.validators);
 
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
-        aborts_if !exists<ValidatorFees>(aptos_addr);
 
         let stake_pool = global<StakePool>(pool_address);
 
@@ -726,20 +711,6 @@ spec aptos_framework::stake {
             active == initial_stake_amount;
     }
 
-    spec add_transaction_fee(validator_addr: address, fee: Coin<AptosCoin>) {
-        aborts_if !exists<ValidatorFees>(@aptos_framework);
-        let fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
-        let post post_fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
-        let collected_fee = table::spec_get(fees_table, validator_addr);
-        let post post_collected_fee = table::spec_get(post_fees_table, validator_addr);
-        ensures if (table::spec_contains(fees_table, validator_addr)) {
-            post_collected_fee.value == collected_fee.value + fee.value
-        } else {
-            table::spec_contains(post_fees_table, validator_addr) &&
-            table::spec_get(post_fees_table, validator_addr) == fee
-        };
-    }
-
     spec update_voting_power_increase(increase_amount: u64) {
         requires !reconfiguration_state::spec_is_in_progress();
         aborts_if !exists<ValidatorSet>(@aptos_framework);
@@ -920,7 +891,6 @@ spec aptos_framework::stake {
         requires exists<StakingConfig>(@aptos_framework);
         requires exists<StakingRewardsConfig>(@aptos_framework) || !features::spec_periodical_reward_rate_decrease_enabled();
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        requires exists<ValidatorFees>(@aptos_framework);
     }
 
     // Adding helper function in staking_config leads to an unexpected error
