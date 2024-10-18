@@ -25,6 +25,21 @@ pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 pub const STATE_SYNCING_FOR_FALLBACK: &str = "sync_for_fallback";
 pub const STATE_SYNCING_TO_COMMIT: &str = "sync_to_commit";
 
+// Useful message tracking labels
+pub const MESSAGE_CREATE_TO_SEND: &str = "create_to_send";
+pub const MESSAGE_SEND_TO_RECEIVE: &str = "send_to_receive";
+pub const MESSAGE_RECEIVE_TO_PROCESS: &str = "receive_to_process";
+
+/// Counter for tracking message processing latencies
+pub static MESSAGE_LATENCY_TRACKER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "consensus_observer_message_processing_latency",
+        "Counters related to message processing latencies",
+        &["message_type", "message_phase"]
+    )
+    .unwrap()
+});
+
 /// Counter for tracking created subscriptions for the consensus observer
 pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -250,6 +265,17 @@ pub fn observe_value_with_label(
     let network_id = peer_network_id.network_id();
     histogram
         .with_label_values(&[request_label, network_id.as_str()])
+        .observe(value)
+}
+
+pub fn observe_message_with_labels(
+    histogram: &Lazy<HistogramVec>,
+    message_type: &str,
+    message_phase: &str,
+    value: f64,
+) {
+    histogram
+        .with_label_values(&[message_type, message_phase])
         .observe(value)
 }
 
