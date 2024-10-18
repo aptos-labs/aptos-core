@@ -22,6 +22,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         // Note(Gas): this initial value is guesswork.
         [signer_borrow_address_base: InternalGas, "signer.borrow_address.base", 735],
 
+        [hot_potato_any_drop_base: InternalGas, "hot_potato_any.drop.base", 735],
+
         // Note(Gas): these initial values are guesswork.
         [string_check_utf8_base: InternalGas, "string.check_utf8.base", 1102],
         [string_check_utf8_per_byte: InternalGasPerByte, "string.check_utf8.per_byte", 29],
