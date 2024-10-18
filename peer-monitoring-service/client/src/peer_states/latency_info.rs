@@ -10,7 +10,11 @@ use crate::{
 use aptos_config::{config::LatencyMonitoringConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
-use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
+use aptos_network::{
+    application::{interface::NetworkClient, metadata::PeerMetadata},
+    peer::PingDisconnectContext,
+    DisconnectReason,
+};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::PeerMonitoringServiceResponse,
@@ -24,9 +28,6 @@ use std::{
     sync::Arc,
 };
 
-type PeerMonitoringClient =
-    PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>;
-
 /// A simple container that holds a peer's latency info
 #[derive(Clone, Debug)]
 pub struct LatencyInfoState {
@@ -39,16 +40,17 @@ pub struct LatencyInfoState {
     // The request tracker for latency ping requests
     request_tracker: Arc<RwLock<RequestTracker>>,
     // Peer monitoring service for disconnecting peers and other network functionality
-    // TODO remove
-    #[allow(dead_code)]
-    peer_monitoring_service_client: PeerMonitoringClient,
+    peer_monitoring_service_client:
+        PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
 }
 
 impl LatencyInfoState {
     pub fn new(
         latency_monitoring_config: LatencyMonitoringConfig,
         time_service: TimeService,
-        peer_monitoring_service_client: &PeerMonitoringClient,
+        peer_monitoring_service_client: &PeerMonitoringServiceClient<
+            NetworkClient<PeerMonitoringServiceMessage>,
+        >,
     ) -> Self {
         let request_tracker = RequestTracker::new(
             latency_monitoring_config.latency_ping_interval_ms,
@@ -76,13 +78,39 @@ impl LatencyInfoState {
         // Update the number of ping failures for the request tracker
         self.request_tracker.write().record_response_failure();
 
-        // TODO: If the number of ping failures is too high, disconnect from the node
         let num_consecutive_failures = self.request_tracker.read().get_num_consecutive_failures();
         if num_consecutive_failures >= self.latency_monitoring_config.max_latency_ping_failures {
             warn!(LogSchema::new(LogEntry::LatencyPing)
                 .event(LogEvent::TooManyPingFailures)
                 .peer(peer_network_id)
                 .message("Too many ping failures occurred for the peer!"));
+
+            // If the number of ping failures is too high, disconnect from the node
+            let service_client = self.peer_monitoring_service_client.clone();
+            let peer_network_id = *peer_network_id;
+            let max_latency_ping_failures =
+                self.latency_monitoring_config.max_latency_ping_failures;
+            tokio::spawn(async move {
+                let result = service_client
+                    .disconnect_from_peer(
+                        peer_network_id,
+                        DisconnectReason::FailedPeerMonitoringPing(PingDisconnectContext::new(
+                            num_consecutive_failures,
+                            max_latency_ping_failures,
+                        )),
+                    )
+                    .await;
+
+                if let Err(e) = result {
+                    warn!(LogSchema::new(LogEntry::LatencyPing)
+                        .event(LogEvent::UnexpectedErrorEncountered)
+                        .peer(&peer_network_id)
+                        .message(
+                            format!("Unexpected error when disconnecting from the peer: {}", e)
+                                .as_str()
+                        ));
+                }
+            });
         }
     }
 
