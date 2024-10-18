@@ -1,0 +1,6 @@
+// -- Model dump before bytecode pipeline
+module 0xa::m {
+    struct Foo {
+    }
+    private native fun whatever(): u64;
+} // end 0xa::m
