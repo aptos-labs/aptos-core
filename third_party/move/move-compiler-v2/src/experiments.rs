@@ -146,7 +146,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::SPLIT_CRITICAL_EDGES.to_string(),
             description: "Turns on or off splitting of critical edges".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
