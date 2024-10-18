@@ -149,9 +149,8 @@ pub enum Constraint {
     /// The type must not be a phantom type. A phantom type is only allowed
     /// as a type argument for a phantom type parameter.
     NoPhantom,
-    /// The type must have the given set of abilities. The boolean indicates whether
-    /// type parameters are exempted.
-    HasAbilities(AbilitySet, bool),
+    /// The type must have the given set of abilities.
+    HasAbilities(AbilitySet, AbilityCheckingScope),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
@@ -159,6 +158,19 @@ pub enum Constraint {
     /// The type must not be function because it is used as the type of some field or
     /// as a type argument.
     NoFunction,
+}
+
+/// Scope of ability checking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AbilityCheckingScope {
+    /// Type parameters are excluded from ability checking. This is in usages the case
+    /// where we check abilities for field types, for example, since those constraints
+    /// are modulo an actual type instantiation.
+    ExcludeTypeParams,
+    /// Type parameters are included in ability checking. This is the case if
+    /// we check ability constraints for a type instantiation, as in `S<T>`,
+    /// and we have `struct S<X:A>`.
+    IncludeTypeParams,
 }
 
 /// A type to describe the context from where a constraint stems. Used for
@@ -520,10 +532,9 @@ impl Constraint {
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
             (Constraint::NoPhantom, Constraint::NoPhantom) => Ok(true),
-            (
-                Constraint::HasAbilities(a1, params_exempted1),
-                Constraint::HasAbilities(a2, params_exempted2),
-            ) if params_exempted1 == params_exempted2 => {
+            (Constraint::HasAbilities(a1, scope1), Constraint::HasAbilities(a2, scope2))
+                if scope1 == scope2 =>
+            {
                 *a1 = a1.union(*a2);
                 Ok(true)
             },
@@ -560,7 +571,10 @@ impl Constraint {
             result.push(Constraint::NoPhantom)
         }
         if !abilities.is_empty() {
-            result.push(Constraint::HasAbilities(*abilities, false));
+            result.push(Constraint::HasAbilities(
+                *abilities,
+                AbilityCheckingScope::IncludeTypeParams,
+            ));
         }
         result
     }
@@ -589,7 +603,10 @@ impl Constraint {
         } else {
             struct_abilities
         };
-        result.push(Constraint::HasAbilities(abilities, true));
+        result.push(Constraint::HasAbilities(
+            abilities,
+            AbilityCheckingScope::ExcludeTypeParams,
+        ));
         result
     }
 
@@ -1783,12 +1800,12 @@ impl Substitution {
                         constraint_unsatisfied_error()
                     }
                 },
-                (Constraint::HasAbilities(required_abilities, type_params_exempted), ty) => self
+                (Constraint::HasAbilities(required_abilities, scope), ty) => self
                     .eval_ability_constraint(
                         context,
                         loc,
                         *required_abilities,
-                        *type_params_exempted,
+                        *scope,
                         ty,
                         ctx_opt,
                     ),
@@ -1830,7 +1847,7 @@ impl Substitution {
         context: &mut impl UnificationContext,
         loc: &Loc,
         required_abilities: AbilitySet,
-        type_params_exempted: bool,
+        required_abilities_scope: AbilityCheckingScope,
         ty: &Type,
         ctx_opt: Option<ConstraintContext>,
     ) -> Result<(), TypeUnificationError> {
@@ -1858,7 +1875,7 @@ impl Substitution {
                         context,
                         loc,
                         required_abilities,
-                        type_params_exempted,
+                        required_abilities_scope,
                         t,
                         ctx_opt.clone().map(|ctx| ctx.derive_tuple_element(i)),
                     )?;
@@ -1871,7 +1888,7 @@ impl Substitution {
                     context,
                     loc,
                     required_abilities,
-                    type_params_exempted,
+                    required_abilities_scope,
                     t,
                     ctx_opt.map(|ctx| ctx.derive_vector_type_param()),
                 )
@@ -1895,7 +1912,7 @@ impl Substitution {
                             context,
                             loc,
                             required,
-                            type_params_exempted,
+                            required_abilities_scope,
                             t,
                             ctx_opt
                                 .clone()
@@ -1922,7 +1939,7 @@ impl Substitution {
                 Ok(())
             },
             TypeParameter(idx) => {
-                if !type_params_exempted {
+                if required_abilities_scope == AbilityCheckingScope::IncludeTypeParams {
                     let tparam = context.type_param(*idx);
                     check(tparam.1.abilities)
                 } else {
@@ -1941,7 +1958,7 @@ impl Substitution {
                     *idx,
                     loc.clone(),
                     WideningOrder::LeftToRight,
-                    Constraint::HasAbilities(required_abilities, type_params_exempted),
+                    Constraint::HasAbilities(required_abilities, required_abilities_scope),
                     ctx_opt,
                 )
             },
