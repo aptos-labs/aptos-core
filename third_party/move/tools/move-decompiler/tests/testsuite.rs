@@ -21,12 +21,6 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         sources_deps: extract_test_directives(path, "// dep:")?,
         sources: vec![path_str.clone()],
         dependencies: vec!["./tests".to_string()],
-        /*if extract_test_directives(path, "// no-stdlib")?.is_empty() {
-            vec![path_from_crate_root("../../move-stdlib/sources")]
-        } else {
-            vec![]
-        },
-         */
         named_address_mapping: vec![
             "std=0x1".to_string(),
             "aptos_std=0x1".to_string(),
