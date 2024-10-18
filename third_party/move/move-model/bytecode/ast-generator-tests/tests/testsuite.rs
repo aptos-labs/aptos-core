@@ -104,6 +104,7 @@ fn generate_output(target: &FunctionTarget, test_output: &mut String) -> Option<
         exp.display_for_fun(target.func_env.clone())
     );
     let exp = astifier::transform_assigns(target, exp);
+    let exp = astifier::bind_free_vars(target, exp);
     *test_output += &format!(
         "--- Assign-Transformed Generated AST\n{}\n\n",
         exp.display_for_fun(target.func_env.clone())

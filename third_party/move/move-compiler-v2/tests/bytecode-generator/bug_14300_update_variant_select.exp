@@ -55,18 +55,18 @@ module 0x815::m {
     }
     fun update_common_field(): u64 {
         let common = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
-        common.Foo.x = 15;
-        common.Foo.x
+        common.x = 15;
+        common.x
     }
     fun update_common_field_different_offset(): u8 {
         let common = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
-        common.Foo.y = 15u8;
-        common.Foo.y
+        common.y = 15u8;
+        common.y
     }
     fun update_non_common_field(): u32 {
         let common = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
-        common.Bar.z = 15u32;
-        common.Bar.z
+        common.z = 15u32;
+        common.z
     }
 }
 

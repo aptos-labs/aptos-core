@@ -147,6 +147,7 @@ if [ ! -z "$CHECK" ]; then
     cargo xclippy
     cargo +nightly fmt
     cargo sort --grouped --workspace
+    cargo machete
   )
 fi
 
