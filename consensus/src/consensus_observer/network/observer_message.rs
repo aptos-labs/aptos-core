@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::common::error::Error;
+use crate::consensus_observer::common::{error::Error, metrics};
 use aptos_consensus_types::{
     common::{BatchPayload, Payload},
     pipelined_block::PipelinedBlock,
@@ -15,11 +15,13 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::SignedTransaction,
 };
+use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
     slice::Iter,
     sync::Arc,
+    time::SystemTime,
 };
 
 /// Types of messages that can be sent between the consensus publisher and observer
@@ -36,17 +38,16 @@ impl ConsensusObserverMessage {
         blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: LedgerInfoWithSignatures,
     ) -> ConsensusObserverDirectSend {
-        ConsensusObserverDirectSend::OrderedBlock(OrderedBlock {
-            blocks,
-            ordered_proof,
-        })
+        let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+        ConsensusObserverDirectSend::OrderedBlock(ordered_block)
     }
 
     /// Creates and returns a new commit decision message using the given commit decision
     pub fn new_commit_decision_message(
         commit_proof: LedgerInfoWithSignatures,
     ) -> ConsensusObserverDirectSend {
-        ConsensusObserverDirectSend::CommitDecision(CommitDecision { commit_proof })
+        let commit_decision = CommitDecision::new(commit_proof);
+        ConsensusObserverDirectSend::CommitDecision(commit_decision)
     }
 
     /// Creates and returns a new block payload message using the given block, transactions and limit
@@ -54,10 +55,8 @@ impl ConsensusObserverMessage {
         block: BlockInfo,
         transaction_payload: BlockTransactionPayload,
     ) -> ConsensusObserverDirectSend {
-        ConsensusObserverDirectSend::BlockPayload(BlockPayload {
-            block,
-            transaction_payload,
-        })
+        let block_payload = BlockPayload::new(block, transaction_payload);
+        ConsensusObserverDirectSend::BlockPayload(block_payload)
     }
 }
 
@@ -140,6 +139,104 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
         }
     }
+
+    pub fn get_creation_time(&self) -> SystemTime {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
+                ordered_block.message_latency_tracker.creation_time
+            },
+            ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
+                commit_decision.message_latency_tracker.creation_time
+            },
+            ConsensusObserverDirectSend::BlockPayload(block_payload) => {
+                block_payload.message_latency_tracker.creation_time
+            },
+        }
+    }
+
+    pub fn get_send_time(&self) -> SystemTime {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
+                ordered_block.message_latency_tracker.send_time
+            },
+            ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
+                commit_decision.message_latency_tracker.send_time
+            },
+            ConsensusObserverDirectSend::BlockPayload(block_payload) => {
+                block_payload.message_latency_tracker.send_time
+            },
+        }
+    }
+
+    pub fn get_receive_time(&self) -> SystemTime {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
+                ordered_block.message_latency_tracker.receive_time
+            },
+            ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
+                commit_decision.message_latency_tracker.receive_time
+            },
+            ConsensusObserverDirectSend::BlockPayload(block_payload) => {
+                block_payload.message_latency_tracker.receive_time
+            },
+        }
+    }
+
+    pub fn get_process_time(&self) -> SystemTime {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
+                ordered_block.message_latency_tracker.process_time
+            },
+            ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
+                commit_decision.message_latency_tracker.process_time
+            },
+            ConsensusObserverDirectSend::BlockPayload(block_payload) => {
+                block_payload.message_latency_tracker.process_time
+            },
+        }
+    }
+
+    pub fn get_nonce(&self) -> u64 {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
+                ordered_block.message_latency_tracker.nonce
+            },
+            ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
+                commit_decision.message_latency_tracker.nonce
+            },
+            ConsensusObserverDirectSend::BlockPayload(block_payload) => {
+                block_payload.message_latency_tracker.nonce
+            },
+        }
+    }
+
+    pub fn set_send_time(&mut self) {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ref mut ordered_block) => {
+                ordered_block.message_latency_tracker.set_send_time()
+            },
+            ConsensusObserverDirectSend::CommitDecision(ref mut commit_decision) => {
+                commit_decision.message_latency_tracker.set_send_time()
+            },
+            ConsensusObserverDirectSend::BlockPayload(ref mut block_payload) => {
+                block_payload.message_latency_tracker.set_send_time()
+            },
+        }
+    }
+
+    pub fn set_receive_time(&mut self) {
+        match self {
+            ConsensusObserverDirectSend::OrderedBlock(ref mut ordered_block) => {
+                ordered_block.message_latency_tracker.set_receive_time()
+            },
+            ConsensusObserverDirectSend::CommitDecision(ref mut commit_decision) => {
+                commit_decision.message_latency_tracker.set_receive_time()
+            },
+            ConsensusObserverDirectSend::BlockPayload(ref mut block_payload) => {
+                block_payload.message_latency_tracker.set_receive_time()
+            },
+        }
+    }
 }
 
 impl Display for ConsensusObserverDirectSend {
@@ -165,11 +262,88 @@ impl Display for ConsensusObserverDirectSend {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MessageLatencyTracker {
+    pub creation_time: SystemTime,
+    pub send_time: SystemTime,
+    pub receive_time: SystemTime,
+    pub process_time: SystemTime,
+    pub nonce: u64,
+}
+
+impl MessageLatencyTracker {
+    pub fn new() -> Self {
+        let mut rng = OsRng;
+        let nonce = rng.gen();
+
+        Self {
+            creation_time: SystemTime::now(),
+            send_time: SystemTime::now(),
+            receive_time: SystemTime::now(),
+            process_time: SystemTime::now(),
+            nonce,
+        }
+    }
+
+    pub fn set_send_time(&mut self) {
+        self.send_time = SystemTime::now();
+    }
+
+    pub fn set_receive_time(&mut self) {
+        self.receive_time = SystemTime::now();
+    }
+
+    pub fn set_process_time(&mut self, message_type: &str) {
+        self.process_time = SystemTime::now();
+        self.update_all_metrics(message_type);
+    }
+
+    fn update_all_metrics(&self, message_type: &str) {
+        // Observe the create to send time
+        if let Ok(create_to_send) = self.send_time.duration_since(self.creation_time) {
+            metrics::observe_message_with_labels(
+                &metrics::MESSAGE_LATENCY_TRACKER,
+                message_type,
+                metrics::MESSAGE_CREATE_TO_SEND,
+                create_to_send.as_secs_f64(),
+            );
+        }
+
+        // Observe the send to receive time
+        if let Ok(send_to_receive) = self.receive_time.duration_since(self.send_time) {
+            metrics::observe_message_with_labels(
+                &metrics::MESSAGE_LATENCY_TRACKER,
+                message_type,
+                metrics::MESSAGE_SEND_TO_RECEIVE,
+                send_to_receive.as_secs_f64(),
+            );
+        }
+
+        // Observe the receive to process time
+        if let Ok(receive_to_process) = self.process_time.duration_since(self.receive_time) {
+            metrics::observe_message_with_labels(
+                &metrics::MESSAGE_LATENCY_TRACKER,
+                message_type,
+                metrics::MESSAGE_RECEIVE_TO_PROCESS,
+                receive_to_process.as_secs_f64(),
+            );
+        }
+    }
+}
+
+impl Default for MessageLatencyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// OrderedBlock message contains the ordered blocks and the proof of the ordering
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OrderedBlock {
     blocks: Vec<Arc<PipelinedBlock>>,
     ordered_proof: LedgerInfoWithSignatures,
+
+    pub message_latency_tracker: MessageLatencyTracker,
 }
 
 impl OrderedBlock {
@@ -177,6 +351,7 @@ impl OrderedBlock {
         Self {
             blocks,
             ordered_proof,
+            message_latency_tracker: MessageLatencyTracker::new(),
         }
     }
 
@@ -270,11 +445,16 @@ impl OrderedBlock {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CommitDecision {
     commit_proof: LedgerInfoWithSignatures,
+
+    pub message_latency_tracker: MessageLatencyTracker,
 }
 
 impl CommitDecision {
     pub fn new(commit_proof: LedgerInfoWithSignatures) -> Self {
-        Self { commit_proof }
+        Self {
+            commit_proof,
+            message_latency_tracker: MessageLatencyTracker::new(),
+        }
     }
 
     /// Returns a reference to the commit proof
@@ -631,6 +811,8 @@ impl BlockTransactionPayload {
 pub struct BlockPayload {
     block: BlockInfo,
     transaction_payload: BlockTransactionPayload,
+
+    pub message_latency_tracker: MessageLatencyTracker,
 }
 
 impl BlockPayload {
@@ -638,6 +820,7 @@ impl BlockPayload {
         Self {
             block,
             transaction_payload,
+            message_latency_tracker: MessageLatencyTracker::new(),
         }
     }
 
