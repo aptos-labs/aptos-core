@@ -21,6 +21,7 @@ use crate::{
     analyzer::PtxAnalyzer, finalizer::PtxFinalizer, metrics::TIMER, runner::PtxRunner,
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
+use aptos_crypto::HashValue;
 use aptos_executor::{
     block_executor::TransactionBlockExecutor,
     workflow::do_get_execution_output::DoGetExecutionOutput,
@@ -121,11 +122,13 @@ impl TransactionBlockExecutor for PtxBlockExecutor {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> anyhow::Result<ExecutionOutput> {
         DoGetExecutionOutput::by_transaction_execution::<PtxBlockExecutor>(
             transactions,
             state_view,
             onchain_config,
+            append_state_checkpoint_to_block,
         )
     }
 }

@@ -1202,6 +1202,16 @@ impl TransactionOutput {
         }
     }
 
+    pub fn new_empty_success() -> Self {
+        Self {
+            write_set: WriteSet::default(),
+            events: vec![],
+            gas_used: 0,
+            status: TransactionStatus::Keep(ExecutionStatus::Success),
+            auxiliary_data: TransactionAuxiliaryData::None,
+        }
+    }
+
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
         (self.write_set, self.events)
     }
@@ -2000,6 +2010,13 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
+    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V0 {
+            block_id,
+            block_end_info,
+        })
+    }
+
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),

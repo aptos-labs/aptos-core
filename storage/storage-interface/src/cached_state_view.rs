@@ -86,6 +86,8 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
+    next_version: Version,
+
     /// A readable snapshot in the persistent storage.
     snapshot: Option<(Version, HashValue)>,
 
@@ -165,6 +167,7 @@ impl CachedStateView {
 
         Ok(Self::new_impl(
             id,
+            next_version,
             snapshot,
             speculative_state,
             proof_fetcher,
@@ -173,12 +176,14 @@ impl CachedStateView {
 
     pub fn new_impl(
         id: StateViewId,
+        next_version: Version,
         snapshot: Option<(Version, HashValue)>,
         speculative_state: FrozenSparseMerkleTree<StateValue>,
         proof_fetcher: Arc<AsyncProofFetcher>,
     ) -> Self {
         Self {
             id,
+            next_version,
             snapshot,
             speculative_state,
             sharded_state_cache: ShardedStateCache::default(),
@@ -263,12 +268,32 @@ impl CachedStateView {
             Some((version, value)) => (Some(version), Some(value)),
         })
     }
+
+    pub fn next_version(&self) -> Version {
+        self.next_version
+    }
 }
 
+#[derive(Debug)]
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub sharded_state_cache: ShardedStateCache,
     pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
+}
+
+impl StateCache {
+    pub fn new_empty(smt: SparseMerkleTree<StateValue>) -> Self {
+        let frozen_base = smt.freeze(&smt);
+        Self {
+            frozen_base,
+            sharded_state_cache: ShardedStateCache::default(),
+            proofs: HashMap::new(),
+        }
+    }
+
+    pub fn new_dummy() -> Self {
+        Self::new_empty(SparseMerkleTree::new_empty())
+    }
 }
 
 impl TStateView for CachedStateView {
