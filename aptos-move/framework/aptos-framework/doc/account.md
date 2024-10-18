@@ -9,6 +9,7 @@
 -  [Resource `Account`](#0x1_account_Account)
 -  [Struct `KeyRotationEvent`](#0x1_account_KeyRotationEvent)
 -  [Struct `CoinRegisterEvent`](#0x1_account_CoinRegisterEvent)
+-  [Struct `CoinRegister`](#0x1_account_CoinRegister)
 -  [Struct `CapabilityOffer`](#0x1_account_CapabilityOffer)
 -  [Struct `RotationCapability`](#0x1_account_RotationCapability)
 -  [Struct `SignerCapability`](#0x1_account_SignerCapability)
@@ -267,6 +268,40 @@ Resource representing an account.
 
 
 <dl>
+<dt>
+<code><a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">type_info</a>: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_account_CoinRegister"></a>
+
+## Struct `CoinRegister`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="account.md#0x1_account_CoinRegister">CoinRegister</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code><a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">type_info</a>: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
 </dt>
@@ -1889,14 +1924,15 @@ in the event of key recovery.
             old_authentication_key: account_resource.authentication_key,
             new_authentication_key: new_auth_key_vector,
         });
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a>&gt;(
+            &<b>mut</b> account_resource.key_rotation_events,
+            <a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a> {
+                old_authentication_key: account_resource.authentication_key,
+                new_authentication_key: new_auth_key_vector,
+            }
+        );
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a>&gt;(
-        &<b>mut</b> account_resource.key_rotation_events,
-        <a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a> {
-            old_authentication_key: account_resource.authentication_key,
-            new_authentication_key: new_auth_key_vector,
-        }
-    );
 
     // Update the <a href="account.md#0x1_account">account</a> resource's authentication key.
     account_resource.authentication_key = new_auth_key_vector;
@@ -2109,12 +2145,21 @@ Coin management methods.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_register_coin">register_coin</a>&lt;CoinType&gt;(account_addr: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a>&gt;(
-        &<b>mut</b> <a href="account.md#0x1_account">account</a>.coin_register_events,
-        <a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a> {
-            <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">type_info</a>: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;(),
-        },
-    );
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="account.md#0x1_account_CoinRegister">CoinRegister</a> {
+                <a href="account.md#0x1_account">account</a>: account_addr,
+                <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">type_info</a>: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;(),
+            },
+        );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a>&gt;(
+            &<b>mut</b> <a href="account.md#0x1_account">account</a>.coin_register_events,
+            <a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a> {
+                <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">type_info</a>: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;(),
+            },
+        );
+    }
 }
 </code></pre>
 

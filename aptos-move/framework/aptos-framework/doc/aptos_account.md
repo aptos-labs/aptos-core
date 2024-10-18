@@ -491,10 +491,11 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
+                <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         };
-        emit_event(
-            &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
-            <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
     } <b>else</b> {
         <b>let</b> direct_transfer_config = <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
             allow_arbitrary_coin_transfers: allow,
@@ -502,10 +503,11 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
         };
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
+                <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         };
-        emit_event(
-            &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
-            <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         <b>move_to</b>(<a href="account.md#0x1_account">account</a>, direct_transfer_config);
     };
 }
