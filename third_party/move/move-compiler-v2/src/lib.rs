@@ -570,7 +570,10 @@ fn report_bytecode_verification_error(
         let debug_info = if command_line::get_move_compiler_backtrace_from_env() {
             format!("\n{:#?}", e)
         } else {
-            "".to_string()
+            format!(
+                "\nError message: {}",
+                e.message().cloned().unwrap_or_else(|| "none".to_string())
+            )
         };
         env.diag(
             Severity::Bug,
