@@ -191,6 +191,7 @@ fn create_test_poison(mloc: Loc) -> P::ModuleMember {
         CallKind::Regular,
         None,
         sp(mloc, args_),
+        false,
     );
 
     // fun unit_test_poison() { 0x1::UnitTest::create_signers_for_testing(0); () }

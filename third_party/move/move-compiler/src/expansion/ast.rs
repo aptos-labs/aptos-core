@@ -6,8 +6,8 @@ use crate::{
     expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName, Label,
-        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
-        ENTRY_MODIFIER,
+        LambdaCaptureKind, ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl,
+        Var, VariantName, ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -401,7 +401,7 @@ pub enum Type_ {
     Multiple(Vec<Type>),
     Apply(ModuleAccess, Vec<Type>),
     Ref(bool, Box<Type>),
-    Fun(Vec<Type>, Box<Type>),
+    Fun(Vec<Type>, Box<Type>, AbilitySet),
     UnresolvedError,
 }
 pub type Type = Spanned<Type_>;
@@ -497,7 +497,18 @@ pub enum Exp_ {
     Copy(Var),
 
     Name(ModuleAccess, Option<Vec<Type>>),
-    Call(ModuleAccess, CallKind, Option<Vec<Type>>, Spanned<Vec<Exp>>),
+    Call(
+        ModuleAccess,
+        CallKind,
+        Option<Vec<Type>>,
+        Spanned<Vec<Exp>>,
+        bool, // ends in ".."
+    ),
+    ExpCall(
+        Box<Exp>,
+        Spanned<Vec<Exp>>,
+        bool, // ends in ".."
+    ),
     Pack(ModuleAccess, Option<Vec<Type>>, Fields<Exp>),
     Vector(Loc, Option<Vec<Type>>, Spanned<Vec<Exp>>),
 
@@ -506,7 +517,7 @@ pub enum Exp_ {
     While(Option<Label>, Box<Exp>, Box<Exp>),
     Loop(Option<Label>, Box<Exp>),
     Block(Sequence),
-    Lambda(TypedLValueList, Box<Exp>),
+    Lambda(TypedLValueList, Box<Exp>, LambdaCaptureKind, AbilitySet),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -899,12 +910,27 @@ impl fmt::Display for ModuleAccess_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match &self {
-            Visibility::Public(_) => Visibility::PUBLIC,
-            Visibility::Package(_) => Visibility::PACKAGE,
-            Visibility::Friend(_) => Visibility::FRIEND,
-            Visibility::Internal => Visibility::INTERNAL,
-        })
+        write!(
+            f,
+            "{}",
+            match &self {
+                Visibility::Public(_) => Visibility::PUBLIC,
+                Visibility::Package(_) => Visibility::PACKAGE,
+                Visibility::Friend(_) => Visibility::FRIEND,
+                Visibility::Internal => Visibility::INTERNAL,
+            }
+        )
+    }
+}
+
+impl fmt::Display for AbilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        if !self.is_empty() {
+            write!(f, ": ")?;
+            write!(f, "{}", format_delim(self, "+"))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -916,19 +942,18 @@ impl fmt::Display for Type_ {
             Apply(n, tys) => {
                 write!(f, "{}", n)?;
                 if !tys.is_empty() {
-                    write!(f, "<")?;
-                    write!(f, "{}", format_comma(tys))?;
-                    write!(f, ">")?;
+                    write!(f, "<{}>", format_comma(tys))
+                } else {
+                    Ok(())
                 }
-                Ok(())
             },
             Ref(mut_, ty) => write!(f, "&{}{}", if *mut_ { "mut " } else { "" }, ty),
-            Fun(args, result) => write!(f, "({}):{}", format_comma(args), result),
+            Fun(args, result, abilities) => {
+                write!(f, "({}):{}{}", format_comma(args), result, abilities)
+            },
             Unit => write!(f, "()"),
             Multiple(tys) => {
-                write!(f, "(")?;
-                write!(f, "{}", format_comma(tys))?;
-                write!(f, ")")
+                write!(f, "({})", format_comma(tys))
             },
         }
     }
@@ -1063,13 +1088,11 @@ impl AstDebug for ModuleDefinition {
             w.writeln(&format!("{}", n))
         }
         attributes.ast_debug(w);
-        w.writeln(
-            if *is_source_module {
-                "source module"
-            } else {
-                "library module"
-            },
-        );
+        w.writeln(if *is_source_module {
+            "source module"
+        } else {
+            "library module"
+        });
         w.writeln(&format!("dependency order #{}", dependency_order));
         for (mident, neighbor) in immediate_neighbors.key_cloned_iter() {
             w.write(&format!("{} {};", neighbor, mident));
@@ -1444,11 +1467,12 @@ impl AstDebug for Type_ {
                 }
                 s.ast_debug(w)
             },
-            Type_::Fun(args, result) => {
+            Type_::Fun(args, result, abilities) => {
                 w.write("|");
                 w.comma(args, |w, ty| ty.ast_debug(w));
                 w.write("|");
                 result.ast_debug(w);
+                ability_constraints_ast_debug(w, &abilities);
             },
             Type_::UnresolvedError => w.write("_|_"),
         }
@@ -1597,7 +1621,7 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             },
-            E::Call(ma, kind, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, kind, tys_opt, sp!(_, rhs), ends_in_dotdot) => {
                 ma.ast_debug(w);
                 w.write(kind.to_string());
                 if let Some(ss) = tys_opt {
@@ -1607,6 +1631,18 @@ impl AstDebug for Exp_ {
                 }
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
+                if ends_in_dotdot {
+                    w.write("..");
+                }
+                w.write(")");
+            },
+            E::ExpCall(fexp, sp!(_, rhs), ends_in_dotdot) => {
+                fexp.ast_debug(w);
+                w.write("(");
+                w.comma(rhs, |w, e| e.ast_debug(w));
+                if ends_in_dotdot {
+                    w.write("..");
+                }
                 w.write(")");
             },
             E::Pack(ma, tys_opt, fields) => {
@@ -1674,11 +1710,15 @@ impl AstDebug for Exp_ {
                 }
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, bs), e, capture_kind, abilities) => {
+                if *capture_kind != LambdaCaptureKind::Default {
+                    w.write(format!(" {}", capture_kind));
+                }
                 w.write("|");
                 bs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
+                ability_constraints_ast_debug(w, abilities)
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);

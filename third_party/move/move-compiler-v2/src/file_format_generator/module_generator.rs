@@ -365,7 +365,7 @@ impl ModuleGenerator {
                     ReferenceKind::Mutable => FF::SignatureToken::MutableReference(target_ty),
                 }
             },
-            Fun(_param_ty, _result_ty) => {
+            Fun(_param_ty, _result_ty, _abilities) => {
                 // TODO(LAMBDA)
                 ctx.error(
                     loc,

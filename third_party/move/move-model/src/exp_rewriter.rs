@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, MatchArm, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget,
-        TempIndex, Value,
+        Condition, Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, Operation, Pattern,
+        Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -13,6 +13,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use move_binary_format::file_format::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
@@ -194,7 +195,14 @@ pub trait ExpRewriterFunctions {
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
         None
     }
-    fn rewrite_lambda(&mut self, id: NodeId, pat: &Pattern, body: &Exp) -> Option<Exp> {
+    fn rewrite_lambda(
+        &mut self,
+        id: NodeId,
+        pat: &Pattern,
+        body: &Exp,
+        capture_kind: LambdaCaptureKind,
+        abilities: AbilitySet,
+    ) -> Option<Exp> {
         None
     }
     // Optionally can rewrite pat and return new value, otherwise is unchanged.
@@ -351,16 +359,18 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Lambda(id, pat, body) => {
+            Lambda(id, pat, body, capture_kind, abilities) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_id, new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope(new_id);
-                if let Some(new_exp) = self.rewrite_lambda(new_id, &new_pat, &new_body) {
+                if let Some(new_exp) =
+                    self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind, *abilities)
+                {
                     new_exp
                 } else if id_changed || pat_changed || body_changed {
-                    Lambda(new_id, new_pat, new_body).into_exp()
+                    Lambda(new_id, new_pat, new_body, *capture_kind, *abilities).into_exp()
                 } else {
                     exp
                 }

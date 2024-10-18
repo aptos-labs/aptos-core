@@ -40,9 +40,9 @@
 //! ```
 
 use itertools::Itertools;
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex},
+    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
@@ -288,7 +288,14 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         None
     }
 
-    fn rewrite_lambda(&mut self, id: NodeId, pat: &Pattern, body: &Exp) -> Option<Exp> {
+    fn rewrite_lambda(
+        &mut self,
+        id: NodeId,
+        pat: &Pattern,
+        body: &Exp,
+        capture_kind: LambdaCaptureKind,
+        _abilities: AbilitySet, // TODO(LAMBDA): do something with this
+    ) -> Option<Exp> {
         if self.exempted_lambdas.contains(&id) {
             return None;
         }
@@ -299,6 +306,21 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         // parameter indices in the lambda context to indices in the lifted
         // functions (courtesy of #12317)
         let mut param_index_mapping = BTreeMap::new();
+        match capture_kind {
+            LambdaCaptureKind::Default => {
+                // OK.
+            },
+            LambdaCaptureKind::Move | LambdaCaptureKind::Copy | LambdaCaptureKind::Borrow => {
+                let loc = env.get_node_loc(id);
+                env.error(
+                    &loc,
+                    &format!(
+                        "Lambda function `{}` of free variables not yet supported.", // TODO(LAMBDA)
+                        capture_kind
+                    ),
+                );
+            },
+        };
         for (used_param_count, (param, var_info)) in
             mem::take(&mut self.free_params).into_iter().enumerate()
         {
@@ -356,7 +378,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         let fun_name = self.gen_closure_function_name();
         let lambda_loc = env.get_node_loc(id).clone();
         let lambda_type = env.get_node_type(id);
-        let result_type = if let Type::Fun(_, result_type) = &lambda_type {
+        let result_type = if let Type::Fun(_, result_type, _) = &lambda_type {
             *result_type.clone()
         } else {
             Type::Error // type error reported

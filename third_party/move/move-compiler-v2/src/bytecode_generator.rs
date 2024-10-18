@@ -480,7 +480,7 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _) => self.error(
+            ExpData::Lambda(id, _, _, _, _) => self.error(
                 *id,
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),
@@ -814,7 +814,7 @@ impl<'env> Generator<'env> {
             Operation::NoOp => {}, // do nothing
 
             // TODO(LAMBDA)
-            Operation::Closure(..) => self.error(
+            Operation::Closure => self.error(
                 id,
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),
