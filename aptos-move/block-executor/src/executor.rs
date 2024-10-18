@@ -16,11 +16,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
-    txn_last_input_output::{
-        KeyKind,
-        KeyKind::{Group, Module, Resource},
-        TxnLastInputOutput,
-    },
+    txn_last_input_output::{KeyKind, TxnLastInputOutput},
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
@@ -31,7 +27,7 @@ use aptos_aggregator::{
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout, VersionedModule},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -45,7 +41,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
-    vm::modules::ModuleCacheEntry,
+    vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -57,8 +53,9 @@ use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
+use move_binary_format::CompiledModule;
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::ModuleCache;
 use num_cpus;
 use rayon::ThreadPool;
@@ -168,14 +165,14 @@ where
                 .collect();
             for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
                 let prev_tags = match prev_modified_keys.remove(&group_key) {
-                    Some(Group(tags)) => tags,
-                    Some(Resource) => {
+                    Some(KeyKind::Group(tags)) => tags,
+                    Some(KeyKind::Resource) => {
                         return Err(code_invariant_error(format!(
                             "Group key {:?} recorded as resource KeyKind",
                             group_key,
                         )));
                     },
-                    Some(Module) => {
+                    Some(KeyKind::Module) => {
                         return Err(code_invariant_error(format!(
                             "Group key {:?} recorded as module KeyKind",
                             group_key,
@@ -231,9 +228,12 @@ where
                     needs_suffix_validation = true;
                 }
                 if !runtime_environment.vm_config().use_loader_v2 {
-                    versioned_cache
-                        .modules()
-                        .write(k, idx_to_execute, v.into_write_op());
+                    #[allow(deprecated)]
+                    versioned_cache.deprecated_modules().write(
+                        k,
+                        idx_to_execute,
+                        v.into_write_op(),
+                    );
                 }
             }
 
@@ -335,7 +335,10 @@ where
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => {
                     if !runtime_environment.vm_config().use_loader_v2 {
-                        versioned_cache.modules().remove(&k, idx_to_execute);
+                        #[allow(deprecated)]
+                        versioned_cache
+                            .deprecated_modules()
+                            .remove(&k, idx_to_execute);
                     }
                 },
                 Group(tags) => {
@@ -432,7 +435,10 @@ where
                         // In V2 loader implementation, all modules writes are "estimates":
                         // they are pending and not visible until committed.
                         if !runtime_environment.vm_config().use_loader_v2 {
-                            versioned_cache.modules().mark_estimate(&k, txn_idx)
+                            #[allow(deprecated)]
+                            versioned_cache
+                                .deprecated_modules()
+                                .mark_estimate(&k, txn_idx)
                         }
                     },
                     Group(tags) => {
@@ -724,15 +730,16 @@ where
         scheduler: &Scheduler,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
+        // Turn on the flag for module read validation.
         scheduler.validate_module_reads();
-        for (_, write) in module_write_set {
-            let (id, write_op) = write.unpack();
-            let entry = ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
 
-            CrossBlockModuleCache::mark_invalid(&id);
-            versioned_cache
-                .module_cache()
-                .insert_module(id, VersionedModule::new(entry, Some(txn_idx)));
+        for (_, write) in module_write_set {
+            Self::add_module_write_to_module_cache(
+                write,
+                txn_idx,
+                runtime_environment,
+                versioned_cache.module_cache(),
+            )?;
         }
         Ok(())
     }
@@ -1144,6 +1151,56 @@ where
             .ok_or(())
     }
 
+    /// Converts module write into cached module representation, and adds it to the module cache.
+    fn add_module_write_to_module_cache(
+        write: ModuleWrite<T::Value>,
+        txn_idx: TxnIndex,
+        runtime_environment: &RuntimeEnvironment,
+        module_cache: &impl ModuleCache<
+            Key = ModuleId,
+            Deserialized = CompiledModule,
+            Verified = Module,
+            Extension = AptosModuleExtension,
+            Version = Option<TxnIndex>,
+        >,
+    ) -> Result<(), PanicError> {
+        let (id, write_op) = write.unpack();
+
+        let state_value = write_op.as_state_value().ok_or_else(|| {
+            PanicError::CodeInvariantError("Modules cannot be deleted".to_string())
+        })?;
+
+        // Since we have successfully serialized the module when converting into this transaction
+        // write, the deserialization should never fail.
+        let (compiled_module, _, _) = runtime_environment
+            .deserialize_into_compiled_module(state_value.bytes())
+            .map_err(|err| {
+                let msg = format!("Failed to construct the module from state value: {:?}", err);
+                PanicError::CodeInvariantError(msg)
+            })?;
+        let extension = AptosModuleExtension::new(state_value);
+
+        CrossBlockModuleCache::mark_invalid(&id);
+        module_cache
+            .insert_deserialized_module(
+                id.clone(),
+                compiled_module,
+                Arc::new(extension),
+                Some(txn_idx),
+            )
+            .map_err(|err| {
+                let msg = format!(
+                    "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
+                    id.address(),
+                    id.name(),
+                    txn_idx,
+                    err
+                );
+                PanicError::CodeInvariantError(msg)
+            })?;
+        Ok(())
+    }
+
     fn apply_output_sequential(
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
@@ -1168,14 +1225,12 @@ where
 
         for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
-                let (id, write_op) = write.unpack();
-                let module =
-                    ModuleCacheEntry::from_transaction_write(runtime_environment, write_op)?;
-
-                CrossBlockModuleCache::mark_invalid(&id);
-                unsync_map
-                    .module_cache()
-                    .insert_module(id, VersionedModule::from_txn_idx(module, txn_idx));
+                Self::add_module_write_to_module_cache(
+                    write,
+                    txn_idx,
+                    runtime_environment,
+                    unsync_map.module_cache(),
+                )?;
             } else {
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());

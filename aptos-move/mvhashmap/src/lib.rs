@@ -3,23 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache::SyncModuleCache, versioned_data::VersionedData,
+    types::TxnIndex, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
     versioned_modules::VersionedModules,
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
-    vm::modules::ModuleCacheEntry,
+    vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
-use move_binary_format::file_format::CompiledScript;
+use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::Script;
-use move_vm_types::code::SyncScriptCache;
+use move_vm_runtime::{Module, Script};
+use move_vm_types::code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache};
 use serde::Serialize;
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-pub mod code_cache;
 pub mod types;
 pub mod unsync_map;
 pub mod versioned_data;
@@ -43,9 +42,12 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
-    modules: VersionedModules<K, V, X>,
 
-    module_cache: SyncModuleCache<ModuleId, ModuleCacheEntry>,
+    #[deprecated]
+    deprecated_modules: VersionedModules<K, V, X>,
+
+    module_cache:
+        SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
     script_cache: SyncScriptCache<[u8; 32], CompiledScript, Script>,
 }
 
@@ -61,11 +63,12 @@ impl<
     // Functions shared for data and modules.
 
     pub fn new() -> MVHashMap<K, T, V, X, I> {
+        #[allow(deprecated)]
         MVHashMap {
             data: VersionedData::empty(),
             group_data: VersionedGroupData::empty(),
             delayed_fields: VersionedDelayedFields::empty(),
-            modules: VersionedModules::empty(),
+            deprecated_modules: VersionedModules::empty(),
 
             module_cache: SyncModuleCache::empty(),
             script_cache: SyncScriptCache::empty(),
@@ -73,11 +76,13 @@ impl<
     }
 
     pub fn stats(&self) -> BlockStateStats {
+        #[allow(deprecated)]
+        let num_modules = self.deprecated_modules.num_keys() + self.module_cache.num_modules();
         BlockStateStats {
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules: self.modules.num_keys() + self.module_cache.num_modules(),
+            num_modules,
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -98,18 +103,35 @@ impl<
         &self.delayed_fields
     }
 
-    pub fn modules(&self) -> &VersionedModules<K, V, X> {
-        &self.modules
+    #[deprecated]
+    pub fn deprecated_modules(&self) -> &VersionedModules<K, V, X> {
+        #[allow(deprecated)]
+        &self.deprecated_modules
     }
 
-    pub fn module_cache(&self) -> &SyncModuleCache<ModuleId, ModuleCacheEntry> {
+    /// Returns the module cache. While modules in it are associated with versions, at any point
+    /// in time throughout block execution the cache contains 1) modules from pre-block state or,
+    /// 2) committed modules.
+    pub fn module_cache(
+        &self,
+    ) -> &SyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>
+    {
         &self.module_cache
     }
 
-    pub fn take_modules_iter(&mut self) -> impl Iterator<Item = (ModuleId, ModuleCacheEntry)> {
+    /// Takes module from module cache and returns an iterator to the taken keys and modules.
+    pub fn take_modules_iter(
+        &mut self,
+    ) -> impl Iterator<
+        Item = (
+            ModuleId,
+            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>,
+        ),
+    > {
         self.module_cache.take_modules_iter()
     }
 
+    /// Returns the script cache.
     pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], CompiledScript, Script> {
         &self.script_cache
     }

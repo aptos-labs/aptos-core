@@ -672,6 +672,7 @@ dependencies = [
 name = "aptos-block-executor"
 version = "0.1.0"
 dependencies = [
+ "ambassador",
  "anyhow",
  "aptos-aggregator",
  "aptos-drop-helper",
@@ -11822,6 +11823,7 @@ dependencies = [
 name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
+ "ambassador",
  "bcs 0.1.4",
  "bytes",
  "claims",

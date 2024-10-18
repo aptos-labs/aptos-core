@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::code::Code;
+use ambassador::delegatable_trait;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use std::{cell::RefCell, hash::Hash, ops::Deref, sync::Arc};
 
 /// Interface used by any script cache implementation.
+#[delegatable_trait]
 pub trait ScriptCache {
     type Key: Eq + Hash + Clone;
     type Deserialized;
