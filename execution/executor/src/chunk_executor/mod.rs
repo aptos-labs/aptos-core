@@ -5,18 +5,15 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        apply_chunk_output::ApplyChunkOutput,
-        chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
-        chunk_output::ChunkOutput,
-        chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier},
-        do_ledger_update::DoLedgerUpdate,
-        executed_chunk::ExecutedChunk,
-        partial_state_compute_result::PartialStateComputeResult,
-        transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk},
-    },
     logging::{LogEntry, LogSchema},
     metrics::{APPLY_CHUNK, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE, EXECUTE_CHUNK},
+    types::{
+        executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
+    },
+    workflow::{
+        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
+        do_state_checkpoint::DoStateCheckpoint,
+    },
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{
@@ -44,6 +41,8 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::VMExecutor;
+use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
+use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
 use fail::fail_point;
 use itertools::multizip;
 use std::{
@@ -55,6 +54,11 @@ use std::{
     },
     time::Instant,
 };
+use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
+
+pub mod chunk_commit_queue;
+pub mod chunk_result_verifier;
+pub mod transaction_chunk;
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -301,14 +305,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let chunk_output = chunk.into_output::<V>(state_view)?;
 
         // Calculate state snapshot
-        let (result_state, next_epoch_state, state_checkpoint_output) =
-            ApplyChunkOutput::calculate_state_checkpoint(
-                chunk_output,
-                &self.commit_queue.lock().latest_state(),
-                None, // append_state_checkpoint_to_block
-                Some(chunk_verifier.state_checkpoint_hashes()),
-                false, // is_block
-            )?;
+        let (result_state, next_epoch_state, state_checkpoint_output) = DoStateCheckpoint::run(
+            chunk_output,
+            &self.commit_queue.lock().latest_state(),
+            None, // append_state_checkpoint_to_block
+            Some(chunk_verifier.state_checkpoint_hashes()),
+            false, // is_block
+        )?;
 
         // Enqueue for next stage.
         self.commit_queue
@@ -597,7 +600,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
-        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
+        let chunk_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

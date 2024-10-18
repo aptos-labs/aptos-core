@@ -1603,6 +1603,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-executor",
+ "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
