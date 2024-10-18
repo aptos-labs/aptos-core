@@ -9,6 +9,7 @@ use aptos_sdk::{
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
+use async_trait::async_trait;
 
 pub struct BatchTransferTransactionGenerator {
     rng: StdRng,
@@ -36,8 +37,9 @@ impl BatchTransferTransactionGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for BatchTransferTransactionGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,

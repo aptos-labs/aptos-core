@@ -118,7 +118,7 @@ where
             parent_block_id,
             ledger_update_sender,
             config.allow_aborts,
-            config.allow_discards,
+            true,
             config.allow_retries,
         );
 

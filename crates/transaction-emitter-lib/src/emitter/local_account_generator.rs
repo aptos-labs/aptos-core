@@ -12,7 +12,7 @@ use futures::StreamExt;
 use rand::rngs::StdRng;
 use std::{
     fs::File,
-    io::{self, BufRead},
+    io::{self, BufRead}, sync::Arc,
 };
 
 const QUERY_PARALLELISM: usize = 300;
@@ -21,7 +21,7 @@ const QUERY_PARALLELISM: usize = 300;
 pub trait LocalAccountGenerator: Send + Sync {
     async fn gen_local_accounts(
         &self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         num_accounts: usize,
         rng: &mut StdRng,
     ) -> anyhow::Result<Vec<LocalAccount>>;
@@ -60,7 +60,7 @@ pub struct PrivateKeyAccountGenerator;
 impl LocalAccountGenerator for PrivateKeyAccountGenerator {
     async fn gen_local_accounts(
         &self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         num_accounts: usize,
         rng: &mut StdRng,
     ) -> anyhow::Result<Vec<LocalAccount>> {
@@ -115,7 +115,7 @@ pub struct KeylessAccountGenerator {
 impl LocalAccountGenerator for KeylessAccountGenerator {
     async fn gen_local_accounts(
         &self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         num_accounts: usize,
         _rng: &mut StdRng,
     ) -> anyhow::Result<Vec<LocalAccount>> {

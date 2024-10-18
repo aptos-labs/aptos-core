@@ -22,21 +22,19 @@ use core::result::Result::{Err, Ok};
 use futures::{future::try_join_all, StreamExt};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
-    path::Path,
-    sync::Arc,
-    time::{Duration, Instant},
+    path::Path, sync::Arc, time::{Duration, Instant}
 };
 
-pub struct SourceAccountManager<'t> {
+pub struct SourceAccountManager {
     pub source_account: Arc<LocalAccount>,
-    pub txn_executor: &'t dyn ReliableTransactionSubmitter,
+    pub txn_executor: Arc<dyn ReliableTransactionSubmitter>,
     pub mint_to_root: bool,
     pub prompt_before_spending: bool,
     pub txn_factory: TransactionFactory,
 }
 
 #[async_trait::async_trait]
-impl<'t> RootAccountHandle for SourceAccountManager<'t> {
+impl RootAccountHandle for SourceAccountManager {
     async fn approve_funds(&self, amount: u64, reason: &str) {
         self.check_approve_funds(amount, reason).await.unwrap();
     }
@@ -46,7 +44,7 @@ impl<'t> RootAccountHandle for SourceAccountManager<'t> {
     }
 }
 
-impl<'t> SourceAccountManager<'t> {
+impl SourceAccountManager {
     fn source_account_address(&self) -> AccountAddress {
         self.source_account.address()
     }
@@ -71,7 +69,7 @@ impl<'t> SourceAccountManager<'t> {
                     reason,
                 );
                 // Mint to refil the balance, to reduce number of mints
-                self.mint_to_root(self.txn_executor, u64::MAX - balance - 1)
+                self.mint_to_root(self.txn_executor.clone(), u64::MAX - balance - 1)
                     .await?;
             } else {
                 info!(
@@ -122,7 +120,7 @@ impl<'t> SourceAccountManager<'t> {
 
     pub async fn mint_to_root(
         &self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         amount: u64,
     ) -> Result<()> {
         info!("Minting new coins to root");
@@ -154,12 +152,12 @@ impl<'t> SourceAccountManager<'t> {
 pub struct AccountMinter<'t> {
     txn_factory: TransactionFactory,
     account_rng: StdRng,
-    source_account: &'t SourceAccountManager<'t>,
+    source_account: &'t SourceAccountManager,
 }
 
 impl<'t> AccountMinter<'t> {
     pub fn new(
-        source_account: &'t SourceAccountManager<'t>,
+        source_account: &'t SourceAccountManager,
         txn_factory: TransactionFactory,
         account_rng: StdRng,
     ) -> Self {
@@ -223,7 +221,7 @@ impl<'t> AccountMinter<'t> {
     /// will create 10 seed accounts, each seed account create 10 new accounts
     pub async fn create_and_fund_accounts(
         &mut self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         seed_accounts: Vec<Arc<LocalAccount>>,
         local_accounts: Vec<Arc<LocalAccount>>,
         coins_per_account: u64,
@@ -274,7 +272,7 @@ impl<'t> AccountMinter<'t> {
 
         let new_source_account = if create_secondary_source_account {
             Some(
-                self.create_new_source_account(txn_executor, coins_for_source)
+                self.create_new_source_account(txn_executor.clone(), coins_for_source)
                     .await?,
             )
         } else {
@@ -289,7 +287,7 @@ impl<'t> AccountMinter<'t> {
         // additional fund for paying gas fees later.
         self.create_and_fund_seed_accounts(
             new_source_account,
-            txn_executor,
+            txn_executor.clone(),
             &seed_accounts,
             coins_per_seed_account,
             max_submit_batch_size,
@@ -335,7 +333,7 @@ impl<'t> AccountMinter<'t> {
                     accounts,
                     coins_per_account,
                     max_submit_batch_size,
-                    txn_executor,
+                    txn_executor.clone(),
                     &txn_factory,
                     &request_counters,
                 )
@@ -363,7 +361,7 @@ impl<'t> AccountMinter<'t> {
     pub async fn create_and_fund_seed_accounts(
         &mut self,
         new_source_account: Option<LocalAccount>,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         seed_accounts: &[Arc<LocalAccount>],
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
@@ -401,7 +399,7 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn load_vasp_account(
         &self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         index: usize,
     ) -> Result<LocalAccount> {
         let file = "vasp".to_owned() + index.to_string().as_str() + ".key";
@@ -425,7 +423,7 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn create_new_source_account(
         &mut self,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         coins_for_source: u64,
     ) -> Result<LocalAccount> {
         const NUM_TRIES: usize = 3;
@@ -482,7 +480,7 @@ async fn create_and_fund_new_accounts(
     accounts: Vec<Arc<LocalAccount>>,
     coins_per_new_account: u64,
     max_num_accounts_per_batch: usize,
-    txn_executor: &dyn ReliableTransactionSubmitter,
+    txn_executor: Arc<dyn ReliableTransactionSubmitter>,
     txn_factory: &TransactionFactory,
     counters: &CounterState,
 ) -> Result<()> {
@@ -604,7 +602,7 @@ impl From<&EmitJobRequest> for BulkAccountCreationConfig {
 
 pub async fn bulk_create_accounts(
     coin_source_account: Arc<LocalAccount>,
-    txn_executor: &RestApiReliableTransactionSubmitter,
+    txn_executor: Arc<RestApiReliableTransactionSubmitter>,
     txn_factory: &TransactionFactory,
     account_generator: Box<dyn LocalAccountGenerator>,
     config: BulkAccountCreationConfig,
@@ -613,7 +611,7 @@ pub async fn bulk_create_accounts(
 ) -> Result<Vec<LocalAccount>> {
     let source_account_manager = SourceAccountManager {
         source_account: coin_source_account,
-        txn_executor,
+        txn_executor: txn_executor.clone(),
         mint_to_root: config.mint_to_root,
         prompt_before_spending: config.prompt_before_spending,
         txn_factory: txn_factory.clone(),
@@ -632,11 +630,11 @@ pub async fn bulk_create_accounts(
 
     let num_seed_accounts = (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
     let seed_accounts = create_private_key_account_generator()
-        .gen_local_accounts(txn_executor, num_seed_accounts, &mut rng)
+        .gen_local_accounts(txn_executor.clone(), num_seed_accounts, &mut rng)
         .await?;
 
     let accounts = account_generator
-        .gen_local_accounts(txn_executor, num_accounts, &mut rng)
+        .gen_local_accounts(txn_executor.clone(), num_accounts, &mut rng)
         .await?;
 
     info!(

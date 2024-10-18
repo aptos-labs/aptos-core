@@ -19,6 +19,7 @@ use std::{
     time::Duration,
 };
 
+#[derive(Clone)]
 pub struct DbReliableTransactionSubmitter {
     pub db: DbReaderWriter,
     pub block_sender: mpsc::SyncSender<Vec<Transaction>>,

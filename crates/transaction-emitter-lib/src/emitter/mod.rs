@@ -143,8 +143,11 @@ impl NumAccountsMode {
             (None, Some(transactions_per_account)) => {
                 Self::TransactionsPerAccount(transactions_per_account)
             },
+            (None, None) => panic!(
+                "Either num_accounts or transactions_per_account should be set"
+            ),
             _ => panic!(
-                "Either num_accounts or transactions_per_account should be set, but not both"
+                "Both num_accounts or transactions_per_account should not be set"
             ),
         }
     }
@@ -789,11 +792,11 @@ impl TxnEmitter {
 
         let mut all_accounts = bulk_create_accounts(
             root_account.clone(),
-            &RestApiReliableTransactionSubmitter::new(
+            Arc::new(RestApiReliableTransactionSubmitter::new(
                 req.rest_clients.clone(),
                 init_retries,
                 req.init_retry_interval,
-            ),
+            )),
             &init_txn_factory,
             account_generator,
             (&req).into(),
@@ -811,9 +814,10 @@ impl TxnEmitter {
             init_retries,
             req.init_retry_interval,
         );
+        let txn_executor = Arc::new(txn_executor);
         let source_account_manager = SourceAccountManager {
             source_account: root_account.clone(),
-            txn_executor: &txn_executor,
+            txn_executor: txn_executor.clone(),
             txn_factory: init_txn_factory.clone(),
             mint_to_root: req.mint_to_root,
             prompt_before_spending: req.prompt_before_spending,
@@ -823,7 +827,7 @@ impl TxnEmitter {
             source_account_manager,
             &mut all_accounts,
             vec![],
-            &txn_executor,
+            txn_executor.clone(),
             &txn_factory,
             &init_txn_factory,
             stats.get_cur_phase_obj(),

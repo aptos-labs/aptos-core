@@ -3,20 +3,23 @@
 
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use async_trait::async_trait;
 
 struct BoundedBatchWrapperTransactionGenerator {
     batch_size: usize,
     generator: Box<dyn TransactionGenerator>,
 }
 
+#[async_trait]
 impl TransactionGenerator for BoundedBatchWrapperTransactionGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         self.generator
             .generate_transactions(account, num_to_create.min(self.batch_size))
+            .await
     }
 }
 

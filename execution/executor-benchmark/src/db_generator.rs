@@ -19,6 +19,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::on_chain_config::Features;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
+use aptos_logger::info;
 
 pub fn create_db_with_accounts<V>(
     num_accounts: usize,
@@ -60,6 +61,7 @@ pub fn create_db_with_accounts<V>(
         pipeline_config,
         init_features,
     );
+    info!("Finished creating accounts.");
 }
 
 fn bootstrap_with_genesis(

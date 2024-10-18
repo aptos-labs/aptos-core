@@ -51,7 +51,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
         &self,
         root_account: &dyn RootAccountHandle,
         txn_factory: &TransactionFactory,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker>;
 }
@@ -79,8 +79,9 @@ impl CustomModulesDelegationGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for CustomModulesDelegationGenerator {
-    fn generate_transactions(
+    async fn generate_transactions(
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
@@ -128,7 +129,7 @@ impl CustomModulesDelegationGeneratorCreator {
         txn_factory: TransactionFactory,
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         num_modules: usize,
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,
@@ -136,7 +137,7 @@ impl CustomModulesDelegationGeneratorCreator {
         let mut packages = Self::publish_package(
             init_txn_factory.clone(),
             root_account,
-            txn_executor,
+            txn_executor.clone(),
             num_modules,
             package_name,
             None,
@@ -160,7 +161,7 @@ impl CustomModulesDelegationGeneratorCreator {
     pub async fn create_worker(
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         packages: &mut [(Package, LocalAccount)],
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Arc<TransactionGeneratorWorker> {
@@ -197,7 +198,7 @@ impl CustomModulesDelegationGeneratorCreator {
     pub async fn publish_package(
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
-        txn_executor: &dyn ReliableTransactionSubmitter,
+        txn_executor: Arc<dyn ReliableTransactionSubmitter>,
         num_modules: usize,
         package_name: &str,
         publisher_balance: Option<u64>,

@@ -290,7 +290,7 @@ enum Command {
         #[clap(long, default_value_t = 1000000)]
         num_accounts: usize,
 
-        #[clap(long, default_value_t = 10000000000)]
+        #[clap(long, default_value_t = 100_0000_0000)]
         init_account_balance: u64,
 
         #[clap(
@@ -396,7 +396,7 @@ fn get_init_features(
     init_features
 }
 
-fn run<E>(opt: Opt)
+async fn run<E>(opt: Opt)
 where
     E: TransactionBlockExecutor + 'static,
 {
@@ -478,7 +478,7 @@ where
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
                 get_init_features(enable_feature, disable_feature),
-            );
+            ).await;
         },
         Command::AddAccounts {
             data_dir,
@@ -502,7 +502,8 @@ where
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opt = Opt::parse();
     aptos_logger::Logger::new().init();
     START_TIME.set(
@@ -585,13 +586,13 @@ fn main() {
     }
 
     if opt.vm_selection_opt.use_native_executor {
-        run::<NativeExecutor>(opt);
+        run::<NativeExecutor>(opt).await;
     } else if opt.vm_selection_opt.use_ptx_executor {
         #[cfg(target_os = "linux")]
         ThreadManagerBuilder::set_thread_config_strategy(ThreadConfigStrategy::ThreadsPriority(48));
-        run::<PtxBlockExecutor>(opt);
+        run::<PtxBlockExecutor>(opt).await;
     } else {
-        run::<AptosVM>(opt);
+        run::<AptosVM>(opt).await;
     }
 
     if cpu_profiling {
