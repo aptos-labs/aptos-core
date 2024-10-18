@@ -7,11 +7,12 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
 };
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct ChunkToCommit<'a> {
     pub first_version: Version,
     pub transactions: &'a [Transaction],
-    pub transaction_outputs: &'a [TransactionOutput],
+    // TODO(aldenhu): make it a ref
+    pub transaction_outputs: Vec<TransactionOutput>,
     pub transaction_infos: &'a [TransactionInfo],
     pub base_state_version: Option<Version>,
     pub latest_in_memory_state: &'a StateDelta,

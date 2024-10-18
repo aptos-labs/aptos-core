@@ -112,11 +112,6 @@ impl BlockLookupInner {
                     .get()
                     .upgrade()
                     .ok_or_else(|| anyhow!("block dropped unexpected."))?;
-                ensure!(
-                    existing.output.is_same_state(&output),
-                    "Different block with same id {:x}",
-                    id,
-                );
                 Ok((existing, true, parent_block))
             },
             Entry::Vacant(entry) => {
@@ -227,10 +222,9 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let output = PartialStateComputeResult::new_empty_completed(
+        let output = PartialStateComputeResult::new_empty(
             ledger_view.state().clone(),
             ledger_view.txn_accumulator().clone(),
-            None,
         );
 
         block_lookup.fetch_or_add_block(id, output, None)
@@ -253,17 +247,11 @@ impl BlockTree {
                     .original_reconfiguration_block_id(committed_block_id),
                 "Updated with a new root block as a virtual block of reconfiguration block"
             );
-            let commited_output = last_committed_block.output.expect_complete_result();
-            let output = PartialStateComputeResult::new_empty_completed(
-                commited_output.result_state.clone(),
-                commited_output
-                    .ledger_update_output
-                    .transaction_accumulator
-                    .clone(),
+            self.block_lookup.fetch_or_add_block(
+                epoch_genesis_id,
+                last_committed_block.output.clone(),
                 None,
-            );
-            self.block_lookup
-                .fetch_or_add_block(epoch_genesis_id, output, None)?
+            )?
         } else {
             info!(
                 LogSchema::new(LogEntry::SpeculationCache).root_block_id(committed_block_id),
@@ -272,17 +260,12 @@ impl BlockTree {
             last_committed_block
         };
         root.output
-            .state()
+            .expect_result_state()
             .current
             .log_generation("block_tree_base");
-        let old_root = {
-            let mut root_locked = self.root.lock();
-            // send old root to async task to drop it
-            let old_root = root_locked.clone();
-            *root_locked = root;
-            old_root
-        };
+        let old_root = std::mem::replace(&mut *self.root.lock(), root);
 
+        // send old root to async task to drop it
         Ok(DEFAULT_DROPPER.schedule_drop_with_waiter(old_root))
     }
 

@@ -268,23 +268,25 @@ pub struct ChunkCommitNotification {
     pub reconfiguration_occurred: bool,
 }
 
-pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProofExt>,
+pub struct ProofReader<'a> {
+    proofs: Option<&'a HashMap<HashValue, SparseMerkleProofExt>>,
 }
 
-impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
-        ProofReader { proofs }
+impl<'a> ProofReader<'a> {
+    pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
+        Self {
+            proofs: Some(proofs),
+        }
     }
 
     pub fn new_empty() -> Self {
-        Self::new(HashMap::new())
+        Self { proofs: None }
     }
 }
 
-impl ProofRead for ProofReader {
+impl<'a> ProofRead for ProofReader<'a> {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
-        self.proofs.get(&key)
+        self.proofs.and_then(|proofs| proofs.get(&key))
     }
 }
 

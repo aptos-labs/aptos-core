@@ -81,6 +81,7 @@ impl TransactionChunk for ChunkToExecute {
             sig_verified_txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            None,
         )
     }
 }

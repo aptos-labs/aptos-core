@@ -288,7 +288,7 @@ impl PipelinedBlock {
     pub fn block_info(&self) -> BlockInfo {
         self.block().gen_block_info(
             self.compute_result().root_hash(),
-            self.compute_result().version(),
+            self.compute_result().last_version_or_0(),
             self.compute_result().epoch_state().clone(),
         )
     }

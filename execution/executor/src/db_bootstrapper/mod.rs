@@ -135,22 +135,27 @@ pub fn calculate_genesis<V: VMExecutor>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        None,
     )?;
-
-    let output = ApplyExecutionOutput::run(execution_output, &executed_trees, None)?;
-
     ensure!(
-        output.expect_ledger_update_output().num_txns() != 0,
+        execution_output.num_transactions_to_commit() != 0,
         "Genesis txn execution failed."
     );
+    ensure!(
+        execution_output.next_epoch_state.is_some(),
+        "Genesis txn didn't output reconfig event."
+    );
 
+    let output = ApplyExecutionOutput::run(execution_output, &executed_trees)?;
     let timestamp_usecs = if genesis_version == 0 {
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output.verified_state_view(
+        let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
+            output.execution_output.next_version(),
+            output.expect_result_state().current.clone(),
             Arc::new(AsyncProofFetcher::new(db.reader.clone())),
         )?;
         let next_epoch = epoch
@@ -162,10 +167,6 @@ pub fn calculate_genesis<V: VMExecutor>(
         );
         get_state_timestamp(&state_view)?
     };
-    ensure!(
-        output.next_epoch_state.is_some(),
-        "Genesis txn didn't output reconfig event."
-    );
 
     let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
         LedgerInfo::new(
@@ -179,7 +180,7 @@ pub fn calculate_genesis<V: VMExecutor>(
                     .root_hash(),
                 genesis_version,
                 timestamp_usecs,
-                output.next_epoch_state.clone(),
+                output.execution_output.next_epoch_state.clone(),
             ),
             genesis_block_id(), /* consensus_data_hash */
         ),
