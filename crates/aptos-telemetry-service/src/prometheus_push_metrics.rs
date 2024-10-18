@@ -17,7 +17,7 @@ use std::{env, time::Duration};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
-const MAX_METRICS_POST_WAIT_DURATION_SECS: u64 = 5;
+const DEFAULT_METRICS_UPSTREAM_INGEST_TIMEOUT_SECS: u64 = 5;
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
@@ -57,6 +57,13 @@ pub async fn handle_metrics_ingest(
         .map(|val| val.parse::<i32>().unwrap_or(20))
         .unwrap_or(20);
 
+    let metrics_upstream_ingest_timeout = env::var("METRICS_UPSTREAM_INGEST_TIMEOUT_SECS")
+        .map(|val| {
+            val.parse::<u64>()
+                .unwrap_or(DEFAULT_METRICS_UPSTREAM_INGEST_TIMEOUT_SECS)
+        })
+        .unwrap_or(DEFAULT_METRICS_UPSTREAM_INGEST_TIMEOUT_SECS);
+
     let mut extra_labels = claims_to_extra_labels(
         &claims,
         context
@@ -93,7 +100,7 @@ pub async fn handle_metrics_ingest(
             extra_labels.clone()
         };
         let result = tokio::time::timeout(
-            Duration::from_secs(MAX_METRICS_POST_WAIT_DURATION_SECS),
+            Duration::from_secs(metrics_upstream_ingest_timeout),
             client.post_prometheus_metrics(
                 metrics_body.clone(),
                 extra_labels.clone(),
