@@ -135,7 +135,11 @@ async fn test_basic_peer_updater_loop() {
 
     // Create a peer state for the fullnode
     let node_config = NodeConfig::default();
-    let mut peer_state = PeerState::new(node_config.clone(), time_service.clone());
+    let mut peer_state = PeerState::new(
+        node_config.clone(),
+        time_service.clone(),
+        &peer_monitoring_client,
+    );
     peer_monitor_state
         .peer_states
         .write()
