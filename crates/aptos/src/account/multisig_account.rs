@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::anyhow;
 use crate::common::{
     types::{
         CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
@@ -25,6 +26,7 @@ use clap::Parser;
 use move_core_types::{ident_str, language_storage::ModuleId};
 use serde::Serialize;
 use serde_json::json;
+use supra_aptos::{SupraCommand, SupraCommandArguments};
 
 /// Create a new multisig account (v2) on-chain.
 ///
@@ -42,6 +44,13 @@ pub struct Create {
     /// transaction.
     #[clap(long)]
     pub(crate) num_signatures_required: u64,
+    /// Allow the multisig account to update its own metadata key and value
+    /// Metadata Key
+    #[clap(long)]
+    metadata_keys: Vec<String>,
+    /// Metadata Value
+    #[clap(long)]
+    metadata_values: Vec<String>,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -106,6 +115,40 @@ impl CliCommand<CreateSummary> for Create {
     }
 }
 
+#[async_trait]
+impl SupraCommand for Create {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        if self.metadata_keys.len() != self.metadata_values.len() {
+            return Err(anyhow!("Not all metadata key has a metadata value."))
+        };
+        let metadata_key = self.metadata_keys.iter()
+            .map(|k| to_bytes(k))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let metadata_value = self.metadata_values.iter()
+            .map(|v| to_bytes(v))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let payload = aptos_stdlib::multisig_account_create_with_owners(
+            self.additional_owners,
+            self.num_signatures_required,
+            metadata_key,
+            metadata_value,
+            self.timeout_duration,
+        );
+        
+        Ok(
+            SupraCommandArguments {
+                payload,
+                sender_account: self.txn_options.sender_account,
+                profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+                rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+                gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+            }
+        )
+    }
+}
+
 /// Propose a new multisig transaction.
 ///
 /// As one of the owners of the multisig, propose a new transaction. This also implicitly approves
@@ -148,6 +191,32 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
             .submit_transaction(transaction_payload)
             .await
             .map(|inner| inner.into())
+    }
+}
+
+#[async_trait]
+impl SupraCommand for CreateTransaction {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let multisig_transaction_payload_bytes =
+            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
+        let payload = if self.store_hash_only {
+            aptos_stdlib::multisig_account_create_transaction_with_hash(
+                self.multisig_account.multisig_address,
+                HashValue::sha3_256_of(&multisig_transaction_payload_bytes).to_vec(),
+            )
+        } else {
+            aptos_stdlib::multisig_account_create_transaction(
+                self.multisig_account.multisig_address,
+                multisig_transaction_payload_bytes,
+            )
+        };
+        Ok(SupraCommandArguments{
+            payload,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+        })
     }
 }
 
@@ -260,6 +329,26 @@ impl CliCommand<TransactionSummary> for Approve {
     }
 }
 
+#[async_trait]
+impl SupraCommand for Approve {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let payload = aptos_stdlib::multisig_account_approve_transaction(
+            self.multisig_account_with_sequence_number
+                .multisig_account
+                .multisig_address,
+            self.multisig_account_with_sequence_number.sequence_number,
+        );
+
+        Ok(SupraCommandArguments {
+            payload,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+        })
+    }
+}
+
 /// Reject a multisig transaction.
 ///
 /// As one of the owners of the multisig, reject a transaction proposed for the multisig.
@@ -292,6 +381,25 @@ impl CliCommand<TransactionSummary> for Reject {
     }
 }
 
+#[async_trait]
+impl SupraCommand for Reject {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let payload = aptos_stdlib::multisig_account_reject_transaction(
+            self.multisig_account_with_sequence_number
+                .multisig_account
+                .multisig_address,
+            self.multisig_account_with_sequence_number.sequence_number,
+        );
+        Ok(SupraCommandArguments {
+            payload,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+        })
+    }
+}
+
 /// Execute a proposed multisig transaction that has a full payload stored on-chain.
 #[derive(Debug, Parser)]
 pub struct Execute {
@@ -315,6 +423,23 @@ impl CliCommand<TransactionSummary> for Execute {
             }))
             .await
             .map(|inner| inner.into())
+    }
+}
+
+#[async_trait]
+impl SupraCommand for Execute {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let payload = TransactionPayload::Multisig(Multisig {
+            multisig_address: self.multisig_account.multisig_address,
+            transaction_payload: None,
+        });
+        Ok(SupraCommandArguments {
+            payload,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+        })
     }
 }
 
@@ -345,6 +470,23 @@ impl CliCommand<TransactionSummary> for ExecuteWithPayload {
     }
 }
 
+#[async_trait]
+impl SupraCommand for ExecuteWithPayload {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let payload = TransactionPayload::Multisig(Multisig {
+            multisig_address: self.execute.multisig_account.multisig_address,
+            transaction_payload: Some(self.entry_function_args.try_into()?),
+        });
+        Ok(SupraCommandArguments {
+            payload,
+            sender_account: self.execute.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.execute.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.execute.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.execute.txn_options.gas_options),
+        })
+    }
+}
+
 /// Remove a proposed multisig transaction.
 ///
 /// The transaction to be removed needs to have as many rejections as the number of signatures
@@ -370,5 +512,21 @@ impl CliCommand<TransactionSummary> for ExecuteReject {
             ))
             .await
             .map(|inner| inner.into())
+    }
+}
+
+#[async_trait]
+impl SupraCommand for ExecuteReject {
+    async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let payload = aptos_stdlib::multisig_account_execute_rejected_transaction(
+            self.multisig_account.multisig_address,
+        );
+        Ok(SupraCommandArguments {
+            payload,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+        })
     }
 }
