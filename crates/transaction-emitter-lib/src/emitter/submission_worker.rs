@@ -437,7 +437,7 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
-
+            info!("Submission to {:?} succeeded. Failures: {:?}", client.path_prefix_string(), failures.len());
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
