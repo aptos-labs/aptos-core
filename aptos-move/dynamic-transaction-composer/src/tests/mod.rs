@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{builder::Argument, TransactionComposer};
+use crate::{BatchArgument, TransactionComposer};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
@@ -35,13 +35,13 @@ fn simple_builder() {
             "transfer".to_string(),
             vec![],
             vec![
-                Argument::new_signer(0),
-                Argument::new_bytes(
+                BatchArgument::new_signer(0),
+                BatchArgument::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
                 ),
-                Argument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -80,8 +80,8 @@ fn chained_deposit() {
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
             vec![
-                Argument::new_signer(0),
-                Argument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgument::new_signer(0),
+                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -99,7 +99,7 @@ fn chained_deposit() {
             "deposit".to_string(),
             vec![],
             vec![
-                Argument::new_bytes(
+                BatchArgument::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -143,8 +143,8 @@ fn chained_deposit_mismatch() {
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
             vec![
-                Argument::new_signer(0),
-                Argument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgument::new_signer(0),
+                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -154,7 +154,7 @@ fn chained_deposit_mismatch() {
             "deposit".to_string(),
             vec![],
             vec![
-                Argument::new_bytes(
+                BatchArgument::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -181,8 +181,8 @@ fn chained_deposit_invalid_copy() {
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
             vec![
-                Argument::new_signer(0),
-                Argument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgument::new_signer(0),
+                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -201,7 +201,7 @@ fn chained_deposit_invalid_copy() {
             "deposit".to_string(),
             vec![],
             vec![
-                Argument::new_bytes(
+                BatchArgument::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -218,7 +218,7 @@ fn chained_deposit_invalid_copy() {
             "deposit".to_string(),
             vec![],
             vec![
-                Argument::new_bytes(
+                BatchArgument::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -267,7 +267,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_copyable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -282,7 +282,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1.copy().unwrap(),
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -294,7 +294,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -309,7 +309,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_copyable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -324,7 +324,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1.clone(),
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -336,7 +336,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .is_err());
@@ -349,7 +349,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_non_droppable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -364,7 +364,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1.copy().unwrap(),
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .is_err());
@@ -377,7 +377,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_non_droppable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -392,7 +392,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .is_err());
@@ -405,7 +405,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_non_droppable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -423,7 +423,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_copyable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -438,7 +438,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1.borrow().unwrap(),
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -450,7 +450,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -465,7 +465,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_non_droppable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -480,7 +480,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1.borrow_mut().unwrap(),
-                Argument::new_bytes(MoveValue::U8(42).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(42).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -492,7 +492,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(42).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(42).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -507,7 +507,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_non_droppable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -533,7 +533,7 @@ fn test_module() {
             vec![],
             vec![
                 returns_2,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -546,7 +546,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_non_droppable_value".to_string(),
             vec![],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -571,7 +571,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_generic_droppable_value".to_string(),
             vec!["0x1::batched_execution::Foo".to_string()],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -586,7 +586,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_generic_non_droppable_value".to_string(),
             vec!["0x1::batched_execution::Foo".to_string()],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -601,7 +601,7 @@ fn test_module() {
             vec!["0x1::batched_execution::Foo".to_string()],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -616,7 +616,7 @@ fn test_module() {
             "0x1::batched_execution".to_string(),
             "create_generic_non_droppable_value".to_string(),
             vec!["0x1::batched_execution::Foo".to_string()],
-            vec![Argument::new_bytes(
+            vec![BatchArgument::new_bytes(
                 MoveValue::U8(10).simple_serialize().unwrap(),
             )],
         )
@@ -631,7 +631,7 @@ fn test_module() {
             vec!["0x1::batched_execution::Bar".to_string()],
             vec![
                 returns_1,
-                Argument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
+                BatchArgument::new_bytes(MoveValue::U8(10).simple_serialize().unwrap()),
             ],
         )
         .is_err());

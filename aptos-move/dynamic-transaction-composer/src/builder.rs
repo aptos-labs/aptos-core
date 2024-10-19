@@ -8,12 +8,12 @@
 //! type safety of the Move calls will be held. After adding the calls, you will be able to consume the `TransactionComposer`
 //! and get the corresponding `CompiledScript` via the `generate_batched_calls` api.
 
+#[cfg(test)]
+use crate::BatchedFunctionCall;
 use crate::{
     helpers::{import_signature, import_type_tag, Script},
-    ArgumentOperation, APTOS_SCRIPT_BUILDER_KEY,
+    ArgumentOperation, BatchArgument, PreviousResult, APTOS_SCRIPT_BUILDER_KEY,
 };
-#[cfg(test)]
-use crate::{BatchArgument, BatchedFunctionCall};
 use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
     access::ScriptAccess,
@@ -44,14 +44,6 @@ pub struct AllocatedLocal {
     op_type: ArgumentOperation,
     is_parameter: bool,
     local_idx: u16,
-}
-
-#[derive(Tsify, Clone, Debug, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub enum Argument {
-    Raw(Vec<u8>),
-    Signer(u16),
-    Local(AllocatedLocal),
 }
 
 #[derive(Clone, Debug)]
@@ -166,8 +158,8 @@ impl TransactionComposer {
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<Argument>,
-    ) -> Result<Vec<Argument>, JsValue> {
+        args: Vec<BatchArgument>,
+    ) -> Result<Vec<BatchArgument>, JsValue> {
         self.add_batched_call(module, function, ty_args, args)
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
@@ -224,8 +216,8 @@ impl TransactionComposer {
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<Argument>,
-    ) -> anyhow::Result<Vec<Argument>> {
+        args: Vec<BatchArgument>,
+    ) -> anyhow::Result<Vec<BatchArgument>> {
         let ty_args = ty_args
             .iter()
             .map(|s| TypeTag::from_str(s))
@@ -275,16 +267,21 @@ impl TransactionComposer {
 
         for (arg, ty) in args.into_iter().zip(expected_args_ty) {
             match arg {
-                Argument::Local(i) => {
-                    self.check_argument_compatibility(&i, &ty)?;
-                    arguments.push(i)
+                BatchArgument::PreviousResult(r) => {
+                    let argument = AllocatedLocal {
+                        op_type: r.operation_type,
+                        is_parameter: false,
+                        local_idx: self.calls[r.call_idx as usize].returns[r.return_idx as usize],
+                    };
+                    self.check_argument_compatibility(&argument, &ty)?;
+                    arguments.push(argument)
                 },
-                Argument::Signer(i) => arguments.push(AllocatedLocal {
+                BatchArgument::Signer(i) => arguments.push(AllocatedLocal {
                     op_type: ArgumentOperation::Copy,
                     is_parameter: true,
                     local_idx: i,
                 }),
-                Argument::Raw(bytes) => {
+                BatchArgument::Raw(bytes) => {
                     let new_local_idx = self.parameters_ty.len() as u16;
                     self.parameters_ty.push(ty);
                     self.parameters.push(bytes);
@@ -317,6 +314,8 @@ impl TransactionComposer {
             returns.push(local_idx);
         }
 
+        let num_of_calls = self.calls.len() as u16;
+
         self.calls.push(BuilderCall {
             type_args: call_type_params,
             call_idx,
@@ -325,13 +324,13 @@ impl TransactionComposer {
             #[cfg(test)]
             type_tags: ty_args,
         });
-        Ok(returns
-            .into_iter()
+
+        Ok((0..returns.len())
             .map(|idx| {
-                Argument::Local(AllocatedLocal {
-                    op_type: ArgumentOperation::Move,
-                    is_parameter: false,
-                    local_idx: idx,
+                BatchArgument::PreviousResult(PreviousResult {
+                    operation_type: ArgumentOperation::Move,
+                    call_idx: num_of_calls,
+                    return_idx: idx as u16,
                 })
             })
             .collect())
@@ -548,46 +547,5 @@ impl AllocatedLocal {
             ArgumentOperation::Move => Bytecode::MoveLoc(local_idx as u8),
             ArgumentOperation::Copy => Bytecode::CopyLoc(local_idx as u8),
         })
-    }
-}
-
-#[wasm_bindgen]
-impl Argument {
-    pub fn new_bytes(bytes: Vec<u8>) -> Self {
-        Argument::Raw(bytes)
-    }
-
-    pub fn new_signer(signer_idx: u16) -> Self {
-        Argument::Signer(signer_idx)
-    }
-
-    pub fn borrow(&self) -> Result<Argument, String> {
-        self.change_op_type(ArgumentOperation::Borrow)
-    }
-
-    pub fn borrow_mut(&self) -> Result<Argument, String> {
-        self.change_op_type(ArgumentOperation::BorrowMut)
-    }
-
-    pub fn copy(&self) -> Result<Argument, String> {
-        self.change_op_type(ArgumentOperation::Copy)
-    }
-
-    fn change_op_type(&self, operation_type: ArgumentOperation) -> Result<Argument, String> {
-        match &self {
-            Argument::Local(AllocatedLocal {
-                op_type: _,
-                is_parameter,
-                local_idx,
-            }) => Ok(Argument::Local(AllocatedLocal {
-                op_type: operation_type,
-                is_parameter: *is_parameter,
-                local_idx: *local_idx,
-            })),
-            _ => Err(
-                "Unexpected argument type, can only borrow from previous function results"
-                    .to_string(),
-            ),
-        }
     }
 }

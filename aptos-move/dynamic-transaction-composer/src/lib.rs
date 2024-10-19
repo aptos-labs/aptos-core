@@ -62,3 +62,40 @@ impl BatchedFunctionCall {
         (self.module, self.function, self.ty_args, self.args)
     }
 }
+
+#[wasm_bindgen]
+impl BatchArgument {
+    pub fn new_bytes(bytes: Vec<u8>) -> Self {
+        BatchArgument::Raw(bytes)
+    }
+
+    pub fn new_signer(signer_idx: u16) -> Self {
+        BatchArgument::Signer(signer_idx)
+    }
+
+    pub fn borrow(&self) -> Result<BatchArgument, String> {
+        self.change_op_type(ArgumentOperation::Borrow)
+    }
+
+    pub fn borrow_mut(&self) -> Result<BatchArgument, String> {
+        self.change_op_type(ArgumentOperation::BorrowMut)
+    }
+
+    pub fn copy(&self) -> Result<BatchArgument, String> {
+        self.change_op_type(ArgumentOperation::Copy)
+    }
+
+    fn change_op_type(&self, operation_type: ArgumentOperation) -> Result<BatchArgument, String> {
+        match &self {
+            BatchArgument::PreviousResult(r) => {
+                let mut result = r.clone();
+                result.operation_type = operation_type;
+                Ok(BatchArgument::PreviousResult(result))
+            },
+            _ => Err(
+                "Unexpected argument type, can only borrow from previous function results"
+                    .to_string(),
+            ),
+        }
+    }
+}
