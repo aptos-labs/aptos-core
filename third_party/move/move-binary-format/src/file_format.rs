@@ -48,7 +48,7 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::{self, Formatter}, ops::BitOr};
+use std::{fmt::{self, Formatter}, ops::BitOr};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -1427,7 +1427,7 @@ impl SignatureToken {
         self.preorder_traversal().count()
     }
 
-    pub fn instantiate(&self, subst_mapping: &BTreeMap<u16, SignatureToken>) -> SignatureToken {
+    pub fn instantiate(&self, subst_mapping: &[SignatureToken]) -> SignatureToken {
         use SignatureToken::*;
         match self {
             Bool => Bool,
@@ -1450,7 +1450,7 @@ impl SignatureToken {
             ),
             Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
             MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
-            TypeParameter(idx) => subst_mapping.get(idx).unwrap().clone(),
+            TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
         }
     }
 }

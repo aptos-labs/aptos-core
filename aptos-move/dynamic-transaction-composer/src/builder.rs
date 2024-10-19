@@ -235,16 +235,10 @@ impl TransactionComposer {
         let call_idx = self
             .builder
             .import_call_by_name(function.as_ident_str(), target_module)?;
-        let call_type_params = ty_args
+        let type_arguments = ty_args
             .iter()
             .map(|ty| import_type_tag(&mut self.builder, ty, &self.modules))
             .collect::<PartialVMResult<Vec<_>>>()?;
-
-        let subst_mapping = call_type_params
-            .iter()
-            .enumerate()
-            .map(|(idx, ty)| (idx as u16, ty.clone()))
-            .collect::<BTreeMap<_, _>>();
 
         let mut arguments = vec![];
         let expected_args_ty = {
@@ -261,7 +255,7 @@ impl TransactionComposer {
                 .signature_at(func.parameters)
                 .0
                 .iter()
-                .map(|ty| ty.instantiate(&subst_mapping))
+                .map(|ty| ty.instantiate(&type_arguments))
                 .collect::<Vec<_>>()
         };
 
@@ -303,7 +297,7 @@ impl TransactionComposer {
                 .signature_at(func.return_)
                 .0
                 .iter()
-                .map(|ty| ty.instantiate(&subst_mapping))
+                .map(|ty| ty.instantiate(&type_arguments))
                 .collect::<Vec<_>>()
         };
 
@@ -317,7 +311,7 @@ impl TransactionComposer {
         let num_of_calls = self.calls.len() as u16;
 
         self.calls.push(BuilderCall {
-            type_args: call_type_params,
+            type_args: type_arguments,
             call_idx,
             arguments,
             returns: returns.clone(),

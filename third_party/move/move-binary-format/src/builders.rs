@@ -265,7 +265,7 @@ impl CompiledScriptBuilder {
         .map(|idx| SignatureIndex(idx as u16))
     }
 
-    pub fn import_call(
+    pub fn import_function_by_handle(
         &mut self,
         module: &CompiledModule,
         idx: FunctionHandleIndex,
@@ -305,7 +305,7 @@ impl CompiledScriptBuilder {
     ) -> PartialVMResult<FunctionHandleIndex> {
         for (idx, handle) in module.function_handles().iter().enumerate() {
             if module.identifier_at(handle.name) == name {
-                return self.import_call(module, FunctionHandleIndex(idx as u16));
+                return self.import_function_by_handle(module, FunctionHandleIndex(idx as u16));
             }
         }
         Err(PartialVMError::new(StatusCode::LOOKUP_FAILED))
