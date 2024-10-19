@@ -426,14 +426,14 @@ pub async fn submit_transactions(
             stats
                 .failed_submission
                 .fetch_add(txns.len() as u64, Ordering::Relaxed);
-            sample!(
-                SampleRate::Duration(Duration::from_secs(60)),
+            // sample!(
+            //     SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
                     "[{:?}] Failed to submit batch request: {:?}",
                     client.path_prefix_string(),
                     e
-                )
-            );
+                );
+            // );
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;

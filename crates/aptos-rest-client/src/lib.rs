@@ -76,6 +76,10 @@ impl Client {
         ClientBuilder::new(aptos_base_url)
     }
 
+    pub fn base_url(&self) -> &Url {
+        &self.base_url
+    }
+
     pub fn new(base_url: Url) -> Self {
         Self::builder(AptosBaseUrl::Custom(base_url)).build()
     }

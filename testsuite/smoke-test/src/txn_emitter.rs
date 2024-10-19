@@ -94,6 +94,7 @@ pub async fn create_emit_job_request(
         .filter(|v| nodes.contains(&v.peer_id()))
         .map(|n| n.rest_client())
         .collect::<Vec<_>>();
+    println!("validator_clients: {:?}", validator_clients.iter().map(|c| c.base_url()).collect::<Vec<_>>());
     let mut emit_job_request = EmitJobRequest::default();
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
