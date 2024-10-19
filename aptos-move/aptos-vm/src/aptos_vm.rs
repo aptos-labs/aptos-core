@@ -53,7 +53,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
+        ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
         OnChainConfig, TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
@@ -2062,7 +2062,7 @@ impl AptosVM {
             .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
         let has_new_epoch_event = events
             .iter()
-            .any(|(e, _)| e.event_key() == Some(&new_epoch_event_key()));
+            .any(|(e, _)| e.is_new_epoch_event());
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -2406,10 +2406,9 @@ impl AptosVM {
     }
 
     pub fn should_restart_execution(events: &[(ContractEvent, Option<MoveTypeLayout>)]) -> bool {
-        let new_epoch_event_key = new_epoch_event_key();
         events
             .iter()
-            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
+            .any(|(event, _)| event.is_new_epoch_event())
     }
 
     /// Executes a single transaction (including user transactions, block

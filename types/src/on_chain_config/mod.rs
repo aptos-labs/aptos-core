@@ -19,6 +19,8 @@ use move_core_types::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt, fmt::Debug, sync::Arc};
+use std::str::FromStr;
+use move_core_types::language_storage::TypeTag;
 
 mod approved_execution_hashes;
 mod aptos_features;
@@ -202,6 +204,10 @@ impl<S: StateView> ConfigStorage for S {
 
 pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
+}
+
+pub fn new_epoch_event_type_tag() -> TypeTag {
+    TypeTag::from_str("0x1::reconfiguration::NewEpoch").expect("cannot fail")
 }
 
 pub fn access_path_for_config(config_id: ConfigID) -> anyhow::Result<AccessPath> {

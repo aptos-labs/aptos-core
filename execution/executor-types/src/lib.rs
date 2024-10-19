@@ -34,6 +34,7 @@ use std::{
         Arc,
     },
 };
+use aptos_types::account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG;
 
 mod error;
 mod ledger_update_output;
@@ -293,6 +294,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
     type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref()
         || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
+        || type_tag == NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.deref()
 }
 
 #[cfg(feature = "bench")]

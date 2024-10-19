@@ -180,7 +180,6 @@ module aptos_framework::block {
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
 
-        // Emit both event v1 and v2 for compatibility. Eventually only module events will be kept.
         let new_block_event = NewBlockEvent {
             hash,
             epoch,
@@ -191,17 +190,7 @@ module aptos_framework::block {
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        let new_block_event_v2 = NewBlock {
-            hash,
-            epoch,
-            round,
-            height: block_metadata_ref.height,
-            previous_block_votes_bitvec,
-            proposer,
-            failed_proposer_indices,
-            time_microseconds: timestamp,
-        };
-        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event, new_block_event_v2);
+        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.
@@ -279,7 +268,6 @@ module aptos_framework::block {
         vm: &signer,
         event_handle: &mut EventHandle<NewBlockEvent>,
         new_block_event: NewBlockEvent,
-        new_block_event_v2: NewBlock
     ) acquires CommitHistory {
         if (exists<CommitHistory>(@aptos_framework)) {
             let commit_history_ref = borrow_global_mut<CommitHistory>(@aptos_framework);
@@ -298,11 +286,7 @@ module aptos_framework::block {
             event::counter(event_handle) == new_block_event.height,
             error::invalid_argument(ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT),
         );
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(new_block_event_v2);
-        } else {
-            event::emit_event<NewBlockEvent>(event_handle, new_block_event);
-        };
+        event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
     /// Emit a `NewBlockEvent` event. This function will be invoked by genesis directly to generate the very first
@@ -323,16 +307,6 @@ module aptos_framework::block {
                 failed_proposer_indices: vector::empty(),
                 time_microseconds: 0,
             },
-            NewBlock {
-                hash: genesis_id,
-                epoch: 0,
-                round: 0,
-                height: 0,
-                previous_block_votes_bitvec: vector::empty(),
-                proposer: @vm_reserved,
-                failed_proposer_indices: vector::empty(),
-                time_microseconds: 0,
-            }
         );
     }
 
@@ -356,16 +330,6 @@ module aptos_framework::block {
                 failed_proposer_indices: vector::empty(),
                 time_microseconds: timestamp::now_microseconds(),
             },
-            NewBlock {
-                hash: fake_block_hash,
-                epoch: reconfiguration::current_epoch(),
-                round: MAX_U64,
-                height: block_metadata_ref.height,
-                previous_block_votes_bitvec: vector::empty(),
-                proposer: @vm_reserved,
-                failed_proposer_indices: vector::empty(),
-                time_microseconds: timestamp::now_microseconds(),
-            }
         );
     }
 

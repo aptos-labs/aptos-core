@@ -15,8 +15,6 @@ use itertools::zip_eq;
 use once_cell::sync::Lazy;
 use std::ops::Deref;
 
-pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
-
 #[derive(Clone)]
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,
@@ -25,9 +23,7 @@ pub struct ParsedTransactionOutput {
 
 impl ParsedTransactionOutput {
     pub fn parse_reconfig_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
-        events
-            .iter()
-            .filter(|e| e.event_key().cloned() == Some(*NEW_EPOCH_EVENT_KEY))
+        events.iter().filter(ContractEvent::is_new_epoch_event)
     }
 }
 
