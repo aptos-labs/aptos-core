@@ -354,7 +354,6 @@ impl WorkflowTxnGeneratorCreator {
                     StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(count))),
                     StageStopCondition::WhenPoolBecomesEmpty(created_pool),
                     StageStopCondition::WhenPoolBecomesEmpty(minted_pool),
-                    StageStopCondition::WhenPoolBecomesEmpty(burnt_pool),
                 ])
             },
             WorkflowKind::StableCoinMint {
