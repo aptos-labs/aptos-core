@@ -1536,14 +1536,14 @@ module aptos_framework::account {
         register_coin<FakeCoin>(addr);
 
         let eventhandle = &borrow_global<Account>(addr).coin_register_events;
-        let event = CoinRegisterEvent { type_info: type_info::type_of<FakeCoin>() };
+        let event = CoinRegister { account: addr, type_info: type_info::type_of<FakeCoin>() };
 
-        let events = event::emitted_events_by_handle(eventhandle);
+        let events = event::emitted_events<CoinRegister>();
         assert!(vector::length(&events) == 1, 0);
         assert!(vector::borrow(&events, 0) == &event, 1);
-        assert!(event::was_event_emitted_by_handle(eventhandle, &event), 2);
+        assert!(event::was_event_emitted(&event), 2);
 
-        let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
-        assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+        let event = CoinRegister { account: addr, type_info: type_info::type_of<SadFakeCoin>() };
+        assert!(!event::was_event_emitted(&event), 3);
     }
 }

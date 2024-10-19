@@ -2063,7 +2063,12 @@ module aptos_token::token {
             vector<bool>[false, false, false, false, false],
         );
         let collections = borrow_global<Collections>(signer::address_of(&creator));
-        assert!(event::counter(&collections.create_collection_events) == 1, 1);
+        assert!(
+            vector::length(&event::emitted_events<CreateCollection>()) == 1 || vector::length(
+                &event::emitted_events<CreateCollectionEvent>()
+            ) == 1,
+            1
+        );
     }
 
     #[test(creator = @0xAF)]
