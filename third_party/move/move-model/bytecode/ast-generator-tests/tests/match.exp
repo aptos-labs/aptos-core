@@ -163,35 +163,35 @@ fun m::id2($t0|self: 0x815::m::Entity): u64 {
   2: $t4 := copy($t1)
   3: $t5 := test_variant 0x815::m::Entity::Person($t4)
   4: if ($t5) goto 5 else goto 19
-  5: label L1
+  5: label L0
   6: $t6 := copy($t1)
   7: $t7 := borrow_variant_field<0x815::m::Entity::Person>.id($t6)
   8: $t8 := read_ref($t7)
   9: $t9 := 0
  10: $t10 := >($t8, $t9)
  11: if ($t10) goto 12 else goto 19
- 12: label L2
+ 12: label L3
  13: $t11 := move($t1)
  14: drop($t11)
  15: $t12 := move($t0)
  16: $t13 := unpack_variant 0x815::m::Entity::Person($t12)
  17: $t2 := $t13
  18: goto 33
- 19: label L0
+ 19: label L2
  20: $t14 := move($t1)
  21: $t15 := test_variant 0x815::m::Entity::Institution($t14)
  22: if ($t15) goto 23 else goto 29
- 23: label L5
+ 23: label L7
  24: $t16 := move($t0)
  25: ($t17, $t18) := unpack_variant 0x815::m::Entity::Institution($t16)
  26: drop($t18)
  27: $t2 := $t17
  28: goto 33
- 29: label L4
+ 29: label L6
  30: $t19 := 0
  31: $t2 := $t19
  32: goto 33
- 33: label L3
+ 33: label L5
  34: $t20 := move($t2)
  35: return $t20
 }
