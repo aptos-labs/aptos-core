@@ -127,7 +127,7 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::CoinTransfer.materialize_default()
+        TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M.materialize_default()
     }
 }
 
