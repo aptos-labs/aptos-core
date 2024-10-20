@@ -120,7 +120,7 @@ pub enum WorkflowProgress {
 impl WorkflowProgress {
     pub fn when_done_default() -> Self {
         Self::WhenDone {
-            delay_between_stages_s: 10,
+            delay_between_stages_s: 60,
         }
     }
 }
