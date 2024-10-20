@@ -107,14 +107,14 @@ pub enum WorkflowProgress {
 impl WorkflowProgress {
     pub fn when_done_default() -> Self {
         Self::WhenDone {
-            delay_between_stages_s: 10,
+            delay_between_stages_s: 30,
         }
     }
 }
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::CoinTransfer.materialize_default()
+        TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M.materialize_default()
     }
 }
 

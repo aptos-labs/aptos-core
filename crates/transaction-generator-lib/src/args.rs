@@ -262,7 +262,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::CreateMintBurn {
-                    count: 10000,
+                    count: 1000000,
                     creation_balance: 200000,
                 },
                 num_modules: 1,
