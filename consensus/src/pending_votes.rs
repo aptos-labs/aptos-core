@@ -22,7 +22,7 @@ use aptos_consensus_types::{
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    ledger_info::{LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{collections::HashMap, fmt, sync::Arc};
@@ -59,7 +59,7 @@ pub enum VoteReceptionResult {
 #[derive(Debug, PartialEq, Eq)]
 pub enum VoteStatus {
     EnoughVotes(LedgerInfoWithSignatures),
-    NotEnoughVotes(LedgerInfoWithUnverifiedSignatures),
+    NotEnoughVotes(SignatureAggregator<LedgerInfo>),
 }
 
 #[derive(Debug)]
@@ -325,9 +325,7 @@ impl PendingVotes {
         let (hash_index, status) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
             (
                 len,
-                VoteStatus::NotEnoughVotes(LedgerInfoWithUnverifiedSignatures::new(
-                    vote.ledger_info().clone(),
-                )),
+                VoteStatus::NotEnoughVotes(SignatureAggregator::new(vote.ledger_info().clone())),
             )
         });
 
@@ -366,12 +364,12 @@ impl PendingVotes {
                     li_with_sig.clone(),
                 )));
             },
-            VoteStatus::NotEnoughVotes(li_with_sig) => {
+            VoteStatus::NotEnoughVotes(sig_aggregator) => {
                 // add this vote to the ledger info with signatures
-                li_with_sig.add_signature(vote.author(), vote.signature_with_status());
+                sig_aggregator.add_signature(vote.author(), vote.signature_with_status());
 
                 // check if we have enough signatures to create a QC
-                match li_with_sig.check_voting_power(validator_verifier, true) {
+                match sig_aggregator.check_voting_power(validator_verifier, true) {
                     // a quorum of signature was reached, a new QC is formed
                     Ok(aggregated_voting_power) => {
                         assert!(
@@ -383,7 +381,11 @@ impl PendingVotes {
                                 .with_label_values(&["vote_aggregate_and_verify"])
                                 .start_timer();
 
-                            li_with_sig.aggregate_and_verify(validator_verifier)
+                            sig_aggregator.aggregate_and_verify(validator_verifier).map(
+                                |(ledger_info, aggregated_sig)| {
+                                    LedgerInfoWithSignatures::new(ledger_info, aggregated_sig)
+                                },
+                            )
                         };
                         match verification_result {
                             Ok(ledger_info_with_sig) => {
@@ -527,13 +529,13 @@ impl fmt::Display for PendingVotes {
                 VoteStatus::EnoughVotes(_li) => {
                     write!(f, "LI {} has aggregated QC", li_digest)?;
                 },
-                VoteStatus::NotEnoughVotes(li) => {
+                VoteStatus::NotEnoughVotes(sig_aggregator) => {
                     write!(
                         f,
                         "LI {} has {} verified votes, {} unverified votes",
                         li_digest,
-                        li.verified_voters().count(),
-                        li.unverified_voters().count(),
+                        sig_aggregator.verified_voters().count(),
+                        sig_aggregator.unverified_voters().count(),
                     )?;
                 },
             }
@@ -599,7 +601,6 @@ mod tests {
         let vote_data_1_author_0 =
             Vote::new(vote_data_1, signers[0].author(), li1, &signers[0]).unwrap();
 
-        vote_data_1_author_0.set_verified();
         // first time a new vote is added -> VoteAdded
         assert_eq!(
             pending_votes.insert_vote(&vote_data_1_author_0, &validator_verifier),
@@ -622,7 +623,6 @@ mod tests {
             &signers[0],
         )
         .unwrap();
-        vote_data_2_author_0.set_verified();
         assert_eq!(
             pending_votes.insert_vote(&vote_data_2_author_0, &validator_verifier),
             VoteReceptionResult::EquivocateVote
@@ -636,7 +636,6 @@ mod tests {
             &signers[1],
         )
         .unwrap();
-        vote_data_2_author_1.set_verified();
         assert_eq!(
             pending_votes.insert_vote(&vote_data_2_author_1, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
@@ -645,7 +644,6 @@ mod tests {
         // two votes for the ledger info -> NewQuorumCertificate
         let vote_data_2_author_2 =
             Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]).unwrap();
-        vote_data_2_author_2.set_verified();
         match pending_votes.insert_vote(&vote_data_2_author_2, &validator_verifier) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
@@ -722,7 +720,6 @@ mod tests {
         partial_sigs.add_signature(signers[0].author(), vote_0.signature().clone());
 
         // same author voting for the same thing -> DuplicateVote
-        vote_0.set_verified();
         assert_eq!(
             pending_votes.insert_vote(&vote_0, &validator_verifier),
             VoteReceptionResult::DuplicateVote
@@ -744,9 +741,9 @@ mod tests {
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
         let (_, vote_status) = pending_votes.li_digest_to_votes.get(&li_hash).unwrap();
         match vote_status {
-            VoteStatus::NotEnoughVotes(li_with_sig) => {
-                assert_eq!(li_with_sig.verified_voters().count(), 2);
-                assert_eq!(li_with_sig.unverified_voters().count(), 0);
+            VoteStatus::NotEnoughVotes(sig_aggregator) => {
+                assert_eq!(sig_aggregator.verified_voters().count(), 2);
+                assert_eq!(sig_aggregator.unverified_voters().count(), 0);
             },
             _ => {
                 panic!("QC should not be formed yet.");
@@ -805,7 +802,6 @@ mod tests {
         let vote0 = random_vote_data();
         let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]).unwrap();
 
-        vote0_author_0.set_verified();
         assert_eq!(
             pending_votes.insert_vote(&vote0_author_0, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
@@ -825,7 +821,6 @@ mod tests {
         let li1 = random_ledger_info();
         let vote1 = random_vote_data();
         let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]).unwrap();
-        vote1_author_1.set_verified();
         assert_eq!(
             pending_votes.insert_vote(&vote1_author_1, &validator_verifier),
             VoteReceptionResult::VoteAdded(1)
@@ -852,7 +847,6 @@ mod tests {
         let timeout = vote2_author_2.generate_2chain_timeout(certificate_for_genesis());
         let signature = timeout.sign(&signers[2]).unwrap();
         vote2_author_2.add_2chain_timeout(timeout, signature);
-        vote2_author_2.set_verified();
         match pending_votes.insert_vote(&vote2_author_2, &validator_verifier) {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 assert!(validator_verifier
