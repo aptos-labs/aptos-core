@@ -365,7 +365,7 @@ impl PendingVotes {
                 )));
             },
             VoteStatus::NotEnoughVotes(sig_aggregator) => {
-                // add this vote to the ledger info with signatures
+                // add this vote to the signature aggregator
                 sig_aggregator.add_signature(vote.author(), vote.signature_with_status());
 
                 // check if we have enough signatures to create a QC
