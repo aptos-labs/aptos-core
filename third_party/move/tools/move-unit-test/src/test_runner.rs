@@ -258,7 +258,7 @@ impl SharedTestingConfig {
         let move_vm = MoveVM::new(self.native_function_table.clone());
         let module_storage = self
             .starting_storage_state
-            .as_unsync_module_storage(&runtime_environment);
+            .as_unsync_module_storage(runtime_environment.clone());
 
         let extensions = extensions::new_extensions();
         let mut session =

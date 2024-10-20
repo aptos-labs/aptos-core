@@ -137,7 +137,7 @@ fn script_large_ty() {
     );
 
     let mut session = move_vm.new_session(&storage);
-    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+    let code_storage = storage.as_unsync_code_storage(runtime_environment);
     let traversal_storage = TraversalStorage::new();
     let res = session
         .execute_script(

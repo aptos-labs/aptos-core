@@ -164,7 +164,7 @@ fn runtime_reentrancy_check() {
     let runtime_environment = RuntimeEnvironment::new(natives.clone());
     let vm = MoveVM::new(natives);
     let mut sess = vm.new_session(&storage);
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
     let traversal_storage = TraversalStorage::new();
 
     // Call stack look like following:

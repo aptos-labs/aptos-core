@@ -104,7 +104,9 @@ fn test_malformed_resource() {
     let mut sess = vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+    let code_storage = storage
+        .clone()
+        .into_unsync_code_storage(runtime_environment);
 
     sess.execute_script(
         script_blob,
@@ -126,7 +128,6 @@ fn test_malformed_resource() {
     s2.serialize(&mut script_blob).unwrap();
     {
         let mut sess = vm.new_session(&storage);
-        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
         sess.execute_script(
             script_blob.clone(),
             vec![],
@@ -155,7 +156,6 @@ fn test_malformed_resource() {
     // The test will be successful if it fails with an invariant violation.
     {
         let mut sess = vm.new_session(&storage);
-        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
         let err = sess
             .execute_script(
                 script_blob,
@@ -201,7 +201,7 @@ fn test_malformed_module() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -233,7 +233,7 @@ fn test_malformed_module() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let err = sess
             .execute_function_bypass_visibility(
@@ -279,7 +279,7 @@ fn test_unverifiable_module() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
 
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -308,7 +308,7 @@ fn test_unverifiable_module() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let err = sess
             .execute_function_bypass_visibility(
@@ -365,7 +365,7 @@ fn test_missing_module_dependency() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
 
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -389,7 +389,7 @@ fn test_missing_module_dependency() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let err = sess
             .execute_function_bypass_visibility(
@@ -446,7 +446,7 @@ fn test_malformed_module_dependency() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
 
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -476,7 +476,7 @@ fn test_malformed_module_dependency() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let err = sess
             .execute_function_bypass_visibility(
@@ -534,7 +534,7 @@ fn test_unverifiable_module_dependency() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
 
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -564,7 +564,7 @@ fn test_unverifiable_module_dependency() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let err = sess
             .execute_function_bypass_visibility(
@@ -671,7 +671,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
         let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
         let err = sess
             .execute_function_bypass_visibility(
                 &module_id,
@@ -765,7 +765,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
 
         let module_storage = storage
             .module_storage
-            .as_unsync_module_storage(&runtime_environment);
+            .as_unsync_module_storage(runtime_environment);
 
         sess.execute_function_bypass_visibility(
             &m_id,

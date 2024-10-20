@@ -70,10 +70,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    WithRuntimeEnvironment,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -471,7 +468,7 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
     let vm = AptosVM::new(env.clone(), &state_view);
     let resolver = state_view.as_move_resolver();
-    let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+    let module_storage = state_view.as_aptos_code_storage(env);
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -627,7 +624,7 @@ pub async fn simulate_multistep_proposal(
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+        let code_storage = state_view.as_aptos_code_storage(env);
 
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,

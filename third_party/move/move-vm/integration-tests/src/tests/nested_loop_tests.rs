@@ -56,7 +56,7 @@ fn test_publish_module_with_nested_loops() {
 
         let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+            let module_storage = storage.as_unsync_module_storage(runtime_environment);
             let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
                 .clone()
                 .into()]);
@@ -88,7 +88,7 @@ fn test_publish_module_with_nested_loops() {
 
         let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+            let module_storage = storage.as_unsync_module_storage(runtime_environment);
             let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
                 .clone()
                 .into()]);
@@ -142,7 +142,7 @@ fn test_run_script_with_nested_loops() {
         let runtime_environment =
             RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
         let vm = MoveVM::new_with_config(natives, vm_config);
-        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+        let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
@@ -174,7 +174,7 @@ fn test_run_script_with_nested_loops() {
         let runtime_environment =
             RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
         let vm = MoveVM::new_with_config(natives, vm_config);
-        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+        let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];

@@ -137,6 +137,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
+use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
 
@@ -147,6 +148,7 @@ pub trait VMValidator {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
+        module_storage: &impl AptosCodeStorage,
     ) -> VMValidatorResult;
 }
 

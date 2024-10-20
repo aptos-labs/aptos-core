@@ -29,7 +29,6 @@ aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
-move-vm-runtime = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }

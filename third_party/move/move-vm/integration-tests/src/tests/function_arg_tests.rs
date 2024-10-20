@@ -66,7 +66,7 @@ fn run(
 
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
     let args: Vec<_> = args
         .into_iter()

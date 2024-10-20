@@ -295,6 +295,12 @@ pub trait WithRuntimeEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
 }
 
+impl WithRuntimeEnvironment for RuntimeEnvironment {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self
+    }
+}
+
 ///Compiled module that passed local bytecode verification, but not the linking checks yet for its
 /// dependencies. Also carries module size in bytes.
 pub struct LocallyVerifiedModule(Arc<CompiledModule>, usize);

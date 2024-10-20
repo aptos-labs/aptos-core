@@ -82,7 +82,7 @@ fn merge_borrow_states_infinite_loop() {
     cs.serialize(&mut script_bytes).unwrap();
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+    let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
     let err = session
         .execute_script(

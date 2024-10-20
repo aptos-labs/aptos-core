@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 ambassador = { workspace = true }
+anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-infallible = { workspace = true }

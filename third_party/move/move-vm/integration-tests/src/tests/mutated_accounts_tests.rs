@@ -54,7 +54,9 @@ fn mutated_accounts() {
     let account1 = AccountAddress::random();
     let traversal_storage = TraversalStorage::new();
 
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+    let module_storage = storage
+        .clone()
+        .into_unsync_module_storage(runtime_environment);
     sess.execute_function_bypass_visibility(
         &m.self_id(),
         &publish,
@@ -100,7 +102,6 @@ fn mutated_accounts() {
     storage.apply(changes).unwrap();
 
     let mut sess = vm.new_session(&storage);
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
     sess.execute_function_bypass_visibility(
         &m.self_id(),
         &get,
