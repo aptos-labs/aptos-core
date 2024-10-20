@@ -63,7 +63,7 @@ fn run(
         .map(|val| val.simple_serialize().unwrap())
         .collect();
 
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
     let traversal_storage = TraversalStorage::new();
 
     let SerializedReturnValues {

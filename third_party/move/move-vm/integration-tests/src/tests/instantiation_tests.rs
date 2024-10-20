@@ -132,7 +132,7 @@ fn instantiation_err() {
         }));
     }
 
-    let module_storage = storage.as_unsync_code_storage(&runtime_environment);
+    let module_storage = storage.as_unsync_code_storage(runtime_environment);
 
     // Publish (must succeed!) and then load the function.
     if vm.vm_config().use_loader_v2 {

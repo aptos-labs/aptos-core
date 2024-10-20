@@ -78,34 +78,34 @@ impl<M: ModuleStorage> UnsyncCodeStorageImpl<M> {
     }
 }
 
-pub trait AsUnsyncCodeStorage<'a, S> {
+pub trait AsUnsyncCodeStorage<'s, S, E> {
     fn as_unsync_code_storage(
-        &'a self,
-        env: &'a RuntimeEnvironment,
-    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'a, S>>;
+        &'s self,
+        runtime_environment: E,
+    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'s, S, E>>;
 
     fn into_unsync_code_storage(
         self,
-        env: &'a RuntimeEnvironment,
-    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'a, S>>;
+        runtime_environment: E,
+    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'s, S, E>>;
 }
 
-impl<'a, S: ModuleBytesStorage> AsUnsyncCodeStorage<'a, S> for S {
+impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> AsUnsyncCodeStorage<'s, S, E> for S {
     fn as_unsync_code_storage(
-        &'a self,
-        env: &'a RuntimeEnvironment,
-    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'a, S>> {
+        &'s self,
+        runtime_environment: E,
+    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'s, S, E>> {
         UnsyncCodeStorage(UnsyncCodeStorageImpl::new(
-            self.as_unsync_module_storage(env),
+            self.as_unsync_module_storage(runtime_environment),
         ))
     }
 
     fn into_unsync_code_storage(
         self,
-        env: &'a RuntimeEnvironment,
-    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'a, S>> {
+        runtime_environment: E,
+    ) -> UnsyncCodeStorage<UnsyncModuleStorage<'s, S, E>> {
         UnsyncCodeStorage(UnsyncCodeStorageImpl::new(
-            self.into_unsync_module_storage(env),
+            self.into_unsync_module_storage(runtime_environment),
         ))
     }
 }
@@ -141,7 +141,7 @@ mod test {
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
+        let code_storage = module_bytes_storage.into_unsync_code_storage(runtime_environment);
 
         let serialized_script = make_script(vec!["a"]);
         let hash_1 = compute_code_hash(&serialized_script);
@@ -167,7 +167,7 @@ mod test {
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
+        let code_storage = module_bytes_storage.into_unsync_code_storage(runtime_environment);
 
         let serialized_script = make_script(vec!["a"]);
         let hash = compute_code_hash(&serialized_script);

@@ -188,7 +188,7 @@ fn main() -> Result<()> {
     let mut sess = vm.new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+    let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
     let args: Vec<Vec<u8>> = vec![];
     match entrypoint {

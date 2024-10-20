@@ -18,6 +18,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage};
 use fail::fail_point;
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
@@ -39,9 +40,10 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-pub struct VMValidator {
+struct VMValidator {
     db_reader: Arc<dyn DbReader>,
     state_view: CachedDbStateView,
+    module_storage: AptosCodeStorageAdapter<'static, CachedDbStateView, AptosEnvironment>,
     vm: AptosVM,
 }
 
@@ -61,47 +63,44 @@ impl VMValidator {
         AptosVM::new(env, state_view)
     }
 
-    pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
+    fn new(db_reader: Arc<dyn DbReader>) -> Self {
         let db_state_view = db_reader
             .latest_state_checkpoint_view()
             .expect("Get db view cannot fail");
 
         let vm = Self::new_vm_for_validation(&db_state_view);
+        let state_view = CachedDbStateView::from(db_state_view.clone());
+        let module_storage =
+            CachedDbStateView::from(db_state_view).into_aptos_code_storage(vm.environment());
+
         VMValidator {
             db_reader,
-            state_view: db_state_view.into(),
+            state_view,
+            module_storage,
             vm,
         }
     }
-}
 
-impl TransactionValidation for VMValidator {
-    type ValidationInstance = AptosVM;
-
-    fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
-        fail_point!("vm_validator::validate_transaction", |_| {
-            Err(anyhow::anyhow!(
-                "Injected error in vm_validator::validate_transaction"
-            ))
-        });
-        use aptos_vm::VMValidator;
-
-        Ok(self.vm.validate_transaction(txn, &self.state_view))
+    fn db_state_view(&self) -> DbStateView {
+        self.db_reader
+            .latest_state_checkpoint_view()
+            .expect("Get db view cannot fail")
     }
 
     fn restart(&mut self) -> Result<()> {
-        self.notify_commit();
+        let db_state_view = self.db_state_view();
 
+        self.state_view = db_state_view.clone().into();
         self.vm = Self::new_vm_for_validation(&self.state_view);
+        self.module_storage =
+            CachedDbStateView::from(db_state_view).into_aptos_code_storage(self.vm.environment());
+
         Ok(())
     }
 
     fn notify_commit(&mut self) {
-        self.state_view = self
-            .db_reader
-            .latest_state_checkpoint_view()
-            .expect("Get db view cannot fail")
-            .into();
+        let db_state_view = self.db_state_view();
+        self.state_view = db_state_view.into();
     }
 }
 
@@ -124,6 +123,7 @@ pub fn get_account_sequence_number(
 
 // A pool of VMValidators that can be used to validate transactions concurrently. This is done because
 // the VM is not thread safe today. This is a temporary solution until the VM is made thread safe.
+// TODO(loader_v2): Re-implement because VM is thread-safe now.
 #[derive(Clone)]
 pub struct PooledVMValidator {
     vm_validators: Vec<Arc<Mutex<VMValidator>>>,
@@ -138,7 +138,7 @@ impl PooledVMValidator {
         PooledVMValidator { vm_validators }
     }
 
-    pub fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
+    fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
         let mut rng = thread_rng(); // Create a thread-local random number generator
         let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
         self.vm_validators[random_index].clone() // Return the VM at the random index
@@ -149,7 +149,22 @@ impl TransactionValidation for PooledVMValidator {
     type ValidationInstance = AptosVM;
 
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
-        self.get_next_vm().lock().unwrap().validate_transaction(txn)
+        let vm_validator = self.get_next_vm();
+
+        fail_point!("vm_validator::validate_transaction", |_| {
+            Err(anyhow::anyhow!(
+                "Injected error in vm_validator::validate_transaction"
+            ))
+        });
+
+        let vm_validator_locked = vm_validator.lock().unwrap();
+
+        use aptos_vm::VMValidator;
+        Ok(vm_validator_locked.vm.validate_transaction(
+            txn,
+            &vm_validator_locked.state_view,
+            &vm_validator_locked.module_storage,
+        ))
     }
 
     fn restart(&mut self) -> Result<()> {

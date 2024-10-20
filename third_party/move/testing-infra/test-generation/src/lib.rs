@@ -151,7 +151,7 @@ fn execute_function_in_module(
         let vm = MoveVM::new(natives);
 
         let storage = storage_with_stdlib_and_modules(vec![&module]);
-        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let traversal_storage = TraversalStorage::new();

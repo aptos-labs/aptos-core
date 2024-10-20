@@ -26,7 +26,7 @@ use std::{borrow::Borrow, ops::Deref, sync::Arc};
 /// Represents owned or borrowed types, similar to [std::borrow::Cow] but without enforcing
 /// [ToOwned] trait bound on types it stores. We use it to be able to construct different storages
 /// that capture or borrow underlying byte storage.
-enum BorrowedOrOwned<'a, T> {
+pub enum BorrowedOrOwned<'a, T> {
     Borrowed(&'a T),
     Owned(T),
 }
@@ -77,20 +77,29 @@ struct NoVersion;
 /// Private implementation of module storage based on non-[Sync] module cache and the baseline
 /// storage.
 #[derive(Delegate)]
-#[delegate(ModuleCache, target = "module_cache", where = "S: ModuleBytesStorage")]
-struct UnsyncModuleStorageImpl<'a, S> {
+#[delegate(
+    WithRuntimeEnvironment,
+    target = "runtime_environment",
+    where = "S: ModuleBytesStorage, E: WithRuntimeEnvironment"
+)]
+#[delegate(
+    ModuleCache,
+    target = "module_cache",
+    where = "S: ModuleBytesStorage, E: WithRuntimeEnvironment"
+)]
+struct UnsyncModuleStorageImpl<'s, S, E> {
     /// Environment where this module storage is defined in.
-    runtime_environment: &'a RuntimeEnvironment,
+    runtime_environment: E,
     /// Module cache with deserialized or verified modules.
     module_cache: UnsyncModuleCache<ModuleId, CompiledModule, Module, BytesWithHash, NoVersion>,
 
     /// Immutable baseline storage from which one can fetch raw module bytes.
-    base_storage: BorrowedOrOwned<'a, S>,
+    base_storage: BorrowedOrOwned<'s, S>,
 }
 
-impl<'a, S: ModuleBytesStorage> UnsyncModuleStorageImpl<'a, S> {
+impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorageImpl<'s, S, E> {
     /// Private constructor from borrowed byte storage. Creates empty module storage cache.
-    fn from_borrowed(runtime_environment: &'a RuntimeEnvironment, storage: &'a S) -> Self {
+    fn from_borrowed(runtime_environment: E, storage: &'s S) -> Self {
         Self {
             runtime_environment,
             module_cache: UnsyncModuleCache::empty(),
@@ -100,7 +109,7 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorageImpl<'a, S> {
 
     /// Private constructor that captures provided byte storage by value. Creates empty module
     /// storage cache.
-    fn from_owned(runtime_environment: &'a RuntimeEnvironment, storage: S) -> Self {
+    fn from_owned(runtime_environment: E, storage: S) -> Self {
         Self {
             runtime_environment,
             module_cache: UnsyncModuleCache::empty(),
@@ -109,13 +118,9 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorageImpl<'a, S> {
     }
 }
 
-impl<'e, B: ModuleBytesStorage> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'e, B> {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.runtime_environment
-    }
-}
-
-impl<'e, S: ModuleBytesStorage> ModuleCodeBuilder for UnsyncModuleStorageImpl<'e, S> {
+impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
+    for UnsyncModuleStorageImpl<'s, S, E>
+{
     type Deserialized = CompiledModule;
     type Extension = BytesWithHash;
     type Key = ModuleId;
@@ -136,7 +141,7 @@ impl<'e, S: ModuleBytesStorage> ModuleCodeBuilder for UnsyncModuleStorageImpl<'e
             None => return Ok(None),
         };
         let (compiled_module, _, hash) = self
-            .runtime_environment
+            .runtime_environment()
             .deserialize_into_compiled_module(&bytes)?;
         let extension = Arc::new(BytesWithHash::new(bytes, hash));
         let module = ModuleCode::from_deserialized(compiled_module, extension, NoVersion);
@@ -146,11 +151,17 @@ impl<'e, S: ModuleBytesStorage> ModuleCodeBuilder for UnsyncModuleStorageImpl<'e
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
 #[derive(Delegate)]
-#[delegate(WithRuntimeEnvironment, where = "S: ModuleBytesStorage")]
-#[delegate(ModuleStorage, where = "S: ModuleBytesStorage")]
-pub struct UnsyncModuleStorage<'a, S>(UnsyncModuleStorageImpl<'a, S>);
+#[delegate(
+    WithRuntimeEnvironment,
+    where = "S: ModuleBytesStorage, E: WithRuntimeEnvironment"
+)]
+#[delegate(
+    ModuleStorage,
+    where = "S: ModuleBytesStorage, E: WithRuntimeEnvironment"
+)]
+pub struct UnsyncModuleStorage<'s, S, E>(UnsyncModuleStorageImpl<'s, S, E>);
 
-impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
+impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'s, S, E> {
     /// The reference to the baseline byte storage used by this module storage.
     pub fn byte_storage(&self) -> &S {
         &self.0.base_storage
@@ -177,25 +188,25 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
     }
 }
 
-pub trait AsUnsyncModuleStorage<'a, S> {
-    fn as_unsync_module_storage(
-        &'a self,
-        env: &'a RuntimeEnvironment,
-    ) -> UnsyncModuleStorage<'a, S>;
+pub trait AsUnsyncModuleStorage<'s, S, E> {
+    fn as_unsync_module_storage(&'s self, runtime_environment: E) -> UnsyncModuleStorage<'s, S, E>;
 
-    fn into_unsync_module_storage(self, env: &'a RuntimeEnvironment) -> UnsyncModuleStorage<'a, S>;
+    fn into_unsync_module_storage(self, runtime_environment: E) -> UnsyncModuleStorage<'s, S, E>;
 }
 
-impl<'a, S: ModuleBytesStorage> AsUnsyncModuleStorage<'a, S> for S {
-    fn as_unsync_module_storage(
-        &'a self,
-        env: &'a RuntimeEnvironment,
-    ) -> UnsyncModuleStorage<'a, S> {
-        UnsyncModuleStorage(UnsyncModuleStorageImpl::from_borrowed(env, self))
+impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> AsUnsyncModuleStorage<'s, S, E> for S {
+    fn as_unsync_module_storage(&'s self, runtime_environment: E) -> UnsyncModuleStorage<'s, S, E> {
+        UnsyncModuleStorage(UnsyncModuleStorageImpl::from_borrowed(
+            runtime_environment,
+            self,
+        ))
     }
 
-    fn into_unsync_module_storage(self, env: &'a RuntimeEnvironment) -> UnsyncModuleStorage<'a, S> {
-        UnsyncModuleStorage(UnsyncModuleStorageImpl::from_owned(env, self))
+    fn into_unsync_module_storage(self, runtime_environment: E) -> UnsyncModuleStorage<'s, S, E> {
+        UnsyncModuleStorage(UnsyncModuleStorageImpl::from_owned(
+            runtime_environment,
+            self,
+        ))
     }
 }
 
@@ -241,8 +252,7 @@ pub(crate) mod test {
     #[test]
     fn test_module_does_not_exist() {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&runtime_environment);
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage(runtime_environment);
 
         let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
         assert!(!assert_ok!(result));
@@ -269,7 +279,7 @@ pub(crate) mod test {
         let id = ModuleId::new(AccountAddress::ZERO, Identifier::new("a").unwrap());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         assert!(assert_ok!(
             module_storage.check_module_exists(id.address(), id.name())
@@ -291,7 +301,7 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "e", vec![], vec![]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         let result = module_storage.fetch_module_metadata(a_id.address(), a_id.name());
         let expected = make_module("a", vec!["b", "c"], vec![]).0.metadata;
@@ -321,7 +331,7 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "e", vec![], vec![]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         assert_ok!(module_storage.fetch_verified_module(c_id.address(), c_id.name()));
         module_storage.assert_cached_state(vec![], vec![&c_id, &d_id, &e_id]);
@@ -353,7 +363,7 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "g", vec![], vec![]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         assert_ok!(module_storage.fetch_deserialized_module(a_id.address(), a_id.name()));
         assert_ok!(module_storage.fetch_deserialized_module(c_id.address(), c_id.name()));
@@ -379,7 +389,7 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "c", vec!["a"], vec![]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         let result = module_storage.fetch_verified_module(c_id.address(), c_id.name());
         assert_eq!(
@@ -399,7 +409,7 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec!["a"]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         let result = module_storage.fetch_verified_module(c_id.address(), c_id.name());
         assert_ok!(result);
@@ -422,7 +432,7 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "d", vec![], vec!["c"]);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
         assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
         module_storage.assert_cached_state(vec![], vec![&a_id, &b_id, &c_id]);

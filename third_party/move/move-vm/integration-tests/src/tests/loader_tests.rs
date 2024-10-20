@@ -224,7 +224,7 @@ fn load() {
     // calls all functions sequentially
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.call_functions(&module_storage);
     } else {
@@ -313,7 +313,7 @@ fn load_phantom_module() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
         let mut session = adapter.vm.new_session(&adapter.store);
@@ -380,7 +380,7 @@ fn load_with_extra_ability() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
         let mut session = adapter.vm.new_session(&adapter.store);
@@ -453,7 +453,7 @@ fn deep_dependency_list_ok_0() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -480,7 +480,7 @@ fn deep_dependency_list_ok_1() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -641,7 +641,7 @@ fn deep_friend_list_ok_0() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -668,7 +668,7 @@ fn deep_friend_list_ok_1() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
+            InMemoryStorage::new().into_unsync_module_storage(adapter.runtime_environment.clone());
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {

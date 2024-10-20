@@ -57,7 +57,7 @@ fn leak_with_abort() {
     cs.serialize(&mut script_bytes).unwrap();
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+    let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
     for _ in 0..100_000 {
         let _ = session.execute_script(
