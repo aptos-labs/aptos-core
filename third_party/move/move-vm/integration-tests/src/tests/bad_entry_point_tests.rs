@@ -28,7 +28,7 @@ fn call_non_existent_module() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
     let err = sess
         .execute_function_bypass_visibility(
@@ -68,7 +68,7 @@ fn call_non_existent_function() {
     let fun_name = Identifier::new("foo").unwrap();
 
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
     let err = sess
         .execute_function_bypass_visibility(

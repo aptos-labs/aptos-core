@@ -42,7 +42,7 @@ pub use storage::{
     },
     implementations::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
-        unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
+        unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
     module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},

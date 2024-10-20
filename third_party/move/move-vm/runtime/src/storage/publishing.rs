@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
+    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
+use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
@@ -70,15 +71,11 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
 ///   2) Published modules satisfy compatibility constraints.
 ///   3) Published modules are verifiable and can link to existing modules without breaking
 ///      invariants such as cyclic dependencies.
-#[ouroboros::self_referencing]
-pub struct StagingModuleStorage<'a, M: 'a> {
-    // TODO(loader_v2):
-    //   Avoid clone and instead stage runtime environment so that higher order indices are
-    //   resolved through some temporary data structure.
-    runtime_environment: RuntimeEnvironment,
-    #[borrows(runtime_environment)]
-    #[covariant]
-    storage: UnsyncModuleStorage<'this, StagingModuleBytesStorage<'a, M>>,
+#[derive(Delegate)]
+#[delegate(WithRuntimeEnvironment, where = "M: ModuleStorage")]
+#[delegate(ModuleStorage, where = "M: ModuleStorage")]
+pub struct StagingModuleStorage<'a, M> {
+    storage: UnsyncModuleStorage<'a, StagingModuleBytesStorage<'a, M>, RuntimeEnvironment>,
 }
 
 impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
@@ -110,6 +107,9 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         // using this new module storage with changes, global caches are not accessed. Only when
         // the published module is committed, and its structs are accessed, their information will
         // be cached in the global runtime environment.
+        // TODO(loader_v2):
+        //   Avoid clone and instead stage runtime environment so that higher order indices are
+        //   resolved through some temporary data structure.
         let runtime_environment = existing_module_storage.runtime_environment().clone();
         let deserializer_config = &runtime_environment.vm_config().deserializer_config;
 
@@ -196,22 +196,18 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
 
         // At this point, we have successfully created a new module storage that also contains the
         // newly published bundle.
-        let staged_module_storage = StagingModuleStorageBuilder {
-            runtime_environment,
-            storage_builder: |runtime_environment| {
-                let staged_module_bytes_storage = StagingModuleBytesStorage {
-                    staged_module_bytes,
-                    module_storage: existing_module_storage,
-                };
-                // Create module storage by "owning" the underlying bytes.
-                staged_module_bytes_storage.into_unsync_module_storage(runtime_environment)
-            },
-        }
-        .build();
+        let staged_module_bytes_storage = StagingModuleBytesStorage {
+            staged_module_bytes,
+            module_storage: existing_module_storage,
+        };
+
+        let staged_module_storage = StagingModuleStorage {
+            storage: staged_module_bytes_storage.into_unsync_module_storage(runtime_environment),
+        };
 
         // Finally, verify the bundle, performing linking checks for all staged modules.
         for (addr, name) in staged_module_storage
-            .borrow_storage()
+            .storage
             .byte_storage()
             .staged_module_bytes
             .iter()
@@ -247,7 +243,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
     }
 
     pub fn release_verified_module_bundle(self) -> VerifiedModuleBundle<ModuleId, Bytes> {
-        let staged_module_bytes = &self.borrow_storage().byte_storage().staged_module_bytes;
+        let staged_module_bytes = &self.storage.byte_storage().staged_module_bytes;
 
         let mut bundle = BTreeMap::new();
         for (addr, account_storage) in staged_module_bytes {
@@ -257,71 +253,5 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         }
 
         VerifiedModuleBundle { bundle }
-    }
-}
-
-/// Note: [ambassador::Delegate] cannot be used for [StagingModuleStorage] because it is a self-
-/// referencing struct.
-impl<'a, M: ModuleStorage> WithRuntimeEnvironment for StagingModuleStorage<'a, M> {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.borrow_runtime_environment()
-    }
-}
-
-/// Note: [ambassador::Delegate] cannot be used for [StagingModuleStorage] because it is a self-
-/// referencing struct.
-impl<'a, M: ModuleStorage> ModuleStorage for StagingModuleStorage<'a, M> {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        self.borrow_storage()
-            .check_module_exists(address, module_name)
-    }
-
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        self.borrow_storage()
-            .fetch_module_bytes(address, module_name)
-    }
-
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        self.borrow_storage()
-            .fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
-        self.borrow_storage()
-            .fetch_module_metadata(address, module_name)
-    }
-
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<CompiledModule>>> {
-        self.borrow_storage()
-            .fetch_deserialized_module(address, module_name)
-    }
-
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
-        self.borrow_storage()
-            .fetch_verified_module(address, module_name)
     }
 }

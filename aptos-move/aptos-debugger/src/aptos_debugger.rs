@@ -31,7 +31,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use itertools::Itertools;
-use move_vm_runtime::WithRuntimeEnvironment;
 use std::{path::Path, sync::Arc, time::Instant};
 
 pub struct AptosDebugger {
@@ -124,7 +123,7 @@ impl AptosDebugger {
         let env = AptosEnvironment::new(&state_view);
         let vm = AptosVM::new(env.clone(), &state_view);
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+        let code_storage = state_view.as_aptos_code_storage(env);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,

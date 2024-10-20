@@ -37,7 +37,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let mut sess = vm.new_session(&storage);
 
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+            let module_storage = storage.as_unsync_module_storage(runtime_environment);
             let new_module_storage =
                 StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
                     .clone()
@@ -86,7 +86,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let mut sess = vm.new_session(&storage);
 
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+            let module_storage = storage.as_unsync_module_storage(runtime_environment);
             let result = StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
                 .clone()
                 .into()]);
@@ -143,7 +143,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         let runtime_environment = RuntimeEnvironment::new(natives.clone());
         let vm = MoveVM::new(natives);
         let mut sess = vm.new_session(&storage);
-        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+        let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
         let args: Vec<Vec<u8>> = vec![];
         sess.execute_script(
@@ -185,7 +185,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
         let vm = MoveVM::new_with_config(natives, vm_config);
         let mut sess = vm.new_session(&storage);
-        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
+        let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
         let args: Vec<Vec<u8>> = vec![];
         assert_eq!(

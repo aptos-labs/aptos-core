@@ -76,7 +76,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, WithRuntimeEnvironment,
+    ModuleStorage,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
@@ -799,9 +799,7 @@ impl FakeExecutor {
         let vm = AptosVM::new(env.clone(), self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
-        let code_storage = self
-            .get_state_view()
-            .as_aptos_code_storage(env.runtime_environment());
+        let code_storage = self.get_state_view().as_aptos_code_storage(env.clone());
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
@@ -868,11 +866,15 @@ impl FakeExecutor {
             .set(state_key, StateValue::new_legacy(data_blob.into()));
     }
 
-    /// Verifies the given transaction by running it through the VM verifier.
+    /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let env = AptosEnvironment::new(&self.data_store);
-        let vm = AptosVM::new(env, self.get_state_view());
-        vm.validate_transaction(txn, &self.data_store)
+        let vm = AptosVM::new(env.clone(), self.get_state_view());
+        vm.validate_transaction(
+            txn,
+            &self.data_store,
+            &self.data_store.as_aptos_code_storage(env),
+        )
     }
 
     pub fn get_state_view(&self) -> &FakeDataStore {
@@ -991,9 +993,7 @@ impl FakeExecutor {
 
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
-        let module_storage = self
-            .data_store
-            .as_aptos_code_storage(env.runtime_environment());
+        let module_storage = self.data_store.as_aptos_code_storage(env.clone());
         assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
@@ -1109,9 +1109,7 @@ impl FakeExecutor {
             let resolver = self.data_store.as_move_resolver();
             let vm = MoveVmExt::new(env.clone(), &resolver);
 
-            let module_storage = self
-                .data_store
-                .as_aptos_code_storage(env.runtime_environment());
+            let module_storage = self.data_store.as_aptos_code_storage(env.clone());
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1171,9 +1169,7 @@ impl FakeExecutor {
             let resolver = self.data_store.as_move_resolver();
             let vm = MoveVmExt::new(env.clone(), &resolver);
 
-            let module_storage = self
-                .data_store
-                .as_aptos_code_storage(env.runtime_environment());
+            let module_storage = self.data_store.as_aptos_code_storage(env.clone());
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1216,9 +1212,7 @@ impl FakeExecutor {
         let resolver = self.data_store.as_move_resolver();
         let vm = MoveVmExt::new(env.clone(), &resolver);
 
-        let module_storage = self
-            .data_store
-            .as_aptos_code_storage(env.runtime_environment());
+        let module_storage = self.data_store.as_aptos_code_storage(env.clone());
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();

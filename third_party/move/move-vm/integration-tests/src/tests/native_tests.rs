@@ -75,7 +75,7 @@ fn test_publish_module_with_nested_loops() {
         let vm = MoveVM::new_with_config(natives, vm_config);
 
         let mut sess = vm.new_session(&storage);
-        let module_storage = storage.as_unsync_code_storage(&runtime_environment);
+        let module_storage = storage.as_unsync_code_storage(runtime_environment);
         if vm.vm_config().use_loader_v2 {
             let new_module_storage =
                 StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob

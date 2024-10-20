@@ -43,7 +43,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
-    StagingModuleStorage,
+    StagingModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -60,11 +60,31 @@ use std::{
 
 const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
+struct RuntimeEnvironmentAdapter(Rc<RuntimeEnvironment>);
+
+impl RuntimeEnvironmentAdapter {
+    fn new(runtime_environment: RuntimeEnvironment) -> Self {
+        Self(Rc::new(runtime_environment))
+    }
+}
+
+impl Clone for RuntimeEnvironmentAdapter {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl WithRuntimeEnvironment for RuntimeEnvironmentAdapter {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.0.runtime_environment()
+    }
+}
+
 struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
 
     // VM and runtime environment to be shared by all tasks. If we use V1 loader, we store None here.
-    vm_and_runtime_environment: (Option<Rc<MoveVM>>, Rc<RuntimeEnvironment>),
+    vm_and_runtime_environment: (Option<Rc<MoveVM>>, RuntimeEnvironmentAdapter),
     storage: InMemoryStorage,
 
     default_syntax: SyntaxChoice,
@@ -152,7 +172,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let vm = vm_config
             .use_loader_v2
             .then_some(Rc::new(create_vm(vm_config.clone())));
-        let runtime_environment = Rc::new(create_runtime_environment(vm_config.clone()));
+        let runtime_environment =
+            RuntimeEnvironmentAdapter::new(create_runtime_environment(vm_config.clone()));
         let vm_and_runtime_environment = (vm, runtime_environment);
 
         let mut adapter = Self {
@@ -173,7 +194,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let module_storage = adapter
             .storage
             .clone()
-            .into_unsync_module_storage(runtime_environment.as_ref());
+            .into_unsync_module_storage(runtime_environment.clone());
 
         if vm_config.use_loader_v2 {
             let addresses = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
@@ -263,7 +284,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let module_storage = self
             .storage
             .clone()
-            .into_unsync_module_storage(runtime_environment.as_ref());
+            .into_unsync_module_storage(runtime_environment.clone());
 
         let mut module_bytes = vec![];
         module.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)?;
@@ -343,7 +364,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let code_storage = self
             .storage
             .clone()
-            .into_unsync_code_storage(runtime_environment.as_ref());
+            .into_unsync_code_storage(runtime_environment.clone());
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -401,7 +422,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let module_storage = self
             .storage
             .clone()
-            .into_unsync_module_storage(runtime_environment.as_ref());
+            .into_unsync_module_storage(runtime_environment.clone());
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -478,7 +499,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
-    fn vm_and_runtime_environment(&self) -> (Rc<MoveVM>, Rc<RuntimeEnvironment>) {
+    fn vm_and_runtime_environment(&self) -> (Rc<MoveVM>, RuntimeEnvironmentAdapter) {
         let vm = match &self.vm_and_runtime_environment.0 {
             Some(vm) => vm.clone(),
             None => Rc::new(create_vm(vm_config())),

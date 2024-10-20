@@ -229,11 +229,11 @@ impl AptosVM {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new(env, &resolver);
+        let move_vm = MoveVmExt::new(env.clone(), &resolver);
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let module_storage = state_view.as_aptos_code_storage(move_vm.env.runtime_environment());
+        let module_storage = state_view.as_aptos_code_storage(env);
         let pvk = keyless_validation::get_groth16_vk_onchain(&resolver, &module_storage)
             .ok()
             .and_then(|vk| vk.try_into().ok());
@@ -299,6 +299,11 @@ impl AptosVM {
     #[inline(always)]
     pub fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.move_vm.env.runtime_environment()
+    }
+
+    #[inline(always)]
+    pub fn environment(&self) -> AptosEnvironment {
+        self.move_vm.env.clone()
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -2434,7 +2439,7 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(env, state_view);
+        let vm = AptosVM::new(env.clone(), state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2460,7 +2465,7 @@ impl AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(vm.runtime_environment());
+        let module_storage = state_view.as_aptos_code_storage(env);
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
@@ -2844,6 +2849,7 @@ impl VMValidator for AptosVM {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
+        module_storage: &impl AptosCodeStorage,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -2894,8 +2900,6 @@ impl VMValidator for AptosVM {
         let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-        let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
-
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
 
         let mut session = self.new_session(
@@ -2910,7 +2914,7 @@ impl VMValidator for AptosVM {
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
             &resolver,
-            &module_storage,
+            module_storage,
             &txn,
             &txn_data,
             &log_context,
@@ -2958,11 +2962,11 @@ impl AptosSimulationVM {
         );
 
         let env = AptosEnvironment::new(state_view);
-        let vm = Self::new(env, state_view);
+        let vm = Self::new(env.clone(), state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(vm.0.runtime_environment());
+        let code_storage = state_view.as_aptos_code_storage(env);
 
         let (vm_status, vm_output) =
             vm.0.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);
