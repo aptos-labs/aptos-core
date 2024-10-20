@@ -87,7 +87,7 @@ impl SubmissionWorker {
             self.sleep_check_done(wait_until - now).await;
         }
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-
+        info!("wait_duration: {:?}", wait_duration);
         while !self.stop.load(Ordering::Relaxed) {
             let stats_clone = self.stats.clone();
             let loop_stats = stats_clone.get_cur();
@@ -437,7 +437,7 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
-            info!("Submission to {:?} succeeded. Failures: {:?}", client.path_prefix_string(), failures.len());
+            info!("Submission to {:?} succeeded. Successes: {:?} Failures: {:?}", client.path_prefix_string(), txns.len(), failures.len());
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
