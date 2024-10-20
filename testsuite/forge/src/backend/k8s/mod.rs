@@ -24,9 +24,7 @@ pub mod prometheus;
 mod stateful_set;
 mod swarm;
 
-use super::{
-    ForgeDeployerManager, DEFAULT_FORGE_DEPLOYER_PROFILE, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO,
-};
+use super::{ForgeDeployerManager, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO};
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
@@ -48,6 +46,7 @@ pub struct K8sFactory {
     keep: bool,
     enable_haproxy: bool,
     enable_indexer: bool,
+    deployer_profile: String,
 }
 
 impl K8sFactory {
@@ -60,6 +59,7 @@ impl K8sFactory {
         keep: bool,
         enable_haproxy: bool,
         enable_indexer: bool,
+        deployer_profile: String,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
@@ -89,6 +89,7 @@ impl K8sFactory {
             keep,
             enable_haproxy,
             enable_indexer,
+            deployer_profile,
         })
     }
 }
@@ -185,6 +186,7 @@ impl Factory for K8sFactory {
                     self.use_port_forward,
                     self.enable_haproxy,
                     self.enable_indexer,
+                    self.deployer_profile.clone(),
                     genesis_config_fn,
                     node_config_fn,
                     false,
@@ -197,7 +199,7 @@ impl Factory for K8sFactory {
             if self.enable_indexer {
                 // NOTE: by default, use a deploy profile and no additional configuration values
                 let config = serde_json::from_value(json!({
-                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "profile": self.deployer_profile.clone(),
                     "era": new_era.clone(),
                     "namespace": self.kube_namespace.clone(),
                     "indexer-grpc-values": {

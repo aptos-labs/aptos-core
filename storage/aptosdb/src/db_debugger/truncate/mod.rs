@@ -269,7 +269,7 @@ mod test {
                     version.checked_sub(1),
                     Some(ledger_info_with_sigs),
                     true,
-                    in_memory_state.clone()
+                    &in_memory_state,
                 )
                     .unwrap();
                 version += txns_to_commit.len() as u64;

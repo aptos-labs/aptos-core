@@ -38,7 +38,7 @@ module 0x42::test {
         0: T,
         1: u8,
     }
-    struct S3<T: key> has key {
+    struct S3<T: key> has store, key {
         0: T,
         1: u8,
     }
@@ -46,7 +46,7 @@ module 0x42::test {
         x: u8,
         y: T,
     }
-    struct S5<T: copy + key> has key {
+    struct S5<T: copy + store + key> has key {
         0: T,
         1: S3<T>,
     }

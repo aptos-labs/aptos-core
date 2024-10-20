@@ -11,7 +11,7 @@ use crate::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_executor_types::{ExecutorResult, StateComputeResult};
+use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorResult};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::{
@@ -44,6 +44,7 @@ pub struct PipelinedBlock {
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
+    #[derivative(PartialEq = "ignore")]
     state_compute_result: StateComputeResult,
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,

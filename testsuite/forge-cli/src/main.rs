@@ -62,7 +62,11 @@ use aptos_testcases::{
 };
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{
+    future,
+    stream::{FuturesUnordered, StreamExt},
+    FutureExt,
+};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
@@ -194,11 +198,14 @@ struct K8sSwarm {
         help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
     )]
     retain_debug_logs: bool,
+    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
+    enable_indexer: bool,
     #[clap(
         long,
-        help = "If set, spins up an indexer stack alongside the testnet. Same as --enable-indexer"
+        help = "The deployer profile used to spin up and configure forge infrastructure",
+        default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
     )]
-    enable_indexer: bool,
+    deployer_profile: String,
 }
 
 #[derive(Parser, Debug)]
@@ -262,6 +269,13 @@ struct Create {
         requires = "enable_indexer"
     )]
     indexer_image_tag: Option<String>,
+    #[clap(
+        long,
+        help = "The deployer profile used to spin up and configure forge infrastructure",
+        default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
+
+    )]
+    deployer_profile: String,
 }
 
 // common metrics thresholds:
@@ -408,6 +422,7 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
+                            k8s.deployer_profile.clone(),
                         )
                         .unwrap(),
                         &args.options,
@@ -444,7 +459,7 @@ fn main() -> Result<()> {
                     .or(Some(create.validator_image_tag.clone()))
                     .expect("Expected indexer or validator image tag to use");
                 let config: Value = serde_json::from_value(json!({
-                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "profile": create.deployer_profile,
                     "era": era.clone(),
                     "namespace": create.namespace.clone(),
                     "indexer-grpc-values": {
@@ -455,32 +470,44 @@ fn main() -> Result<()> {
                     },
                 }))?;
 
-                runtime.block_on(install_testnet_resources(
-                    era.clone(),
-                    create.namespace.clone(),
-                    create.num_validators,
-                    create.num_fullnodes,
-                    create.validator_image_tag,
-                    create.testnet_image_tag,
-                    create.move_modules_dir,
-                    false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
-                    create.enable_haproxy,
-                    create.enable_indexer,
-                    None,
-                    None,
-                    true,
-                ))?;
-
-                if create.enable_indexer {
-                    let indexer_deployer = ForgeDeployerManager::new(
-                        kube_client.clone(),
+                let deploy_testnet_fut = async {
+                    install_testnet_resources(
+                        era.clone(),
                         create.namespace.clone(),
-                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        create.num_validators,
+                        create.num_fullnodes,
+                        create.validator_image_tag,
+                        create.testnet_image_tag,
+                        create.move_modules_dir,
+                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                        create.enable_haproxy,
+                        create.enable_indexer,
+                        create.deployer_profile,
                         None,
-                    );
-                    runtime.block_on(indexer_deployer.start(config))?;
-                    runtime.block_on(indexer_deployer.wait_completed())?;
+                        None,
+                        true,
+                    )
+                    .await
                 }
+                .boxed();
+
+                let deploy_indexer_fut = async {
+                    if create.enable_indexer {
+                        let indexer_deployer = ForgeDeployerManager::new(
+                            kube_client.clone(),
+                            create.namespace.clone(),
+                            FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                            None,
+                        );
+                        indexer_deployer.start(config).await?;
+                        indexer_deployer.wait_completed().await
+                    } else {
+                        Ok(())
+                    }
+                }
+                .boxed();
+
+                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_indexer_fut))?;
                 Ok(())
             },
         },
@@ -811,9 +838,12 @@ fn get_multi_region_test(test_name: &str) -> Option<ForgeConfig> {
     Some(test)
 }
 
-fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
+fn wrap_with_realistic_env<T: NetworkTest + 'static>(
+    num_validators: usize,
+    test: T,
+) -> CompositeNetworkTest {
     CompositeNetworkTest::new_with_two_wrappers(
-        MultiRegionNetworkEmulationTest::default(),
+        MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
         CpuChaosTest::default(),
         test,
     )
@@ -858,8 +888,9 @@ fn wrap_with_two_region_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwo
 }
 
 fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
+    let num_validators = 20;
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
@@ -868,7 +899,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
                 .txn_expiration_time_secs(5 * 60),
         )
         .add_network_test(CompositeNetworkTest::new(
-            MultiRegionNetworkEmulationTest::default(),
+            MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
             CpuChaosTest::default(),
         ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1119,7 +1150,7 @@ fn realistic_env_sweep_wrap(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
-        .add_network_test(wrap_with_realistic_env(test))
+        .add_network_test(wrap_with_realistic_env(num_validators, test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
@@ -1388,10 +1419,11 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
 }
 
 fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig {
+    let num_validators = 20;
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(20)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 15000 })
                 .init_gas_price_multiplier(20),
@@ -1952,7 +1984,7 @@ fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20),
@@ -2013,7 +2045,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
-        .add_network_test(MultiRegionNetworkEmulationTest::default())
+        .add_network_test(MultiRegionNetworkEmulationTest::default_for_validator_count(VALIDATOR_COUNT))
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
         }))
@@ -2326,8 +2358,9 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
 }
 
 fn mainnet_like_simulation_test() -> ForgeConfig {
+    let num_validators = 20;
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
@@ -2336,7 +2369,7 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
                 .txn_expiration_time_secs(5 * 60),
         )
         .add_network_test(CompositeNetworkTest::new(
-            MultiRegionNetworkEmulationTest::default(),
+            MultiRegionNetworkEmulationTest::default_for_validator_count(num_validators),
             CpuChaosTest::default(),
         ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -2383,48 +2416,52 @@ fn indexer_test() -> ForgeConfig {
     // Define all the workloads and their corresponding success criteria upfront
     // The TransactionTypeArg is the workload per phase
     // The structure of the success criteria is generally (min_tps, latencies...). See below for the exact definition.
+    // NOTES on tuning these criteria:
+    // * The blockchain's TPS criteria are generally lower than that of other tests. This is because we want to only capture indexer performance regressions. Other tests with higher TPS requirements
+    //   for the blockchain would catch an earlier regression
+    // * The indexer latencies are inter-component within the indexer stack, but not that of the e2e wall-clock time vs the blockchain
     let workloads_and_criteria = vec![
         (
             TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
-            (7000, 0.5, 0.5, 0.5),
+            (7000, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
-            (8500, 0.5, 0.5, 0.5),
+            (8500, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
                 .with_transactions_per_account(1),
-            (2000, 0.5, 0.5, 0.5),
+            (2000, 0.5, 0.5, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
-            (3200, 0.5, 0.5, 0.5),
+            (2000, 1.0, 1.0, 0.5),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
                 .with_transactions_per_account(1),
-            (28, 0.5, 0.5, 0.5),
+            (28, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 100),
-            (100, 1.0, 1.0, 1.0),
+            (100, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture30KWith200Change, 100),
-            (100, 1.0, 1.0, 1.0),
+            (100, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(
                 TransactionTypeArg::TokenV1NFTMintAndTransferSequential,
                 1000,
             ),
-            (500, 0.5, 0.5, 0.5),
+            (500, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::TokenV1FTMintAndTransfer, 1000),
-            (500, 0.5, 0.5, 0.5),
+            (500, 0.5, 0.5, 0.1),
         ),
     ];
     let num_sweep = workloads_and_criteria.len();
