@@ -230,8 +230,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                 })?;
 
             // Also verify that all friends exist.
-            for (friend_addr, friend_name) in module.compiled_module_ref().immediate_friends_iter()
-            {
+            for (friend_addr, friend_name) in module.immediate_friends_iter() {
                 if !staged_module_storage.check_module_exists(friend_addr, friend_name)? {
                     return Err(module_linker_error!(friend_addr, friend_name));
                 }

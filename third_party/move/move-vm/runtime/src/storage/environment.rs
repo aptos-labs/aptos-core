@@ -125,10 +125,10 @@ impl RuntimeEnvironment {
             locally_verified_script.0.as_ref(),
             immediate_dependencies
                 .iter()
-                .map(|m| m.compiled_module_ref()),
+                .map(|module| module.as_ref().as_ref()),
         )?;
         Script::new(locally_verified_script.0, self.struct_name_index_map())
-            .map_err(|e| e.finish(Location::Script))
+            .map_err(|err| err.finish(Location::Script))
     }
 
     /// Creates a locally verified compiled module by running:
@@ -167,7 +167,7 @@ impl RuntimeEnvironment {
             locally_verified_module.0.as_ref(),
             immediate_dependencies
                 .iter()
-                .map(|m| m.compiled_module_ref()),
+                .map(|module| module.as_ref().as_ref()),
         )?;
         let result = Module::new(
             &self.natives,

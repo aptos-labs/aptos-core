@@ -21,7 +21,7 @@ use move_core_types::{
     metadata::Metadata, vm_status::StatusCode,
 };
 use move_vm_types::resolver::MoveResolver;
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 #[derive(Clone)]
 pub struct MoveVM {
@@ -135,7 +135,7 @@ impl MoveVM {
                     ),
                     &ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
                 )?;
-                Ok(module.compiled_module_arc().clone())
+                Ok(module.as_ref().deref().clone())
             },
             Loader::V2(_) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -190,11 +190,6 @@ impl MoveVM {
     where
         F: FnOnce(&[Metadata]) -> Option<T>,
     {
-        f(&self
-            .runtime
-            .module_cache
-            .fetch_module(module)?
-            .compiled_module_ref()
-            .metadata)
+        f(&self.runtime.module_cache.fetch_module(module)?.metadata)
     }
 }

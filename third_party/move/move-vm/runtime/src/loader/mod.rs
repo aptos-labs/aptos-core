@@ -525,7 +525,7 @@ impl LoaderV1 {
             .into_iter()
             .map(|module_id| self.load_module(&module_id, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.compiled_module_ref()))?;
+        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.as_ref().as_ref()))?;
         Ok(script)
     }
 
@@ -909,7 +909,7 @@ impl LoaderV1 {
 
         // verify that the transitive closure does not have cycles
         self.verify_module_cyclic_relations(
-            module_ref.compiled_module_ref(),
+            &module_ref,
             &BTreeMap::new(),
             &BTreeSet::new(),
             module_store,
@@ -1034,7 +1034,7 @@ impl LoaderV1 {
         // once all dependencies are loaded, do the linking check
         let all_imm_deps = bundle_deps
             .into_iter()
-            .chain(cached_deps.iter().map(|m| m.compiled_module_ref()));
+            .chain(cached_deps.iter().map(|m| m.as_ref().as_ref()));
         let result = dependencies::verify_module(module, all_imm_deps);
 
         // if dependencies loading is not allowed to fail, the linking should not fail as well

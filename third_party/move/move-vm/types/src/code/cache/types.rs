@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use bytes::Bytes;
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+};
 use std::{ops::Deref, sync::Arc};
 
 pub trait WithBytes {
@@ -14,6 +17,26 @@ pub trait WithBytes {
 
 pub trait WithHash {
     fn hash(&self) -> &[u8; 32];
+}
+
+pub trait WithAddress {
+    fn address(&self) -> &AccountAddress;
+}
+
+impl WithAddress for ModuleId {
+    fn address(&self) -> &AccountAddress {
+        self.address()
+    }
+}
+
+pub trait WithName {
+    fn name(&self) -> &IdentStr;
+}
+
+impl WithName for ModuleId {
+    fn name(&self) -> &IdentStr {
+        self.name()
+    }
 }
 
 /// An entry for the code cache that can have multiple different representations.
@@ -75,6 +98,7 @@ impl<D, V> Clone for Code<D, V> {
 }
 
 #[cfg(any(test, feature = "testing"))]
+#[derive(Clone)]
 pub struct MockDeserializedCode(usize);
 
 #[cfg(any(test, feature = "testing"))]

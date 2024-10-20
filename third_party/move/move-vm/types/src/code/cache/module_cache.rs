@@ -63,6 +63,19 @@ where
     }
 }
 
+impl<DC, VC, E, V> Clone for ModuleCode<DC, VC, E, V>
+where
+    V: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            code: self.code.clone(),
+            extension: self.extension.clone(),
+            version: self.version.clone(),
+        }
+    }
+}
+
 /// Interface for building module code to be stored in cache, e.g., if it is not yet cached.
 pub trait ModuleCodeBuilder {
     type Key: Eq + Hash + Clone;

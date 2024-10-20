@@ -15,14 +15,16 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::AptosModuleExtension,
     write_set::WriteOp,
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
-use move_core_types::value::MoveTypeLayout;
-use move_vm_runtime::RuntimeEnvironment;
+use move_binary_format::CompiledModule;
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
+use move_vm_runtime::{Module, RuntimeEnvironment};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -30,7 +32,7 @@ use std::{
     sync::Arc,
 };
 
-type TxnInput<T> = CapturedReads<T>;
+type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
 macro_rules! forward_on_success_or_skip_rest {
     ($self:ident, $txn_idx:ident, $f:ident) => {{
@@ -128,7 +130,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: CapturedReads<T>,
+        input: TxnInput<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
         group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)>,
@@ -173,7 +175,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
         self.inputs[txn_idx as usize].load_full()
     }
 

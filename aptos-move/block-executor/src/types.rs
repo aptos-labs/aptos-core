@@ -68,22 +68,27 @@ pub(crate) mod test_types {
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     };
     use move_vm_runtime::{Module, RuntimeEnvironment};
-    use move_vm_types::code::ModuleCode;
+    use move_vm_types::code::{MockDeserializedCode, MockVerifiedCode, ModuleCode};
     use std::sync::Arc;
 
-    /// Returns a dummy [ModuleCode] in deserialized state.
-    pub(crate) fn deserialized_code(
-        module_name: &str,
+    pub(crate) fn mock_deserialized_code(
+        value: usize,
         version: Option<TxnIndex>,
-    ) -> Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>> {
-        let compiled_module =
-            empty_module_with_dependencies_and_friends(module_name, vec![], vec![]);
-        let extension = Arc::new(AptosModuleExtension::new(StateValue::new_legacy(
-            Bytes::new(),
-        )));
+    ) -> Arc<ModuleCode<MockDeserializedCode, MockVerifiedCode, (), Option<TxnIndex>>> {
         Arc::new(ModuleCode::from_deserialized(
-            compiled_module,
-            extension,
+            MockDeserializedCode::new(value),
+            Arc::new(()),
+            version,
+        ))
+    }
+
+    pub(crate) fn mock_verified_code(
+        value: usize,
+        version: Option<TxnIndex>,
+    ) -> Arc<ModuleCode<MockDeserializedCode, MockVerifiedCode, (), Option<TxnIndex>>> {
+        Arc::new(ModuleCode::from_verified(
+            MockVerifiedCode::new(value),
+            Arc::new(()),
             version,
         ))
     }

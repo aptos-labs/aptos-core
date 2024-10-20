@@ -42,6 +42,7 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -50,9 +51,12 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::RuntimeEnvironment;
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
@@ -162,11 +166,14 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
-    pub(crate) captured_reads: RefCell<CapturedReads<T>>,
+    pub(crate) captured_reads:
+        RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
 
 fn get_delayed_field_value_impl<T: Transaction>(
-    captured_reads: &RefCell<CapturedReads<T>>,
+    captured_reads: &RefCell<
+        CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
     wait_for: &dyn TWaitForDependency,
     id: &T::Identifier,
@@ -304,7 +311,9 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
-    captured_reads: &RefCell<CapturedReads<T>>,
+    captured_reads: &RefCell<
+        CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
     wait_for: &dyn TWaitForDependency,
     id: &T::Identifier,
@@ -778,7 +787,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
 
 pub(crate) struct SequentialState<'a, T: Transaction> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
-    pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
+    pub(crate) read_set: RefCell<UnsyncReadSet<T, ModuleId>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
     // TODO: Move to UnsyncMap.
@@ -1009,7 +1018,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     /// Drains the parallel captured reads.
-    pub(crate) fn take_parallel_reads(&self) -> CapturedReads<T> {
+    pub(crate) fn take_parallel_reads(
+        &self,
+    ) -> CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
@@ -1019,7 +1030,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     /// Drains the unsync read set.
-    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T> {
+    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T, ModuleId> {
         match &self.latest_view {
             ViewState::Sync(_) => {
                 unreachable!("Take unsync reads called in parallel setting")
@@ -1890,7 +1901,13 @@ mod test {
     #[test]
     fn test_history_updates() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2029,7 +2046,13 @@ mod test {
     #[test]
     fn test_aggregator_overflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2168,7 +2191,13 @@ mod test {
     #[test]
     fn test_aggregator_underflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2307,7 +2336,13 @@ mod test {
     #[test]
     fn test_read_kind_upgrade_fail() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;

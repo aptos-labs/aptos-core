@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cross_block_caches::CrossBlockModuleCache, types::InputOutputKey,
+    cross_block_caches::ImmutableModuleCache, types::InputOutputKey,
     value_exchange::filter_value_for_exchange,
 };
 use anyhow::bail;
@@ -24,15 +24,12 @@ use aptos_types::{
     executable::ModulePath,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
-use move_binary_format::CompiledModule;
-use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
-use move_vm_runtime::Module;
-use move_vm_types::code::{ModuleCode, SyncModuleCache};
+use move_core_types::value::MoveTypeLayout;
+use move_vm_types::code::{ModuleCode, SyncModuleCache, WithAddress, WithName};
 use std::{
     collections::{
         hash_map::{
@@ -41,6 +38,8 @@ use std::{
         },
         BTreeMap, HashMap, HashSet,
     },
+    hash::Hash,
+    ops::Deref,
     sync::Arc,
 };
 
@@ -296,13 +295,11 @@ impl DelayedFieldRead {
 /// Represents a module read, either from immutable cross-block cache, or from code [SyncCodeCache]
 /// used by block executor (per-block cache). This way, when transaction needs to read a module
 /// from [SyncCodeCache] it can first check the read-set here.
-enum ModuleRead {
+enum ModuleRead<DC, VC, S> {
     /// Read from the cross-block module cache.
     GlobalCache,
     /// Read from per-block cache ([SyncCodeCache]) used by parallel execution.
-    PerBlockCache(
-        Option<Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>>,
-    ),
+    PerBlockCache(Option<Arc<ModuleCode<DC, VC, S, Option<TxnIndex>>>>),
 }
 
 /// Represents a result of a read from [CapturedReads] when they are used as the transaction-level
@@ -322,14 +319,14 @@ pub enum CacheRead<T> {
 /// read that has a kind <= already captured read (for that key / tag).
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct CapturedReads<T: Transaction> {
+pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
     #[deprecated]
     pub(crate) deprecated_module_reads: Vec<T::Key>,
-    module_reads: hashbrown::HashMap<ModuleId, ModuleRead>,
+    module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -338,7 +335,7 @@ pub(crate) struct CapturedReads<T: Transaction> {
     /// require different validation behavior (delayed fields are validated commit-time).
     delayed_field_speculative_failure: bool,
     non_delayed_field_speculative_failure: bool,
-    /// Set if the invarint on CapturedReads intended use is violated. Leads to an alert
+    /// Set if the invariant on CapturedReads intended use is violated. Leads to an alert
     /// and sequential execution fallback.
     incorrect_use: bool,
 }
@@ -351,7 +348,12 @@ enum UpdateResult {
     Inconsistency(String),
 }
 
-impl<T: Transaction> CapturedReads<T> {
+impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
+where
+    T: Transaction,
+    K: Hash + Eq + Ord + Clone,
+    VC: Deref<Target = Arc<DC>>,
+{
     // Return an iterator over the captured reads.
     pub(crate) fn get_read_values_with_delayed_fields(
         &self,
@@ -390,8 +392,8 @@ impl<T: Transaction> CapturedReads<T> {
 
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
     // consistency and ensures that the most comprehensive read is recorded.
-    fn update_entry<K, V: TransactionWrite>(
-        entry: Entry<K, DataRead<V>>,
+    fn update_entry<Q, V: TransactionWrite>(
+        entry: Entry<Q, DataRead<V>>,
         read: DataRead<V>,
     ) -> UpdateResult {
         match entry {
@@ -612,20 +614,18 @@ impl<T: Transaction> CapturedReads<T> {
     }
 
     /// Records the read to global cache that spans across multiple blocks.
-    pub(crate) fn capture_global_cache_read(&mut self, module_id: ModuleId) {
-        self.module_reads.insert(module_id, ModuleRead::GlobalCache);
+    pub(crate) fn capture_global_cache_read(&mut self, key: K) {
+        self.module_reads.insert(key, ModuleRead::GlobalCache);
     }
 
     /// Records the read to per-block level cache.
     pub(crate) fn capture_per_block_cache_read(
         &mut self,
-        module_id: ModuleId,
-        read: Option<
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>,
-        >,
+        key: K,
+        read: Option<Arc<ModuleCode<DC, VC, S, Option<TxnIndex>>>>,
     ) {
         self.module_reads
-            .insert(module_id, ModuleRead::PerBlockCache(read));
+            .insert(key, ModuleRead::PerBlockCache(read));
     }
 
     /// If the module has been previously read from [SyncCodeCache], returns it. Returns a panic
@@ -633,22 +633,14 @@ impl<T: Transaction> CapturedReads<T> {
     /// for those).
     pub(crate) fn get_module_read(
         &self,
-        module_id: &ModuleId,
-    ) -> Result<
-        CacheRead<
-            Option<Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>>,
-        >,
-        PanicError,
-    > {
-        Ok(match self.module_reads.get(module_id) {
+        key: &K,
+    ) -> Result<CacheRead<Option<Arc<ModuleCode<DC, VC, S, Option<TxnIndex>>>>>, PanicError> {
+        Ok(match self.module_reads.get(key) {
             Some(ModuleRead::PerBlockCache(read)) => CacheRead::Hit(read.clone()),
             Some(ModuleRead::GlobalCache) => {
-                let msg = format!(
-                    "Trying to get the captured read for {}::{} in global cache",
-                    module_id.address(),
-                    module_id.name()
-                );
-                return Err(PanicError::CodeInvariantError(msg));
+                return Err(PanicError::CodeInvariantError(
+                    "Global module cache reads do not capture values".to_string(),
+                ));
             },
             None => CacheRead::Miss,
         })
@@ -660,22 +652,17 @@ impl<T: Transaction> CapturedReads<T> {
     ///   3. Entries that were in per-block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
-        module_cache: &SyncModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-            Option<TxnIndex>,
-        >,
+        global_module_cache: &ImmutableModuleCache<K, DC, VC, S>,
+        per_block_module_cache: &SyncModuleCache<K, DC, VC, S, Option<TxnIndex>>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
             return false;
         }
 
-        self.module_reads.iter().all(|(id, read)| match read {
-            ModuleRead::GlobalCache => CrossBlockModuleCache::is_valid(id),
+        self.module_reads.iter().all(|(key, read)| match read {
+            ModuleRead::GlobalCache => global_module_cache.contains_valid(key),
             ModuleRead::PerBlockCache(previous) => {
-                let current_version = module_cache.get_module_version(id);
+                let current_version = per_block_module_cache.get_module_version(key);
                 let previous_version = previous.as_ref().map(|module| module.version());
                 current_version == previous_version
             },
@@ -772,6 +759,25 @@ impl<T: Transaction> CapturedReads<T> {
         Ok(true)
     }
 
+    pub(crate) fn mark_failure(&mut self, delayed_field_failure: bool) {
+        if delayed_field_failure {
+            self.delayed_field_speculative_failure = true;
+        } else {
+            self.non_delayed_field_speculative_failure = true;
+        }
+    }
+
+    pub(crate) fn mark_incorrect_use(&mut self) {
+        self.incorrect_use = true;
+    }
+}
+
+impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
+where
+    T: Transaction,
+    K: Hash + Eq + Ord + Clone + WithAddress + WithName,
+    VC: Deref<Target = Arc<DC>>,
+{
     pub(crate) fn get_read_summary(
         &self,
     ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
@@ -795,8 +801,8 @@ impl<T: Transaction> CapturedReads<T> {
         for key in &self.deprecated_module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
-        for id in self.module_reads.keys() {
-            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+        for key in self.module_reads.keys() {
+            let key = T::Key::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
         }
 
@@ -808,36 +814,28 @@ impl<T: Transaction> CapturedReads<T> {
 
         ret
     }
-
-    pub(crate) fn mark_failure(&mut self, delayed_field_failure: bool) {
-        if delayed_field_failure {
-            self.delayed_field_speculative_failure = true;
-        } else {
-            self.non_delayed_field_speculative_failure = true;
-        }
-    }
-
-    pub(crate) fn mark_incorrect_use(&mut self) {
-        self.incorrect_use = true;
-    }
 }
 
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct UnsyncReadSet<T: Transaction> {
+pub(crate) struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) resource_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<T::Identifier>,
 
     #[deprecated]
     pub(crate) deprecated_module_reads: HashSet<T::Key>,
-    module_reads: HashSet<ModuleId>,
+    module_reads: HashSet<K>,
 }
 
-impl<T: Transaction> UnsyncReadSet<T> {
+impl<T, K> UnsyncReadSet<T, K>
+where
+    T: Transaction,
+    K: Hash + Eq + Ord + Clone + WithAddress + WithName,
+{
     /// Captures the module read for sequential execution.
-    pub(crate) fn capture_module_read(&mut self, module_id: ModuleId) {
-        self.module_reads.insert(module_id);
+    pub(crate) fn capture_module_read(&mut self, key: K) {
+        self.module_reads.insert(key);
     }
 
     pub(crate) fn get_read_summary(
@@ -859,8 +857,8 @@ impl<T: Transaction> UnsyncReadSet<T> {
         for key in &self.deprecated_module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
-        for id in &self.module_reads {
-            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+        for key in &self.module_reads {
+            let key = T::Key::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
         }
 
@@ -877,14 +875,17 @@ mod test {
     use super::*;
     use crate::{
         proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
-        types::test_types::{deserialized_code, module_id, verified_code},
+        types::test_types::{mock_deserialized_code, mock_verified_code},
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use aptos_types::executable::ExecutableTestType;
     use claims::{
         assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
-    use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
+    use move_vm_types::{
+        code::{MockDeserializedCode, MockVerifiedCode, ModuleCache},
+        delayed_values::delayed_field_id::DelayedFieldID,
+    };
     use test_case::test_case;
 
     #[test]
@@ -1076,7 +1077,7 @@ mod test {
         ($m:expr, $x:expr, $y:expr) => {{
             let original = $m.get(&$x).cloned().unwrap();
             assert_matches!(
-                CapturedReads::<TestTransactionType>::update_entry($m.entry($x), $y.clone()),
+                CapturedReads::<TestTransactionType, u32, MockDeserializedCode, MockVerifiedCode, ()>::update_entry($m.entry($x), $y.clone()),
                 UpdateResult::IncorrectUse(_)
             );
             assert_some_eq!($m.get(&$x), &original);
@@ -1087,7 +1088,7 @@ mod test {
         ($m:expr, $x:expr, $y:expr) => {{
             let original = $m.get(&$x).cloned().unwrap();
             assert_matches!(
-                CapturedReads::<TestTransactionType>::update_entry($m.entry($x), $y.clone()),
+                CapturedReads::<TestTransactionType, u32, MockDeserializedCode, MockVerifiedCode, ()>::update_entry($m.entry($x), $y.clone()),
                 UpdateResult::Inconsistency(_)
             );
             assert_some_eq!($m.get(&$x), &original);
@@ -1097,7 +1098,7 @@ mod test {
     macro_rules! assert_update {
         ($m:expr, $x:expr, $y:expr) => {{
             assert_matches!(
-                CapturedReads::<TestTransactionType>::update_entry($m.entry($x), $y.clone()),
+                CapturedReads::<TestTransactionType, u32, MockDeserializedCode, MockVerifiedCode, ()>::update_entry($m.entry($x), $y.clone()),
                 UpdateResult::Updated
             );
             assert_some_eq!($m.get(&$x), &$y);
@@ -1107,7 +1108,7 @@ mod test {
     macro_rules! assert_insert {
         ($m:expr, $x:expr, $y:expr) => {{
             assert_matches!(
-                CapturedReads::<TestTransactionType>::update_entry($m.entry($x), $y.clone()),
+                CapturedReads::<TestTransactionType, u32, MockDeserializedCode, MockVerifiedCode, ()>::update_entry($m.entry($x), $y.clone()),
                 UpdateResult::Inserted
             );
             assert_some_eq!($m.get(&$x), &$y);
@@ -1274,7 +1275,13 @@ mod test {
     #[test_case(false)]
     #[test_case(true)]
     fn capture_and_get_by_kind(use_tag: bool) {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            u32,
+        >::new();
         let legacy_reads = legacy_reads_by_kind();
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
@@ -1302,7 +1309,13 @@ mod test {
     #[should_panic]
     #[test]
     fn metadata_for_group_member() {
-        let captured_reads = CapturedReads::<TestTransactionType>::new();
+        let captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            u32,
+        >::new();
         captured_reads.get_by_kind(&KeyType::<u32>(21, false), Some(&10), ReadKind::Metadata);
     }
 
@@ -1324,7 +1337,13 @@ mod test {
     #[test_case(false)]
     #[test_case(true)]
     fn incorrect_use_flag(use_tag: bool) {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
         let legacy_reads = legacy_reads_by_kind();
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
@@ -1380,7 +1399,13 @@ mod test {
     #[test_case(false)]
     #[test_case(true)]
     fn speculative_failure_flag(use_tag: bool) {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(
@@ -1431,7 +1456,13 @@ mod test {
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
 
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
         captured_reads.mark_failure(true);
@@ -1459,182 +1490,212 @@ mod test {
 
     #[test]
     fn test_speculative_failure_for_module_reads() {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
+        let global_module_cache = ImmutableModuleCache::empty();
+        let per_block_module_cache = SyncModuleCache::empty();
 
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
         captured_reads.mark_failure(true);
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
         captured_reads.mark_failure(false);
-        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        assert!(
+            !captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache)
+        );
     }
 
     #[test]
     fn test_global_cache_module_reads_are_not_recorded() {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
 
-        let module_id = module_id("a");
-        captured_reads.capture_global_cache_read(module_id.clone());
-
-        let result = captured_reads.get_module_read(&module_id);
-        assert!(result.is_err())
+        captured_reads.capture_global_cache_read(0);
+        assert!(captured_reads.get_module_read(&0).is_err())
     }
 
     #[test]
     fn test_global_cache_module_reads() {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
+        let global_module_cache = ImmutableModuleCache::empty();
+        let per_block_module_cache = SyncModuleCache::empty();
 
-        let a_id = module_id("a");
-        CrossBlockModuleCache::insert(a_id.clone(), verified_code("a", None));
-        captured_reads.capture_global_cache_read(a_id.clone());
+        global_module_cache.insert(0, mock_verified_code(0, None));
+        captured_reads.capture_global_cache_read(0);
 
-        let b_id = module_id("b");
-        CrossBlockModuleCache::insert(b_id.clone(), verified_code("b", None));
-        captured_reads.capture_global_cache_read(b_id.clone());
+        global_module_cache.insert(1, mock_verified_code(1, None));
+        captured_reads.capture_global_cache_read(1);
 
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
-        // Now, mark one of the cross-module entries invalid. Validations should fail!
-        CrossBlockModuleCache::mark_invalid(&b_id);
-        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        // Now, mark one of the entries in invalid. Validations should fail!
+        global_module_cache.mark_invalid(&1);
+        let valid =
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        assert!(!valid);
 
         // Without invalid module (and if it is not captured), validation should pass.
-        CrossBlockModuleCache::remove(&b_id);
-        captured_reads.module_reads.remove(&b_id);
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        global_module_cache.remove(&1);
+        captured_reads.module_reads.remove(&1);
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
         // Validation fails if we captured a cross-block module which does not exist anymore.
-        CrossBlockModuleCache::remove(&a_id);
-        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        global_module_cache.remove(&0);
+        let valid =
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        assert!(!valid);
     }
 
     #[test]
     fn test_block_cache_module_reads_are_recorded() {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
+        let per_block_module_cache: SyncModuleCache<u32, _, MockVerifiedCode, _, _> =
+            SyncModuleCache::empty();
 
-        let a_id = module_id("a");
-        let a = deserialized_code("a", Some(2));
-        mvhashmap
-            .module_cache()
+        let a = mock_deserialized_code(0, Some(2));
+        per_block_module_cache
             .insert_deserialized_module(
-                a_id.clone(),
+                0,
                 a.code().deserialized().as_ref().clone(),
                 a.extension().clone(),
                 a.version(),
             )
             .unwrap();
-        captured_reads.capture_per_block_cache_read(a_id.clone(), Some(a));
+        captured_reads.capture_per_block_cache_read(0, Some(a));
         assert!(matches!(
-            captured_reads.get_module_read(&a_id),
+            captured_reads.get_module_read(&0),
             Ok(CacheRead::Hit(Some(_)))
         ));
 
-        let b_id = module_id("b");
-        captured_reads.capture_per_block_cache_read(b_id.clone(), None);
+        captured_reads.capture_per_block_cache_read(1, None);
         assert!(matches!(
-            captured_reads.get_module_read(&b_id),
+            captured_reads.get_module_read(&1),
             Ok(CacheRead::Hit(None))
         ));
 
-        let c_id = module_id("c");
         assert!(matches!(
-            captured_reads.get_module_read(&c_id),
+            captured_reads.get_module_read(&2),
             Ok(CacheRead::Miss)
         ));
     }
 
     #[test]
     fn test_block_cache_module_reads() {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
+        let global_module_cache = ImmutableModuleCache::empty();
+        let per_block_module_cache = SyncModuleCache::empty();
 
-        let a_id = module_id("a");
-        let a = deserialized_code("a", Some(10));
-        mvhashmap
-            .module_cache()
+        let a = mock_deserialized_code(0, Some(10));
+        per_block_module_cache
             .insert_deserialized_module(
-                a_id.clone(),
+                0,
                 a.code().deserialized().as_ref().clone(),
                 a.extension().clone(),
                 a.version(),
             )
             .unwrap();
-        captured_reads.capture_per_block_cache_read(a_id.clone(), Some(a));
+        captured_reads.capture_per_block_cache_read(0, Some(a));
+        captured_reads.capture_per_block_cache_read(1, None);
 
-        let b_id = module_id("b");
-        captured_reads.capture_per_block_cache_read(b_id.clone(), None);
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
-
-        // Entry did not exist before and now exists.
-        let b = deserialized_code("b", Some(12));
-        mvhashmap
-            .module_cache()
+        let b = mock_deserialized_code(1, Some(12));
+        per_block_module_cache
             .insert_deserialized_module(
-                b_id.clone(),
+                1,
                 b.code().deserialized().as_ref().clone(),
                 b.extension().clone(),
                 b.version(),
             )
             .unwrap();
 
-        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        // Entry did not exist before and now exists.
+        let valid =
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        assert!(!valid);
 
-        captured_reads.module_reads.remove(&b_id);
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        captured_reads.module_reads.remove(&1);
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
         // Version has been republished, with a higher transaction index. Should fail validation.
-        let a = deserialized_code("a", Some(20));
-        mvhashmap
-            .module_cache()
+        let a = mock_deserialized_code(0, Some(20));
+        per_block_module_cache
             .insert_deserialized_module(
-                a_id.clone(),
+                0,
                 a.code().deserialized().as_ref().clone(),
                 a.extension().clone(),
                 a.version(),
             )
             .unwrap();
 
-        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        let valid =
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        assert!(!valid);
     }
 
     #[test]
     fn test_global_and_block_cache_module_reads() {
-        let mut captured_reads = CapturedReads::<TestTransactionType>::new();
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mut captured_reads = CapturedReads::<
+            TestTransactionType,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new();
+        let global_module_cache = ImmutableModuleCache::empty();
+        let per_block_module_cache = SyncModuleCache::empty();
 
         // Module exists in global cache.
-        let a_id = module_id("a");
-        let a = verified_code("a", None);
-        CrossBlockModuleCache::insert(a_id.clone(), a.clone());
-        captured_reads.capture_global_cache_read(a_id.clone());
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
+        global_module_cache.insert(0, mock_verified_code(0, None));
+        captured_reads.capture_global_cache_read(0);
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
         // Assume we republish this module: validation must fail.
-        let a = deserialized_code("a", Some(10));
-        CrossBlockModuleCache::mark_invalid(&a_id);
-        mvhashmap
-            .module_cache()
+        let a = mock_deserialized_code(100, Some(10));
+        global_module_cache.mark_invalid(&0);
+        per_block_module_cache
             .insert_deserialized_module(
-                a_id.clone(),
+                0,
                 a.code().deserialized().as_ref().clone(),
                 a.extension().clone(),
                 a.version(),
             )
             .unwrap();
-        assert!(!captured_reads.validate_module_reads(mvhashmap.module_cache()));
+
+        let valid =
+            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        assert!(!valid);
 
         // Assume we re-read the new correct version. Then validation should pass again.
-        captured_reads.capture_per_block_cache_read(a_id.clone(), Some(a.clone()));
-        assert!(captured_reads.validate_module_reads(mvhashmap.module_cache()));
-        assert!(!CrossBlockModuleCache::is_valid(&a_id));
-        CrossBlockModuleCache::remove(&a_id);
+        captured_reads.capture_per_block_cache_read(0, Some(a));
+        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(!global_module_cache.contains_valid(&0));
     }
 }
