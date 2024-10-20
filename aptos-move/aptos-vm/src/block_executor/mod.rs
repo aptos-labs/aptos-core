@@ -12,8 +12,9 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
-    cross_block_caches::CachedAptosEnvironment, errors::BlockExecutionError,
-    executor::BlockExecutor, task::TransactionOutput as BlockExecutorTransactionOutput,
+    cross_block_caches::get_environment_with_delayed_field_optimization_enabled,
+    errors::BlockExecutionError, executor::BlockExecutor,
+    task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
@@ -416,8 +417,7 @@ impl BlockAptosVM {
             ExecutableTestType,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let environment =
-            CachedAptosEnvironment::get_with_delayed_field_optimization_enabled(state_view)?;
+        let environment = get_environment_with_delayed_field_optimization_enabled(state_view)?;
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {

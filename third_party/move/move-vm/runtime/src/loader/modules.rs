@@ -670,14 +670,6 @@ impl Module {
         self.struct_instantiations[idx as usize].field_count
     }
 
-    pub fn compiled_module_ref(&self) -> &CompiledModule {
-        &self.module
-    }
-
-    pub fn compiled_module_arc(&self) -> &Arc<CompiledModule> {
-        &self.module
-    }
-
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         self.field_handles[idx.0 as usize].offset
     }

@@ -8,7 +8,7 @@ use crate::{
         PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
-    cross_block_caches::CrossBlockModuleCache,
+    cross_block_caches::get_global_module_cache,
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
@@ -411,7 +411,10 @@ where
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
             && (scheduler.skip_module_reads_validation()
-                || read_set.validate_module_reads(versioned_cache.module_cache()))
+                || read_set.validate_module_reads(
+                    get_global_module_cache(),
+                    versioned_cache.module_cache(),
+                ))
     }
 
     fn update_transaction_on_abort(
@@ -1125,12 +1128,11 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
-        CrossBlockModuleCache::populate_from_code_cache_at_block_end(
-            versioned_cache.take_modules_iter(),
-        )
-        .map_err(|err| {
-            alert!("[BlockSTM] Encountered panic error: {:?}", err);
-        })?;
+        get_global_module_cache()
+            .insert_verified_unchecked(versioned_cache.take_modules_iter())
+            .map_err(|err| {
+                alert!("[BlockSTM] Encountered panic error: {:?}", err);
+            })?;
 
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
@@ -1180,7 +1182,7 @@ where
             })?;
         let extension = AptosModuleExtension::new(state_value);
 
-        CrossBlockModuleCache::mark_invalid(&id);
+        get_global_module_cache().mark_invalid(&id);
         module_cache
             .insert_deserialized_module(
                 id.clone(),
@@ -1594,9 +1596,7 @@ where
         ret.resize_with(num_txns, E::Output::skip_output);
 
         counters::update_state_counters(unsync_map.stats(), false);
-        CrossBlockModuleCache::populate_from_code_cache_at_block_end(
-            unsync_map.into_modules_iter(),
-        )?;
+        get_global_module_cache().insert_verified_unchecked(unsync_map.into_modules_iter())?;
 
         let block_end_info = if self
             .config
@@ -1656,7 +1656,7 @@ where
             // Flush the cache and the environment to re-run from the "clean" state.
             env.runtime_environment()
                 .flush_struct_name_and_info_caches();
-            CrossBlockModuleCache::flush_at_block_start();
+            get_global_module_cache().flush_unchecked();
 
             info!("parallel execution requiring fallback");
         }
