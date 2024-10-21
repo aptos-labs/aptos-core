@@ -30,7 +30,7 @@ members = [
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
     "aptos-move/block-executor",
-    "aptos-move/dynamic-transaction-composer",
+    "aptos-move/script-composer",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -328,7 +328,7 @@ aptos-event-notifications = { path = "state-sync/inter-component/event-notificat
 aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-block-partitioner = { path = "execution/block-partitioner" }
-aptos-dynamic-transaction-composer = { path = "aptos-move/dynamic-transaction-composer" }
+aptos-script-composer = { path = "aptos-move/script-composer" }
 aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
@@ -793,6 +793,7 @@ tonic = { version = "0.11.0", features = [
 ] }
 tonic-reflection = "0.11.0"
 triomphe = "0.1.9"
+tsify-next = "0.5.4"
 tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
@@ -807,6 +808,8 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.42"
 which = "4.2.5"
 whoami = "1.5.0"
 x25519-dalek = "1.2.0"

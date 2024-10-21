@@ -9,10 +9,10 @@
 //! and get the corresponding `CompiledScript` via the `generate_batched_calls` api.
 
 #[cfg(test)]
-use crate::BatchedFunctionCall;
+use crate::MoveFunctionCall;
 use crate::{
     helpers::{import_signature, import_type_tag, Script},
-    ArgumentOperation, BatchArgument, PreviousResult, APTOS_SCRIPT_BUILDER_KEY,
+    ArgumentOperation, CallArgument, ComposerVersion, PreviousResult, APTOS_SCRIPT_COMPOSER_KEY,
 };
 use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
@@ -97,7 +97,8 @@ impl TransactionComposer {
         }
     }
 
-    /// Create a builder with one signer needed for script. This would be needed for multi-agent transaction where multiple signers are present.
+    /// Create a builder with one signer needed for script. This would be needed for multi-agent
+    /// transaction where multiple signers are present.
     pub fn multi_signer(signer_count: u16) -> Self {
         let mut script = empty_script();
         script.code.code = vec![];
@@ -127,7 +128,8 @@ impl TransactionComposer {
             .map_err(|e| e.to_string())
     }
 
-    /// Load up a module from a remote endpoint. Will need to invoke this function prior to the call.
+    /// Load up a module from a remote endpoint. Will need to invoke this function prior to the
+    /// call.
     pub async fn load_module(
         &mut self,
         api_url: String,
@@ -140,6 +142,7 @@ impl TransactionComposer {
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
 
+    /// Load up the dependency modules of a TypeTag from a remote endpoint.
     pub async fn load_type_tag(
         &mut self,
         api_url: String,
@@ -152,14 +155,22 @@ impl TransactionComposer {
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
 
+    /// This would be the core api for the `TransactionComposer`. The function would:
+    /// - add the function call to the builder
+    /// - allocate the locals and parameters needed for this function call
+    /// - return the arguments back to the caller which could be passed into subsequent calls
+    ///   into `add_batched_call`.
+    ///
+    /// This function would also check for the ability and type safety when passing values
+    /// into the function call, and will abort if there's a violation.
     #[wasm_bindgen(js_name = add_batched_call)]
     pub fn add_batched_call_wasm(
         &mut self,
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<BatchArgument>,
-    ) -> Result<Vec<BatchArgument>, JsValue> {
+        args: Vec<CallArgument>,
+    ) -> Result<Vec<CallArgument>, JsValue> {
         self.add_batched_call(module, function, ty_args, args)
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
@@ -216,8 +227,8 @@ impl TransactionComposer {
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<BatchArgument>,
-    ) -> anyhow::Result<Vec<BatchArgument>> {
+        args: Vec<CallArgument>,
+    ) -> anyhow::Result<Vec<CallArgument>> {
         let ty_args = ty_args
             .iter()
             .map(|s| TypeTag::from_str(s))
@@ -261,7 +272,7 @@ impl TransactionComposer {
 
         for (arg, ty) in args.into_iter().zip(expected_args_ty) {
             match arg {
-                BatchArgument::PreviousResult(r) => {
+                CallArgument::PreviousResult(r) => {
                     let argument = AllocatedLocal {
                         op_type: r.operation_type,
                         is_parameter: false,
@@ -270,12 +281,12 @@ impl TransactionComposer {
                     self.check_argument_compatibility(&argument, &ty)?;
                     arguments.push(argument)
                 },
-                BatchArgument::Signer(i) => arguments.push(AllocatedLocal {
+                CallArgument::Signer(i) => arguments.push(AllocatedLocal {
                     op_type: ArgumentOperation::Copy,
                     is_parameter: true,
                     local_idx: i,
                 }),
-                BatchArgument::Raw(bytes) => {
+                CallArgument::Raw(bytes) => {
                     let new_local_idx = self.parameters_ty.len() as u16;
                     self.parameters_ty.push(ty);
                     self.parameters.push(bytes);
@@ -321,7 +332,7 @@ impl TransactionComposer {
 
         Ok((0..returns.len())
             .map(|idx| {
-                BatchArgument::PreviousResult(PreviousResult {
+                CallArgument::PreviousResult(PreviousResult {
                     operation_type: ArgumentOperation::Move,
                     call_idx: num_of_calls,
                     return_idx: idx as u16,
@@ -388,8 +399,8 @@ impl TransactionComposer {
         move_bytecode_verifier::verify_script(&script).map_err(|err| anyhow!("{:?}", err))?;
         if with_metadata {
             script.metadata.push(Metadata {
-                key: APTOS_SCRIPT_BUILDER_KEY.to_owned(),
-                value: vec![],
+                key: APTOS_SCRIPT_COMPOSER_KEY.to_owned(),
+                value: bcs::to_bytes(&ComposerVersion::V1).unwrap(),
             });
         }
         let mut bytes = vec![];
@@ -459,13 +470,13 @@ impl TransactionComposer {
                 }
                 Ok(())
             },
-            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, &v)).await,
+            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, v)).await,
             _ => Ok(()),
         }
     }
 
     #[cfg(test)]
-    pub(crate) fn assert_decompilation_eq(&self, calls: &[BatchedFunctionCall]) {
+    pub(crate) fn assert_decompilation_eq(&self, calls: &[MoveFunctionCall]) {
         let script = self.builder.as_script();
 
         assert_eq!(self.calls.len(), calls.len());
@@ -488,11 +499,11 @@ impl TransactionComposer {
     }
 
     #[cfg(test)]
-    fn check_argument_eq(&self, lhs: &AllocatedLocal, rhs: &BatchArgument) {
+    fn check_argument_eq(&self, lhs: &AllocatedLocal, rhs: &CallArgument) {
         use crate::PreviousResult;
 
         match rhs {
-            BatchArgument::PreviousResult(PreviousResult {
+            CallArgument::PreviousResult(PreviousResult {
                 call_idx,
                 return_idx,
                 operation_type,
@@ -504,7 +515,7 @@ impl TransactionComposer {
                     is_parameter: false,
                 });
             },
-            BatchArgument::Raw(input) => {
+            CallArgument::Raw(input) => {
                 assert!(lhs.is_parameter);
                 assert_eq!(lhs.op_type, ArgumentOperation::Move);
                 assert_eq!(
@@ -512,7 +523,7 @@ impl TransactionComposer {
                     input
                 );
             },
-            BatchArgument::Signer(idx) => {
+            CallArgument::Signer(idx) => {
                 assert_eq!(lhs, &AllocatedLocal {
                     op_type: ArgumentOperation::Copy,
                     is_parameter: true,
