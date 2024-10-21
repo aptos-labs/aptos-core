@@ -455,7 +455,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::code::cache::types::{MockDeserializedCode, MockVerifiedCode};
+    use crate::code::{MockDeserializedCode, MockVerifiedCode};
     use claims::{assert_ok, assert_some};
     use move_binary_format::errors::{Location, PartialVMError};
     use move_core_types::vm_status::StatusCode;

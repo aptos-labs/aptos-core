@@ -3,16 +3,10 @@
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{error::PanicError, state_store::StateView, vm::modules::AptosModuleExtension};
-use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_types::error::PanicError;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
-use move_binary_format::{errors::Location, CompiledModule};
-use move_core_types::{language_storage::ModuleId, vm_status::VMStatus};
-use move_vm_runtime::{Module, WithRuntimeEnvironment};
 use move_vm_types::code::ModuleCode;
-use once_cell::sync::Lazy;
-use parking_lot::Mutex;
 use std::{
     hash::Hash,
     ops::Deref,
@@ -22,50 +16,10 @@ use std::{
     },
 };
 
-/// The maximum size of struct name index map in runtime environment. Checked at block boundaries
-/// only.
-const MAX_STRUCT_NAME_INDEX_MAP_SIZE: usize = 100_000;
-
-/// A cached environment that can be persisted across blocks. Used by block executor only.
-static CROSS_BLOCK_ENVIRONMENT: Lazy<Mutex<Option<AptosEnvironment>>> =
-    Lazy::new(|| Mutex::new(None));
-
-/// Returns the cached environment if it exists and has the same configuration as if it was
-/// created based on the current state, or creates a new one and caches it. Should only be
-/// called at the block boundaries.
-pub fn get_environment_with_delayed_field_optimization_enabled(
-    state_view: &impl StateView,
-) -> Result<AptosEnvironment, VMStatus> {
-    // Create a new environment.
-    let current_env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-
-    // Lock the cache, and check if the environment is the same.
-    let mut cross_block_environment = CROSS_BLOCK_ENVIRONMENT.lock();
-    if let Some(previous_env) = cross_block_environment.as_ref() {
-        if &current_env == previous_env {
-            let runtime_env = previous_env.runtime_environment();
-            let struct_name_index_map_size = runtime_env
-                .struct_name_index_map_size()
-                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-            if struct_name_index_map_size > MAX_STRUCT_NAME_INDEX_MAP_SIZE {
-                // Cache is too large, flush it. Also flush the module cache.
-                runtime_env.flush_struct_name_and_info_caches();
-                get_global_module_cache().flush_unchecked();
-            }
-            return Ok(previous_env.clone());
-        }
-    }
-
-    // It is not cached or has changed, so we have to reset it. As a result, we need to flush
-    // the cross-block cache because we need to reload all modules with new configs.
-    *cross_block_environment = Some(current_env.clone());
-    drop(cross_block_environment);
-    get_global_module_cache().flush_unchecked();
-
-    Ok(current_env)
-}
-
 /// Module code stored in cross-block module cache.
+// TODO(loader_v2):
+//   We can move this to move-vm-types, but then we also need to have version generic or expose
+//   transaction index there, and define PanicError in Move (or convert from VMError).
 struct ImmutableModuleCode<DC, VC, E> {
     /// True if this code is "valid" within the block execution context (i.e, there has been no
     /// republishing of this module so far). If false, executor needs to read the module from the
@@ -129,11 +83,10 @@ pub struct ImmutableModuleCache<K, DC, VC, E> {
 impl<K, DC, VC, E> ImmutableModuleCache<K, DC, VC, E>
 where
     K: Hash + Eq + Clone,
-
     VC: Deref<Target = Arc<DC>>,
 {
     /// Returns new empty module cache with default capacity.
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         let default_capacity = 100_000;
         Self::with_capacity(default_capacity)
     }
@@ -220,56 +173,31 @@ where
     }
 
     /// Insert the module to cache. Used for tests only.
-    #[cfg(test)]
-    pub(crate) fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) {
+    #[cfg(any(test, feature = "testing"))]
+    pub fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) {
         self.module_cache
             .acquire()
             .insert(key, ImmutableModuleCode::new(module).unwrap());
     }
 
     /// Removes the module from cache. Used for tests only.
-    #[cfg(test)]
-    pub(crate) fn remove(&self, key: &K) {
+    #[cfg(any(test, feature = "testing"))]
+    pub fn remove(&self, key: &K) {
         self.module_cache.acquire().remove(key);
     }
 
     /// Returns the size of the cache. Used for tests only.
-    #[cfg(test)]
-    pub(crate) fn size(&self) -> usize {
+    #[cfg(any(test, feature = "testing"))]
+    pub fn size(&self) -> usize {
         self.module_cache.acquire().len()
     }
-}
-
-/// Immutable global cache. The size of the cache is fixed within a single block (modules are not
-/// inserted or removed) and it is only mutated at the block boundaries. At the same time, modules
-/// in this cache can be marked as "invalid" so that block executor can decide on whether to read
-/// the module from this cache or from elsewhere.
-#[allow(clippy::redundant_closure)]
-static CROSS_BLOCK_MODULE_CACHE: Lazy<
-    ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-> = Lazy::new(|| ImmutableModuleCache::empty());
-
-/// Returns the module from the cross module cache. If the module has not been cached, or is
-/// no longer valid due to module publishing, [None] is returned.
-pub fn get_global_module_cache(
-) -> &'static ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension> {
-    &CROSS_BLOCK_MODULE_CACHE
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::test_types::{
-        mock_deserialized_code, mock_verified_code, module_id, verified_code,
-    };
-    use aptos_types::{
-        on_chain_config::{FeatureFlag, Features},
-        state_store::{
-            errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-            state_value::StateValue, StateViewId, TStateView,
-        },
-    };
     use claims::{assert_err, assert_ok, assert_some};
+    use move_vm_types::code::{mock_deserialized_code, mock_verified_code};
 
     #[test]
     fn test_immutable_module_code() {
@@ -348,66 +276,5 @@ mod test {
         let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
         assert!(result.is_ok());
         assert_eq!(global_cache.size(), 1);
-    }
-
-    #[derive(Default)]
-    struct HashMapView {
-        data: HashMap<StateKey, StateValue>,
-    }
-
-    impl TStateView for HashMapView {
-        type Key = StateKey;
-
-        fn get_state_value(
-            &self,
-            state_key: &Self::Key,
-        ) -> Result<Option<StateValue>, StateviewError> {
-            Ok(self.data.get(state_key).cloned())
-        }
-
-        fn id(&self) -> StateViewId {
-            unreachable!("Not used in tests");
-        }
-
-        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-            unreachable!("Not used in tests");
-        }
-    }
-
-    #[test]
-    fn test_cross_block_module_cache_flush() {
-        let c_id = module_id("c");
-        get_global_module_cache().insert(c_id.clone(), verified_code("c", None));
-        assert_eq!(get_global_module_cache().size(), 1);
-
-        get_global_module_cache().flush_unchecked();
-        assert_eq!(get_global_module_cache().size(), 0);
-
-        // Now check that cache is flushed when the environment is flushed.
-        let mut state_view = HashMapView::default();
-        let env_old = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
-
-        for i in 0..10 {
-            let name = format!("m_{}", i);
-            let id = module_id(&name);
-            get_global_module_cache().insert(id.clone(), verified_code(&name, None));
-        }
-        assert_eq!(get_global_module_cache().size(), 10);
-
-        let state_key = StateKey::on_chain_config::<Features>().unwrap();
-        let mut features = Features::default();
-        features.disable(FeatureFlag::KEYLESS_ACCOUNTS);
-        state_view.data.insert(
-            state_key,
-            StateValue::new_legacy(bcs::to_bytes(&features).unwrap().into()),
-        );
-
-        // New environment means we need to also flush global caches - to invalidate struct name
-        // indices.
-        let env_new = assert_ok!(get_environment_with_delayed_field_optimization_enabled(
-            &state_view
-        ));
-        assert!(env_old != env_new);
-        assert_eq!(get_global_module_cache().size(), 0);
     }
 }

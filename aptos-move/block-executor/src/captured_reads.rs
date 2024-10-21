@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cross_block_caches::ImmutableModuleCache, types::InputOutputKey,
+    code_cache_global::ImmutableModuleCache, types::InputOutputKey,
     value_exchange::filter_value_for_exchange,
 };
 use anyhow::bail;
@@ -873,17 +873,17 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
-        types::test_types::{mock_deserialized_code, mock_verified_code},
-    };
+    use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use aptos_types::executable::ExecutableTestType;
     use claims::{
         assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
     use move_vm_types::{
-        code::{MockDeserializedCode, MockVerifiedCode, ModuleCache},
+        code::{
+            mock_deserialized_code, mock_verified_code, MockDeserializedCode, MockVerifiedCode,
+            ModuleCache,
+        },
         delayed_values::delayed_field_id::DelayedFieldID,
     };
     use test_case::test_case;

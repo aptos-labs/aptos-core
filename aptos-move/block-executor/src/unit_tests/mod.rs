@@ -5,6 +5,7 @@
 mod code_cache_tests;
 
 use crate::{
+    code_cache_global::ImmutableModuleCache,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
@@ -86,6 +87,7 @@ fn test_resource_group_deletion() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
+        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
@@ -152,6 +154,7 @@ fn resource_group_bcs_fallback() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
+        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
@@ -251,6 +254,7 @@ fn block_output_err_precedence() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
+        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
@@ -290,6 +294,7 @@ fn skip_rest_gas_limit() {
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
+        Arc::new(ImmutableModuleCache::empty()),
         None,
     );
 
@@ -325,6 +330,7 @@ where
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
+        Arc::new(ImmutableModuleCache::empty()),
         None,
     )
     .execute_transactions_parallel(&env, &transactions, &data_view);
