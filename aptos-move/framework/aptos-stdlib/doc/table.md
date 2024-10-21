@@ -22,7 +22,7 @@ struct itself, while the operations are implemented as native functions. No trav
 -  [Function `upsert`](#0x1_table_upsert)
 -  [Function `remove`](#0x1_table_remove)
 -  [Function `contains`](#0x1_table_contains)
--  [Function `destroy`](#0x1_table_destroy)
+-  [Function `destroy_known_empty_unsafe`](#0x1_table_destroy_known_empty_unsafe)
 -  [Function `new_table_handle`](#0x1_table_new_table_handle)
 -  [Function `add_box`](#0x1_table_add_box)
 -  [Function `borrow_box`](#0x1_table_borrow_box)
@@ -41,7 +41,7 @@ struct itself, while the operations are implemented as native functions. No trav
     -  [Function `upsert`](#@Specification_0_upsert)
     -  [Function `remove`](#@Specification_0_remove)
     -  [Function `contains`](#@Specification_0_contains)
-    -  [Function `destroy`](#@Specification_0_destroy)
+    -  [Function `destroy_known_empty_unsafe`](#@Specification_0_destroy_known_empty_unsafe)
 
 
 <pre><code></code></pre>
@@ -352,15 +352,15 @@ Returns true iff <code>self</code> contains an entry for <code>key</code>.
 
 </details>
 
-<a id="0x1_table_destroy"></a>
+<a id="0x1_table_destroy_known_empty_unsafe"></a>
 
-## Function `destroy`
+## Function `destroy_known_empty_unsafe`
 
 Table cannot know if it is empty or not, so this method is not public,
 and can be used only in modules that know by themselves that table is empty.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy">destroy</a>&lt;K: <b>copy</b>, drop, V&gt;(self: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;K: <b>copy</b>, drop, V&gt;(self: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -369,7 +369,7 @@ and can be used only in modules that know by themselves that table is empty.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy">destroy</a>&lt;K: <b>copy</b> + drop, V&gt;(self: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;K: <b>copy</b> + drop, V&gt;(self: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;) {
     <a href="table.md#0x1_table_destroy_empty_box">destroy_empty_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(&self);
     <a href="table.md#0x1_table_drop_unchecked_box">drop_unchecked_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self)
 }
@@ -583,7 +583,7 @@ and can be used only in modules that know by themselves that table is empty.
 
 <pre><code><b>pragma</b> intrinsic = map,
     map_new = new,
-    map_destroy_empty = destroy,
+    map_destroy_empty = destroy_known_empty_unsafe,
     map_has_key = contains,
     map_add_no_override = add,
     map_add_override_if_exists = upsert,
@@ -763,12 +763,12 @@ and can be used only in modules that know by themselves that table is empty.
 
 
 
-<a id="@Specification_0_destroy"></a>
+<a id="@Specification_0_destroy_known_empty_unsafe"></a>
 
-### Function `destroy`
+### Function `destroy_known_empty_unsafe`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy">destroy</a>&lt;K: <b>copy</b>, drop, V&gt;(self: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;K: <b>copy</b>, drop, V&gt;(self: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;)
 </code></pre>
 
 

@@ -36,6 +36,7 @@ once it contains enough keys
 -  [Function `find`](#0x1_big_ordered_map_find)
 -  [Function `contains`](#0x1_big_ordered_map_contains)
 -  [Function `borrow`](#0x1_big_ordered_map_borrow)
+-  [Function `borrow_mut`](#0x1_big_ordered_map_borrow_mut)
 -  [Function `new_begin_iter`](#0x1_big_ordered_map_new_begin_iter)
 -  [Function `new_end_iter`](#0x1_big_ordered_map_new_end_iter)
 -  [Function `iter_is_begin`](#0x1_big_ordered_map_iter_is_begin)
@@ -115,13 +116,13 @@ So Leaf node contains multiple values, not just one.
 
 </dd>
 <dt>
-<code>prev: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a></code>
+<code>prev: u64</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>next: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a></code>
+<code>next: u64</code>
 </dt>
 <dd>
 
@@ -235,7 +236,7 @@ An iterator to iterate all keys in the BigOrderedMap.
 
 <dl>
 <dt>
-<code>node_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a></code>
+<code>node_index: u64</code>
 </dt>
 <dd>
  The node index of the iterator pointing to.
@@ -291,28 +292,22 @@ The BigOrderedMap data structure.
 <code>root: <a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;</code>
 </dt>
 <dd>
-
-</dd>
-<dt>
-<code>root_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a></code>
-</dt>
-<dd>
- The node index of the root node.
+ Root node. It is stored directly in the resource itself, unlike all other nodes.
 </dd>
 <dt>
 <code>nodes: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;&gt;</code>
 </dt>
 <dd>
- Mapping of node_index -> node.
+ Storage of all non-root nodes. They are stored in separate storage slots.
 </dd>
 <dt>
-<code>min_leaf_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a></code>
+<code>min_leaf_index: u64</code>
 </dt>
 <dd>
  The node index of the leftmost node.
 </dd>
 <dt>
-<code>max_leaf_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a></code>
+<code>max_leaf_index: u64</code>
 </dt>
 <dd>
  The node index of the rightmost node.
@@ -352,15 +347,26 @@ The BigOrderedMap data structure.
 
 <a id="0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN"></a>
 
+Internal errors.
 
 
-<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>: u64 = 7;
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>: u64 = 20;
+</code></pre>
+
+
+
+<a id="0x1_big_ordered_map_NULL_INDEX"></a>
+
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>: u64 = 0;
 </code></pre>
 
 
 
 <a id="0x1_big_ordered_map_EITER_OUT_OF_BOUNDS"></a>
 
+Trying to do an operation on an Iterator that would go out of bounds
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>: u64 = 3;
@@ -417,6 +423,7 @@ Map key is not found
 
 <a id="0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE"></a>
 
+Trying to insert too large of an object into the mp.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>: u64 = 6;
@@ -424,8 +431,20 @@ Map key is not found
 
 
 
+<a id="0x1_big_ordered_map_EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE"></a>
+
+borrow_mut requires that key and value types have constant size
+(otherwise it wouldn't be able to guarantee size requirements are not violated)
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE">EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE</a>: u64 = 7;
+</code></pre>
+
+
+
 <a id="0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER"></a>
 
+The provided configuration parameter is invalid.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>: u64 = 4;
@@ -435,6 +454,7 @@ Map key is not found
 
 <a id="0x1_big_ordered_map_EMAP_NOT_EMPTY"></a>
 
+Map isn't empty
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EMAP_NOT_EMPTY">EMAP_NOT_EMPTY</a>: u64 = 5;
@@ -456,6 +476,15 @@ Map key is not found
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>: u64 = 204800;
+</code></pre>
+
+
+
+<a id="0x1_big_ordered_map_ROOT_INDEX"></a>
+
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>: u64 = 1;
 </code></pre>
 
 
@@ -507,16 +536,18 @@ If 0 is passed, then it is dynamically computed based on size of first key and v
     <b>assert</b>!(leaf_max_degree == 0 || leaf_max_degree &gt;= <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_LEAF_MIN_DEGREE">DEFAULT_LEAF_MIN_DEGREE</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
     <b>assert</b>!(reuse_slots || num_to_preallocate == 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
 
+    // Assert that <a href="storage_slots_allocator.md#0x1_storage_slots_allocator">storage_slots_allocator</a> special indices are aligned:
+    <b>assert</b>!(<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_is_null_index">storage_slots_allocator::is_null_index</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+    <b>assert</b>!(<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_is_special_unused_index">storage_slots_allocator::is_special_unused_index</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+
     <b>let</b> nodes = <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new">storage_slots_allocator::new</a>(<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_new_config">storage_slots_allocator::new_config</a>(reuse_slots, num_to_preallocate));
 
-    <b>let</b> root_ref = <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_special_ref">storage_slots_allocator::special_ref</a>();
     <b>let</b> self = BigOrderedMap::BPlusTreeMap {
         root: <a href="big_ordered_map.md#0x1_big_ordered_map_new_node">new_node</a>(/*is_leaf=*/<b>true</b>),
-        root_index: root_ref,
         nodes: nodes,
-        min_leaf_index: root_ref,
-        max_leaf_index: root_ref,
-        constant_kv_size: <b>false</b>,
+        min_leaf_index: <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>,
+        max_leaf_index: <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>,
+        constant_kv_size: <b>false</b>, // Will be initialized in validate_static_size_and_init_max_degrees below.
         inner_max_degree: inner_max_degree,
         leaf_max_degree: leaf_max_degree
     };
@@ -546,9 +577,11 @@ Destroys the map if it's empty, otherwise aborts.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty">destroy_empty</a>&lt;K: store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;) {
-    <b>let</b> BigOrderedMap::BPlusTreeMap { root, nodes, root_index: _, min_leaf_index: _, max_leaf_index: _, constant_kv_size: _, inner_max_degree: _, leaf_max_degree: _ } = self;
+    <b>let</b> BigOrderedMap::BPlusTreeMap { root, nodes, min_leaf_index: _, max_leaf_index: _, constant_kv_size: _, inner_max_degree: _, leaf_max_degree: _ } = self;
     root.<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty_node">destroy_empty_node</a>();
-    nodes.destroy();
+    // If root node is empty, then we know that no storage slots are used,
+    // and so we can safely destroy all nodes.
+    nodes.destroy_known_empty_unsafe();
 }
 </code></pre>
 
@@ -635,6 +668,15 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove">remove</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): V {
+    // Optimize case <b>where</b> only root node <b>exists</b>
+    // (optimizes out borrowing and path creation in `find_leaf_with_path`)
+    <b>if</b> (self.root.is_leaf) {
+        <b>let</b> Child::Leaf {
+            value,
+        } = self.root.children.<a href="big_ordered_map.md#0x1_big_ordered_map_remove">remove</a>(key);
+        <b>return</b> value;
+    };
+
     <b>let</b> path_to_leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_with_path">find_leaf_with_path</a>(key);
 
     <b>assert</b>!(!path_to_leaf.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
@@ -642,7 +684,6 @@ Aborts if there is no entry for <code>key</code>.
     <b>let</b> Child::Leaf {
         value,
     } = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_leaf, key);
-
     value
 }
 </code></pre>
@@ -670,7 +711,7 @@ key, or an end iterator if such element doesn't exist.
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     <b>let</b> leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf">find_leaf</a>(key);
-    <b>if</b> (leaf.ref_is_null()) {
+    <b>if</b> (leaf == <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
         <b>return</b> self.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>()
     };
 
@@ -778,6 +819,36 @@ Returns a reference to the element with its key, aborts if the key is not found.
     <b>assert</b>!(iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
     <b>let</b> children = &self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(iter.node_index).children;
     &iter.child_iter.iter_borrow(children).value
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_borrow_mut"></a>
+
+## Function `borrow_mut`
+
+Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: K): &<b>mut</b> V
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: K): &<b>mut</b> V {
+    <b>assert</b>!(self.constant_kv_size, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE">EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE</a>));
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>(&key);
+
+    <b>assert</b>!(iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
+    <b>let</b> children = &<b>mut</b> self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(iter.node_index).children;
+    &<b>mut</b> iter.child_iter.iter_borrow_mut(children).value
 }
 </code></pre>
 
@@ -946,12 +1017,14 @@ Requires the map is not changed after the input iterator is generated.
 
     <b>let</b> child_iter = self.child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>(&node.children);
     <b>if</b> (!child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(&node.children)) {
+        // next is in the same leaf node
         <b>let</b> iter_key = *child_iter.iter_borrow_key(&node.children);
         <b>return</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>(node_index, child_iter, iter_key);
     };
 
+    // next is in a different leaf node
     <b>let</b> next_index = node.next;
-    <b>if</b> (!next_index.ref_is_null()) {
+    <b>if</b> (next_index != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
         <b>let</b> next_node = map.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(next_index);
 
         <b>let</b> child_iter = next_node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>();
@@ -993,6 +1066,7 @@ Requires the map is not changed after the input iterator is generated.
         <b>let</b> node = map.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(node_index);
 
         <b>if</b> (!self.child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_begin">iter_is_begin</a>(&node.children)) {
+            // next is in the same leaf node
             <b>let</b> child_iter = self.child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(&node.children);
             <b>let</b> key = *child_iter.iter_borrow_key(&node.children);
             <b>return</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>(node_index, child_iter, key);
@@ -1000,8 +1074,9 @@ Requires the map is not changed after the input iterator is generated.
         node.prev
     };
 
-    <b>assert</b>!(!prev_index.ref_is_null(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
+    <b>assert</b>!(prev_index != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
 
+    // next is in a different leaf node
     <b>let</b> prev_node = map.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(prev_index);
 
     <b>let</b> prev_children = &prev_node.children;
@@ -1019,9 +1094,10 @@ Requires the map is not changed after the input iterator is generated.
 
 ## Function `borrow_node`
 
+Borrow a node, given an index. Works for both root (i.e. inline) node and separately stored nodes
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): &<a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node_index: u64): &<a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -1030,11 +1106,11 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node: RefToSlot): &<a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
-    <b>if</b> (self.root_index == node) {
+<pre><code>inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node_index: u64): &<a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
+    <b>if</b> (node_index == <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>) {
         &self.root
     } <b>else</b> {
-        self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(node)
+        self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(node_index)
     }
 }
 </code></pre>
@@ -1047,9 +1123,10 @@ Requires the map is not changed after the input iterator is generated.
 
 ## Function `borrow_node_mut`
 
+Borrow a node mutably, given an index. Works for both root (i.e. inline) node and separately stored nodes
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node_index: u64): &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -1058,11 +1135,11 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node: RefToSlot): &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
-    <b>if</b> (self.root_index == node) {
+<pre><code>inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node_index: u64): &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
+    <b>if</b> (node_index == <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>) {
         &<b>mut</b> self.root
     } <b>else</b> {
-        self.nodes.borrow_mut(node)
+        self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(node_index)
     }
 }
 </code></pre>
@@ -1091,12 +1168,26 @@ Requires the map is not changed after the input iterator is generated.
         self.<a href="big_ordered_map.md#0x1_big_ordered_map_validate_dynamic_size_and_init_max_degrees">validate_dynamic_size_and_init_max_degrees</a>(&key, &value);
     };
 
+    // Optimize case <b>where</b> only root node <b>exists</b>
+    // (optimizes out borrowing and path creation in `find_leaf_with_path`)
+    <b>if</b> (self.root.is_leaf) {
+        <b>let</b> children = &<b>mut</b> self.root.children;
+        <b>let</b> current_size = children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>();
+
+        <b>if</b> (current_size &lt; (self.leaf_max_degree <b>as</b> u64)) {
+            <b>let</b> result = children.<a href="big_ordered_map.md#0x1_big_ordered_map_upsert">upsert</a>(key, <a href="big_ordered_map.md#0x1_big_ordered_map_new_leaf_child">new_leaf_child</a>(value));
+            <b>assert</b>!(allow_overwrite || result.is_none(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
+            <b>return</b> result;
+        };
+    };
+
     <b>let</b> path_to_leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_with_path">find_leaf_with_path</a>(&key);
 
     <b>if</b> (path_to_leaf.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
         // In this case, the key is greater than all keys in the map.
-
-        <b>let</b> current = self.root_index;
+        // So we need <b>to</b> <b>update</b> `key` in the pointers <b>to</b> the last child,
+        // <b>to</b> maintain the <b>invariant</b> of `add_at`
+        <b>let</b> current = <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>;
 
         <b>loop</b> {
             path_to_leaf.push_back(current);
@@ -1106,13 +1197,11 @@ Requires the map is not changed after the input iterator is generated.
                 <b>break</b>;
             };
             <b>let</b> last_value = current_node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(&current_node.children).iter_remove(&<b>mut</b> current_node.children);
-            current = last_value.node_index.stored_as_ref();
+            current = last_value.node_index.stored_to_index();
             current_node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(key, last_value);
         };
     };
 
-    // aptos_std::debug::print(&std::string::utf8(b"add_or_upsert_impl::path_to_leaf"));
-    // aptos_std::debug::print(&path_to_leaf);
     self.<a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>(path_to_leaf, key, <a href="big_ordered_map.md#0x1_big_ordered_map_new_leaf_child">new_leaf_child</a>(value), allow_overwrite)
 }
 </code></pre>
@@ -1203,6 +1292,7 @@ Requires the map is not changed after the input iterator is generated.
         self.leaf_max_degree = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / entry_size), <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_LEAF_MIN_DEGREE">DEFAULT_LEAF_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
     };
 
+    // Make sure that no nodes can exceed the upper size limit.
     <b>assert</b>!(key_size * (self.inner_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>));
     <b>assert</b>!(entry_size * (self.leaf_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>));
 }
@@ -1285,8 +1375,8 @@ Requires the map is not changed after the input iterator is generated.
     <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> {
         is_leaf: is_leaf,
         children: <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>(),
-        prev: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">storage_slots_allocator::null_ref</a>(),
-        next: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">storage_slots_allocator::null_ref</a>(),
+        prev: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
+        next: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
     }
 }
 </code></pre>
@@ -1314,8 +1404,8 @@ Requires the map is not changed after the input iterator is generated.
     <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> {
         is_leaf: is_leaf,
         children: children,
-        prev: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">storage_slots_allocator::null_ref</a>(),
-        next: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">storage_slots_allocator::null_ref</a>(),
+        prev: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
+        next: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
     }
 }
 </code></pre>
@@ -1382,7 +1472,7 @@ Requires the map is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>&lt;K&gt;(node_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>, child_iter: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, key: K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>&lt;K&gt;(node_index: u64, child_iter: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, key: K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -1391,7 +1481,7 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>&lt;K&gt;(node_index: RefToSlot, child_iter: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, key: K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>&lt;K&gt;(node_index: u64, child_iter: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, key: K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     Iterator::Some {
         node_index: node_index,
         child_iter: child_iter,
@@ -1408,9 +1498,12 @@ Requires the map is not changed after the input iterator is generated.
 
 ## Function `find_leaf`
 
+Find leaf where the given key would fall in.
+So the largest leaf with it's <code>max_key &lt;= key</code>.
+return NULL_INDEX if <code>key</code> is larger than any key currently stored in the map.
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf">find_leaf</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf">find_leaf</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): u64
 </code></pre>
 
 
@@ -1419,9 +1512,9 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf">find_leaf</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): RefToSlot {
-    <b>let</b> current = self.root_index;
-    <b>while</b> (!current.ref_is_null()) {
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf">find_leaf</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): u64 {
+    <b>let</b> current = <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>;
+    <b>loop</b> {
         <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(current);
         <b>if</b> (node.is_leaf) {
             <b>return</b> current;
@@ -1429,13 +1522,11 @@ Requires the map is not changed after the input iterator is generated.
         <b>let</b> children = &node.children;
         <b>let</b> child_iter = children.<a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>(key);
         <b>if</b> (child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(children)) {
-            <b>return</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">storage_slots_allocator::null_ref</a>();
+            <b>return</b> <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>;
         } <b>else</b> {
-            current = child_iter.iter_borrow(children).node_index.stored_as_ref();
-        }
-    };
-
-    <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">storage_slots_allocator::null_ref</a>()
+            current = child_iter.iter_borrow(children).node_index.stored_to_index();
+        };
+    }
 }
 </code></pre>
 
@@ -1447,9 +1538,13 @@ Requires the map is not changed after the input iterator is generated.
 
 ## Function `find_leaf_with_path`
 
+Find leaf where the given key would fall in.
+So the largest leaf with it's <code>max_key &lt;= key</code>.
+Return the path from root to that leaf (including the leaf itself)
+Return empty path if <code>key</code> is larger than any key currently stored in the map.
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_with_path">find_leaf_with_path</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_with_path">find_leaf_with_path</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -1458,11 +1553,11 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_with_path">find_leaf_with_path</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RefToSlot&gt; {
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf_with_path">find_leaf_with_path</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
     <b>let</b> vec = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
-    <b>let</b> current = self.root_index;
-    <b>while</b> (!current.ref_is_null()) {
+    <b>let</b> current = <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>;
+    <b>loop</b> {
         vec.push_back(current);
 
         <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(current);
@@ -1474,11 +1569,9 @@ Requires the map is not changed after the input iterator is generated.
         <b>if</b> (child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(children)) {
             <b>return</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
         } <b>else</b> {
-            current = child_iter.iter_borrow(children).node_index.stored_as_ref();
-        }
-    };
-
-    <b>abort</b> <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>)
+            current = child_iter.iter_borrow(children).node_index.stored_to_index();
+        };
+    }
 }
 </code></pre>
 
@@ -1518,9 +1611,15 @@ Requires the map is not changed after the input iterator is generated.
 
 ## Function `add_at`
 
+Add a given child to a given node (last in the <code>path_to_node</code>), and update/rebalance the tree as necessary.
+It is required that <code>key</code> pointers to the child node, on the <code>path_to_node</code> are greater or equal to the given key.
+That means if we are adding a <code>key</code> larger than any currently existing in the map - we needed
+to update <code>key</code> pointers on the <code>path_to_node</code> to include it, before calling this method.
+
+If <code>allow_overwrite</code> is not set, function will abort if <code>key</code> is already present.
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>&gt;, key: K, child: <a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;, allow_overwrite: bool): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: K, child: <a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;, allow_overwrite: bool): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;&gt;
 </code></pre>
 
 
@@ -1529,9 +1628,13 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RefToSlot&gt;, key: K, child: <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;, allow_overwrite: bool): Option&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;&gt; {
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: K, child: <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;, allow_overwrite: bool): Option&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;&gt; {
+    // Last node in the path is one <b>where</b> we need <b>to</b> add the child <b>to</b>.
     <b>let</b> node_index = path_to_node.pop_back();
     {
+        // First check <b>if</b> we can perform this operation, without changing structure of the tree (i.e. without adding <a href="any.md#0x1_any">any</a> nodes).
+
+        // For that we can just borrow the single node
         <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index);
         <b>let</b> children = &<b>mut</b> node.children;
         <b>let</b> current_size = children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>();
@@ -1543,6 +1646,7 @@ Requires the map is not changed after the input iterator is generated.
         };
 
         <b>if</b> (current_size &lt; max_degree) {
+            // Adding a child <b>to</b> a current node doesn't exceed the size, so we can just do that.
             <b>let</b> result = children.<a href="big_ordered_map.md#0x1_big_ordered_map_upsert">upsert</a>(key, child);
 
             <b>if</b> (node.is_leaf) {
@@ -1554,63 +1658,90 @@ Requires the map is not changed after the input iterator is generated.
             };
         };
 
-        <b>if</b> (allow_overwrite) {
-            <b>let</b> iter = children.<a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>(&key);
-            <b>if</b> (!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(children)) {
-                <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(iter.iter_replace(children, child));
-            }
+        // If we cannot add more nodes without exceeding the size,
+        // but node <b>with</b> `key` already <b>exists</b>, we either need <b>to</b> replace or <b>abort</b>.
+        <b>let</b> iter = children.<a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>(&key);
+        <b>if</b> (!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(children)) {
+            <b>assert</b>!(node.is_leaf, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+            <b>assert</b>!(allow_overwrite, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
+
+            <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(iter.iter_replace(children, child));
         }
     };
 
     // # of children in the current node exceeds the threshold, need <b>to</b> split into two nodes.
 
-    <b>let</b> (right_node_slot, node) = <b>if</b> (path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
-        // If we are at the root, we need <b>to</b> <b>move</b> root node <b>to</b> become a child and have a new root node.
-
-        <b>assert</b>!(node_index == self.root_index, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
-        // aptos_std::debug::print(&std::string::utf8(b"changing root"));
+    // If we are at the root, we need <b>to</b> <b>move</b> root node <b>to</b> become a child and have a new root node,
+    // in order <b>to</b> be able <b>to</b> split the node on the level it is.
+    <b>let</b> (reserved_slot, node) = <b>if</b> (node_index == <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>) {
+        <b>assert</b>!(path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
 
         // Splitting root now, need <b>to</b> create a new root.
-        // We keep root_index always the same
+        // Since root is stored direclty in the resource, we will swap-in the new node there.
         <b>let</b> new_root_node = <a href="big_ordered_map.md#0x1_big_ordered_map_new_node">new_node</a>&lt;K, V&gt;(/*is_leaf=*/<b>false</b>);
 
-        <b>let</b> (replacement_node_stored_slot, replacement_node_slot) = self.nodes.reserve_slot();
-        // aptos_std::debug::print(&replacement_node_slot);
+        // Reserve a slot <b>where</b> the current root will be moved <b>to</b>.
+        <b>let</b> (replacement_node_slot, replacement_node_reserved_slot) = self.nodes.reserve_slot();
 
-        <b>let</b> root_children = &self.root.children;
-        <b>let</b> max_element = *root_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(root_children).iter_borrow_key(root_children);
-        <b>if</b> (<a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&max_element, &key).is_less_than()) {
-            max_element = key;
+        <b>let</b> max_key = {
+            <b>let</b> root_children = &self.root.children;
+            <b>let</b> max_key = *root_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(root_children).iter_borrow_key(root_children);
+            // need <b>to</b> check <b>if</b> key is largest, <b>as</b> <b>invariant</b> is that "parent's pointers" have been updated,
+            // but key itself can be larger than all previous ones.
+            <b>if</b> (<a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&max_key, &key).is_lt()) {
+                max_key = key;
+            };
+            max_key
         };
-        new_root_node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(max_element, <a href="big_ordered_map.md#0x1_big_ordered_map_new_inner_child">new_inner_child</a>(replacement_node_stored_slot));
-
-        // aptos_std::debug::print(&cur_node_slot);
-        path_to_node.push_back(self.root_index);
-
+        // New root will have start <b>with</b> a single child - the existing root (which will be at replacement location).
+        new_root_node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(max_key, <a href="big_ordered_map.md#0x1_big_ordered_map_new_inner_child">new_inner_child</a>(replacement_node_slot));
         <b>let</b> node = <a href="../../move-stdlib/doc/mem.md#0x1_mem_replace">mem::replace</a>(&<b>mut</b> self.root, new_root_node);
 
-        <b>let</b> replacement_ref = replacement_node_slot.reserved_as_ref();
+        // we moved the currently processing node one level down, so we need <b>to</b> <b>update</b> the path
+        path_to_node.push_back(<a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>);
+
+        <b>let</b> replacement_index = replacement_node_reserved_slot.reserved_to_index();
         <b>if</b> (node.is_leaf) {
-            self.min_leaf_index = replacement_ref;
-            self.max_leaf_index = replacement_ref;
+            // replacement node is the only leaf, so we <b>update</b> the pointers:
+            self.min_leaf_index = replacement_index;
+            self.max_leaf_index = replacement_index;
         };
-        (replacement_node_slot, node)
+        (replacement_node_reserved_slot, node)
     } <b>else</b> {
-        <b>let</b> (cur_node_slot, node) = self.nodes.remove_and_reserve(node_index);
-        (cur_node_slot, node)
+        // In order <b>to</b> work on multiple nodes at the same time, we cannot borrow_mut, and need <b>to</b> be
+        // remove_and_reserve existing node.
+        <b>let</b> (cur_node_reserved_slot, node) = self.nodes.remove_and_reserve(node_index);
+        (cur_node_reserved_slot, node)
     };
 
-    // aptos_std::debug::print(&std::string::utf8(b"node that needs <b>to</b> be split"));
-    // aptos_std::debug::print(&node);
-
+    // <b>move</b> node_index out of scope, <b>to</b> make sure we don't accidentally access it, <b>as</b> we are done <b>with</b> it.
+    // (i.e. we should be using `reserved_slot` instead).
     <b>move</b> node_index;
-    <b>let</b> is_leaf = node.is_leaf;
-    <b>let</b> children = &<b>mut</b> node.children;
 
-    <b>let</b> right_node_ref = right_node_slot.reserved_as_ref();
-    <b>let</b> next = &<b>mut</b> node.next;
-    <b>let</b> prev = &<b>mut</b> node.prev;
+    // Now we can perform the split at the current level, <b>as</b> we know we are not at the root level.
+    <b>assert</b>!(!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
 
+    // Parent <b>has</b> a reference under max key <b>to</b> the current node, so existing index
+    // needs <b>to</b> be the right node.
+    // Since <a href="ordered_map.md#0x1_ordered_map_trim">ordered_map::trim</a> moves from the end (i.e. smaller keys stay),
+    // we are going <b>to</b> put the contents of the current node on the left side,
+    // and create a new right node.
+    // So <b>if</b> we had before (node_index, node), we will change that <b>to</b> end up having:
+    // (new_left_node_index, node trimmed off) and (node_index, new node <b>with</b> trimmed off children)
+    //
+    // So <b>let</b>'s rename variables cleanly:
+    <b>let</b> right_node_reserved_slot = reserved_slot;
+    <b>let</b> left_node = node;
+
+
+    <b>let</b> is_leaf = left_node.is_leaf;
+    <b>let</b> left_children = &<b>mut</b> left_node.children;
+
+    <b>let</b> right_node_index = right_node_reserved_slot.reserved_to_index();
+    <b>let</b> left_next = &<b>mut</b> left_node.next;
+    <b>let</b> left_prev = &<b>mut</b> left_node.prev;
+
+    // compute the target size for the left node:
     <b>let</b> max_degree = <b>if</b> (is_leaf) {
         self.leaf_max_degree <b>as</b> u64
     } <b>else</b> {
@@ -1618,40 +1749,42 @@ Requires the map is not changed after the input iterator is generated.
     };
     <b>let</b> target_size = (max_degree + 1) / 2;
 
-    children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(key, child);
-    <b>let</b> new_node_children = children.trim(target_size);
+    // Add child (which will exceed the size), and then trim off <b>to</b> create two sets of children of correct sizes.
+    left_children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(key, child);
+    <b>let</b> right_node_children = left_children.trim(target_size);
 
-    <b>assert</b>!(children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() &lt;= max_degree, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
-    <b>assert</b>!(new_node_children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() &lt;= max_degree, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+    <b>assert</b>!(left_children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() &lt;= max_degree, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+    <b>assert</b>!(right_node_children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() &lt;= max_degree, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
 
-    <b>let</b> right_node = <a href="big_ordered_map.md#0x1_big_ordered_map_new_node_with_children">new_node_with_children</a>(is_leaf, new_node_children);
+    <b>let</b> right_node = <a href="big_ordered_map.md#0x1_big_ordered_map_new_node_with_children">new_node_with_children</a>(is_leaf, right_node_children);
 
-    <b>let</b> (left_node_stored_slot, left_node_slot) = self.nodes.reserve_slot();
-    <b>let</b> left_node_ref = left_node_stored_slot.stored_as_ref();
-    right_node.next = *next;
-    *next = right_node_ref;
-    right_node.prev = left_node_ref;
-    <b>if</b> (!prev.ref_is_null()) {
-        self.nodes.borrow_mut(*prev).next = left_node_ref;
+    <b>let</b> (left_node_slot, left_node_reserved_slot) = self.nodes.reserve_slot();
+    <b>let</b> left_node_index = left_node_slot.stored_to_index();
+
+    // right nodes next is the node that was next of the left (previous) node, and next of left node is the right node.
+    right_node.next = *left_next;
+    *left_next = right_node_index;
+
+    // right nodes previous is current left node
+    right_node.prev = left_node_index;
+    // Since the previuosly used index is going <b>to</b> the right node, `prev` pointer of the next node is correct,
+    // and we need <b>to</b> <b>update</b> next pointer of the previous node (<b>if</b> <b>exists</b>)
+    <b>if</b> (*left_prev != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
+        self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(*left_prev).next = left_node_index;
+    };
+    // Otherwise, we were the smallest node on the level. <b>if</b> this is the leaf level, <b>update</b> the pointer.
+    <b>if</b> (right_node_index == self.min_leaf_index) {
+        self.min_leaf_index = left_node_index;
     };
 
-    <b>let</b> split_key = *children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_borrow_key(children);
+    // Largest left key is the split key.
+    <b>let</b> max_left_key = *left_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(left_children).iter_borrow_key(left_children);
 
-    // aptos_std::debug::print(&std::string::utf8(b"creating right node"));
-    // aptos_std::debug::print(&right_node_slot);
-    // aptos_std::debug::print(&right_node);
+    self.nodes.fill_reserved_slot(left_node_reserved_slot, left_node);
+    self.nodes.fill_reserved_slot(right_node_reserved_slot, right_node);
 
-    // aptos_std::debug::print(&std::string::utf8(b"updating left node"));
-    // aptos_std::debug::print(&left_node_slot);
-    // aptos_std::debug::print(&node);
-
-    self.nodes.fill_reserved_slot(left_node_slot, node);
-    self.nodes.fill_reserved_slot(right_node_slot, right_node);
-
-    <b>if</b> (right_node_ref == self.min_leaf_index) {
-        self.min_leaf_index = left_node_ref;
-    };
-    self.<a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>(path_to_node, split_key, <a href="big_ordered_map.md#0x1_big_ordered_map_new_inner_child">new_inner_child</a>(left_node_stored_slot), <b>false</b>).destroy_none();
+    // Add new <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a> (i.e. pointer <b>to</b> the left node) in the parent.
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_add_at">add_at</a>(path_to_node, max_left_key, <a href="big_ordered_map.md#0x1_big_ordered_map_new_inner_child">new_inner_child</a>(left_node_slot), <b>false</b>).destroy_none();
     <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
 }
 </code></pre>
@@ -1664,9 +1797,10 @@ Requires the map is not changed after the input iterator is generated.
 
 ## Function `update_key`
 
+Given a path to node (excluding the node itself), which is currently stored under "old_key", update "old_key" to "new_key".
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>&gt;, old_key: &K, new_key: K)
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, old_key: &K, new_key: K)
 </code></pre>
 
 
@@ -1675,19 +1809,18 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RefToSlot&gt;, old_key: &K, new_key: K) {
-    <b>if</b> (path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
-        <b>return</b>
-    };
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, old_key: &K, new_key: K) {
+    <b>while</b> (!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
+        <b>let</b> node_index = path_to_node.pop_back();
+        <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index);
+        <b>let</b> children = &<b>mut</b> node.children;
+        children.replace_key_inplace(old_key, new_key);
 
-    <b>let</b> node_index = path_to_node.pop_back();
-    <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index);
-    <b>let</b> children = &<b>mut</b> node.children;
-    children.replace_key_inplace(old_key, new_key);
-
-    <b>if</b> (children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_borrow_key(children) == &new_key) {
-        self.<a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>(path_to_node, old_key, new_key);
-    };
+        // If we were not updating the largest child, we don't need <b>to</b> <b>continue</b>.
+        <b>if</b> (children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_borrow_key(children) != &new_key) {
+            <b>return</b>
+        };
+    }
 }
 </code></pre>
 
@@ -1701,7 +1834,7 @@ Requires the map is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">big_ordered_map::Child</a>&lt;V&gt;
 </code></pre>
 
 
@@ -1710,37 +1843,42 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RefToSlot&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt; {
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, path_to_node: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt; {
+    // Last node in the path is one <b>where</b> we need <b>to</b> add the child <b>to</b>.
     <b>let</b> node_index = path_to_node.pop_back();
     <b>let</b> old_child = {
+        // First check <b>if</b> we can perform this operation, without changing structure of the tree (i.e. without adding <a href="any.md#0x1_any">any</a> nodes).
+
+        // For that we can just borrow the single node
         <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index);
 
         <b>let</b> children = &<b>mut</b> node.children;
-
         <b>let</b> is_leaf = node.is_leaf;
 
         <b>let</b> old_child = children.<a href="big_ordered_map.md#0x1_big_ordered_map_remove">remove</a>(key);
-        <b>if</b> (path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
-            <b>assert</b>!(node_index == self.root_index, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+        <b>if</b> (node_index == <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>) {
+            // If current node is root, lower limit of max_degree/2 nodes doesn't <b>apply</b>.
+            // So we can adjust internally
+
+            <b>assert</b>!(path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
 
             <b>if</b> (!is_leaf && children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() == 1) {
-                // promote only child <b>to</b> root, and drop current root.
-                // keep the root index the same.
+                // If root is not leaf, but <b>has</b> a single child, promote only child <b>to</b> root,
+                // and drop current root. Since root is stored directly in the resource, we
+                // "<b>move</b>" the child into the root.
+
                 <b>let</b> Child::Inner {
                     node_index: inner_child_index,
                 } = children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_remove(children);
-                <b>move</b> children;
-                <b>move</b> node;
 
                 <b>let</b> inner_child = self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_remove">remove</a>(inner_child_index);
                 <b>if</b> (inner_child.is_leaf) {
-                    <b>let</b> root_ref = self.root_index;
-                    self.min_leaf_index = root_ref;
-                    self.max_leaf_index = root_ref;
+                    self.min_leaf_index = <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>;
+                    self.max_leaf_index = <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>;
                 };
 
                 <a href="../../move-stdlib/doc/mem.md#0x1_mem_replace">mem::replace</a>(&<b>mut</b> self.root, inner_child).<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty_node">destroy_empty_node</a>();
-            }; // <b>else</b>: nothing <b>to</b> change
+            };
             <b>return</b> old_child;
         };
 
@@ -1749,31 +1887,33 @@ Requires the map is not changed after the input iterator is generated.
         } <b>else</b> {
             self.inner_max_degree <b>as</b> u64
         };
-
         <b>let</b> current_size = children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>();
+
+        // See <b>if</b> the node is big enough, or we need <b>to</b> merge it <b>with</b> another node on this level.
         <b>let</b> big_enough = current_size * 2 &gt;= max_degree;
 
         <b>let</b> new_max_key = *children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_borrow_key(children);
-        <b>let</b> max_key_updated = <a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&new_max_key, key).is_less_than();
-        <b>if</b> (!max_key_updated && big_enough) {
-            <b>return</b> old_child;
-        };
 
+        // See <b>if</b> max key was updated for the current node, and <b>if</b> so - <b>update</b> it on the path.
+        <b>let</b> max_key_updated = <a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&new_max_key, key).is_lt();
         <b>if</b> (max_key_updated) {
             <b>assert</b>!(current_size &gt;= 1, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
 
             self.<a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>(path_to_node, key, new_max_key);
+        };
 
-            <b>if</b> (big_enough) {
-                <b>return</b> old_child;
-            }
+        // If node is big enough after removal, we are done.
+        <b>if</b> (big_enough) {
+            <b>return</b> old_child;
         };
 
         old_child
     };
 
-    // Children size is below threshold, we need <b>to</b> rebalance
+    // Children size is below threshold, we need <b>to</b> rebalance <b>with</b> a neighbor on the same level.
 
+    // In order <b>to</b> work on multiple nodes at the same time, we cannot borrow_mut, and need <b>to</b> be
+    // remove_and_reserve existing node.
     <b>let</b> (node_slot, node) = self.nodes.remove_and_reserve(node_index);
 
     <b>let</b> is_leaf = node.is_leaf;
@@ -1781,9 +1921,12 @@ Requires the map is not changed after the input iterator is generated.
     <b>let</b> prev = node.prev;
     <b>let</b> next = node.next;
 
-    <b>let</b> brother_index = {
-        <b>let</b> parent_children = &self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(*path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() - 1)).children;
-        <b>if</b> (parent_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(parent_children).iter_borrow(parent_children).node_index.stored_as_ref() == node_index) {
+    // index of the node we will rebalance <b>with</b>.
+    <b>let</b> sibling_index = {
+        <b>let</b> parent_children = &self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(*path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() - 1)).children;
+        <b>assert</b>!(parent_children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() &gt;= 2, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+        // We merge <b>with</b> previous node - <b>if</b> it <b>has</b> the same parent, otherwise <b>with</b> next node (which then needs <b>to</b> have the same parent)
+        <b>if</b> (parent_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(parent_children).iter_borrow(parent_children).node_index.stored_to_index() == node_index) {
             prev
         } <b>else</b> {
             next
@@ -1791,84 +1934,96 @@ Requires the map is not changed after the input iterator is generated.
     };
 
     <b>let</b> children = &<b>mut</b> node.children;
-    <b>let</b> (brother_slot, brother_node) = self.nodes.remove_and_reserve(brother_index);
 
-    <b>let</b> brother_children = &<b>mut</b> brother_node.children;
+    <b>let</b> (sibling_slot, sibling_node) = self.nodes.remove_and_reserve(sibling_index);
+    <b>let</b> sibling_children = &<b>mut</b> sibling_node.children;
 
-    <b>if</b> ((brother_children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() - 1) * 2 &gt;= max_degree) {
-        // The brother node <b>has</b> enough elements, borrow an element from the brother node.
-        <b>if</b> (brother_index == next) {
+    <b>if</b> ((sibling_children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>() - 1) * 2 &gt;= max_degree) {
+        // The sibling node <b>has</b> enough elements, we can just borrow an element from the sibling node.
+        <b>if</b> (sibling_index == next) {
+            // <b>if</b> sibling is a larger node, we remove a child from the start
             <b>let</b> old_max_key = *children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_borrow_key(children);
-            <b>let</b> brother_begin_iter = brother_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>();
-            <b>let</b> borrowed_max_key = *brother_begin_iter.iter_borrow_key(brother_children);
-            <b>let</b> borrowed_element = brother_begin_iter.iter_remove(brother_children);
+            <b>let</b> sibling_begin_iter = sibling_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>();
+            <b>let</b> borrowed_max_key = *sibling_begin_iter.iter_borrow_key(sibling_children);
+            <b>let</b> borrowed_element = sibling_begin_iter.iter_remove(sibling_children);
 
             children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(borrowed_max_key, borrowed_element);
+
+            // max_key of the current node changed, so <b>update</b>
             self.<a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>(path_to_node, &old_max_key, borrowed_max_key);
         } <b>else</b> {
-            <b>let</b> brother_end_iter = brother_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(brother_children);
-            <b>let</b> borrowed_max_key = *brother_end_iter.iter_borrow_key(brother_children);
-            <b>let</b> borrowed_element = brother_end_iter.iter_remove(brother_children);
+            // <b>if</b> sibling is a smaller node, we remove a child from the end
+            <b>let</b> sibling_end_iter = sibling_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(sibling_children);
+            <b>let</b> borrowed_max_key = *sibling_end_iter.iter_borrow_key(sibling_children);
+            <b>let</b> borrowed_element = sibling_end_iter.iter_remove(sibling_children);
 
             children.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(borrowed_max_key, borrowed_element);
-            self.<a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>(path_to_node, &borrowed_max_key, *brother_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(brother_children).iter_borrow_key(brother_children));
+
+            // max_key of the sibling node changed, so <b>update</b>
+            self.<a href="big_ordered_map.md#0x1_big_ordered_map_update_key">update_key</a>(path_to_node, &borrowed_max_key, *sibling_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(sibling_children).iter_borrow_key(sibling_children));
         };
 
         self.nodes.fill_reserved_slot(node_slot, node);
-        self.nodes.fill_reserved_slot(brother_slot, brother_node);
+        self.nodes.fill_reserved_slot(sibling_slot, sibling_node);
         <b>return</b> old_child;
     };
 
-    // The brother node doesn't have enough elements <b>to</b> borrow, merge <b>with</b> the brother node.
-    <b>if</b> (brother_index == next) {
-        <b>let</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> { children: brother_children, is_leaf: _, prev: _, next: brother_next } = brother_node;
+    // The sibling node doesn't have enough elements <b>to</b> borrow, merge <b>with</b> the sibling node.
+    // Keep the slot of the larger node of the two, <b>to</b> not require updating key on the parent nodes.
+    // But append <b>to</b> the smaller node, <b>as</b> <a href="ordered_map.md#0x1_ordered_map_append">ordered_map::append</a> is more efficient when adding <b>to</b> the end.
+    <b>let</b> (key_to_remove, reserved_slot_to_remove) = <b>if</b> (sibling_index == next) {
+        // destroying larger sibling node, keeping sibling_slot.
+        <b>let</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
         <b>let</b> key_to_remove = *children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).iter_borrow_key(children);
-        children.append(brother_children);
-        node.next = brother_next;
+        children.append(sibling_children);
+        node.next = sibling_next;
 
-        <b>move</b> children;
-
-        <b>if</b> (!node.next.ref_is_null()) {
-            self.nodes.borrow_mut(node.next).prev = brother_index;
-        };
-        <b>if</b> (!node.prev.ref_is_null()) {
-            self.nodes.borrow_mut(node.prev).next = brother_index;
+        <b>if</b> (node.next != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
+            <b>assert</b>!(self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(node.next).prev == sibling_index, 1);
         };
 
-        self.nodes.fill_reserved_slot(brother_slot, node);
-
+        // we are removing node_index, which previous's node's next was pointing <b>to</b>,
+        // so <b>update</b> the pointer
+        <b>if</b> (node.prev != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
+            self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(node.prev).next = sibling_index;
+        };
+        // Otherwise, we were the smallest node on the level. <b>if</b> this is the leaf level, <b>update</b> the pointer.
         <b>if</b> (self.min_leaf_index == node_index) {
-            self.min_leaf_index = brother_index;
+            self.min_leaf_index = sibling_index;
         };
 
-        <b>assert</b>!(!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
-        <b>let</b> node_stored_slot = <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>(self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove));
-        self.nodes.free_reserved_slot(node_slot, node_stored_slot);
+        self.nodes.fill_reserved_slot(sibling_slot, node);
+
+        (key_to_remove, node_slot)
     } <b>else</b> {
+        // destroying larger current node, keeping node_slot
         <b>let</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
-        <b>let</b> key_to_remove = *brother_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(brother_children).iter_borrow_key(brother_children);
-        brother_children.append(node_children);
-        brother_node.next = node_next;
+        <b>let</b> key_to_remove = *sibling_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(sibling_children).iter_borrow_key(sibling_children);
+        sibling_children.append(node_children);
+        sibling_node.next = node_next;
 
-        <b>move</b> brother_children;
-
-        <b>if</b> (!brother_node.next.ref_is_null()) {
-            self.nodes.borrow_mut(brother_node.next).prev = node_index;
+        <b>if</b> (sibling_node.next != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
+            <b>assert</b>!(self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(sibling_node.next).prev == node_index, 1);
         };
-        <b>if</b> (!brother_node.prev.ref_is_null()) {
-            self.nodes.borrow_mut(brother_node.prev).next = node_index;
+        // we are removing sibling node_index, which previous's node's next was pointing <b>to</b>,
+        // so <b>update</b> the pointer
+        <b>if</b> (sibling_node.prev != <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
+            self.nodes.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(sibling_node.prev).next = node_index;
         };
-
-        self.nodes.fill_reserved_slot(node_slot, brother_node);
-
-        <b>if</b> (self.min_leaf_index == brother_index) {
+        // Otherwise, sibling was the smallest node on the level. <b>if</b> this is the leaf level, <b>update</b> the pointer.
+        <b>if</b> (self.min_leaf_index == sibling_index) {
             self.min_leaf_index = node_index;
         };
 
-        <b>assert</b>!(!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
-        <b>let</b> node_stored_slot = <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>(self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove));
-        self.nodes.free_reserved_slot(brother_slot, node_stored_slot);
+        self.nodes.fill_reserved_slot(node_slot, sibling_node);
+
+        (key_to_remove, sibling_slot)
     };
+
+    <b>assert</b>!(!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
+    <b>let</b> slot_to_remove = <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>(self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove));
+    self.nodes.free_reserved_slot(reserved_slot_to_remove, slot_to_remove);
+
     old_child
 }
 </code></pre>
@@ -1894,7 +2049,7 @@ Returns the number of elements in the BigOrderedMap.
 
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): u64 {
-    self.<a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>(self.root_index)
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>)
 }
 </code></pre>
 
@@ -1908,7 +2063,7 @@ Returns the number of elements in the BigOrderedMap.
 
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): u64
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, node_index: u64): u64
 </code></pre>
 
 
@@ -1917,7 +2072,7 @@ Returns the number of elements in the BigOrderedMap.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node_index: RefToSlot): u64 {
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, node_index: u64): u64 {
     <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(node_index);
     <b>if</b> (node.is_leaf) {
         node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_length">length</a>()
@@ -1925,7 +2080,7 @@ Returns the number of elements in the BigOrderedMap.
         <b>let</b> size = 0;
 
         node.children.for_each_ref(|_key, child| {
-            size = size + self.<a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>(child.node_index.stored_as_ref());
+            size = size + self.<a href="big_ordered_map.md#0x1_big_ordered_map_length_for_node">length_for_node</a>(child.node_index.stored_to_index());
         });
         size
     }

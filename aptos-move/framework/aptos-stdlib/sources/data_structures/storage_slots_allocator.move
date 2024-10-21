@@ -13,6 +13,7 @@
 ///
 /// In the future, more sophisticated strategies can be added, without breaking/modifying callers,
 /// for example:
+/// * inlining some nodes
 /// * having a fee-payer for any storage creation operations
 module aptos_std::storage_slots_allocator {
     friend aptos_std::big_ordered_map;
@@ -24,8 +25,7 @@ module aptos_std::storage_slots_allocator {
     const EINTERNAL_INVARIANT_BROKEN: u64 = 7;
 
     const NULL_INDEX: u64 = 0;
-    const SPECIAL_SLOT_INDEX: u64 = 1;
-    const FIRST_INDEX: u64 = 10; // keeping space for new special values
+    const FIRST_INDEX: u64 = 10; // keeping space for usecase-specific values
 
     /// Data stored in an individual slot
     enum Link<T: store> has store {
@@ -71,13 +71,6 @@ module aptos_std::storage_slots_allocator {
         slot_index: u64,
     }
 
-    /// (Weak) Reference to a slot.
-    /// We can have variety of `RefToSlot`, but only a single `StoredSlot`.
-    /// It is on the caller to make sure references are not used after slot is freed.
-    struct RefToSlot has copy, drop, store {
-        slot_index: u64,
-    }
-
     public fun new<T: store>(config: StorageSlotsAllocatorConfig): StorageSlotsAllocator<T> {
         let result = StorageSlotsAllocator::V1 {
             slots: option::none(),
@@ -116,12 +109,14 @@ module aptos_std::storage_slots_allocator {
     }
 
     public fun remove<T: store>(self: &mut StorageSlotsAllocator<T>, slot: StoredSlot): T {
-        let (reserved_slot, value) = self.remove_and_reserve(slot.stored_as_ref());
+        let (reserved_slot, value) = self.remove_and_reserve(slot.stored_to_index());
         self.free_reserved_slot(reserved_slot, slot);
         value
     }
 
-    public(friend) fun destroy<T: store>(self: StorageSlotsAllocator<T>) {
+    /// We cannot know if allocator is empty or not, so this method is not public,
+    /// and can be used only in modules that know by themselves that allocator is empty.
+    public(friend) fun destroy_known_empty_unsafe<T: store>(self: StorageSlotsAllocator<T>) {
         loop {
             let reuse_index = self.maybe_pop_from_reuse_queue();
             if (reuse_index == NULL_INDEX) {
@@ -137,17 +132,17 @@ module aptos_std::storage_slots_allocator {
                 reuse_spare_count: _,
             } => {
                 assert!(reuse_head_index == NULL_INDEX, EINTERNAL_INVARIANT_BROKEN);
-                slots.destroy_some().destroy();
+                slots.destroy_some().destroy_known_empty_unsafe();
             },
         };
     }
 
-    public fun borrow<T: store>(self: &StorageSlotsAllocator<T>, slot: RefToSlot): &T {
-        &self.slots.borrow().borrow(slot.slot_index).value
+    public fun borrow<T: store>(self: &StorageSlotsAllocator<T>, slot_index: u64): &T {
+        &self.slots.borrow().borrow(slot_index).value
     }
 
-    public fun borrow_mut<T: store>(self: &mut StorageSlotsAllocator<T>, slot: RefToSlot): &mut T {
-        &mut self.slots.borrow_mut().borrow_mut(slot.slot_index).value
+    public fun borrow_mut<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): &mut T {
+        &mut self.slots.borrow_mut().borrow_mut(slot_index).value
     }
 
     // We also provide here operations where `add()` is split into `reserve_slot`,
@@ -173,8 +168,7 @@ module aptos_std::storage_slots_allocator {
     }
 
     /// Remove storage slot, but reserve it for later.
-    public fun remove_and_reserve<T: store>(self: &mut StorageSlotsAllocator<T>, slot: RefToSlot): (ReservedSlot, T) {
-        let slot_index = slot.slot_index;
+    public fun remove_and_reserve<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): (ReservedSlot, T) {
         let Link::Occupied { value } = self.remove_link(slot_index);
         (ReservedSlot { slot_index }, value)
     }
@@ -188,24 +182,20 @@ module aptos_std::storage_slots_allocator {
 
     // ========== Section for methods handling references ========
 
-    public fun reserved_as_ref(self: &ReservedSlot): RefToSlot {
-        RefToSlot { slot_index: self.slot_index }
+    public fun reserved_to_index(self: &ReservedSlot): u64 {
+        self.slot_index
     }
 
-    public fun stored_as_ref(self: &StoredSlot): RefToSlot {
-        RefToSlot { slot_index: self.slot_index }
+    public fun stored_to_index(self: &StoredSlot): u64 {
+        self.slot_index
     }
 
-    public fun null_ref(): RefToSlot {
-        RefToSlot { slot_index: NULL_INDEX }
+    public fun is_null_index(slot_index: u64): bool {
+        slot_index == NULL_INDEX
     }
 
-    public fun special_ref(): RefToSlot {
-        RefToSlot { slot_index: SPECIAL_SLOT_INDEX }
-    }
-
-    public fun ref_is_null(self: &RefToSlot): bool {
-        self.slot_index == NULL_INDEX
+    public fun is_special_unused_index(slot_index: u64): bool {
+        slot_index != NULL_INDEX && slot_index < FIRST_INDEX
     }
 
     // ========== Section for private internal utility methods ========
