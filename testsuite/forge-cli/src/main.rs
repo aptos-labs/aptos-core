@@ -1987,7 +1987,8 @@ fn realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
-                .init_gas_price_multiplier(20),
+                .init_gas_price_multiplier(20)
+                .coins_per_account_override(25_0000_0000),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
                     7000
