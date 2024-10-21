@@ -5,21 +5,22 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        block_tree::BlockTree, chunk_output::ChunkOutput, do_ledger_update::DoLedgerUpdate,
-        partial_state_compute_result::PartialStateComputeResult,
-    },
     logging::{LogEntry, LogSchema},
     metrics::{
         COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
         TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
     },
+    types::partial_state_compute_result::PartialStateComputeResult,
+    workflow::{
+        do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
+        do_state_checkpoint::DoStateCheckpoint,
+    },
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, state_compute_result::StateComputeResult,
-    BlockExecutorTrait, ExecutorError, ExecutorResult,
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -38,15 +39,18 @@ use aptos_types::{
     state_store::{state_value::StateValue, StateViewId},
 };
 use aptos_vm::AptosVM;
+use block_tree::BlockTree;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
+
+pub mod block_tree;
 
 pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput>;
+    ) -> Result<ExecutionOutput>;
 }
 
 impl TransactionBlockExecutor for AptosVM {
@@ -54,8 +58,12 @@ impl TransactionBlockExecutor for AptosVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, onchain_config)
+    ) -> Result<ExecutionOutput> {
+        DoGetExecutionOutput::by_transaction_execution::<AptosVM>(
+            transactions,
+            state_view,
+            onchain_config,
+        )
     }
 }
 
@@ -267,7 +275,17 @@ where
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
+                    fail_point!("executor::block_state_checkpoint", |_| {
+                        Err(anyhow::anyhow!("Injected error in block state checkpoint."))
+                    });
+
+                    DoStateCheckpoint::run(
+                        chunk_output,
+                        parent_output.state(),
+                        Some(block_id),
+                        None,
+                        /*is_block=*/ true,
+                    )
                 })?
             };
 

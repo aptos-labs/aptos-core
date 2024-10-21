@@ -22,8 +22,10 @@ use crate::{
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
 use aptos_executor::{
-    block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
+    block_executor::TransactionBlockExecutor,
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
+use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
@@ -119,8 +121,8 @@ impl TransactionBlockExecutor for PtxBlockExecutor {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> anyhow::Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
+    ) -> anyhow::Result<ExecutionOutput> {
+        DoGetExecutionOutput::by_transaction_execution::<PtxBlockExecutor>(
             transactions,
             state_view,
             onchain_config,
