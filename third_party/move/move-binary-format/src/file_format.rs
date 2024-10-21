@@ -48,7 +48,10 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{fmt::{self, Formatter}, ops::BitOr};
+use std::{
+    fmt::{self, Formatter},
+    ops::BitOr,
+};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
