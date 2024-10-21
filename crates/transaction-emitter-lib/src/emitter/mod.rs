@@ -21,7 +21,7 @@ use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
+use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient, Response};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -751,6 +751,9 @@ impl TxnEmitter {
             num_accounts, num_accounts
         );
 
+        info!("Beginning: Balance with root account :{:?}", get_account_balance(req.rest_clients.first().unwrap(), root_account.address()).await);
+        info!("Beginning: Root account address and seq number: {:?}", get_account_address_and_seq_num(req.rest_clients.first().unwrap(), root_account.address()).await);
+
         let txn_factory = self
             .txn_factory
             .clone()
@@ -818,6 +821,10 @@ impl TxnEmitter {
             mint_to_root: req.mint_to_root,
             prompt_before_spending: req.prompt_before_spending,
         };
+
+        info!("After account creation: Balance with root account :{:?}", get_account_balance(req.rest_clients.first().unwrap(), root_account.address()).await);
+        info!("After account creation: Root account address and seq number: {:?}", get_account_address_and_seq_num(req.rest_clients.first().unwrap(), root_account.address()).await);
+
         let (txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
             source_account_manager,
@@ -829,6 +836,9 @@ impl TxnEmitter {
             stats.get_cur_phase_obj(),
         )
         .await;
+
+        info!("After generator: Balance with root account :{:?}", get_account_balance(req.rest_clients.first().unwrap(), root_account.address()).await);
+        info!("After generator: Root account address and seq number: {:?}", get_account_address_and_seq_num(req.rest_clients.first().unwrap(), root_account.address()).await);
 
         if !req.coordination_delay_between_instances.is_zero() {
             info!(
@@ -1133,6 +1143,19 @@ pub async fn get_account_seq_num(
             result?;
             unreachable!()
         },
+    }
+}
+
+pub async fn get_account_balance(
+    client: &RestClient,
+    address: AccountAddress,
+) -> Result<Response<u64>> {
+    match client.view_apt_account_balance(address).await {
+        Ok(resp) => Ok(resp),
+        Err(e) => {
+            error!("Failed to get balance for account {}: {:?}", address, e);
+            Err(e.into())
+        }
     }
 }
 
