@@ -14,9 +14,14 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-use move_binary_format::file_format::{Ability, AbilitySet, TypeParameterIndex};
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{Ability, AbilitySet, SignatureToken, TypeParameterIndex},
+    views::StructHandleView,
+    CompiledModule,
+};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     u256::U256,
@@ -1308,6 +1313,68 @@ impl Type {
                 Struct(qid.module_id, qid.id, type_args)
             },
             TypeTag::Vector(type_param) => Vector(Box::new(Self::from_type_tag(type_param, env))),
+        }
+    }
+
+    /// Generates a type from a signature token in the context of the given binary module.
+    /// The `env` is only passed for general purposes, type name resolution is done
+    /// via a special resolver function, allowing to work with partially populated
+    /// environments.
+    pub fn from_signature_token(
+        env: &GlobalEnv,
+        module: &CompiledModule,
+        struct_resolver: &impl Fn(ModuleName, Symbol) -> QualifiedId<StructId>,
+        sig: &SignatureToken,
+    ) -> Self {
+        match sig {
+            SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
+            SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
+            SignatureToken::U16 => Type::Primitive(PrimitiveType::U16),
+            SignatureToken::U32 => Type::Primitive(PrimitiveType::U32),
+            SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
+            SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
+            SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
+            SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
+            SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
+            SignatureToken::Reference(t) => Type::Reference(
+                ReferenceKind::Immutable,
+                Box::new(Self::from_signature_token(env, module, struct_resolver, t)),
+            ),
+            SignatureToken::MutableReference(t) => Type::Reference(
+                ReferenceKind::Mutable,
+                Box::new(Self::from_signature_token(env, module, struct_resolver, t)),
+            ),
+            SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
+            SignatureToken::Vector(bt) => Type::Vector(Box::new(Self::from_signature_token(
+                env,
+                module,
+                struct_resolver,
+                bt,
+            ))),
+            SignatureToken::Struct(handle_idx) => {
+                let struct_view =
+                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
+                let struct_id = struct_resolver(
+                    env.to_module_name(&struct_view.module_id()),
+                    env.symbol_pool.make(struct_view.name().as_str()),
+                );
+                Type::Struct(struct_id.module_id, struct_id.id, vec![])
+            },
+            SignatureToken::StructInstantiation(handle_idx, args) => {
+                let struct_view =
+                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
+                let struct_id = struct_resolver(
+                    env.to_module_name(&struct_view.module_id()),
+                    env.symbol_pool.make(struct_view.name().as_str()),
+                );
+                Type::Struct(
+                    struct_id.module_id,
+                    struct_id.id,
+                    args.iter()
+                        .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
+                        .collect(),
+                )
+            },
         }
     }
 
