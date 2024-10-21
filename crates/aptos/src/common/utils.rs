@@ -597,3 +597,15 @@ pub fn explorer_transaction_link(
         )
     }
 }
+
+/// Strips the private key prefix for a given key string if it is AIP-80 compliant.
+///
+/// [Read about AIP-80](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-80.md)
+pub fn strip_private_key_prefix(key: &String) -> String {
+    let prefixes = ["ed25519-priv-", "secp256k1-priv-"];
+    prefixes
+        .iter()
+        .find_map(|prefix| key.strip_prefix(prefix))
+        .unwrap_or(key) // If no prefix is found, return the original key
+        .to_string()
+}
