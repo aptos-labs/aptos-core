@@ -363,36 +363,13 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     .get_peer_failures(peer_id)
                     .unwrap_or(0);
                 if failures > self.ping_failures_tolerated {
+                    // TODO deprecate: this no longer disconnects peers, only responds to pings
                     info!(
                         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        "{} Disconnecting from peer: {}",
+                        "{} Health check pings are greater than ping failures tolerated from peer: {}",
                         self.network_context,
                         peer_id.short_str()
                     );
-                    let peer_network_id =
-                        PeerNetworkId::new(self.network_context.network_id(), peer_id);
-                    if let Err(err) = timeout(
-                        Duration::from_millis(50),
-                        self.network_interface.disconnect_peer(
-                            peer_network_id,
-                            DisconnectReason::FailedHealthCheckPing(PingDisconnectContext::new(
-                                failures,
-                                self.ping_failures_tolerated,
-                            )),
-                        ),
-                    )
-                    .await
-                    {
-                        warn!(
-                            NetworkSchema::new(&self.network_context)
-                                .remote_peer(&peer_id),
-                            error = ?err,
-                            "{} Failed to disconnect from peer: {} with error: {:?}",
-                            self.network_context,
-                            peer_id.short_str(),
-                            err
-                        );
-                    }
                 }
             },
         }
