@@ -127,6 +127,16 @@ Convert address to singer and return.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == addr;
+<b>ensures</b> [abstract] result == <a href="create_signer.md#0x1_create_signer_spec_create_signer">spec_create_signer</a>(addr);
+</code></pre>
+
+
+
+
+<a id="0x1_create_signer_spec_create_signer"></a>
+
+
+<pre><code><b>fun</b> <a href="create_signer.md#0x1_create_signer_spec_create_signer">spec_create_signer</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
 </code></pre>
 
 
