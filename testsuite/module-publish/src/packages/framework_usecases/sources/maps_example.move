@@ -69,7 +69,7 @@ module 0xABCD::maps_example {
     }
 
     public entry fun test_add_remove_big_ordered_map(sender: &signer, len: u64, repeats: u64, inner_max_degree: u16, leaf_max_degree: u16) {
-        let map = big_ordered_map::new_with_config(inner_max_degree, leaf_max_degree, true, false, 0);
+        let map = big_ordered_map::new_with_config(inner_max_degree, leaf_max_degree, false, 0);
         do_test_add_remove(
             len,
             repeats,
