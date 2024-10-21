@@ -15,7 +15,7 @@ use aptos_protos::{
 };
 use aptos_transaction_filter::BooleanTransactionFilter;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 use tonic::{codec::CompressionEncoding, transport::Server};
 
 pub const SERVER_NAME: &str = "idxdatasvc";
@@ -183,7 +183,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             self.data_service_response_channel_size,
             self.txns_to_strip_filter.clone(),
             cache_storage_format,
-            Arc::new(in_memory_cache),
+            in_memory_cache,
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Zstd)
