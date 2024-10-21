@@ -897,6 +897,7 @@ dependencies = [
  "aptos-safety-rules",
  "aptos-schemadb",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
@@ -1347,6 +1348,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
+ "derive_more",
  "once_cell",
  "threadpool",
 ]
@@ -1546,12 +1548,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
  "criterion",
+ "derive_more",
  "itertools 0.13.0",
  "once_cell",
  "serde",
@@ -2093,6 +2097,25 @@ dependencies = [
  "tonic-reflection",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-file-checker"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-metrics-core",
+ "async-trait",
+ "clap 4.4.14",
+ "cloud-storage",
+ "jemallocator",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2843,6 +2866,7 @@ dependencies = [
  "aptos-vm",
  "clap 4.4.14",
  "move-cli",
+ "move-model",
  "move-package",
  "move-prover",
  "move-unit-test",
@@ -3852,6 +3876,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-experimental-runtimes",
  "aptos-logger",
  "aptos-metrics-core",

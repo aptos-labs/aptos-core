@@ -71,5 +71,4 @@ jobs:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
-          DRY_RUN: ${{ inputs.dry_run }}
         run: ./docker/release-images.mjs --wait-for-image-seconds=3600 ${{ inputs.dry_run && '--dry-run' || '' }}

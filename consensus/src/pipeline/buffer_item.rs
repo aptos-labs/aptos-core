@@ -464,7 +464,7 @@ mod test {
     use super::*;
     use aptos_consensus_types::{block::Block, block_data::BlockData};
     use aptos_crypto::HashValue;
-    use aptos_executor_types::StateComputeResult;
+    use aptos_executor_types::state_compute_result::StateComputeResult;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         ledger_info::LedgerInfo,
