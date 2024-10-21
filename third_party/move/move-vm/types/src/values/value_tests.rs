@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
+use claims::{assert_err, assert_ok};
 use move_binary_format::errors::*;
 use move_core_types::{account_address::AccountAddress, u256::U256};
 
@@ -227,6 +228,105 @@ fn test_vm_value_vector_u64_casting() {
         vec![1, 2, 3],
         Value::vector_u64([1, 2, 3]).value_as::<Vec<u64>>().unwrap()
     );
+}
+
+#[test]
+fn test_mem_swap() -> PartialVMResult<()> {
+    let mut locals = Locals::new(20);
+    // IndexedRef(Locals)
+    locals.store_loc(0, Value::u64(0), false)?;
+    locals.store_loc(1, Value::u64(1), false)?;
+    locals.store_loc(2, Value::address(AccountAddress::ZERO), false)?;
+    locals.store_loc(3, Value::address(AccountAddress::ONE), false)?;
+
+    // ContainerRef
+
+    // - Specialized
+    locals.store_loc(4, Value::vector_u64(vec![1, 2]), false)?;
+    locals.store_loc(5, Value::vector_u64(vec![3, 4, 5]), false)?;
+    locals.store_loc(6, Value::vector_address(vec![AccountAddress::ZERO]), false)?;
+    locals.store_loc(7, Value::vector_address(vec![AccountAddress::ONE]), false)?;
+
+    // - Generic
+    // -- Container of container
+    locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])), false)?;
+    locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])), false)?;
+    locals.store_loc(10, Value::signer(AccountAddress::ZERO), false)?;
+    locals.store_loc(11, Value::signer(AccountAddress::ONE), false)?;
+
+    // -- Container of vector
+    locals.store_loc(
+        12,
+        Value::vector_for_testing_only(vec![Value::u64(1u64), Value::u64(2u64)]),
+        false,
+    )?;
+    locals.store_loc(
+        13,
+        Value::vector_for_testing_only(vec![Value::u64(3u64), Value::u64(4u64)]),
+        false,
+    )?;
+    locals.store_loc(
+        14,
+        Value::vector_for_testing_only(vec![Value::signer(AccountAddress::ZERO)]),
+        false,
+    )?;
+    locals.store_loc(
+        15,
+        Value::vector_for_testing_only(vec![Value::signer(AccountAddress::ONE)]),
+        false,
+    )?;
+
+    let mut locals2 = Locals::new(2);
+    locals2.store_loc(0, Value::u64(0), false)?;
+
+    let get_local =
+        |ls: &Locals, idx: usize| ls.borrow_loc(idx).unwrap().value_as::<Reference>().unwrap();
+
+    for i in (0..16).step_by(2) {
+        assert_ok!(get_local(&locals, i).swap_values(get_local(&locals, i + 1)));
+    }
+
+    assert_ok!(get_local(&locals, 0).swap_values(get_local(&locals2, 0)));
+
+    for i in (0..16).step_by(2) {
+        for j in ((i + 2)..16).step_by(2) {
+            let result = get_local(&locals, i).swap_values(get_local(&locals, j));
+
+            // These would all fail in `call_native` typing checks.
+            // But here some do pass:
+            if j < 4  // locals are not checked between each other
+               || (8 <= i && j < 12) // ContainerRef of containers is not checked between each other
+               || (12 <= i && j < 16)
+            // ContainerRef of vector is not checked between each other
+            //    || i >= 8 // containers are also interchangeable
+            {
+                assert_ok!(result, "{} and {}", i, j);
+            } else {
+                assert_err!(result, "{} and {}", i, j);
+            }
+        }
+    }
+
+    // assert_err!(get_local(&locals, 0).swap_values(get_local(&locals, 4)));
+    // assert_err!(get_local(&locals, 0).swap_values(get_local(&locals, 6)));
+    // assert_err!(get_local(&locals, 0).swap_values(get_local(&locals, 8)));
+    // assert_err!(get_local(&locals, 0).swap_values(get_local(&locals, 10)));
+    // assert_err!(get_local(&locals, 0).swap_values(get_local(&locals, 12)));
+    // assert_err!(get_local(&locals, 2).swap_values(get_local(&locals, 4)));
+    // assert_err!(get_local(&locals, 2).swap_values(get_local(&locals, 4)));
+    // assert_err!(get_local(&locals, 2).swap_values(get_local(&locals, 4)));
+    // assert_err!(get_local(&locals, 2).swap_values(get_local(&locals, 4)));
+
+    // assert_ok!(get_local(&locals, 0).swap_values(get_local(&locals, 1)));
+    // assert_ok!(get_local(&locals, 2).swap_values(get_local(&locals, 3)));
+    // assert_ok!(get_local(&locals, 4).swap_values(get_local(&locals, 5)));
+    // assert_ok!(get_local(&locals, 6).swap_values(get_local(&locals, 7)));
+    // assert_ok!(get_local(&locals, 8).swap_values(get_local(&locals, 9)));
+    // assert_ok!(get_local(&locals, 10).swap_values(get_local(&locals, 11)));
+    // assert_ok!(get_local(&locals, 12).swap_values(get_local(&locals, 13)));
+    // assert_ok!(get_local(&locals, 14).swap_values(get_local(&locals, 15)));
+
+    Ok(())
 }
 
 #[cfg(test)]
