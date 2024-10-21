@@ -430,6 +430,7 @@ impl<T: Clone> TransactionWithDependencies<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct ExecutableBlock {
     pub block_id: HashValue,
     pub transactions: ExecutableTransactions,

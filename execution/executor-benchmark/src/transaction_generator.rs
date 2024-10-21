@@ -258,13 +258,13 @@ impl TransactionGenerator {
         block_size: usize,
     ) {
         assert!(self.block_sender.is_some());
-        // Ensure that seed accounts have enough balance to transfer money to at least 10000 account with
+        // Ensure that seed accounts have enough balance to transfer money to at least 50000 account with
         // balance init_account_balance.
         self.create_seed_accounts(
             reader,
             num_new_accounts,
             block_size,
-            init_account_balance * 10_000,
+            init_account_balance * 50_000,
         );
         self.create_and_fund_accounts(
             num_existing_accounts,
@@ -403,9 +403,11 @@ impl TransactionGenerator {
         block_size: usize,
     ) {
         println!(
-            "[{}] Generating {} account creation txns.",
+            "[{}] Generating {} account creation txns with init account balance {}. number of existing accounts {}.",
             now_fmt!(),
-            num_new_accounts
+            num_new_accounts,
+            init_account_balance,
+            num_existing_accounts,
         );
         let mut generator = AccountGenerator::new_for_user_accounts(num_existing_accounts as u64);
         println!("Skipped first {} existing accounts.", num_existing_accounts);
@@ -413,7 +415,7 @@ impl TransactionGenerator {
         let bar = get_progress_bar(num_new_accounts);
 
         for chunk in &(0..num_new_accounts).chunks(block_size) {
-            let input: Vec<_> = chunk
+            let input = chunk
                 .map(|_| {
                     (
                         self.seed_accounts_cache

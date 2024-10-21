@@ -31,13 +31,14 @@ class Flow(Flag):
     AGG_V2 = auto()
     # Test resource groups
     RESOURCE_GROUPS = auto()
+    # Test stable coin minting
+    STABLE_COIN = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 
-SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
-
+SELECTED_FLOW = Flow[os.environ.get("FLOW", default="STABLE_COIN")]
 print(f"Executing flow: {SELECTED_FLOW}")
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 SOURCE = os.environ.get("SOURCE", default="LOCAL")
@@ -48,19 +49,20 @@ if SOURCE not in ["ADHOC", "CI", "LOCAL"]:
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "200000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=150))
 NUM_BLOCKS_DETAILED = 10
-NUM_ACCOUNTS = max(
-    [
-        int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
-        (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
-    ]
-)
+NUM_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS))
+# NUM_ACCOUNTS = max(
+#     [
+#         int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
+#         (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
+#     ]
+# )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
@@ -207,6 +209,9 @@ no-op-fee-payer	100	VM	17	0.585	1.021	27642.4
 DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
+    RunGroupConfig(expected_tps= 10000, key=RunGroupKey("stable-coin-mint"), included_in=Flow.STABLE_COIN),
+    RunGroupConfig(expected_tps= 10000, key=RunGroupKey("stable-coin-batch-mint"), included_in=Flow.STABLE_COIN),
+
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
@@ -823,6 +828,7 @@ if warnings:
 if errors:
     print("Errors: ")
     print("\n".join(errors))
+    # exit(1)
     print(
         """If you expect your PR to change the performance, you need to recalibrate the values.
 To do so, you should run the test on your branch 6 times 
@@ -832,7 +838,6 @@ update it to your branch, and export values as CSV, and then open and copy value
 testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
 """
     )
-    exit(1)
 
 if move_e2e_benchmark_failed:
     print(

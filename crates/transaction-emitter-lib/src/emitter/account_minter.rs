@@ -370,7 +370,8 @@ impl<'t> AccountMinter<'t> {
         counters: &CounterState,
     ) -> Result<()> {
         info!(
-            "Creating and funding seeds accounts (txn {} gas price)",
+            "Creating and funding {} seeds accounts (txn {} gas price)",
+            seed_accounts.len(),
             self.txn_factory.get_gas_unit_price()
         );
         let source_account = match new_source_account {
@@ -379,6 +380,7 @@ impl<'t> AccountMinter<'t> {
         };
 
         for chunk in seed_accounts.chunks(max_submit_batch_size) {
+            info!("Creating and funding {} seed accounts with {} coins", chunk.len(), coins_per_seed_account);
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = chunk
                 .iter()
@@ -391,10 +393,13 @@ impl<'t> AccountMinter<'t> {
                     )
                 })
                 .collect();
+            info!("Created requests");
             txn_executor
                 .execute_transactions_with_counter(&create_requests, counters)
                 .await?;
+            info!("Executed requests");
         }
+        info!("Successfully created and funded seed accounts");
 
         Ok(())
     }

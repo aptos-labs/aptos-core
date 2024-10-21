@@ -343,6 +343,7 @@ fn add_accounts_impl<V>(
 ) where
     V: TransactionBlockExecutor + 'static,
 {
+    info!("Adding {} new accounts...", num_new_accounts);
     let (mut config, genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
@@ -368,6 +369,7 @@ fn add_accounts_impl<V>(
         pipeline_config.num_generator_workers,
     );
 
+    info!("num exisiting accounts {}, init account balance {}", generator.num_existing_accounts(), init_account_balance);
     let start_time = Instant::now();
     generator.run_mint(
         db.reader.clone(),

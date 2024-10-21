@@ -27,9 +27,10 @@ pub struct RestApiReliableTransactionSubmitter {
 impl RestApiReliableTransactionSubmitter {
     pub fn new(rest_clients: Vec<RestClient>, max_retries: usize, retry_after: Duration) -> Self {
         info!(
-            "Using reliable/retriable init transaction executor with {} retries, every {}s",
+            "Using reliable/retriable init transaction executor with {} retries, every {}s with rest clients {:?}",
             max_retries,
-            retry_after.as_secs_f32()
+            retry_after.as_secs_f32(),
+            rest_clients,
         );
         Self {
             rest_clients,
