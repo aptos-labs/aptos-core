@@ -22,6 +22,8 @@ use std::{
     },
     thread::JoinHandle,
 };
+use aptos_metrics_core::TimerHelper;
+use crate::metrics::OTHER_TIMERS_SECONDS;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
@@ -180,7 +182,10 @@ impl BufferedState {
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             let state_after_checkpoint = self
                 .state_after_checkpoint
-                .replace_with(new_state_after_checkpoint.clone());
+                .replace_with({
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_delta_clone"]);
+                    new_state_after_checkpoint.clone()
+                });
             if let Some(ref mut delta) = self.state_until_checkpoint {
                 delta.merge(state_after_checkpoint);
             } else {
