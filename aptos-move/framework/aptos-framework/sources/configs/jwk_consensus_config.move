@@ -15,6 +15,7 @@ module aptos_framework::jwk_consensus_config {
     use std::string::utf8;
 
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     /// `ConfigV1` creation failed with duplicated providers given.
     const EDUPLICATE_PROVIDERS: u64 = 1;

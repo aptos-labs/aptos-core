@@ -9,8 +9,10 @@ module aptos_framework::block {
     use aptos_framework::randomness;
 
     use aptos_framework::account;
+    use aptos_framework::async_reconfig;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
+    use aptos_framework::reconfiguration_state;
     use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
@@ -264,6 +266,45 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
+        };
+    }
+
+    /// Block prologue with formal async reconfig framework.
+    fun block_prologue_ext_v2(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        randomness_seed: Option<vector<u8>>,
+        framework: signer,
+    ) acquires BlockResource, CommitHistory {
+        let epoch_interval = block_prologue_common(
+            &vm,
+            hash,
+            epoch,
+            round,
+            proposer,
+            failed_proposer_indices,
+            previous_block_votes_bitvec,
+            timestamp
+        );
+        randomness::on_new_block(&vm, epoch, round, randomness_seed);
+
+        // If we are not in a reconfig, and it's time for one, start it.
+        if (!reconfiguration_state::is_in_progress()) {
+            if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+                async_reconfig::try_start();
+            };
+        };
+
+        // If we are in a reconfig, see if we can complete it and enter the new epoch.
+        // This can even complete the reconfig we just triggered within the same txn, if no feature needs end-of-epoch processing.
+        if (reconfiguration_state::is_in_progress()) {
+            async_reconfig::try_finish(&framework);
         };
     }
 

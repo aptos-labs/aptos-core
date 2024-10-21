@@ -5,7 +5,9 @@ use crate::{
     aptos_vm::{get_or_vm_startup_failure, get_system_transaction_output},
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
-    system_module_names::{FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
+    system_module_names::{
+        DKG_MODULE, FINISH, FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE,
+    },
     validator_txns::dkg::{
         ExecutionFailure::{Expected, Unexpected},
         ExpectedFailure::*,
@@ -15,7 +17,7 @@ use crate::{
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::{ConfigurationResource, OnChainConfig},
+    on_chain_config::{ConfigurationResource, FeatureFlag, OnChainConfig},
     transaction::TransactionStatus,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -106,18 +108,25 @@ impl AptosVM {
         ];
 
         let module_storage = TraversalStorage::new();
+        let (module, func_name) = if self
+            .features()
+            .is_enabled(FeatureFlag::ASYNC_RECONFIG_FRAMEWORK)
+        {
+            (&DKG_MODULE, FINISH)
+        } else {
+            (&RECONFIGURATION_WITH_DKG_MODULE, FINISH_WITH_DKG_RESULT)
+        };
+
         session
             .execute_function_bypass_visibility(
-                &RECONFIGURATION_WITH_DKG_MODULE,
-                FINISH_WITH_DKG_RESULT,
+                module,
+                func_name,
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
                 &mut TraversalContext::new(&module_storage),
             )
-            .map_err(|e| {
-                expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)
-            })
+            .map_err(|e| expect_only_successful_execution(e, func_name.as_str(), log_context))
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
         let output = get_system_transaction_output(
