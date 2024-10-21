@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
         batch_generator::BatchGeneratorCommand,
@@ -167,7 +168,10 @@ impl BatchCoordinator {
                     break;
                 },
                 BatchCoordinatorCommand::NewBatches(author, batches) => {
-                    self.handle_batches_msg(author, batches).await;
+                    monitor!(
+                        "qs_handle_batches_msg",
+                        self.handle_batches_msg(author, batches).await
+                    );
                 },
             }
         }

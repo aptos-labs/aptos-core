@@ -39,6 +39,7 @@ impl NetworkListener {
 
     pub async fn start(mut self) {
         info!("QS: starting networking");
+        let mut next_batch_coordinator_idx = 0;
         while let Some(msg) = self.network_msg_rx.next().await {
             monitor!("qs_network_listener_main_loop", {
                 match msg {
@@ -71,14 +72,19 @@ impl NetworkListener {
                         let batches = batch_msg.take();
                         counters::RECEIVED_BATCH_MSG_COUNT.inc();
 
-                        let idx =
-                            author.to_vec()[0] as usize % self.remote_batch_coordinator_tx.len();
+                        // Round-robin assignment to batch coordinator.
+                        let idx = next_batch_coordinator_idx;
+                        next_batch_coordinator_idx = (next_batch_coordinator_idx + 1)
+                            % self.remote_batch_coordinator_tx.len();
                         trace!(
                             "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
                             author,
                             self.remote_batch_coordinator_tx.len(),
                             idx
                         );
+                        counters::BATCH_COORDINATOR_NUM_BATCH_REQS
+                            .with_label_values(&[&idx.to_string()])
+                            .inc();
                         self.remote_batch_coordinator_tx[idx]
                             .send(BatchCoordinatorCommand::NewBatches(author, batches))
                             .await

@@ -947,3 +947,12 @@ pub static BATCH_RECEIVED_LATE_REPLIES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_batch_coord_requests",
+        "Number of requests to batch coordinator.",
+        &["bucket"]
+    )
+    .unwrap()
+});
