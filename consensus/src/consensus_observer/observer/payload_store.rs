@@ -213,8 +213,7 @@ impl BlockPayloadStore {
     }
 
     /// Verifies the block payload signatures against the given epoch state.
-    /// If verification is successful, blocks are marked as verified. Each
-    /// new verified block is
+    /// If verification is successful, blocks are marked as verified.
     pub fn verify_payload_signatures(&mut self, epoch_state: &EpochState) -> Vec<Round> {
         // Get the current epoch
         let current_epoch = epoch_state.epoch;

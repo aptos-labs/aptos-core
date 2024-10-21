@@ -55,7 +55,10 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -360,7 +363,7 @@ impl ConsensusObserver {
     async fn process_block_payload_message(
         &mut self,
         peer_network_id: PeerNetworkId,
-        block_payload: BlockPayload,
+        mut block_payload: BlockPayload,
     ) {
         // Get the epoch and round for the block
         let block_epoch = block_payload.epoch();
@@ -386,6 +389,7 @@ impl ConsensusObserver {
         update_metrics_for_block_payload_message(peer_network_id, &block_payload);
 
         // Verify the block payload digests
+        let time_now = SystemTime::now();
         if let Err(error) = block_payload.verify_payload_digests() {
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -396,11 +400,20 @@ impl ConsensusObserver {
             );
             return;
         }
+        if let Ok(duration) = time_now.elapsed() {
+            metrics::observe_message_with_labels(
+                &metrics::MESSAGE_LATENCY_TRACKER,
+                metrics::BLOCK_PAYLOAD_LABEL,
+                "verify_payload_digests",
+                duration.as_secs_f64(),
+            );
+        }
 
         // If the payload is for the current epoch, verify the proof signatures
         let epoch_state = self.get_epoch_state();
         let verified_payload = if block_epoch == epoch_state.epoch {
             // Verify the block proof signatures
+            let time_now = SystemTime::now();
             if let Err(error) = block_payload.verify_payload_signatures(&epoch_state) {
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -410,11 +423,24 @@ impl ConsensusObserver {
                 );
                 return;
             }
+            if let Ok(duration) = time_now.elapsed() {
+                metrics::observe_message_with_labels(
+                    &metrics::MESSAGE_LATENCY_TRACKER,
+                    metrics::BLOCK_PAYLOAD_LABEL,
+                    "verify_payload_signatures",
+                    duration.as_secs_f64(),
+                );
+            }
 
             true // We have successfully verified the signatures
         } else {
             false // We can't verify the signatures yet
         };
+
+        // Set the processing time
+        block_payload
+            .message_latency_tracker
+            .set_process_time(metrics::BLOCK_PAYLOAD_LABEL);
 
         // Update the payload store with the payload
         self.block_payload_store
@@ -434,7 +460,7 @@ impl ConsensusObserver {
     fn process_commit_decision_message(
         &mut self,
         peer_network_id: PeerNetworkId,
-        commit_decision: CommitDecision,
+        mut commit_decision: CommitDecision,
     ) {
         // Get the commit decision epoch and round
         let commit_epoch = commit_decision.epoch();
@@ -466,7 +492,7 @@ impl ConsensusObserver {
             }
 
             // Update the pending blocks with the commit decision
-            if self.process_commit_decision_for_pending_block(&commit_decision) {
+            if self.process_commit_decision_for_pending_block(&mut commit_decision) {
                 return; // The commit decision was successfully processed
             }
         }
@@ -512,7 +538,15 @@ impl ConsensusObserver {
     /// Processes the commit decision for the pending block and returns true iff
     /// the commit decision was successfully processed. Note: this function
     /// assumes the commit decision has already been verified.
-    fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
+    fn process_commit_decision_for_pending_block(
+        &self,
+        commit_decision: &mut CommitDecision,
+    ) -> bool {
+        // Set the processing time
+        commit_decision
+            .message_latency_tracker
+            .set_process_time(metrics::COMMIT_DECISION_LABEL);
+
         // Get the pending block for the commit decision
         let pending_block = self
             .ordered_block_store
@@ -554,7 +588,10 @@ impl ConsensusObserver {
     /// Processes a network message received by the consensus observer
     async fn process_network_message(&mut self, network_message: ConsensusObserverNetworkMessage) {
         // Unpack the network message
-        let (peer_network_id, message) = network_message.into_parts();
+        let (peer_network_id, mut message) = network_message.into_parts();
+
+        // Update the message receive time
+        message.set_receive_time();
 
         // Verify the message is from the peers we've subscribed to
         if let Err(error) = self
@@ -658,10 +695,11 @@ impl ConsensusObserver {
 
     /// Processes the ordered block. This assumes the ordered block
     /// has been sanity checked and that all payloads exist.
-    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
+    async fn process_ordered_block(&mut self, mut ordered_block: OrderedBlock) {
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
         if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
+            let time_now = SystemTime::now();
             if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
                 warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -671,6 +709,14 @@ impl ConsensusObserver {
                     ))
                 );
                 return;
+            }
+            if let Ok(duration) = time_now.elapsed() {
+                metrics::observe_message_with_labels(
+                    &metrics::MESSAGE_LATENCY_TRACKER,
+                    metrics::ORDERED_BLOCK_LABEL,
+                    "verify_ordered_proof",
+                    duration.as_secs_f64(),
+                );
             }
         } else {
             // Drop the block and log an error (the block should always be for the current epoch)
@@ -684,6 +730,7 @@ impl ConsensusObserver {
         };
 
         // Verify the block payloads against the ordered block
+        let time_now = SystemTime::now();
         if let Err(error) = self
             .block_payload_store
             .lock()
@@ -698,10 +745,23 @@ impl ConsensusObserver {
             );
             return;
         }
+        if let Ok(duration) = time_now.elapsed() {
+            metrics::observe_message_with_labels(
+                &metrics::MESSAGE_LATENCY_TRACKER,
+                metrics::ORDERED_BLOCK_LABEL,
+                "verify_payloads_against_ordered_block",
+                duration.as_secs_f64(),
+            );
+        }
 
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
         if self.get_last_ordered_block().id() == ordered_block.first_block().parent_id() {
+            // Set the processing time
+            ordered_block
+                .message_latency_tracker
+                .set_process_time(metrics::ORDERED_BLOCK_LABEL);
+
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
