@@ -1,9 +1,12 @@
-error[E01002]: unexpected token
-  ┌─ tests/move_check/parser/invalid_call_lhs_parens_around_name.move:3:14
+error[E02004]: invalid 'module' declaration
+  ┌─ tests/move_check/parser/invalid_call_lhs_parens_around_name.move:1:8
+  │
+1 │ module M {
+  │        ^ Invalid module declaration. The module does not have a specified address. Either declare it inside of an 'address <address> {' block or declare it with an address 'module <address>::M''
+
+error[E03009]: unbound variable
+  ┌─ tests/move_check/parser/invalid_call_lhs_parens_around_name.move:3:10
   │
 3 │         (foo)()
-  │              ^
-  │              │
-  │              Unexpected '('
-  │              Expected ';'
+  │          ^^^ Invalid function usage. Unbound variable 'foo'
 

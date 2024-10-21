@@ -21,6 +21,7 @@ move-symbol-pool = { path = "../move-symbol-pool" }
 # external dependencies
 codespan = { workspace = true }
 codespan-reporting = { workspace = true }
+either = { workspace = true }
 internment = { workspace = true, features = ["arc"] }
 itertools = { workspace = true }
 log = { workspace = true }

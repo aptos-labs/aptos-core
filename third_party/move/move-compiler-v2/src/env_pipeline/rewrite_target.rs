@@ -159,8 +159,8 @@ impl RewriteTargets {
 }
 
 impl RewriteTarget {
-    /// Gets the call sites for the target.
-    pub fn called_funs_with_call_sites(
+    /// Gets the functions called or referenced in the target.
+    pub fn used_funs_with_uses(
         &self,
         env: &GlobalEnv,
     ) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
@@ -179,7 +179,7 @@ impl RewriteTarget {
                 .unwrap_or_default(),
             SpecBlock(target) => {
                 let spec = env.get_spec_block(target);
-                spec.called_funs_with_callsites()
+                spec.used_funs_with_uses()
             },
         }
     }

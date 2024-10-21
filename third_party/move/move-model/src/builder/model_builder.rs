@@ -496,20 +496,24 @@ impl<'env> ModelBuilder<'env> {
         for cur_mod in target_modules {
             let cur_mod_env = self.env.get_module(cur_mod);
             let cur_mod_name = cur_mod_env.get_name().clone();
-            for need_to_be_friended_by in cur_mod_env.need_to_be_friended_by() {
-                let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friended_by);
+            let needed = cur_mod_env.need_to_be_friended_by();
+            for need_to_be_friended_by in needed {
+                let need_to_be_friend_with = self.env.get_module(need_to_be_friended_by);
                 let already_friended = need_to_be_friend_with
-                    .friend_decls
+                    .get_friend_decls()
                     .iter()
                     .any(|friend_decl| friend_decl.module_name == cur_mod_name);
                 if !already_friended {
-                    let loc = need_to_be_friend_with.loc.clone();
+                    let loc = need_to_be_friend_with.get_loc();
                     let friend_decl = FriendDecl {
                         loc,
                         module_name: cur_mod_name.clone(),
                         module_id: Some(cur_mod),
                     };
-                    need_to_be_friend_with.friend_decls.push(friend_decl);
+                    self.env
+                        .get_module_data_mut(need_to_be_friended_by)
+                        .friend_decls
+                        .push(friend_decl);
                 }
             }
         }

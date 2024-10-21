@@ -90,7 +90,7 @@ pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_func
         let mut visited_targets = BTreeSet::new();
         while let Some(target) = todo.pop_first() {
             if visited_targets.insert(target.clone()) {
-                let callees_with_sites = target.called_funs_with_call_sites(env);
+                let callees_with_sites = target.used_funs_with_uses(env);
                 for (callee, sites) in callees_with_sites {
                     todo.insert(RewriteTarget::MoveFun(callee));
                     targets.entry(RewriteTarget::MoveFun(callee));
@@ -1161,7 +1161,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         };
         let call_loc = self.env.get_node_loc(id);
         if let Some(lambda_target) = optional_lambda_target {
-            if let ExpData::Lambda(_, pat, body) = lambda_target.as_ref() {
+            if let ExpData::Lambda(_, pat, body, _, _) = lambda_target.as_ref() {
                 let args_vec: Vec<Exp> = args.to_vec();
                 Some(InlinedRewriter::construct_inlined_call_expression(
                     self.env,
