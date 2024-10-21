@@ -271,6 +271,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::NATIVE_CHECK.to_string(),
+            description: "Whether to check for native functions/structs in non-special modules"
+                .to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
     ];
     experiments
         .into_iter()
@@ -302,6 +308,7 @@ impl Experiment {
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LAMBDA_VALUES: &'static str = "lambda-values";
     pub const LINT_CHECKS: &'static str = "lint-checks";
+    pub const NATIVE_CHECK: &'static str = "native-check";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =

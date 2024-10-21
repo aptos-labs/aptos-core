@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: Only special-address modules can have native structs
+  ┌─ tests/checking/natives/disallowed.move:2:5
+  │
+2 │     native struct Foo;
+  │     ^^^^^^^^^^^^^^^^^^
+
+error: Only special-address modules can have native functions
+  ┌─ tests/checking/natives/disallowed.move:4:5
+  │
+4 │     native fun whatever(): u64;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
