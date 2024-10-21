@@ -90,7 +90,7 @@ pub struct BuildOptions {
            default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", "2.1"))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -139,8 +139,8 @@ impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
             bytecode_version: Some(VERSION_7),
-            language_version: Some(LanguageVersion::V2_0),
-            compiler_version: Some(CompilerVersion::V2_0),
+            language_version: Some(LanguageVersion::latest_stable()),
+            compiler_version: Some(CompilerVersion::latest_stable()),
             ..Self::default()
         }
     }

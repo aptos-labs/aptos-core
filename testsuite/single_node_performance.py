@@ -167,7 +167,7 @@ account-resource32-b	1	VM	36	0.809	1.084	35822.6
 modify-global-resource	1	VM	36	0.921	1.015	2799.1
 modify-global-resource	100	VM	36	0.839	1.04	35206.7
 publish-package	1	VM	36	0.886	1.039	147
-mix_publish_transfer	1	VM	36	0.918	1.086	2149.7
+mix_publish_transfer	1	VM	36	0.918	1.086	2079.7
 batch100-transfer	1	VM	36	0.727	1.018	740.9
 vector-picture30k	1	VM	36	0.863	1.024	110.6
 vector-picture30k	100	VM	36	0.573	1.027	2025.7
@@ -825,10 +825,10 @@ if errors:
     print("\n".join(errors))
     print(
         """If you expect your PR to change the performance, you need to recalibrate the values.
-To do so, you should run the test on your branch 6 times 
+To do so, you should run the test on your branch 6 times
 (https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml).
 Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
-update it to your branch, and export values as CSV, and then open and copy values inside 
+update it to your branch, and export values as CSV, and then open and copy values inside
 testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
 """
     )
