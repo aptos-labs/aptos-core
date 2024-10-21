@@ -20,12 +20,11 @@ on:
         description: "The path to the backup config template to use."
         type: string
         required: true
-      # GHA job config
       RUNS_ON:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "high-perf-docker-with-local-ssd"
+        default: runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,spot=false
       TIMEOUT_MINUTES:
         description: "Github job timeout in minutes"
         type: number
@@ -41,10 +40,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
-
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Install AWS CLI
         shell: bash
