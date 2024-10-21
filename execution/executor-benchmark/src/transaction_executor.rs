@@ -7,10 +7,12 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::block_executor::{
-    config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+use aptos_types::{
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
+    transaction::TransactionOutputProvider,
 };
 use std::{
+    collections::HashMap,
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
@@ -58,6 +60,7 @@ where
         current_block_start_time: Instant,
         partition_time: Duration,
         executable_block: ExecutableBlock,
+        event_summary: &mut HashMap<String, usize>,
     ) {
         let execution_start_time = Instant::now();
         if self.maybe_first_block_start_time.is_none() {
@@ -86,6 +89,14 @@ where
         );
         if !self.allow_retries {
             assert_eq!(output.txns_to_commit_len(), num_txns + 1);
+        }
+        for parsed_output in output.txns().to_commit().parsed_outputs() {
+            for event in parsed_output.get_transaction_output().events() {
+                let count = event_summary
+                    .entry(event.type_tag().to_canonical_string())
+                    .or_insert(0);
+                *count += 1;
+            }
         }
 
         let msg = LedgerUpdateMessage {
