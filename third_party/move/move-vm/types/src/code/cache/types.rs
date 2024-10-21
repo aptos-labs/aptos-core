@@ -97,43 +97,10 @@ impl<D, V> Clone for Code<D, V> {
     }
 }
 
-#[cfg(any(test, feature = "testing"))]
-#[derive(Clone)]
-pub struct MockDeserializedCode(usize);
-
-#[cfg(any(test, feature = "testing"))]
-impl MockDeserializedCode {
-    pub fn new(value: usize) -> Self {
-        Self(value)
-    }
-
-    pub fn value(&self) -> usize {
-        self.0
-    }
-}
-
-#[cfg(any(test, feature = "testing"))]
-pub struct MockVerifiedCode(Arc<MockDeserializedCode>);
-
-#[cfg(any(test, feature = "testing"))]
-impl MockVerifiedCode {
-    pub fn new(value: usize) -> Self {
-        Self(Arc::new(MockDeserializedCode(value)))
-    }
-}
-
-#[cfg(any(test, feature = "testing"))]
-impl Deref for MockVerifiedCode {
-    type Target = Arc<MockDeserializedCode>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::{MockDeserializedCode, MockVerifiedCode};
 
     #[test]
     fn test_deserialized_code() {

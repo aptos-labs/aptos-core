@@ -273,7 +273,7 @@ where
         if visited.insert(dependency_id.clone()) {
             // Dependency is not verified, and we have not visited it yet.
             let verified_dependency = visit_dependencies_and_verify(
-                dependency_id,
+                dependency_id.clone(),
                 dependency,
                 visited,
                 module_cache_with_context,
@@ -282,8 +282,8 @@ where
         } else {
             // We must have found a cycle otherwise.
             return Err(module_cyclic_dependency_error!(
-                module_id.address(),
-                module_id.name()
+                dependency_id.address(),
+                dependency_id.name()
             ));
         }
     }

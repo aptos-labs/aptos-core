@@ -200,7 +200,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::code::cache::types::{MockDeserializedCode, MockVerifiedCode};
+    use crate::code::{MockDeserializedCode, MockVerifiedCode};
     use claims::{assert_ok, assert_some};
     use std::collections::BTreeSet;
 

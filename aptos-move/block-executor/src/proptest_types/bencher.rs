@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    code_cache_global::ImmutableModuleCache,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -127,6 +128,7 @@ where
                 .build()
                 .unwrap(),
         );
+        let global_module_cache = Arc::new(ImmutableModuleCache::empty());
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let env = MockEnvironment::new();
@@ -136,7 +138,7 @@ where
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
-        >::new(config, executor_thread_pool, None)
+        >::new(config, executor_thread_pool, global_module_cache, None)
         .execute_transactions_parallel(&env, &self.transactions, &data_view);
 
         self.baseline_output.assert_parallel_output(&output);

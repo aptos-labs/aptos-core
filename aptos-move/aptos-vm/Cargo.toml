@@ -60,6 +60,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
+aptos-block-executor = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }

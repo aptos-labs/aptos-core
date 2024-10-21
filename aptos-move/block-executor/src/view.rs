@@ -8,6 +8,7 @@ use crate::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
         UnsyncReadSet,
     },
+    code_cache_global::ImmutableModuleCache,
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
     value_exchange::{
@@ -989,6 +990,8 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
+    pub(crate) global_module_cache:
+        &'a ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T, X>,
     pub(crate) txn_idx: TxnIndex,
@@ -997,12 +1000,19 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
+        global_module_cache: &'a ImmutableModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         runtime_environment: &'a RuntimeEnvironment,
         latest_view: ViewState<'a, T, X>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
             base_view,
+            global_module_cache,
             runtime_environment,
             latest_view,
             txn_idx,
@@ -2511,9 +2521,11 @@ mod test {
         let base_view = MockStateView::new(HashMap::new());
         let start_counter = 5;
         let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let global_module_cache = ImmutableModuleCache::empty();
 
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
+            &global_module_cache,
             &runtime_environment,
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
@@ -2777,6 +2789,8 @@ mod test {
         unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
         counter: RefCell<u32>,
         base_view: MockStateView,
+        empty_global_module_cache:
+            ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
     }
 
@@ -2790,6 +2804,7 @@ mod test {
                 unsync_map,
                 counter,
                 base_view,
+                empty_global_module_cache: ImmutableModuleCache::empty(),
                 runtime_environment,
             }
         }
@@ -2803,6 +2818,7 @@ mod test {
 
         LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
             &h.base_view,
+            &h.empty_global_module_cache,
             &h.runtime_environment,
             ViewState::Unsync(sequential_state),
             1,
@@ -2844,6 +2860,7 @@ mod test {
             let latest_view_par =
                 LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
                     &self.base_view,
+                    &self.holder.empty_global_module_cache,
                     &self.runtime_environment,
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,

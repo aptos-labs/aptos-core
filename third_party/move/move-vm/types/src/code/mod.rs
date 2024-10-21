@@ -6,7 +6,9 @@ pub mod errors;
 mod storage;
 
 #[cfg(any(test, feature = "testing"))]
-pub use cache::types::{MockDeserializedCode, MockVerifiedCode};
+pub use cache::test_types::{
+    mock_deserialized_code, mock_verified_code, MockDeserializedCode, MockVerifiedCode,
+};
 pub use cache::{
     module_cache::{
         ambassador_impl_ModuleCache, ModuleCache, ModuleCode, ModuleCodeBuilder, SyncModuleCache,
