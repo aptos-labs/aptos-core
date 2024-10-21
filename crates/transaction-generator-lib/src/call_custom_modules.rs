@@ -248,7 +248,15 @@ impl CustomModulesDelegationGeneratorCreator {
                 })
                 .unwrap();
         }
-
+        info!("Done creating {} publisher accounts.", requests_create.len());
+        for (_, publisher) in packages.iter().map(|(package, acc)| (package, acc)) {
+            info!(
+                "Package {} created by publisher {} with account balance {:?}",
+                package_name,
+                publisher.address(),
+                txn_executor.get_account_balance(publisher.address()).await
+            );
+        }
         info!(
             "Publishing {} copies of package {}",
             requests_publish.len(),
