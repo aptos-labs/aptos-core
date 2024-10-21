@@ -54,8 +54,23 @@ spec:
           value: "1"
         - name: KUBECONFIG
           value: {KUBECONFIG}
-      # - name: RUST_LOG
-      #   value: debug
+        # - name: RUST_LOG
+        #   value: debug
+        # These env vars are required for push metrics
+        - name: PUSH_METRICS_NAMESPACE
+          value: "{FORGE_NAMESPACE}"
+        - name: PUSH_METRICS_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-push-metrics
+              key: url
+              optional: true
+        - name: PUSH_METRICS_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-push-metrics
+              key: token
+              optional: true
       volumeMounts:
         - name: multiregion-kubeconfig
           readOnly: true
