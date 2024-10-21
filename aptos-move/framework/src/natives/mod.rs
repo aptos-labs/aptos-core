@@ -13,6 +13,7 @@ pub mod dispatchable_fungible_asset;
 pub mod event;
 pub mod function_info;
 pub mod hash;
+pub mod intent;
 pub mod object;
 pub mod object_code_deployment;
 pub mod randomness;
@@ -101,6 +102,11 @@ pub fn all_natives(
             )])
         );
     }
+
+    add_natives_from_module!(
+        "intent",
+        intent::make_all(builder)
+    );
 
     make_table_from_iter(framework_addr, natives)
 }
