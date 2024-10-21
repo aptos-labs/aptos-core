@@ -77,6 +77,7 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use url::Url;
+use crate::common::types::GIT_IGNORE;
 
 pub mod aptos_debug_natives;
 mod bytecode;
@@ -270,6 +271,15 @@ impl FrameworkPackageArgs {
             toml::to_string_pretty(&manifest)
                 .map_err(|err| CliError::UnexpectedError(err.to_string()))?
                 .as_bytes(),
+        )?;
+
+        // Write a .gitignore
+        let gitignore = package_dir.join(GIT_IGNORE);
+        check_if_file_exists(gitignore.as_path(), prompt_options)?;
+        write_to_file(
+            gitignore.as_path(),
+            GIT_IGNORE,
+            ".aptos/\nbuild/".as_bytes()
         )
     }
 }
