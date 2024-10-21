@@ -352,13 +352,13 @@ Only called during genesis to initialize system resources for this module.
         // );
 
         <b>assert</b>!(
-            <a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">nonce_validation::check_and_insert_nonce</a>(transaction_sender, txn_sequence_number, txn_expiration_time),
+            !<a href="nonce_validation.md#0x1_nonce_validation_nonce_exists">nonce_validation::nonce_exists</a>(transaction_sender, txn_sequence_number, txn_expiration_time),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_EXISTS">PROLOGUE_NONCE_ALREADY_EXISTS</a>)
         );
+        <a href="nonce_validation.md#0x1_nonce_validation_insert_nonce">nonce_validation::insert_nonce</a>(transaction_sender, txn_sequence_number, txn_expiration_time);
+
         // <b>assert</b>!(!<a href="nonce_validation.md#0x1_nonce_validation_nonce_exists">nonce_validation::nonce_exists</a>(transaction_sender, txn_sequence_number, txn_expiration_time),
         //     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_EXISTS">PROLOGUE_NONCE_ALREADY_EXISTS</a>));
-
-        // <a href="nonce_validation.md#0x1_nonce_validation_insert_nonce">nonce_validation::insert_nonce</a>(transaction_sender, txn_sequence_number, txn_expiration_time);
 
     } <b>else</b> {
         // In this case, the transaction is sponsored and the <a href="account.md#0x1_account">account</a> does not exist, so ensure
