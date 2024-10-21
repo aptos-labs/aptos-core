@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::for_each_ref_mut` has a function parameter:
+  ┌─ tests/lambda/inline-parity/multi_param.move:7:16
+  │
+7 │     public fun for_each_ref_mut<Element>(v: &mut vector<Element>, f: |&mut Element|) {
+  │                ^^^^^^^^^^^^^^^^                                   - Parameter `f` has function-valued type `|&mut Element|`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::elem_for_each_ref` has a function parameter:
+   ┌─ tests/lambda/inline-parity/multi_param.move:17:16
+   │
+17 │     public fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K,V>>, f: |&K, &mut V|u64): u64 {
+   │                ^^^^^^^^^^^^^^^^^                                 - Parameter `f` has function-valued type `|(&K, &mut V)|u64`.
