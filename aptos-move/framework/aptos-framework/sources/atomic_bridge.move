@@ -24,6 +24,15 @@ module aptos_framework::ethereum {
         EthereumAddress { inner: ethereum_address }
     }
 
+    /// Returns a new `EthereumAddress` without EIP-55 validation.
+    ///
+    /// @param ethereum_address A 40-byte vector of unsigned 8-bit integers (hexadecimal format).
+    /// @return A validated `EthereumAddress` struct.
+    /// @abort If the address does not conform to EIP-55 standards.
+    public fun ethereum_address_no_eip55(ethereum_address: vector<u8>): EthereumAddress {
+        EthereumAddress { inner: ethereum_address }
+    }
+
     /// Converts uppercase ASCII characters in a vector to their lowercase equivalents.
     ///
     /// @param input A reference to a vector of ASCII characters.
@@ -1363,7 +1372,7 @@ module aptos_framework::atomic_bridge_counterparty {
         amount: u64
     ) {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
-        let ethereum_address = ethereum::ethereum_address(initiator);
+        let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
         let time_lock = atomic_bridge_configuration::counterparty_timelock_duration();
         let details = atomic_bridge_store::create_details(
             ethereum_address,
