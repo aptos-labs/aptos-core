@@ -10,7 +10,7 @@ mod tests {
 
     #[test]
     fn test_generate_transactions() {
-        let json_bytes = GENERATED_TXNS_SIMPLE_USER_SCRIPT1;
+        let json_bytes = SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT1;
         // Check that the transaction is valid JSON
         let transaction = serde_json::from_slice::<Transaction>(json_bytes).unwrap();
 

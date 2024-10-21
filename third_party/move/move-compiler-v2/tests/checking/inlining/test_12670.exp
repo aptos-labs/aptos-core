@@ -4,18 +4,18 @@ module 0x1::Test {
     struct S {
         x: u8,
     }
-    private fun foo(xs: vector<Test::S>) {
+    private fun foo(xs: vector<S>) {
         {
           let sum: u8 = 0;
           {
-            let (v: &vector<Test::S>): (&vector<Test::S>) = Tuple(Borrow(Immutable)(xs));
+            let (v: &vector<S>): (&vector<S>) = Tuple(Borrow(Immutable)(xs));
             {
               let i: u64 = 0;
               loop {
-                if Lt<u64>(i, vector::length<Test::S>(v)) {
+                if Lt<u64>(i, vector::length<S>(v)) {
                   {
-                    let (e: &Test::S): (&Test::S) = Tuple(vector::borrow<Test::S>(v, i));
-                    sum: u8 = Add<u8>(sum, select Test::S.x<&Test::S>(e));
+                    let (e: &S): (&S) = Tuple(vector::borrow<S>(v, i));
+                    sum: u8 = Add<u8>(sum, select Test::S.x<&S>(e));
                     Tuple()
                   };
                   i: u64 = Add<u64>(i, 1)
@@ -29,6 +29,27 @@ module 0x1::Test {
         }
     }
 } // end 0x1::Test
+
+// -- Sourcified model before bytecode pipeline
+module 0x1::Test {
+    struct S has drop {
+        x: u8,
+    }
+    fun foo(xs: vector<S>) {
+        let sum = 0u8;
+        {
+            let (v) = (&xs);
+            let i = 0;
+            while (i < 0x1::vector::length<S>(v)) {
+                {
+                    let (e) = (0x1::vector::borrow<S>(v, i));
+                    sum = sum + e.x;
+                };
+                i = i + 1
+            }
+        };
+    }
+}
 
 
 ============ bytecode verification succeeded ========

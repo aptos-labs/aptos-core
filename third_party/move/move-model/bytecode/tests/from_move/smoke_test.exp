@@ -123,14 +123,14 @@ fun SmokeTest::bool_ops($t0|a: u64, $t1|b: u64): (bool, bool) {
 [variant baseline]
 fun SmokeTest::borrow_global_mut_test($t0|a: address) {
      var $t1: address
-     var $t2: &mut SmokeTest::R
+     var $t2: &mut 0x42::SmokeTest::R
      var $t3: address
-     var $t4: &mut SmokeTest::R
+     var $t4: &mut 0x42::SmokeTest::R
   0: $t1 := copy($t0)
-  1: $t2 := borrow_global<SmokeTest::R>($t1)
+  1: $t2 := borrow_global<0x42::SmokeTest::R>($t1)
   2: drop($t2)
   3: $t3 := move($t0)
-  4: $t4 := borrow_global<SmokeTest::R>($t3)
+  4: $t4 := borrow_global<0x42::SmokeTest::R>($t3)
   5: drop($t4)
   6: return ()
 }
@@ -140,11 +140,11 @@ fun SmokeTest::borrow_global_mut_test($t0|a: address) {
 fun SmokeTest::create_resource($t0|sender: &signer) {
      var $t1: &signer
      var $t2: u64
-     var $t3: SmokeTest::R
+     var $t3: 0x42::SmokeTest::R
   0: $t1 := move($t0)
   1: $t2 := 1
-  2: $t3 := pack SmokeTest::R($t2)
-  3: move_to<SmokeTest::R>($t3, $t1)
+  2: $t3 := pack 0x42::SmokeTest::R($t2)
+  3: move_to<0x42::SmokeTest::R>($t3, $t1)
   4: return ()
 }
 
@@ -153,11 +153,11 @@ fun SmokeTest::create_resource($t0|sender: &signer) {
 fun SmokeTest::create_resoure_generic($t0|sender: &signer) {
      var $t1: &signer
      var $t2: u64
-     var $t3: SmokeTest::G<u64>
+     var $t3: 0x42::SmokeTest::G<u64>
   0: $t1 := move($t0)
   1: $t2 := 1
-  2: $t3 := pack SmokeTest::G<u64>($t2)
-  3: move_to<SmokeTest::G<u64>>($t3, $t1)
+  2: $t3 := pack 0x42::SmokeTest::G<u64>($t2)
+  3: move_to<0x42::SmokeTest::G<u64>>($t3, $t1)
   4: return ()
 }
 
@@ -169,16 +169,16 @@ fun SmokeTest::exists_resource($t0|sender: &signer): bool {
      var $t3: bool
   0: $t1 := move($t0)
   1: $t2 := signer::address_of($t1)
-  2: $t3 := exists<SmokeTest::R>($t2)
+  2: $t3 := exists<0x42::SmokeTest::R>($t2)
   3: return $t3
 }
 
 
 [variant baseline]
-fun SmokeTest::identity($t0|a: SmokeTest::A, $t1|b: SmokeTest::B, $t2|c: SmokeTest::C): (SmokeTest::A, SmokeTest::B, SmokeTest::C) {
-     var $t3: SmokeTest::A
-     var $t4: SmokeTest::B
-     var $t5: SmokeTest::C
+fun SmokeTest::identity($t0|a: 0x42::SmokeTest::A, $t1|b: 0x42::SmokeTest::B, $t2|c: 0x42::SmokeTest::C): (0x42::SmokeTest::A, 0x42::SmokeTest::B, 0x42::SmokeTest::C) {
+     var $t3: 0x42::SmokeTest::A
+     var $t4: 0x42::SmokeTest::B
+     var $t5: 0x42::SmokeTest::C
   0: $t3 := move($t0)
   1: $t4 := move($t1)
   2: $t5 := move($t2)
@@ -189,11 +189,11 @@ fun SmokeTest::identity($t0|a: SmokeTest::A, $t1|b: SmokeTest::B, $t2|c: SmokeTe
 [variant baseline]
 fun SmokeTest::move_from_addr($t0|a: address) {
      var $t1: address
-     var $t2: SmokeTest::R
+     var $t2: 0x42::SmokeTest::R
      var $t3: u64
   0: $t1 := move($t0)
-  1: $t2 := move_from<SmokeTest::R>($t1)
-  2: $t3 := unpack SmokeTest::R($t2)
+  1: $t2 := move_from<0x42::SmokeTest::R>($t1)
+  2: $t3 := unpack 0x42::SmokeTest::R($t2)
   3: drop($t3)
   4: return ()
 }
@@ -203,121 +203,121 @@ fun SmokeTest::move_from_addr($t0|a: address) {
 fun SmokeTest::move_from_addr_to_sender($t0|sender: &signer, $t1|a: address) {
      var $t2|x: u64
      var $t3: address
-     var $t4: SmokeTest::R
+     var $t4: 0x42::SmokeTest::R
      var $t5: u64
      var $t6: &signer
      var $t7: u64
-     var $t8: SmokeTest::R
+     var $t8: 0x42::SmokeTest::R
   0: $t3 := move($t1)
-  1: $t4 := move_from<SmokeTest::R>($t3)
-  2: $t5 := unpack SmokeTest::R($t4)
+  1: $t4 := move_from<0x42::SmokeTest::R>($t3)
+  2: $t5 := unpack 0x42::SmokeTest::R($t4)
   3: $t2 := $t5
   4: $t6 := move($t0)
   5: $t7 := move($t2)
-  6: $t8 := pack SmokeTest::R($t7)
-  7: move_to<SmokeTest::R>($t8, $t6)
+  6: $t8 := pack 0x42::SmokeTest::R($t7)
+  7: move_to<0x42::SmokeTest::R>($t8, $t6)
   8: return ()
 }
 
 
 [variant baseline]
-fun SmokeTest::pack_A($t0|a: address, $t1|va: u64): SmokeTest::A {
+fun SmokeTest::pack_A($t0|a: address, $t1|va: u64): 0x42::SmokeTest::A {
      var $t2: address
      var $t3: u64
-     var $t4: SmokeTest::A
+     var $t4: 0x42::SmokeTest::A
   0: $t2 := move($t0)
   1: $t3 := move($t1)
-  2: $t4 := pack SmokeTest::A($t2, $t3)
+  2: $t4 := pack 0x42::SmokeTest::A($t2, $t3)
   3: return $t4
 }
 
 
 [variant baseline]
-fun SmokeTest::pack_B($t0|a: address, $t1|va: u64, $t2|vb: u64): SmokeTest::B {
-     var $t3|var_a: SmokeTest::A
+fun SmokeTest::pack_B($t0|a: address, $t1|va: u64, $t2|vb: u64): 0x42::SmokeTest::B {
+     var $t3|var_a: 0x42::SmokeTest::A
      var $t4: address
      var $t5: u64
-     var $t6: SmokeTest::A
+     var $t6: 0x42::SmokeTest::A
      var $t7: u64
-     var $t8: SmokeTest::A
-     var $t9: SmokeTest::B
+     var $t8: 0x42::SmokeTest::A
+     var $t9: 0x42::SmokeTest::B
   0: $t4 := move($t0)
   1: $t5 := move($t1)
-  2: $t6 := pack SmokeTest::A($t4, $t5)
+  2: $t6 := pack 0x42::SmokeTest::A($t4, $t5)
   3: $t3 := $t6
   4: $t7 := move($t2)
   5: $t8 := move($t3)
-  6: $t9 := pack SmokeTest::B($t7, $t8)
+  6: $t9 := pack 0x42::SmokeTest::B($t7, $t8)
   7: return $t9
 }
 
 
 [variant baseline]
-fun SmokeTest::pack_C($t0|a: address, $t1|va: u64, $t2|vb: u64, $t3|vc: u64): SmokeTest::C {
-     var $t4|var_a: SmokeTest::A
-     var $t5|var_b: SmokeTest::B
+fun SmokeTest::pack_C($t0|a: address, $t1|va: u64, $t2|vb: u64, $t3|vc: u64): 0x42::SmokeTest::C {
+     var $t4|var_a: 0x42::SmokeTest::A
+     var $t5|var_b: 0x42::SmokeTest::B
      var $t6: address
      var $t7: u64
-     var $t8: SmokeTest::A
+     var $t8: 0x42::SmokeTest::A
      var $t9: u64
-     var $t10: SmokeTest::A
-     var $t11: SmokeTest::B
+     var $t10: 0x42::SmokeTest::A
+     var $t11: 0x42::SmokeTest::B
      var $t12: u64
-     var $t13: SmokeTest::B
-     var $t14: SmokeTest::C
+     var $t13: 0x42::SmokeTest::B
+     var $t14: 0x42::SmokeTest::C
   0: $t6 := move($t0)
   1: $t7 := move($t1)
-  2: $t8 := pack SmokeTest::A($t6, $t7)
+  2: $t8 := pack 0x42::SmokeTest::A($t6, $t7)
   3: $t4 := $t8
   4: $t9 := move($t2)
   5: $t10 := move($t4)
-  6: $t11 := pack SmokeTest::B($t9, $t10)
+  6: $t11 := pack 0x42::SmokeTest::B($t9, $t10)
   7: $t5 := $t11
   8: $t12 := move($t3)
   9: $t13 := move($t5)
- 10: $t14 := pack SmokeTest::C($t12, $t13)
+ 10: $t14 := pack 0x42::SmokeTest::C($t12, $t13)
  11: return $t14
 }
 
 
 [variant baseline]
-fun SmokeTest::ref_A($t0|a: address, $t1|b: bool): SmokeTest::A {
-     var $t2|tmp#$2: SmokeTest::A
-     var $t3|var_a: SmokeTest::A
+fun SmokeTest::ref_A($t0|a: address, $t1|b: bool): 0x42::SmokeTest::A {
+     var $t2|tmp#$2: 0x42::SmokeTest::A
+     var $t3|var_a: 0x42::SmokeTest::A
      var $t4: bool
      var $t5: address
      var $t6: u64
-     var $t7: SmokeTest::A
+     var $t7: 0x42::SmokeTest::A
      var $t8: address
      var $t9: u64
-     var $t10: SmokeTest::A
-     var $t11: SmokeTest::A
-     var $t12: &SmokeTest::A
+     var $t10: 0x42::SmokeTest::A
+     var $t11: 0x42::SmokeTest::A
+     var $t12: &0x42::SmokeTest::A
      var $t13: &u64
      var $t14: u64
      var $t15: u64
      var $t16: bool
      var $t17: u64
-     var $t18: SmokeTest::A
+     var $t18: 0x42::SmokeTest::A
   0: $t4 := move($t1)
   1: if ($t4) goto 2 else goto 8
   2: label L1
   3: $t5 := move($t0)
   4: $t6 := 1
-  5: $t7 := pack SmokeTest::A($t5, $t6)
+  5: $t7 := pack 0x42::SmokeTest::A($t5, $t6)
   6: $t2 := $t7
   7: goto 14
   8: label L0
   9: $t8 := move($t0)
  10: $t9 := 42
- 11: $t10 := pack SmokeTest::A($t8, $t9)
+ 11: $t10 := pack 0x42::SmokeTest::A($t8, $t9)
  12: $t2 := $t10
  13: goto 14
  14: label L2
  15: $t11 := move($t2)
  16: $t3 := $t11
  17: $t12 := borrow_local($t3)
- 18: $t13 := borrow_field<SmokeTest::A>.val($t12)
+ 18: $t13 := borrow_field<0x42::SmokeTest::A>.val($t12)
  19: $t14 := read_ref($t13)
  20: $t15 := 42
  21: $t16 := !=($t14, $t15)
@@ -335,13 +335,13 @@ fun SmokeTest::ref_A($t0|a: address, $t1|b: bool): SmokeTest::A {
 fun SmokeTest::unpack_A($t0|a: address, $t1|va: u64): (address, u64) {
      var $t2: address
      var $t3: u64
-     var $t4: SmokeTest::A
+     var $t4: 0x42::SmokeTest::A
      var $t5: address
      var $t6: u64
   0: $t2 := move($t0)
   1: $t3 := move($t1)
-  2: $t4 := pack SmokeTest::A($t2, $t3)
-  3: ($t5, $t6) := unpack SmokeTest::A($t4)
+  2: $t4 := pack 0x42::SmokeTest::A($t2, $t3)
+  3: ($t5, $t6) := unpack 0x42::SmokeTest::A($t4)
   4: return ($t5, $t6)
 }
 
@@ -351,15 +351,15 @@ fun SmokeTest::unpack_B($t0|a: address, $t1|va: u64, $t2|vb: u64): (address, u64
      var $t3|aa: address
      var $t4|v1: u64
      var $t5|v2: u64
-     var $t6|var_a: SmokeTest::A
+     var $t6|var_a: 0x42::SmokeTest::A
      var $t7: address
      var $t8: u64
-     var $t9: SmokeTest::A
+     var $t9: 0x42::SmokeTest::A
      var $t10: u64
-     var $t11: SmokeTest::A
-     var $t12: SmokeTest::B
+     var $t11: 0x42::SmokeTest::A
+     var $t12: 0x42::SmokeTest::B
      var $t13: u64
-     var $t14: SmokeTest::A
+     var $t14: 0x42::SmokeTest::A
      var $t15: address
      var $t16: u64
      var $t17: address
@@ -367,13 +367,13 @@ fun SmokeTest::unpack_B($t0|a: address, $t1|va: u64, $t2|vb: u64): (address, u64
      var $t19: u64
   0: $t7 := move($t0)
   1: $t8 := move($t1)
-  2: $t9 := pack SmokeTest::A($t7, $t8)
+  2: $t9 := pack 0x42::SmokeTest::A($t7, $t8)
   3: $t6 := $t9
   4: $t10 := move($t2)
   5: $t11 := move($t6)
-  6: $t12 := pack SmokeTest::B($t10, $t11)
-  7: ($t13, $t14) := unpack SmokeTest::B($t12)
-  8: ($t15, $t16) := unpack SmokeTest::A($t14)
+  6: $t12 := pack 0x42::SmokeTest::B($t10, $t11)
+  7: ($t13, $t14) := unpack 0x42::SmokeTest::B($t12)
+  8: ($t15, $t16) := unpack 0x42::SmokeTest::A($t14)
   9: $t4 := $t16
  10: $t3 := $t15
  11: $t5 := $t13
@@ -390,21 +390,21 @@ fun SmokeTest::unpack_C($t0|a: address, $t1|va: u64, $t2|vb: u64, $t3|vc: u64): 
      var $t5|v1: u64
      var $t6|v2: u64
      var $t7|v3: u64
-     var $t8|var_a: SmokeTest::A
-     var $t9|var_b: SmokeTest::B
+     var $t8|var_a: 0x42::SmokeTest::A
+     var $t9|var_b: 0x42::SmokeTest::B
      var $t10: address
      var $t11: u64
-     var $t12: SmokeTest::A
+     var $t12: 0x42::SmokeTest::A
      var $t13: u64
-     var $t14: SmokeTest::A
-     var $t15: SmokeTest::B
+     var $t14: 0x42::SmokeTest::A
+     var $t15: 0x42::SmokeTest::B
      var $t16: u64
-     var $t17: SmokeTest::B
-     var $t18: SmokeTest::C
+     var $t17: 0x42::SmokeTest::B
+     var $t18: 0x42::SmokeTest::C
      var $t19: u64
-     var $t20: SmokeTest::B
+     var $t20: 0x42::SmokeTest::B
      var $t21: u64
-     var $t22: SmokeTest::A
+     var $t22: 0x42::SmokeTest::A
      var $t23: address
      var $t24: u64
      var $t25: address
@@ -413,18 +413,18 @@ fun SmokeTest::unpack_C($t0|a: address, $t1|va: u64, $t2|vb: u64, $t3|vc: u64): 
      var $t28: u64
   0: $t10 := move($t0)
   1: $t11 := move($t1)
-  2: $t12 := pack SmokeTest::A($t10, $t11)
+  2: $t12 := pack 0x42::SmokeTest::A($t10, $t11)
   3: $t8 := $t12
   4: $t13 := move($t2)
   5: $t14 := move($t8)
-  6: $t15 := pack SmokeTest::B($t13, $t14)
+  6: $t15 := pack 0x42::SmokeTest::B($t13, $t14)
   7: $t9 := $t15
   8: $t16 := move($t3)
   9: $t17 := move($t9)
- 10: $t18 := pack SmokeTest::C($t16, $t17)
- 11: ($t19, $t20) := unpack SmokeTest::C($t18)
- 12: ($t21, $t22) := unpack SmokeTest::B($t20)
- 13: ($t23, $t24) := unpack SmokeTest::A($t22)
+ 10: $t18 := pack 0x42::SmokeTest::C($t16, $t17)
+ 11: ($t19, $t20) := unpack 0x42::SmokeTest::C($t18)
+ 12: ($t21, $t22) := unpack 0x42::SmokeTest::B($t20)
+ 13: ($t23, $t24) := unpack 0x42::SmokeTest::A($t22)
  14: $t5 := $t24
  15: $t4 := $t23
  16: $t6 := $t21

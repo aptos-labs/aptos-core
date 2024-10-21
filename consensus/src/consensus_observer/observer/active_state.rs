@@ -209,10 +209,10 @@ async fn extract_on_chain_configs(
     let validator_set: ValidatorSet = on_chain_configs
         .get()
         .expect("Failed to get the validator set from the on-chain configs!");
-    let epoch_state = Arc::new(EpochState {
-        epoch: on_chain_configs.epoch(),
-        verifier: (&validator_set).into(),
-    });
+    let epoch_state = Arc::new(EpochState::new(
+        on_chain_configs.epoch(),
+        (&validator_set).into(),
+    ));
 
     // Extract the consensus config (or use the default if it's missing)
     let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = on_chain_configs.get();

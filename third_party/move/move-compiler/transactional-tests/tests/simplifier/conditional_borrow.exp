@@ -12,7 +12,7 @@ return values: 11
 
 >>> V1 Compiler {
 == BEGIN Bytecode ==
-// Move bytecode v6
+// Move bytecode v7
 module 8675.M {
 struct S has copy, drop {
 	f: u64

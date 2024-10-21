@@ -310,11 +310,11 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
             .for_each(|(baseline_read, result_read)| baseline_read.assert_read_result(result_read));
 
             // Update group world.
-            for (group_key, v, updates) in output.group_writes.iter() {
+            for (group_key, v, group_size, updates) in output.group_writes.iter() {
                 group_metadata.insert(group_key.clone(), v.as_state_value_metadata());
 
+                let group_map = group_world.entry(group_key).or_insert(base_map.clone());
                 for (tag, v) in updates {
-                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
                     if v.is_deletion() {
                         assert_some!(group_map.remove(tag));
                     } else {
@@ -324,6 +324,9 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                         assert_eq!(existed, v.is_modification());
                     }
                 }
+                let computed_size =
+                    group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len()))).unwrap();
+                assert_eq!(computed_size, *group_size);
             }
 
             // Test recorded finalized group writes: it should contain the whole group, and

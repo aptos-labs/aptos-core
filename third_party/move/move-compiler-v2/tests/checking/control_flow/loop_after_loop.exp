@@ -9,3 +9,11 @@ module <SELF>_0 {
         }
     }
 } // end <SELF>_0
+
+// -- Sourcified model before bytecode pipeline
+script {
+    fun main() {
+        loop break;
+        loop ()
+    }
+}

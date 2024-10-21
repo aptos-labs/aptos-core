@@ -6,6 +6,13 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    fun continued() {
+        continue;
+    }
+}
+
 
 Diagnostics:
 error: missing enclosing loop statement

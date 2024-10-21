@@ -644,14 +644,21 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
+
         let result = task::spawn_blocking(move || {
             prover_options.prove(
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
-                move_options.compiler_version,
-                move_options.language_version,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],
@@ -1569,7 +1576,7 @@ async fn submit_chunked_publish_transactions(
         match result {
             Ok(tx_summary) => {
                 let tx_hash = tx_summary.transaction_hash.to_string();
-                let status = tx_summary.success.map_or("".to_string(), |success| {
+                let status = tx_summary.success.map_or_else(String::new, |success| {
                     if success {
                         "Success".to_string()
                     } else {

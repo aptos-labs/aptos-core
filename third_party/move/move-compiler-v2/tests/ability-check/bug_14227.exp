@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: local `_common_fields` of type `m::CommonFields` does not have the `copy` ability
+error: local `_common_fields` of type `CommonFields` does not have the `copy` ability
    ┌─ tests/ability-check/bug_14227.move:21:16
    │
 21 │             y: vector[_common_fields]

@@ -344,9 +344,7 @@ fn commit_1_pre_commit_2_return_3() -> (
             output.root_hash(),
             ledger_info.ledger_info().transaction_accumulator_hash()
         );
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
+        block_executor.pre_commit_block(block_id).unwrap();
         parent_block_id = block_id;
     }
     // commit till block 1

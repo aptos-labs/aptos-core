@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
+use aptos_drop_helper::DropHelper;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
     state_store::{
@@ -24,7 +25,7 @@ pub struct StateDelta {
     pub base_version: Option<Version>,
     pub current: SparseMerkleTree<StateValue>,
     pub current_version: Option<Version>,
-    pub updates_since_base: ShardedStateUpdates,
+    pub updates_since_base: DropHelper<ShardedStateUpdates>,
 }
 
 impl StateDelta {
@@ -42,7 +43,7 @@ impl StateDelta {
             base_version,
             current,
             current_version,
-            updates_since_base,
+            updates_since_base: DropHelper::new(updates_since_base),
         }
     }
 
@@ -74,7 +75,7 @@ impl StateDelta {
 
     pub fn merge(&mut self, other: StateDelta) {
         assert!(other.follow(self));
-        combine_sharded_state_updates(&mut self.updates_since_base, other.updates_since_base);
+        combine_sharded_state_updates(&mut self.updates_since_base, &other.updates_since_base);
 
         self.current = other.current;
         self.current_version = other.current_version;

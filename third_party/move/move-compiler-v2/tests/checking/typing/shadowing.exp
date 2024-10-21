@@ -41,3 +41,44 @@ module 0x8675309::M {
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+        f: u64,
+        b: bool,
+    }
+    fun t0() {
+        {
+            false;
+        };
+        0;
+        {
+            false;
+        };
+        0;
+        {
+            {
+                0x0;
+            };
+            false;
+        };
+        0;
+    }
+    fun t1(cond: bool) {
+        if (cond) {
+            false;
+        } else {
+            0x0;
+        };
+        0;
+    }
+    fun t2() {
+        loop {
+            let S{f: _,b: x} = S{f: 0,b: false};
+            false;
+            break
+        };
+        0;
+    }
+}

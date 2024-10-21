@@ -56,19 +56,17 @@ pub(crate) fn unpack_aggregator_struct(
 
     let pop_with_err = |vec: &mut Vec<Value>, msg: &str| {
         vec.pop()
-            .map_or(Err(extension_error(msg)), |v| v.value_as::<u128>())
+            .map_or_else(|| Err(extension_error(msg)), |v| v.value_as::<u128>())
     };
 
     let limit = pop_with_err(&mut fields, "unable to pop 'limit' field")?;
-    let key = fields
-        .pop()
-        .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
-            v.value_as::<AccountAddress>()
-        })?;
-    let handle = fields
-        .pop()
-        .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
-            v.value_as::<AccountAddress>()
-        })?;
+    let key = fields.pop().map_or_else(
+        || Err(extension_error("unable to pop `handle` field")),
+        |v| v.value_as::<AccountAddress>(),
+    )?;
+    let handle = fields.pop().map_or_else(
+        || Err(extension_error("unable to pop `handle` field")),
+        |v| v.value_as::<AccountAddress>(),
+    )?;
     Ok((TableHandle(handle), key, limit))
 }

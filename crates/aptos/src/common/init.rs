@@ -231,9 +231,9 @@ impl CliCommand<()> for InitTool {
         let public_key = if self.is_hardware_wallet() {
             let pub_key = match aptos_ledger::get_public_key(
                 derivation_path
-                    .ok_or(CliError::UnexpectedError(
-                        "Invalid derivation path".to_string(),
-                    ))?
+                    .ok_or_else(|| {
+                        CliError::UnexpectedError("Invalid derivation path".to_string())
+                    })?
                     .as_str(),
                 false,
             ) {

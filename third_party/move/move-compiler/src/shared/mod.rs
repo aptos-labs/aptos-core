@@ -414,6 +414,10 @@ pub struct Flags {
     #[clap(long = cli::COMPILER_V2_FLAG)]
     compiler_v2: bool,
 
+    /// Language version
+    #[clap(long = cli::LANGUAGE_VERSION, default_value="1")]
+    language_version: LanguageVersion,
+
     /// Block v1 runs past expansion phase
     #[clap(long = MOVE_COMPILER_BLOCK_V1_FLAG, default_value=bool_to_str(get_move_compiler_block_v1_from_env()))]
     block_v1_compiler: bool,
@@ -435,6 +439,7 @@ impl Flags {
             warn_unused: false,
             lang_v2: false,
             compiler_v2: false,
+            language_version: LanguageVersion::V1,
             block_v1_compiler: get_move_compiler_block_v1_from_env(),
         }
     }
@@ -593,9 +598,14 @@ impl Flags {
         self.lang_v2
     }
 
-    pub fn set_lang_v2(self, v2: bool) -> Self {
+    pub fn language_version(&self) -> LanguageVersion {
+        self.language_version
+    }
+
+    pub fn set_language_version(self, language_version: LanguageVersion) -> Self {
         Self {
-            lang_v2: v2,
+            language_version,
+            lang_v2: language_version >= LanguageVersion::V2,
             ..self
         }
     }
@@ -609,6 +619,60 @@ impl Flags {
             compiler_v2: v2,
             ..self
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum LanguageVersion {
+    #[value(name = "1")]
+    V1,
+    #[value(name = "2")]
+    V2, /* V2 is the same as V2_0, here for the parser */
+    #[value(name = "2.0")]
+    V2_0,
+    #[value(name = "2.1")]
+    V2_1,
+}
+
+impl LanguageVersion {
+    fn to_ordinal(self) -> usize {
+        match self {
+            LanguageVersion::V1 => 0,
+            LanguageVersion::V2 => 1,
+            LanguageVersion::V2_0 => 1,
+            LanguageVersion::V2_1 => 2,
+        }
+    }
+}
+
+impl PartialEq<LanguageVersion> for LanguageVersion {
+    fn eq(&self, other: &LanguageVersion) -> bool {
+        self.to_ordinal() == other.to_ordinal()
+    }
+}
+
+impl Eq for LanguageVersion {}
+
+impl PartialOrd<LanguageVersion> for LanguageVersion {
+    fn partial_cmp(&self, other: &LanguageVersion) -> Option<std::cmp::Ordering> {
+        Some(self.to_ordinal().cmp(&other.to_ordinal()))
+    }
+}
+
+impl Ord for LanguageVersion {
+    fn cmp(&self, other: &LanguageVersion) -> std::cmp::Ordering {
+        self.to_ordinal().cmp(&other.to_ordinal())
+    }
+}
+
+impl std::fmt::Display for LanguageVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            LanguageVersion::V1 => "1",
+            LanguageVersion::V2 => "2",
+            LanguageVersion::V2_0 => "2.0",
+            LanguageVersion::V2_1 => "2.1",
+        })
     }
 }
 

@@ -4,18 +4,18 @@ module 0x1::m {
         value: bool,
     }
     private fun f1()
-        acquires m::R(*)
+        acquires R(*)
      {
         {
-          let x: &mut m::R = BorrowGlobal(Mutable)<m::R>(0x1);
-          select m::R.value<&mut m::R>(x) = false;
-          if Eq<bool>(select m::R.value<m::R>(BorrowGlobal(Immutable)<m::R>(0x1)), false) {
+          let x: &mut R = BorrowGlobal(Mutable)<R>(0x1);
+          select m::R.value<&mut R>(x) = false;
+          if Eq<bool>(select m::R.value<R>(BorrowGlobal(Immutable)<R>(0x1)), false) {
             Tuple()
           } else {
             Abort(1)
           };
-          select m::R.value<m::R>(BorrowGlobal(Mutable)<m::R>(0x1)) = true;
-          if Eq<bool>(select m::R.value<m::R>(BorrowGlobal(Immutable)<m::R>(0x1)), true) {
+          select m::R.value<R>(BorrowGlobal(Mutable)<R>(0x1)) = true;
+          if Eq<bool>(select m::R.value<R>(BorrowGlobal(Immutable)<R>(0x1)), true) {
             Tuple()
           } else {
             Abort(2)
@@ -24,3 +24,19 @@ module 0x1::m {
         }
     }
 } // end 0x1::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x1::m {
+    struct R has drop, key {
+        value: bool,
+    }
+    fun f1()
+        acquires R
+    {
+        let x = borrow_global_mut<R>(0x1);
+        x.value = false;
+        if (borrow_global<R>(0x1).value == false) () else abort 1;
+        borrow_global_mut<R>(0x1).value = true;
+        if (borrow_global<R>(0x1).value == true) () else abort 2;
+    }
+}

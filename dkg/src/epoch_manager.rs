@@ -159,10 +159,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get()
             .expect("failed to get ValidatorSet from payload");
 
-        let epoch_state = Arc::new(EpochState {
-            epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
-        });
+        let epoch_state = Arc::new(EpochState::new(payload.epoch(), (&validator_set).into()));
         self.epoch_state = Some(epoch_state.clone());
         let my_index = epoch_state
             .verifier

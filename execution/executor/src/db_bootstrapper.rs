@@ -4,10 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::chunk_output::ChunkOutput;
+use crate::components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
@@ -22,7 +21,7 @@ use aptos_types::{
     on_chain_config::ConfigurationResource,
     state_store::{state_key::StateKey, StateViewId, TStateView},
     timestamp::TimestampResource,
-    transaction::{Transaction, Version},
+    transaction::Transaction,
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
@@ -61,7 +60,7 @@ pub fn maybe_bootstrap<V: VMExecutor>(
         waypoint,
         committer.waypoint(),
     );
-    let ledger_info = committer.output.ledger_info.clone();
+    let ledger_info = committer.output.ledger_info_opt.clone();
     committer.commit()?;
     Ok(ledger_info)
 }
@@ -69,18 +68,13 @@ pub fn maybe_bootstrap<V: VMExecutor>(
 pub struct GenesisCommitter {
     db: Arc<dyn DbWriter>,
     output: ExecutedChunk,
-    base_state_version: Option<Version>,
     waypoint: Waypoint,
 }
 
 impl GenesisCommitter {
-    pub fn new(
-        db: Arc<dyn DbWriter>,
-        output: ExecutedChunk,
-        base_state_version: Option<Version>,
-    ) -> Result<Self> {
+    pub fn new(db: Arc<dyn DbWriter>, output: ExecutedChunk) -> Result<Self> {
         let ledger_info = output
-            .ledger_info
+            .ledger_info_opt
             .as_ref()
             .ok_or_else(|| anyhow!("LedgerInfo missing."))?
             .ledger_info();
@@ -90,7 +84,6 @@ impl GenesisCommitter {
             db,
             output,
             waypoint,
-            base_state_version,
         })
     }
 
@@ -100,21 +93,12 @@ impl GenesisCommitter {
 
     pub fn commit(self) -> Result<()> {
         self.db.save_transactions(
-            self.output.transactions_to_commit(),
             self.output
-                .ledger_update_output
-                .transaction_accumulator
-                .num_leaves()
-                - 1,
-            self.base_state_version,
-            self.output.ledger_info.as_ref(),
+                .output
+                .expect_complete_result()
+                .as_chunk_to_commit(),
+            self.output.ledger_info_opt.as_ref(),
             true, /* sync_commit */
-            self.output.result_state.clone(),
-            self.output
-                .ledger_update_output
-                .state_updates_until_last_checkpoint
-                .clone(),
-            Some(&self.output.ledger_update_output.sharded_state_cache),
         )?;
         info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.
@@ -144,14 +128,15 @@ pub fn calculate_genesis<V: VMExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
+    let (mut chunk, _, _) = ChunkOutput::by_transaction_execution::<V>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )?
     .apply_to_ledger(&executed_trees, None)?;
+    let output = &chunk.output;
     ensure!(
-        !output.transactions_to_commit().is_empty(),
+        output.expect_ledger_update_output().num_txns() != 0,
         "Genesis txn execution failed."
     );
 
@@ -159,7 +144,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output.result_view().verified_state_view(
+        let state_view = output.verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
             Arc::new(AsyncProofFetcher::new(db.reader.clone())),
@@ -178,6 +163,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         "Genesis txn didn't output reconfig event."
     );
 
+    let output = output.expect_complete_result();
     let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
         LedgerInfo::new(
             BlockInfo::new(
@@ -196,16 +182,12 @@ pub fn calculate_genesis<V: VMExecutor>(
         ),
         AggregateSignature::empty(), /* signatures */
     );
-    output.ledger_info = Some(ledger_info_with_sigs);
+    chunk.ledger_info_opt = Some(ledger_info_with_sigs);
 
-    let committer = GenesisCommitter::new(
-        db.writer.clone(),
-        output,
-        executed_trees.state().base_version,
-    )?;
+    let committer = GenesisCommitter::new(db.writer.clone(), chunk)?;
     info!(
         "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",
-        &committer.output.ledger_info, committer.waypoint,
+        &committer.output.ledger_info_opt, committer.waypoint,
     );
     Ok(committer)
 }

@@ -5,51 +5,64 @@ module 0xc0ffee::m {
     }
     public fun bar() {
         {
-          let s: m::S = pack m::S(false);
+          let s: S = pack m::S(false);
           {
-            let _: m::S = s;
+            let _: S = s;
             Tuple()
           }
         }
     }
-    public fun foo(s: m::S) {
+    public fun foo(s: S) {
         {
-          let _: m::S = s;
+          let _: S = s;
           Tuple()
         }
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+    }
+    public fun bar() {
+        let s = S{};
+        let _ = s;
+    }
+    public fun foo(s: S) {
+        let _ = s;
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
 public fun m::bar() {
-     var $t0: m::S
+     var $t0: 0xc0ffee::m::S
      var $t1: bool
-     var $t2: m::S
+     var $t2: 0xc0ffee::m::S
   0: $t1 := false
-  1: $t0 := pack m::S($t1)
+  1: $t0 := pack 0xc0ffee::m::S($t1)
   2: $t2 := infer($t0)
   3: return ()
 }
 
 
 [variant baseline]
-public fun m::foo($t0: m::S) {
-     var $t1: m::S
+public fun m::foo($t0: 0xc0ffee::m::S) {
+     var $t1: 0xc0ffee::m::S
   0: $t1 := infer($t0)
   1: return ()
 }
 
 
 Diagnostics:
-error: value of type `m::S` does not have the `drop` ability
+error: value of type `S` does not have the `drop` ability
   ┌─ tests/bytecode-generator/wildcard3.move:5:13
   │
 5 │         let _ = s;
   │             ^ implicitly dropped here since it is no longer used
 
-error: value of type `m::S` does not have the `drop` ability
+error: value of type `S` does not have the `drop` ability
    ┌─ tests/bytecode-generator/wildcard3.move:10:13
    │
 10 │         let _ = s;

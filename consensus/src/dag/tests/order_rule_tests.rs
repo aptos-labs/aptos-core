@@ -132,7 +132,7 @@ proptest! {
         let nodes = generate_dag_nodes(&dag, &validators);
         let epoch_state = Arc::new(EpochState {
             epoch: 1,
-            verifier: validator_verifier,
+            verifier: validator_verifier.into(),
         });
         let mut dag = InMemDag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
         for round_nodes in &nodes {
@@ -219,7 +219,7 @@ fn test_order_rule_basic() {
     let nodes = generate_dag_nodes(&dag, &validators);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
-        verifier: validator_verifier,
+        verifier: validator_verifier.into(),
     });
     let mut dag = InMemDag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
     for round_nodes in &nodes {

@@ -1,0 +1,9 @@
+Move prover returns: exiting with model building errors
+error: invalid transfer of references
+   ┌─ tests/sources/functional/bug_14762.move:45:26
+   │
+39 │         let (found, index) = find(&s.entries, |obj| {
+   │                                   ---------- It is still being borrowed by this reference
+   ·
+45 │             option::some(vector::remove(&mut s.entries, index))
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid usage of reference as function argument. Cannot transfer a mutable reference that is being borrowed

@@ -6,7 +6,7 @@
 use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress, aggregate_signature::AggregateSignature,
-    on_chain_config::ValidatorSet,
+    ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
@@ -21,11 +21,11 @@ use derivative::Derivative;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
-    sync::Arc,
 };
 use thiserror::Error;
 
@@ -130,7 +130,10 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 /// Supports validation of signatures for known authors with individual voting powers. This struct
 /// can be used for all signature verification operations including block and network signature
 /// verification, respectively.
-#[derive(Clone, Debug, Derivative, Serialize)]
+// Note: The "Clone" trait has been removed intentionally for ValidatorVerifier to ensure that the same
+// view of ValidatorVerifier is used across the system. In case a ValidatorVerifier needs to be cloned,
+// please use Arc<ValidatorVerifier> instead.
+#[derive(Debug, Derivative, Serialize)]
 #[derivative(PartialEq, Eq)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
@@ -151,7 +154,11 @@ pub struct ValidatorVerifier {
     /// will be verified individually bypassing the optimization.
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
-    pessimistic_verify_set: Arc<DashSet<AccountAddress>>,
+    pessimistic_verify_set: DashSet<AccountAddress>,
+    /// This is the feature flag indicating whether the optimistic signature verification feature is enabled.
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    optimistic_sig_verification: bool,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -190,7 +197,8 @@ impl ValidatorVerifier {
             quorum_voting_power,
             total_voting_power,
             address_to_validator_index,
-            pessimistic_verify_set: Arc::new(DashSet::new()),
+            pessimistic_verify_set: DashSet::new(),
+            optimistic_sig_verification: false,
         }
     }
 
@@ -226,12 +234,16 @@ impl ValidatorVerifier {
         ))
     }
 
+    pub fn set_optimistic_sig_verification_flag(&mut self, flag: bool) {
+        self.optimistic_sig_verification = flag;
+    }
+
     pub fn add_pessimistic_verify_set(&self, author: AccountAddress) {
         self.pessimistic_verify_set.insert(author);
     }
 
-    pub fn pessimistic_verify_set(&self) -> Arc<DashSet<AccountAddress>> {
-        self.pessimistic_verify_set.clone()
+    pub fn pessimistic_verify_set(&self) -> &DashSet<AccountAddress> {
+        &self.pessimistic_verify_set
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.
@@ -253,6 +265,47 @@ impl ValidatorVerifier {
                 .map_err(|_| VerifyError::InvalidMultiSignature),
             None => Err(VerifyError::UnknownAuthor),
         }
+    }
+
+    pub fn optimistic_verify<T: Serialize + CryptoHash>(
+        &self,
+        author: AccountAddress,
+        message: &T,
+        signature_with_status: &SignatureWithStatus,
+    ) -> std::result::Result<(), VerifyError> {
+        if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
+            && !signature_with_status.is_verified()
+        {
+            self.verify(author, message, signature_with_status.signature())?;
+            signature_with_status.set_verified();
+        }
+        Ok(())
+    }
+
+    pub fn filter_invalid_signatures<T: Send + Sync + Serialize + CryptoHash>(
+        &self,
+        message: &T,
+        signatures: BTreeMap<AccountAddress, SignatureWithStatus>,
+    ) -> BTreeMap<AccountAddress, SignatureWithStatus> {
+        signatures
+            .into_iter()
+            .collect_vec()
+            .into_par_iter()
+            .with_min_len(4) // At least 4 signatures are verified in each task
+            .filter_map(|(account_address, signature)| {
+                if signature.is_verified()
+                    || self
+                        .verify(account_address, message, signature.signature())
+                        .is_ok()
+                {
+                    signature.set_verified();
+                    Some((account_address, signature))
+                } else {
+                    self.add_pessimistic_verify_set(account_address);
+                    None
+                }
+            })
+            .collect()
     }
 
     // Generates a multi signature or aggregate signature
@@ -424,6 +477,19 @@ impl ValidatorVerifier {
         Ok(aggregated_voting_power)
     }
 
+    pub fn aggregate_signature_authors(
+        &self,
+        aggregated_signature: &AggregateSignature,
+    ) -> Vec<&AccountAddress> {
+        let mut authors = vec![];
+        for index in aggregated_signature.get_signers_bitvec().iter_ones() {
+            if let Some(validator) = self.validator_infos.get(index) {
+                authors.push(&validator.address);
+            }
+        }
+        authors
+    }
+
     /// Returns the public key for this address.
     pub fn get_public_key(&self, author: &AccountAddress) -> Option<PublicKey> {
         self.address_to_validator_index
@@ -562,6 +628,25 @@ pub fn random_validator_verifier(
     custom_voting_power_quorum: Option<u128>,
     pseudo_random_account_address: bool,
 ) -> (Vec<ValidatorSigner>, ValidatorVerifier) {
+    random_validator_verifier_with_voting_power(
+        count,
+        custom_voting_power_quorum,
+        pseudo_random_account_address,
+        &[],
+    )
+}
+
+/// Helper function to get random validator signers and a corresponding validator verifier for
+/// testing.  If custom_voting_power_quorum is not None, set a custom voting power quorum amount.
+/// With pseudo_random_account_address enabled, logs show `0 -> [0000]`, `1 -> [1000]`
+/// `voting_power` is optional in that if it's empty then a voting power of 1 is used.
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn random_validator_verifier_with_voting_power(
+    count: usize,
+    custom_voting_power_quorum: Option<u128>,
+    pseudo_random_account_address: bool,
+    voting_power: &[u64],
+) -> (Vec<ValidatorSigner>, ValidatorVerifier) {
     let mut signers = Vec::new();
     let mut validator_infos = vec![];
     for i in 0..count {
@@ -573,7 +658,7 @@ pub fn random_validator_verifier(
         validator_infos.push(ValidatorConsensusInfo::new(
             random_signer.author(),
             random_signer.public_key(),
-            1,
+            *voting_power.get(i).unwrap_or(&1),
         ));
         signers.push(random_signer);
     }

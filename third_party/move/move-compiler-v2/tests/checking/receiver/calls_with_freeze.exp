@@ -3,20 +3,20 @@ module 0x42::m {
     struct S {
         x: u64,
     }
-    private fun sum(self: &m::S,_other: &m::S): u64 {
+    private fun sum(self: &S,_other: &S): u64 {
         Abort(1)
     }
-    private fun test_arg_freeze(s: m::S): u64 {
+    private fun test_arg_freeze(s: S): u64 {
         {
-          let p1: &m::S = Borrow(Immutable)(s);
+          let p1: &S = Borrow(Immutable)(s);
           {
-            let p1m: &mut m::S = Borrow(Mutable)(s);
+            let p1m: &mut S = Borrow(Mutable)(s);
             {
-              let s2: m::S = pack m::S(4);
+              let s2: S = pack m::S(4);
               {
-                let p2: &m::S = Borrow(Immutable)(s2);
+                let p2: &S = Borrow(Immutable)(s2);
                 {
-                  let p2m: &mut m::S = Borrow(Mutable)(s);
+                  let p2m: &mut S = Borrow(Mutable)(s);
                   {
                     let x1: u64 = m::sum(Freeze(false)(p1m), p1);
                     {
@@ -37,3 +37,25 @@ module 0x42::m {
         }
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct S {
+        x: u64,
+    }
+    fun sum(self: &S, _other: &S): u64 {
+        abort 1
+    }
+    fun test_arg_freeze(s: S): u64 {
+        let p1 = &s;
+        let p1m = &mut s;
+        let s2 = S{x: 4};
+        let p2 = &s2;
+        let p2m = &mut s;
+        let x1 = sum(/*freeze*/p1m, p1);
+        let x2 = sum(/*freeze*/p1m, /*freeze*/p1m);
+        let x3 = sum(/*freeze*/p1m, p2);
+        let x4 = sum(/*freeze*/p2m, /*freeze*/p2m);
+        x1 + x2 + x3 + x4
+    }
+}

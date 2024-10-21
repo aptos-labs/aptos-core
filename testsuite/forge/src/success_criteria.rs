@@ -79,7 +79,7 @@ impl MetricsThreshold {
         }
 
         if metrics.is_empty() {
-            bail!("Empty metrics provided");
+            bail!("Empty metrics provided for {}", metrics_name);
         }
         let breach_count = metrics
             .iter()
@@ -150,7 +150,9 @@ impl LatencyBreakdownThreshold {
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         for (slice, threshold) in &self.thresholds {
-            let samples = metrics.get_samples(slice);
+            let samples = metrics
+                .get_samples(slice)
+                .expect("Could not get metric samples");
             threshold.ensure_metrics_threshold(
                 &format!("{:?}{}", slice, traffic_name_addition),
                 samples.get(),

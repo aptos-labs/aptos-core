@@ -19,11 +19,13 @@ aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-system-utils = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+futures-channel = { workspace = true }
 http = { workspace = true }
 hyper = { workspace = true }
 sha256 = { workspace = true }

@@ -45,7 +45,7 @@ pub fn tmp_db_with_random_content() -> (
             cur_ver.checked_sub(1),
             Some(ledger_info_with_sigs),
             true, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
         cur_ver += txns_to_commit.len() as u64;

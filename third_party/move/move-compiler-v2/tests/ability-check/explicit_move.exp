@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: local `x` of type `m::R` does not have the `copy` ability
+error: local `x` of type `R` does not have the `copy` ability
    ┌─ tests/ability-check/explicit_move.move:12:9
    │
 12 │         some(x);

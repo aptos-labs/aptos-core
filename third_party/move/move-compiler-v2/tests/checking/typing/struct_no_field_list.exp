@@ -3,7 +3,7 @@ module 0x42::m {
     struct S {
         dummy_field: bool,
     }
-    private fun f(_s: m::S): m::S {
+    private fun f(_s: S): S {
         pack m::S(false)
     }
     private fun d() {
@@ -19,3 +19,17 @@ module 0x42::m {
         }
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct S has copy, drop {
+    }
+    fun f(_s: S): S {
+        S{}
+    }
+    fun d() {
+        let S{} = S{};
+        let S{} = S{};
+        let S{} = S{};
+    }
+}

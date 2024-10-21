@@ -1,31 +1,31 @@
 // -- Model dump before bytecode pipeline
 module 0x2::Container {
-    struct T {
-        f: #0,
+    struct T<V> {
+        f: V,
     }
-    public fun get<V>(_self: &Container::T<#0>): #0 {
+    public fun get<V>(_self: &T<V>): V {
         Abort(0)
     }
-    public fun new<V>(): Container::T<#0> {
+    public fun new<V>(): T<V> {
         Abort(0)
     }
-    public fun put<V>(_self: &mut Container::T<#0>,_item: #0) {
+    public fun put<V>(_self: &mut T<V>,_item: V) {
         Abort(0)
     }
 } // end 0x2::Container
 module 0x2::M {
     use 0x2::Container; // resolved as: 0x2::Container
-    struct Box {
-        f1: #0,
-        f2: #0,
+    struct Box<T> {
+        f1: T,
+        f2: T,
     }
-    private fun t0(): M::Box<u64> {
+    private fun t0(): Box<u64> {
         {
           let v: Container::T<u64> = Container::new<u64>();
           {
             let x: u64 = Container::get<u64>(Borrow(Immutable)(v));
             {
-              let b: M::Box<u64> = pack M::Box<u64>(x, x);
+              let b: Box<u64> = pack M::Box<u64>(x, x);
               Container::put<u64>(Borrow(Mutable)(v), 0);
               b
             }
@@ -33,3 +33,33 @@ module 0x2::M {
         }
     }
 } // end 0x2::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x2::Container {
+    struct T<V> has drop {
+        f: V,
+    }
+    public fun get<V: drop>(_self: &T<V>): V {
+        abort 0
+    }
+    public fun new<V>(): T<V> {
+        abort 0
+    }
+    public fun put<V>(_self: &mut T<V>, _item: V) {
+        abort 0
+    }
+}
+module 0x2::M {
+    use 0x2::Container;
+    struct Box<T> has drop {
+        f1: T,
+        f2: T,
+    }
+    fun t0(): Box<u64> {
+        let v = Container::new<u64>();
+        let x = Container::get<u64>(&v);
+        let b = Box<u64>{f1: x,f2: x};
+        Container::put<u64>(&mut v, 0);
+        b
+    }
+}

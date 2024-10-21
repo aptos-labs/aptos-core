@@ -10,9 +10,8 @@ use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::{
-    cached_state_view::{CachedStateView, ShardedStateCache},
-    state_delta::StateDelta,
-    DbReader, DbReaderWriter, DbWriter,
+    cached_state_view::CachedStateView, chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter,
+    DbWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -20,13 +19,13 @@ use aptos_types::{
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{ShardedStateUpdates, StateView},
+    state_store::StateView,
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
+        BlockOutput, Transaction, TransactionOutput, Version,
     },
     vm_status::VMStatus,
 };
@@ -115,13 +114,8 @@ impl DbReader for FakeDb {
 impl DbWriter for FakeDb {
     fn pre_commit_ledger(
         &self,
-        _txns_to_commit: &[TransactionToCommit],
-        _first_version: Version,
-        _base_state_version: Option<Version>,
+        _chunk: ChunkToCommit,
         _sync_commit: bool,
-        _latest_in_memory_state: StateDelta,
-        _state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }
@@ -130,7 +124,7 @@ impl DbWriter for FakeDb {
         &self,
         _version: Version,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        _txns_to_commit: Option<&[TransactionToCommit]>,
+        _chunk: Option<ChunkToCommit>,
     ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }

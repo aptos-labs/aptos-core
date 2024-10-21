@@ -52,3 +52,35 @@ module 0x2::M {
         }
     }
 } // end 0x2::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x2::X {
+    struct R {
+    }
+}
+module 0x2::M {
+    use 0x2::X;
+    fun foo(_x: u64) {
+    }
+    fun t0(): X::R {
+        loop ()
+    }
+    fun t1(): u64 {
+        loop {
+            0;
+        }
+    }
+    fun t2() {
+        foo(loop ())
+    }
+    fun t3(): X::R {
+        let x = loop {
+            0;
+        };
+        x
+    }
+    fun t4() {
+        let () = loop break;
+        let () = loop if (false) break;
+    }
+}

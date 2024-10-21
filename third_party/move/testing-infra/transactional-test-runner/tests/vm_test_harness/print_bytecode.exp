@@ -1,7 +1,7 @@
 processed 2 tasks
 
 task 0 'print-bytecode'. lines 1-5:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -12,7 +12,7 @@ B0:
 }
 
 task 1 'print-bytecode'. lines 7-13:
-// Move bytecode v6
+// Move bytecode v7
 module 42.M {
 
 

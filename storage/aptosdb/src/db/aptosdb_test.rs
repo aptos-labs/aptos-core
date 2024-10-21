@@ -262,7 +262,7 @@ pub fn test_state_merkle_pruning_impl(
             next_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
             true, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
 

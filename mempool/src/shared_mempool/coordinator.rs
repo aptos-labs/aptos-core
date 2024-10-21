@@ -217,6 +217,11 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 ))
                 .await;
         },
+        MempoolClientRequest::GetAddressesFromParkingLot(callback) => {
+            bounded_executor
+                .spawn(tasks::process_parking_lot_addresses(smp.clone(), callback))
+                .await;
+        },
     }
 }
 

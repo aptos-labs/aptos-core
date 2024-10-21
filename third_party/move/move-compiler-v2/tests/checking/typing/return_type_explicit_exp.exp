@@ -13,7 +13,7 @@ module 0x8675309::M {
     private fun t1(): u64 {
         return 0
     }
-    private fun t2(): (u64, bool, M::R) {
+    private fun t2(): (u64, bool, R) {
         loop {
           if true {
             return Tuple(0, false, pack M::R(false))
@@ -24,3 +24,19 @@ module 0x8675309::M {
         Abort(0)
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+    }
+    fun t0() {
+        if (true) () else ()
+    }
+    fun t1(): u64 {
+        0
+    }
+    fun t2(): (u64, bool, R) {
+        while (true) return (0, false, R{});
+        abort 0
+    }
+}

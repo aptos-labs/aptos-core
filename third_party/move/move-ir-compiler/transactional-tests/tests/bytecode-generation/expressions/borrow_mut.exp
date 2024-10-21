@@ -1,7 +1,7 @@
 processed 3 tasks
 
 task 0 'print-bytecode'. lines 1-10:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -21,7 +21,7 @@ B0:
 }
 
 task 1 'print-bytecode'. lines 12-23:
-// Move bytecode v6
+// Move bytecode v7
 module 3d.Foobar {
 struct FooCoin {
 	value: u64
@@ -40,7 +40,7 @@ B0:
 }
 
 task 2 'print-bytecode'. lines 25-36:
-// Move bytecode v6
+// Move bytecode v7
 module 4d.Foobar {
 struct FooCoin<Ty0> {
 	value: u64

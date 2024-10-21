@@ -15,3 +15,11 @@ module 0x1::M {
         Tuple()
     }
 } // end 0x1::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x1::M {
+    fun bar() {
+    }
+    fun foo() {
+    }
+}

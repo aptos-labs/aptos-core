@@ -542,7 +542,7 @@ impl DbReader for AptosDB {
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
             let executed_trees = ExecutedTrees::new(
-                buffered_state.current_state().clone(),
+                Arc::new(buffered_state.current_state().clone()),
                 transaction_accumulator,
             );
             Ok(executed_trees)

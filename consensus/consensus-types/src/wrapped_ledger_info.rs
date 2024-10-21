@@ -28,11 +28,7 @@ pub struct WrappedLedgerInfo {
 
 impl Display for WrappedLedgerInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "WrappedLedgerInfo: [{}, {}]",
-            self.vote_data, self.signed_ledger_info
-        )
+        write!(f, "WrappedLedgerInfo: [{}]", self.signed_ledger_info)
     }
 }
 

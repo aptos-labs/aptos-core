@@ -6,7 +6,7 @@ use anyhow::Context;
 use aptos_forge::{
     args::TransactionTypeArg,
     emitter::NumAccountsMode,
-    prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
+    prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice, MetricSamples},
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     EmitJob, EmitJobMode, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest,
     Result, Test, TxnStats, WorkflowProgress,
@@ -471,7 +471,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
 
     let mut table = Vec::new();
     table.push(format!(
-        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
         type_name,
         "submitted/s",
         "committed/s",
@@ -486,14 +486,18 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         "pos->prop",
         "prop->order",
         "order->commit",
-        "actual dur"
+        "actual dur",
+        // optional indexer metrics
+        "idx_fn",
+        "idx_cache",
+        "idx_data",
     ));
 
     for run_results in results {
         for result in run_results {
             let rate = result.stats.rate();
             table.push(format!(
-                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12}",
+                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12} | {: <12.3} | {: <12.3} | {: <12.3}",
                 result.name,
                 rate.submitted,
                 rate.committed,
@@ -504,11 +508,15 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
                 rate.p50_latency as f64 / 1000.0,
                 rate.p90_latency as f64 / 1000.0,
                 rate.p99_latency as f64 / 1000.0,
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).max_sample(),
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).max_sample(),
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).max_sample(),
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).max_sample(),
-                result.actual_duration.as_secs()
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.actual_duration.as_secs(),
+                // optional indexer metrics
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::IndexerFullnodeProcessedBatch).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::IndexerCacheWorkerProcessedBatch).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::IndexerDataServiceAllChunksSent).unwrap_or(&MetricSamples::default()).max_sample(),
             ));
         }
     }

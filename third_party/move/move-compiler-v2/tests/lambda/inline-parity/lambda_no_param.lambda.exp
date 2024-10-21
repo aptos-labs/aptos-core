@@ -1,0 +1,309 @@
+// -- Model dump before env processor pipeline:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor unused checks:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor inlining:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor simplifier:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(|(): ()| Tuple());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(|(): ()| x)
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(closure m::one$lambda$1());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(closure m::two$lambda$1(x))
+    }
+    private fun one$lambda$1() {
+        Tuple()
+    }
+    private fun two$lambda$1(x: u64): u64 {
+        x
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor specification checker:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(closure m::one$lambda$1());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(closure m::two$lambda$1(x))
+    }
+    private fun one$lambda$1() {
+        Tuple()
+    }
+    private fun two$lambda$1(x: u64): u64 {
+        x
+    }
+} // end 0xdecafbad::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xdecafbad::m {
+    private fun bar(f: |()|u64): u64 {
+        (f)()
+    }
+    private fun foo(f: |()|) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(closure m::one$lambda$1());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(closure m::two$lambda$1(x))
+    }
+    private fun one$lambda$1() {
+        Tuple()
+    }
+    private fun two$lambda$1(x: u64): u64 {
+        x
+    }
+} // end 0xdecafbad::m
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet supported
+  ┌─ tests/lambda/inline-parity/lambda_no_param.move:3:9
+  │
+3 │         f();
+  │         ^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+  ┌─ tests/lambda/inline-parity/lambda_no_param.move:7:13
+  │
+7 │         foo(|| {});
+  │             ^^^^^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/inline-parity/lambda_no_param.move:11:9
+   │
+11 │         f()
+   │         ^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/lambda_no_param.move:15:13
+   │
+15 │         bar(||x)
+   │             ^^^

@@ -53,10 +53,10 @@ impl<
 
     pub fn new() -> MVHashMap<K, T, V, X, I> {
         MVHashMap {
-            data: VersionedData::new(),
-            group_data: VersionedGroupData::new(),
-            delayed_fields: VersionedDelayedFields::new(),
-            modules: VersionedModules::new(),
+            data: VersionedData::empty(),
+            group_data: VersionedGroupData::empty(),
+            delayed_fields: VersionedDelayedFields::empty(),
+            modules: VersionedModules::empty(),
         }
     }
 

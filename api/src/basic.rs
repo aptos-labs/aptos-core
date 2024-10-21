@@ -10,9 +10,14 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::AptosErrorCode;
-use poem_openapi::{param::Query, payload::Html, Object, OpenApi};
+use poem_openapi::{
+    param::Query,
+    payload::{Html, Json},
+    Object, OpenApi,
+};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     ops::Sub,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -58,6 +63,56 @@ impl BasicApi {
     )]
     async fn spec(&self) -> Html<String> {
         Html(OPEN_API_HTML.to_string())
+    }
+
+    /// Show some basic info of the node.
+    #[oai(
+        path = "/info",
+        method = "get",
+        operation_id = "info",
+        tag = "ApiTags::General"
+    )]
+    async fn info(&self) -> Json<HashMap<String, serde_json::Value>> {
+        let mut info = HashMap::new();
+        info.insert(
+            "bootstrapping_mode".to_string(),
+            serde_json::to_value(
+                self.context
+                    .node_config
+                    .state_sync
+                    .state_sync_driver
+                    .bootstrapping_mode,
+            )
+            .unwrap(),
+        );
+        info.insert(
+            "continuous_syncing_mode".to_string(),
+            serde_json::to_value(
+                self.context
+                    .node_config
+                    .state_sync
+                    .state_sync_driver
+                    .continuous_syncing_mode,
+            )
+            .unwrap(),
+        );
+        info.insert(
+            "new_storage_format".to_string(),
+            serde_json::to_value(
+                self.context
+                    .node_config
+                    .storage
+                    .rocksdb_configs
+                    .enable_storage_sharding,
+            )
+            .unwrap(),
+        );
+        info.insert(
+            "internal_indexer_config".to_string(),
+            serde_json::to_value(&self.context.node_config.indexer_db_config).unwrap(),
+        );
+
+        Json(info)
     }
 
     /// Check basic node health

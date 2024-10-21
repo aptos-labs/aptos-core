@@ -10,7 +10,7 @@ module 0x42::test {
         1: u8,
         2: address,
     }
-    private fun extra_dotdot(x: test::S,y: test::T) {
+    private fun extra_dotdot(x: S,y: T) {
         {
           let test::S{ 0: _x, 1: _, 2: _ } = x;
           {
@@ -26,3 +26,23 @@ module 0x42::test {
         }
     }
 } // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    struct T {
+        x: bool,
+        y: u8,
+        z: address,
+    }
+    struct S {
+        0: bool,
+        1: u8,
+        2: address,
+    }
+    fun extra_dotdot(x: S, y: T) {
+        let S(_x,_,_) = x;
+        let S(_,_,_) = x;
+        let S(_,_,_) = x;
+        let T{x: _,y: _,z: _} = y;
+    }
+}

@@ -7,6 +7,7 @@ use aptos_consensus::{
 };
 use aptos_infallible::RwLock;
 use aptos_logger::info;
+use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_system_utils::utils::reply_with_status;
 #[cfg(target_os = "linux")]
@@ -26,6 +27,7 @@ use std::{
 use tokio::runtime::Runtime;
 
 mod consensus;
+mod mempool;
 
 #[derive(Default)]
 pub struct Context {
@@ -34,6 +36,7 @@ pub struct Context {
     aptos_db: RwLock<Option<Arc<DbReaderWriter>>>,
     consensus_db: RwLock<Option<Arc<StorageWriteProxy>>>,
     quorum_store_db: RwLock<Option<Arc<QuorumStoreDB>>>,
+    mempool_client_sender: RwLock<Option<MempoolClientSender>>,
 }
 
 impl Context {
@@ -48,6 +51,10 @@ impl Context {
     ) {
         *self.consensus_db.write() = Some(consensus_db);
         *self.quorum_store_db.write() = Some(quorum_store_db);
+    }
+
+    fn set_mempool_client_sender(&self, mempool_client_sender: MempoolClientSender) {
+        *self.mempool_client_sender.write() = Some(mempool_client_sender);
     }
 }
 
@@ -105,6 +112,11 @@ impl AdminService {
     ) {
         self.context
             .set_consensus_dbs(consensus_db, quorum_store_db)
+    }
+
+    pub fn set_mempool_client_sender(&self, mempool_client_sender: MempoolClientSender) {
+        self.context
+            .set_mempool_client_sender(mempool_client_sender)
     }
 
     fn start(&self, address: SocketAddr, enabled: bool) {
@@ -207,6 +219,21 @@ impl AdminService {
                     Ok(reply_with_status(
                         StatusCode::NOT_FOUND,
                         "Consensus db and/or quorum store db is not available.",
+                    ))
+                }
+            },
+            (hyper::Method::GET, "/debug/mempool/parking-lot/addresses") => {
+                let mempool_client_sender = context.mempool_client_sender.read().clone();
+                if mempool_client_sender.is_some() {
+                    mempool::mempool_handle_parking_lot_address_request(
+                        req,
+                        mempool_client_sender.unwrap(),
+                    )
+                    .await
+                } else {
+                    Ok(reply_with_status(
+                        StatusCode::NOT_FOUND,
+                        "Mempool parking lot is not available.",
                     ))
                 }
             },

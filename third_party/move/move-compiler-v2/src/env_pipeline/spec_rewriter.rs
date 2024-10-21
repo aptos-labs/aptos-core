@@ -377,7 +377,7 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                     .into_exp()
                 },
                 // Deal with removing various occurrences of Abort and spec blocks
-                Call(id, Abort, _) | SpecBlock(id, ..) => {
+                SpecBlock(id, ..) => {
                     // Replace direct call by unit
                     Call(*id, Tuple, vec![]).into_exp()
                 },

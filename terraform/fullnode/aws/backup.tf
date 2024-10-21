@@ -50,6 +50,7 @@ data "aws_iam_policy_document" "backup" {
   statement {
     actions = [
       "s3:ListBucket",
+      "s3:PutBucketAcl",
       "s3:PutObject",
       "s3:GetObject",
       "s3:GetObjectTagging",

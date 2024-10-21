@@ -1568,6 +1568,15 @@ impl TransactionToCommit {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction(transaction: Transaction) -> Self {
+        Self {
+            transaction,
+            transaction_info: TransactionInfo::dummy(),
+            ..Self::dummy()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_with_transaction_auxiliary_data(
         transaction_auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
@@ -2027,7 +2036,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(vt) => vt.type_name(),
-            Transaction::BlockMetadataExt(_) => "block_metadata_ext",
+            Transaction::BlockMetadataExt(bmet) => bmet.type_name(),
         }
     }
 

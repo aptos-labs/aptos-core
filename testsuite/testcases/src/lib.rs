@@ -283,7 +283,10 @@ impl NetworkTest for dyn NetworkLoadTest {
                     .keys()
                     .into_iter()
                     .map(|slice| {
-                        let slice_samples = phase_stats.latency_breakdown.get_samples(&slice);
+                        let slice_samples = phase_stats
+                            .latency_breakdown
+                            .get_samples(&slice)
+                            .expect("Could not get samples");
                         format!(
                             "{:?}: max: {:.3}, avg: {:.3}",
                             slice,

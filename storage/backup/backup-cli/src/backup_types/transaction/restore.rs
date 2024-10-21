@@ -27,8 +27,9 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor::chunk_executor::ChunkExecutor;
-use aptos_executor_types::{TransactionReplayer, VerifyExecutionMode};
+use aptos_executor_types::{ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode};
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -592,7 +593,7 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));
-        let db_commit_stream = txns_to_execute_stream
+        let ledger_update_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()
             .map_ok(|chunk| {
@@ -602,11 +603,10 @@ impl TransactionRestoreBatchController {
                 let verify_execution_mode = self.verify_execution_mode.clone();
 
                 async move {
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["replay_txn_chunk"])
-                        .start_timer();
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["enqueue_chunks"]);
+
                     tokio::task::spawn_blocking(move || {
-                        chunk_replayer.replay(
+                        chunk_replayer.enqueue_chunks(
                             txns,
                             txn_infos,
                             write_sets,
@@ -614,23 +614,38 @@ impl TransactionRestoreBatchController {
                             &verify_execution_mode,
                         )
                     })
-                    .err_into::<anyhow::Error>()
                     .await
+                    .expect("spawn_blocking failed")
                 }
             })
-            .try_buffered_x(self.global_opt.concurrent_downloads, 1)
-            .and_then(future::ready);
+            .try_buffered_x(3, 1)
+            .map_ok(|chunks_enqueued| {
+                futures::stream::repeat_with(|| Result::Ok(())).take(chunks_enqueued)
+            })
+            .try_flatten();
+
+        let db_commit_stream = ledger_update_stream
+            .map_ok(|()| {
+                let chunk_replayer = chunk_replayer.clone();
+                async move {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["ledger_update"]);
+
+                    tokio::task::spawn_blocking(move || chunk_replayer.update_ledger())
+                        .await
+                        .expect("spawn_blocking failed")
+                }
+            })
+            .try_buffered_x(3, 1);
 
         let total_replayed = db_commit_stream
             .and_then(|()| {
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["commit_txn_chunk"])
-                        .start_timer();
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit"]);
+
                     tokio::task::spawn_blocking(move || {
-                        let committed_chunk = chunk_replayer.commit()?;
-                        let v = committed_chunk.result_state.current_version.unwrap_or(0);
+                        let v = chunk_replayer.commit()?;
+
                         let total_replayed = v - first_version + 1;
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(
@@ -640,13 +655,17 @@ impl TransactionRestoreBatchController {
                                 as u64,
                             "Transactions replayed."
                         );
-                        Ok(v)
+                        Ok(total_replayed)
                     })
-                    .await?
+                    .await
+                    .expect("spawn_blocking failed")
                 }
             })
-            .try_fold(0, |_total, total| future::ok(total))
+            .try_fold(0, |_prev_total, total| future::ok(total))
             .await?;
+        // assert all chunks are fully processed and in DB.
+        assert!(chunk_replayer.is_empty());
+
         info!(
             total_replayed = total_replayed,
             accumulative_tps =

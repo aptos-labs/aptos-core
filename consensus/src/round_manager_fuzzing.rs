@@ -20,7 +20,9 @@ use crate::{
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::DummyExecutionClient,
     round_manager::RoundManager,
-    test_utils::{MockPayloadManager, MockStorage},
+    test_utils::{
+        MockOptQSPayloadProvider, MockPastProposalStatusTracker, MockPayloadManager, MockStorage,
+    },
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -148,10 +150,7 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
 
-    let epoch_state = Arc::new(EpochState {
-        epoch: 1,
-        verifier: storage.get_validator_set().into(),
-    });
+    let epoch_state = Arc::new(EpochState::new(1, storage.get_validator_set().into()));
     let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
@@ -183,6 +182,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
 
     //
@@ -212,6 +212,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         None,
+        Arc::new(MockPastProposalStatusTracker {}),
     )
 }
 

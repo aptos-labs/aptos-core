@@ -495,10 +495,10 @@ impl BatchGenerator {
                                 "QS: got clean request from execution, block timestamp {}",
                                 block_timestamp
                             );
-                            assert!(
-                                self.latest_block_timestamp <= block_timestamp,
-                                "Decreasing block timestamp"
-                            );
+                            // Block timestamp is updated asynchronously, so it may race when it enters state sync.
+                            if self.latest_block_timestamp > block_timestamp {
+                                continue;
+                            }
                             self.latest_block_timestamp = block_timestamp;
 
                             for (author, batch_id) in batches.iter().map(|b| (b.author(), b.batch_id())) {

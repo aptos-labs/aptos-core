@@ -5,9 +5,17 @@ metadata:
   labels:
     {{- include "aptos-fullnode.labels" . | nindent 4 }}
 spec:
+{{- with .Values.storage }}
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.storage.class }}
+  storageClassName: {{ .class }}
   resources:
     requests:
-      storage: {{ .Values.storage.size }}
+      storage: {{ .size }}
+  {{- if .snapshotRefForRestore }}
+  dataSourceRef:
+    apiGroup: snapshot.storage.k8s.io
+    kind: VolumeSnapshot
+    name: {{ .snapshotRefForRestore }}
+  {{- end }}
+{{- end }}

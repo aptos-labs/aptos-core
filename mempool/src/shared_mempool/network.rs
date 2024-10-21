@@ -370,7 +370,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
             .get_mut(&peer)
-            .ok_or(BroadcastError::PeerNotFound(peer))?;
+            .ok_or_else(|| BroadcastError::PeerNotFound(peer))?;
 
         // If backoff mode is on for this peer, only execute broadcasts that were scheduled as a backoff broadcast.
         // This is to ensure the backoff mode is actually honored (there is a chance a broadcast was scheduled
@@ -607,7 +607,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         let mut sync_states = self.sync_states.write();
         let state = sync_states
             .get_mut(&peer)
-            .ok_or(BroadcastError::PeerNotFound(peer))?;
+            .ok_or_else(|| BroadcastError::PeerNotFound(peer))?;
 
         // Update peer sync state with info from above broadcast.
         state.update(&message_id);

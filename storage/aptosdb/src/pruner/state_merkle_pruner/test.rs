@@ -63,7 +63,7 @@ fn put_value_set(
     let enable_sharding = state_store.state_kv_db.enabled_sharding();
     state_store
         .put_value_sets(
-            vec![&sharded_value_set],
+            &[sharded_value_set],
             version,
             StateStorageUsage::new_untracked(),
             None,
@@ -375,7 +375,7 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
         user_pruning_window_offset: 0,
     });
     for batch in inputs {
-        update_store(store, batch.clone().into_iter(), version);
+        update_store(store, batch.clone().into_iter(), version, false);
         for (k, v) in batch.iter() {
             if let Some((old_version, old_v_opt)) =
                 current_state_values.insert(k.clone(), (version, v.clone()))

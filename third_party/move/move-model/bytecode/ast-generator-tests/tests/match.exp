@@ -1,0 +1,335 @@
+
+=== Processing m::id =====================================================
+--- Source
+fun id(self: &Entity): u64 {
+        match (self) {
+            Person{id} => *id,
+            Institution{id, ..} => *id
+        }
+    }
+
+--- Stackless Bytecode
+fun m::id($t0|self: &0x815::m::Entity): u64 {
+     var $t1|return: u64
+     var $t2: &0x815::m::Entity
+     var $t3: bool
+     var $t4: &0x815::m::Entity
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &0x815::m::Entity
+     var $t8: bool
+     var $t9: &0x815::m::Entity
+     var $t10: &u64
+     var $t11: u64
+     var $t12: &0x815::m::Entity
+     var $t13: u64
+     var $t14: u64
+  0: $t2 := copy($t0)
+  1: $t3 := test_variant 0x815::m::Entity::Person($t2)
+  2: if ($t3) goto 3 else goto 9
+  3: label L1
+  4: $t4 := move($t0)
+  5: $t5 := borrow_variant_field<0x815::m::Entity::Person>.id($t4)
+  6: $t6 := read_ref($t5)
+  7: $t1 := $t6
+  8: goto 24
+  9: label L0
+ 10: $t7 := copy($t0)
+ 11: $t8 := test_variant 0x815::m::Entity::Institution($t7)
+ 12: if ($t8) goto 13 else goto 19
+ 13: label L4
+ 14: $t9 := move($t0)
+ 15: $t10 := borrow_variant_field<0x815::m::Entity::Institution>.id($t9)
+ 16: $t11 := read_ref($t10)
+ 17: $t1 := $t11
+ 18: goto 24
+ 19: label L3
+ 20: $t12 := move($t0)
+ 21: drop($t12)
+ 22: $t13 := 14566554180833181697
+ 23: abort($t13)
+ 24: label L2
+ 25: $t14 := move($t1)
+ 26: return $t14
+}
+
+--- Raw Generated AST
+_t2: &Entity = self;
+_t3: bool = test_variants m::Entity::Person(_t2);
+loop {
+  loop {
+    if (Not(_t3)) break;
+    _t4: &Entity = self;
+    _t5: &u64 = select_variants m::Entity.id(_t4);
+    _t6: u64 = Deref(_t5);
+    _t1: u64 = _t6;
+    break[1]
+  };
+  _t7: &Entity = self;
+  _t8: bool = test_variants m::Entity::Institution(_t7);
+  loop {
+    loop {
+      if (Not(_t8)) break;
+      _t9: &Entity = self;
+      _t10: &u64 = select_variants m::Entity.id(_t9);
+      _t11: u64 = Deref(_t10);
+      _t1: u64 = _t11;
+      break[1]
+    };
+    _t12: &Entity = self;
+    _t13: u64 = 14566554180833181697;
+    Abort(_t13)
+  };
+  break
+};
+_t14: u64 = _t1;
+return _t14
+
+--- If-Transformed Generated AST
+_t2: &Entity = self;
+_t3: bool = test_variants m::Entity::Person(_t2);
+if _t3 {
+  _t4: &Entity = self;
+  _t5: &u64 = select_variants m::Entity.id(_t4);
+  _t6: u64 = Deref(_t5);
+  _t1: u64 = _t6
+} else {
+  _t7: &Entity = self;
+  _t8: bool = test_variants m::Entity::Institution(_t7);
+  if _t8 {
+    _t9: &Entity = self;
+    _t10: &u64 = select_variants m::Entity.id(_t9);
+    _t11: u64 = Deref(_t10);
+    _t1: u64 = _t11
+  } else {
+    _t12: &Entity = self;
+    _t13: u64 = 14566554180833181697;
+    Abort(_t13)
+  }
+};
+_t14: u64 = _t1;
+return _t14
+
+--- Assign-Transformed Generated AST
+{
+  let _t1: u64;
+  if test_variants m::Entity::Person(self) {
+    _t1: u64 = Deref(select_variants m::Entity.id(self))
+  } else {
+    if test_variants m::Entity::Institution(self) {
+      _t1: u64 = Deref(select_variants m::Entity.id(self))
+    } else {
+      Abort(14566554180833181697)
+    }
+  };
+  return _t1
+}
+
+
+=== Processing m::id2 =====================================================
+--- Source
+fun id2(self: Entity): u64 {
+        match (self) {
+            Person{id} if id > 0 => id,
+            Institution{id, ..} => id,
+            _ => 0
+        }
+    }
+
+--- Stackless Bytecode
+fun m::id2($t0|self: 0x815::m::Entity): u64 {
+     var $t1|$t2: &0x815::m::Entity
+     var $t2|$t5: u64
+     var $t3: &0x815::m::Entity
+     var $t4: &0x815::m::Entity
+     var $t5: bool
+     var $t6: &0x815::m::Entity
+     var $t7: &u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: bool
+     var $t11: &0x815::m::Entity
+     var $t12: 0x815::m::Entity
+     var $t13: u64
+     var $t14: &0x815::m::Entity
+     var $t15: bool
+     var $t16: 0x815::m::Entity
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+  0: $t3 := borrow_local($t0)
+  1: $t1 := $t3
+  2: $t4 := copy($t1)
+  3: $t5 := test_variant 0x815::m::Entity::Person($t4)
+  4: if ($t5) goto 5 else goto 19
+  5: label L1
+  6: $t6 := copy($t1)
+  7: $t7 := borrow_variant_field<0x815::m::Entity::Person>.id($t6)
+  8: $t8 := read_ref($t7)
+  9: $t9 := 0
+ 10: $t10 := >($t8, $t9)
+ 11: if ($t10) goto 12 else goto 19
+ 12: label L2
+ 13: $t11 := move($t1)
+ 14: drop($t11)
+ 15: $t12 := move($t0)
+ 16: $t13 := unpack_variant 0x815::m::Entity::Person($t12)
+ 17: $t2 := $t13
+ 18: goto 33
+ 19: label L0
+ 20: $t14 := move($t1)
+ 21: $t15 := test_variant 0x815::m::Entity::Institution($t14)
+ 22: if ($t15) goto 23 else goto 29
+ 23: label L5
+ 24: $t16 := move($t0)
+ 25: ($t17, $t18) := unpack_variant 0x815::m::Entity::Institution($t16)
+ 26: drop($t18)
+ 27: $t2 := $t17
+ 28: goto 33
+ 29: label L4
+ 30: $t19 := 0
+ 31: $t2 := $t19
+ 32: goto 33
+ 33: label L3
+ 34: $t20 := move($t2)
+ 35: return $t20
+}
+
+--- Raw Generated AST
+_t3: &Entity = Borrow(Immutable)(self);
+_t1: &Entity = _t3;
+_t4: &Entity = _t1;
+_t5: bool = test_variants m::Entity::Person(_t4);
+loop {
+  loop {
+    if (Not(_t5)) break;
+    _t6: &Entity = _t1;
+    _t7: &u64 = select_variants m::Entity.id(_t6);
+    _t8: u64 = Deref(_t7);
+    _t9: u64 = 0;
+    _t10: bool = Gt(_t8, _t9);
+    if (Not(_t10)) break;
+    _t11: &Entity = _t1;
+    _t12: Entity = self;
+    m::Entity::Person{ id: _t13 } = _t12;
+    _t2: u64 = _t13;
+    break[1]
+  };
+  _t14: &Entity = _t1;
+  _t15: bool = test_variants m::Entity::Institution(_t14);
+  loop {
+    loop {
+      if (Not(_t15)) break;
+      _t16: Entity = self;
+      m::Entity::Institution{ id: _t17, admin: _t18 } = _t16;
+      _t2: u64 = _t17;
+      break[1]
+    };
+    _t19: u64 = 0;
+    _t2: u64 = _t19;
+    break
+  };
+  break
+};
+_t20: u64 = _t2;
+return _t20
+
+--- If-Transformed Generated AST
+_t3: &Entity = Borrow(Immutable)(self);
+_t1: &Entity = _t3;
+_t4: &Entity = _t1;
+_t5: bool = test_variants m::Entity::Person(_t4);
+loop {
+  loop {
+    if (Not(_t5)) break;
+    _t6: &Entity = _t1;
+    _t7: &u64 = select_variants m::Entity.id(_t6);
+    _t8: u64 = Deref(_t7);
+    _t9: u64 = 0;
+    _t10: bool = Gt(_t8, _t9);
+    if (Not(_t10)) break;
+    _t11: &Entity = _t1;
+    _t12: Entity = self;
+    m::Entity::Person{ id: _t13 } = _t12;
+    _t2: u64 = _t13;
+    break[1]
+  };
+  _t14: &Entity = _t1;
+  _t15: bool = test_variants m::Entity::Institution(_t14);
+  if _t15 {
+    _t16: Entity = self;
+    m::Entity::Institution{ id: _t17, admin: _t18 } = _t16;
+    _t2: u64 = _t17
+  } else {
+    _t19: u64 = 0;
+    _t2: u64 = _t19
+  };
+  break
+};
+_t20: u64 = _t2;
+return _t20
+
+--- Assign-Transformed Generated AST
+{
+  let _t2: u64;
+  {
+    let _t1: &Entity = Borrow(Immutable)(self);
+    loop {
+      loop {
+        if (Not(test_variants m::Entity::Person(_t1))) break;
+        if (Not(Gt(Deref(select_variants m::Entity.id(_t1)), 0))) break;
+        {
+          let m::Entity::Person{ id: _t13 } = self;
+          break[1]
+        }
+      };
+      if test_variants m::Entity::Institution(_t1) {
+        {
+          let m::Entity::Institution{ id: _t17, admin: _t18 } = self;
+          _t2: u64 = _t17
+        }
+      } else {
+        _t2: u64 = 0
+      };
+      break
+    };
+    return _t2
+  }
+}
+
+=== Sourcified Output ============================================
+module 0x815::m {
+    enum Entity has drop {
+        Person {
+            id: u64,
+        }
+        Institution {
+            id: u64,
+            admin: u64,
+        }
+    }
+    fun id(self: &Entity): u64 {
+        let _t1;
+        if (self is Person) _t1 = *self.id else if (self is Institution) _t1 = *self.id else abort 14566554180833181697;
+        _t1
+    }
+    fun id2(self: Entity): u64 {
+        let _t2;
+        let _t1 = &self;
+        'l0: loop {
+            loop {
+                if (!(_t1 is Person)) break;
+                if (!(*_t1.id > 0)) break;
+                let Entity::Person{id: _t13} = self;
+                break 'l0
+            };
+            if (_t1 is Institution) {
+                let Entity::Institution{id: _t17,admin: _t18} = self;
+                _t2 = _t17
+            } else _t2 = 0;
+            break
+        };
+        _t2
+    }
+}

@@ -379,8 +379,14 @@ mod test {
 
     #[test]
     fn test_clear_all_payloads() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store
@@ -446,8 +452,14 @@ mod test {
 
     #[test]
     fn test_insert_block_payload() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks to the payload store
@@ -556,8 +568,14 @@ mod test {
 
     #[test]
     fn test_remove_blocks_for_epoch_round_verified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks to the payload store for the current epoch
@@ -614,8 +632,14 @@ mod test {
 
     #[test]
     fn test_remove_blocks_for_epoch_round_unverified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store for the current epoch
@@ -671,8 +695,14 @@ mod test {
 
     #[test]
     fn test_remove_committed_blocks_verified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some blocks to the payload store for the current epoch
@@ -740,8 +770,14 @@ mod test {
 
     #[test]
     fn test_remove_committed_blocks_unverified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some blocks to the payload store for the current epoch
@@ -808,8 +844,14 @@ mod test {
 
     #[test]
     fn test_verify_payload_signatures() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks for the current epoch
@@ -940,8 +982,14 @@ mod test {
 
     #[test]
     fn test_verify_payload_signatures_failure() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks for the current epoch
@@ -981,8 +1029,11 @@ mod test {
             validator_signer.public_key(),
             100,
         );
-        let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(next_epoch, validator_verifier.clone());
+        let validator_verifier = Arc::new(ValidatorVerifier::new(vec![validator_consensus_info]));
+        let epoch_state = EpochState {
+            epoch: next_epoch,
+            verifier: validator_verifier.clone(),
+        };
 
         // Verify the block payload signatures (for this epoch)
         block_payload_store.verify_payload_signatures(&epoch_state);
@@ -997,7 +1048,10 @@ mod test {
         );
 
         // Create an epoch state for the future epoch (with a non-empty verifier)
-        let epoch_state = EpochState::new(future_epoch, validator_verifier);
+        let epoch_state = EpochState {
+            epoch: future_epoch,
+            verifier: validator_verifier.clone(),
+        };
 
         // Verify the block payload signatures (for the future epoch)
         block_payload_store.verify_payload_signatures(&epoch_state);

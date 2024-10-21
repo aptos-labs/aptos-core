@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::apply` has a function parameter:
+   ┌─ tests/lambda/inline-parity/unnecessary_numerical_extreme_comparisons_warn.move:49:9
+   │
+49 │     fun apply(f: |u8|bool, x: u8): bool {
+   │         ^^^^^ - Parameter `f` has function-valued type `|u8|bool`.

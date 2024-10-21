@@ -1416,6 +1416,20 @@ paths:
               schema:
                 type: string
       operationId: spec
+  /info:
+    get:
+      tags:
+      - General
+      summary: Show some basic info of the node.
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+      operationId: info
   /-/healthy:
     get:
       tags:
@@ -10669,6 +10683,47 @@ components:
           $ref: '#/components/schemas/U64'
         block_end_info:
           $ref: '#/components/schemas/BlockEndInfo'
+    BlockMetadataExtension:
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
+      - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+      discriminator:
+        propertyName: type
+        mapping:
+          v0: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
+          v1: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+    BlockMetadataExtensionEmpty:
+      type: object
+    BlockMetadataExtensionRandomness:
+      type: object
+      properties:
+        randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    BlockMetadataExtension_BlockMetadataExtensionEmpty:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - v0
+            example: v0
+      - $ref: '#/components/schemas/BlockMetadataExtensionEmpty'
+    BlockMetadataExtension_BlockMetadataExtensionRandomness:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - v1
+            example: v1
+      - $ref: '#/components/schemas/BlockMetadataExtensionRandomness'
     BlockMetadataTransaction:
       type: object
       description: |-
@@ -10747,6 +10802,18 @@ components:
             format: uint32
         timestamp:
           $ref: '#/components/schemas/U64'
+        block_metadata_extension:
+          allOf:
+          - $ref: '#/components/schemas/BlockMetadataExtension'
+          - description: |-
+              If some, it means the internal txn type is `aptos_types::transaction::Transaction::BlockMetadataExt`.
+              Otherwise, it is `aptos_types::transaction::Transaction::BlockMetadata`.
+
+              NOTE: we could have introduced a new APT txn type to represent the corresponding internal type,
+              but that is a breaking change to the ecosystem.
+
+              NOTE: `oai` does not support `flatten` together with `skip_serializing_if`.
+            default: null
     DKGResultTransaction:
       type: object
       required:

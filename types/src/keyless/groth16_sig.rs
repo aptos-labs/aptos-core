@@ -24,6 +24,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[derive(
     Copy, Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
 )]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Groth16Proof {
     a: G1Bytes,
     b: G2Bytes,
@@ -31,6 +32,7 @@ pub struct Groth16Proof {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct ZeroKnowledgeSig {
     pub proof: ZKP,
     /// The expiration horizon that the circuit should enforce on the expiration date committed in

@@ -1,0 +1,58 @@
+
+Diagnostics:
+error: `reduce` is a function and not a macro
+   ┌─ tests/lambda/lambda.move:34:37
+   │
+34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
+   │                                     ^^^^^^
+
+error: expected `|(&T, u64)|_` but found a value of type `|&T|`
+   ┌─ tests/lambda/lambda.move:40:13
+   │
+40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `|u64|_` but found a value of type `|&T|`
+   ┌─ tests/lambda/lambda.move:48:13
+   │
+48 │             action(i); // expected to have wrong argument type
+   │             ^^^^^^^^^
+
+error: cannot use `()` with an operator which expects a value of type `u64`
+   ┌─ tests/lambda/lambda.move:56:21
+   │
+56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot return `u64` from a function with result type `|integer|`
+   ┌─ tests/lambda/lambda.move:61:9
+   │
+61 │         x(1) // expected to be not a function
+   │         ^^^^
+
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/lambda.move:67:35
+   │
+67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
+   │                                   ^
+   │
+   = required by instantiating type parameter `T` of function `+`
+
+error: tuple type `()` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/lambda.move:73:37
+   │
+ 4 │     public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+   │                               - declaration of type parameter `T`
+   ·
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │                                     ^
+   │
+   = required by instantiating type parameter `T` of function `foreach`
+
+error: function type `|u64|u64` is not allowed as a field type
+   ┌─ tests/lambda/lambda.move:81:12
+   │
+81 │         f: |u64|u64, // expected lambda not allowed
+   │            ^^^^^^^^
+   │
+   = required by declaration of field `f`

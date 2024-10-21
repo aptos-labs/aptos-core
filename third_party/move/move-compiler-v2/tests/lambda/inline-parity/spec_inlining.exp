@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::apply` has a function parameter:
+  ┌─ tests/lambda/inline-parity/spec_inlining.move:2:9
+  │
+2 │     fun apply(v: u64, predicate: |u64| bool): bool {
+  │         ^^^^^         --------- Parameter `predicate` has function-valued type `|u64|bool`.

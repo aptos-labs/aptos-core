@@ -58,6 +58,21 @@ pub struct CustomNativeOptions {
     pub module_instance_names: Vec<(String, String, bool)>,
 }
 
+pub fn custom_native_options() -> Vec<(String, String, bool)> {
+    vec![
+        (
+            "0x1::object".to_string(),
+            "object_instances".to_string(),
+            true,
+        ),
+        (
+            "0x1::aggregator_v2".to_string(),
+            "aggregator_v2_instances".to_string(),
+            true,
+        ),
+    ]
+}
+
 /// Contains information about a native method implementing mutable borrow semantics for a given
 /// type in an alternative storage model (returning &mut without taking appropriate &mut as a
 /// parameter, much like vector::borrow_mut)

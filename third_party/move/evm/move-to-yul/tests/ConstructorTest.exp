@@ -23,14 +23,14 @@ object "A2_ConstructorTest" {
             mstore($locals, A2_Evm_sign($t3))
             // $t4 := borrow_local($t2)
             $t4 := $MakePtr(false, $locals)
-            // $t5 := pack ConstructorTest::Balance($t0, $t1)
+            // $t5 := pack 0x2::ConstructorTest::Balance($t0, $t1)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU64(add($mem, 0), value)
                 $MemoryStoreU64(add($mem, 8), value2)
                 $t5 := $mem
             }
-            // move_to<ConstructorTest::Balance>($t5, $t4)
+            // move_to<0x2::ConstructorTest::Balance>($t5, $t4)
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x91d9463a, $LoadU256($t4))
                 if $AlignedStorageLoad($base_offset) {
@@ -212,7 +212,7 @@ object "A2_ConstructorTest" {
                 let $t0, $t1, $t2, $t3
                 // $t0 := 0x42
                 $t0 := 0x42
-                // $t1 := borrow_global<ConstructorTest::Balance>($t0)
+                // $t1 := borrow_global<0x2::ConstructorTest::Balance>($t0)
                 {
                     let $base_offset := $MakeTypeStorageBase(0, 0x91d9463a, $t0)
                     if iszero($AlignedStorageLoad($base_offset)) {
@@ -220,7 +220,7 @@ object "A2_ConstructorTest" {
                     }
                     $t1 := $MakePtr(true, add($base_offset, 32))
                 }
-                // $t2 := borrow_field<ConstructorTest::Balance>.value($t1)
+                // $t2 := borrow_field<0x2::ConstructorTest::Balance>.value($t1)
                 $t2 := $t1
                 // $t3 := read_ref($t2)
                 $t3 := $LoadU64($t2)

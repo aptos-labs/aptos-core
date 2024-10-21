@@ -7,6 +7,7 @@ use move_command_line_common::{
     env,
     env::{get_move_compiler_v2_from_env, read_bool_env_var},
 };
+use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -144,6 +145,16 @@ impl CompilerVersion {
         }
     }
 
+    /// The latest compiler version.
+    pub fn latest() -> Self {
+        CompilerVersion::V2_1
+    }
+
+    /// The latest stable compiler version.
+    pub fn latest_stable() -> Self {
+        CompilerVersion::V2_0
+    }
+
     /// Check whether the compiler version supports the given language version,
     /// generates an error if not.
     pub fn check_language_support(self, version: LanguageVersion) -> anyhow::Result<()> {
@@ -214,6 +225,16 @@ impl FromStr for LanguageVersion {
     }
 }
 
+impl From<LanguageVersion> for CompilerLanguageVersion {
+    fn from(val: LanguageVersion) -> Self {
+        match val {
+            LanguageVersion::V1 => CompilerLanguageVersion::V1,
+            LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
+            LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
+        }
+    }
+}
+
 impl LanguageVersion {
     /// Whether the language version is unstable. An unstable version
     /// should not be allowed on production networks.
@@ -223,6 +244,16 @@ impl LanguageVersion {
             LanguageVersion::V2_0 => false,
             LanguageVersion::V2_1 => true,
         }
+    }
+
+    /// The latest language version.
+    pub fn latest() -> Self {
+        LanguageVersion::V2_1
+    }
+
+    /// The latest stable language version.
+    pub fn latest_stable() -> Self {
+        LanguageVersion::V2_0
     }
 
     /// Whether the language version is equal to greater than `ver`

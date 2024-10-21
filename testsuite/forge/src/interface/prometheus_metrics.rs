@@ -43,6 +43,12 @@ impl fmt::Debug for MetricSamples {
     }
 }
 
+impl Default for MetricSamples {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SystemMetrics {
     pub cpu_core_metrics: MetricSamples,
@@ -105,6 +111,13 @@ pub enum LatencyBreakdownSlice {
     ConsensusProposalToOrdered,
     ConsensusOrderedToCommit,
     ConsensusProposalToCommit,
+    // each of the indexer grpc steps in order
+    IndexerFullnodeProcessedBatch,
+    IndexerCacheWorkerProcessedBatch,
+    IndexerDataServiceAllChunksSent,
+    // these two mesasure the same latency, but the metrics are different for the SDK
+    IndexerProcessorLatency,
+    IndexerProcessorSdkLatency,
 }
 
 #[derive(Clone, Debug)]
@@ -119,10 +132,16 @@ impl LatencyBreakdown {
         self.0.keys().cloned().collect()
     }
 
-    pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> &MetricSamples {
-        self.0
-            .get(slice)
-            .unwrap_or_else(|| panic!("Missing latency breakdown for {:?}", slice))
+    pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> Option<&MetricSamples> {
+        self.0.get(slice)
+    }
+
+    pub fn join(&self, other: &LatencyBreakdown) -> LatencyBreakdown {
+        let mut ret_latency = self.0.clone();
+        for (slice, samples) in other.0.iter() {
+            ret_latency.insert(slice.clone(), samples.clone());
+        }
+        LatencyBreakdown::new(ret_latency)
     }
 }
 
@@ -210,5 +229,87 @@ pub async fn fetch_latency_breakdown(
         MetricSamples::new(consensus_proposal_to_commit_samples),
     );
 
+    if swarm.has_indexer() {
+        // These counters are defined in ecosystem/indexer-grpc/indexer-grpc-utils/src/counters.rs
+        let indexer_fullnode_processed_batch_query =
+            r#"max(indexer_grpc_duration_in_secs{step="4", service_type="indexer_fullnode"})"#;
+        let indexer_cache_worker_processed_batch_query =
+            r#"max(indexer_grpc_duration_in_secs{step="4", service_type="cache_worker"})"#;
+        let indexer_data_service_all_chunks_sent_query =
+            r#"max(indexer_grpc_duration_in_secs{step="4", service_type="data_service"})"#;
+
+        // These are processor latencies for both original core processors and those written with the processor SDK: https://github.com/aptos-labs/aptos-indexer-processor-sdk
+        // Note the use of empty {}, where additional test-specific labels will be added by Forge
+        let indexer_processor_latency_query =
+            r#"max(indexer_processor_data_processed_latency_in_secs{})"#;
+        let indexer_sdk_processor_latency_query =
+            "max(aptos_procsdk_step__processed_transaction_latency_secs{})";
+
+        let indexer_fullnode_processed_batch_samples = swarm
+            .query_range_metrics(
+                indexer_fullnode_processed_batch_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_cache_worker_processed_batch_samples = swarm
+            .query_range_metrics(
+                indexer_cache_worker_processed_batch_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_data_service_all_chunks_sent_samples = swarm
+            .query_range_metrics(
+                indexer_data_service_all_chunks_sent_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_processor_latency_samples = swarm
+            .query_range_metrics(
+                indexer_processor_latency_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        let indexer_processor_sdk_latency_samples = swarm
+            .query_range_metrics(
+                indexer_sdk_processor_latency_query,
+                start_time as i64,
+                end_time as i64,
+                None,
+            )
+            .await?;
+
+        samples.insert(
+            LatencyBreakdownSlice::IndexerFullnodeProcessedBatch,
+            MetricSamples::new(indexer_fullnode_processed_batch_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerCacheWorkerProcessedBatch,
+            MetricSamples::new(indexer_cache_worker_processed_batch_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerDataServiceAllChunksSent,
+            MetricSamples::new(indexer_data_service_all_chunks_sent_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerProcessorLatency,
+            MetricSamples::new(indexer_processor_latency_samples),
+        );
+        samples.insert(
+            LatencyBreakdownSlice::IndexerProcessorSdkLatency,
+            MetricSamples::new(indexer_processor_sdk_latency_samples),
+        );
+    }
     Ok(LatencyBreakdown::new(samples))
 }

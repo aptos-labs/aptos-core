@@ -78,6 +78,44 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    fun tborrow1(cond: bool) {
+        let x;
+        while (cond) {
+            let y = &x;
+            _ = move y;
+            x = 0
+        }
+    }
+    fun tborrow2(cond: bool) {
+        let x;
+        while (cond) {
+            let y = &x;
+            _ = move y;
+            if (cond) x = 0;
+            break
+        }
+    }
+    fun tcopy(cond: bool) {
+        let x;
+        while (cond) {
+            let y = (move x) + 1;
+            if (cond) continue;
+            x = 0;
+            y;
+        }
+    }
+    fun tmove(cond: bool) {
+        let x;
+        while (cond) {
+            let y = (move x) + 1;
+            x = 0;
+            y;
+        }
+    }
+}
+
 
 Diagnostics:
 error: use of possibly unassigned local `x`

@@ -71,5 +71,50 @@ module 0x42::m {
     }
 } // end 0x42::m
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    public entry fun init() {
+        let _x = {
+            let (v) = (*0x1::vector::borrow<vector<vector<u8>>>(&vector[vector[]], 0));
+            let result = vector[];
+            {
+                let (v) = (v);
+                0x1::vector::reverse<vector<u8>>(&mut v);
+                while (!0x1::vector::is_empty<vector<u8>>(&v)) {
+                    let e = 0x1::vector::pop_back<vector<u8>>(&mut v);
+                    {
+                        let (elem) = (e);
+                        0x1::vector::push_back<u64>(&mut result, {
+                            let (key) = (elem);
+                            let t = key;
+                            0x1::vector::length<u8>(&t) + 2
+                        })
+                    };
+                };
+            };
+            result
+        };
+        let _y = {
+            let (v) = (*0x1::vector::borrow<vector<u64>>(&vector[vector[]], 0));
+            let result = vector[];
+            {
+                let (v) = (v);
+                0x1::vector::reverse<u64>(&mut v);
+                while (!0x1::vector::is_empty<u64>(&v)) {
+                    let e = 0x1::vector::pop_back<u64>(&mut v);
+                    {
+                        let (elem) = (e);
+                        0x1::vector::push_back<u64>(&mut result, {
+                            let (v) = (elem);
+                            v + 3
+                        })
+                    };
+                };
+            };
+            result
+        };
+    }
+}
+
 
 ============ bytecode verification succeeded ========

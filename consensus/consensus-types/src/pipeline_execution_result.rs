@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_executor_types::{ExecutorResult, StateComputeResult};
+use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorResult};
 use aptos_types::transaction::SignedTransaction;
 use derivative::Derivative;
 use futures::future::BoxFuture;

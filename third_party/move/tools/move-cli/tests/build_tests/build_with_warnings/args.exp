@@ -7,7 +7,7 @@ warning[W09002]: unused variable
   │                ^ Unused parameter 'x'. Consider removing or prefixing with an underscore: '_x'
 
 Command `disassemble --package Test --name m`:
-// Move bytecode v6
+// Move bytecode v7
 module 42.m {
 
 

@@ -11,13 +11,15 @@ use crate::{
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_consensus_types::{
     block::Block, pipeline_execution_result::PipelineExecutionResult,
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{
+    state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
+};
 use aptos_logger::debug;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
@@ -67,7 +69,19 @@ impl StateComputer for EmptyStateComputer {
         Ok(())
     }
 
-    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the EmptyStateComputer!"
+        )))
+    }
+
+    async fn sync_to_target(
+        &self,
+        _target: LedgerInfoWithSignatures,
+    ) -> Result<(), StateSyncError> {
         Ok(())
     }
 
@@ -141,7 +155,19 @@ impl StateComputer for RandomComputeResultStateComputer {
         Ok(())
     }
 
-    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the RandomComputeResultStateComputer!"
+        )))
+    }
+
+    async fn sync_to_target(
+        &self,
+        _target: LedgerInfoWithSignatures,
+    ) -> Result<(), StateSyncError> {
         Ok(())
     }
 

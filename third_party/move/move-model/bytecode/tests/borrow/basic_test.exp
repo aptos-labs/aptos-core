@@ -1,21 +1,21 @@
 ============ initial translation from Move ================
 
 [variant baseline]
-fun TestBorrow::test1(): TestBorrow::R {
-     var $t0|r: TestBorrow::R
+fun TestBorrow::test1(): 0x42::TestBorrow::R {
+     var $t0|r: 0x42::TestBorrow::R
      var $t1|x_ref: &mut u64
      var $t2: u64
-     var $t3: TestBorrow::R
-     var $t4: &mut TestBorrow::R
+     var $t3: 0x42::TestBorrow::R
+     var $t4: &mut 0x42::TestBorrow::R
      var $t5: &mut u64
      var $t6: u64
      var $t7: &mut u64
-     var $t8: TestBorrow::R
+     var $t8: 0x42::TestBorrow::R
   0: $t2 := 3
-  1: $t3 := pack TestBorrow::R($t2)
+  1: $t3 := pack 0x42::TestBorrow::R($t2)
   2: $t0 := $t3
   3: $t4 := borrow_local($t0)
-  4: $t5 := borrow_field<TestBorrow::R>.x($t4)
+  4: $t5 := borrow_field<0x42::TestBorrow::R>.x($t4)
   5: $t1 := $t5
   6: $t6 := 0
   7: $t7 := move($t1)
@@ -37,12 +37,12 @@ fun TestBorrow::test2($t0|x_ref: &mut u64, $t1|v: u64) {
 
 
 [variant baseline]
-public fun TestBorrow::test3($t0|r_ref: &mut TestBorrow::R, $t1|v: u64) {
-     var $t2: &mut TestBorrow::R
+public fun TestBorrow::test3($t0|r_ref: &mut 0x42::TestBorrow::R, $t1|v: u64) {
+     var $t2: &mut 0x42::TestBorrow::R
      var $t3: &mut u64
      var $t4: u64
   0: $t2 := move($t0)
-  1: $t3 := borrow_field<TestBorrow::R>.x($t2)
+  1: $t3 := borrow_field<0x42::TestBorrow::R>.x($t2)
   2: $t4 := move($t1)
   3: TestBorrow::test2($t3, $t4)
   4: return ()
@@ -50,15 +50,15 @@ public fun TestBorrow::test3($t0|r_ref: &mut TestBorrow::R, $t1|v: u64) {
 
 
 [variant baseline]
-fun TestBorrow::test4(): TestBorrow::R {
-     var $t0|r: TestBorrow::R
+fun TestBorrow::test4(): 0x42::TestBorrow::R {
+     var $t0|r: 0x42::TestBorrow::R
      var $t1: u64
-     var $t2: TestBorrow::R
-     var $t3: &mut TestBorrow::R
+     var $t2: 0x42::TestBorrow::R
+     var $t3: &mut 0x42::TestBorrow::R
      var $t4: u64
-     var $t5: TestBorrow::R
+     var $t5: 0x42::TestBorrow::R
   0: $t1 := 3
-  1: $t2 := pack TestBorrow::R($t1)
+  1: $t2 := pack 0x42::TestBorrow::R($t1)
   2: $t0 := $t2
   3: $t3 := borrow_local($t0)
   4: $t4 := 0
@@ -69,26 +69,26 @@ fun TestBorrow::test4(): TestBorrow::R {
 
 
 [variant baseline]
-public fun TestBorrow::test5($t0|r_ref: &mut TestBorrow::R): &mut u64 {
-     var $t1: &mut TestBorrow::R
+public fun TestBorrow::test5($t0|r_ref: &mut 0x42::TestBorrow::R): &mut u64 {
+     var $t1: &mut 0x42::TestBorrow::R
      var $t2: &mut u64
   0: $t1 := move($t0)
-  1: $t2 := borrow_field<TestBorrow::R>.x($t1)
+  1: $t2 := borrow_field<0x42::TestBorrow::R>.x($t1)
   2: return $t2
 }
 
 
 [variant baseline]
-fun TestBorrow::test6(): TestBorrow::R {
-     var $t0|r: TestBorrow::R
+fun TestBorrow::test6(): 0x42::TestBorrow::R {
+     var $t0|r: 0x42::TestBorrow::R
      var $t1: u64
-     var $t2: TestBorrow::R
-     var $t3: &mut TestBorrow::R
+     var $t2: 0x42::TestBorrow::R
+     var $t3: &mut 0x42::TestBorrow::R
      var $t4: &mut u64
      var $t5: u64
-     var $t6: TestBorrow::R
+     var $t6: 0x42::TestBorrow::R
   0: $t1 := 3
-  1: $t2 := pack TestBorrow::R($t1)
+  1: $t2 := pack 0x42::TestBorrow::R($t1)
   2: $t0 := $t2
   3: $t3 := borrow_local($t0)
   4: $t4 := TestBorrow::test5($t3)
@@ -101,24 +101,24 @@ fun TestBorrow::test6(): TestBorrow::R {
 
 [variant baseline]
 fun TestBorrow::test7($t0|b: bool) {
-     var $t1|r1: TestBorrow::R
-     var $t2|r2: TestBorrow::R
-     var $t3|r_ref: &mut TestBorrow::R
+     var $t1|r1: 0x42::TestBorrow::R
+     var $t2|r2: 0x42::TestBorrow::R
+     var $t3|r_ref: &mut 0x42::TestBorrow::R
      var $t4: u64
-     var $t5: TestBorrow::R
+     var $t5: 0x42::TestBorrow::R
      var $t6: u64
-     var $t7: TestBorrow::R
-     var $t8: &mut TestBorrow::R
+     var $t7: 0x42::TestBorrow::R
+     var $t8: &mut 0x42::TestBorrow::R
      var $t9: bool
-     var $t10: &mut TestBorrow::R
-     var $t11: &mut TestBorrow::R
-     var $t12: &mut TestBorrow::R
+     var $t10: &mut 0x42::TestBorrow::R
+     var $t11: &mut 0x42::TestBorrow::R
+     var $t12: &mut 0x42::TestBorrow::R
      var $t13: u64
   0: $t4 := 3
-  1: $t5 := pack TestBorrow::R($t4)
+  1: $t5 := pack 0x42::TestBorrow::R($t4)
   2: $t1 := $t5
   3: $t6 := 4
-  4: $t7 := pack TestBorrow::R($t6)
+  4: $t7 := pack 0x42::TestBorrow::R($t6)
   5: $t2 := $t7
   6: $t8 := borrow_local($t1)
   7: $t3 := $t8
@@ -139,41 +139,41 @@ fun TestBorrow::test7($t0|b: bool) {
 
 
 [variant baseline]
-fun TestBorrow::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut TestBorrow::R) {
-     var $t3|r1: TestBorrow::R
-     var $t4|r2: TestBorrow::R
-     var $t5|t_ref: &mut TestBorrow::R
+fun TestBorrow::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut 0x42::TestBorrow::R) {
+     var $t3|r1: 0x42::TestBorrow::R
+     var $t4|r2: 0x42::TestBorrow::R
+     var $t5|t_ref: &mut 0x42::TestBorrow::R
      var $t6: u64
-     var $t7: TestBorrow::R
+     var $t7: 0x42::TestBorrow::R
      var $t8: u64
-     var $t9: TestBorrow::R
-     var $t10: &mut TestBorrow::R
+     var $t9: 0x42::TestBorrow::R
+     var $t10: &mut 0x42::TestBorrow::R
      var $t11: u64
      var $t12: u64
      var $t13: bool
-     var $t14: &mut TestBorrow::R
+     var $t14: &mut 0x42::TestBorrow::R
      var $t15: u64
      var $t16: u64
      var $t17: u64
      var $t18: u64
      var $t19: bool
-     var $t20: &mut TestBorrow::R
-     var $t21: &mut TestBorrow::R
+     var $t20: &mut 0x42::TestBorrow::R
+     var $t21: &mut 0x42::TestBorrow::R
      var $t22: u64
      var $t23: u64
      var $t24: u64
      var $t25: bool
-     var $t26: &mut TestBorrow::R
-     var $t27: &mut TestBorrow::R
+     var $t26: &mut 0x42::TestBorrow::R
+     var $t27: &mut 0x42::TestBorrow::R
      var $t28: u64
-     var $t29: &mut TestBorrow::R
-     var $t30: &mut TestBorrow::R
+     var $t29: &mut 0x42::TestBorrow::R
+     var $t30: &mut 0x42::TestBorrow::R
      var $t31: u64
   0: $t6 := 3
-  1: $t7 := pack TestBorrow::R($t6)
+  1: $t7 := pack 0x42::TestBorrow::R($t6)
   2: $t3 := $t7
   3: $t8 := 4
-  4: $t9 := pack TestBorrow::R($t8)
+  4: $t9 := pack 0x42::TestBorrow::R($t8)
   5: $t4 := $t9
   6: $t10 := borrow_local($t4)
   7: $t5 := $t10
@@ -232,21 +232,21 @@ fun TestBorrow::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut TestBorrow::R) {
 ============ after pipeline `borrow` ================
 
 [variant baseline]
-fun TestBorrow::test1(): TestBorrow::R {
-     var $t0|r: TestBorrow::R
+fun TestBorrow::test1(): 0x42::TestBorrow::R {
+     var $t0|r: 0x42::TestBorrow::R
      var $t1|x_ref: &mut u64 [unused]
      var $t2: u64
-     var $t3: &mut TestBorrow::R
+     var $t3: &mut 0x42::TestBorrow::R
      var $t4: &mut u64
      var $t5: u64
-     var $t6: TestBorrow::R
+     var $t6: 0x42::TestBorrow::R
   0: $t2 := 3
-  1: $t0 := pack TestBorrow::R($t2)
+  1: $t0 := pack 0x42::TestBorrow::R($t2)
   2: $t3 := borrow_local($t0)
      # live_nodes: Reference($t3)
      # borrowed_by: LocalRoot($t0) -> {(@, Reference($t3))}
      # borrows_from: Reference($t3) -> {(@, LocalRoot($t0))}
-  3: $t4 := borrow_field<TestBorrow::R>.x($t3)
+  3: $t4 := borrow_field<0x42::TestBorrow::R>.x($t3)
      # live_nodes: Reference($t4)
      # borrowed_by: LocalRoot($t0) -> {(@, Reference($t3))}, Reference($t3) -> {(.x (u64), Reference($t4))}
      # borrows_from: Reference($t3) -> {(@, LocalRoot($t0))}, Reference($t4) -> {(.x (u64), Reference($t3))}
@@ -275,10 +275,10 @@ fun TestBorrow::test2($t0|x_ref: &mut u64, $t1|v: u64) {
 
 
 [variant baseline]
-public fun TestBorrow::test3($t0|r_ref: &mut TestBorrow::R, $t1|v: u64) {
+public fun TestBorrow::test3($t0|r_ref: &mut 0x42::TestBorrow::R, $t1|v: u64) {
      var $t2: &mut u64
      # live_nodes: LocalRoot($t1), Reference($t0)
-  0: $t2 := borrow_field<TestBorrow::R>.x($t0)
+  0: $t2 := borrow_field<0x42::TestBorrow::R>.x($t0)
      # live_nodes: LocalRoot($t1), Reference($t2)
      # borrowed_by: Reference($t0) -> {(.x (u64), Reference($t2))}
      # borrows_from: Reference($t2) -> {(.x (u64), Reference($t0))}
@@ -291,14 +291,14 @@ public fun TestBorrow::test3($t0|r_ref: &mut TestBorrow::R, $t1|v: u64) {
 
 
 [variant baseline]
-fun TestBorrow::test4(): TestBorrow::R {
-     var $t0|r: TestBorrow::R
+fun TestBorrow::test4(): 0x42::TestBorrow::R {
+     var $t0|r: 0x42::TestBorrow::R
      var $t1: u64
-     var $t2: &mut TestBorrow::R
+     var $t2: &mut 0x42::TestBorrow::R
      var $t3: u64
-     var $t4: TestBorrow::R
+     var $t4: 0x42::TestBorrow::R
   0: $t1 := 3
-  1: $t0 := pack TestBorrow::R($t1)
+  1: $t0 := pack 0x42::TestBorrow::R($t1)
   2: $t2 := borrow_local($t0)
      # live_nodes: Reference($t2)
      # borrowed_by: LocalRoot($t0) -> {(@, Reference($t2))}
@@ -319,10 +319,10 @@ fun TestBorrow::test4(): TestBorrow::R {
 
 
 [variant baseline]
-public fun TestBorrow::test5($t0|r_ref: &mut TestBorrow::R): &mut u64 {
+public fun TestBorrow::test5($t0|r_ref: &mut 0x42::TestBorrow::R): &mut u64 {
      var $t1: &mut u64
      # live_nodes: Reference($t0)
-  0: $t1 := borrow_field<TestBorrow::R>.x($t0)
+  0: $t1 := borrow_field<0x42::TestBorrow::R>.x($t0)
      # live_nodes: Reference($t1)
      # borrowed_by: Reference($t0) -> {(.x (u64), Reference($t1))}
      # borrows_from: Reference($t1) -> {(.x (u64), Reference($t0))}
@@ -331,15 +331,15 @@ public fun TestBorrow::test5($t0|r_ref: &mut TestBorrow::R): &mut u64 {
 
 
 [variant baseline]
-fun TestBorrow::test6(): TestBorrow::R {
-     var $t0|r: TestBorrow::R
+fun TestBorrow::test6(): 0x42::TestBorrow::R {
+     var $t0|r: 0x42::TestBorrow::R
      var $t1: u64
-     var $t2: &mut TestBorrow::R
+     var $t2: &mut 0x42::TestBorrow::R
      var $t3: &mut u64
      var $t4: u64
-     var $t5: TestBorrow::R
+     var $t5: 0x42::TestBorrow::R
   0: $t1 := 3
-  1: $t0 := pack TestBorrow::R($t1)
+  1: $t0 := pack 0x42::TestBorrow::R($t1)
   2: $t2 := borrow_local($t0)
      # live_nodes: Reference($t2)
      # borrowed_by: LocalRoot($t0) -> {(@, Reference($t2))}
@@ -365,22 +365,22 @@ fun TestBorrow::test6(): TestBorrow::R {
 
 [variant baseline]
 fun TestBorrow::test7($t0|b: bool) {
-     var $t1|r1: TestBorrow::R
-     var $t2|r2: TestBorrow::R
-     var $t3|r_ref: &mut TestBorrow::R
+     var $t1|r1: 0x42::TestBorrow::R
+     var $t2|r2: 0x42::TestBorrow::R
+     var $t3|r_ref: &mut 0x42::TestBorrow::R
      var $t4: u64
      var $t5: u64
-     var $t6: &mut TestBorrow::R
-     var $t7: &mut TestBorrow::R
+     var $t6: &mut 0x42::TestBorrow::R
+     var $t7: &mut 0x42::TestBorrow::R
      var $t8: u64
      # live_nodes: LocalRoot($t0)
   0: $t4 := 3
      # live_nodes: LocalRoot($t0)
-  1: $t1 := pack TestBorrow::R($t4)
+  1: $t1 := pack 0x42::TestBorrow::R($t4)
      # live_nodes: LocalRoot($t0)
   2: $t5 := 4
      # live_nodes: LocalRoot($t0)
-  3: $t2 := pack TestBorrow::R($t5)
+  3: $t2 := pack 0x42::TestBorrow::R($t5)
      # live_nodes: LocalRoot($t0)
   4: $t6 := borrow_local($t1)
      # live_nodes: LocalRoot($t0), Reference($t6)
@@ -455,32 +455,32 @@ fun TestBorrow::test7($t0|b: bool) {
 
 
 [variant baseline]
-fun TestBorrow::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut TestBorrow::R) {
-     var $t3|r1: TestBorrow::R
-     var $t4|r2: TestBorrow::R
-     var $t5|t_ref: &mut TestBorrow::R
+fun TestBorrow::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut 0x42::TestBorrow::R) {
+     var $t3|r1: 0x42::TestBorrow::R
+     var $t4|r2: 0x42::TestBorrow::R
+     var $t5|t_ref: &mut 0x42::TestBorrow::R
      var $t6: u64
      var $t7: u64
-     var $t8: &mut TestBorrow::R
+     var $t8: &mut 0x42::TestBorrow::R
      var $t9: u64
      var $t10: bool
      var $t11: u64
      var $t12: u64
      var $t13: u64
      var $t14: bool
-     var $t15: &mut TestBorrow::R
-     var $t16: &mut TestBorrow::R
+     var $t15: &mut 0x42::TestBorrow::R
+     var $t16: &mut 0x42::TestBorrow::R
      var $t17: u64
      var $t18: u64
      var $t19: u64
      # live_nodes: LocalRoot($t0), LocalRoot($t1), Reference($t2)
   0: $t6 := 3
      # live_nodes: LocalRoot($t0), LocalRoot($t1), Reference($t2)
-  1: $t3 := pack TestBorrow::R($t6)
+  1: $t3 := pack 0x42::TestBorrow::R($t6)
      # live_nodes: LocalRoot($t0), LocalRoot($t1), Reference($t2)
   2: $t7 := 4
      # live_nodes: LocalRoot($t0), LocalRoot($t1), Reference($t2)
-  3: $t4 := pack TestBorrow::R($t7)
+  3: $t4 := pack 0x42::TestBorrow::R($t7)
      # live_nodes: LocalRoot($t0), LocalRoot($t1), Reference($t2)
   4: $t8 := borrow_local($t4)
      # live_nodes: LocalRoot($t0), LocalRoot($t1), Reference($t2), Reference($t8)

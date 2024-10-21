@@ -96,7 +96,7 @@ object "test_A2_M_test_increment_a" {
                     // $t5 := 0x3
                     /// @src 1:1309:1311
                     $t5 := 0x3
-                    // $t6 := borrow_global<M::S>($t5)
+                    // $t6 := borrow_global<0x2::M::S>($t5)
                     /// @src 1:1292:1305
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $t5)
@@ -105,7 +105,7 @@ object "test_A2_M_test_increment_a" {
                         }
                         $t6 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t7 := borrow_field<M::S>.a($t6)
+                    // $t7 := borrow_field<0x2::M::S>.a($t6)
                     /// @src 1:1292:1314
                     $t7 := $IndexPtr($t6, 32)
                     // $t8 := read_ref($t7)
@@ -135,7 +135,7 @@ object "test_A2_M_test_increment_a" {
 
         function A2_M_increment_a(addr) {
             let r, $t2, $t3, $t4, $t5, $t6, $t7
-            // $t2 := borrow_global<M::S>($t0)
+            // $t2 := borrow_global<0x2::M::S>($t0)
             /// @src 1:1106:1123
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, addr)
@@ -144,7 +144,7 @@ object "test_A2_M_test_increment_a" {
                 }
                 $t2 := $MakePtr(true, add($base_offset, 32))
             }
-            // $t3 := borrow_field<M::S>.a($t2)
+            // $t3 := borrow_field<0x2::M::S>.a($t2)
             /// @src 1:1148:1151
             $t3 := $IndexPtr($t2, 32)
             // $t4 := read_ref($t3)
@@ -156,7 +156,7 @@ object "test_A2_M_test_increment_a" {
             // $t6 := +($t4, $t5)
             /// @src 1:1152:1153
             $t6 := $AddU64($t4, $t5)
-            // $t7 := borrow_field<M::S>.a($t2)
+            // $t7 := borrow_field<0x2::M::S>.a($t2)
             /// @src 1:1142:1145
             $t7 := $IndexPtr($t2, 32)
             // write_ref($t7, $t6)
@@ -183,14 +183,14 @@ object "test_A2_M_test_increment_a" {
             // $t7 := (u128)($t6)
             /// @src 1:405:422
             $t7 := $CastU128($t6)
-            // $t8 := pack M::S2($t7)
+            // $t8 := pack 0x2::M::S2($t7)
             /// @src 1:399:423
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), $t7)
                 $t8 := $mem
             }
-            // $t9 := pack M::S($t1, $t5, $t8)
+            // $t9 := pack 0x2::M::S($t1, $t5, $t8)
             /// @src 1:371:424
             {
                 let $mem := $Malloc(41)
@@ -199,7 +199,7 @@ object "test_A2_M_test_increment_a" {
                 $MemoryStoreU256(add($mem, 0), $t8)
                 $t9 := $mem
             }
-            // move_to<M::S>($t9, $t0)
+            // move_to<0x2::M::S>($t9, $t0)
             /// @src 1:434:441
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $LoadU256(sg))
@@ -492,7 +492,7 @@ object "test_A2_M_test_publish" {
                     // $t4 := 0x3
                     /// @src 1:566:568
                     $t4 := 0x3
-                    // $t5 := exists<M::S>($t4)
+                    // $t5 := exists<0x2::M::S>($t4)
                     /// @src 1:556:562
                     $t5 := $AlignedStorageLoad($MakeTypeStorageBase(0, 0x698265eb, $t4))
                     // if ($t5) goto L1 else goto L0
@@ -506,7 +506,7 @@ object "test_A2_M_test_publish" {
                     // $t7 := 0x3
                     /// @src 1:609:611
                     $t7 := 0x3
-                    // $t8 := borrow_global<M::S>($t7)
+                    // $t8 := borrow_global<0x2::M::S>($t7)
                     /// @src 1:592:605
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $t7)
@@ -515,7 +515,7 @@ object "test_A2_M_test_publish" {
                         }
                         $t8 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t9 := borrow_field<M::S>.a($t8)
+                    // $t9 := borrow_field<0x2::M::S>.a($t8)
                     /// @src 1:592:614
                     $t9 := $IndexPtr($t8, 32)
                     // $t10 := read_ref($t9)
@@ -553,7 +553,7 @@ object "test_A2_M_test_publish" {
                     // $t14 := 0x3
                     /// @src 1:660:662
                     $t14 := 0x3
-                    // $t15 := borrow_global<M::S>($t14)
+                    // $t15 := borrow_global<0x2::M::S>($t14)
                     /// @src 1:643:656
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $t14)
@@ -562,7 +562,7 @@ object "test_A2_M_test_publish" {
                         }
                         $t15 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t16 := borrow_field<M::S>.b($t15)
+                    // $t16 := borrow_field<0x2::M::S>.b($t15)
                     /// @src 1:643:665
                     $t16 := $IndexPtr($t15, 40)
                     // $t17 := read_ref($t16)
@@ -600,7 +600,7 @@ object "test_A2_M_test_publish" {
                     // $t21 := 0x3
                     /// @src 1:711:713
                     $t21 := 0x3
-                    // $t22 := borrow_global<M::S>($t21)
+                    // $t22 := borrow_global<0x2::M::S>($t21)
                     /// @src 1:694:707
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $t21)
@@ -609,12 +609,12 @@ object "test_A2_M_test_publish" {
                         }
                         $t22 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t23 := borrow_field<M::S>.c($t22)
+                    // $t23 := borrow_field<0x2::M::S>.c($t22)
                     /// @src 1:694:716
                     {
                         $t23 := $MakePtr($IsStoragePtr($t22), $LoadU256($t22))
                     }
-                    // $t24 := borrow_field<M::S2>.x($t23)
+                    // $t24 := borrow_field<0x2::M::S2>.x($t23)
                     /// @src 1:694:718
                     $t24 := $t23
                     // $t25 := read_ref($t24)
@@ -674,14 +674,14 @@ object "test_A2_M_test_publish" {
             // $t7 := (u128)($t6)
             /// @src 1:405:422
             $t7 := $CastU128($t6)
-            // $t8 := pack M::S2($t7)
+            // $t8 := pack 0x2::M::S2($t7)
             /// @src 1:399:423
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), $t7)
                 $t8 := $mem
             }
-            // $t9 := pack M::S($t1, $t5, $t8)
+            // $t9 := pack 0x2::M::S($t1, $t5, $t8)
             /// @src 1:371:424
             {
                 let $mem := $Malloc(41)
@@ -690,7 +690,7 @@ object "test_A2_M_test_publish" {
                 $MemoryStoreU256(add($mem, 0), $t8)
                 $t9 := $mem
             }
-            // move_to<M::S>($t9, $t0)
+            // move_to<0x2::M::S>($t9, $t0)
             /// @src 1:434:441
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $LoadU256(sg))
@@ -976,7 +976,7 @@ object "test_A2_M_test_publish_t" {
                     // $t4 := 0x3
                     /// @src 1:1602:1604
                     $t4 := 0x3
-                    // $t5 := exists<M::T>($t4)
+                    // $t5 := exists<0x2::M::T>($t4)
                     /// @src 1:1592:1598
                     $t5 := $AlignedStorageLoad($MakeTypeStorageBase(0, 0x3948ca0a, $t4))
                     // if ($t5) goto L1 else goto L0
@@ -990,7 +990,7 @@ object "test_A2_M_test_publish_t" {
                     // $t7 := 0x3
                     /// @src 1:1646:1648
                     $t7 := 0x3
-                    // $t8 := borrow_global<M::T>($t7)
+                    // $t8 := borrow_global<0x2::M::T>($t7)
                     /// @src 1:1629:1642
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $t7)
@@ -999,12 +999,12 @@ object "test_A2_M_test_publish_t" {
                         }
                         $t8 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t9 := borrow_field<M::T>.s($t8)
+                    // $t9 := borrow_field<0x2::M::T>.s($t8)
                     /// @src 1:1629:1651
                     {
                         $t9 := $MakePtr($IsStoragePtr($t8), $LoadU256($t8))
                     }
-                    // $t10 := borrow_field<M::S>.a($t9)
+                    // $t10 := borrow_field<0x2::M::S>.a($t9)
                     /// @src 1:1629:1653
                     $t10 := $IndexPtr($t9, 32)
                     // $t11 := read_ref($t10)
@@ -1042,7 +1042,7 @@ object "test_A2_M_test_publish_t" {
                     // $t15 := 0x3
                     /// @src 1:1700:1702
                     $t15 := 0x3
-                    // $t16 := borrow_global<M::T>($t15)
+                    // $t16 := borrow_global<0x2::M::T>($t15)
                     /// @src 1:1683:1696
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $t15)
@@ -1051,12 +1051,12 @@ object "test_A2_M_test_publish_t" {
                         }
                         $t16 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t17 := borrow_field<M::T>.s($t16)
+                    // $t17 := borrow_field<0x2::M::T>.s($t16)
                     /// @src 1:1683:1705
                     {
                         $t17 := $MakePtr($IsStoragePtr($t16), $LoadU256($t16))
                     }
-                    // $t18 := borrow_field<M::S>.b($t17)
+                    // $t18 := borrow_field<0x2::M::S>.b($t17)
                     /// @src 1:1683:1707
                     $t18 := $IndexPtr($t17, 40)
                     // $t19 := read_ref($t18)
@@ -1094,7 +1094,7 @@ object "test_A2_M_test_publish_t" {
                     // $t23 := 0x3
                     /// @src 1:1754:1756
                     $t23 := 0x3
-                    // $t24 := borrow_global<M::T>($t23)
+                    // $t24 := borrow_global<0x2::M::T>($t23)
                     /// @src 1:1737:1750
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $t23)
@@ -1103,17 +1103,17 @@ object "test_A2_M_test_publish_t" {
                         }
                         $t24 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t25 := borrow_field<M::T>.s($t24)
+                    // $t25 := borrow_field<0x2::M::T>.s($t24)
                     /// @src 1:1737:1759
                     {
                         $t25 := $MakePtr($IsStoragePtr($t24), $LoadU256($t24))
                     }
-                    // $t26 := borrow_field<M::S>.c($t25)
+                    // $t26 := borrow_field<0x2::M::S>.c($t25)
                     /// @src 1:1737:1761
                     {
                         $t26 := $MakePtr($IsStoragePtr($t25), $LoadU256($t25))
                     }
-                    // $t27 := borrow_field<M::S2>.x($t26)
+                    // $t27 := borrow_field<0x2::M::S2>.x($t26)
                     /// @src 1:1737:1763
                     $t27 := $t26
                     // $t28 := read_ref($t27)
@@ -1173,14 +1173,14 @@ object "test_A2_M_test_publish_t" {
             // $t7 := (u128)($t6)
             /// @src 1:1434:1451
             $t7 := $CastU128($t6)
-            // $t8 := pack M::S2($t7)
+            // $t8 := pack 0x2::M::S2($t7)
             /// @src 1:1428:1452
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), $t7)
                 $t8 := $mem
             }
-            // $t9 := pack M::S($t1, $t5, $t8)
+            // $t9 := pack 0x2::M::S($t1, $t5, $t8)
             /// @src 1:1400:1453
             {
                 let $mem := $Malloc(41)
@@ -1189,14 +1189,14 @@ object "test_A2_M_test_publish_t" {
                 $MemoryStoreU256(add($mem, 0), $t8)
                 $t9 := $mem
             }
-            // $t10 := pack M::T($t9)
+            // $t10 := pack 0x2::M::T($t9)
             /// @src 1:1393:1454
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t9)
                 $t10 := $mem
             }
-            // move_to<M::T>($t10, $t0)
+            // move_to<0x2::M::T>($t10, $t0)
             /// @src 1:1464:1471
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $LoadU256(sg))
@@ -1491,13 +1491,13 @@ object "test_A2_M_test_unpublish" {
                     // $t7 := M::unpublish($t6)
                     /// @src 1:931:944
                     $t7 := A2_M_unpublish($t6)
-                    // ($t8, $t9, $t10) := unpack M::S($t7)
+                    // ($t8, $t9, $t10) := unpack 0x2::M::S($t7)
                     /// @src 1:911:928
                     $t8 := $MemoryLoadU64(add($t7, 32))
                     $t9 := $MemoryLoadU8(add($t7, 40))
                     $t10 := $MemoryLoadU256(add($t7, 0))
                     $Free($t7, 41)
-                    // $t11 := unpack M::S2($t10)
+                    // $t11 := unpack 0x2::M::S2($t10)
                     /// @src 1:922:927
                     $t11 := $MemoryLoadU128(add($t10, 0))
                     $Free($t10, 16)
@@ -1583,7 +1583,7 @@ object "test_A2_M_test_unpublish" {
 
         function A2_M_unpublish(a) -> $result {
             let $t1
-            // $t1 := move_from<M::S>($t0)
+            // $t1 := move_from<0x2::M::S>($t0)
             /// @src 1:793:802
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, a)
@@ -1631,14 +1631,14 @@ object "test_A2_M_test_unpublish" {
             // $t7 := (u128)($t6)
             /// @src 1:405:422
             $t7 := $CastU128($t6)
-            // $t8 := pack M::S2($t7)
+            // $t8 := pack 0x2::M::S2($t7)
             /// @src 1:399:423
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), $t7)
                 $t8 := $mem
             }
-            // $t9 := pack M::S($t1, $t5, $t8)
+            // $t9 := pack 0x2::M::S($t1, $t5, $t8)
             /// @src 1:371:424
             {
                 let $mem := $Malloc(41)
@@ -1647,7 +1647,7 @@ object "test_A2_M_test_unpublish" {
                 $MemoryStoreU256(add($mem, 0), $t8)
                 $t9 := $mem
             }
-            // move_to<M::S>($t9, $t0)
+            // move_to<0x2::M::S>($t9, $t0)
             /// @src 1:434:441
             {
                 let $base_offset := $MakeTypeStorageBase(0, 0x698265eb, $LoadU256(sg))

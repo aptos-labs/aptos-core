@@ -4,3 +4,10 @@ module 0xc0ffee::m {
         5
     }
 } // end 0xc0ffee::m
+
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    public fun test(): u64 {
+        5
+    }
+}

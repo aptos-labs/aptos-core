@@ -9,8 +9,11 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    abstract_write_op::GroupWrite, resolver::ResourceGroupSize,
-    resource_group_adapter::group_tagged_resource_size,
+    abstract_write_op::GroupWrite,
+    resource_group_adapter::{
+        check_size_and_existence_match, decrement_size_for_remove_tag, group_tagged_resource_size,
+        increment_size_for_add_tag,
+    },
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -18,7 +21,6 @@ use move_core_types::{
     effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_types::delayed_values::error::code_invariant_error;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct WriteOpConverter<'r> {
@@ -45,96 +47,6 @@ macro_rules! convert_impl {
             )
         }
     };
-}
-
-// We set SPECULATIVE_EXECUTION_ABORT_ERROR here, as the error can happen due to
-// speculative reads (and in a non-speculative context, e.g. during commit, it
-// is a more serious error and block execution must abort).
-// BlockExecutor is responsible with handling this error.
-fn group_size_arithmetics_error() -> PartialVMError {
-    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-        .with_message("Group size arithmetics error while applying updates".to_string())
-}
-
-fn decrement_size_for_remove_tag(
-    size: &mut ResourceGroupSize,
-    old_tagged_resource_size: u64,
-) -> PartialVMResult<()> {
-    match size {
-        ResourceGroupSize::Concrete(_) => Err(code_invariant_error(
-            "Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag",
-        )),
-        ResourceGroupSize::Combined {
-            num_tagged_resources,
-            all_tagged_resources_size,
-        } => {
-            *num_tagged_resources = num_tagged_resources
-                .checked_sub(1)
-                .ok_or_else(group_size_arithmetics_error)?;
-            *all_tagged_resources_size = all_tagged_resources_size
-                .checked_sub(old_tagged_resource_size)
-                .ok_or_else(group_size_arithmetics_error)?;
-            Ok(())
-        },
-    }
-}
-
-fn increment_size_for_add_tag(
-    size: &mut ResourceGroupSize,
-    new_tagged_resource_size: u64,
-) -> PartialVMResult<()> {
-    match size {
-        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )
-        .with_message(
-            "Unexpected ResourceGroupSize::Concrete in increment_size_for_add_tag".to_string(),
-        )),
-        ResourceGroupSize::Combined {
-            num_tagged_resources,
-            all_tagged_resources_size,
-        } => {
-            *num_tagged_resources = num_tagged_resources
-                .checked_add(1)
-                .ok_or_else(group_size_arithmetics_error)?;
-            *all_tagged_resources_size = all_tagged_resources_size
-                .checked_add(new_tagged_resource_size)
-                .ok_or_else(group_size_arithmetics_error)?;
-            Ok(())
-        },
-    }
-}
-
-fn check_size_and_existence_match(
-    size: &ResourceGroupSize,
-    exists: bool,
-    state_key: &StateKey,
-) -> PartialVMResult<()> {
-    if exists {
-        if size.get() == 0 {
-            Err(
-                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
-                    format!(
-                        "Group tag count/size shouldn't be 0 for an existing group: {:?}",
-                        state_key
-                    ),
-                ),
-            )
-        } else {
-            Ok(())
-        }
-    } else if size.get() > 0 {
-        Err(
-            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
-                format!(
-                    "Group tag count/size should be 0 for a new group: {:?}",
-                    state_key
-                ),
-            ),
-        )
-    } else {
-        Ok(())
-    }
 }
 
 impl<'r> WriteOpConverter<'r> {

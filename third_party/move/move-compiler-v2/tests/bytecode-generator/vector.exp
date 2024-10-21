@@ -5,6 +5,13 @@ module 0x42::vector {
     }
 } // end 0x42::vector
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::vector {
+    fun create(): vector<u64> {
+        vector[1, 2, 3]
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]

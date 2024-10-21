@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: local `s` of type `M::S` does not have the `copy` ability
+error: local `s` of type `S` does not have the `copy` ability
    ┌─ tests/ability-check/typing/pack.move:14:29
    │
 14 │         let n2 = Nat { f: *&s };

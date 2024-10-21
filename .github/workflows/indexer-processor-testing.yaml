@@ -1,0 +1,150 @@
+
+name: Trigger Processor Tests on JSON Change
+
+on:
+  workflow_dispatch:
+  pull_request:  # Trigger on PR-level events
+    branches:
+      - main
+    paths:
+      - 'ecosystem/indexer-grpc/indexer-test-transactions/**'  # Only trigger if files under this path change
+
+# the required permissions to request the ID token
+permissions:
+  id-token: write  # This is required for GCP authentication
+  contents: read   # Ensure the workflow has access to repository contents
+
+jobs:
+  dispatch_event:
+    runs-on: runs-on,cpu=16,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Set up Rust
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      # Install necessary system dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential libssl-dev pkg-config
+
+      # Ensure Rust is updated
+      - name: Update Rust toolchain
+        run: rustup update
+
+      - name: Run CLI to Generate JSON Files
+        run: |
+          cd ecosystem/indexer-grpc/indexer-transaction-generator
+          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/new_json_transactions
+
+      - name: Install jq
+        run: sudo apt-get install jq  # Ensure jq is installed for JSON processing
+
+      # TODO: improve this step to be easily maintainable and extensible
+      # Prepare Original and New JSON Files
+      - name: Prepare and Clean JSON Files
+        run: |
+          cd ecosystem/indexer-grpc/indexer-test-transactions
+
+          for folder in json_transactions/scripted_transactions new_json_transactions/scripted_transactions; do
+            for file in $folder/*.json; do
+              echo "Processing $file..."
+              base_file=$(basename "$file")
+
+              jq 'del(.timestamp,
+                      .version,
+                      .info.hash,
+                      .info.stateChangeHash,
+                      .info.accumulatorRootHash,
+                      .info.changes[].writeResource.stateKeyHash,
+                      .info.changes[].writeResource.type.address,
+                      .info.changes[].writeResource.address,
+                      .info.changes[].writeTableItem.stateKeyHash,
+                      .info.changes[].writeTableItem.data.key,
+                      .info.changes[].writeTableItem.data.value,
+                      .epoch,
+                      .blockHeight,
+                      .sizeInfo,
+                      .user.request.sender,
+                      .user.request.expirationTimestampSecs.seconds,
+                      .user.request.signature.ed25519.publicKey,
+                      .user.request.signature.ed25519.signature)
+                  | (.info.changes[].writeResource.data |=
+                  if type == "string" then
+                    (fromjson
+                     | del(.authentication_key)
+                     | walk(if type == "object" and has("addr") then del(.addr) else . end)
+                     | tostring)
+                  else . end)' "$file" > "$folder/cleaned_$base_file"
+            done
+          done
+
+      - name: Compare JSON Files Across Multiple Folders
+        id: diff_check
+        run: |
+          . scripts/indexer_test_txns_compare_and_diff.sh
+
+      - name: Handle New Files and Differences
+        run: |
+          echo "Checking outputs from diff_check step..."
+          echo "New file found: ${{ steps.diff_check.outputs.new_file_found }}"
+          echo "Diff found: ${{ steps.diff_check.outputs.diff_found }}"
+          
+          if [ "${{ steps.diff_check.outputs.new_file_found }}" == "true" ]; then
+            echo "New JSON files detected:"
+            echo "${{ steps.diff_check.outputs.new_files }}"  # Print all new files with paths
+            exit 0  # Fail the workflow to enforce manual review
+          elif [ "${{ steps.diff_check.outputs.diff_found }}" == "true" ]; then
+            echo "Differences detected. Proceeding with dispatch event."
+            echo "Modified files:"
+            echo "${{ steps.diff_check.outputs.modified_files }}"  # Print modified files with paths
+          else
+            echo "No differences or new files detected."
+            exit 0  # Proceed successfully only if no new files or differences are found
+          fi
+
+      - id: auth
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Log active service account email
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
+        run: |
+          gcloud auth list --filter=status:ACTIVE --format="value(account)"
+
+      - id: 'secrets'
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            token:aptos-ci/github-actions-repository-dispatch
+
+      # Conditionally Dispatch Event to Processor Repo if Differences Found
+      - name: Dispatch Event to Processor Repo
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          TOKEN: '${{ steps.secrets.outputs.token }}'
+          repository: 'aptos-labs/aptos-indexer-processors'
+          event-type: 'test-txn-json-change-detected'
+          client-payload: '{"commit_hash": "${{ github.sha }}"}'
+
+      # Poll Processor Repo for Workflow Run Status and Memorize Run ID to check the job status
+      - name: Poll for Workflow Run and Wait for Job Completion
+        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
+        id: poll_status
+        run: |
+          . scripts/indexer_processor_tests_status_poll.sh
+        env:
+          GITHUB_TOKEN: ${{ steps.secrets.outputs.token }}  # Pass the correct GitHub token
+          GITHUB_SHA: ${{ github.sha }}

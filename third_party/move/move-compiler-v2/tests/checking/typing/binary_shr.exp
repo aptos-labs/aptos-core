@@ -4,7 +4,7 @@ module 0x8675309::M {
         f: u64,
         b: u8,
     }
-    private fun t0(x: u64,b: u8,r: M::R) {
+    private fun t0(x: u64,b: u8,r: R) {
         0;
         1;
         0;
@@ -13,8 +13,29 @@ module 0x8675309::M {
         0;
         0;
         Shr<u64>(Copy(x), Copy(b));
-        Shr<u64>(select M::R.f<M::R>(r), select M::R.b<M::R>(r));
-        Shr<u64>(Shr<u64>(Shr<u64>(1, select M::R.b<M::R>(r)), select M::R.b<M::R>(r)), 0);
+        Shr<u64>(select M::R.f<R>(r), select M::R.b<R>(r));
+        Shr<u64>(Shr<u64>(Shr<u64>(1, select M::R.b<R>(r)), select M::R.b<R>(r)), 0);
         M::R{ f: _, b: _ } = r
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+        b: u8,
+    }
+    fun t0(x: u64, b: u8, r: R) {
+        0;
+        1;
+        0;
+        0;
+        1u8;
+        0u128;
+        0;
+        (copy x) >> (copy b);
+        r.f >> r.b;
+        1 >> r.b >> r.b >> 0u8;
+        R{f: _,b: _} = r
+    }
+}

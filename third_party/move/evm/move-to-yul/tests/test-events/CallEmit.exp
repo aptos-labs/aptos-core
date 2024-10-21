@@ -137,7 +137,7 @@ object "A2_M" {
             $Abort(97)
             function A2_M_do_event_1(from, to, amount) {
                 let $t3
-                // $t3 := pack M::Event_1($t0, $t1, $t2)
+                // $t3 := pack 0x2::M::Event_1($t0, $t1, $t2)
                 {
                     let $mem := $Malloc(65)
                     $MemoryStoreU8(add($mem, 64), from)
@@ -145,14 +145,14 @@ object "A2_M" {
                     $MemoryStoreU256(add($mem, 32), amount)
                     $t3 := $mem
                 }
-                // Evm::emit<M::Event_1>($t3)
+                // Evm::emit<0x2::M::Event_1>($t3)
                 A2_Evm_emit$A2_M_Event_1$($t3)
                 // return ()
             }
 
             function A2_M_do_event_2(v1, v2, v3, v4) {
                 let $t4
-                // $t4 := pack M::Event_2($t0, $t1, $t2, $t3)
+                // $t4 := pack 0x2::M::Event_2($t0, $t1, $t2, $t3)
                 {
                     let $mem := $Malloc(73)
                     $MemoryStoreU8(add($mem, 72), v1)
@@ -161,14 +161,14 @@ object "A2_M" {
                     $MemoryStoreU256(add($mem, 0), v4)
                     $t4 := $mem
                 }
-                // Evm::emit<M::Event_2>($t4)
+                // Evm::emit<0x2::M::Event_2>($t4)
                 A2_Evm_emit$A2_M_Event_2$($t4)
                 // return ()
             }
 
             function A2_M_do_event_3(from, to, amount) {
                 let $t3
-                // $t3 := pack M::Event_3($t0, $t1, $t2)
+                // $t3 := pack 0x2::M::Event_3($t0, $t1, $t2)
                 {
                     let $mem := $Malloc(65)
                     $MemoryStoreU8(add($mem, 64), from)
@@ -176,14 +176,14 @@ object "A2_M" {
                     $MemoryStoreU256(add($mem, 32), amount)
                     $t3 := $mem
                 }
-                // Evm::emit<M::Event_3>($t3)
+                // Evm::emit<0x2::M::Event_3>($t3)
                 A2_Evm_emit$A2_M_Event_3$($t3)
                 // return ()
             }
 
             function A2_M_do_event_4(v1, v2, v3) {
                 let $t3
-                // $t3 := pack M::Event_4($t0, $t1, $t2)
+                // $t3 := pack 0x2::M::Event_4($t0, $t1, $t2)
                 {
                     let $mem := $Malloc(96)
                     $MemoryStoreU256(add($mem, 0), v1)
@@ -191,28 +191,28 @@ object "A2_M" {
                     $MemoryStoreU256(add($mem, 64), v3)
                     $t3 := $mem
                 }
-                // Evm::emit<M::Event_4>($t3)
+                // Evm::emit<0x2::M::Event_4>($t3)
                 A2_Evm_emit$A2_M_Event_4$($t3)
                 // return ()
             }
 
             function A2_M_do_event_5(bys, str) {
                 let $t2
-                // $t2 := pack M::Event_5($t0, $t1)
+                // $t2 := pack 0x2::M::Event_5($t0, $t1)
                 {
                     let $mem := $Malloc(64)
                     $MemoryStoreU256(add($mem, 0), bys)
                     $MemoryStoreU256(add($mem, 32), str)
                     $t2 := $mem
                 }
-                // Evm::emit<M::Event_5>($t2)
+                // Evm::emit<0x2::M::Event_5>($t2)
                 A2_Evm_emit$A2_M_Event_5$($t2)
                 // return ()
             }
 
             function A2_M_do_event_6(bys, str, uint16_array) {
                 let $t3
-                // $t3 := pack M::Event_6($t0, $t1, $t2)
+                // $t3 := pack 0x2::M::Event_6($t0, $t1, $t2)
                 {
                     let $mem := $Malloc(96)
                     $MemoryStoreU256(add($mem, 0), bys)
@@ -220,41 +220,41 @@ object "A2_M" {
                     $MemoryStoreU256(add($mem, 64), uint16_array)
                     $t3 := $mem
                 }
-                // Evm::emit<M::Event_6>($t3)
+                // Evm::emit<0x2::M::Event_6>($t3)
                 A2_Evm_emit$A2_M_Event_6$($t3)
                 // return ()
             }
 
             function A2_M_do_event_7(bys) {
                 let $t1
-                // $t1 := pack M::Event_7($t0)
+                // $t1 := pack 0x2::M::Event_7($t0)
                 {
                     let $mem := $Malloc(32)
                     $MemoryStoreU256(add($mem, 0), bys)
                     $t1 := $mem
                 }
-                // Evm::emit<M::Event_7>($t1)
+                // Evm::emit<0x2::M::Event_7>($t1)
                 A2_Evm_emit$A2_M_Event_7$($t1)
                 // return ()
             }
 
             function A2_M_do_event_8(bys, strs) {
                 let $t2
-                // $t2 := pack M::Event_8($t0, $t1)
+                // $t2 := pack 0x2::M::Event_8($t0, $t1)
                 {
                     let $mem := $Malloc(64)
                     $MemoryStoreU256(add($mem, 0), bys)
                     $MemoryStoreU256(add($mem, 32), strs)
                     $t2 := $mem
                 }
-                // Evm::emit<M::Event_8>($t2)
+                // Evm::emit<0x2::M::Event_8>($t2)
                 A2_Evm_emit$A2_M_Event_8$($t2)
                 // return ()
             }
 
             function A2_M_do_transfer(from, to, amount) {
                 let $t3
-                // $t3 := pack M::Transfer($t0, $t1, $t2)
+                // $t3 := pack 0x2::M::Transfer($t0, $t1, $t2)
                 {
                     let $mem := $Malloc(96)
                     $MemoryStoreU256(add($mem, 0), from)
@@ -262,7 +262,7 @@ object "A2_M" {
                     $MemoryStoreU256(add($mem, 64), amount)
                     $t3 := $mem
                 }
-                // Evm::emit<M::Transfer>($t3)
+                // Evm::emit<0x2::M::Transfer>($t3)
                 A2_Evm_emit$A2_M_Transfer$($t3)
                 // return ()
             }
