@@ -180,17 +180,17 @@ module aptos_framework::atomic_bridge_initiator {
 
     /// This struct will store the event handles for bridge events.
     struct BridgeInitiatorEvents has key, store {
-        bridge_transfer_initiated: EventHandle<BridgeTransferInitiatedEvent>,
-        bridge_transfer_completed: EventHandle<BridgeTransferCompletedEvent>,
-        bridge_transfer_refunded: EventHandle<BridgeTransferRefundedEvent>,
+        bridge_transfer_initiated_events: EventHandle<BridgeTransferInitiatedEvent>,
+        bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
+        bridge_transfer_refunded_events: EventHandle<BridgeTransferRefundedEvent>,
     }
 
     /// Initializes the module and stores the `EventHandle`s in the resource.
     fun init_module(aptos_framework: &signer) {
         move_to(aptos_framework, BridgeInitiatorEvents {
-            bridge_transfer_initiated: account::new_event_handle<BridgeTransferInitiatedEvent>(aptos_framework),
-            bridge_transfer_completed: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
-            bridge_transfer_refunded: account::new_event_handle<BridgeTransferRefundedEvent>(aptos_framework),
+            bridge_transfer_initiated_events: account::new_event_handle<BridgeTransferInitiatedEvent>(aptos_framework),
+            bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
+            bridge_transfer_refunded_events: account::new_event_handle<BridgeTransferRefundedEvent>(aptos_framework),
         });
     }
 
@@ -221,7 +221,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
         event::emit_event(
-            &mut bridge_initiator_events.bridge_transfer_initiated,
+            &mut bridge_initiator_events.bridge_transfer_initiated_events,
             BridgeTransferInitiatedEvent {
                 bridge_transfer_id,
                 initiator: initiator_address,
@@ -244,7 +244,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
         event::emit_event(
-            &mut bridge_initiator_events.bridge_transfer_completed,
+            &mut bridge_initiator_events.bridge_transfer_completed_events,
             BridgeTransferCompletedEvent {
                 bridge_transfer_id,
                 pre_image,
@@ -262,7 +262,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
         event::emit_event(
-            &mut bridge_initiator_events.bridge_transfer_refunded,
+            &mut bridge_initiator_events.bridge_transfer_refunded_events,
             BridgeTransferRefundedEvent {
                 bridge_transfer_id,
             },
@@ -301,7 +301,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
         let bridge_transfer_initiated_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated
+            &bridge_initiator_events.bridge_transfer_initiated_events
         );   
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
@@ -367,7 +367,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
         let bridge_transfer_initiated_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated
+            &bridge_initiator_events.bridge_transfer_initiated_events
         );   
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
@@ -380,7 +380,7 @@ module aptos_framework::atomic_bridge_initiator {
         );
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(signer::address_of(aptos_framework));
-        let complete_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_completed);
+        let complete_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_completed_events);
         let expected_event = BridgeTransferCompletedEvent {
             bridge_transfer_id,
             pre_image: plain_secret(),
@@ -420,7 +420,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
         let bridge_transfer_initiated_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated
+            &bridge_initiator_events.bridge_transfer_initiated_events
         );   
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
@@ -464,7 +464,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
         let bridge_transfer_initiated_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated
+            &bridge_initiator_events.bridge_transfer_initiated_events
         );   
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
@@ -530,7 +530,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
         let bridge_transfer_initiated_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated
+            &bridge_initiator_events.bridge_transfer_initiated_events
         );   
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
@@ -543,7 +543,7 @@ module aptos_framework::atomic_bridge_initiator {
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance, 0);
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(signer::address_of(aptos_framework));
-        let refund_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_refunded);
+        let refund_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_refunded_events);
         let expected_event = BridgeTransferRefundedEvent { bridge_transfer_id };
         let was_event_emitted = std::vector::contains(&refund_events, &expected_event);
         
@@ -584,7 +584,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
         let bridge_transfer_initiated_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated
+            &bridge_initiator_events.bridge_transfer_initiated_events
         );   
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
@@ -1429,17 +1429,17 @@ module aptos_framework::atomic_bridge_counterparty {
 
     /// This struct will store the event handles for bridge events.
     struct BridgeCounterpartyEvents has key, store {
-        bridge_transfer_locked: EventHandle<BridgeTransferLockedEvent>,
-        bridge_transfer_completed: EventHandle<BridgeTransferCompletedEvent>,
-        bridge_transfer_cancelled: EventHandle<BridgeTransferCancelledEvent>,
+        bridge_transfer_locked_events: EventHandle<BridgeTransferLockedEvent>,
+        bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
+        bridge_transfer_cancelled_events: EventHandle<BridgeTransferCancelledEvent>,
     }
 
     /// Initializes the module and stores the `EventHandle`s in the resource.
     fun init_module(aptos_framework: &signer) {
         move_to(aptos_framework, BridgeCounterpartyEvents {
-            bridge_transfer_locked: account::new_event_handle<BridgeTransferLockedEvent>(aptos_framework),
-            bridge_transfer_completed: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
-            bridge_transfer_cancelled: account::new_event_handle<BridgeTransferCancelledEvent>(aptos_framework),
+            bridge_transfer_locked_events: account::new_event_handle<BridgeTransferLockedEvent>(aptos_framework),
+            bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
+            bridge_transfer_cancelled_events: account::new_event_handle<BridgeTransferCancelledEvent>(aptos_framework),
         });
     }
 
@@ -1478,7 +1478,7 @@ module aptos_framework::atomic_bridge_counterparty {
         let bridge_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
 
         event::emit_event(
-            &mut bridge_events.bridge_transfer_locked,
+            &mut bridge_events.bridge_transfer_locked_events,
             BridgeTransferLockedEvent {
                 bridge_transfer_id,
                 initiator,
@@ -1509,7 +1509,7 @@ module aptos_framework::atomic_bridge_counterparty {
         
         let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
         event::emit_event(
-            &mut bridge_counterparty_events.bridge_transfer_completed,
+            &mut bridge_counterparty_events.bridge_transfer_completed_events,
             BridgeTransferCompletedEvent {
                 bridge_transfer_id,
                 pre_image,
@@ -1532,7 +1532,7 @@ module aptos_framework::atomic_bridge_counterparty {
 
         let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
         event::emit_event(
-            &mut bridge_counterparty_events.bridge_transfer_cancelled,
+            &mut bridge_counterparty_events.bridge_transfer_cancelled_events,
             BridgeTransferCancelledEvent {
                 bridge_transfer_id,
             },
@@ -1557,7 +1557,7 @@ module aptos_framework::atomic_bridge_counterparty {
                                     amount);
 
         let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
-        let lock_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_locked);
+        let lock_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_locked_events);
 
         // Assert that the event was emitted
         let expected_event = BridgeTransferLockedEvent {
@@ -1593,7 +1593,7 @@ module aptos_framework::atomic_bridge_counterparty {
         abort_bridge_transfer(aptos_framework, bridge_transfer_id);
 
         let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
-        let cancel_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_cancelled);
+        let cancel_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_cancelled_events);
         let expected_event = BridgeTransferCancelledEvent { bridge_transfer_id };
         assert!(std::vector::contains(&cancel_events, &expected_event), 0);
     }
@@ -1621,7 +1621,7 @@ module aptos_framework::atomic_bridge_counterparty {
         complete_bridge_transfer(bridge_transfer_id, plain_secret());
 
         let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
-        let complete_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_completed);
+        let complete_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_completed_events);
         let expected_event = BridgeTransferCompletedEvent {
             bridge_transfer_id,
             pre_image: plain_secret(),
