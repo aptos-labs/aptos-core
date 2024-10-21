@@ -9,7 +9,10 @@ use crate::{
             ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
             ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
         },
-        utils::{explorer_account_link, fund_account, prompt_yes_with_override, read_line},
+        utils::{
+            explorer_account_link, fund_account, prompt_yes_with_override, read_line,
+            strip_private_key_prefix,
+        },
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
@@ -218,9 +221,10 @@ impl CliCommand<()> for InitTool {
                             .generate_ed25519_private_key()
                     }
                 } else {
-                    Ed25519PrivateKey::from_encoded_string(input).map_err(|err| {
-                        CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
-                    })?
+                    Ed25519PrivateKey::from_encoded_string(&strip_private_key_prefix(
+                        &input.to_string(),
+                    ))
+                    .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
                 }
             };
 

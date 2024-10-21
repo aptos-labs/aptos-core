@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::{explorer_transaction_link, fund_account};
+use super::utils::{explorer_transaction_link, fund_account, strip_private_key_prefix};
 use crate::{
     common::{
         init::Network,
@@ -691,7 +691,7 @@ pub trait ParsePrivateKey {
                 encoding.load_key("--private-key-file", file.as_path())?,
             ))
         } else if let Some(ref key) = private_key {
-            let key = key.as_bytes().to_vec();
+            let key = strip_private_key_prefix(key).as_bytes().to_vec();
             Ok(Some(encoding.decode_key("--private-key", key)?))
         } else {
             Ok(None)
