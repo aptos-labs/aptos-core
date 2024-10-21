@@ -131,6 +131,8 @@ pub struct NodeResourceOverride {
 }
 
 pub struct ForgeConfig {
+    suite_name: Option<String>,
+
     aptos_tests: Vec<Box<dyn AptosTest>>,
     admin_tests: Vec<Box<dyn AdminTest>>,
     network_tests: Vec<Box<dyn NetworkTest>>,
@@ -182,6 +184,11 @@ impl ForgeConfig {
 
     pub fn add_aptos_test<T: AptosTest + 'static>(mut self, aptos_test: T) -> Self {
         self.aptos_tests.push(Box::new(aptos_test));
+        self
+    }
+
+    pub fn with_suite_name(mut self, suite_name: String) -> Self {
+        self.suite_name = Some(suite_name);
         self
     }
 
@@ -484,6 +491,7 @@ impl Default for ForgeConfig {
                 ))
         };
         Self {
+            suite_name: None,
             aptos_tests: vec![],
             admin_tests: vec![],
             network_tests: vec![],
