@@ -483,9 +483,6 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         "p90 lat",
         "p99 lat",
         "mempool->block",
-        // TODO remove
-        // "batch->pos",
-        // "pos->prop",
         "prop->order",
         "order->commit",
         "actual dur",
@@ -510,9 +507,6 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
                 rate.p50_latency as f64 / 1000.0,
                 rate.p90_latency as f64 / 1000.0,
                 rate.p99_latency as f64 / 1000.0,
-                // TODO remove
-                // result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).unwrap_or(&MetricSamples::default()).max_sample(),
-                // result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::MempoolToBlockCreation).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).unwrap_or(&MetricSamples::default()).max_sample(),

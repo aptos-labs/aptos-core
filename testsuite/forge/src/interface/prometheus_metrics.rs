@@ -196,15 +196,6 @@ pub async fn fetch_latency_breakdown(
         )
         .await?;
 
-    // let qs_batch_to_pos_samples = swarm
-    //     .query_range_metrics(
-    //         qs_batch_to_pos_query,
-    //         start_time_adjusted as i64,
-    //         end_time as i64,
-    //         None,
-    //     )
-    //     .await?;
-
     let mempool_to_block_creation_samples = swarm
         .query_range_metrics(
             mempool_to_block_creation_query.as_str(),
@@ -214,25 +205,7 @@ pub async fn fetch_latency_breakdown(
         )
         .await?;
 
-    // let qs_pos_to_proposal_samples = swarm
-    //     .query_range_metrics(
-    //         qs_pos_to_proposal_query,
-    //         start_time_adjusted as i64,
-    //         end_time as i64,
-    //         None,
-    //     )
-    //     .await?;
-
     let mut samples = BTreeMap::new();
-    // samples.insert(
-    //     LatencyBreakdownSlice::QsBatchToPos,
-    //     MetricSamples::new(qs_batch_to_pos_samples),
-    // );
-    // samples.insert(
-    //     LatencyBreakdownSlice::QsPosToProposal,
-    //     MetricSamples::new(qs_pos_to_proposal_samples),
-    // );
-    // TODO figure out how to sum QsBatchToPos and QsPosToProposal
     samples.insert(
         LatencyBreakdownSlice::MempoolToBlockCreation,
         MetricSamples::new(mempool_to_block_creation_samples),
