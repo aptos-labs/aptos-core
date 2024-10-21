@@ -68,19 +68,16 @@ loop {
   _t7: &Entity = self;
   _t8: bool = test_variants m::Entity::Institution(_t7);
   loop {
-    loop {
-      if (Not(_t8)) break;
-      _t9: &Entity = self;
-      _t10: &u64 = select_variants m::Entity.Institution.id(_t9);
-      _t11: u64 = Deref(_t10);
-      _t1: u64 = _t11;
-      break[1]
-    };
-    _t12: &Entity = self;
-    _t13: u64 = 14566554180833181697;
-    Abort(_t13)
+    if (Not(_t8)) break;
+    _t9: &Entity = self;
+    _t10: &u64 = select_variants m::Entity.Institution.id(_t9);
+    _t11: u64 = Deref(_t10);
+    _t1: u64 = _t11;
+    break[1]
   };
-  break
+  _t12: &Entity = self;
+  _t13: u64 = 14566554180833181697;
+  Abort(_t13)
 };
 _t14: u64 = _t1;
 return _t14
@@ -88,24 +85,28 @@ return _t14
 --- If-Transformed Generated AST
 _t2: &Entity = self;
 _t3: bool = test_variants m::Entity::Person(_t2);
-if _t3 {
-  _t4: &Entity = self;
-  _t5: &u64 = select_variants m::Entity.Person.id(_t4);
-  _t6: u64 = Deref(_t5);
-  _t1: u64 = _t6
-} else {
+loop {
+  loop {
+    if (Not(_t3)) break;
+    _t4: &Entity = self;
+    _t5: &u64 = select_variants m::Entity.Person.id(_t4);
+    _t6: u64 = Deref(_t5);
+    _t1: u64 = _t6;
+    break[1]
+  };
   _t7: &Entity = self;
   _t8: bool = test_variants m::Entity::Institution(_t7);
-  if _t8 {
+  loop {
+    if (Not(_t8)) break;
     _t9: &Entity = self;
     _t10: &u64 = select_variants m::Entity.Institution.id(_t9);
     _t11: u64 = Deref(_t10);
-    _t1: u64 = _t11
-  } else {
-    _t12: &Entity = self;
-    _t13: u64 = 14566554180833181697;
-    Abort(_t13)
-  }
+    _t1: u64 = _t11;
+    break[1]
+  };
+  _t12: &Entity = self;
+  _t13: u64 = 14566554180833181697;
+  Abort(_t13)
 };
 _t14: u64 = _t1;
 return _t14
@@ -113,14 +114,16 @@ return _t14
 --- Assign-Transformed Generated AST
 {
   let _t1: u64;
-  if test_variants m::Entity::Person(self) {
-    _t1: u64 = Deref(select_variants m::Entity.Person.id(self))
-  } else {
-    if test_variants m::Entity::Institution(self) {
-      _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
-    } else {
-      Abort(14566554180833181697)
-    }
+  loop {
+    loop {
+      if (Not(test_variants m::Entity::Person(self))) break;
+      break[1]
+    };
+    loop {
+      if (Not(test_variants m::Entity::Institution(self))) break;
+      break[1]
+    };
+    Abort(14566554180833181697)
   };
   return _t1
 }
@@ -219,17 +222,14 @@ loop {
   _t14: &Entity = _t1;
   _t15: bool = test_variants m::Entity::Institution(_t14);
   loop {
-    loop {
-      if (Not(_t15)) break;
-      _t16: Entity = self;
-      m::Entity::Institution{ id: _t17, admin: _t18 } = _t16;
-      _t2: u64 = _t17;
-      break[1]
-    };
-    _t19: u64 = 0;
-    _t2: u64 = _t19;
-    break
+    if (Not(_t15)) break;
+    _t16: Entity = self;
+    m::Entity::Institution{ id: _t17, admin: _t18 } = _t16;
+    _t2: u64 = _t17;
+    break[1]
   };
+  _t19: u64 = 0;
+  _t2: u64 = _t19;
   break
 };
 _t20: u64 = _t2;
@@ -257,14 +257,15 @@ loop {
   };
   _t14: &Entity = _t1;
   _t15: bool = test_variants m::Entity::Institution(_t14);
-  if _t15 {
+  loop {
+    if (Not(_t15)) break;
     _t16: Entity = self;
     m::Entity::Institution{ id: _t17, admin: _t18 } = _t16;
-    _t2: u64 = _t17
-  } else {
-    _t19: u64 = 0;
-    _t2: u64 = _t19
+    _t2: u64 = _t17;
+    break[1]
   };
+  _t19: u64 = 0;
+  _t2: u64 = _t19;
   break
 };
 _t20: u64 = _t2;
@@ -284,14 +285,14 @@ return _t20
           break[1]
         }
       };
-      if test_variants m::Entity::Institution(_t1) {
+      loop {
+        if (Not(test_variants m::Entity::Institution(_t1))) break;
         {
           let m::Entity::Institution{ id: _t17, admin: _t18 } = self;
-          _t2: u64 = _t17
+          break[1]
         }
-      } else {
-        _t2: u64 = 0
       };
+      _t2: u64 = 0;
       break
     };
     return _t2
@@ -311,7 +312,17 @@ module 0x815::m {
     }
     fun id(self: &Entity): u64 {
         let _t1;
-        if (self is Person) _t1 = *&self.id else if (self is Institution) _t1 = *&self.id else abort 14566554180833181697;
+        'l0: loop {
+            loop {
+                if (!(self is Person)) break;
+                break 'l0
+            };
+            loop {
+                if (!(self is Institution)) break;
+                break 'l0
+            };
+            abort 14566554180833181697
+        };
         _t1
     }
     fun id2(self: Entity): u64 {
@@ -324,10 +335,12 @@ module 0x815::m {
                 let Entity::Person{id: _t13} = self;
                 break 'l0
             };
-            if (_t1 is Institution) {
+            loop {
+                if (!(_t1 is Institution)) break;
                 let Entity::Institution{id: _t17,admin: _t18} = self;
-                _t2 = _t17
-            } else _t2 = 0;
+                break 'l0
+            };
+            _t2 = 0;
             break
         };
         _t2
