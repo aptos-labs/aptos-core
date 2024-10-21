@@ -12,10 +12,5 @@ module MoonCoin::moon_coin {
         );
     }
 
-
-
-    public fun test_moon_coin(caller:&signer){
-
-    }
 }
 //<:!:moon
