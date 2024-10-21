@@ -8,6 +8,7 @@
 -  [Struct `EthereumAddress`](#0x1_ethereum_EthereumAddress)
 -  [Constants](#@Constants_0)
 -  [Function `ethereum_address`](#0x1_ethereum_ethereum_address)
+-  [Function `ethereum_address_no_eip55`](#0x1_ethereum_ethereum_address_no_eip55)
 -  [Function `to_lowercase`](#0x1_ethereum_to_lowercase)
 -  [Function `to_eip55_checksumed_address`](#0x1_ethereum_to_eip55_checksumed_address)
 -  [Function `get_inner`](#0x1_ethereum_get_inner)
@@ -112,6 +113,35 @@ Validates an Ethereum address against EIP-55 checksum rules and returns a new <c
 
 <pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address">ethereum_address</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> {
     <a href="atomic_bridge.md#0x1_ethereum_assert_eip55">assert_eip55</a>(&ethereum_address);
+    <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> { inner: ethereum_address }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ethereum_ethereum_address_no_eip55"></a>
+
+## Function `ethereum_address_no_eip55`
+
+Returns a new <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a></code> without EIP-55 validation.
+
+@param ethereum_address A 40-byte vector of unsigned 8-bit integers (hexadecimal format).
+@return A validated <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a></code> struct.
+@abort If the address does not conform to EIP-55 standards.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum_address_no_eip55</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum_address_no_eip55</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> {
     <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> { inner: ethereum_address }
 }
 </code></pre>
@@ -2575,7 +2605,7 @@ Locks assets for a bridge transfer by the initiator.
     amount: u64
 ) {
     <a href="atomic_bridge.md#0x1_atomic_bridge_configuration_assert_is_caller_operator">atomic_bridge_configuration::assert_is_caller_operator</a>(caller);
-    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address">ethereum::ethereum_address</a>(initiator);
+    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum::ethereum_address_no_eip55</a>(initiator);
     <b>let</b> time_lock = <a href="atomic_bridge.md#0x1_atomic_bridge_configuration_counterparty_timelock_duration">atomic_bridge_configuration::counterparty_timelock_duration</a>();
     <b>let</b> details = <a href="atomic_bridge.md#0x1_atomic_bridge_store_create_details">atomic_bridge_store::create_details</a>(
         ethereum_address,
