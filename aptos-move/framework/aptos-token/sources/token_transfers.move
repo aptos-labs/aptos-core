@@ -36,7 +36,8 @@ module aptos_token::token_transfers {
     }
 
     #[event]
-    struct TokenOfferEvent has drop, store {
+    struct Offer has drop, store {
+        account: address,
         to_address: address,
         token_id: TokenId,
         amount: u64,
@@ -50,7 +51,8 @@ module aptos_token::token_transfers {
     }
 
     #[event]
-    struct TokenCancelOffer has drop, store {
+    struct CancelOffer has drop, store {
+        account: address,
         to_address: address,
         token_id: TokenId,
         amount: u64,
@@ -64,7 +66,8 @@ module aptos_token::token_transfers {
     }
 
     #[event]
-    struct TokenClaim has drop, store {
+    struct Claim has drop, store {
+        account: address,
         to_address: address,
         token_id: TokenId,
         amount: u64,
@@ -126,21 +129,23 @@ module aptos_token::token_transfers {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                TokenOffer {
+                Offer {
+                    account: sender_addr,
                     to_address: receiver,
                     token_id,
                     amount,
                 }
             )
-        };
-        event::emit_event<TokenOfferEvent>(
-            &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
-            TokenOfferEvent {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
-        );
+        } else {
+            event::emit_event<TokenOfferEvent>(
+                &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
+                TokenOfferEvent {
+                    to_address: receiver,
+                    token_id,
+                    amount,
+                },
+            );
+        }
     }
 
     public entry fun claim_script(
@@ -171,21 +176,23 @@ module aptos_token::token_transfers {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                TokenClaim {
+                Claim {
+                    account: sender,
                     to_address: signer::address_of(receiver),
                     token_id,
                     amount,
                 }
             )
+        } else {
+            event::emit_event<TokenClaimEvent>(
+                &mut borrow_global_mut<PendingClaims>(sender).claim_events,
+                TokenClaimEvent {
+                    to_address: signer::address_of(receiver),
+                    token_id,
+                    amount,
+                },
+            );
         };
-        event::emit_event<TokenClaimEvent>(
-            &mut borrow_global_mut<PendingClaims>(sender).claim_events,
-            TokenClaimEvent {
-                to_address: signer::address_of(receiver),
-                token_id,
-                amount,
-            },
-        );
     }
 
     public entry fun cancel_offer_script(
@@ -217,21 +224,23 @@ module aptos_token::token_transfers {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                TokenCancelOffer {
+                CancelOffer {
+                    account: sender_addr,
                     to_address: receiver,
                     token_id,
                     amount,
                 },
             )
-        };
-        event::emit_event<TokenCancelOfferEvent>(
-            &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
-            TokenCancelOfferEvent {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
-        );
+        } else {
+            event::emit_event<TokenCancelOfferEvent>(
+                &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
+                TokenCancelOfferEvent {
+                    to_address: receiver,
+                    token_id,
+                    amount,
+                },
+            );
+        }
     }
 
     #[test(creator = @0x1, owner = @0x2)]
@@ -324,4 +333,29 @@ module aptos_token::token_transfers {
             0
         )
     }
+
+    #[deprecated]
+    #[event]
+    struct TokenOfferEvent has drop, store {
+        to_address: address,
+        token_id: TokenId,
+        amount: u64,
+    }
+
+    #[deprecated]
+    #[event]
+    struct TokenCancelOffer has drop, store {
+        to_address: address,
+        token_id: TokenId,
+        amount: u64,
+    }
+
+    #[deprecated]
+    #[event]
+    struct TokenClaim has drop, store {
+        to_address: address,
+        token_id: TokenId,
+        amount: u64,
+    }
+
 }

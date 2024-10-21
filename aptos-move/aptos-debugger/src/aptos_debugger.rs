@@ -30,6 +30,7 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use itertools::Itertools;
 use std::{path::Path, sync::Arc, time::Instant};
+use aptos_types::contract_event::ContractEvent;
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -412,11 +413,10 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
 }
 
 fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
-    let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
     vm_output
         .events()
         .iter()
-        .any(|event| event.event_key() == Some(&new_epoch_event_key))
+        .any(ContractEvent::is_new_epoch_event)
 }
 
 fn execute_block_no_limit(

@@ -2748,14 +2748,15 @@ maliciously alter the number of signatures required.
                     new_metadata: multisig_account_resource.metadata,
                 }
             )
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> multisig_account_resource.metadata_updated_events,
+                <a href="multisig_account.md#0x1_multisig_account_MetadataUpdatedEvent">MetadataUpdatedEvent</a> {
+                    old_metadata,
+                    new_metadata: multisig_account_resource.metadata,
+                }
+            );
         };
-        emit_event(
-            &<b>mut</b> multisig_account_resource.metadata_updated_events,
-            <a href="multisig_account.md#0x1_multisig_account_MetadataUpdatedEvent">MetadataUpdatedEvent</a> {
-                old_metadata,
-                new_metadata: multisig_account_resource.metadata,
-            }
-        );
     };
 }
 </code></pre>
@@ -2950,15 +2951,16 @@ will continue to be an accessible entry point.
                 approved,
             }
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> multisig_account_resource.vote_events,
+            <a href="multisig_account.md#0x1_multisig_account_VoteEvent">VoteEvent</a> {
+                owner: owner_addr,
+                sequence_number,
+                approved,
+            }
+        );
     };
-    emit_event(
-        &<b>mut</b> multisig_account_resource.vote_events,
-        <a href="multisig_account.md#0x1_multisig_account_VoteEvent">VoteEvent</a> {
-            owner: owner_addr,
-            sequence_number,
-            approved,
-        }
-    );
 }
 </code></pre>
 
@@ -3072,15 +3074,16 @@ Remove the next transaction if it has sufficient owner rejections.
                 executor: address_of(owner),
             }
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> multisig_account_resource.execute_rejected_transaction_events,
+            <a href="multisig_account.md#0x1_multisig_account_ExecuteRejectedTransactionEvent">ExecuteRejectedTransactionEvent</a> {
+                sequence_number,
+                num_rejections,
+                executor: owner_addr,
+            }
+        );
     };
-    emit_event(
-        &<b>mut</b> multisig_account_resource.execute_rejected_transaction_events,
-        <a href="multisig_account.md#0x1_multisig_account_ExecuteRejectedTransactionEvent">ExecuteRejectedTransactionEvent</a> {
-            sequence_number,
-            num_rejections,
-            executor: owner_addr,
-        }
-    );
 }
 </code></pre>
 
@@ -3226,16 +3229,17 @@ This function is private so no other code can call this beside the VM itself as 
                 executor,
             }
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> multisig_account_resource.execute_transaction_events,
+            <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionSucceededEvent">TransactionExecutionSucceededEvent</a> {
+                sequence_number: multisig_account_resource.last_executed_sequence_number,
+                transaction_payload,
+                num_approvals,
+                executor,
+            }
+        );
     };
-    emit_event(
-        &<b>mut</b> multisig_account_resource.execute_transaction_events,
-        <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionSucceededEvent">TransactionExecutionSucceededEvent</a> {
-            sequence_number: multisig_account_resource.last_executed_sequence_number,
-            transaction_payload,
-            num_approvals,
-            executor,
-        }
-    );
 }
 </code></pre>
 
@@ -3279,17 +3283,18 @@ This function is private so no other code can call this beside the VM itself as 
                 execution_error,
             }
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> multisig_account_resource.transaction_execution_failed_events,
+            <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionFailedEvent">TransactionExecutionFailedEvent</a> {
+                executor,
+                sequence_number: multisig_account_resource.last_executed_sequence_number,
+                transaction_payload,
+                num_approvals,
+                execution_error,
+            }
+        );
     };
-    emit_event(
-        &<b>mut</b> multisig_account_resource.transaction_execution_failed_events,
-        <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionFailedEvent">TransactionExecutionFailedEvent</a> {
-            executor,
-            sequence_number: multisig_account_resource.last_executed_sequence_number,
-            transaction_payload,
-            num_approvals,
-            execution_error,
-        }
-    );
 }
 </code></pre>
 
@@ -3329,16 +3334,17 @@ This function is private so no other code can call this beside the VM itself as 
                     approved: <b>true</b>,
                 }
             );
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> multisig_account_resource.vote_events,
+                <a href="multisig_account.md#0x1_multisig_account_VoteEvent">VoteEvent</a> {
+                    owner: executor,
+                    sequence_number,
+                    approved: <b>true</b>,
+                }
+            );
         };
         num_approvals = num_approvals + 1;
-        emit_event(
-            &<b>mut</b> multisig_account_resource.vote_events,
-            <a href="multisig_account.md#0x1_multisig_account_VoteEvent">VoteEvent</a> {
-                owner: executor,
-                sequence_number,
-                approved: <b>true</b>,
-            }
-        );
     };
 
     num_approvals
@@ -3415,11 +3421,12 @@ This function is private so no other code can call this beside the VM itself as 
         emit(
             <a href="multisig_account.md#0x1_multisig_account_CreateTransaction">CreateTransaction</a> { <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, creator, sequence_number, transaction }
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> multisig_account_resource.create_transaction_events,
+            <a href="multisig_account.md#0x1_multisig_account_CreateTransactionEvent">CreateTransactionEvent</a> { creator, sequence_number, transaction },
+        );
     };
-    emit_event(
-        &<b>mut</b> multisig_account_resource.create_transaction_events,
-        <a href="multisig_account.md#0x1_multisig_account_CreateTransactionEvent">CreateTransactionEvent</a> { creator, sequence_number, transaction },
-    );
 }
 </code></pre>
 
@@ -3807,11 +3814,12 @@ Add new owners, remove owners to remove, update signatures required.
         );
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="multisig_account.md#0x1_multisig_account_AddOwners">AddOwners</a> { <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: multisig_address, owners_added: new_owners });
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> multisig_account_ref_mut.add_owners_events,
+                <a href="multisig_account.md#0x1_multisig_account_AddOwnersEvent">AddOwnersEvent</a> { owners_added: new_owners }
+            );
         };
-        emit_event(
-            &<b>mut</b> multisig_account_ref_mut.add_owners_events,
-            <a href="multisig_account.md#0x1_multisig_account_AddOwnersEvent">AddOwnersEvent</a> { owners_added: new_owners }
-        );
     };
     // If owners <b>to</b> remove provided, try <b>to</b> remove them.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&owners_to_remove) &gt; 0) {
@@ -3833,11 +3841,12 @@ Add new owners, remove owners to remove, update signatures required.
                 emit(
                     <a href="multisig_account.md#0x1_multisig_account_RemoveOwners">RemoveOwners</a> { <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: multisig_address, owners_removed }
                 );
+            } <b>else</b> {
+                emit_event(
+                    &<b>mut</b> multisig_account_ref_mut.remove_owners_events,
+                    <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed }
+                );
             };
-            emit_event(
-                &<b>mut</b> multisig_account_ref_mut.remove_owners_events,
-                <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed }
-            );
         }
     };
     // If new signature count provided, try <b>to</b> <b>update</b> count.
@@ -3862,14 +3871,15 @@ Add new owners, remove owners to remove, update signatures required.
                         new_num_signatures_required,
                     }
                 );
-            };
-            emit_event(
-                &<b>mut</b> multisig_account_ref_mut.update_signature_required_events,
-                <a href="multisig_account.md#0x1_multisig_account_UpdateSignaturesRequiredEvent">UpdateSignaturesRequiredEvent</a> {
-                    old_num_signatures_required,
-                    new_num_signatures_required,
-                }
-            );
+            } <b>else</b> {
+                emit_event(
+                    &<b>mut</b> multisig_account_ref_mut.update_signature_required_events,
+                    <a href="multisig_account.md#0x1_multisig_account_UpdateSignaturesRequiredEvent">UpdateSignaturesRequiredEvent</a> {
+                        old_num_signatures_required,
+                        new_num_signatures_required,
+                    }
+                );
+            }
         }
     };
     // Verify number of owners.
