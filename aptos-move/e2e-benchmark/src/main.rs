@@ -7,7 +7,7 @@ use aptos_language_e2e_tests::{
 };
 use aptos_transaction_generator_lib::{
     publishing::{
-        module_simple::{AutomaticArgs, LoopType, MultiSigConfig},
+        module_simple::{AutomaticArgs, LoopType, MapType, MultiSigConfig},
         publish_util::{Package, PackageHandler},
     },
     EntryPoints,
@@ -239,42 +239,42 @@ fn main() {
         EntryPoints::MapInsertRemove {
             len: 10,
             repeats: 0,
-            use_simple_map: false,
+            map_type: MapType::OrderedMap,
         },
         EntryPoints::MapInsertRemove {
             len: 10,
             repeats: 100,
-            use_simple_map: false,
+            map_type: MapType::OrderedMap,
         },
         EntryPoints::MapInsertRemove {
             len: 10,
             repeats: 100,
-            use_simple_map: true,
+            map_type: MapType::SimpleMap,
         },
         EntryPoints::MapInsertRemove {
             len: 100,
             repeats: 0,
-            use_simple_map: false,
+            map_type: MapType::OrderedMap,
         },
         EntryPoints::MapInsertRemove {
             len: 100,
             repeats: 100,
-            use_simple_map: false,
+            map_type: MapType::OrderedMap,
         },
         EntryPoints::MapInsertRemove {
             len: 100,
             repeats: 100,
-            use_simple_map: true,
+            map_type: MapType::SimpleMap,
         },
         EntryPoints::MapInsertRemove {
             len: 1000,
             repeats: 0,
-            use_simple_map: false,
+            map_type: MapType::OrderedMap,
         },
         EntryPoints::MapInsertRemove {
             len: 1000,
             repeats: 100,
-            use_simple_map: false,
+            map_type: MapType::OrderedMap,
         },
     ];
 

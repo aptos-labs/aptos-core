@@ -115,7 +115,10 @@ pub enum LoopType {
 pub enum MapType {
     SimpleMap,
     OrderedMap,
-    BigOrderedMap{ inner_max_degree: u16, leaf_max_degree: u16 }
+    BigOrderedMap {
+        inner_max_degree: u16,
+        leaf_max_degree: u16,
+    },
 }
 
 /// Automatic arguments function expects (i.e. signer, or multiple signers, etc)
@@ -645,14 +648,14 @@ impl EntryPoints {
                 repeats,
                 map_type,
             } => {
-                let mut args = vec![
-                    bcs::to_bytes(len).unwrap(),
-                    bcs::to_bytes(repeats).unwrap(),
-                ];
+                let mut args = vec![bcs::to_bytes(len).unwrap(), bcs::to_bytes(repeats).unwrap()];
                 let func = match map_type {
                     MapType::SimpleMap => ident_str!("test_add_remove_simple_map").to_owned(),
                     MapType::OrderedMap => ident_str!("test_add_remove_ordered_map").to_owned(),
-                    MapType::BigOrderedMap { inner_max_degree, leaf_max_degree } => {
+                    MapType::BigOrderedMap {
+                        inner_max_degree,
+                        leaf_max_degree,
+                    } => {
                         args.push(bcs::to_bytes(inner_max_degree).unwrap());
                         args.push(bcs::to_bytes(leaf_max_degree).unwrap());
                         ident_str!("test_add_remove_big_ordered_map").to_owned()
@@ -660,7 +663,7 @@ impl EntryPoints {
                 };
 
                 get_payload(module_id, func, args)
-            } ,
+            },
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
                 module_id,
                 ident_str!("token_v1_initialize_collection").to_owned(),
@@ -933,7 +936,7 @@ impl EntryPoints {
             EntryPoints::VectorTrimAppend { .. }
             | EntryPoints::VectorRemoveInsert { .. }
             | EntryPoints::VectorRangeMove { .. } => AutomaticArgs::None,
-            | EntryPoints::MapInsertRemove { .. } => AutomaticArgs::Signer,
+            EntryPoints::MapInsertRemove { .. } => AutomaticArgs::Signer,
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
