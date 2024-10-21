@@ -31,15 +31,18 @@ module aptos_framework::transaction_context {
         entry_function_payload: Option<EntryFunctionPayload>,
     }
 
-    /// Returns the transaction hash of the current transaction.
-    native fun get_txn_hash(): vector<u8>;
-
-    /// Returns the transaction hash of the current transaction.
-    /// Internally calls the private function `get_txn_hash`.
-    /// This function is created for to feature gate the `get_txn_hash` function.
-    public fun get_transaction_hash(): vector<u8> {
-        get_txn_hash()
+    /// Returns a unique session hash, ensuring a distinct value for each transaction
+    /// session: prologue, execution, epilogue.
+    public fun unique_session_hash(): vector<u8> {
+        unique_session_hash_internal()
     }
+    native fun unique_session_hash_internal(): vector<u8>;
+
+    #[deprecated]
+    public fun get_transaction_hash(): vector<u8> {
+        unique_session_hash_internal()
+    }
+
 
     /// Returns a universally unique identifier (of type address) generated
     /// by hashing the transaction hash of this transaction and a sequence number
@@ -182,6 +185,13 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
+    /// Returns the hash of the current raw transaction, which is used for transaction authentication.
+    /// This function calls an internal native function to retrieve the raw transaction hash.
+    public fun raw_transaction_hash(): vector<u8> {
+        raw_transaction_hash_internal()
+    }
+    native fun raw_transaction_hash_internal(): vector<u8>;
+
     #[test()]
     fun test_auid_uniquess() {
         use std::vector;
@@ -256,6 +266,13 @@ module aptos_framework::transaction_context {
     #[test]
     #[expected_failure(abort_code=196609, location = Self)]
     fun test_call_multisig_payload() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _multisig = multisig_payload();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_raw_txn_hash() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _multisig = multisig_payload();
     }

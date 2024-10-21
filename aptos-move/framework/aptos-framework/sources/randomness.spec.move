@@ -43,7 +43,7 @@ spec aptos_framework::randomness {
         let input = b"APTOS_RANDOMNESS";
         let randomness = global<PerBlockRandomness>(@aptos_framework);
         let seed = option::spec_borrow(randomness.seed);
-        let txn_hash = transaction_context::spec_get_txn_hash();
+        let txn_hash = transaction_context::spec_unique_session_hash();
         let txn_counter = spec_fetch_and_increment_txn_counter();
         ensures len(result) == 32;
         ensures result == hash::sha3_256(concat(concat(concat(input, seed), txn_hash), txn_counter));

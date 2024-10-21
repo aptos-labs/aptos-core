@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     move_utils::MemberId,
@@ -31,6 +32,7 @@ struct TransactionContextStore {
     type_arg_names: Vec<String>,
     args: Vec<Vec<u8>>,
     multisig_address: AccountAddress,
+    raw_transaction_hash: Vec<u8>,
 }
 
 fn setup(harness: &mut MoveHarness) -> Account {
@@ -467,4 +469,30 @@ fn test_transaction_context_multisig_payload() {
     );
     assert!(txn_ctx_store.type_arg_names.is_empty());
     assert!(txn_ctx_store.args.is_empty());
+}
+
+#[test]
+fn test_transaction_context_raw_transaction_hash() {
+    let mut harness = new_move_harness();
+    let account = setup(&mut harness);
+    let signed_txn = harness.create_entry_function(
+        &account,
+        str::parse(
+            "0x1::transaction_context_test::store_raw_transaction_hash_from_native_txn_context",
+        )
+        .unwrap(),
+        vec![],
+        vec![],
+    );
+    let expected_hash = signed_txn.clone().into_raw_transaction().hash();
+    let status = harness.run(signed_txn);
+    assert!(status.status().unwrap().is_success());
+    let txn_ctx_store = harness
+        .read_resource::<crate::tests::transaction_context::TransactionContextStore>(
+            account.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+    let hash = txn_ctx_store.raw_transaction_hash;
+    assert_eq!(hash, expected_hash.to_vec());
 }
