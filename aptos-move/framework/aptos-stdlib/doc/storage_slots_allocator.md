@@ -18,6 +18,7 @@ later (i.e. if we need address to initialize the value itself).
 
 In the future, more sophisticated strategies can be added, without breaking/modifying callers,
 for example:
+* inlining some nodes
 * having a fee-payer for any storage creation operations
 
 
@@ -26,25 +27,23 @@ for example:
 -  [Enum `StorageSlotsAllocator`](#0x1_storage_slots_allocator_StorageSlotsAllocator)
 -  [Struct `ReservedSlot`](#0x1_storage_slots_allocator_ReservedSlot)
 -  [Struct `StoredSlot`](#0x1_storage_slots_allocator_StoredSlot)
--  [Struct `RefToSlot`](#0x1_storage_slots_allocator_RefToSlot)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_storage_slots_allocator_new)
 -  [Function `new_default_config`](#0x1_storage_slots_allocator_new_default_config)
 -  [Function `new_config`](#0x1_storage_slots_allocator_new_config)
 -  [Function `add`](#0x1_storage_slots_allocator_add)
 -  [Function `remove`](#0x1_storage_slots_allocator_remove)
--  [Function `destroy`](#0x1_storage_slots_allocator_destroy)
+-  [Function `destroy_known_empty_unsafe`](#0x1_storage_slots_allocator_destroy_known_empty_unsafe)
 -  [Function `borrow`](#0x1_storage_slots_allocator_borrow)
 -  [Function `borrow_mut`](#0x1_storage_slots_allocator_borrow_mut)
 -  [Function `reserve_slot`](#0x1_storage_slots_allocator_reserve_slot)
 -  [Function `fill_reserved_slot`](#0x1_storage_slots_allocator_fill_reserved_slot)
 -  [Function `remove_and_reserve`](#0x1_storage_slots_allocator_remove_and_reserve)
 -  [Function `free_reserved_slot`](#0x1_storage_slots_allocator_free_reserved_slot)
--  [Function `reserved_as_ref`](#0x1_storage_slots_allocator_reserved_as_ref)
--  [Function `stored_as_ref`](#0x1_storage_slots_allocator_stored_as_ref)
--  [Function `null_ref`](#0x1_storage_slots_allocator_null_ref)
--  [Function `special_ref`](#0x1_storage_slots_allocator_special_ref)
--  [Function `ref_is_null`](#0x1_storage_slots_allocator_ref_is_null)
+-  [Function `reserved_to_index`](#0x1_storage_slots_allocator_reserved_to_index)
+-  [Function `stored_to_index`](#0x1_storage_slots_allocator_stored_to_index)
+-  [Function `is_null_index`](#0x1_storage_slots_allocator_is_null_index)
+-  [Function `is_special_unused_index`](#0x1_storage_slots_allocator_is_special_unused_index)
 -  [Function `maybe_pop_from_reuse_queue`](#0x1_storage_slots_allocator_maybe_pop_from_reuse_queue)
 -  [Function `maybe_push_to_reuse_queue`](#0x1_storage_slots_allocator_maybe_push_to_reuse_queue)
 -  [Function `next_slot_index`](#0x1_storage_slots_allocator_next_slot_index)
@@ -288,36 +287,6 @@ and there is unique owner for each slot.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_RefToSlot"></a>
-
-## Struct `RefToSlot`
-
-(Weak) Reference to a slot.
-We can have variety of <code><a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a></code>, but only a single <code><a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">StoredSlot</a></code>.
-It is on the caller to make sure references are not used after slot is freed.
-
-
-<pre><code><b>struct</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>slot_index: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -355,15 +324,6 @@ It is on the caller to make sure references are not used after slot is freed.
 
 
 <pre><code><b>const</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>: u64 = 0;
-</code></pre>
-
-
-
-<a id="0x1_storage_slots_allocator_SPECIAL_SLOT_INDEX"></a>
-
-
-
-<pre><code><b>const</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_SPECIAL_SLOT_INDEX">SPECIAL_SLOT_INDEX</a>: u64 = 1;
 </code></pre>
 
 
@@ -501,7 +461,7 @@ It is on the caller to make sure references are not used after slot is freed.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove">remove</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">StoredSlot</a>): T {
-    <b>let</b> (reserved_slot, value) = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>(slot.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_stored_as_ref">stored_as_ref</a>());
+    <b>let</b> (reserved_slot, value) = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>(slot.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_stored_to_index">stored_to_index</a>());
     self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_free_reserved_slot">free_reserved_slot</a>(reserved_slot, slot);
     value
 }
@@ -511,13 +471,15 @@ It is on the caller to make sure references are not used after slot is freed.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_destroy"></a>
+<a id="0x1_storage_slots_allocator_destroy_known_empty_unsafe"></a>
 
-## Function `destroy`
+## Function `destroy_known_empty_unsafe`
+
+We cannot know if allocator is empty or not, so this method is not public,
+and can be used only in modules that know by themselves that allocator is empty.
 
 
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy">destroy</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -526,7 +488,7 @@ It is on the caller to make sure references are not used after slot is freed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy">destroy</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;) {
     <b>loop</b> {
         <b>let</b> reuse_index = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_maybe_pop_from_reuse_queue">maybe_pop_from_reuse_queue</a>();
         <b>if</b> (reuse_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>) {
@@ -542,7 +504,7 @@ It is on the caller to make sure references are not used after slot is freed.
             reuse_spare_count: _,
         } =&gt; {
             <b>assert</b>!(reuse_head_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
-            slots.destroy_some().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy">destroy</a>();
+            slots.destroy_some().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>();
         },
     };
 }
@@ -558,7 +520,7 @@ It is on the caller to make sure references are not used after slot is freed.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): &T
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): &T
 </code></pre>
 
 
@@ -567,8 +529,8 @@ It is on the caller to make sure references are not used after slot is freed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a>): &T {
-    &self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>(slot.slot_index).value
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): &T {
+    &self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>(slot_index).value
 }
 </code></pre>
 
@@ -582,7 +544,7 @@ It is on the caller to make sure references are not used after slot is freed.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): &<b>mut</b> T
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): &<b>mut</b> T
 </code></pre>
 
 
@@ -591,8 +553,8 @@ It is on the caller to make sure references are not used after slot is freed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a>): &<b>mut</b> T {
-    &<b>mut</b> self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>(slot.slot_index).value
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): &<b>mut</b> T {
+    &<b>mut</b> self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>(slot_index).value
 }
 </code></pre>
 
@@ -664,7 +626,7 @@ It is on the caller to make sure references are not used after slot is freed.
 Remove storage slot, but reserve it for later.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>, T)
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>, T)
 </code></pre>
 
 
@@ -673,8 +635,7 @@ Remove storage slot, but reserve it for later.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a>): (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a>, T) {
-    <b>let</b> slot_index = slot.slot_index;
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a>, T) {
     <b>let</b> Link::Occupied { value } = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_link">remove_link</a>(slot_index);
     (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a> { slot_index }, value)
 }
@@ -711,13 +672,13 @@ Remove storage slot, but reserve it for later.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_reserved_as_ref"></a>
+<a id="0x1_storage_slots_allocator_reserved_to_index"></a>
 
-## Function `reserved_as_ref`
+## Function `reserved_to_index`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_reserved_as_ref">reserved_as_ref</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_reserved_to_index">reserved_to_index</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>): u64
 </code></pre>
 
 
@@ -726,8 +687,8 @@ Remove storage slot, but reserve it for later.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_reserved_as_ref">reserved_as_ref</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a>): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> {
-    <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> { slot_index: self.slot_index }
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_reserved_to_index">reserved_to_index</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a>): u64 {
+    self.slot_index
 }
 </code></pre>
 
@@ -735,13 +696,13 @@ Remove storage slot, but reserve it for later.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_stored_as_ref"></a>
+<a id="0x1_storage_slots_allocator_stored_to_index"></a>
 
-## Function `stored_as_ref`
+## Function `stored_to_index`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_stored_as_ref">stored_as_ref</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">storage_slots_allocator::StoredSlot</a>): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_stored_to_index">stored_to_index</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">storage_slots_allocator::StoredSlot</a>): u64
 </code></pre>
 
 
@@ -750,8 +711,8 @@ Remove storage slot, but reserve it for later.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_stored_as_ref">stored_as_ref</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">StoredSlot</a>): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> {
-    <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> { slot_index: self.slot_index }
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_stored_to_index">stored_to_index</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">StoredSlot</a>): u64 {
+    self.slot_index
 }
 </code></pre>
 
@@ -759,13 +720,13 @@ Remove storage slot, but reserve it for later.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_null_ref"></a>
+<a id="0x1_storage_slots_allocator_is_null_index"></a>
 
-## Function `null_ref`
+## Function `is_null_index`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">null_ref</a>(): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_is_null_index">is_null_index</a>(slot_index: u64): bool
 </code></pre>
 
 
@@ -774,8 +735,8 @@ Remove storage slot, but reserve it for later.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_null_ref">null_ref</a>(): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> {
-    <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> { slot_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_is_null_index">is_null_index</a>(slot_index: u64): bool {
+    slot_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>
 }
 </code></pre>
 
@@ -783,13 +744,13 @@ Remove storage slot, but reserve it for later.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_special_ref"></a>
+<a id="0x1_storage_slots_allocator_is_special_unused_index"></a>
 
-## Function `special_ref`
+## Function `is_special_unused_index`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_special_ref">special_ref</a>(): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_is_special_unused_index">is_special_unused_index</a>(slot_index: u64): bool
 </code></pre>
 
 
@@ -798,32 +759,8 @@ Remove storage slot, but reserve it for later.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_special_ref">special_ref</a>(): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> {
-    <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a> { slot_index: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_SPECIAL_SLOT_INDEX">SPECIAL_SLOT_INDEX</a> }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_storage_slots_allocator_ref_is_null"></a>
-
-## Function `ref_is_null`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ref_is_null">ref_is_null</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">storage_slots_allocator::RefToSlot</a>): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ref_is_null">ref_is_null</a>(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_RefToSlot">RefToSlot</a>): bool {
-    self.slot_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_is_special_unused_index">is_special_unused_index</a>(slot_index: u64): bool {
+    slot_index != <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a> && slot_index &lt; <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_FIRST_INDEX">FIRST_INDEX</a>
 }
 </code></pre>
 
