@@ -13,6 +13,7 @@ publish = false
 [dependencies]
 aptos-gas-schedule = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-types = { workspace = true }
 move-core-types = { path = "../../../third_party/move/move-core/types" }
 move-vm-runtime = { path = "../../../third_party/move/move-vm/runtime" }
 move-vm-types = { path = "../../../third_party/move/move-vm/types" }
