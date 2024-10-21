@@ -35,7 +35,7 @@ module aptos_framework::function_info {
         )
     }
 
-    public(friend) fun new_function_info_from_address(
+    public fun new_function_info_from_address(
         module_address: address,
         module_name: String,
         function_name: String,
