@@ -60,7 +60,6 @@ impl BlockPreparer {
 
                 txn_shuffler.shuffle(deduped_txns)
             };
-
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
                 shuffled_txns.truncate(max_txns_from_block_to_execute as usize);
             }
