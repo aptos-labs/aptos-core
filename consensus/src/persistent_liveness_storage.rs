@@ -16,7 +16,12 @@ use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
-use std::{cmp::max, collections::HashSet, fmt::Debug, sync::Arc};
+use std::{
+    cmp::max,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is
@@ -37,7 +42,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData;
+    fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -59,7 +64,9 @@ pub trait PersistentLivenessStorage: Send + Sync {
 
 #[derive(Clone)]
 pub struct RootInfo(
-    pub Box<Block>,
+    // TODO: just need the id?
+    pub Box<Block>, // root block
+    pub Box<Block>, // window block
     pub QuorumCert,
     pub WrappedLedgerInfo,
     pub WrappedLedgerInfo,
@@ -99,6 +106,7 @@ impl LedgerRecoveryData {
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
         order_vote_enabled: bool,
+        window_size: usize,
     ) -> Result<RootInfo> {
         info!(
             "The last committed block id as recorded in storage: {}",
@@ -107,37 +115,38 @@ impl LedgerRecoveryData {
 
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
-        let (root_id, latest_ledger_info_sig) = if self.storage_ledger.ledger_info().ends_epoch() {
-            let genesis =
-                Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
-            let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
-                self.storage_ledger.ledger_info(),
-                genesis.id(),
-            );
-            let genesis_ledger_info = genesis_qc.ledger_info().clone();
-            let genesis_id = genesis.id();
-            blocks.push(genesis);
-            quorum_certs.push(genesis_qc);
-            (genesis_id, genesis_ledger_info)
-        } else {
-            (
-                self.storage_ledger.ledger_info().consensus_block_id(),
-                self.storage_ledger.clone(),
-            )
-        };
+        let (latest_commit_id, latest_ledger_info_sig) =
+            if self.storage_ledger.ledger_info().ends_epoch() {
+                let genesis =
+                    Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
+                let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
+                    self.storage_ledger.ledger_info(),
+                    genesis.id(),
+                );
+                let genesis_ledger_info = genesis_qc.ledger_info().clone();
+                let genesis_id = genesis.id();
+                blocks.push(genesis);
+                quorum_certs.push(genesis_qc);
+                (genesis_id, genesis_ledger_info)
+            } else {
+                (
+                    self.storage_ledger.ledger_info().consensus_block_id(),
+                    self.storage_ledger.clone(),
+                )
+            };
 
         // sort by (epoch, round) to guarantee the topological order of parent <- child
         blocks.sort_by_key(|b| (b.epoch(), b.round()));
 
-        let root_idx = blocks
+        let latest_commit_idx = blocks
             .iter()
-            .position(|block| block.id() == root_id)
-            .ok_or_else(|| format_err!("unable to find root: {}", root_id))?;
-        let root_block = blocks.remove(root_idx);
+            .position(|block| block.id() == latest_commit_id)
+            .ok_or_else(|| format_err!("unable to find root: {}", latest_commit_id))?;
+        let commit_block = blocks[latest_commit_idx].clone();
         let root_quorum_cert = quorum_certs
             .iter()
-            .find(|qc| qc.certified_block().id() == root_block.id())
-            .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
+            .find(|qc| qc.certified_block().id() == commit_block.id())
+            .ok_or_else(|| format_err!("No QC found for root: {}", commit_block.id()))?
             .clone();
 
         let (root_ordered_cert, root_commit_cert) = if order_vote_enabled {
@@ -150,8 +159,8 @@ impl LedgerRecoveryData {
         } else {
             let root_ordered_cert = quorum_certs
                 .iter()
-                .find(|qc| qc.commit_info().id() == root_block.id())
-                .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
+                .find(|qc| qc.commit_info().id() == commit_block.id())
+                .ok_or_else(|| format_err!("No LI found for root: {}", latest_commit_id))?
                 .clone()
                 .into_wrapped_ledger_info();
             let root_commit_cert = root_ordered_cert
@@ -159,10 +168,58 @@ impl LedgerRecoveryData {
                 .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
             (root_ordered_cert, root_commit_cert)
         };
-        info!("Consensus root block is {}", root_block);
+
+        let window_start_round = blocks[latest_commit_idx]
+            .round()
+            .saturating_add(1)
+            .saturating_sub(window_size as u64);
+        let epoch = blocks[latest_commit_idx].epoch();
+        let mut id_to_blocks = HashMap::new();
+        blocks.iter().for_each(|block| {
+            id_to_blocks.insert(block.id(), block);
+        });
+
+        let mut prev_id = HashValue::zero();
+        let mut curr_id = latest_commit_id;
+        let mut window_start_id = HashValue::zero();
+        while let Some(block) = id_to_blocks.get(&curr_id) {
+            // TODO: do we ever fetch block cross-epoch?
+            if block.epoch() < epoch {
+                info!("Epoch change detected: {}, root: {}", block, commit_block);
+                window_start_id = prev_id;
+                break;
+            }
+            if block.round() < window_start_round {
+                info!("Found window block: {}, root: {}", block, commit_block);
+                window_start_id = curr_id;
+                break;
+            }
+
+            window_start_id = curr_id;
+            prev_id = curr_id;
+            curr_id = block.parent_id();
+        }
+        // TODO: panic or bail?
+        assert_ne!(
+            window_start_id,
+            HashValue::zero(),
+            "Window start block not found"
+        );
+
+        let window_start_idx = blocks
+            .iter()
+            .position(|block| block.id() == window_start_id)
+            .ok_or_else(|| format_err!("unable to find root: {}", window_start_id))?;
+        let window_start_block = blocks.remove(window_start_idx);
+
+        info!(
+            "Commit block is {}, window block is {}",
+            commit_block, window_start_block
+        );
 
         Ok(RootInfo(
-            Box::new(root_block),
+            Box::new(commit_block),
+            Box::new(window_start_block),
             root_quorum_cert,
             root_ordered_cert,
             root_commit_cert,
@@ -227,9 +284,15 @@ impl RecoveryData {
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
         order_vote_enabled: bool,
+        window_size: usize,
     ) -> Result<Self> {
         let root = ledger_recovery_data
-            .find_root(&mut blocks, &mut quorum_certs, order_vote_enabled)
+            .find_root(
+                &mut blocks,
+                &mut quorum_certs,
+                order_vote_enabled,
+                window_size,
+            )
             .with_context(|| {
                 // for better readability
                 blocks.sort_by_key(|block| block.round());
@@ -250,11 +313,14 @@ impl RecoveryData {
                 )
             })?;
 
+        // TODO: Change RootInfo to a struct to be clearer?
+        let window_start_id = root.1.id();
         let blocks_to_prune = Some(Self::find_blocks_to_prune(
-            root.0.id(),
+            window_start_id,
             &mut blocks,
             &mut quorum_certs,
         ));
+        info!("Blocks to prune: {:?}", blocks_to_prune);
         let epoch = root.0.epoch();
         Ok(RecoveryData {
             last_vote: match last_vote {
@@ -371,7 +437,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData {
+    fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -419,6 +485,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             quorum_certs,
             highest_2chain_timeout_cert,
             order_vote_enabled,
+            window_size,
         ) {
             Ok(mut initial_data) => {
                 (self as &dyn PersistentLivenessStorage)
