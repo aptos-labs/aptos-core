@@ -40,7 +40,7 @@ fn generate_commit_ledger_info(
     )
 }
 
-fn signature_aggregator(
+fn create_signature_aggregator(
     unverified_votes: HashMap<Author, CommitVote>,
     commit_ledger_info: &LedgerInfo,
 ) -> SignatureAggregator<LedgerInfo> {
@@ -174,7 +174,7 @@ impl BufferItem {
                     );
 
                     let mut partial_commit_proof =
-                        signature_aggregator(unverified_votes, &commit_ledger_info);
+                        create_signature_aggregator(unverified_votes, &commit_ledger_info);
                     if let Ok(commit_proof) = partial_commit_proof
                         .aggregate_and_verify(validator)
                         .map(|(ledger_info, aggregated_sig)| {
