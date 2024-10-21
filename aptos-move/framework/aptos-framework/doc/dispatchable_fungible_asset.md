@@ -555,7 +555,7 @@ The semantics of supply will be governed by the function specified in DeriveSupp
 
 
 
-<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
 </code></pre>
 
 
@@ -565,7 +565,7 @@ The semantics of supply will be governed by the function specified in DeriveSupp
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(
-    store: Object&lt;T&gt;,
+    metadata: Object&lt;T&gt;,
     function: &FunctionInfo,
 ): Option&lt;u128&gt;;
 </code></pre>
@@ -638,7 +638,7 @@ The semantics of supply will be governed by the function specified in DeriveSupp
 ### Function `dispatchable_derived_supply`
 
 
-<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
 </code></pre>
 
 
