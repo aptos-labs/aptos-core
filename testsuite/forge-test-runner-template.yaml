@@ -38,6 +38,8 @@ spec:
           value: {FORGE_USERNAME}
         - name: FORGE_RETAIN_DEBUG_LOGS
           value: "{FORGE_RETAIN_DEBUG_LOGS}"
+        - name: FORGE_JUNIT_XML_PATH
+          value: "{FORGE_JUNIT_XML_PATH}"
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:

@@ -277,6 +277,7 @@ jobs:
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SEND_RESULTS_TO_TRUNK: true
   
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
@@ -356,6 +357,7 @@ jobs:
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SEND_RESULTS_TO_TRUNK: true
   
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
@@ -385,6 +387,7 @@ jobs:
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
+      SEND_RESULTS_TO_TRUNK: true
 
   forge-consensus-only-perf-test:
     needs:

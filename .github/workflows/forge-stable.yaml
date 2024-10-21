@@ -136,6 +136,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-load-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -148,6 +149,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes (6 tests, each for 300 seconds)
       FORGE_TEST_SUITE: realistic_env_load_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -160,6 +162,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2000 # Run for 33 minutes (5 tests, each for 400 seconds)
       FORGE_TEST_SUITE: realistic_env_workload_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-graceful-overload:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -172,6 +175,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1200 # Run for 20 minutes
       FORGE_TEST_SUITE: realistic_env_graceful_overload
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-graceful-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -184,6 +188,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2100 # Run for 5 minutes per test, 7 tests.
       FORGE_TEST_SUITE: realistic_env_graceful_workload_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-fairness-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -196,6 +201,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 5 minutes per test, 3 tests.
       FORGE_TEST_SUITE: realistic_env_fairness_workload_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-network-tuned-for-throughput:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -209,6 +215,7 @@ jobs:
       FORGE_TEST_SUITE: realistic_network_tuned_for_throughput
       FORGE_ENABLE_PERFORMANCE: true
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   ### Forge Correctness/Componenet/Stress tests
 
@@ -223,6 +230,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2400 # Run for 40 minutes
       FORGE_TEST_SUITE: consensus_stress_test
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-workload-mix-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -235,6 +243,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: workload_mix
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-single-vfn-perf:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -247,6 +256,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 480 # Run for 8 minutes
       FORGE_TEST_SUITE: single_vfn_perf
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-fullnode-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -259,6 +269,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
       FORGE_TEST_SUITE: fullnode_reboot_stress_test
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   ### Compatibility Forge tests
 
@@ -275,6 +286,7 @@ jobs:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }}
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   ### Changing working quorum Forge tests
 
@@ -289,6 +301,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1200 # Run for 20 minutes
       FORGE_TEST_SUITE: changing_working_quorum_test
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   run-forge-changing-working-quorum-test-high-load:
@@ -302,6 +315,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   # Measures PFN latencies with a constant TPS (with a realistic environment)
@@ -316,6 +330,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: pfn_const_tps_with_realistic_env
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
 
   # longest test for last, to get useful signal from short tests first
@@ -331,3 +346,4 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: realistic_env_max_load_large
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
