@@ -589,7 +589,6 @@ spec aptos_framework::staking_contract {
         requires exists<staking_config::StakingRewardsConfig>(
             @aptos_framework
         ) || !std::features::spec_periodical_reward_rate_decrease_enabled();
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<aptos_framework::timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         requires exists<stake::AptosCoinCapabilities>(@aptos_framework);
     }
