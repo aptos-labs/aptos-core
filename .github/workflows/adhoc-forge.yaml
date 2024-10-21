@@ -20,7 +20,7 @@ on:
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: string
-        default: "480"
+        default: "1200"
         description: Duration of the forge test run. For multi-phasic tests this is the length of a single phase
       FORGE_TEST_SUITE:
         required: false
