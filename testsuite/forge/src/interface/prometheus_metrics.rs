@@ -154,14 +154,17 @@ pub async fn fetch_latency_breakdown(
     let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
     let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
 
-    let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
-    let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
-
-    // the result of mempool_to_block_creation_query is the sum of the individual limit values of qs_batch_to_pos_query and qs_pos_to_proposal_query
-    let mempool_to_block_creation_query = format!(
-        "sum({}, {})",
-        qs_batch_to_pos_query, qs_pos_to_proposal_query
-    );
+    let mempool_to_block_creation_query = r#"sum(
+        rate(aptos_core_mempool_txn_commit_latency_sum{
+            role=~"validator",
+            stage="commit_accepted_block"
+        }[1m])
+    ) / sum(
+        rate(aptos_core_mempool_txn_commit_latency_count{
+            role=~"validator",
+            stage="commit_accepted_block"
+        }[1m])
+    )"#;
 
     let swarm = swarm.read().await;
     let consensus_proposal_to_ordered_samples = swarm
@@ -196,7 +199,7 @@ pub async fn fetch_latency_breakdown(
 
     let mempool_to_block_creation_samples = swarm
         .query_range_metrics(
-            mempool_to_block_creation_query.as_str(),
+            mempool_to_block_creation_query,
             start_time_adjusted as i64,
             end_time as i64,
             None,
