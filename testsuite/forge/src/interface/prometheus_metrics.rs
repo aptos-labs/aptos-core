@@ -106,8 +106,6 @@ pub async fn fetch_system_metrics(
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum LatencyBreakdownSlice {
-    QsBatchToPos,
-    QsPosToProposal,
     MempoolToBlockCreation,
     ConsensusProposalToOrdered,
     ConsensusOrderedToCommit,
