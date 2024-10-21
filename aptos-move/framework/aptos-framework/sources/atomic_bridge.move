@@ -365,7 +365,13 @@ module aptos_framework::atomic_bridge_initiator {
             amount
         );
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         complete_bridge_transfer(
             aptos_framework,
@@ -373,13 +379,14 @@ module aptos_framework::atomic_bridge_initiator {
             plain_secret(),
         );
 
-        assert!(
-            event::was_event_emitted<BridgeTransferCompletedEvent>(
-                &BridgeTransferCompletedEvent {
-                    bridge_transfer_id,
-                    pre_image: plain_secret(),
-                }
-            ), 0);
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(signer::address_of(aptos_framework));
+        let complete_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_completed);
+        let expected_event = BridgeTransferCompletedEvent {
+            bridge_transfer_id,
+            pre_image: plain_secret(),
+        };
+        assert!(std::vector::contains(&complete_events, &expected_event), 0);
+
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -432,10 +439,10 @@ module aptos_framework::atomic_bridge_initiator {
         sender: &signer,
         aptos_framework: &signer
     ) acquires BridgeInitiatorEvents {
-        init_module(aptos_framework);
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
+        init_module(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -455,7 +462,13 @@ module aptos_framework::atomic_bridge_initiator {
             amount
         );
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         complete_bridge_transfer(
             aptos_framework,
@@ -515,7 +528,13 @@ module aptos_framework::atomic_bridge_initiator {
 
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance - amount, 0);
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         timestamp::fast_forward_seconds(atomic_bridge_configuration::initiator_timelock_duration() + 1);
 
@@ -523,12 +542,12 @@ module aptos_framework::atomic_bridge_initiator {
 
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance, 0);
 
-        assert!(
-            event::was_event_emitted<BridgeTransferRefundedEvent>(
-                &BridgeTransferRefundedEvent {
-                    bridge_transfer_id,
-                }
-            ), 0);
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(signer::address_of(aptos_framework));
+        let refund_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_refunded);
+        let expected_event = BridgeTransferRefundedEvent { bridge_transfer_id };
+        let was_event_emitted = std::vector::contains(&refund_events, &expected_event);
+        
+        assert!(was_event_emitted, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -563,7 +582,13 @@ module aptos_framework::atomic_bridge_initiator {
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance - amount, 0);
 
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         refund_bridge_transfer(sender, bridge_transfer_id);
     }
@@ -1450,7 +1475,7 @@ module aptos_framework::atomic_bridge_counterparty {
         // bridge_store::add_counterparty(bridge_transfer_id, details);
         atomic_bridge_store::add(bridge_transfer_id, details);
 
-        let bridge_events = borrow_global_mut<BridgeCounterpartyEvents>(signer::address_of(caller));
+        let bridge_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
 
         event::emit_event(
             &mut bridge_events.bridge_transfer_locked,
@@ -1517,7 +1542,7 @@ module aptos_framework::atomic_bridge_counterparty {
     #[test(aptos_framework = @aptos_framework)]
     fun test_lock_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-
+        init_module(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1531,23 +1556,26 @@ module aptos_framework::atomic_bridge_counterparty {
                                     recipient,
                                     amount);
 
-        assert!(
-            event::was_event_emitted<BridgeTransferLockedEvent>(
-                &BridgeTransferLockedEvent {
-                    bridge_transfer_id,
-                    initiator,
-                    recipient,
-                    amount,
-                    hash_lock,
-                    time_lock: atomic_bridge_configuration::counterparty_timelock_duration(),
-                }
-            ), 0);
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let lock_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_locked);
+
+        // Assert that the event was emitted
+        let expected_event = BridgeTransferLockedEvent {
+            bridge_transfer_id,
+            initiator,
+            recipient,
+            amount,
+            hash_lock,
+            time_lock: atomic_bridge_configuration::counterparty_timelock_duration(),
+        };
+        assert!(std::vector::contains(&lock_events, &expected_event), 0);
+
     }
 
     #[test(aptos_framework = @aptos_framework)]
     fun test_abort_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-
+        init_module(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1564,18 +1592,16 @@ module aptos_framework::atomic_bridge_counterparty {
         timestamp::fast_forward_seconds(atomic_bridge_configuration::counterparty_timelock_duration() + 1);
         abort_bridge_transfer(aptos_framework, bridge_transfer_id);
 
-        assert!(
-            event::was_event_emitted<BridgeTransferCancelledEvent>(
-                &BridgeTransferCancelledEvent {
-                    bridge_transfer_id,
-                }
-            ), 0);
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let cancel_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_cancelled);
+        let expected_event = BridgeTransferCancelledEvent { bridge_transfer_id };
+        assert!(std::vector::contains(&cancel_events, &expected_event), 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
     fun test_complete_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-
+        init_module(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1594,19 +1620,21 @@ module aptos_framework::atomic_bridge_counterparty {
 
         complete_bridge_transfer(bridge_transfer_id, plain_secret());
 
-        assert!(
-            event::was_event_emitted<BridgeTransferCompletedEvent>(
-                &BridgeTransferCompletedEvent {
-                    bridge_transfer_id,
-                    pre_image: plain_secret(),
-                }
-            ), 0);
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let complete_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_completed);
+        let expected_event = BridgeTransferCompletedEvent {
+            bridge_transfer_id,
+            pre_image: plain_secret(),
+        };
+        assert!(std::vector::contains(&complete_events, &expected_event), 0);
+
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x1, location = atomic_bridge_store)]
     fun test_failing_complete_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
+        init_module(aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
