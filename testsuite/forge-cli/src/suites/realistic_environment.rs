@@ -323,9 +323,12 @@ pub(crate) fn realistic_env_max_load_test(
         success_criteria = success_criteria.add_latency_breakdown_threshold(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
-                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    // TODO remove
+                    // (LatencyBreakdownSlice::QsBatchToPos, 0.35),
                     // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
+                    // (LatencyBreakdownSlice::QsPosToProposal, 2.5),
+                    // sum of QsBatchToPos and QsPosToProposal thresholds
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 2.5),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
