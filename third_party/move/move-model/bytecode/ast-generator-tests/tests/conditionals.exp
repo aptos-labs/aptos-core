@@ -189,16 +189,13 @@ loop {
   };
   _t4: bool = d;
   loop {
-    loop {
-      if (Not(_t4)) break;
-      _t5: u8 = 1;
-      _t2: u8 = _t5;
-      break[1]
-    };
-    _t6: u8 = 2;
-    _t2: u8 = _t6;
-    break
+    if (Not(_t4)) break;
+    _t5: u8 = 1;
+    _t2: u8 = _t5;
+    break[1]
   };
+  _t6: u8 = 2;
+  _t2: u8 = _t6;
   break
 };
 _t8: u8 = _t2;
@@ -206,18 +203,23 @@ return _t8
 
 --- If-Transformed Generated AST
 _t3: bool = c;
-if _t3 {
+loop {
+  loop {
+    if (_t3) break;
+    _t7: u8 = 3;
+    _t2: u8 = _t7;
+    break[1]
+  };
   _t4: bool = d;
-  if _t4 {
+  loop {
+    if (Not(_t4)) break;
     _t5: u8 = 1;
-    _t2: u8 = _t5
-  } else {
-    _t6: u8 = 2;
-    _t2: u8 = _t6
-  }
-} else {
-  _t7: u8 = 3;
-  _t2: u8 = _t7
+    _t2: u8 = _t5;
+    break[1]
+  };
+  _t6: u8 = 2;
+  _t2: u8 = _t6;
+  break
 };
 _t8: u8 = _t2;
 return _t8
@@ -225,14 +227,17 @@ return _t8
 --- Assign-Transformed Generated AST
 {
   let _t2: u8;
-  if c {
-    if d {
-      _t2: u8 = 1
-    } else {
-      _t2: u8 = 2
-    }
-  } else {
-    _t2: u8 = 3
+  loop {
+    loop {
+      if (c) break;
+      break[1]
+    };
+    loop {
+      if (Not(d)) break;
+      break[1]
+    };
+    _t2: u8 = 2;
+    break
   };
   return _t2
 }
@@ -451,7 +456,18 @@ module 0x815::m {
     }
     fun if_else_2(c: bool, d: bool): u8 {
         let _t2;
-        if (c) if (d) _t2 = 1u8 else _t2 = 2u8 else _t2 = 3u8;
+        'l0: loop {
+            loop {
+                if (c) break;
+                break 'l0
+            };
+            loop {
+                if (!d) break;
+                break 'l0
+            };
+            _t2 = 2u8;
+            break
+        };
         _t2
     }
     fun if_else_3(c: bool): u64 {

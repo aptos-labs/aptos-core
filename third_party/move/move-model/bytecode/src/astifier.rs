@@ -738,11 +738,6 @@ impl Generator {
             // during processing of blocks in topological order.
             self.block_stack.push(BlockInfo {
                 stms: vec![],
-                break_label: None,
-                continue_label: None,
-            });
-            self.block_stack.push(BlockInfo {
-                stms: vec![],
                 break_label: Some(if_false),
                 continue_label: None,
             });
@@ -761,10 +756,23 @@ impl Generator {
             if let Some(nest) = self.find_continue_nest(ctx, target) {
                 // continue loop
                 self.add_stm(ctx.builder.continue_(&self.current_loc(ctx), nest))
-            } else {
-                // must bind to an outer block for forward jump
-                let nest = self.find_or_bind_break_nest(ctx, target);
+            } else if let Some(nest) = self.find_break_nest(ctx, target) {
+                // bind to an existing outer block for forward jump
                 self.add_stm(ctx.builder.break_(&self.current_loc(ctx), nest));
+            } else {
+                // we need to create a new block which encloses existing blocks
+                self.block_stack.insert(1, BlockInfo {
+                    stms: vec![],
+                    break_label: Some(target),
+                    continue_label: None,
+                });
+                self.add_stm(
+                    ctx.builder.break_(
+                        &self.current_loc(ctx),
+                        self.find_break_nest(ctx, target)
+                            .expect("expected label assigned"),
+                    ),
+                );
             }
         }
     }
