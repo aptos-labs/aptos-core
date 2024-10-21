@@ -7,7 +7,9 @@ use crate::{
     gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_23},
     gas_schedule::NativeGasParameters,
 };
-use aptos_gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte};
+use aptos_gas_algebra::{
+    InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasPerTypeNode,
+};
 
 crate::gas_schedule::macros::define_gas_parameters!(
     MoveStdlibGasParameters,
@@ -39,6 +41,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bcs_serialized_size_base: InternalGas, { RELEASE_V1_18.. => "bcs.serialized_size.base" }, 735],
         [bcs_serialized_size_per_byte_serialized: InternalGasPerByte, { RELEASE_V1_18.. => "bcs.serialized_size.per_byte_serialized" }, 36],
         [bcs_serialized_size_failure: InternalGas, { RELEASE_V1_18.. => "bcs.serialized_size.failure" }, 3676],
+        [bcs_constant_serialized_size_base: InternalGas, { RELEASE_V1_23.. => "bcs.constant_serialized_size.base" }, 735],
+        [bcs_constant_serialized_size_per_type_node: InternalGasPerTypeNode, { RELEASE_V1_23.. => "bcs.constant_serialized_size.per_type_node" }, 40],
 
         [mem_swap_base: InternalGas, { RELEASE_V1_23.. => "mem.swap.base" }, 1500],
 
