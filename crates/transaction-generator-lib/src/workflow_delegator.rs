@@ -296,7 +296,7 @@ impl WorkflowTxnGeneratorCreator {
                     txn_executor,
                     num_modules,
                     mint_entry_point.package_name(),
-                    Some(20_00000000),
+                    Some(20_0000_0000),
                 )
                 .await;
 
