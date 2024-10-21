@@ -105,12 +105,30 @@ module std::vector_tests {
             let v = vector[1, 2];
             assert!(&V::trim(&mut v, 0) == &vector[1, 2], 3);
         };
+        {
+            let v = vector[1, 2, 3, 4, 5, 6];
+            let other = V::trim(&mut v, 4);
+            assert!(v == vector[1, 2, 3, 4], 4);
+            assert!(other == vector[5, 6], 5);
+
+            let other_empty = V::trim(&mut v, 4);
+            assert!(v == vector[1, 2, 3, 4], 6);
+            assert!(other_empty == vector[], 7);
+        };
     }
+
     #[test]
     #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun test_trim_fail() {
         let v = vector[1];
         V::trim(&mut v, 2);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_trim_fail_2() {
+        let v = vector[1, 2, 3];
+        V::trim(&mut v, 4);
     }
 
     #[test]
@@ -952,7 +970,7 @@ module std::vector_tests {
     #[test]
     fun test_destroy() {
         let v = vector[MoveOnly {}];
-        vector::destroy(v, |m| { let MoveOnly {} = m; })
+        V::destroy(v, |m| { let MoveOnly {} = m; })
     }
 
     #[test]
@@ -963,5 +981,20 @@ module std::vector_tests {
         V::move_range(&mut v, 1, 2, &mut w, 1);
         assert!(&v == &vector[3, 6], 0);
         assert!(&w == &vector[1, 4, 5, 2], 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_replace_empty_abort() {
+        let v = vector[];
+        let MoveOnly {} = V::replace(&mut v, 0, MoveOnly {});
+        V::destroy_empty(v);
+    }
+
+    #[test]
+    fun test_replace() {
+        let v = vector[1, 2, 3, 4];
+        V::replace(&mut v, 1, 17);
+        assert!(v == vector[1, 17, 3, 4], 0);
     }
 }
