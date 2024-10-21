@@ -521,7 +521,12 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
+clap = { version = "4.3.9", features = [
+    "derive",
+    "env",
+    "unstable-styles",
+    "wrap_help",
+] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [
@@ -677,8 +682,14 @@ petgraph = "0.6.5"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 # We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
-poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["anyhow", "rustls"] }
-poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["swagger-ui", "url"] }
+poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "anyhow",
+    "rustls",
+] }
+poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "swagger-ui",
+    "url",
+] }
 poem-openapi-derive = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b" }
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
@@ -696,6 +707,7 @@ prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
 quick_cache = "0.5.1"
+quick-junit = "0.5.0"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
@@ -758,6 +770,7 @@ stats_alloc = "0.1.8"
 status-line = "0.2.0"
 strum = "0.24.1"
 strum_macros = "0.24.2"
+sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
