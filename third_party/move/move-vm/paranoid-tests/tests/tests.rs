@@ -9,10 +9,7 @@ use std::path::Path;
 
 fn run_test_(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let scenario = FailScenario::setup();
-    fail::cfg("verifier-failpoint-1", "100%return").unwrap();
-    fail::cfg("verifier-failpoint-2", "100%return").unwrap();
-    fail::cfg("verifier-failpoint-3", "100%return").unwrap();
-    fail::cfg("verifier-failpoint-4", "100%return").unwrap();
+    fail::cfg("skip-verification-for-paranoid-tests", "100%return").unwrap();
     run_test(path)?;
     scenario.teardown();
     Ok(())

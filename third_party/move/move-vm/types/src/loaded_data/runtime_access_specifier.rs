@@ -494,13 +494,13 @@ impl AddressSpecifierFunction {
 impl AccessInstance {
     pub fn new(
         kind: AccessKind,
-        resource: &StructIdentifier,
+        resource: StructIdentifier,
         instance: &[Type],
         address: AccountAddress,
     ) -> Option<Self> {
         Some(AccessInstance {
             kind,
-            resource: resource.clone(),
+            resource,
             instance: instance.to_vec(),
             address,
         })
@@ -511,7 +511,7 @@ impl AccessInstance {
         instance: &[Type],
         address: AccountAddress,
     ) -> Option<Self> {
-        Self::new(AccessKind::Reads, resource, instance, address)
+        Self::new(AccessKind::Reads, resource.clone(), instance, address)
     }
 
     pub fn write(
@@ -519,7 +519,7 @@ impl AccessInstance {
         instance: &[Type],
         address: AccountAddress,
     ) -> Option<Self> {
-        Self::new(AccessKind::Writes, resource, instance, address)
+        Self::new(AccessKind::Writes, resource.clone(), instance, address)
     }
 }
 

@@ -16,10 +16,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
-use aptos_types::{
-    account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
-};
+use aptos_types::on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder};
 #[cfg(feature = "testing")]
 use aptos_types::{
     chain_id::ChainId,
@@ -29,6 +26,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
 };
+use aptos_vm_environment::natives::aptos_natives_with_builder;
 #[cfg(feature = "testing")]
 use bytes::Bytes;
 #[cfg(feature = "testing")]
@@ -160,26 +158,6 @@ pub fn aptos_natives(
     );
 
     aptos_natives_with_builder(&mut builder, false)
-}
-
-pub fn aptos_natives_with_builder(
-    builder: &mut SafeNativeBuilder,
-    inject_create_signer_for_gov_sim: bool,
-) -> NativeFunctionTable {
-    #[allow(unreachable_code)]
-    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
-        .into_iter()
-        .filter(|(_, name, _, _)| name.as_str() != "vector")
-        .chain(aptos_framework::natives::all_natives(
-            CORE_CODE_ADDRESS,
-            builder,
-            inject_create_signer_for_gov_sim,
-        ))
-        .chain(aptos_table_natives::table_natives(
-            CORE_CODE_ADDRESS,
-            builder,
-        ))
-        .collect()
 }
 
 pub fn assert_no_test_natives(err_msg: &str) {

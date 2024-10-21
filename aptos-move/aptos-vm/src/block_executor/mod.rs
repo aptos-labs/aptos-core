@@ -12,6 +12,7 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
+    cross_block_caches::get_environment_with_delayed_field_optimization_enabled,
     errors::BlockExecutionError, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
@@ -32,7 +33,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, environment::Environment, output::VMOutput,
+    abstract_write_op::AbstractResourceWriteOp, module_write_set::ModuleWrite, output::VMOutput,
     resolver::ResourceGroupSize,
 };
 use move_core_types::{
@@ -192,7 +193,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
+    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
@@ -416,8 +417,7 @@ impl BlockAptosVM {
             ExecutableTestType,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let environment =
-            Arc::new(Environment::new(state_view).try_enable_delayed_field_optimization());
+        let environment = get_environment_with_delayed_field_optimization_enabled(state_view)?;
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {
