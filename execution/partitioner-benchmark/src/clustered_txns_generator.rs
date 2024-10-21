@@ -9,6 +9,7 @@ use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use rand_distr::{Distribution, LogNormal, Normal};
 use aptos_logger::info;
 use rayon::prelude::*;
+use aptos_transaction_orderer::common::PTransaction;
 
 #[derive(Debug)]
 pub struct ClusteredTxnsGenConfig {
@@ -236,22 +237,35 @@ impl ClusteredTxnsGenerator {
 
         let start_time = Instant::now();
         let txn_indices = self.generate_txn_indices(num_txns);
+        //let txn_indices = [(0, (0, 0)), (1, (0, 1)), (2, (0, 2)), (3, (0, 2)), (3, (0, 3)), (5, (0, 4)), (6, (0, 5)), (7, (0, 6))]; // preserves sender order
+        //let txn_indices = [(0, (0, 0)), (1, (0, 0)), (2, (0, 0)), (3, (0, 0)), (4, (0, 1)), (5, (0, 1)), (6, (0, 1)), (7, (0, 1))]; // simple re-order with window_size == 2
+        //let txn_indices = [(0, (0, 0)), (1, (0, 1)), (2, (0, 2)), (3, (0, 2)), (4, (0, 2)), (5, (0, 2)), (6, (0, 3)), (7, (0, 4))]; // complex re-order with window_size == 2
         //let txn_indices = [(13, (1, 0)), (4, (1, 1)), (7, (0, 0)), (10, (0, 0)), (3, (0, 1)), (0, (0, 1)), (12, (1, 1)), (1, (0, 1)), (5, (0, 1)), (11, (0, 0)), (14, (0, 0)), (13, (1, 0)), (10, (1, 0)), (9, (1, 0)), (13, (1, 1)), (12, (1, 1)), (12, (1, 1)), (13, (0, 0)), (3, (0, 0)), (3, (1, 1)), (10, (1, 0)), (9, (1, 1)), (8, (1, 1)), (9, (1, 1)), (2, (0, 0)), (3, (0, 1)), (3, (0, 0)), (6, (0, 1)), (3, (0, 1)), (2, (1, 1))];
         //println!("txn_indices: {:?}", txn_indices);
         let duration = start_time.elapsed();
         info!("Time taken to generate txn_indices: {:?}", duration);
 
         let start_time = Instant::now();
-        let mut by_sender = HashMap::new();
+        /*let mut by_sender = HashMap::new();
         for (sender_idx, (recvr_cluster, recvr_resource_idx)) in txn_indices {
             by_sender.entry(sender_idx).or_insert(Vec::new()).push((recvr_cluster, recvr_resource_idx));
         }
 
-        let txns: Vec<AnalyzedTransaction> = by_sender.par_iter().map(|(sender_idx, recvs)| {
+        let mut txns: Vec<AnalyzedTransaction> = by_sender.par_iter().map(|(sender_idx, recvs)| {
             let receivers = recvs.iter().map(|(recvr_cluster, recvr_resource_idx)| &self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]).collect::<Vec<_>>();
             let sender = &self.all_user_accounts[*sender_idx];
             create_signed_p2p_transaction(sender, receivers)
+        }).flatten().collect();*/
+        let mut txns: Vec<AnalyzedTransaction> = txn_indices.iter().map(|(sender_idx, (recvr_cluster, recvr_resource_idx))| {
+            let receivers = vec![&self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]];
+            let sender = &self.all_user_accounts[*sender_idx];
+            create_signed_p2p_transaction(sender, receivers)
         }).flatten().collect();
+
+        for (idx, txn) in txns.iter_mut().enumerate() {
+            txn.id = idx;
+        }
+
         let duration = start_time.elapsed();
         info!("Time taken to create p2p txns: {:?}", duration);
 

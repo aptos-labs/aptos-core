@@ -24,6 +24,10 @@ pub trait PTransaction {
     fn read_set(&self) -> Self::ReadSetIter<'_>;
 
     fn write_set(&self) -> Self::WriteSetIter<'_>;
+
+    fn get_id(&self) -> usize {
+        0
+    }
 }
 
 impl PTransaction for AnalyzedTransaction {
@@ -39,5 +43,9 @@ impl PTransaction for AnalyzedTransaction {
 
     fn write_set(&self) -> Self::WriteSetIter<'_> {
         self.write_hints().iter().map(StorageLocation::state_key)
+    }
+
+    fn get_id(&self) -> usize {
+        self.id
     }
 }

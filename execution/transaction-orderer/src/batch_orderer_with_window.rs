@@ -180,7 +180,11 @@ where
                 && pending_read_table_requests == 0;
 
             if selected {
+                //println!("Selected txn id {}", tx.get_id());
                 self.selected.insert(idx);
+            } else {
+                //println!("Not selected txn id {}; pending_recent_write_dependencies {}; pending_write_table_requests {}; pending_read_table_requests {}",
+                  //       tx.get_id(), pending_recent_write_dependencies, pending_write_table_requests, pending_read_table_requests);
             }
 
             self.txn_info.push(TxnInfo {
@@ -220,6 +224,9 @@ where
         // Note that the callback cannot access the Orderer as we are still holding a mutable
         // reference to it. Hence, it will not be able to observe the orderer in an inconsistent
         // state.
+        for tx in committed_txns.iter() {
+        //    println!("Ordered txn id {}", tx.get_id());
+        }
         let res = callback(committed_txns);
 
         // Update the internal data structures.

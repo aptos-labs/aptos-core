@@ -33,6 +33,8 @@ pub struct AnalyzedTransaction {
     predictable_transaction: bool,
     /// The hash of the transaction - this is cached for performance reasons.
     hash: HashValue,
+    /// identifier
+    pub id: usize,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -77,6 +79,7 @@ impl AnalyzedTransaction {
             write_hints,
             predictable_transaction: !hints_contain_wildcard,
             hash,
+            id: 0,
         }
     }
 

@@ -17,6 +17,7 @@ use crate::batch_orderer::SequentialDynamicAriaOrderer;
 use crate::batch_orderer_with_window::SequentialDynamicWindowOrderer;
 use crate::block_orderer::BatchedBlockOrdererWithWindow;
 use crate::block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner};
+use crate::common::PTransaction;
 use crate::transaction_compressor::{compress_transactions, CompressedPTransaction, CompressedPTransactionInner};
 
 pub mod batch_orderer;
@@ -111,12 +112,15 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
 
         drop(block_partitioner);
 
-        let txns = txns_in_new_order.into_iter()
+        let txns: Vec<AnalyzedTransaction> = txns_in_new_order.into_iter()
             .map(|t|{
                 let CompressedPTransactionInner{ original, .. } = Rc::try_unwrap(t.unwrap()).unwrap();
                 *original
             })
             .collect();
+
+        //let txn_order: Vec<usize> = txns.iter().map(|t| t.get_id()).collect();
+        //println!("txn_order after partition: {:?}", txn_order);
 
         PartitionedTransactions::V3(build_partitioning_result(num_shards, txns, shard_idxs, self.print_debug_stats, false))
     }

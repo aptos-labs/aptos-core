@@ -357,6 +357,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         onchain_config: &onchain_config_clone,
                     });
                 let msg = Message::create_with_metadata(bcs::to_bytes(&execution_metadata).unwrap(), duration_since_epoch, 0, 0);
+                info!("********* Metadata sent to shard {}; metadata size {}", shard_id, msg.data.len());
+
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 /*senders[shard_id][0]
                     .lock()
@@ -392,6 +394,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                             .with_label_values(&["0", "cmd_tx_bcs_ser"])
                             .start_timer();
                         let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, analyzed_txns.len() as u64, (chunk_idx + 1) as u64);
+                        info!("********* Cmds sent to shard {}; size {}", shard_id, msg.data.len());
                         drop(bcs_ser_timer);
                         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                             .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);

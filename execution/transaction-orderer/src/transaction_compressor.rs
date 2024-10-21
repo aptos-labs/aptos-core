@@ -14,6 +14,7 @@ pub struct CompressedPTransactionInner<T: Debug> {
     pub original: Box<T>,
     pub read_set: Vec<CompressedKey>,
     pub write_set: Vec<CompressedKey>,
+    pub id: usize,
 }
 
 pub type CompressedPTransaction<T> = Rc<CompressedPTransactionInner<T>>;
@@ -29,6 +30,10 @@ impl<T: Debug> PTransaction for CompressedPTransaction<T> {
 
     fn write_set(&self) -> Self::WriteSetIter<'_> {
         self.write_set.iter()
+    }
+
+    fn get_id(&self) -> usize {
+        self.id
     }
 }
 
@@ -76,10 +81,13 @@ impl<K: Hash + Clone + Eq> TransactionCompressor<K> {
 
             let write_set = tx.write_set().map(|key| self.map_key(key)).collect();
 
+            let id = tx.get_id();
+
             res.push(Rc::new(CompressedPTransactionInner {
                 original: Box::new(tx),
                 read_set,
                 write_set,
+                id,
             }));
         }
 
