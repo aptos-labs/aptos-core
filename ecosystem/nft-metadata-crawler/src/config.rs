@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    asset_uploader::worker::{config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext},
+    asset_uploader::{
+        api::AssetUploaderApiContext,
+        throttler::{config::AssetUploaderThrottlerConfig, AssetUploaderThrottlerContext},
+        worker::{config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext},
+    },
     parser::{config::ParserConfig, ParserContext},
     utils::database::{establish_connection_pool, run_migrations},
 };
@@ -28,6 +32,8 @@ pub trait Server: Send + Sync {
 pub enum ServerConfig {
     Parser(ParserConfig),
     AssetUploaderWorker(AssetUploaderWorkerConfig),
+    AssetUploaderApi,
+    AssetUploaderThrottler(AssetUploaderThrottlerConfig),
 }
 
 /// Structs to hold config from YAML
@@ -44,6 +50,8 @@ pub struct NFTMetadataCrawlerConfig {
 pub enum ServerContext {
     Parser(ParserContext),
     AssetUploaderWorker(AssetUploaderWorkerContext),
+    AssetUploaderApi(AssetUploaderApiContext),
+    AssetUploaderThrottler(AssetUploaderThrottlerContext),
 }
 
 impl ServerConfig {
@@ -58,6 +66,15 @@ impl ServerConfig {
             ServerConfig::AssetUploaderWorker(asset_uploader_worker_config) => {
                 ServerContext::AssetUploaderWorker(AssetUploaderWorkerContext::new(
                     asset_uploader_worker_config.clone(),
+                ))
+            },
+            ServerConfig::AssetUploaderApi => {
+                ServerContext::AssetUploaderApi(AssetUploaderApiContext::new(pool))
+            },
+            ServerConfig::AssetUploaderThrottler(asset_uploader_throttler_config) => {
+                ServerContext::AssetUploaderThrottler(AssetUploaderThrottlerContext::new(
+                    asset_uploader_throttler_config.clone(),
+                    pool,
                 ))
             },
         }
@@ -87,9 +104,11 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
     }
 
     fn get_server_name(&self) -> String {
-        match &self.server_config {
+        match self.server_config {
             ServerConfig::Parser(_) => "parser",
             ServerConfig::AssetUploaderWorker(_) => "asset_uploader_worker",
+            ServerConfig::AssetUploaderApi => "asset_uploader_api",
+            ServerConfig::AssetUploaderThrottler(_) => "asset_uploader_throttler",
         }
         .to_string()
     }
