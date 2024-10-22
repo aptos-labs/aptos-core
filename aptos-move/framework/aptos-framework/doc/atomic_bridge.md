@@ -1276,6 +1276,11 @@ Generates a unique bridge transfer ID based on transfer details and nonce.
 
 ## Function `get_bridge_transfer_details_initiator`
 
+Gets initiator bridge transfer details given a bridge transfer ID
+
+@param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
+@return A <code><a href="atomic_bridge.md#0x1_atomic_bridge_store_BridgeTransferDetails">BridgeTransferDetails</a></code> struct.
+@abort If there is no transfer in the atomic bridge store.
 
 
 <pre><code>#[view]
@@ -1303,6 +1308,11 @@ Generates a unique bridge transfer ID based on transfer details and nonce.
 
 ## Function `get_bridge_transfer_details_counterparty`
 
+Gets counterparty bridge transfer details given a bridge transfer ID
+
+@param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
+@return A <code><a href="atomic_bridge.md#0x1_atomic_bridge_store_BridgeTransferDetails">BridgeTransferDetails</a></code> struct.
+@abort If there is no transfer in the atomic bridge store.
 
 
 <pre><code>#[view]

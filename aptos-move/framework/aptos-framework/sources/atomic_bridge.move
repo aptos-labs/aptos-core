@@ -601,7 +601,6 @@ module aptos_framework::atomic_bridge_store {
     use aptos_std::aptos_hash::keccak256;
     use aptos_std::smart_table;
     use aptos_std::smart_table::SmartTable;
-    use aptos_framework::atomic_bridge_configuration;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -615,6 +614,8 @@ module aptos_framework::atomic_bridge_store {
     use std::hash::sha3_256;
     #[test_only]
     use aptos_framework::ethereum;
+    #[test_only]
+    use aptos_framework::atomic_bridge_configuration;
 
     /// Error codes
     const EINVALID_PRE_IMAGE : u64 = 0x1;
@@ -903,24 +904,24 @@ module aptos_framework::atomic_bridge_store {
         keccak256(combined_bytes)
     }
 
+    #[view]
     /// Gets initiator bridge transfer details given a bridge transfer ID
     ///
     /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
     /// @return A `BridgeTransferDetails` struct.
     /// @abort If there is no transfer in the atomic bridge store.
-    #[view]
     public fun get_bridge_transfer_details_initiator(
         bridge_transfer_id: vector<u8>
     ): BridgeTransferDetails<address, EthereumAddress> acquires SmartTableWrapper {
         get_bridge_transfer_details(bridge_transfer_id)
     }
-
+    
+    #[view]
     /// Gets counterparty bridge transfer details given a bridge transfer ID
     ///
     /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
     /// @return A `BridgeTransferDetails` struct.
     /// @abort If there is no transfer in the atomic bridge store.
-    #[view]
     public fun get_bridge_transfer_details_counterparty(
         bridge_transfer_id: vector<u8>
     ): BridgeTransferDetails<EthereumAddress, address> acquires SmartTableWrapper {
@@ -1390,8 +1391,6 @@ module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::event::{Self, EventHandle}; 
-    use aptos_framework::signer;
-
     #[test_only]
     use aptos_framework::aptos_account;
     #[test_only]
@@ -1400,6 +1399,8 @@ module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::atomic_bridge_store::{valid_bridge_transfer_id, valid_hash_lock, plain_secret};
     #[test_only]
     use aptos_framework::ethereum::valid_eip55;
+    #[test_only]
+    use aptos_framework::signer;
     #[test_only]
     use aptos_framework::timestamp;
 
