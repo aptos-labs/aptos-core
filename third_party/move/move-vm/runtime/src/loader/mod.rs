@@ -147,6 +147,23 @@ impl Loader {
 
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
+    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorageV2) -> &StructInfoCache {
+        match self {
+            Self::V1(loader) => &loader.type_cache,
+            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
+        }
+    }
+
+    pub(crate) fn struct_name_index_map<'a>(
+        &'a self,
+        module_storage: &'a dyn ModuleStorageV2,
+    ) -> &StructNameIndexMap {
+        match self {
+            Self::V1(loader) => &loader.name_cache,
+            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+        }
+    }
+
     pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
@@ -327,14 +344,11 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<Arc<StructType>> {
-        let struct_name_index_map = match self {
-            Self::V1(loader) => &loader.name_cache,
-            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-        };
-
         // Ensure we do not return a guard here (still holding the lock) because loading the struct
         // type below can fetch struct type by index recursively.
-        let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx)?;
+        let struct_name = self
+            .struct_name_index_map(module_storage)
+            .idx_to_struct_name_ref(idx)?;
 
         match self {
             Loader::V1(_) => {
@@ -1666,11 +1680,7 @@ impl Loader {
         gas_context: &mut PseudoGasContext,
         module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<StructTag> {
-        let ty_cache = match self {
-            Self::V1(loader) => &loader.type_cache,
-            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
-        };
-
+        let ty_cache = self.ty_cache(module_storage);
         if let Some((struct_tag, gas)) = ty_cache.get_struct_tag(&struct_name_idx, ty_args) {
             gas_context.charge(gas)?;
             return Ok(struct_tag.clone());
@@ -1683,10 +1693,7 @@ impl Loader {
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context, module_storage))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        let struct_name_index_map = match self {
-            Self::V1(loader) => &loader.name_cache,
-            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-        };
+        let struct_name_index_map = self.struct_name_index_map(module_storage);
         let struct_tag = struct_name_index_map.idx_to_struct_tag(struct_name_idx, type_args)?;
 
         let size =
@@ -1749,11 +1756,7 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let ty_cache = match self {
-            Self::V1(loader) => &loader.type_cache,
-            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
-        };
-
+        let ty_cache = self.ty_cache(module_storage);
         if let Some((struct_layout, node_count, has_identifier_mappings)) =
             ty_cache.get_struct_layout_info(&struct_name_idx, ty_args)
         {
@@ -1769,14 +1772,11 @@ impl Loader {
 
         let layout = match &struct_type.layout {
             StructLayout::Single(fields) => {
-                let struct_name_index_map = match self {
-                    Self::V1(loader) => &loader.name_cache,
-                    Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-                };
-
                 // Some types can have fields which are lifted at serialization or deserialization
                 // times. Right now these are Aggregator and AggregatorSnapshot.
-                let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx)?;
+                let struct_name = self
+                    .struct_name_index_map(module_storage)
+                    .idx_to_struct_name_ref(struct_name_idx)?;
                 let maybe_mapping = self.get_identifier_mapping_kind(struct_name.as_ref());
 
                 let field_tys = fields
@@ -2008,11 +2008,7 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        let ty_cache = match self {
-            Self::V1(loader) => &loader.type_cache,
-            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
-        };
-
+        let ty_cache = self.ty_cache(module_storage);
         if let Some((layout, annotated_node_count)) =
             ty_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
         {
@@ -2155,11 +2151,7 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<DepthFormula> {
-        let ty_cache = match self {
-            Self::V1(loader) => &loader.type_cache,
-            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
-        };
-
+        let ty_cache = self.ty_cache(module_storage);
         if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
             return Ok(depth_formula);
         }
@@ -2184,10 +2176,7 @@ impl Loader {
 
         let formula = DepthFormula::normalize(formulas);
 
-        let struct_name_index_map = match self {
-            Self::V1(loader) => &loader.name_cache,
-            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-        };
+        let struct_name_index_map = self.struct_name_index_map(module_storage);
         ty_cache.store_depth_formula(struct_name_idx, struct_name_index_map, &formula)?;
         Ok(formula)
     }
