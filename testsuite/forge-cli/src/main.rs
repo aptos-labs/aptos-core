@@ -2531,7 +2531,10 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 }))
+        .with_emit_job(EmitJobRequest::default()
+                                        .mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 })
+                                        .coins_per_account_override(1_0000_0000_0000),
+                    )
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,

@@ -389,7 +389,7 @@ impl WorkflowTxnGeneratorCreator {
                     None,
                     Some(created_minter_pool.clone()),
                     num_minter_accounts,
-                    50_0000_0000,
+                    100_0000_0000,
                 ));
 
                 // Stage 1: Create user accounts
