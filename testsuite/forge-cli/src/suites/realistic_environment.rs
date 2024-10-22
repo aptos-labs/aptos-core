@@ -124,20 +124,19 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (7000, 100, 0.3, 0.5, 0.5, 0.4),
-            (8500, 100, 0.3, 0.5, 0.5, 0.4),
-            (2000, 300, 0.3, 1.0, 0.6, 1.0),
-            (3200, 500, 0.3, 1.0, 0.7, 0.6),
+            (7000, 100, 0.3 + 0.5, 0.5, 0.5),
+            (8500, 100, 0.3 + 0.5, 0.5, 0.4),
+            (2000, 300, 0.3 + 1.0, 0.6, 1.0),
+            (3200, 500, 0.3 + 1.0, 0.7, 0.8),
             // TODO - pos-to-proposal is set to high, until it is calibrated/understood.
-            (28, 5, 0.3, 5.0, 0.7, 1.0),
+            (28, 5, 0.3 + 5.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
             |(
                 min_tps,
                 max_expired,
-                batch_to_pos,
-                pos_to_proposal,
+                mempool_to_block_creation,
                 proposal_to_ordered,
                 ordered_to_commit,
             )| {
@@ -145,8 +144,10 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
                     .add_max_expired_tps(max_expired as f64)
                     .add_max_failed_submission_tps(200.0)
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
-                        (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
-                        (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
+                        (
+                            LatencyBreakdownSlice::MempoolToBlockCreation,
+                            mempool_to_block_creation,
+                        ),
                         (
                             LatencyBreakdownSlice::ConsensusProposalToOrdered,
                             proposal_to_ordered,
@@ -323,9 +324,8 @@ pub(crate) fn realistic_env_max_load_test(
         success_criteria = success_criteria.add_latency_breakdown_threshold(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
-                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
                     // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 2.5),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
