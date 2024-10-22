@@ -42,17 +42,14 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::{flush_warm_vm_cache, SessionId},
-    AptosVM,
-};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
 use aptos_vm_environment::{
     environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
-    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
+    module_and_script_storage::AsAptosCodeStorage, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use clap::Parser;
 use move_binary_format::{
@@ -71,7 +68,7 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
+use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -343,12 +340,12 @@ fn patch_module<F>(
 where
     F: FnOnce(&mut CompiledModule) -> Result<()>,
 {
-    let resolver = state_view.as_move_resolver();
-    let blob = resolver
-        .get_module(module_id)?
+    let state_key = StateKey::module_id(module_id);
+    let state_value = state_view
+        .get_state_value(&state_key)?
         .ok_or_else(|| anyhow!("module {} does not exist", module_id))?;
 
-    let mut m = CompiledModule::deserialize_with_config(&blob, deserializer_config)?;
+    let mut m = CompiledModule::deserialize_with_config(state_value.bytes(), deserializer_config)?;
 
     modify_module(&mut m)?;
 
@@ -363,10 +360,7 @@ where
     let mut blob = vec![];
     m.serialize(&mut blob)?;
 
-    state_view.set_state_value(
-        StateKey::module_id(module_id),
-        StateValue::new_legacy(blob.into()),
-    );
+    state_view.set_state_value(state_key, StateValue::new_legacy(blob.into()));
 
     Ok(())
 }
@@ -464,15 +458,12 @@ fn add_script_execution_hash(
  *
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
-    flush_warm_vm_cache();
     let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+    let gas_feature_version = env.gas_feature_version();
+
     let vm = AptosVM::new(env.clone(), &state_view);
     let resolver = state_view.as_move_resolver();
     let module_storage = state_view.as_aptos_code_storage(env);
-
-    let gas_schedule =
-        GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
-    let gas_feature_version = gas_schedule.feature_version;
 
     let change_set_configs =
         ChangeSetConfigs::unlimited_at_gas_feature_version(gas_feature_version);
@@ -488,16 +479,11 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
     )?;
-    let (mut change_set, empty_module_write_set) =
-        sess.finish(&change_set_configs, &module_storage)?;
-    assert!(
-        empty_module_write_set.is_empty(),
-        "Modules cannot be published by 'force_end_epoch'"
-    );
+    let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
 
     change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set
-        .try_combine_into_storage_change_set(empty_module_write_set)
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner();
 
@@ -616,9 +602,6 @@ pub async fn simulate_multistep_proposal(
         println!("    {}", script_name);
 
         // Create a new VM to ensure the loader is clean.
-        // The warm vm cache also needs to be explicitly flushed as it cannot detect the
-        // patches we performed.
-        flush_warm_vm_cache();
         let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
         let vm = AptosVM::new(env.clone(), &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);

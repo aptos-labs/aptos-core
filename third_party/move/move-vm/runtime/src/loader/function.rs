@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{
-        access_specifier_loader::load_access_specifier, Loader, Module, ModuleStorageAdapter,
-        Resolver, Script,
-    },
+    loader::{access_specifier_loader::load_access_specifier, Loader, Module, Resolver, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     ModuleStorage,
 };
@@ -144,15 +141,14 @@ impl LoadedFunction {
     pub(crate) fn get_resolver<'a>(
         &self,
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
         module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module_storage, module.clone())
+                Resolver::for_module(loader, module_storage, module.clone())
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, module_storage, script.clone())
+                Resolver::for_script(loader, module_storage, script.clone())
             },
         }
     }

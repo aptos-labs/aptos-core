@@ -144,7 +144,6 @@ impl RuntimeEnvironment {
     pub fn build_locally_verified_module(
         &self,
         compiled_module: Arc<CompiledModule>,
-        module_size: usize,
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
         if !VERIFIED_MODULES_V2.contains(module_hash) {
@@ -160,7 +159,7 @@ impl RuntimeEnvironment {
             VERIFIED_MODULES_V2.put(*module_hash);
         }
 
-        Ok(LocallyVerifiedModule(compiled_module, module_size))
+        Ok(LocallyVerifiedModule(compiled_module))
     }
 
     /// Creates a verified module by running dependency verification pass for a locally verified
@@ -178,7 +177,6 @@ impl RuntimeEnvironment {
         )?;
         let result = Module::new(
             &self.natives,
-            locally_verified_module.1,
             locally_verified_module.0,
             self.struct_name_index_map(),
         );
@@ -245,11 +243,6 @@ impl RuntimeEnvironment {
         Ok(())
     }
 
-    /// Returns native functions available to this runtime.
-    pub(crate) fn natives(&self) -> &NativeFunctions {
-        &self.natives
-    }
-
     /// Returns the re-indexing map currently used by this runtime environment to remap struct
     /// identifiers into indices.
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
@@ -309,8 +302,8 @@ impl WithRuntimeEnvironment for RuntimeEnvironment {
 }
 
 ///Compiled module that passed local bytecode verification, but not the linking checks yet for its
-/// dependencies. Also carries module size in bytes.
-pub struct LocallyVerifiedModule(Arc<CompiledModule>, usize);
+/// dependencies.
+pub struct LocallyVerifiedModule(Arc<CompiledModule>);
 
 impl LocallyVerifiedModule {
     pub fn immediate_dependencies_iter(

@@ -16,10 +16,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType,
-};
+use aptos_types::{block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent};
 use claims::{assert_matches, assert_ok};
 use num_cpus;
 use proptest::{
@@ -78,7 +75,6 @@ fn run_transactions<K, V, E>(
             MockTask<KeyType<K>, E>,
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
@@ -215,7 +211,6 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
@@ -268,7 +263,6 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
@@ -312,6 +306,7 @@ fn dynamic_read_writes_contended_with_block_gas_limit(
     );
 }
 
+#[allow(dead_code)]
 fn module_publishing_fallback_with_block_gas_limit(
     num_txns: usize,
     maybe_block_gas_limit: Option<u64>,
@@ -398,9 +393,10 @@ fn publishing_fixed_params_with_block_gas_limit(
                 assert!(!behavior.writes.is_empty());
                 let insert_idx = indices[1].index(behavior.writes.len());
                 let val = behavior.writes[0].1.clone();
+                // TODO(loader_v2): This used to be a module write. Revisit module publishing prop tests.
                 behavior
                     .writes
-                    .insert(insert_idx, (KeyType(universe[42], true), val));
+                    .insert(insert_idx, (KeyType(universe[42]), val));
             });
         },
         _ => {
@@ -426,7 +422,6 @@ fn publishing_fixed_params_with_block_gas_limit(
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         DeltaDataView<KeyType<[u8; 32]>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-        ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
@@ -446,9 +441,8 @@ fn publishing_fixed_params_with_block_gas_limit(
             incarnation_behaviors.iter_mut().for_each(|behavior| {
                 assert!(!behavior.reads.is_empty());
                 let insert_idx = indices[3].index(behavior.reads.len());
-                behavior
-                    .reads
-                    .insert(insert_idx, KeyType(universe[42], true));
+                // TODO(loader_v2): This used to be a module read. Revisit module publishing prop tests.
+                behavior.reads.insert(insert_idx, KeyType(universe[42]));
             });
         },
         _ => {
@@ -470,7 +464,6 @@ fn publishing_fixed_params_with_block_gas_limit(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(
                 num_cpus::get(),
@@ -536,7 +529,7 @@ fn non_empty_group(
     let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
         group_keys: key_universe[(key_universe_len - 3)..key_universe_len]
             .iter()
-            .map(|k| KeyType(*k, false))
+            .map(|k| KeyType(*k))
             .collect(),
     };
 
@@ -554,7 +547,6 @@ fn non_empty_group(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
@@ -573,7 +565,6 @@ fn non_empty_group(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
@@ -610,13 +601,6 @@ fn deltas_resolver() {
 #[test]
 fn dynamic_read_writes_contended() {
     dynamic_read_writes_contended_with_block_gas_limit(1000, None);
-}
-
-// TODO(loader_v2): Fix this test.
-#[test]
-#[ignore]
-fn module_publishing_fallback() {
-    module_publishing_fallback_with_block_gas_limit(3000, None);
 }
 
 // TODO(loader_v2): Fix this test.
@@ -719,17 +703,6 @@ fn dynamic_read_writes_contended_with_block_gas_limit_test() {
         Some(rand::thread_rng().gen_range(0, 1000) as u64),
     );
     dynamic_read_writes_contended_with_block_gas_limit(1000, Some(0));
-}
-
-// TODO(loader_v2): Fix this test.
-#[test]
-#[ignore]
-fn module_publishing_fallback_with_block_gas_limit_test() {
-    module_publishing_fallback_with_block_gas_limit(
-        3000,
-        // Need to execute at least 2 txns to trigger module publishing fallback
-        Some(rand::thread_rng().gen_range(1, 3000 * MAX_GAS_PER_TXN / 2)),
-    );
 }
 
 // TODO(loader_v2): Fix this test.

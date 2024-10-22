@@ -159,8 +159,8 @@ fn main() -> Result<()> {
         &mut builder,
     ));
 
-    let runtime_environment = RuntimeEnvironment::new(natives.clone());
-    let vm = MoveVM::new(natives);
+    let runtime_environment = RuntimeEnvironment::new(natives);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut storage = InMemoryStorage::new();
 
     let test_modules = compile_test_modules();

@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::SessionExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
@@ -14,7 +13,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, language_storage::ModuleId, vm_status::StatusCode,
+    account_address::AccountAddress, identifier::IdentStr, vm_status::StatusCode,
 };
 use std::collections::HashSet;
 
@@ -35,7 +34,6 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Extract the event metadata
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
 pub(crate) fn validate_module_events(
-    session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
     modules: &[CompiledModule],
 ) -> VMResult<()> {
@@ -50,8 +48,11 @@ pub(crate) fn validate_module_events(
         // Check all the emit calls have the correct struct with event attribute.
         validate_emit_calls(&new_event_structs, module)?;
 
-        let original_event_structs =
-            extract_event_metadata_from_module(session, module_storage, &module.self_id())?;
+        let original_event_structs = extract_event_metadata_from_module(
+            module_storage,
+            module.self_addr(),
+            module.self_name(),
+        )?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -119,37 +120,18 @@ pub(crate) fn validate_emit_calls(
 
 /// Given a module id extract all event metadata
 pub(crate) fn extract_event_metadata_from_module(
-    session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
+    address: &AccountAddress,
+    module_name: &IdentStr,
 ) -> VMResult<HashSet<String>> {
-    if module_storage.is_enabled() {
-        // TODO(loader_v2): We can optimize metadata calls as well.
-        let metadata = module_storage
-            .fetch_deserialized_module(module_id.address(), module_id.name())?
-            .map(|module| aptos_framework::get_metadata_from_compiled_module(module.as_ref()));
-        if let Some(Some(metadata)) = metadata {
-            extract_event_metadata(&metadata)
-        } else {
-            Ok(HashSet::new())
-        }
+    // TODO(loader_v2): We can optimize metadata calls as well.
+    let metadata = module_storage
+        .fetch_deserialized_module(address, module_name)?
+        .map(|module| aptos_framework::get_metadata_from_compiled_module(module.as_ref()));
+    if let Some(Some(metadata)) = metadata {
+        extract_event_metadata(&metadata)
     } else {
-        #[allow(deprecated)]
-        let metadata = session
-            .fetch_module_from_data_store(module_id)
-            .map(|module| {
-                CompiledModule::deserialize_with_config(
-                    &module,
-                    &session.get_vm_config().deserializer_config,
-                )
-                .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-            });
-
-        if let Ok(Ok(Some(metadata))) = metadata {
-            extract_event_metadata(&metadata)
-        } else {
-            Ok(HashSet::new())
-        }
+        Ok(HashSet::new())
     }
 }
 

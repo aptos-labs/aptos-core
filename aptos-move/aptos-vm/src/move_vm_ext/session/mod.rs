@@ -24,10 +24,8 @@ use aptos_types::{
     transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet,
-    module_and_script_storage::module_storage::AptosModuleStorage,
-    module_write_set::{ModuleWrite, ModuleWriteSet},
-    storage::change_set_configs::ChangeSetConfigs,
+    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWrite, storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
@@ -59,8 +57,8 @@ pub(crate) enum ResourceGroupChangeSet {
     // Granular ops to individual resources within a group.
     V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
 }
-type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
-type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
+type AccountChangeSet = AccountChanges<BytesWithResourceLayout>;
+type ChangeSet = Changes<BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
@@ -106,13 +104,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         extensions.add(NativeEventContext::default());
         extensions.add(NativeObjectContext::default());
 
-        // Old VM code loader has bugs around module upgrade. After a module upgrade, the internal
-        // cache needed to be flushed to work around those bugs.
-        if !features.is_loader_v2_enabled() {
-            #[allow(deprecated)]
-            move_vm.flush_loader_cache_if_invalidated();
-        }
-
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
             inner: move_vm.new_session_with_extensions(resolver, extensions),
@@ -125,9 +116,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         self,
         configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
-    ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
-        let move_vm = self.inner.get_move_vm();
-
+    ) -> VMResult<VMChangeSet> {
         let resource_converter = |value: Value,
                                   layout: MoveTypeLayout,
                                   has_aggregator_lifting: bool|
@@ -155,13 +144,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .inner
             .finish_with_extensions_with_custom_effects(&resource_converter, module_storage)?;
 
-        let (change_set, resource_group_change_set) = Self::split_and_merge_resource_groups(
-            move_vm,
-            self.resolver,
-            module_storage,
-            change_set,
-        )
-        .map_err(|e| e.finish(Location::Undefined))?;
+        let (change_set, resource_group_change_set) =
+            Self::split_and_merge_resource_groups(self.resolver, module_storage, change_set)
+                .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -178,7 +163,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
 
-        let (change_set, module_write_set) = Self::convert_change_set(
+        let change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -189,7 +174,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
-        Ok((change_set, module_write_set))
+        Ok(change_set)
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -271,7 +256,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
-        vm: &MoveVM,
         resolver: &dyn AptosMoveResolver,
         module_storage: &impl ModuleStorage,
         change_set: ChangeSet,
@@ -300,20 +284,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
             > = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
-            let (modules, resources) = account_changeset.into_inner();
+            let resources = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group_tag = if module_storage.is_enabled() {
-                    let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
-                        .map_err(|e| e.to_partial())?;
-                    get_resource_group_member_from_metadata(&struct_tag, &metadata)
-                } else {
-                    #[allow(deprecated)]
-                    vm.with_module_metadata(&struct_tag.module_id(), |md| {
-                        get_resource_group_member_from_metadata(&struct_tag, md)
-                    })
-                };
+                let metadata = module_storage
+                    .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                    .map_err(|e| e.to_partial())?;
+                let resource_group_tag =
+                    get_resource_group_member_from_metadata(&struct_tag, &metadata);
 
                 if let Some(resource_group_tag) = resource_group_tag {
                     if resource_groups
@@ -330,10 +308,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             change_set_filtered
-                .add_account_changeset(
-                    addr,
-                    AccountChangeSet::from_modules_resources(modules, resources_filtered),
-                )
+                .add_account_changeset(addr, AccountChangeSet::from_resources(resources_filtered))
                 .map_err(|_| common_error())?;
 
             for (resource_group_tag, resources) in resource_groups {
@@ -381,18 +356,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         legacy_resource_creation_as_modification: bool,
-    ) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
+    ) -> PartialVMResult<VMChangeSet> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
-
-        let mut has_modules_published_to_special_address = false;
-        let mut module_writes = BTreeMap::new();
 
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
-            let (modules, resources) = account_changeset.into_inner();
+            let resources = account_changeset.into_inner();
             for (struct_tag, blob_and_layout_op) in resources {
                 let state_key = resource_state_key(&addr, &struct_tag)?;
                 let op = woc.convert_resource(
@@ -402,17 +374,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 )?;
 
                 resource_write_set.insert(state_key, op);
-            }
-
-            for (name, blob_op) in modules {
-                if addr.is_special() {
-                    has_modules_published_to_special_address = true;
-                }
-
-                let module_id = ModuleId::new(addr, name);
-                let state_key = StateKey::module_id(&module_id);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_writes.insert(state_key, ModuleWrite::new(module_id, op));
             }
         }
 
@@ -469,7 +430,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
             .collect();
 
-        let change_set = VMChangeSet::new_expanded(
+        VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
             aggregator_v1_write_set,
@@ -478,12 +439,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             reads_needing_exchange,
             group_reads_needing_change,
             events,
-        )?;
-
-        let module_write_set =
-            ModuleWriteSet::new(has_modules_published_to_special_address, module_writes);
-
-        Ok((change_set, module_write_set))
+        )
     }
 }
 

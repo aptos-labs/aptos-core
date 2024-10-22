@@ -54,8 +54,6 @@ macro_rules! convert_impl {
 }
 
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_module, get_module_state_value_metadata);
-
     convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
 
     pub(crate) fn new(

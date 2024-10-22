@@ -2,17 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::state_key::{inner::StateKeyInner, StateKey};
-use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
-
-#[derive(PartialEq, Eq, Debug)]
-pub enum ExecutableDescriptor {
-    /// Possibly speculative, based on code published during the block.
-    Published(HashValue),
-
-    /// Based on code published (and committed) in previous blocks.
-    Storage,
-}
 
 pub trait ModulePath {
     // TODO(loader_v2):
@@ -40,13 +30,4 @@ impl ModulePath for StateKey {
 /// different ownership for the arena / memory.
 pub trait Executable: Clone + Send + Sync {
     fn size_bytes(&self) -> usize;
-}
-
-#[derive(Clone)]
-pub struct ExecutableTestType(());
-
-impl Executable for ExecutableTestType {
-    fn size_bytes(&self) -> usize {
-        0
-    }
 }

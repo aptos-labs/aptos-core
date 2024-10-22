@@ -65,9 +65,9 @@ impl<'r, 'l> UserSession<'r, 'l> {
         module_storage: &impl ModuleStorage,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let Self { session } = self;
-        let (change_set, module_write_set) =
+        let change_set =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
-        UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
+        UserSessionChangeSet::new(change_set, ModuleWriteSet::empty(), change_set_configs)
     }
 
     /// Finishes the session while also processing the publish request, and running module
@@ -144,7 +144,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
             staging_module_storage.release_verified_module_bundle(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
-        let module_write_set = ModuleWriteSet::new(false, write_ops);
+        let module_write_set = ModuleWriteSet::new(write_ops);
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 }
