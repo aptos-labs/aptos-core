@@ -555,7 +555,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::BytecodePipeline(Some("uninitialized_use_checker")),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "uninitialized_use_checker"]),
         },
         // -- File Format Generation
         // Test without bytecode optimizations enabled
