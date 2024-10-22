@@ -25,6 +25,10 @@ pub trait BlockOrderer {
     ) -> Result<(), E>
     where
         F: FnMut(Vec<Self::Txn>) -> Result<(), E>;
+
+    fn get_max_window_size(&self) -> usize {
+        0
+    }
 }
 
 pub struct IdentityBlockOrderer<T> {
@@ -172,7 +176,7 @@ where
                 batch_orderer.add_transactions((&mut txns).take(self.insert_batch_size));
             }
 
-            if batch_orderer.get_window_size() > self.max_window_size {
+            if batch_orderer.get_window_size() >= self.max_window_size {
                 let window_size = batch_orderer.get_window_size();
                 //println!("Forgetting prefix of size {}", window_size - self.max_window_size);
                 batch_orderer.forget_prefix(window_size - self.max_window_size);
@@ -192,7 +196,7 @@ where
             let commit_len = min(n_selected, self.max_window_size);
             //batch_orderer.commit_prefix_callback((n_selected + 1) / 2, |ordered_batch| {
             batch_orderer.commit_prefix_callback(commit_len, |ordered_batch| {
-                println!("Ordered batch size: {}", ordered_batch.len());
+                //println!("Ordered batch size: {}; n_ordered: {}", ordered_batch.len(), n_ordered);
                 n_ordered += ordered_batch.len();
                 n_batches += 1;
                 ordered_batch_max_size = max(ordered_batch_max_size, ordered_batch.len());
@@ -204,5 +208,9 @@ where
             "BatchedBlockOrdererWithWindow: ordered {} transactions in {} batches, max batch size = {}, min batch size = {}, avg batch size = {}",
             n_ordered, n_batches, ordered_batch_max_size, ordered_batch_min_size, n_ordered / n_batches);
         Ok(())
+    }
+
+    fn get_max_window_size(&self) -> usize {
+        self.max_window_size
     }
 }

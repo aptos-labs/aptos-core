@@ -34,6 +34,7 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_block_partitioner::v3::V3NaivePartitioner;
 use aptos_fanout_partitioner::fanout::V3FanoutPartitionerConfig;
 use aptos_streaming_partitioner::V3FennelBasedPartitionerConfig;
 use aptos_transaction_orderer::V3ReorderingPartitionerConfig;
@@ -166,6 +167,10 @@ struct ShardingOpt {
     partitioner_v2_dashmap_num_shards: usize,
     #[clap(long)]
     pub v3_debug_logs: bool,
+    #[clap(long, default_value_t = 100)]
+    pub v3_reorderer_min_ordered_transaction_before_execution: usize,
+    #[clap(long, default_value_t = 1000)]
+    pub v3_reorderer_max_window_size: usize,
     #[clap(long)]
     pub fanout_detailed_debug_logs: bool,
     #[clap(long, default_value_t = 10)]
@@ -200,8 +205,12 @@ impl ShardingOpt {
                 partition_last_round: !self.use_global_executor,
                 pre_partitioner_config: self.pre_partitioner_config(),
             }),
-            Some("v3-naive") => Box::new(V3NaivePartitionerConfig {}),
-            Some("v3-orderer") => Box::new(V3ReorderingPartitionerConfig {}),
+            Some("v3-naive") => Box::new(V3NaivePartitionerConfig { print_debug_stats: self.v3_debug_logs, }),
+            Some("v3-orderer") => Box::new(V3ReorderingPartitionerConfig {
+                print_debug_stats: self.v3_debug_logs,
+                min_ordered_transaction_before_execution: self.v3_reorderer_min_ordered_transaction_before_execution,
+                max_window_size: self.v3_reorderer_max_window_size,
+            }),
             Some("v3-fennel") => Box::new(V3FennelBasedPartitionerConfig {}),
             Some("v3-fanout") => Box::new(V3FanoutPartitionerConfig {
                 print_debug_stats: self.v3_debug_logs,

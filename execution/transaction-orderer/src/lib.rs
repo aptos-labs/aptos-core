@@ -127,10 +127,18 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
 }
 
 #[derive(Debug, Default)]
-pub struct V3ReorderingPartitionerConfig {}
+pub struct V3ReorderingPartitionerConfig {
+    pub print_debug_stats: bool,
+    pub min_ordered_transaction_before_execution: usize,
+    pub max_window_size: usize,
+}
 
 impl PartitionerConfig for V3ReorderingPartitionerConfig {
     fn build(&self) -> Box<dyn aptos_block_partitioner::BlockPartitioner> {
-        Box::new(V3ReorderingPartitioner::default())
+        Box::new(V3ReorderingPartitioner {
+            print_debug_stats: self.print_debug_stats,
+            min_ordered_transaction_before_execution: self.min_ordered_transaction_before_execution,
+            max_window_size: self.max_window_size,
+        })
     }
 }

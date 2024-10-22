@@ -73,11 +73,13 @@ impl BlockPartitioner for V3NaivePartitioner {
 }
 
 #[derive(Debug, Default)]
-pub struct V3NaivePartitionerConfig {}
+pub struct V3NaivePartitionerConfig {
+    pub print_debug_stats: bool,
+}
 
 impl PartitionerConfig for V3NaivePartitionerConfig {
     fn build(&self) -> Box<dyn BlockPartitioner> {
-        Box::new(V3NaivePartitioner::default())
+        Box::new(V3NaivePartitioner { print_debug_stats: self.print_debug_stats })
     }
 }
 
