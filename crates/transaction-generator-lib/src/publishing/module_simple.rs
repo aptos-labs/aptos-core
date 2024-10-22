@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
+use std::{process::id, vec};
+
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
@@ -10,8 +12,7 @@ use aptos_sdk::{
         language_storage::ModuleId,
     },
     types::{
-        serde_helper::bcs_utils::bcs_size_of_byte_array,
-        transaction::{EntryFunction, TransactionPayload},
+        serde_helper::bcs_utils::bcs_size_of_byte_array, state_store::state_key::registry::Entry, transaction::{EntryFunction, TransactionPayload}
     },
 };
 use move_binary_format::{
@@ -267,6 +268,8 @@ pub enum EntryPoints {
         num_points_per_txn: usize,
     },
     DeserializeU256,
+    CheckAndInsertNonce,
+    InitializeNonceTable,
 }
 
 impl EntryPoints {
@@ -323,6 +326,8 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::CheckAndInsertNonce
+            | EntryPoints::InitializeNonceTable => "aptos_framework",
         }
     }
 
@@ -382,6 +387,8 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::CheckAndInsertNonce
+            | EntryPoints::InitializeNonceTable => "nonce_validation",
         }
     }
 
@@ -722,6 +729,24 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::CheckAndInsertNonce => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("check_and_insert_nonce").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rng.gen_range(0u64, 1000u64)).unwrap(),
+                        bcs::to_bytes(&rng.gen_range(0u64, 1000u64)).unwrap(),
+                    ]
+                )
+            },
+            EntryPoints::InitializeNonceTable => {
+                get_payload(
+                    module_id,
+                    ident_str!("initialize_nonce_table").to_owned(),
+                    vec![],
+                )
+            }
         }
     }
 
@@ -749,6 +774,7 @@ impl EntryPoints {
                     milestone_every: *milestone_every,
                 })
             },
+            EntryPoints::CheckAndInsertNonce => Some(EntryPoints::InitializeNonceTable)
             _ => None,
         }
     }
@@ -829,6 +855,7 @@ impl EntryPoints {
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
+            EntryPoints::CheckAndInsertNonce => AutomaticArgs::None,
         }
     }
 }
