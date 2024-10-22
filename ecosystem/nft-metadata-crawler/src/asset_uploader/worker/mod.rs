@@ -77,7 +77,7 @@ impl AssetUploaderWorkerContext {
             .text(
                 // Save the asset_uri in the upload metadata to enable retrieval by asset_uri later
                 "metadata",
-                format!("{{\"asset_uri\": \"{}\"}}", url.to_string()),
+                format!("{{\"asset_uri\": \"{}\"}}", url),
             )
             .text("url", url.to_string());
 
