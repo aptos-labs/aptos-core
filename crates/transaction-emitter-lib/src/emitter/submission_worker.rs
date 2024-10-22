@@ -270,6 +270,7 @@ impl SubmissionWorker {
         }
         let (num_committed, num_expired) =
             count_committed_expired_stats(account_to_start_and_end_seq_num, latest_fetched_counts);
+        info!("account: {:?}, num_committed: {:?}, num_expired: {:?}", self.accounts.first().unwrap().address(), num_committed, num_expired);
 
         if num_expired > 0 {
             loop_stats

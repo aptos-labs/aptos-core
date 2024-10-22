@@ -170,7 +170,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         }
 
         sample!(
-            SampleRate::Duration(Duration::from_secs(2)),
+            SampleRate::Duration(Duration::from_millis(250)),
             info!("Cur stage: {}, stop conditions per stage: {:?}", stage, self.stop_condition_per_stage);
         );
 

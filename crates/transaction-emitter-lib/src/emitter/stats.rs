@@ -10,7 +10,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-
+use aptos_logger::info;
 #[derive(Debug, Clone, Default)]
 pub struct TxnStats {
     pub submitted: u64,
@@ -284,6 +284,7 @@ pub struct DynamicStatsTracking {
 impl DynamicStatsTracking {
     pub fn new(num_phases: usize) -> DynamicStatsTracking {
         assert!(num_phases >= 1);
+        info!("DynamicStatsTracking: {} phases", num_phases);
         Self {
             num_phases,
             cur_phase: Arc::new(AtomicUsize::new(0)),
