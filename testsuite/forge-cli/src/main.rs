@@ -2522,7 +2522,7 @@ fn pfn_const_tps(
     add_network_emulation: bool,
     epoch_changes: bool,
 ) -> ForgeConfig {
-    let epoch_duration_secs = if epoch_changes {
+    let _epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
     } else {
         60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
@@ -2542,7 +2542,7 @@ fn pfn_const_tps(
             None,
         ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
+            helm_values["chain"]["epoch_duration_secs"] = 3000.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(4500)
