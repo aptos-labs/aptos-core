@@ -835,14 +835,10 @@ impl Interpreter {
                 )
             },
         };
-        let struct_name_index_map = match resolver.loader() {
-            Loader::V1(loader) => &loader.name_cache,
-            Loader::V2(_) => resolver
-                .module_storage()
-                .runtime_environment()
-                .struct_name_index_map(),
-        };
-        let struct_name = struct_name_index_map.idx_to_struct_name(struct_idx)?;
+        let struct_name = resolver
+            .loader()
+            .struct_name_index_map(resolver.module_storage())
+            .idx_to_struct_name(struct_idx)?;
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }

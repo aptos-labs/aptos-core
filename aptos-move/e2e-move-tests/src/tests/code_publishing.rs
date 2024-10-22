@@ -427,7 +427,6 @@ fn test_module_publishing_does_not_fallback() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
     let account = h.new_account_at(addr);
 
@@ -530,7 +529,6 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::random();
     let account = h.new_account_at(addr);
 
@@ -547,7 +545,7 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     let mut expected_abort_codes: Vec<Option<u64>> = vec![];
 
     for (ty, maybe_abort_code) in tys_with_abort_codes {
-        expected_abort_codes.push(maybe_abort_code.clone());
+        expected_abort_codes.push(maybe_abort_code);
 
         // Create module to be published that uses the same type name but different layout. For
         // the first few modules, run 'init_module' to ensure the type is used and then abort the
@@ -557,7 +555,7 @@ fn test_module_publishing_does_not_leak_speculative_information() {
         let init_module = if let Some(abort_code) = maybe_abort_code {
             format!("fun init_module(sender: &signer) {{ move_to(sender, Foo {{ data: 0 }}); abort {} }}", abort_code)
         } else {
-            format!("fun init_module(sender: &signer) {{ move_to(sender, Foo {{ data: 77 }}) }}")
+            "fun init_module(sender: &signer) { move_to(sender, Foo { data: 77 }) }".to_string()
         };
         let source = format!("module {}::foo {{ {} {} }}", addr, struct_def, init_module);
 
