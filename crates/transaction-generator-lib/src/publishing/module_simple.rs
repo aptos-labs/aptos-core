@@ -245,6 +245,11 @@ pub enum EntryPoints {
         move_len: u64,
         repeats: u64,
     },
+    MapInsertRemove {
+        len: u64,
+        repeats: u64,
+        use_simple_map: bool,
+    },
     /// Initialize Token V1 NFT collection
     TokenV1InitializeCollection,
     /// Mint an NFT token. Should be called only after InitializeCollection is called
@@ -319,6 +324,7 @@ impl EntryPoints {
             | EntryPoints::VectorTrimAppend { .. }
             | EntryPoints::VectorRemoveInsert { .. }
             | EntryPoints::VectorRangeMove { .. }
+            | EntryPoints::MapInsertRemove { .. }
             | EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -379,6 +385,7 @@ impl EntryPoints {
             EntryPoints::VectorTrimAppend { .. }
             | EntryPoints::VectorRemoveInsert { .. }
             | EntryPoints::VectorRangeMove { .. } => "vector_example",
+            EntryPoints::MapInsertRemove { .. } => "maps_example",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -603,6 +610,15 @@ impl EntryPoints {
                     bcs::to_bytes(repeats).unwrap(),
                 ],
             ),
+            EntryPoints::MapInsertRemove {
+                len,
+                repeats,
+                use_simple_map,
+            } => get_payload(module_id, ident_str!("test_add_remove").to_owned(), vec![
+                bcs::to_bytes(len).unwrap(),
+                bcs::to_bytes(repeats).unwrap(),
+                bcs::to_bytes(use_simple_map).unwrap(),
+            ]),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
                 module_id,
                 ident_str!("token_v1_initialize_collection").to_owned(),
@@ -871,7 +887,8 @@ impl EntryPoints {
             },
             EntryPoints::VectorTrimAppend { .. }
             | EntryPoints::VectorRemoveInsert { .. }
-            | EntryPoints::VectorRangeMove { .. } => AutomaticArgs::None,
+            | EntryPoints::VectorRangeMove { .. }
+            | EntryPoints::MapInsertRemove { .. } => AutomaticArgs::None,
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential

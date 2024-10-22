@@ -8,18 +8,13 @@ module std::cmp {
         Greater,
     }
 
-    // TODO - functions here are `public(friend)` here for one release,
-    // and to be changed to `public` one release later.
-    #[test_only]
-    friend std::bcs_tests;
-
     /// Compares two values with the natural ordering:
     /// - native types are compared identically to `<` and other operators
     /// - complex types
     ///   - Structs and vectors - are compared lexicographically - first field/element is compared first,
     ///     and if equal we proceed to the next.
     ///   - enum's are compared first by their variant, and if equal - they are compared as structs are.
-    native public(friend) fun compare<T>(first: &T, second: &T): Ordering;
+    native public fun compare<T>(first: &T, second: &T): Ordering;
 
     public fun is_eq(self: &Ordering): bool {
         self is Ordering::Equal

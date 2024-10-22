@@ -68,11 +68,6 @@ module std::vector {
     /// Aborts if `i` or `j` is out of bounds.
     native public fun swap<Element>(self: &mut vector<Element>, i: u64, j: u64);
 
-    // TODO - functions here are `public(friend)` here for one release,
-    // and to be changed to `public` one release later.
-    #[test_only]
-    friend std::vector_tests;
-
     /// Moves range of elements `[removal_position, removal_position + length)` from vector `from`,
     /// to vector `to`, inserting them starting at the `insert_position`.
     /// In the `from` vector, elements after the selected range are moved left to fill the hole
@@ -80,7 +75,7 @@ module std::vector {
     /// In the `to` vector, elements after the `insert_position` are moved the the right to make space for new elements
     /// (i.e. range is inserted, while the order of the rest of the elements is kept).
     /// Move prevents from having two mutable references to the same value, so `from` and `to` vectors are always distinct.
-    native public(friend) fun move_range<T>(from: &mut vector<T>, removal_position: u64, length: u64, to: &mut vector<T>, insert_position: u64);
+    native public fun move_range<T>(from: &mut vector<T>, removal_position: u64, length: u64, to: &mut vector<T>, insert_position: u64);
 
     /// Return an vector of size one containing element `e`.
     public fun singleton<Element>(e: Element): vector<Element> {

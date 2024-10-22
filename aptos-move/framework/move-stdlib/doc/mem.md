@@ -25,7 +25,7 @@ I.e. swapping/replacing non-copyable/non-droppable types.
 Swap contents of two passed mutable references.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T)
+<pre><code><b>public</b> <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T)
 </code></pre>
 
 
@@ -34,7 +34,7 @@ Swap contents of two passed mutable references.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T);
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T);
 </code></pre>
 
 
@@ -49,7 +49,7 @@ Replace value reference points to with the given new value,
 and return value it had before.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T
+<pre><code><b>public</b> <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T
 </code></pre>
 
 
@@ -58,7 +58,7 @@ and return value it had before.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T {
+<pre><code><b>public</b> <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T {
     <a href="mem.md#0x1_mem_swap">swap</a>(ref, &<b>mut</b> new);
     new
 }
@@ -78,7 +78,7 @@ and return value it had before.
 ### Function `swap`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T)
+<pre><code><b>public</b> <b>fun</b> <a href="mem.md#0x1_mem_swap">swap</a>&lt;T&gt;(left: &<b>mut</b> T, right: &<b>mut</b> T)
 </code></pre>
 
 
@@ -97,7 +97,7 @@ and return value it had before.
 ### Function `replace`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T
+<pre><code><b>public</b> <b>fun</b> <a href="mem.md#0x1_mem_replace">replace</a>&lt;T&gt;(ref: &<b>mut</b> T, new: T): T
 </code></pre>
 
 
