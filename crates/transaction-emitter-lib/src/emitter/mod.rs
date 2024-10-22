@@ -937,8 +937,8 @@ impl TxnEmitter {
         let per_phase_duration = duration.checked_div(phases as u32).unwrap();
         for phase in 0..phases {
             if phase > 0 {
-                info!("Starting next phase");
                 job.start_next_phase();
+                info!("Starting next phase. cur phase {}. total phases {}. per phase duration {:?}", job.get_cur_phase(), phases, per_phase_duration);
             }
             if let Some(interval_secs) = print_stats_interval {
                 job.periodic_stat(per_phase_duration, interval_secs).await;
@@ -958,6 +958,7 @@ impl TxnEmitter {
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
+        info!("emit_txn_for");
         self.emit_txn_for_impl(source_account, emit_job_request, duration, None)
             .await
     }
@@ -969,6 +970,7 @@ impl TxnEmitter {
         duration: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
+        info!("emit_txn_for_with_stats");
         self.emit_txn_for_impl(
             source_account,
             emit_job_request,
