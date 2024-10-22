@@ -1181,7 +1181,7 @@ pub struct MovePackageDir {
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    /// Same as `--bytecode_version=7 --language_version=2.1 --compiler_version=2.0`
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }
