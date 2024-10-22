@@ -73,6 +73,7 @@ const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
+pub const GIT_IGNORE: &str = ".gitignore";
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -374,7 +375,18 @@ impl CliConfig {
         let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
+        let no_dir = !aptos_folder.exists();
         create_dir_if_not_exist(aptos_folder.as_path())?;
+
+        // If the `.aptos/` doesn't exist, we'll add a .gitignore in it to ignore the config file
+        // so people don't save their credentials...
+        if no_dir {
+            write_to_user_only_file(
+                aptos_folder.join(GIT_IGNORE).as_path(),
+                GIT_IGNORE,
+                "*\ntestnet/\nconfig.yaml".as_bytes(),
+            )?;
+        }
 
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
