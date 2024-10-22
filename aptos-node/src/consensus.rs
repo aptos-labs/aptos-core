@@ -29,7 +29,7 @@ use aptos_event_notifications::{
 use aptos_jwk_consensus::{start_jwk_consensus_runtime, types::JWKConsensusMsg};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
@@ -67,6 +67,7 @@ pub fn create_consensus_runtime(
 /// Creates and starts the DKG runtime (if enabled)
 pub fn create_dkg_runtime(
     node_config: &mut NodeConfig,
+    db: Arc<dyn DbReader>,
     dkg_subscriptions: Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
@@ -87,6 +88,7 @@ pub fn create_dkg_runtime(
             let dkg_runtime = start_dkg_runtime(
                 my_addr,
                 &node_config.consensus.safety_rules,
+                db,
                 network_client,
                 network_service_events,
                 reconfig_events,

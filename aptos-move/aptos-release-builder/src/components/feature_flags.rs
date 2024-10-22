@@ -133,6 +133,7 @@ pub enum FeatureFlag {
     CollectionOwner,
     NativeMemoryOperations,
     EnableLoaderV2,
+    NewFlag,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -496,6 +497,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
+            AptosFeatureFlag::NEW_FLAG => FeatureFlag::NewFlag,
         }
     }
 }

@@ -1,8 +1,12 @@
 /// Structs and functions for on-chain randomness configurations.
 module aptos_framework::randomness_config {
+    use std::option;
+    use std::option::Option;
     use std::string;
+    use std::string::String;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
+    use aptos_std::fixed_point64;
     use aptos_std::fixed_point64::FixedPoint64;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
@@ -120,6 +124,25 @@ module aptos_framework::randomness_config {
             *borrow_global<RandomnessConfig>(@aptos_framework)
         } else {
             new_off()
+        }
+    }
+
+    /// Return the typy name, the secrecy threshold, the reconstruction threshold and the fast-path secrecy threshold.
+    public(friend) fun flatten(config: &RandomnessConfig): (String, FixedPoint64, FixedPoint64, FixedPoint64) {
+        let type_name = *copyable_any::type_name(&config.variant);
+        let type_name_bytes = *string::bytes(&type_name);
+        if (type_name_bytes == b"0x1::randomness_config::ConfigOff") {
+            let zero = fixed_point64::create_from_u128(0);
+            (type_name, zero, zero, zero)
+        } else if (type_name_bytes == b"0x1::randomness_config::ConfigV1") {
+            let v1 = copyable_any::unpack<ConfigV1>(config.variant);
+            (type_name, v1.secrecy_threshold, v1.reconstruction_threshold, fixed_point64::create_from_u128(0))
+        } else if (type_name_bytes == b"0x1::randomness_config::ConfigV2") {
+            let v2 = copyable_any::unpack<ConfigV2>(config.variant);
+            (type_name, v2.secrecy_threshold, v2.reconstruction_threshold, v2.fast_path_secrecy_threshold)
+        } else {
+            let zero = fixed_point64::create_from_u128(0);
+            (type_name, zero, zero, zero)
         }
     }
 

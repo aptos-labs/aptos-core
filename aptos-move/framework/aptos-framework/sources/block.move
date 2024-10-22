@@ -5,6 +5,8 @@ module aptos_framework::block {
     use std::option;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::Option;
+    use std::string::utf8;
+    use aptos_std::debug;
     use aptos_framework::randomness;
 
     use aptos_framework::account;
@@ -244,6 +246,38 @@ module aptos_framework::block {
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
         };
+    }
+
+    /// `block_prologue()` but trigger reconfiguration with DKG after epoch timed out.
+    fun block_prologue_ext_v2(
+        framework: signer,
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        randomness_seed: Option<vector<u8>>,
+    ) acquires BlockResource, CommitHistory {
+        debug::print(&utf8(b"block_prologue_ext_v2: begin"));
+        let epoch_interval = block_prologue_common(
+            &vm,
+            hash,
+            epoch,
+            round,
+            proposer,
+            failed_proposer_indices,
+            previous_block_votes_bitvec,
+            timestamp
+        );
+        randomness::on_new_block(&vm, epoch, round, randomness_seed);
+
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+            reconfiguration_with_dkg::try_start_v2(&framework);
+        };
+        debug::print(&utf8(b"block_prologue_ext_v2: end"));
     }
 
     #[view]

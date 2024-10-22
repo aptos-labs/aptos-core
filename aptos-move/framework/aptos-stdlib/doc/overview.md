@@ -45,6 +45,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::table`](table.md#0x1_table)
 -  [`0x1::table_with_length`](table_with_length.md#0x1_table_with_length)
 -  [`0x1::type_info`](type_info.md#0x1_type_info)
+-  [`0x1::unsigned_bignum`](unsigned_bignum.md#0x1_unsigned_bignum)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

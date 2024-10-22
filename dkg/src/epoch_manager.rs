@@ -20,20 +20,16 @@ use aptos_logger::{debug, error, info, warn};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_safety_rules::{safety_rules_manager::storage, PersistentSafetyStorage};
-use aptos_types::{
-    account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState, DefaultDKG},
-    epoch_state::EpochState,
-    on_chain_config::{
-        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
-    },
-};
+use aptos_types::{account_address::AccountAddress, dkg::{DKGStartEvent, DKGState, DefaultDKG}, epoch_state::EpochState, NextEpochRounding, on_chain_config::{
+    OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+    OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+}};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_storage_interface::DbReader;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
     // Some useful metadata
@@ -48,7 +44,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dkg_rpc_msg_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-    dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
+    dkg_start_event_tx: Option<aptos_channel::Sender<(), EventNotification>>,
     vtxn_pool: VTxnPoolState,
 
     // Network utils
@@ -60,12 +56,14 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     randomness_override_seq_num: u64,
 
     key_storage: PersistentSafetyStorage,
+    db: Arc<dyn DbReader>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
         safety_rules_config: &SafetyRulesConfig,
         my_addr: AccountAddress,
+        db: Arc<dyn DbReader>,
         reconfig_events: ReconfigNotificationListener<P>,
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -75,6 +73,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         randomness_override_seq_num: u64,
     ) -> Self {
         Self {
+            db,
             my_addr,
             epoch_state: None,
             reconfig_events,
@@ -107,17 +106,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
         if let Some(tx) = self.dkg_start_event_tx.as_ref() {
-            let EventNotification {
-                subscribed_events, ..
-            } = notification;
-            for event in subscribed_events {
-                if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
-                    let _ = tx.push((), dkg_start_event);
-                    return Ok(());
-                } else {
-                    debug!("[DKG] on_dkg_start_notification: failed in converting a contract event to a dkg start event!");
-                }
-            }
+            let _ = tx.push((), notification);
+            // let EventNotification {
+            //     version, subscribed_events
+            // } = notification;
+            // for event in subscribed_events {
+            //     if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
+            //         let _ = tx.push((), (version, dkg_start_event));
+            //         return Ok(());
+            //     } else {
+            //         debug!("[DKG] on_dkg_start_notification: failed in converting a contract event to a dkg start event!");
+            //     }
+            // }
         }
         Ok(())
     }
@@ -203,7 +203,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 in_progress: in_progress_session,
                 ..
             } = payload.get::<DKGState>().unwrap_or_default();
-
+            let next_epoch_rounding = payload.get::<NextEpochRounding>().ok();
             let network_sender = self.create_network_sender();
             let rb = ReliableBroadcast::new(
                 self.my_addr,
@@ -239,6 +239,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 anyhow!("dkg new epoch handling failed with consensus sk lookup err: {e}")
             })?;
             let dkg_manager = DKGManager::<DefaultDKG>::new(
+                self.db.clone(),
                 Arc::new(dealer_sk),
                 my_index,
                 self.my_addr,
@@ -248,6 +249,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
+                next_epoch_rounding,
                 dkg_start_event_rx,
                 dkg_rpc_msg_rx,
                 dkg_manager_close_rx,

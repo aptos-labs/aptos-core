@@ -10,6 +10,7 @@ pub mod network_interface;
 pub mod transcript_aggregation;
 pub mod types;
 
+use std::sync::Arc;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
@@ -21,11 +22,13 @@ use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents}
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use tokio::runtime::Runtime;
+use aptos_storage_interface::DbReader;
 pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
     my_addr: AccountAddress,
     safety_rules_config: &SafetyRulesConfig,
+    db: Arc<dyn DbReader>,
     network_client: NetworkClient<DKGMessage>,
     network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -41,6 +44,7 @@ pub fn start_dkg_runtime(
     let dkg_epoch_manager = EpochManager::new(
         safety_rules_config,
         my_addr,
+        db,
         reconfig_events,
         dkg_start_events,
         self_sender,

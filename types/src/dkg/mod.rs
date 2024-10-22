@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::real_dkg::RealDKG;
-use crate::{
-    dkg::real_dkg::rounding::DKGRoundingProfile,
-    on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
-    validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
-};
+use crate::{dkg::real_dkg::rounding::DKGRoundingProfile, on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct}, RoundingResult, validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct}};
 use anyhow::Result;
 use aptos_crypto::Uniform;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -177,7 +173,7 @@ pub trait DKGTrait: Debug {
     type DealtPubKeyShare;
     type NewValidatorDecryptKey: Uniform;
 
-    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
+    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata, rounding_result: Option<RoundingResult>) -> Self::PublicParams;
     fn aggregate_input_secret(secrets: Vec<Self::InputSecret>) -> Self::InputSecret;
     fn dealt_secret_from_input(
         pub_params: &Self::PublicParams,

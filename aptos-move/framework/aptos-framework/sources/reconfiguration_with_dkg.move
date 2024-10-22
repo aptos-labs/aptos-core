@@ -2,8 +2,10 @@
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
     use std::option;
+    use std::vector;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
+    use aptos_framework::dkg_rounding;
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
     use aptos_framework::jwk_consensus_config;
@@ -16,6 +18,8 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::reconfiguration_state;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
+    use aptos_framework::validator_consensus_info;
+    use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
@@ -39,6 +43,32 @@ module aptos_framework::reconfiguration_with_dkg {
         );
     }
 
+    public(friend) fun try_start_v2(framework: &signer) {
+        let incomplete_dkg_session = dkg::incomplete_session();
+        if (option::is_some(&incomplete_dkg_session)) {
+            let session = option::borrow(&incomplete_dkg_session);
+            if (dkg::session_dealer_epoch(session) == reconfiguration::current_epoch()) {
+                return
+            }
+        };
+        reconfiguration_state::on_reconfig_start();
+        let cur_epoch = reconfiguration::current_epoch();
+        let target_validator_set = stake::next_validator_consensus_infos();
+        let cur_rand_config = randomness_config::current();
+        dkg::start(
+            cur_epoch,
+            cur_rand_config,
+            stake::cur_validator_consensus_infos(),
+            target_validator_set,
+        );
+        let new_stake_dist = vector::map(target_validator_set, |vci|{
+            let vci: ValidatorConsensusInfo = vci;
+            validator_consensus_info::get_voting_power(&vci)
+        });
+        let (_, sec_thre, recon_thre, recon_thre_fast) = randomness_config::flatten(&cur_rand_config);
+        dkg_rounding::on_reconfig_start(framework, new_stake_dist, sec_thre, recon_thre, option::some(recon_thre_fast));
+    }
+
     /// Clear incomplete DKG session, if it exists.
     /// Apply buffered on-chain configs (except for ValidatorSet, which is done inside `reconfiguration::reconfigure()`).
     /// Re-enable validator set changes.
@@ -57,6 +87,7 @@ module aptos_framework::reconfiguration_with_dkg {
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
+        dkg_rounding::on_new_epoch(framework);
         reconfiguration::reconfigure();
     }
 

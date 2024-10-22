@@ -12,14 +12,10 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::Uniform;
 use aptos_infallible::duration_since_epoch;
 use aptos_logger::{debug, error, info, warn};
-use aptos_types::{
-    dkg::{
-        DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
-        DKGTranscriptMetadata, MayHaveRoundingSummary,
-    },
-    epoch_state::EpochState,
-    validator_txn::{Topic, ValidatorTransaction},
-};
+use aptos_types::{dkg::{
+    DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
+    DKGTranscriptMetadata, MayHaveRoundingSummary,
+}, epoch_state::EpochState, NextEpochRounding, RoundingResult, validator_txn::{Topic, ValidatorTransaction}};
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use fail::fail_point;
 use futures_channel::oneshot;
@@ -27,6 +23,10 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
+use aptos_event_notifications::EventNotification;
+use aptos_storage_interface::DbReader;
+use aptos_storage_interface::state_view::DbStateViewAtVersion;
+use aptos_types::on_chain_config::OnChainConfig;
 
 #[derive(Clone, Debug)]
 enum InnerState {
@@ -67,6 +67,8 @@ pub struct DKGManager<DKG: DKGTrait> {
     // Control states.
     stopped: bool,
     state: InnerState,
+
+    db: Arc<dyn DbReader>,
 }
 
 impl InnerState {
@@ -90,6 +92,7 @@ impl InnerState {
 
 impl<DKG: DKGTrait> DKGManager<DKG> {
     pub fn new(
+        db: Arc<dyn DbReader>,
         dealer_sk: Arc<DKG::DealerPrivateKey>,
         my_index: usize,
         my_addr: AccountAddress,
@@ -111,13 +114,15 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             agg_trx_producer,
             stopped: false,
             state: InnerState::NotStarted,
+            db,
         }
     }
 
     pub async fn run(
         mut self,
         in_progress_session: Option<DKGSessionState>,
-        mut dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
+        next_epoch_rounding: Option<NextEpochRounding>,
+        mut dkg_start_event_rx: aptos_channel::Receiver<(), EventNotification>,
         mut rpc_msg_rx: aptos_channel::Receiver<
             AccountAddress,
             (AccountAddress, IncomingRpcRequest),
@@ -140,13 +145,13 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 metadata,
                 ..
             } = session_state;
-
+            let rounding_result = next_epoch_rounding.map(|NextEpochRounding{rounding}|rounding);
             if metadata.dealer_epoch == self.epoch_state.epoch {
                 info!(
                     epoch = self.epoch_state.epoch,
                     "Found unfinished and current DKG session. Continuing it."
                 );
-                if let Err(e) = self.setup_deal_broadcast(start_time_us, &metadata).await {
+                if let Err(e) = self.setup_deal_broadcast(start_time_us, &metadata, rounding_result).await {
                     error!(epoch = self.epoch_state.epoch, "dkg resumption failed: {e}");
                 }
             } else {
@@ -161,8 +166,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         let mut close_rx = close_rx.into_stream();
         while !self.stopped {
             let handling_result = tokio::select! {
-                dkg_start_event = dkg_start_event_rx.select_next_some() => {
-                    self.process_dkg_start_event(dkg_start_event)
+                notification = dkg_start_event_rx.select_next_some() => {
+                    self.process_dkg_start_event(notification)
                         .await
                         .map_err(|e|anyhow!("[DKG] process_dkg_start_event failed: {e}"))
                 },
@@ -291,6 +296,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         &mut self,
         start_time_us: u64,
         dkg_session_metadata: &DKGSessionMetadata,
+        rounding_result: Option<RoundingResult>,
     ) -> Result<()> {
         ensure!(
             matches!(&self.state, InnerState::NotStarted),
@@ -308,7 +314,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             secs_since_dkg_start = secs_since_dkg_start,
             "[DKG] Deal transcript started.",
         );
-        let public_params = DKG::new_public_params(dkg_session_metadata);
+        let public_params = DKG::new_public_params(dkg_session_metadata, rounding_result);
         if let Some(summary) = public_params.rounding_summary() {
             info!(
                 epoch = self.epoch_state.epoch,
@@ -420,7 +426,13 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         Ok(())
     }
 
-    async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
+    async fn process_dkg_start_event(&mut self, notification: EventNotification) -> Result<()> {
+        let EventNotification { version, subscribed_events } = notification;
+        debug!(version = version, "process_dkg_start_event begins");
+        //TODO: read session data from state view at version, instead of rely on event content.
+
+        let raw_event= subscribed_events.first().ok_or_else(||anyhow!("process_dkg_start_event failed with empty notification"))?;
+        let event = DKGStartEvent::try_from(raw_event).map_err(|e|anyhow!("process_dkg_start_event failed with raw event conversion error: {e}"))?;
         info!(
             epoch = self.epoch_state.epoch,
             my_addr = self.my_addr,
@@ -437,13 +449,15 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
         if self.epoch_state.epoch != session_metadata.dealer_epoch {
             warn!(
-                "[DKG] event (from epoch {}) not for current epoch ({}), ignoring",
-                session_metadata.dealer_epoch, self.epoch_state.epoch
-            );
+            "[DKG] event (from epoch {}) not for current epoch ({}), ignoring",
+            session_metadata.dealer_epoch, self.epoch_state.epoch
+        );
             return Ok(());
         }
-        self.setup_deal_broadcast(start_time_us, &session_metadata)
-            .await
+        let state_view = self.db.state_view_at_version(Some(version)).unwrap();
+        let rounding_result = NextEpochRounding::fetch_config(&state_view).map(|NextEpochRounding { rounding }| rounding);
+        println!("rounding_result={:?}", rounding_result);
+        self.setup_deal_broadcast(start_time_us, &session_metadata, rounding_result).await
     }
 
     /// Process an RPC request from DKG peers.

@@ -102,7 +102,7 @@ fn test_dummy_dkg_correctness() {
         target_validator_set: new_validator_infos.clone(),
     };
 
-    let pub_params = DummyDKG::new_public_params(&dkg_session_metadata);
+    let pub_params = DummyDKG::new_public_params(&dkg_session_metadata, None);
     // Every current validator generates a transcript.
     for (idx, dealer_state) in dealer_states.iter_mut().enumerate() {
         let trx = DummyDKG::generate_transcript(

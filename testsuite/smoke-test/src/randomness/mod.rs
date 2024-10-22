@@ -8,12 +8,7 @@ use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_forge::LocalSwarm;
 use aptos_logger::info;
 use aptos_rest_client::Client;
-use aptos_types::{
-    dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
-    on_chain_config::{OnChainConfig, OnChainConsensusConfig},
-    randomness::{PerBlockRandomness, RandMetadata, WVUF},
-    validator_verifier::ValidatorConsensusInfo,
-};
+use aptos_types::{dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG}, on_chain_config::{OnChainConfig, OnChainConsensusConfig}, randomness::{PerBlockRandomness, RandMetadata, WVUF}, RoundingResult, validator_verifier::ValidatorConsensusInfo};
 use digest::Digest;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use rand::{prelude::StdRng, SeedableRng};
@@ -47,7 +42,7 @@ async fn get_current_version(rest_client: &Client) -> u64 {
 async fn get_on_chain_resource_at_version<T: OnChainConfig>(
     rest_client: &Client,
     version: u64,
-) -> T {
+) -> Result<T> {
     let maybe_response = rest_client
         .get_account_resource_at_version_bcs::<T>(
             CORE_CODE_ADDRESS,
@@ -55,8 +50,8 @@ async fn get_on_chain_resource_at_version<T: OnChainConfig>(
             version,
         )
         .await;
-    let response = maybe_response.unwrap();
-    response.into_inner()
+    let response = maybe_response.map_err(|e|anyhow!("get_on_chain_resource_at_version failed with rest error: {e}"))?;
+    Ok(response.into_inner())
 }
 
 /// Poll the on-chain state until we see a DKG session finishes.
@@ -90,13 +85,14 @@ async fn wait_for_dkg_finish(
 /// by the validator set in epoch i-1 (stored in `new_dkg_state`).
 fn verify_dkg_transcript(
     dkg_session: &DKGSessionState,
+    rounding_result: Option<RoundingResult>,
     decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
 ) -> Result<()> {
     info!(
         "Verifying the transcript generated in epoch {}.",
         dkg_session.metadata.dealer_epoch,
     );
-    let pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+    let pub_params = DefaultDKG::new_public_params(&dkg_session.metadata, rounding_result);
     let transcript = bcs::from_bytes(dkg_session.transcript.as_slice()).map_err(|e| {
         anyhow!("DKG transcript verification failed with transcript deserialization error: {e}")
     })?;
@@ -207,10 +203,13 @@ async fn verify_randomness(
     version: u64,
 ) -> Result<()> {
     // Fetch resources.
-    let (dkg_state, on_chain_block_randomness) = tokio::join!(
+    let (dkg_state, on_chain_block_randomness, rounding_result) = tokio::join!(
         get_on_chain_resource_at_version::<DKGState>(rest_client, version),
-        get_on_chain_resource_at_version::<PerBlockRandomness>(rest_client, version)
+        get_on_chain_resource_at_version::<PerBlockRandomness>(rest_client, version),
+        get_on_chain_resource_at_version::<RoundingResult>(rest_client, version),
     );
+    let on_chain_block_randomness = on_chain_block_randomness.unwrap();
+    let dkg_state = dkg_state.unwrap();
 
     ensure!(
         on_chain_block_randomness.seed.is_some(),
@@ -221,7 +220,7 @@ async fn verify_randomness(
     let dkg_session = dkg_state
         .last_completed
         .ok_or_else(|| anyhow!("randomness verification failed with missing dkg result"))?;
-    let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+    let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata, rounding_result.ok());
     let transcript =
         bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice())
             .map_err(|_| {

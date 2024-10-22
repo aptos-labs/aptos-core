@@ -19,6 +19,7 @@ Structs and functions for on-chain randomness configurations.
 -  [Function `new_v1`](#0x1_randomness_config_new_v1)
 -  [Function `new_v2`](#0x1_randomness_config_new_v2)
 -  [Function `current`](#0x1_randomness_config_current)
+-  [Function `flatten`](#0x1_randomness_config_flatten)
 -  [Specification](#@Specification_1)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `current`](#@Specification_1_current)
@@ -414,6 +415,45 @@ Get the currently effective randomness configuration object.
         *<b>borrow_global</b>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;(@aptos_framework)
     } <b>else</b> {
         <a href="randomness_config.md#0x1_randomness_config_new_off">new_off</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_randomness_config_flatten"></a>
+
+## Function `flatten`
+
+Return the typy name, the secrecy threshold, the reconstruction threshold and the fast-path secrecy threshold.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_flatten">flatten</a>(config: &<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>): (<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_flatten">flatten</a>(config: &<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>): (String, FixedPoint64, FixedPoint64, FixedPoint64) {
+    <b>let</b> type_name = *<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&config.variant);
+    <b>let</b> type_name_bytes = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&type_name);
+    <b>if</b> (type_name_bytes == b"<a href="randomness_config.md#0x1_randomness_config_ConfigOff">0x1::randomness_config::ConfigOff</a>") {
+        <b>let</b> zero = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_u128">fixed_point64::create_from_u128</a>(0);
+        (type_name, zero, zero, zero)
+    } <b>else</b> <b>if</b> (type_name_bytes == b"<a href="randomness_config.md#0x1_randomness_config_ConfigV1">0x1::randomness_config::ConfigV1</a>") {
+        <b>let</b> v1 = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="randomness_config.md#0x1_randomness_config_ConfigV1">ConfigV1</a>&gt;(config.variant);
+        (type_name, v1.secrecy_threshold, v1.reconstruction_threshold, <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_u128">fixed_point64::create_from_u128</a>(0))
+    } <b>else</b> <b>if</b> (type_name_bytes == b"<a href="randomness_config.md#0x1_randomness_config_ConfigV2">0x1::randomness_config::ConfigV2</a>") {
+        <b>let</b> v2 = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a>&gt;(config.variant);
+        (type_name, v2.secrecy_threshold, v2.reconstruction_threshold, v2.fast_path_secrecy_threshold)
+    } <b>else</b> {
+        <b>let</b> zero = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_u128">fixed_point64::create_from_u128</a>(0);
+        (type_name, zero, zero, zero)
     }
 }
 </code></pre>
