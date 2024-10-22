@@ -169,6 +169,7 @@ impl StructNameIndexMap {
     }
 }
 
+// Only used by V1 loader.
 impl Clone for StructNameIndexMap {
     fn clone(&self) -> Self {
         Self(RwLock::new(self.0.read().clone()))
