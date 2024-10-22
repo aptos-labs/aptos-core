@@ -109,7 +109,7 @@ impl SubmissionWorker {
             wait_until += wait_duration;
 
             let requests = self.gen_requests();
-            info!("Request count: {:?}", requests.len());
+            info!("account: {:?}, Request count: {:?}", self.accounts.first().unwrap().address(), requests.len());
             if !requests.is_empty() {
                 let mut account_to_start_and_end_seq_num = HashMap::new();
                 for req in requests.iter() {
@@ -210,6 +210,7 @@ impl SubmissionWorker {
                 self.sleep_check_done(wait_until - now).await;
             }
         }
+        info!("account: {:?}, stop: {:?}, SubmissionWorker run done", self.accounts.first().unwrap().address(), self.stop.load(Ordering::Relaxed));
 
         self.accounts
             .into_iter()
