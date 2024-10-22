@@ -3110,6 +3110,7 @@ dependencies = [
 name = "aptos-nft-metadata-crawler"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-metrics-core",
@@ -3127,6 +3128,7 @@ dependencies = [
  "google-cloud-storage",
  "image",
  "once_cell",
+ "rayon",
  "regex",
  "reqwest 0.11.23",
  "serde",
@@ -3135,6 +3137,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -7266,6 +7269,7 @@ dependencies = [
  "pq-sys",
  "r2d2",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
