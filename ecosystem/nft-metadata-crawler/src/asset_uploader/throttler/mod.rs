@@ -132,7 +132,7 @@ impl AssetUploaderThrottlerContext {
                 self.config.cloudflare_default_variant,
             ));
 
-            asset.cdn_image_uri = cdn_image_uri.clone();
+            asset.cdn_image_uri.clone_from(&cdn_image_uri);
 
             // Update the asset URI in the parsed_asset_uris table
             let mut parsed_asset_uri = ParsedAssetUris::new(&asset.asset_uri);
