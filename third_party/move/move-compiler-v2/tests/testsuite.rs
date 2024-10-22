@@ -761,7 +761,6 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         "A=0x42".to_string(),
         "B=0x42".to_string(),
         "K=0x19".to_string(),
-        "Async=0x20".to_string(),
     ];
 
     // Putting the generated test baseline into a Refcell to avoid problems with mut borrow
