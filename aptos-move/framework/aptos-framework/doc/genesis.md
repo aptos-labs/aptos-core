@@ -40,6 +40,8 @@
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="aptos_governance.md#0x1_aptos_governance">0x1::aptos_governance</a>;
 <b>use</b> <a href="atomic_bridge.md#0x1_atomic_bridge">0x1::atomic_bridge</a>;
+<b>use</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty">0x1::atomic_bridge_counterparty</a>;
+<b>use</b> <a href="atomic_bridge.md#0x1_atomic_bridge_initiator">0x1::atomic_bridge_initiator</a>;
 <b>use</b> <a href="block.md#0x1_block">0x1::block</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -367,6 +369,8 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
     <a href="atomic_bridge.md#0x1_atomic_bridge_initialize">atomic_bridge::initialize</a>(&aptos_framework_account);
+    <a href="atomic_bridge.md#0x1_atomic_bridge_initiator_initialize">atomic_bridge_initiator::initialize</a>(&aptos_framework_account);
+    <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_initialize">atomic_bridge_counterparty::initialize</a>(&aptos_framework_account);
 }
 </code></pre>
 

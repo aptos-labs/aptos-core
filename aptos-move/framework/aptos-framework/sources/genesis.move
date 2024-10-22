@@ -11,6 +11,8 @@ module aptos_framework::genesis {
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
     use aptos_framework::atomic_bridge;
+    use aptos_framework::atomic_bridge_initiator;
+    use aptos_framework::atomic_bridge_counterparty;
     use aptos_framework::block;
     use aptos_framework::chain_id;
     use aptos_framework::chain_status;
@@ -133,6 +135,8 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         atomic_bridge::initialize(&aptos_framework_account);
+        atomic_bridge_initiator::initialize(&aptos_framework_account);
+        atomic_bridge_counterparty::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.

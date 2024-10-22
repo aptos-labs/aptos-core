@@ -186,7 +186,7 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     /// Initializes the module and stores the `EventHandle`s in the resource.
-    fun init_module(aptos_framework: &signer) {
+    public fun initialize(aptos_framework: &signer) {
         move_to(aptos_framework, BridgeInitiatorEvents {
             bridge_transfer_initiated_events: account::new_event_handle<BridgeTransferInitiatedEvent>(aptos_framework),
             bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
@@ -278,7 +278,7 @@ module aptos_framework::atomic_bridge_initiator {
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
         aptos_account::create_account(sender_address);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
@@ -344,7 +344,7 @@ module aptos_framework::atomic_bridge_initiator {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -398,7 +398,7 @@ module aptos_framework::atomic_bridge_initiator {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -442,7 +442,7 @@ module aptos_framework::atomic_bridge_initiator {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -506,7 +506,7 @@ module aptos_framework::atomic_bridge_initiator {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -559,7 +559,7 @@ module aptos_framework::atomic_bridge_initiator {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -1435,7 +1435,7 @@ module aptos_framework::atomic_bridge_counterparty {
     }
 
     /// Initializes the module and stores the `EventHandle`s in the resource.
-    fun init_module(aptos_framework: &signer) {
+    public fun initialize(aptos_framework: &signer) {
         move_to(aptos_framework, BridgeCounterpartyEvents {
             bridge_transfer_locked_events: account::new_event_handle<BridgeTransferLockedEvent>(aptos_framework),
             bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
@@ -1542,7 +1542,7 @@ module aptos_framework::atomic_bridge_counterparty {
     #[test(aptos_framework = @aptos_framework)]
     fun test_lock_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1575,7 +1575,7 @@ module aptos_framework::atomic_bridge_counterparty {
     #[test(aptos_framework = @aptos_framework)]
     fun test_abort_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1601,7 +1601,7 @@ module aptos_framework::atomic_bridge_counterparty {
     #[test(aptos_framework = @aptos_framework)]
     fun test_complete_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1634,7 +1634,7 @@ module aptos_framework::atomic_bridge_counterparty {
     #[expected_failure(abort_code = 0x1, location = atomic_bridge_store)]
     fun test_failing_complete_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-        init_module(aptos_framework);
+        initialize(aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
