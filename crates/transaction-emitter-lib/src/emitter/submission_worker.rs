@@ -109,6 +109,7 @@ impl SubmissionWorker {
             wait_until += wait_duration;
 
             let requests = self.gen_requests();
+            info!("Request count: {:?}", requests.len());
             if !requests.is_empty() {
                 let mut account_to_start_and_end_seq_num = HashMap::new();
                 for req in requests.iter() {
@@ -125,6 +126,7 @@ impl SubmissionWorker {
                         })
                         .or_insert((cur, cur + 1));
                 }
+                info!("account: {:?}, account_to_start_and_end_seq_num: {:?}", self.accounts.first().unwrap().address(), account_to_start_and_end_seq_num);
                 // Some transaction generators use burner accounts, and will have different
                 // number of accounts per transaction, so useful to very rarely log.
                 sample!(
@@ -246,6 +248,8 @@ impl SubmissionWorker {
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
+        info!("wait_and_update_stats for account: {:?}, start_time: {:?} avg_txn_offset_time: {:?} skip_latency_stats {:?}, check_account_sleep_duration {:?}, txn_expiration_ts_secs {:?}", self.accounts.first().unwrap().address(), start_time, avg_txn_offset_time, skip_latency_stats, check_account_sleep_duration, txn_expiration_ts_secs);
+        let now = Instant::now();
         let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
             wait_for_accounts_sequence(
                 start_time,
@@ -304,6 +308,7 @@ impl SubmissionWorker {
                     .record_data_point(avg_latency, num_committed as u64);
             }
         }
+        info!("{:?} waited for accounts to reach sequence number for {:?} ms", self.accounts.first().unwrap().address(), now.elapsed().as_millis());
     }
 
     fn gen_requests(&mut self) -> Vec<SignedTransaction> {
