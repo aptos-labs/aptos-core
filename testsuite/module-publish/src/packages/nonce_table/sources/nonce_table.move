@@ -144,16 +144,96 @@ module 0xABCD::nonce_table {
         false
     }
 
+    // public entry fun check_and_insert_nonce(
+    //     publisher: address,
+    //     sender_address: address,
+    //     nonce: u64,
+    //     txn_expiration_time: u64,
+    // ) acquires NonceHistory {
+    //     let nonce_entry = NonceEntry {
+    //         sender_address,
+    //         nonce,
+    //         txn_expiration_time,
+    //     };
+    //     let nonce_key = NonceKey {
+    //         sender_address,
+    //         nonce,
+    //     };
+    //     let hash = sip_hash_from_value(&nonce_key);
+    //     let index = hash % 200000;
+    //     let nonce_history = borrow_global_mut<NonceHistory>(publisher);
+    //     if (table::contains(&nonce_history.nonce_table, index)) {
+    //         if (vector::contains(&table::borrow(&nonce_history.nonce_table, index).nonces, &nonce_entry)) {
+    //             return
+    //         };
+    //         vector::push_back(&mut table::borrow_mut(&mut nonce_history.nonce_table, index).nonces, nonce_entry);
+    //     } else {
+    //         let bucket = Bucket {
+    //             lowest_expiration_time: txn_expiration_time,
+    //             nonces: vector::empty(),
+    //         };
+    //         table::add(&mut nonce_history.nonce_table, index, bucket);
+    //     };
+    // }
+
     public entry fun check_and_insert_nonce(
         publisher: address,
         sender_address: address,
         nonce: u64,
         txn_expiration_time: u64,
     ) acquires NonceHistory {
-        if (nonce_exists(publisher, sender_address, nonce, txn_expiration_time)) {
-            return
+        let nonce_entry = NonceEntry {
+            sender_address,
+            nonce,
+            txn_expiration_time,
         };
-        insert_nonce(publisher, sender_address, nonce, txn_expiration_time);
+        let nonce_key = NonceKey {
+            sender_address,
+            nonce,
+        };
+        let hash = sip_hash_from_value(&nonce_key);
+        let index = hash % 200000;
+        let nonce_history = borrow_global_mut<NonceHistory>(publisher);
+        if (table::contains(&nonce_history.nonce_table, index)) {
+            if (vector::contains(&table::borrow(&nonce_history.nonce_table, index).nonces, &nonce_entry)) {
+                return
+            };
+
+            let bucket = table::borrow_mut(&mut nonce_history.nonce_table, index);
+        
+            let current_time = timestamp::now_seconds();
+            if (current_time <= bucket.lowest_expiration_time) {
+                // None of the nonces are expired. Just insert the nonce.
+                vector::push_back(&mut bucket.nonces, nonce_entry);
+                
+                // Question: Is there a better way to do this?
+                table::borrow_mut(&mut nonce_history.nonce_table, index).lowest_expiration_time = min(bucket.lowest_expiration_time, txn_expiration_time);
+            } else {
+                // There is an expired nonce. Remove the expired nonces.
+                let new_bucket = Bucket {
+                    lowest_expiration_time: txn_expiration_time,
+                    nonces: vector::empty(),
+                };
+                let len = vector::length(&bucket.nonces);
+                let i = 0;
+                while (i < len) {
+                    let nonce_entry = vector::borrow(&bucket.nonces, i);
+                    if (current_time <= nonce_entry.txn_expiration_time) {
+                        vector::push_back(&mut new_bucket.nonces, *nonce_entry);
+                        new_bucket.lowest_expiration_time = min(new_bucket.lowest_expiration_time, nonce_entry.txn_expiration_time);
+                    };
+                    i = i + 1;
+                };
+                *table::borrow_mut(&mut nonce_history.nonce_table, index) = new_bucket;
+            }
+            // vector::push_back(&mut table::borrow_mut(&mut nonce_history.nonce_table, index).nonces, nonce_entry);
+        } else {
+            let bucket = Bucket {
+                lowest_expiration_time: txn_expiration_time,
+                nonces: vector::empty(),
+            };
+            table::add(&mut nonce_history.nonce_table, index, bucket);
+        };
     }
 }
 
