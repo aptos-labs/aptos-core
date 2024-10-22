@@ -233,7 +233,7 @@ impl Default for EmitJobRequest {
             latency_polling_interval: Duration::from_millis(300),
             tps_wait_after_expiration_secs: None,
             account_minter_seed: None,
-            coins_per_account_override: None,
+            coins_per_account_override: Some(1000_0000_0000),
             account_type: AccountType::Local,
             keyless_ephem_secret_key: None,
             proof_file_path: None,
