@@ -427,6 +427,7 @@ fn test_module_publishing_does_not_fallback() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
+    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
     let account = h.new_account_at(addr);
 
@@ -441,10 +442,11 @@ fn test_module_publishing_does_not_fallback() {
     // Generate a simple test workload.
     for abort_code in [1, 2, 3, 4, 5, 1] {
         // Transaction that publishes code, must succeed.
-        let txn = h.create_transaction_payload(
-            &account,
-            module_with_abort(&addr, module_name, function_name, abort_code),
+        let source = format!(
+            "module {}::{} {{ public entry fun {}() {{ abort {} }} }}",
+            addr, module_name, function_name, abort_code
         );
+        let txn = h.create_transaction_payload(&account, publish_module_txn(source, module_name));
         txns.push(txn);
         expected_abort_codes.push(None);
 
@@ -499,16 +501,7 @@ fn test_module_publishing_does_not_fallback() {
     }
 }
 
-fn module_with_abort(
-    address: &AccountAddress,
-    module_name: &str,
-    function_name: &str,
-    abort_code: u64,
-) -> TransactionPayload {
-    let source = format!(
-        "module {}::{} {{ public entry fun {}() {{ abort {} }} }}",
-        address, module_name, function_name, abort_code
-    );
+fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
     let mut builder = PackageBuilder::new(module_name).with_policy(UpgradePolicy::compat());
     builder.add_source(module_name, &source);
 
@@ -524,4 +517,83 @@ fn module_with_abort(
         bcs::to_bytes(&metadata).unwrap(),
         code,
     )
+}
+
+#[derive(Serialize, Deserialize)]
+struct Foo {
+    data: u64,
+}
+
+#[test]
+fn test_module_publishing_does_not_leak_speculative_information() {
+    let mut executor = FakeExecutor::from_head_genesis().set_parallel();
+    executor.disable_block_executor_fallback();
+
+    let mut h = MoveHarness::new_with_executor(executor);
+    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
+    let addr = AccountAddress::random();
+    let account = h.new_account_at(addr);
+
+    let tys_with_abort_codes = [
+        ("u8", Some(1)),
+        ("u16", Some(2)),
+        ("u32", Some(3)),
+        ("u128", Some(4)),
+        ("u256", Some(5)),
+        ("u64", None),
+    ];
+
+    let mut txns = vec![];
+    let mut expected_abort_codes: Vec<Option<u64>> = vec![];
+
+    for (ty, maybe_abort_code) in tys_with_abort_codes {
+        expected_abort_codes.push(maybe_abort_code.clone());
+
+        // Create module to be published that uses the same type name but different layout. For
+        // the first few modules, run 'init_module' to ensure the type is used and then abort the
+        // transaction. This ensures that the struct name re-indexing cache and publishing works as
+        // expected - not caching type layouts for the struct until it is actually committed.
+        let struct_def = format!("struct Foo has key, store {{ data: {}, }}", ty);
+        let init_module = if let Some(abort_code) = maybe_abort_code {
+            format!("fun init_module(sender: &signer) {{ move_to(sender, Foo {{ data: 0 }}); abort {} }}", abort_code)
+        } else {
+            format!("fun init_module(sender: &signer) {{ move_to(sender, Foo {{ data: 77 }}) }}")
+        };
+        let source = format!("module {}::foo {{ {} {} }}", addr, struct_def, init_module);
+
+        let txn = h.create_transaction_payload(&account, publish_module_txn(source, "foo"));
+        txns.push(txn);
+    }
+
+    for (output, maybe_abort_code) in h
+        .run_block_get_output(txns)
+        .into_iter()
+        .zip(expected_abort_codes.into_iter())
+    {
+        let status = output.status().clone();
+        match maybe_abort_code {
+            Some(abort_code) => {
+                let status = assert_ok!(status.as_kept_status());
+                if let ExecutionStatus::MoveAbort {
+                    location: _,
+                    code,
+                    info: _,
+                } = status
+                {
+                    assert_eq!(code, abort_code);
+                } else {
+                    panic!(
+                        "Transaction should succeed with abort code {}, got {:?}",
+                        abort_code, status
+                    );
+                }
+            },
+            None => {
+                assert_success!(status);
+                let struct_tag = parse_struct_tag(&format!("{}::foo::Foo", addr)).unwrap();
+                let data = h.read_resource::<Foo>(&addr, struct_tag).unwrap().data;
+                assert_eq!(data, 77);
+            },
+        }
+    }
 }

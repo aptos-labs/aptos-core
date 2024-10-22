@@ -41,22 +41,29 @@ pub struct RuntimeEnvironment {
 
     /// Map from struct names to indices, to save on unnecessary cloning and reduce memory
     /// consumption. Used by all struct type creations in the VM and in code cache.
-    struct_name_index_map: StructNameIndexMap,
+    ///
+    /// SAFETY:
+    ///   By itself, it is fine to index struct names even of non-successful module publishes. If
+    ///   we cached some name, which was not published, it will stay in cache and will be used by
+    ///   another republish. Since there is no other information other than index, even for structs
+    ///   with different layouts it is fine to re-use the index.
+    ///   We wrap the index map into an [Arc] so that on republishing these clones are cheap.
+    struct_name_index_map: Arc<StructNameIndexMap>,
 
     /// Type cache for struct layouts, tags and depths, shared across multiple threads.
     ///
     /// SAFETY:
-    /// Here we informally show that it is safe to share type cache across multiple threads. Same
-    /// argument applies to struct name indexing map.
+    /// Here we informally show that it is safe to share type cache across multiple threads.
     ///   1) Struct has been already published.
     ///      In this case, it is fine to have multiple transactions concurrently accessing and
-    ///      caching struct names, layouts and depth formulas. Even if transaction failed due to
+    ///      caching struct tags, layouts and depth formulas. Even if transaction failed due to
     ///      speculation, and is re-executed later, the speculative aborted execution cached a non-
     ///      speculative existing struct information. It is safe for other threads to access it.
     ///  2) Struct is being published with a module.
     ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
     ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
     ///     possible to mutate this global cache speculatively.
+    ///  Importantly, this SHOULD NOT be mutated by speculative module publish.
     ty_cache: StructInfoCache,
 }
 
@@ -85,7 +92,7 @@ impl RuntimeEnvironment {
         Self {
             vm_config,
             natives,
-            struct_name_index_map: StructNameIndexMap::empty(),
+            struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_cache: StructInfoCache::empty(),
         }
     }
