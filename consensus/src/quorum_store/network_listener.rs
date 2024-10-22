@@ -16,7 +16,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
-    network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+    network_msg_rx: aptos_channel::Receiver<PeerId, (PeerId, VerifiedEvent)>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
     proof_manager_tx: Sender<ProofManagerCommand>,
@@ -24,7 +24,7 @@ pub(crate) struct NetworkListener {
 
 impl NetworkListener {
     pub(crate) fn new(
-        network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        network_msg_rx: aptos_channel::Receiver<PeerId, (PeerId, VerifiedEvent)>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
         remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
         proof_manager_tx: Sender<ProofManagerCommand>,
@@ -40,7 +40,7 @@ impl NetworkListener {
     pub async fn start(mut self) {
         info!("QS: starting networking");
         let mut next_batch_coordinator_idx = 0;
-        while let Some(msg) = self.network_msg_rx.next().await {
+        while let Some((sender, msg)) = self.network_msg_rx.next().await {
             monitor!("qs_network_listener_main_loop", {
                 match msg {
                     // TODO: does the assumption have to be that network listener is shutdown first?
@@ -58,7 +58,8 @@ impl NetworkListener {
                         counters::QUORUM_STORE_MSG_COUNT
                             .with_label_values(&["NetworkListener::signedbatchinfo"])
                             .inc();
-                        let cmd = ProofCoordinatorCommand::AppendSignature(*signed_batch_infos);
+                        let cmd =
+                            ProofCoordinatorCommand::AppendSignature(sender, *signed_batch_infos);
                         self.proof_coordinator_tx
                             .send(cmd)
                             .await
