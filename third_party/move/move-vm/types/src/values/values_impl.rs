@@ -23,6 +23,7 @@ use move_core_types::{
 };
 use std::{
     cell::RefCell,
+    cmp::Ordering,
     fmt::{self, Debug, Display, Formatter},
     iter, mem,
     rc::Rc,
@@ -536,8 +537,62 @@ impl ValueImpl {
             | (ContainerRef(_), _)
             | (IndexedRef(_), _)
             | (DelayedFieldID { .. }, _) => {
-                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                    .with_message(format!("cannot compare values: {:?}, {:?}", self, other)))
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "inconsistent argument types passed to equals check: {:?}, {:?}",
+                        self, other
+                    )),
+                )
+            },
+        };
+
+        Ok(res)
+    }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        use ValueImpl::*;
+
+        let res = match (self, other) {
+            (U8(l), U8(r)) => l.cmp(r),
+            (U16(l), U16(r)) => l.cmp(r),
+            (U32(l), U32(r)) => l.cmp(r),
+            (U64(l), U64(r)) => l.cmp(r),
+            (U128(l), U128(r)) => l.cmp(r),
+            (U256(l), U256(r)) => l.cmp(r),
+            (Bool(l), Bool(r)) => l.cmp(r),
+            (Address(l), Address(r)) => l.cmp(r),
+
+            (Container(l), Container(r)) => l.compare(r)?,
+
+            (ContainerRef(l), ContainerRef(r)) => l.compare(r)?,
+            (IndexedRef(l), IndexedRef(r)) => l.compare(r)?,
+
+            // Disallow comparison for delayed values.
+            // (see `ValueImpl::equals` above for details on reasoning behind it)
+            (DelayedFieldID { .. }, DelayedFieldID { .. }) => {
+                return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                    .with_message("cannot compare delayed values".to_string()))
+            },
+
+            (Invalid, _)
+            | (U8(_), _)
+            | (U16(_), _)
+            | (U32(_), _)
+            | (U64(_), _)
+            | (U128(_), _)
+            | (U256(_), _)
+            | (Bool(_), _)
+            | (Address(_), _)
+            | (Container(_), _)
+            | (ContainerRef(_), _)
+            | (IndexedRef(_), _)
+            | (DelayedFieldID { .. }, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "inconsistent argument types passed to comparison: {:?}, {:?}",
+                        self, other
+                    )),
+                )
             },
         };
 
@@ -595,11 +650,64 @@ impl Container {
 
         Ok(res)
     }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        use Container::*;
+
+        let res = match (self, other) {
+            (Vec(l), Vec(r)) | (Struct(l), Struct(r)) => {
+                let l = &l.borrow();
+                let r = &r.borrow();
+
+                for (v1, v2) in l.iter().zip(r.iter()) {
+                    let value_cmp = v1.compare(v2)?;
+                    if value_cmp.is_ne() {
+                        return Ok(value_cmp);
+                    }
+                }
+
+                l.len().cmp(&r.len())
+            },
+            (VecU8(l), VecU8(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU16(l), VecU16(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU32(l), VecU32(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU64(l), VecU64(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU128(l), VecU128(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU256(l), VecU256(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecBool(l), VecBool(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecAddress(l), VecAddress(r)) => l.borrow().cmp(&*r.borrow()),
+
+            (Locals(_), _)
+            | (Vec(_), _)
+            | (Struct(_), _)
+            | (VecU8(_), _)
+            | (VecU16(_), _)
+            | (VecU32(_), _)
+            | (VecU64(_), _)
+            | (VecU128(_), _)
+            | (VecU256(_), _)
+            | (VecBool(_), _)
+            | (VecAddress(_), _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "cannot compare container values: {:?}, {:?}",
+                        self, other
+                    )),
+                )
+            },
+        };
+
+        Ok(res)
+    }
 }
 
 impl ContainerRef {
     fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         self.container().equals(other.container())
+    }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        self.container().compare(other.container())
     }
 }
 
@@ -704,11 +812,116 @@ impl IndexedRef {
         };
         Ok(res)
     }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        use Container::*;
+
+        let res = match (
+            self.container_ref.container(),
+            other.container_ref.container(),
+        ) {
+            // VecC <=> VecR impossible
+            (Vec(r1), Vec(r2))
+            | (Vec(r1), Struct(r2))
+            | (Vec(r1), Locals(r2))
+            | (Struct(r1), Vec(r2))
+            | (Struct(r1), Struct(r2))
+            | (Struct(r1), Locals(r2))
+            | (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2))
+            | (Locals(r1), Locals(r2)) => r1.borrow()[self.idx].compare(&r2.borrow()[other.idx])?,
+
+            (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU32(r1), VecU32(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU64(r1), VecU64(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU128(r1), VecU128(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU256(r1), VecU256(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+
+            // Comparison between a generic and a specialized container.
+            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u8>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u8>()?)
+            },
+
+            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u16>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u16>()?)
+            },
+
+            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u32>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u32>()?)
+            },
+
+            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u64>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u64>()?)
+            },
+
+            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u128>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u128>()?)
+            },
+
+            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u256::U256>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u256::U256>()?)
+            },
+
+            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<bool>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<bool>()?)
+            },
+
+            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<AccountAddress>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?)
+            },
+
+            // All other combinations are illegal.
+            (Vec(_), _)
+            | (VecU8(_), _)
+            | (VecU16(_), _)
+            | (VecU32(_), _)
+            | (VecU64(_), _)
+            | (VecU128(_), _)
+            | (VecU256(_), _)
+            | (VecBool(_), _)
+            | (VecAddress(_), _) => {
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("cannot compare references {:?}, {:?}", self, other)))
+            },
+        };
+        Ok(res)
+    }
 }
 
 impl Value {
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         self.0.equals(&other.0)
+    }
+
+    pub fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        self.0.compare(&other.0)
     }
 }
 
