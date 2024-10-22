@@ -127,7 +127,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
             (7000, 100, 0.3 + 0.5, 0.5, 0.5),
             (8500, 100, 0.3 + 0.5, 0.5, 0.4),
             (2000, 300, 0.3 + 1.0, 0.6, 1.0),
-            (3200, 500, 0.3 + 1.0, 0.7, 0.6),
+            (3200, 500, 0.3 + 1.0, 0.7, 0.8),
             // TODO - pos-to-proposal is set to high, until it is calibrated/understood.
             (28, 5, 0.3 + 5.0, 0.7, 1.0),
         ]
