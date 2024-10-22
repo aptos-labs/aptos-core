@@ -14,12 +14,10 @@ use aptos_consensus_types::proof_of_store::{
 };
 use aptos_logger::prelude::*;
 use aptos_types::{
-    aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
-    validator_verifier::ValidatorVerifier, PeerId,
+    ledger_info::SignatureAggregator, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
-    mem,
+    collections::{hash_map::Entry, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -36,8 +34,7 @@ pub(crate) enum ProofCoordinatorCommand {
 }
 
 struct IncrementalProofState {
-    info: BatchInfo,
-    signatures: BTreeMap<PeerId, SignatureWithStatus>,
+    signature_aggregator: SignatureAggregator<BatchInfo>,
     self_voted: bool,
     completed: bool,
 }
@@ -45,20 +42,19 @@ struct IncrementalProofState {
 impl IncrementalProofState {
     fn new(info: BatchInfo) -> Self {
         Self {
-            info,
-            signatures: BTreeMap::new(),
+            signature_aggregator: SignatureAggregator::new(info),
             self_voted: false,
             completed: false,
         }
     }
 
     pub fn voter_count(&self) -> u64 {
-        self.signatures.len() as u64
+        self.signature_aggregator.all_voters().count() as u64
     }
 
     pub fn aggregate_voting_power(&self, verifier: &ValidatorVerifier) -> u64 {
-        verifier
-            .check_voting_power(self.signatures.keys(), true)
+        self.signature_aggregator
+            .check_voting_power(verifier, true)
             .unwrap_or(0) as u64
     }
 
@@ -67,33 +63,21 @@ impl IncrementalProofState {
         signed_batch_info: &SignedBatchInfo,
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedBatchInfoError> {
-        if signed_batch_info.batch_info() != &self.info {
+        if signed_batch_info.batch_info() != self.signature_aggregator.data() {
             return Err(SignedBatchInfoError::WrongInfo((
                 signed_batch_info.batch_id().id,
-                self.info.batch_id().id,
+                self.signature_aggregator.data().batch_id().id,
             )));
-        }
-
-        if self.signatures.contains_key(&signed_batch_info.signer()) {
-            return Err(SignedBatchInfoError::DuplicatedSignature);
         }
 
         match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
             Some(_voting_power) => {
-                let signer = signed_batch_info.signer();
-                if self
-                    .signatures
-                    .insert(signer, signed_batch_info.signature_with_status().clone())
-                    .is_none()
-                {
-                    if signer == self.info.author() {
-                        self.self_voted = true;
-                    }
-                } else {
-                    error!(
-                        "Author already in aggregated_signatures right after rechecking: {}",
-                        signer
-                    );
+                self.signature_aggregator.add_signature(
+                    signed_batch_info.signer(),
+                    signed_batch_info.signature_with_status(),
+                );
+                if signed_batch_info.signer() == self.signature_aggregator.data().author() {
+                    self.self_voted = true;
                 }
             },
             None => {
@@ -113,32 +97,9 @@ impl IncrementalProofState {
         validator_verifier: &ValidatorVerifier,
         check_super_majority: bool,
     ) -> bool {
-        validator_verifier
-            .check_voting_power(self.signatures.keys(), check_super_majority)
+        self.signature_aggregator
+            .check_voting_power(validator_verifier, check_super_majority)
             .is_ok()
-    }
-
-    fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier) {
-        let signatures = mem::take(&mut self.signatures);
-        self.signatures = verifier.filter_invalid_signatures(self.batch_info(), signatures);
-    }
-
-    fn try_aggregate(
-        &self,
-        validator_verifier: &ValidatorVerifier,
-    ) -> Result<AggregateSignature, SignedBatchInfoError> {
-        if !self.check_voting_power(validator_verifier, true) {
-            return Err(SignedBatchInfoError::LowVotingPower);
-        }
-
-        let all_signatures = self
-            .signatures
-            .iter()
-            .map(|(voter, sig)| (voter, sig.signature()));
-        let aggregate_sig = validator_verifier
-            .aggregate_signatures(all_signatures)
-            .map_err(|_| SignedBatchInfoError::UnableToAggregate)?;
-        Ok(aggregate_sig)
     }
 
     /// Try to aggregate all signatures if the voting power is enough. If the aggregated signature is
@@ -147,29 +108,23 @@ impl IncrementalProofState {
         &mut self,
         validator_verifier: &ValidatorVerifier,
     ) -> Result<ProofOfStore, SignedBatchInfoError> {
-        let aggregated_sig = self.try_aggregate(validator_verifier)?;
         if self.completed {
             panic!("Cannot call take twice, unexpected issue occurred");
         }
-        match validator_verifier.verify_multi_signatures(self.batch_info(), &aggregated_sig) {
-            Ok(_) => {
-                // We are not marking all the signatures as "verified" here, as two malicious
-                // voters can collude and create a valid aggregated signature.
+        match self
+            .signature_aggregator
+            .aggregate_and_verify(validator_verifier)
+        {
+            Ok((batch_info, aggregated_sig)) => {
                 self.completed = true;
-                Ok(ProofOfStore::new(self.batch_info().clone(), aggregated_sig))
+                Ok(ProofOfStore::new(batch_info, aggregated_sig))
             },
-            Err(_) => {
-                self.filter_invalid_signatures(validator_verifier);
-
-                let aggregated_sig = self.try_aggregate(validator_verifier)?;
-                self.completed = true;
-                Ok(ProofOfStore::new(self.batch_info().clone(), aggregated_sig))
-            },
+            Err(_) => Err(SignedBatchInfoError::UnableToAggregate),
         }
     }
 
-    fn batch_info(&self) -> &BatchInfo {
-        &self.info
+    pub fn batch_info(&self) -> &BatchInfo {
+        self.signature_aggregator.data()
     }
 }
 
