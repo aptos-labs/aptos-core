@@ -12,13 +12,16 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{
     BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
-use aptos_crypto::bls12381;
 use aptos_logger::prelude::*;
-use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::{
+    aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
+    validator_verifier::ValidatorVerifier, PeerId,
+};
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
+    mem,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     sync::{mpsc::Receiver, oneshot as TokioOneshot},
@@ -34,8 +37,7 @@ pub(crate) enum ProofCoordinatorCommand {
 
 struct IncrementalProofState {
     info: BatchInfo,
-    aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
-    aggregated_voting_power: u128,
+    signatures: BTreeMap<PeerId, SignatureWithStatus>,
     self_voted: bool,
     completed: bool,
 }
@@ -44,11 +46,20 @@ impl IncrementalProofState {
     fn new(info: BatchInfo) -> Self {
         Self {
             info,
-            aggregated_signature: BTreeMap::new(),
-            aggregated_voting_power: 0,
+            signatures: BTreeMap::new(),
             self_voted: false,
             completed: false,
         }
+    }
+
+    pub fn voter_count(&self) -> u64 {
+        self.signatures.len() as u64
+    }
+
+    pub fn aggregate_voting_power(&self, verifier: &ValidatorVerifier) -> u64 {
+        verifier
+            .check_voting_power(self.signatures.keys(), true)
+            .unwrap_or(0) as u64
     }
 
     fn add_signature(
@@ -63,22 +74,18 @@ impl IncrementalProofState {
             )));
         }
 
-        if self
-            .aggregated_signature
-            .contains_key(&signed_batch_info.signer())
-        {
+        if self.signatures.contains_key(&signed_batch_info.signer()) {
             return Err(SignedBatchInfoError::DuplicatedSignature);
         }
 
         match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
-            Some(voting_power) => {
+            Some(_voting_power) => {
                 let signer = signed_batch_info.signer();
                 if self
-                    .aggregated_signature
-                    .insert(signer, signed_batch_info.signature().clone())
+                    .signatures
+                    .insert(signer, signed_batch_info.signature_with_status().clone())
                     .is_none()
                 {
-                    self.aggregated_voting_power += voting_power as u128;
                     if signer == self.info.author() {
                         self.self_voted = true;
                     }
@@ -101,28 +108,63 @@ impl IncrementalProofState {
         Ok(())
     }
 
-    fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        if self.aggregated_voting_power >= validator_verifier.quorum_voting_power() {
-            let recheck =
-                validator_verifier.check_voting_power(self.aggregated_signature.keys(), true);
-            if recheck.is_err() {
-                error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
-            }
-            recheck.is_ok()
-        } else {
-            false
-        }
+    fn check_voting_power(
+        &self,
+        validator_verifier: &ValidatorVerifier,
+        check_super_majority: bool,
+    ) -> bool {
+        validator_verifier
+            .check_voting_power(self.signatures.keys(), check_super_majority)
+            .is_ok()
     }
 
-    fn take(&mut self, validator_verifier: &ValidatorVerifier) -> ProofOfStore {
+    fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier) {
+        let signatures = mem::take(&mut self.signatures);
+        self.signatures = verifier.filter_invalid_signatures(self.batch_info(), signatures);
+    }
+
+    fn try_aggregate(
+        &self,
+        validator_verifier: &ValidatorVerifier,
+    ) -> Result<AggregateSignature, SignedBatchInfoError> {
+        if !self.check_voting_power(validator_verifier, true) {
+            return Err(SignedBatchInfoError::LowVotingPower);
+        }
+
+        let all_signatures = self
+            .signatures
+            .iter()
+            .map(|(voter, sig)| (voter, sig.signature()));
+        let aggregate_sig = validator_verifier
+            .aggregate_signatures(all_signatures)
+            .map_err(|_| SignedBatchInfoError::UnableToAggregate)?;
+        Ok(aggregate_sig)
+    }
+
+    /// Try to aggregate all signatures if the voting power is enough. If the aggregated signature is
+    /// valid, return the ProofOfStore.
+    pub fn aggregate_and_verify(
+        &mut self,
+        validator_verifier: &ValidatorVerifier,
+    ) -> Result<ProofOfStore, SignedBatchInfoError> {
+        let aggregated_sig = self.try_aggregate(validator_verifier)?;
         if self.completed {
             panic!("Cannot call take twice, unexpected issue occurred");
         }
-        self.completed = true;
+        match validator_verifier.verify_multi_signatures(self.batch_info(), &aggregated_sig) {
+            Ok(_) => {
+                // We are not marking all the signatures as "verified" here, as two malicious
+                // voters can collude and create a valid aggregated signature.
+                self.completed = true;
+                Ok(ProofOfStore::new(self.batch_info().clone(), aggregated_sig))
+            },
+            Err(_) => {
+                self.filter_invalid_signatures(validator_verifier);
 
-        match validator_verifier.aggregate_signatures(self.aggregated_signature.iter()) {
-            Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
-            Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
+                let aggregated_sig = self.try_aggregate(validator_verifier)?;
+                self.completed = true;
+                Ok(ProofOfStore::new(self.batch_info().clone(), aggregated_sig))
+            },
         }
     }
 
@@ -136,7 +178,7 @@ pub(crate) struct ProofCoordinator {
     proof_timeout_ms: usize,
     batch_info_to_proof: HashMap<BatchInfo, IncrementalProofState>,
     // to record the batch creation time
-    batch_info_to_time: HashMap<BatchInfo, u64>,
+    batch_info_to_time: HashMap<BatchInfo, Instant>,
     timeouts: Timeouts<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -191,10 +233,9 @@ impl ProofCoordinator {
             signed_batch_info.batch_info().clone(),
             IncrementalProofState::new(signed_batch_info.batch_info().clone()),
         );
-        #[allow(deprecated)]
         self.batch_info_to_time
             .entry(signed_batch_info.batch_info().clone())
-            .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+            .or_insert(Instant::now());
         debug!(
             LogSchema::new(LogEvent::ProofOfStoreInit),
             digest = signed_batch_info.digest(),
@@ -219,22 +260,24 @@ impl ProofCoordinator {
             .get_mut(signed_batch_info.batch_info())
         {
             value.add_signature(&signed_batch_info, validator_verifier)?;
-            if !value.completed && value.ready(validator_verifier) {
-                let proof = value.take(validator_verifier);
+            if !value.completed && value.check_voting_power(validator_verifier, true) {
+                let proof = {
+                    let _timer = counters::SIGNED_BATCH_INFO_VERIFY_DURATION.start_timer();
+                    value.aggregate_and_verify(validator_verifier)?
+                };
                 // proof validated locally, so adding to cache
                 self.proof_cache
                     .insert(proof.info().clone(), proof.multi_signature().clone());
                 // quorum store measurements
-                #[allow(deprecated)]
-                let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
-                    - self
-                        .batch_info_to_time
-                        .remove(signed_batch_info.batch_info())
-                        .ok_or(
-                            // Batch created without recording the time!
-                            SignedBatchInfoError::NoTimeStamps,
-                        )?;
-                counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
+                let duration = self
+                    .batch_info_to_time
+                    .remove(signed_batch_info.batch_info())
+                    .ok_or(
+                        // Batch created without recording the time!
+                        SignedBatchInfoError::NoTimeStamps,
+                    )?
+                    .elapsed();
+                counters::BATCH_TO_POS_DURATION.observe_duration(duration);
                 return Ok(Some(proof));
             }
         } else {
@@ -243,22 +286,25 @@ impl ProofCoordinator {
         Ok(None)
     }
 
-    fn update_counters_on_expire(state: &IncrementalProofState) {
+    fn update_counters_on_expire(
+        state: &IncrementalProofState,
+        validator_verifier: &ValidatorVerifier,
+    ) {
         // Count late votes separately
         if !state.completed && !state.self_voted {
-            counters::BATCH_RECEIVED_LATE_REPLIES_COUNT
-                .inc_by(state.aggregated_signature.len() as u64);
+            counters::BATCH_RECEIVED_LATE_REPLIES_COUNT.inc_by(state.voter_count());
             return;
         }
 
-        counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.aggregated_signature.len() as f64);
-        counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
+        counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.voter_count() as f64);
+        counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
+            .observe(state.aggregate_voting_power(validator_verifier) as f64);
         if !state.completed {
             counters::BATCH_SUCCESSFUL_CREATION.observe(0.0);
         }
     }
 
-    async fn expire(&mut self) {
+    async fn expire(&mut self, validator_verifier: &ValidatorVerifier) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
             if let Some(state) = self.batch_info_to_proof.remove(&signed_batch_info_info) {
@@ -280,7 +326,7 @@ impl ProofCoordinator {
                         self_voted = state.self_voted,
                     );
                 }
-                Self::update_counters_on_expire(&state);
+                Self::update_counters_on_expire(&state, validator_verifier);
             }
         }
         if self
@@ -371,7 +417,7 @@ impl ProofCoordinator {
                     }
                 }),
                 _ = interval.tick() => {
-                    monitor!("proof_coordinator_handle_tick", self.expire().await);
+                    monitor!("proof_coordinator_handle_tick", self.expire(&validator_verifier).await);
                 }
             }
         }
