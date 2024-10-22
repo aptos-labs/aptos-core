@@ -656,6 +656,7 @@ impl EmitJob {
 
         assert!(self.phase_starts.len() == cur_phase);
         self.phase_starts.push(Instant::now());
+        info!("Starting next phase. Phase: {}", cur_phase);
     }
 
     pub fn get_cur_phase(&self) -> usize {

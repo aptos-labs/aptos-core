@@ -30,6 +30,7 @@ pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
     emit_args: &EmitArgs,
 ) -> Result<TxnStats> {
+    info!("emit_transactions");
     if emit_args.coordination_delay_between_instances.is_none() {
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
@@ -77,6 +78,7 @@ pub async fn emit_transactions_with_cluster(
     cluster: &Cluster,
     args: &EmitArgs,
 ) -> Result<TxnStats> {
+    info!("emit_transactions_with_cluster");
     let emitter_mode = EmitJobMode::create(args.mempool_backlog, args.target_tps);
 
     let duration = Duration::from_secs(args.duration);

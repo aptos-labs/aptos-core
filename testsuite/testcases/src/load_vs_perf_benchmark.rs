@@ -299,6 +299,7 @@ impl LoadVsPerfBenchmark {
 #[async_trait]
 impl NetworkTest for LoadVsPerfBenchmark {
     async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        info!("Running LoadVsPerfBenchmark test");
         assert!(
             self.criteria.is_empty() || self.criteria.len() == self.workloads.len(),
             "Invalid config, {} criteria and {} workloads given",

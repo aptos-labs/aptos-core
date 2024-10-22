@@ -334,12 +334,13 @@ pub async fn create_buffered_load(
     swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     nodes_to_send_load_to: &[PeerId],
     emit_job_request: EmitJobRequest,
-    duration: Duration,
+    _duration: Duration,
     warmup_duration_fraction: f32,
     cooldown_duration_fraction: f32,
     mut inner_test_and_report: Option<(&dyn NetworkLoadTest, &mut TestReport)>,
     mut synchronized_with_job: Option<&mut EmitJob>,
 ) -> Result<Vec<LoadTestPhaseStats>> {
+    let duration = Duration::from_secs(1200);
     info!("Creating buffered load for {}s, warmup_duration_fraction {:?}, cooldown_duration_fraction {:?}", duration.as_secs(), warmup_duration_fraction, cooldown_duration_fraction);
     // Generate some traffic
     let (mut emitter, emit_job_request) = create_emitter_and_request(

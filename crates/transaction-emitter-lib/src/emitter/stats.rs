@@ -297,6 +297,7 @@ impl DynamicStatsTracking {
     pub fn start_next_phase(&self) -> usize {
         let cur_phase = self.cur_phase.fetch_add(1, Ordering::Relaxed) + 1;
         assert!(cur_phase < self.num_phases);
+        info!("Starting phase {}. num_phases {}", cur_phase, self.num_phases);
         cur_phase
     }
 
