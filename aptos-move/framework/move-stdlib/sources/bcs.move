@@ -11,11 +11,6 @@ module std::bcs {
     /// Aborts with `0x1c5` error code if there is a failure when calculating serialized size.
     native public fun serialized_size<MoveValue>(v: &MoveValue): u64;
 
-    // TODO - function `constant_serialized_size1 is `public(friend)` here for one release,
-    // and to be changed to `public` one release later.
-    #[test_only]
-    friend std::bcs_tests;
-
     /// If the type has known constant (always the same, independent of instance) serialized size
     /// in BCS (Binary Canonical Serialization) format, returns it, otherwise returns None.
     /// Aborts with `0x1c5` error code if there is a failure when calculating serialized size.
@@ -26,7 +21,7 @@ module std::bcs {
     /// If this function returned Some() for some type before - it is guaranteed to continue returning Some()
     /// On the other hand, if function has returned None for some type,
     /// it might change in the future to return Some() instead, if size becomes "known".
-    native public(friend) fun constant_serialized_size<MoveValue>(): std::option::Option<u64>;
+    native public fun constant_serialized_size<MoveValue>(): std::option::Option<u64>;
 
     // ==============================
     // Module Specification

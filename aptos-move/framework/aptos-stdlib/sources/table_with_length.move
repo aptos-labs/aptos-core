@@ -28,7 +28,7 @@ module aptos_std::table_with_length {
     public fun destroy_empty<K: copy + drop, V>(self: TableWithLength<K, V>) {
         assert!(self.length == 0, error::invalid_state(ENOT_EMPTY));
         let TableWithLength { inner, length: _ } = self;
-        table::destroy(inner)
+        table::destroy_known_empty_unsafe(inner)
     }
 
     /// Add a new entry to the table. Aborts if an entry for this
