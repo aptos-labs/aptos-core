@@ -35,6 +35,7 @@ mod suites;
 // Useful constants
 const KILOBYTE: usize = 1000;
 const MEGABYTE: usize = KILOBYTE * 1000;
+const BWAHAHA: &str = "banana";
 
 #[cfg(unix)]
 #[global_allocator]

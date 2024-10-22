@@ -23,7 +23,7 @@ name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -264,7 +264,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -278,7 +278,7 @@ jobs:
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
     needs:
@@ -300,7 +300,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.ref }}
-      
+
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
@@ -319,7 +319,7 @@ jobs:
         with:
           base-branch: ${{ github.base_ref }}
           variants: "failpoints performance"
-      
+
       - name: Add Image Tag to Step Summary
         run: |
           echo "## Image Tag for compat tests" >> $GITHUB_STEP_SUMMARY
@@ -327,10 +327,10 @@ jobs:
           echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}" >> $GITHUB_STEP_SUMMARY
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
-  
+
   # Run e2e compat test against testnet branch. This is a PR required job.
   forge-compat-test:
-    needs: 
+    needs:
       - permission-check
       - fetch-last-released-docker-image-tag
       - determine-docker-build-metadata
@@ -347,7 +347,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -358,7 +358,7 @@ jobs:
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
     needs:
@@ -377,7 +377,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -400,7 +400,7 @@ jobs:
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -422,7 +422,7 @@ jobs:
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
