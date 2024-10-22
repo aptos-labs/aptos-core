@@ -284,8 +284,6 @@ impl SignedBatchInfo {
         self.signature.signature()
     }
 
-    // Note: SignatureWithStatus has interior mutability for verification status. We should make sure that the status is set
-    // only by the validator verifier upon verification.
     pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
     }
@@ -313,7 +311,6 @@ pub enum SignedBatchInfoError {
     AlreadyCommitted,
     NoTimeStamps,
     UnableToAggregate,
-    LowVotingPower,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
