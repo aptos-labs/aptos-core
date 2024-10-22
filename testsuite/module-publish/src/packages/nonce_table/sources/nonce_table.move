@@ -1,12 +1,10 @@
-module aptos_framework::nonce_validation {
+module 0xABCD::nonce_table {
     use aptos_framework::account;
     use aptos_std::table::{Self, Table};
     use aptos_std::timestamp;
     use aptos_std::math64::min;
     use aptos_std::vector;
     use aptos_std::aptos_hash::sip_hash_from_value;
-    friend aptos_framework::genesis;
-    friend aptos_framework::transaction_validation;
 
     struct NonceEntry has copy, drop, store {
         sender_address: address,
@@ -34,22 +32,23 @@ module aptos_framework::nonce_validation {
     }
 
 
-    public(friend) fun initialize(aptos_framework: &signer) {
+    public(friend) entry fun initialize(publisher: &signer) {
         let table = table::new();
         let nonce_history = NonceHistory {
             nonce_table: table,
         };
-        move_to<NonceHistory>(aptos_framework, nonce_history);
+        move_to<NonceHistory>(publisher, nonce_history);
     }
 
     // returns true if the nonce is valid and inserted into nonce table successfully
     // returns false if the nonce is duplicate
-    public(friend) fun insert_nonce(
+    public(friend) entry fun insert_nonce(
+        publisher: address,
         sender_address: address,
         nonce: u64,
         txn_expiration_time: u64,
     ) acquires NonceHistory {
-        let nonce_history = borrow_global_mut<NonceHistory>(@aptos_framework);
+        let nonce_history = borrow_global_mut<NonceHistory>(publisher);
         let nonce_entry = NonceEntry {
             sender_address,
             nonce,
@@ -120,6 +119,7 @@ module aptos_framework::nonce_validation {
     // }
 
     public(friend) fun nonce_exists(
+        publisher: address,
         sender_address: address,
         nonce: u64,
         txn_expiration_time: u64,
@@ -135,7 +135,7 @@ module aptos_framework::nonce_validation {
         };
         let hash = sip_hash_from_value(&nonce_key);
         let index = hash % 200000;
-        let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
+        let nonce_history = borrow_global<NonceHistory>(publisher);
         if (table::contains(&nonce_history.nonce_table, index)) {
             if (vector::contains(&table::borrow(&nonce_history.nonce_table, index).nonces, &nonce_entry)) {
                 return true
@@ -144,15 +144,16 @@ module aptos_framework::nonce_validation {
         false
     }
 
-    public fun check_and_insert_nonce(
+    public entry fun check_and_insert_nonce(
+        publisher: address,
         sender_address: address,
         nonce: u64,
         txn_expiration_time: u64,
     ) acquires NonceHistory {
-        if (nonce_exists(sender_address, nonce, txn_expiration_time)) {
+        if (nonce_exists(publisher, sender_address, nonce, txn_expiration_time)) {
             return
         };
-        insert_nonce(sender_address, nonce, txn_expiration_time);
+        insert_nonce(publisher, sender_address, nonce, txn_expiration_time);
     }
 }
 

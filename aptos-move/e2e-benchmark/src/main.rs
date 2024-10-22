@@ -91,6 +91,7 @@ fn main() {
         //     data_length: Some(32),
         // }),
         // (, EntryPoints::IncGlobal),
+        (300, EntryPoints::CheckAndInsertNonce),
         (32800, EntryPoints::Loop {
             loop_count: Some(100000),
             loop_type: LoopType::NoOp,
@@ -194,7 +195,7 @@ fn main() {
             } else if expected_time > 1000 {
                 10
             } else {
-                100
+                1000000
             },
         );
         let diff = (elapsed_micros as f32 - expected_time as f32) / (expected_time as f32) * 100.0;

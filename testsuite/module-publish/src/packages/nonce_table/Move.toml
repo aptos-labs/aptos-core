@@ -1,5 +1,5 @@
 [package]
-name = "NonceValidation"
+name = "nonce_table"
 version = "0.0.0"
 
 [dependencies]
