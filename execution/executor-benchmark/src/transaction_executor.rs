@@ -60,8 +60,7 @@ where
             self.num_blocks_processed, block_id
         );
         let num_input_txns = executable_block.transactions.num_transactions();
-        let state_checkpoint_output = self
-            .executor
+        self.executor
             .execute_and_state_checkpoint(
                 executable_block,
                 self.parent_block_id,
@@ -77,7 +76,6 @@ where
             block_id,
             parent_block_id: self.parent_block_id,
             num_input_txns,
-            state_checkpoint_output,
         };
         self.ledger_update_sender.send(msg).unwrap();
         self.parent_block_id = block_id;

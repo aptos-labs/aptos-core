@@ -52,12 +52,11 @@ where
             block_id,
             parent_block_id,
             num_input_txns,
-            state_checkpoint_output,
         } = ledger_update_message;
 
         let output = self
             .executor
-            .ledger_update(block_id, parent_block_id, state_checkpoint_output.clone())
+            .ledger_update(block_id, parent_block_id)
             .unwrap();
         output.execution_output.check_aborts_discards_retries(
             self.allow_aborts,
