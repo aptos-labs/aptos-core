@@ -62,22 +62,6 @@ async fn randomness_stall_recovery() {
     info!("liveness_check_result={:?}", liveness_check_result);
     assert!(liveness_check_result.is_err());
 
-    info!("Hot-fixing the VFNs.");
-    for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
-        info!("Stopping VFN {}.", idx);
-        vfn.stop();
-        let config_path = vfn.config_path();
-        let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
-        vfn_override_config
-            .override_config_mut()
-            .randomness_override_seq_num = 1;
-        info!("Updating VFN {} config.", idx);
-        vfn_override_config.save_config(config_path).unwrap();
-        info!("Restarting VFN {}.", idx);
-        vfn.start().unwrap();
-        tokio::time::sleep(Duration::from_secs(5)).await;
-    }
-
     info!("Hot-fixing all validators.");
     for (idx, validator) in swarm.validators_mut().enumerate() {
         info!("Stopping validator {}.", idx);
@@ -96,6 +80,22 @@ async fn randomness_stall_recovery() {
         validator_override_config.save_config(config_path).unwrap();
         info!("Restarting validator {}.", idx);
         validator.start().unwrap();
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+
+    info!("Hot-fixing the VFNs.");
+    for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
+        info!("Stopping VFN {}.", idx);
+        vfn.stop();
+        let config_path = vfn.config_path();
+        let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
+        vfn_override_config
+            .override_config_mut()
+            .randomness_override_seq_num = 1;
+        info!("Updating VFN {} config.", idx);
+        vfn_override_config.save_config(config_path).unwrap();
+        info!("Restarting VFN {}.", idx);
+        vfn.start().unwrap();
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
