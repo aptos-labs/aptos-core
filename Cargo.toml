@@ -194,7 +194,6 @@ members = [
     "third_party/move/evm/exec-utils",
     "third_party/move/evm/extract-ethereum-abi",
     # third_party/move
-    "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
