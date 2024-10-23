@@ -1176,7 +1176,7 @@ pub struct MovePackageDir {
     /// Currently, defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", "2.0"),
+           default_value_if("move_2", "true", "2.1"),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
