@@ -183,6 +183,9 @@ impl StateComputer for ExecutionProxy {
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         block.init_committed_transactions();
+        if let Some(s) = self.state.write().as_ref() {
+            s.payload_manager.notify_ordered(block.clone());
+        }
 
         let block_id = block.id();
         debug!(

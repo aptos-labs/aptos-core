@@ -238,8 +238,12 @@ impl DagDriver {
                     .map(|node_status| node_status.as_node())
                     .collect::<Vec<_>>();
 
-                let payload_filter =
-                    PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
+                let payload_filter = PayloadFilter::from(
+                    &nodes
+                        .iter()
+                        .map(|node| (new_round, node.payload()))
+                        .collect(),
+                );
                 let validator_txn_hashes = nodes
                     .iter()
                     .flat_map(|node| node.validator_txns())
@@ -273,6 +277,7 @@ impl DagDriver {
                     pending_uncommitted_blocks: 0,
                     recent_max_fill_fraction: 0.0,
                     block_timestamp: self.time_service.now_unix_time(),
+                    block_round: new_round,
                 },
                 sys_payload_filter,
                 Box::pin(async {}),
