@@ -4,6 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+- Update CLI commands logs to use `println` for regular output.
+
 ## [4.2.4] - 2024/10/21
 - Releasing Move 2.1, which adds compound assignments (`x += 1`) and loop labels to the language. See [Move 2 Release Notes](https://aptos.dev/en/build/smart-contracts/book/move-2).
 - multiple bug fixes in the Move 2 compilation chain.

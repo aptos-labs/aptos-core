@@ -106,20 +106,20 @@ impl CliCommand<()> for InitTool {
         } else {
             ProfileConfig::default()
         };
-        eprintln!("Configuring for profile {}", profile_name);
+        println!("Configuring for profile {}", profile_name);
 
         // Choose a network
         let network = if let Some(network) = self.network {
-            eprintln!("Configuring for network {:?}", network);
+            println!("Configuring for network {:?}", network);
             network
         } else {
-            eprintln!(
+            println!(
                 "Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]"
             );
             let input = read_line("network")?;
             let input = input.trim();
             if input.is_empty() {
-                eprintln!("No network given, using devnet...");
+                println!("No network given, using devnet...");
                 Network::Devnet
             } else {
                 Network::from_str(input)?
@@ -161,14 +161,14 @@ impl CliCommand<()> for InitTool {
         } else if self.ledger {
             // Fetch the top 5 (index 0-4) accounts from Ledger
             let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
-            eprintln!(
+            println!(
                 "Please choose an index from the following {} ledger accounts, or choose an arbitrary index that you want to use:",
                 account_map.len()
             );
 
             // Iterate through the accounts and print them out
             for (index, (derivation_path, account)) in account_map.iter().enumerate() {
-                eprintln!(
+                println!(
                     "[{}] Derivation path: {} (Address: {})",
                     index, derivation_path, account
                 );
@@ -201,18 +201,18 @@ impl CliCommand<()> for InitTool {
                 .private_key_options
                 .extract_private_key_cli(self.encoding_options.encoding)?
             {
-                eprintln!("Using command line argument for private key");
+                println!("Using command line argument for private key");
                 key
             } else {
-                eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+                println!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
                 let input = read_line("Private key")?;
                 let input = input.trim();
                 if input.is_empty() {
                     if let Some(key) = profile_config.private_key {
-                        eprintln!("No key given, keeping existing key...");
+                        println!("No key given, keeping existing key...");
                         key
                     } else {
-                        eprintln!("No key given, generating key...");
+                        println!("No key given, generating key...");
                         self.rng_args
                             .key_generator()?
                             .generate_ed25519_private_key()
@@ -309,9 +309,9 @@ impl CliCommand<()> for InitTool {
 
         if let Some(faucet_url) = maybe_faucet_url {
             if account_exists {
-                eprintln!("Account {} has been already found onchain", address);
+                println!("Account {} has been already found onchain", address);
             } else {
-                eprintln!(
+                println!(
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
@@ -324,14 +324,14 @@ impl CliCommand<()> for InitTool {
                     NUM_DEFAULT_OCTAS,
                 )
                 .await?;
-                eprintln!("Account {} funded successfully", address);
+                println!("Account {} funded successfully", address);
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
         } else if network == Network::Mainnet {
             eprintln!("Account {} does not exist, you will need to create and fund the account by transferring funds from another account", address);
         } else {
-            eprintln!("Account {} has been initialized locally, but you must transfer coins to it to create the account onchain", address);
+            println!("Account {} has been initialized locally, but you must transfer coins to it to create the account onchain", address);
         }
 
         // Ensure the loaded config has profiles setup for a possible empty file
@@ -348,7 +348,7 @@ impl CliCommand<()> for InitTool {
             .profile_options
             .profile_name()
             .unwrap_or(DEFAULT_PROFILE);
-        eprintln!(
+        println!(
             "\n---\nAptos CLI is now set up for account {} as profile {}!\n See the account here: {}\n Run `aptos --help` for more information about commands",
             address,
             profile_name,
@@ -363,11 +363,11 @@ impl InitTool {
     fn custom_network(&self, profile_config: &mut ProfileConfig) -> CliTypedResult<()> {
         // Rest Endpoint
         let rest_url = if let Some(ref rest_url) = self.rest_url {
-            eprintln!("Using command line argument for rest URL {}", rest_url);
+            println!("Using command line argument for rest URL {}", rest_url);
             Some(rest_url.to_string())
         } else {
             let current = profile_config.rest_url.as_deref();
-            eprintln!(
+            println!(
                     "Enter your rest endpoint [Current: {} | No input: Exit (or keep the existing if present)]",
                     current.unwrap_or("None"),
                 );
@@ -375,7 +375,7 @@ impl InitTool {
             let input = input.trim();
             if input.is_empty() {
                 if let Some(current) = current {
-                    eprintln!("No rest url given, keeping the existing url...");
+                    println!("No rest url given, keeping the existing url...");
                     Some(current.to_string())
                 } else {
                     eprintln!("No rest url given, exiting...");
@@ -393,14 +393,14 @@ impl InitTool {
 
         // Faucet Endpoint
         let faucet_url = if self.skip_faucet {
-            eprintln!("Not configuring a faucet because --skip-faucet was provided");
+            println!("Not configuring a faucet because --skip-faucet was provided");
             None
         } else if let Some(ref faucet_url) = self.faucet_url {
-            eprintln!("Using command line argument for faucet URL {}", faucet_url);
+            println!("Using command line argument for faucet URL {}", faucet_url);
             Some(faucet_url.to_string())
         } else {
             let current = profile_config.faucet_url.as_deref();
-            eprintln!(
+            println!(
                     "Enter your faucet endpoint [Current: {} | No input: Skip (or keep the existing one if present) | 'skip' to not use a faucet]",
                     current
                         .unwrap_or("None"),
@@ -409,14 +409,14 @@ impl InitTool {
             let input = input.trim();
             if input.is_empty() {
                 if let Some(current) = current {
-                    eprintln!("No faucet url given, keeping the existing url...");
+                    println!("No faucet url given, keeping the existing url...");
                     Some(current.to_string())
                 } else {
-                    eprintln!("No faucet url given, skipping faucet...");
+                    println!("No faucet url given, skipping faucet...");
                     None
                 }
             } else if input.to_lowercase() == "skip" {
-                eprintln!("Skipping faucet...");
+                println!("Skipping faucet...");
                 None
             } else {
                 Some(

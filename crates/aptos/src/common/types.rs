@@ -1867,7 +1867,7 @@ impl TransactionOptions {
             .profile()
             .ok()
             .and_then(|profile| profile.network);
-        eprintln!(
+        println!(
             "Transaction submitted: {}",
             explorer_transaction_link(transaction_hash, network)
         );

@@ -251,7 +251,7 @@ impl BuiltPackage {
             },
         };
 
-        eprintln!("Compiling, may take a little while to download git dependencies...");
+        println!("Compiling, may take a little while to download git dependencies...");
         let (mut package, model_opt) =
             build_config.compile_package_no_exit(&package_path, &mut stderr())?;
 
