@@ -105,6 +105,8 @@ async fn randomness_stall_recovery() {
         vfn.start().unwrap();
     }
 
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
     let liveness_check_result = swarm
         .liveness_check(Instant::now().add(Duration::from_secs(30)))
         .await;
