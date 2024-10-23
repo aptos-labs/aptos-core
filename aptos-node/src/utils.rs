@@ -28,6 +28,7 @@ pub fn create_global_rayon_pool(create_global_rayon_pool: bool) {
     if create_global_rayon_pool {
         rayon::ThreadPoolBuilder::new()
             .thread_name(|index| format!("rayon-global-{}", index))
+            .num_threads(4)
             .build_global()
             .expect("Failed to build rayon global thread pool.");
     }
