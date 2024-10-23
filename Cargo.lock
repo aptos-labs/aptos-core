@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "4.2.5"
+version = "4.2.6"
 dependencies = [
  "anyhow",
  "aptos-api-types",

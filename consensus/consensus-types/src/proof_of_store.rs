@@ -6,8 +6,8 @@ use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, PeerId,
+    aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use mini_moka::sync::Cache;
 use rand::{seq::SliceRandom, thread_rng};
@@ -217,7 +217,7 @@ impl SignedBatchInfoMsg {
 pub struct SignedBatchInfo {
     info: BatchInfo,
     signer: PeerId,
-    signature: bls12381::Signature,
+    signature: SignatureWithStatus,
 }
 
 impl SignedBatchInfo {
@@ -230,8 +230,25 @@ impl SignedBatchInfo {
         Ok(Self {
             info: batch_info,
             signer: validator_signer.author(),
-            signature,
+            signature: SignatureWithStatus::from(signature),
         })
+    }
+
+    pub fn new_with_signature(
+        batch_info: BatchInfo,
+        signer: PeerId,
+        signature: bls12381::Signature,
+    ) -> Self {
+        Self {
+            info: batch_info,
+            signer,
+            signature: SignatureWithStatus::from(signature),
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy(batch_info: BatchInfo, signer: PeerId) -> Self {
+        Self::new_with_signature(batch_info, signer, bls12381::Signature::dummy_signature())
     }
 
     pub fn signer(&self) -> PeerId {
@@ -260,10 +277,14 @@ impl SignedBatchInfo {
             );
         }
 
-        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
+        Ok(validator.optimistic_verify(self.signer, &self.info, &self.signature)?)
     }
 
     pub fn signature(&self) -> &bls12381::Signature {
+        self.signature.signature()
+    }
+
+    pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
     }
 
@@ -289,6 +310,7 @@ pub enum SignedBatchInfoError {
     NotFound,
     AlreadyCommitted,
     NoTimeStamps,
+    UnableToAggregate,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
