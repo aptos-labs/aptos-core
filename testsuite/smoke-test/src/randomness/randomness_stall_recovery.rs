@@ -102,7 +102,7 @@ async fn randomness_stall_recovery() {
     tokio::time::sleep(Duration::from_secs(10)).await;
 
     info!("Every node except the last validator should pass liveness check.");
-    for node in swarm.validators().take(num_validators - 1) {
+    for node in swarm.validators() {
         info!("checking node {}", node.index());
         node.liveness_check(20).await.unwrap();
     }
