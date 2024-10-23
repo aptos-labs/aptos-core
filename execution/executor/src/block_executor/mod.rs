@@ -19,8 +19,8 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
+    execution_output::ExecutionOutput, state_compute_result::StateComputeResult,
+    BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -120,7 +120,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput> {
+    ) -> ExecutorResult<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
@@ -135,7 +135,6 @@ where
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "ledger_update"]);
 
@@ -144,7 +143,7 @@ where
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .ledger_update(block_id, parent_block_id, state_checkpoint_output)
+            .ledger_update(block_id, parent_block_id)
     }
 
     fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
@@ -207,7 +206,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput> {
+    ) -> ExecutorResult<()> {
         let _timer = EXECUTE_BLOCK.start_timer();
         let ExecutableBlock {
             block_id,
@@ -283,19 +282,18 @@ where
                 (execution_output, state_checkpoint_output)
             };
         let output = PartialStateComputeResult::new(execution_output);
-        output.set_state_checkpoint_output(state_checkpoint_output.clone());
+        output.set_state_checkpoint_output(state_checkpoint_output);
 
         let _ = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
-        Ok(state_checkpoint_output)
+        Ok(())
     }
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        _state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = UPDATE_LEDGER.start_timer();
         info!(
