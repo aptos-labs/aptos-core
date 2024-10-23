@@ -203,7 +203,7 @@ module aptos_framework::atomic_bridge_initiator {
         hash_lock: vector<u8>,
         amount: u64
     ) acquires BridgeInitiatorEvents {
-        let ethereum_address = ethereum::ethereum_address(recipient);
+        let ethereum_address = ethereum::ethereum_address_no_eip55(recipient);
         let initiator_address = signer::address_of(initiator);
         let time_lock = atomic_bridge_configuration::initiator_timelock_duration();
 
