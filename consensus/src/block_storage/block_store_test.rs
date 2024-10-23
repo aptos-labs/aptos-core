@@ -300,7 +300,6 @@ async fn test_insert_vote() {
             voter,
         )
         .unwrap();
-        vote.set_verified();
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
@@ -330,7 +329,6 @@ async fn test_insert_vote() {
         final_voter,
     )
     .unwrap();
-    vote.set_verified();
     match pending_votes.insert_vote(&vote, &validator_verifier) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
