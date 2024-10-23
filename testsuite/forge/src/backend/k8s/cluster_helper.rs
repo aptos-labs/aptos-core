@@ -608,8 +608,19 @@ pub async fn install_testnet_resources(
         enable_haproxy,
     )?;
 
+    info!("aptos_node_helm_values: {:?}", aptos_node_helm_values);
+    info!(
+        "aptos_node_helm_values_override: {:?}",
+        aptos_node_helm_values_override
+    );
+
     merge_yaml(&mut aptos_node_helm_values, aptos_node_helm_values_override);
     merge_yaml(&mut genesis_helm_values, genesis_helm_values_override);
+
+    info!(
+        "aptos_node_helm_values after override: {:?}",
+        aptos_node_helm_values
+    );
 
     // disable uploading genesis to blob storage since indexer requires it in the cluster
     if enable_indexer {
