@@ -3,8 +3,7 @@
 
 use super::{publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter};
 use crate::{
-    call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator},
-    RootAccountHandle,
+    call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, BucketedObjectPool, RootAccountHandle
 };
 use aptos_sdk::{
     bcs,
@@ -115,7 +114,7 @@ impl UserModuleTransactionGenerator for StableCoinSetMinterAllowanceGenerator {
 pub struct StableCoinMinterGenerator {
     pub max_mint_amount: u64,
     pub batch_size: usize,
-    pub minter_accounts: Arc<ObjectPool<LocalAccount>>,
+    pub minter_accounts: Arc<BucketedObjectPool<LocalAccount>>,
     pub destination_accounts: Arc<ObjectPool<LocalAccount>>,
 }
 
@@ -123,7 +122,7 @@ impl StableCoinMinterGenerator {
     pub fn new(
         max_mint_amount: u64,
         batch_size: usize,
-        minter_accounts: Arc<ObjectPool<LocalAccount>>,
+        minter_accounts: Arc<BucketedObjectPool<LocalAccount>>,
         destination_accounts: Arc<ObjectPool<LocalAccount>>,
     ) -> Self {
         Self {
@@ -158,8 +157,8 @@ impl UserModuleTransactionGenerator for StableCoinMinterGenerator {
         let destination_accounts = self.destination_accounts.clone();
         let max_mint_amount = self.max_mint_amount;
         let batch_size = self.batch_size;
-        Arc::new(move |_fee_payer, _package, publisher, txn_factory, rng| {
-            let minter = minter_accounts.take_from_pool(1, true, rng);
+        Arc::new(move |account, _package, publisher, txn_factory, rng| {
+            let minter = minter_accounts.take_from_pool(account.address(), 1, true, rng);
             let destinations = destination_accounts.take_from_pool(batch_size, true, rng);
             if minter.is_empty() || destinations.is_empty() {
                 return None;
@@ -196,7 +195,7 @@ impl UserModuleTransactionGenerator for StableCoinMinterGenerator {
                     ))),
                 )),
             };
-            minter_accounts.add_to_pool(minter);
+            minter_accounts.add_to_bucket(account.address(), minter);
             destination_accounts.add_to_pool(destinations);
             txn
         })

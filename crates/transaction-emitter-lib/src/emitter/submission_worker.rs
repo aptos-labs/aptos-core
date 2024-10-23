@@ -249,7 +249,7 @@ impl SubmissionWorker {
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
-        info!("wait_and_update_stats for account: {:?}, start_time: {:?} avg_txn_offset_time: {:?} skip_latency_stats {:?}, check_account_sleep_duration {:?}, txn_expiration_ts_secs {:?}", self.accounts.first().unwrap().address(), start_time, avg_txn_offset_time, skip_latency_stats, check_account_sleep_duration, txn_expiration_ts_secs);
+        info!("wait_and_update_stats for account: {:?}, start_time: {:?} avg_txn_offset_time: {:?} skip_latency_stats {:?}, check_account_sleep_duration {:?}, txn_expiration_ts_secs {:?}, main_client_index {:?}, client url {:?}", self.accounts.first().unwrap().address(), start_time, avg_txn_offset_time, skip_latency_stats, check_account_sleep_duration, txn_expiration_ts_secs, self.main_client_index, self.client().path_prefix_string());
         let now = Instant::now();
         let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
             wait_for_accounts_sequence(

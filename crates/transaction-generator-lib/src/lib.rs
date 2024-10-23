@@ -137,6 +137,10 @@ pub trait TransactionGenerator: Sync + Send {
         account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
+
+    // fn update_sequence_numbers(&mut self, _latest_fetched_sequence_numbers: &HashMap<AccountAddress, u64>) {
+    //     // Default implementation does nothing
+    // }
 }
 
 #[async_trait]
@@ -369,7 +373,7 @@ pub async fn create_txn_generator_creator(
                 },
                 TransactionType::Workflow {
                     num_modules,
-                    use_account_pool,
+                    use_account_pool: _,
                     workflow_kind,
                     progress_type,
                 } => Box::new(
@@ -380,7 +384,11 @@ pub async fn create_txn_generator_creator(
                         &root_account,
                         txn_executor,
                         *num_modules,
-                        use_account_pool.then(|| accounts_pool.clone()),
+                        Some(Arc::new(source_accounts
+                            .iter()
+                            .map(|d| d.address())
+                            .collect()
+                        )),
                         cur_phase.clone(),
                         *progress_type,
                     )
@@ -400,6 +408,74 @@ pub async fn create_txn_generator_creator(
         addresses_pool,
         accounts_pool,
     )
+}
+
+pub struct BucketedObjectPool<T> {
+    pool: RwLock<HashMap<AccountAddress, Vec<T>>>,
+}
+
+impl<T> BucketedObjectPool<T> {
+    pub(crate) fn new(addresses: Arc<Vec<AccountAddress>>) -> Self {
+        let mut pool = HashMap::new();
+        for address in addresses.iter() {
+            pool.insert(address.clone(), Vec::new());
+        }
+        Self {
+            pool: RwLock::new(pool),
+        }
+    }
+
+    pub(crate) fn add_to_bucket(&self, address: AccountAddress, mut addition: Vec<T>) {
+        assert!(!addition.is_empty());
+        let mut current = self.pool.write();
+        current
+            .entry(address)
+            .or_insert_with(Vec::new)
+            .append(&mut addition);
+    }
+
+
+    pub(crate) fn add_to_pool(&self, addition: Vec<T>, rng: &mut StdRng) {
+        assert!(!addition.is_empty());
+        let mut current = self.pool.write();
+        let addresses = current.keys().cloned().collect::<Vec<_>>();
+        for object in addition {
+            let address = addresses[rng.gen_range(0, addresses.len())];
+            current
+                .entry(address)
+                .or_insert_with(Vec::new)
+                .append(&mut vec![object]);
+        }
+    }
+
+    pub(crate) fn take_from_pool(
+        &self,
+        address: AccountAddress,
+        needed: usize,
+        return_partial: bool,
+        rng: &mut StdRng,
+    ) -> Vec<T> {
+        let mut current = self.pool.write();
+        let num_in_pool = current.get_mut(&address).map_or(0, |v| v.len());
+        if !return_partial && num_in_pool < needed {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(10)),
+                warn!("Cannot fetch enough from shared pool, left in pool {}, needed {}", num_in_pool, needed);
+            );
+            return Vec::new();
+        }
+        let num_to_return = std::cmp::min(num_in_pool, needed);
+        let current_bucket = current.get_mut(&address).unwrap();
+        let mut result = current_bucket
+            .drain((num_in_pool - num_to_return)..)
+            .collect::<Vec<_>>();
+
+        if current_bucket.len() > num_to_return {
+            let start = rng.gen_range(0, current_bucket.len() - num_to_return);
+            current_bucket[start..start + num_to_return].swap_with_slice(&mut result);
+        }
+        result
+    }
 }
 
 /// Simple object pool structure, that you can add and remove from multiple threads.

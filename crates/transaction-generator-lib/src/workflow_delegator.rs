@@ -2,21 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator,
-    accounts_pool_wrapper::AccountsPoolWrapperCreator,
-    call_custom_modules::CustomModulesDelegationGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator,
-    stable_coin_minter::{
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BucketedAccountsPoolWrapperCreator}, call_custom_modules::CustomModulesDelegationGeneratorCreator, entry_points::EntryPointTransactionGenerator, stable_coin_minter::{
         StableCoinConfigureControllerGenerator, StableCoinMinterGenerator,
         StableCoinSetMinterAllowanceGenerator,
-    },
-    EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
+    }, BucketedObjectPool, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
+    move_types::account_address::AccountAddress,
 };
 use std::{
     fmt::Debug,
@@ -255,7 +250,7 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
-        _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+        txn_emitter_account_pool: Option<Arc<Vec<AccountAddress>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
     ) -> Self {
@@ -371,7 +366,7 @@ impl WorkflowTxnGeneratorCreator {
                 let created_minter_pool = Arc::new(ObjectPool::new());
                 let destination_pool = Arc::new(ObjectPool::new());
                 let configured_minter_pool = Arc::new(ObjectPool::new());
-                let minters_with_allowance_pool = Arc::new(ObjectPool::new());
+                let minters_with_allowance_pool = Arc::new(BucketedObjectPool::new(txn_emitter_account_pool.unwrap()));
 
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),
@@ -450,7 +445,7 @@ impl WorkflowTxnGeneratorCreator {
                     Some(configured_minter_pool.clone()),
                 ));
 
-                let set_minter_allowance_stage = Box::new(AccountsPoolWrapperCreator::new(
+                let set_minter_allowance_stage = Box::new(BucketedAccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                         txn_factory.clone(),
                         packages.clone(),
