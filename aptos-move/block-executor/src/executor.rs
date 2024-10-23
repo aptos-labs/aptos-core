@@ -902,12 +902,13 @@ where
         let num_active_workers = AtomicUsize::new(self.config.local.concurrency_level);
 
         self.executor_thread_pool.scope(|s| {
-            s.spawn(|_| {
-                txn_provider
-                    .as_ref()
-                    .run_sharding_msg_loop(&versioned_cache, &scheduler);
-            });
             for _ in 0..self.config.local.concurrency_level {
+                s.spawn(|_| {
+                    txn_provider
+                        .as_ref()
+                        .run_sharding_msg_loop(&versioned_cache, &scheduler);
+                });
+
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         &executor_initial_arguments,

@@ -54,6 +54,7 @@ use serde::{Deserialize, Serialize};
 use aptos_block_executor::txn_commit_hook::OutputStreamHook;
 use aptos_block_executor::txn_provider::sharded::ShardedTransaction;
 use aptos_mvhashmap::types::TxnIndex;
+use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
 use aptos_types::state_store::state_key::StateKey;
 use crate::block_executor::AptosTransactionOutput;
@@ -343,6 +344,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         stream_results_receiver,
                         num_txns,
                         onchain_config,
+                        start_ms_since_epoch,
                     } = cmd;
                     cumulative_txns += num_txns;
 
@@ -382,6 +384,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     });
 
                     disable_speculative_logging();
+                    let delta = get_delta_time(start_ms_since_epoch.unwrap());
+                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["5b_start_block_execution"]).observe(delta as f64);
                     let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
                         .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
                         .start_timer();

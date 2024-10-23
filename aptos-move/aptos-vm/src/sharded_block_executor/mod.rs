@@ -74,6 +74,7 @@ pub struct ExecuteV3PartitionStreamedInitCommand<S> {
     pub stream_results_receiver: Receiver<(TxnIndex, TransactionOutput)>,
     pub num_txns: usize,
     pub onchain_config: BlockExecutorConfigFromOnchain,
+    pub start_ms_since_epoch: Option<u64>,
 }
 
 impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {

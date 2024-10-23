@@ -181,10 +181,9 @@ impl RemoteCoordinatorClient {
                     }
 
                     cmd_rx_thread_pool_clone.spawn_fifo(move || {
-                        let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
-                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                            .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
-                        cmd_rx_msg_duration_since_epoch_clone.store(message.start_ms_since_epoch.unwrap(), std::sync::atomic::Ordering::Relaxed);
+                        let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
+                        let delta = get_delta_time(start_ms_since_epoch);
+                        cmd_rx_msg_duration_since_epoch_clone.store(start_ms_since_epoch, std::sync::atomic::Ordering::Relaxed);
                         let _rx_timer = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&[&shard_id.to_string(), "cmd_rx"])
                             .start_timer();
@@ -196,6 +195,8 @@ impl RemoteCoordinatorClient {
 
                         match cmds_or_metadata {
                             V3CmdsOrMetaData::MetaData(meta_data) => {
+                                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                                    .with_label_values(&["5a_cmd_v3metadata_msg_shard_recv"]).observe(delta as f64);
                                 //info!("Received metadata");
                                 match init_sender_clone.as_ref() {
                                     None => {
@@ -226,6 +227,7 @@ impl RemoteCoordinatorClient {
                                                 stream_results_receiver: stream_results_rx,
                                                 num_txns: meta_data.num_txns,
                                                 onchain_config: meta_data.onchain_config,
+                                                start_ms_since_epoch: Some(start_ms_since_epoch),
                                             }
                                         ));
                                     }
@@ -233,6 +235,8 @@ impl RemoteCoordinatorClient {
                             }
                             V3CmdsOrMetaData::Cmds(cmds) => {
                                 //info!("Received cmds");
+                                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                                    .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
                                 let transactions = cmds.cmds;
                                 let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
                                     .with_label_values(&[&shard_id.to_string(), "init_prefetch"])
@@ -260,10 +264,9 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command(&self) -> ExecutorShardCommand<RemoteStateViewClient> {
         match self.command_rx.recv() {
             Ok(message) => {
-                let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
-                self.cmd_rx_msg_duration_since_epoch.store(message.start_ms_since_epoch.unwrap(), std::sync::atomic::Ordering::Relaxed);
+                let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
+                let delta = get_delta_time(start_ms_since_epoch);
+                self.cmd_rx_msg_duration_since_epoch.store(start_ms_since_epoch, std::sync::atomic::Ordering::Relaxed);
                 let _rx_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
                     .start_timer();
@@ -284,6 +287,8 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let remote_cross_shard_client = self.remote_cross_shard_client.clone();
                 return match cmds_or_metadata {
                     V3CmdsOrMetaData::MetaData(meta_data) => {
+                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                            .with_label_values(&["5a_cmd_v3metadata_msg_shard_recv"]).observe(delta as f64);
                         let dummy: [u8; 32] = [0; 32];
                         //let blocking_txns = Arc::new(vec![ShardedTransaction::BlockingTxn(BlockingTransaction::new()); meta_data.num_txns]);
                         let mut blocking_txns = Vec::new();
@@ -330,10 +335,13 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                                 stream_results_receiver: stream_results_rx,
                                 num_txns: meta_data.num_txns,
                                 onchain_config: meta_data.onchain_config,
+                                start_ms_since_epoch: Some(start_ms_since_epoch),
                             }
                         )
                     }
                     V3CmdsOrMetaData::Cmds(cmds) => {
+                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                            .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
                         let (sender, receiver) = crossbeam_channel::unbounded();
                         let sender_arc = Arc::new(Some(sender));
                         let mut blocking_txns = Vec::new();

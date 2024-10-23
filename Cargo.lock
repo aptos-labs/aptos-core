@@ -4242,6 +4242,7 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-mvhashmap",
  "aptos-native-interface",
+ "aptos-secure-net",
  "aptos-streaming-partitioner",
  "aptos-table-natives",
  "aptos-transaction-orderer",

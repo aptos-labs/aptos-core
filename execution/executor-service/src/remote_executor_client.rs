@@ -362,6 +362,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                     let msg = Message::create_with_metadata(bcs::to_bytes(&execution_metadata).unwrap(), duration_since_epoch, 0, 0);
                     //info!("********* Metadata sent to shard {}; metadata size {}", shard_id, msg.data.len());
 
+                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["1a_cmd_v3metadata_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
                     let execute_command_type = format!("execute_command_{}", shard_id);
                     /*senders[shard_id][0]
                         .lock()
