@@ -466,7 +466,6 @@ async fn test_commit_sync_race() {
     };
     use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
-    use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
@@ -505,7 +504,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _onchain_config: BlockExecutorConfigFromOnchain,
-        ) -> ExecutorResult<StateCheckpointOutput> {
+        ) -> ExecutorResult<()> {
             todo!()
         }
 
@@ -513,7 +512,6 @@ async fn test_commit_sync_race() {
             &self,
             _block_id: HashValue,
             _parent_block_id: HashValue,
-            _state_checkpoint_output: StateCheckpointOutput,
         ) -> ExecutorResult<StateComputeResult> {
             todo!()
         }
