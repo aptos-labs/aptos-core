@@ -22,28 +22,35 @@ module redemption::redemption_tests {
         let user_addr = signer::address_of(user);
         let coins = create_coin_and_mint(deployer, 1000);
         aptos_account::deposit_coins(user_addr, coins);
-        let (to, native_tokens) = create_fungible_asset_and_mint(deployer, 1000);
+        let (redemption_fa, native_tokens) = create_fungible_asset_and_mint(deployer, 1000);
         primary_fungible_store::deposit(signer::address_of(operator), native_tokens);
-        redemption::create_pool<WrappedCoin>(deployer, to);
+        redemption::create_pool<WrappedCoin>(deployer, redemption_fa);
 
         let operator_addr = signer::address_of(operator);
-        assert!(primary_fungible_store::balance(operator_addr, to) == 1000, 0);
+        assert!(primary_fungible_store::balance(operator_addr, redemption_fa) == 1000, 0);
         redemption::deposit_native<WrappedCoin>(operator, 1000);
-        assert!(primary_fungible_store::balance(operator_addr, to) == 0, 0);
+        assert!(primary_fungible_store::balance(operator_addr, redemption_fa) == 0, 0);
 
+        assert!(primary_fungible_store::balance(user_addr, redemption_fa) == 0, 0);
         assert!(coin::balance<WrappedCoin>(user_addr) == 1000, 0);
         redemption::redeem<WrappedCoin>(user, 500);
+        assert!(primary_fungible_store::balance(user_addr, redemption_fa) == 500, 0);
         assert!(coin::balance<WrappedCoin>(user_addr) == 500, 0);
 
+        assert!(primary_fungible_store::balance(operator_addr, redemption_fa) == 0, 0);
         assert!(coin::balance<WrappedCoin>(operator_addr) == 0, 0);
         redemption::withdraw_wrapped<WrappedCoin>(operator, 500);
+        assert!(primary_fungible_store::balance(operator_addr, redemption_fa) == 0, 0);
         assert!(coin::balance<WrappedCoin>(operator_addr) == 500, 0);
 
+        assert!(primary_fungible_store::balance(operator_addr, redemption_fa) == 0, 0);
         redemption::redeem<WrappedCoin>(user, 500);
         assert!(coin::balance<WrappedCoin>(user_addr) == 0, 0);
+        assert!(primary_fungible_store::balance(user_addr, redemption_fa) == 1000, 0);
 
         redemption::withdraw_wrapped<WrappedCoin>(operator, 500);
         assert!(coin::balance<WrappedCoin>(operator_addr) == 1000, 0);
+        assert!(primary_fungible_store::balance(operator_addr, redemption_fa) == 0, 0);
     }
 
     fun create_coin_and_mint(creator: &signer, amount: u64): Coin<WrappedCoin> {
