@@ -155,7 +155,7 @@ impl StateComputeResult {
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
             transactions: self.execution_output.to_commit.txns(),
-            transaction_outputs: self.execution_output.to_commit.make_transaction_outputs(),
+            transaction_outputs: self.execution_output.to_commit.transaction_outputs(),
             transaction_infos: &self.ledger_update_output.transaction_infos,
             per_version_state_updates: &self.state_checkpoint_output.per_version_state_updates,
             base_state_version: self.state_checkpoint_output.parent_state.base_version,

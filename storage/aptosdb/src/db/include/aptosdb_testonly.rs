@@ -173,7 +173,7 @@ impl ChunkToCommitOwned {
         ChunkToCommit {
             first_version: self.first_version,
             transactions: &self.transactions,
-            transaction_outputs: self.transaction_outputs.clone(),
+            transaction_outputs: &self.transaction_outputs,
             transaction_infos: &self.transaction_infos,
             base_state_version: self.base_state_version,
             latest_in_memory_state: &self.latest_in_memory_state,

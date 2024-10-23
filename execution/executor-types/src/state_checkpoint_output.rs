@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::parsed_transaction_output::TransactionsWithParsedOutput;
+use crate::transactions_with_output::TransactionsWithOutput;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_delta::StateDelta;
@@ -18,17 +18,17 @@ pub struct TransactionsByStatus {
     // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
     statuses_for_input_txns: Vec<TransactionStatus>,
     // List of all transactions to be committed, including StateCheckpoint/BlockEpilogue if needed.
-    to_commit: TransactionsWithParsedOutput,
-    to_discard: TransactionsWithParsedOutput,
-    to_retry: TransactionsWithParsedOutput,
+    to_commit: TransactionsWithOutput,
+    to_discard: TransactionsWithOutput,
+    to_retry: TransactionsWithOutput,
 }
 
 impl TransactionsByStatus {
     pub fn new(
         statuses_for_input_txns: Vec<TransactionStatus>,
-        to_commit: TransactionsWithParsedOutput,
-        to_discard: TransactionsWithParsedOutput,
-        to_retry: TransactionsWithParsedOutput,
+        to_commit: TransactionsWithOutput,
+        to_discard: TransactionsWithOutput,
+        to_retry: TransactionsWithOutput,
     ) -> Self {
         Self {
             statuses_for_input_txns,
@@ -46,9 +46,9 @@ impl TransactionsByStatus {
         self,
     ) -> (
         Vec<TransactionStatus>,
-        TransactionsWithParsedOutput,
-        TransactionsWithParsedOutput,
-        TransactionsWithParsedOutput,
+        TransactionsWithOutput,
+        TransactionsWithOutput,
+        TransactionsWithOutput,
     ) {
         (
             self.statuses_for_input_txns,

@@ -280,7 +280,7 @@ impl AptosDB {
             //
             // TODO(grao): Consider propagating the error instead of panic, if necessary.
             s.spawn(|_| {
-                self.commit_events(chunk.first_version, &chunk.transaction_outputs, skip_index_and_usage)
+                self.commit_events(chunk.first_version, chunk.transaction_outputs, skip_index_and_usage)
                     .unwrap()
             });
             s.spawn(|_| {

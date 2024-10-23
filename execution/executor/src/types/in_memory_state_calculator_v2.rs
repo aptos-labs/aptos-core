@@ -5,8 +5,8 @@ use crate::metrics::OTHER_TIMERS;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, parsed_transaction_output::TransactionsWithParsedOutput,
-    state_checkpoint_output::StateCheckpointOutput, ProofReader,
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
+    transactions_with_output::TransactionsWithOutput, ProofReader,
 };
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
@@ -43,7 +43,7 @@ impl InMemoryStateCalculatorV2 {
         }
 
         let state_updates_vec = Self::get_sharded_state_updates(
-            execution_output.to_commit.parsed_outputs(),
+            execution_output.to_commit.transaction_outputs(),
             |txn_output| txn_output.write_set(),
         );
 
@@ -354,7 +354,7 @@ impl InMemoryStateCalculatorV2 {
 
     fn validate_input_for_block(
         base: &StateDelta,
-        to_commit: &TransactionsWithParsedOutput,
+        to_commit: &TransactionsWithOutput,
     ) -> Result<()> {
         let num_txns = to_commit.len();
         ensure!(num_txns != 0, "Empty block is not allowed.");
@@ -369,12 +369,12 @@ impl InMemoryStateCalculatorV2 {
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
-        for (i, (txn, txn_output)) in to_commit.iter().enumerate() {
+        for (i, (txn, _txn_out, is_reconfig)) in to_commit.iter().enumerate() {
             ensure!(
-                TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
+                TransactionsWithOutput::need_checkpoint(txn, is_reconfig) ^ (i != num_txns - 1),
                 "Checkpoint is allowed iff it's the last txn in the block. index: {i}, num_txns: {num_txns}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
                 i == num_txns - 1,
-                txn_output.is_reconfig()
+                is_reconfig,
             );
         }
         Ok(())

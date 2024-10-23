@@ -4,15 +4,14 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{parsed_transaction_output::TransactionsWithParsedOutput, ParsedTransactionOutput};
+use crate::transactions_with_output::TransactionsWithOutput;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
-        block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionStatus, Version,
+        block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
     },
 };
 use derive_more::Deref;
@@ -29,9 +28,9 @@ impl ExecutionOutput {
         is_block: bool,
         first_version: Version,
         statuses_for_input_txns: Vec<TransactionStatus>,
-        to_commit: TransactionsWithParsedOutput,
-        to_discard: TransactionsWithParsedOutput,
-        to_retry: TransactionsWithParsedOutput,
+        to_commit: TransactionsWithOutput,
+        to_discard: TransactionsWithOutput,
+        to_retry: TransactionsWithOutput,
         state_cache: StateCache,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
@@ -68,9 +67,9 @@ impl ExecutionOutput {
             is_block: false,
             first_version: state.next_version(),
             statuses_for_input_txns: vec![],
-            to_commit: TransactionsWithParsedOutput::new_empty(),
-            to_discard: TransactionsWithParsedOutput::new_empty(),
-            to_retry: TransactionsWithParsedOutput::new_empty(),
+            to_commit: TransactionsWithOutput::new_empty(),
+            to_discard: TransactionsWithOutput::new_empty(),
+            to_retry: TransactionsWithOutput::new_empty(),
             state_cache: StateCache::new_empty(state.current.clone()),
             block_end_info: None,
             next_epoch_state: None,
@@ -81,14 +80,13 @@ impl ExecutionOutput {
     pub fn new_dummy_with_input_txns(txns: Vec<Transaction>) -> Self {
         let num_txns = txns.len();
         let success_status = TransactionStatus::Keep(ExecutionStatus::Success);
-        let success_output = ParsedTransactionOutput::from(TransactionOutput::new_empty_success());
         Self::new_impl(Inner {
             is_block: false,
             first_version: 0,
             statuses_for_input_txns: vec![success_status; num_txns],
-            to_commit: TransactionsWithParsedOutput::new(txns, vec![success_output; num_txns]),
-            to_discard: TransactionsWithParsedOutput::new_empty(),
-            to_retry: TransactionsWithParsedOutput::new_empty(),
+            to_commit: TransactionsWithOutput::new_dummy_success(txns),
+            to_discard: TransactionsWithOutput::new_empty(),
+            to_retry: TransactionsWithOutput::new_empty(),
             state_cache: StateCache::new_dummy(),
             block_end_info: None,
             next_epoch_state: None,
@@ -105,9 +103,9 @@ impl ExecutionOutput {
             is_block: false,
             first_version: self.next_version(),
             statuses_for_input_txns: vec![],
-            to_commit: TransactionsWithParsedOutput::new_empty(),
-            to_discard: TransactionsWithParsedOutput::new_empty(),
-            to_retry: TransactionsWithParsedOutput::new_empty(),
+            to_commit: TransactionsWithOutput::new_empty(),
+            to_discard: TransactionsWithOutput::new_empty(),
+            to_retry: TransactionsWithOutput::new_empty(),
             state_cache: StateCache::new_dummy(),
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
@@ -143,9 +141,9 @@ pub struct Inner {
     // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
     pub statuses_for_input_txns: Vec<TransactionStatus>,
     // List of all transactions to be committed, including StateCheckpoint/BlockEpilogue if needed.
-    pub to_commit: TransactionsWithParsedOutput,
-    pub to_discard: TransactionsWithParsedOutput,
-    pub to_retry: TransactionsWithParsedOutput,
+    pub to_commit: TransactionsWithOutput,
+    pub to_discard: TransactionsWithOutput,
+    pub to_retry: TransactionsWithOutput,
 
     /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
     /// execution result is processed; as well as all the accounts touched during execution, together
@@ -170,29 +168,31 @@ impl Inner {
         let aborts = self
             .to_commit
             .iter()
-            .flat_map(|(txn, output)| match output.status().status() {
-                Ok(execution_status) => {
-                    if execution_status.is_success() {
-                        None
-                    } else {
-                        Some(format!("{:?}: {:?}", txn, output.status()))
-                    }
+            .flat_map(
+                |(txn, output, _is_reconfig)| match output.status().status() {
+                    Ok(execution_status) => {
+                        if execution_status.is_success() {
+                            None
+                        } else {
+                            Some(format!("{:?}: {:?}", txn, output.status()))
+                        }
+                    },
+                    Err(_) => None,
                 },
-                Err(_) => None,
-            })
+            )
             .collect::<Vec<_>>();
 
         let discards_3 = self
             .to_discard
             .iter()
             .take(3)
-            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .map(|(txn, output, _is_reconfig)| format!("{:?}: {:?}", txn, output.status()))
             .collect::<Vec<_>>();
         let retries_3 = self
             .to_retry
             .iter()
             .take(3)
-            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .map(|(txn, output, _is_reconfig)| format!("{:?}: {:?}", txn, output.status()))
             .collect::<Vec<_>>();
 
         if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {

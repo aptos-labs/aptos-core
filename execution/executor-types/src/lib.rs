@@ -23,7 +23,6 @@ use aptos_types::{
 };
 pub use error::{ExecutorError, ExecutorResult};
 pub use ledger_update_output::LedgerUpdateOutput;
-pub use parsed_transaction_output::ParsedTransactionOutput;
 use state_compute_result::StateComputeResult;
 use std::{
     collections::{BTreeSet, HashMap},
@@ -37,9 +36,9 @@ use std::{
 mod error;
 pub mod execution_output;
 mod ledger_update_output;
-pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
 pub mod state_compute_result;
+pub mod transactions_with_output;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions

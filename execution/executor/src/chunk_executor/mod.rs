@@ -17,8 +17,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ParsedTransactionOutput, TransactionReplayer,
-    VerifyExecutionMode,
+    ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
@@ -457,9 +456,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let mut epochs = Vec::new();
         let mut epoch_begin = chunk_begin; // epoch begin version
         for (version, events) in multizip((chunk_begin..chunk_end, event_vecs.iter())) {
-            let is_epoch_ending = ParsedTransactionOutput::parse_reconfig_events(events)
-                .next()
-                .is_some();
+            let is_epoch_ending = events.iter().any(ContractEvent::is_new_epoch_event);
             if is_epoch_ending {
                 epochs.push((epoch_begin, version + 1));
                 epoch_begin = version + 1;
@@ -610,7 +607,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,
-            execution_output.to_commit.parsed_outputs().iter(),
+            execution_output.to_commit.transaction_outputs(),
             transaction_infos.iter(),
             write_sets.iter(),
             event_vecs.iter(),
