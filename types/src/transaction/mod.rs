@@ -1344,15 +1344,9 @@ impl TransactionOutput {
         }
         Ok(None)
     }
-}
 
-pub trait TransactionOutputProvider {
-    fn get_transaction_output(&self) -> &TransactionOutput;
-}
-
-impl TransactionOutputProvider for TransactionOutput {
-    fn get_transaction_output(&self) -> &TransactionOutput {
-        self
+    pub fn has_new_epoch_event(&self) -> bool {
+        self.events.iter().any(ContractEvent::is_new_epoch_event)
     }
 }
 

@@ -12,8 +12,8 @@ use aptos_executor_service::{
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, parsed_transaction_output::TransactionsWithParsedOutput,
-    should_forward_to_subscription_service, ParsedTransactionOutput,
+    execution_output::ExecutionOutput, should_forward_to_subscription_service,
+    transactions_with_output::TransactionsWithOutput,
 };
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
@@ -34,7 +34,7 @@ use aptos_types::{
         authenticator::AccountAuthenticator,
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         BlockEndInfo, BlockOutput, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionOutputProvider, TransactionStatus, Version,
+        TransactionStatus, Version,
     },
     write_set::{TransactionWrite, WriteSet},
 };
@@ -52,22 +52,31 @@ impl DoGetExecutionOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
-        match transactions {
+        let res = match transactions {
             ExecutableTransactions::Unsharded(txns) => {
                 Self::by_transaction_execution_unsharded::<V>(
                     txns,
                     state_view,
                     onchain_config,
                     append_state_checkpoint_to_block,
-                )
+                )?
             },
             ExecutableTransactions::Sharded(txns) => Self::by_transaction_execution_sharded::<V>(
                 txns,
                 state_view,
                 onchain_config,
                 append_state_checkpoint_to_block,
-            ),
+            )?,
+        };
+
+        {
+            let _timer = OTHER_TIMERS.timer_with(&["update_counters__by_execution"]);
+            for x in [&res.to_commit, &res.to_discard, &res.to_retry] {
+                update_counters_for_processed_chunk(x.txns(), x.transaction_outputs(), "execution");
+            }
         }
+
+        Ok(res)
     }
 
     fn by_transaction_execution_unsharded<V: VMExecutor>(
@@ -219,13 +228,12 @@ impl DoGetExecutionOutput {
     }
 }
 
-pub fn update_counters_for_processed_chunk<T, O>(
+pub fn update_counters_for_processed_chunk<T>(
     transactions: &[T],
-    transaction_outputs: &[O],
+    transaction_outputs: &[TransactionOutput],
     process_type: &str,
 ) where
     T: TransactionProvider,
-    O: TransactionOutputProvider,
 {
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
@@ -239,14 +247,14 @@ pub fn update_counters_for_processed_chunk<T, O>(
 
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
         if detailed_counters {
-            if let Ok(size) = bcs::serialized_size(output.get_transaction_output()) {
+            if let Ok(size) = bcs::serialized_size(output) {
                 metrics::PROCESSED_TXNS_OUTPUT_SIZE
                     .with_label_values(&[process_type])
                     .observe(size as f64);
             }
         }
 
-        let (state, reason, error_code) = match output.get_transaction_output().status() {
+        let (state, reason, error_code) = match output.status() {
             TransactionStatus::Keep(execution_status) => match execution_status {
                 ExecutionStatus::Success => ("keep_success", "", "".to_string()),
                 ExecutionStatus::OutOfGas => ("keep_rejected", "OutOfGas", "error".to_string()),
@@ -438,7 +446,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
             }
         }
 
-        for event in output.get_transaction_output().events() {
+        for event in output.events() {
             let (is_core, creation_number) = match event {
                 ContractEvent::V1(v1) => (
                     v1.key().get_creator_address() == CORE_CODE_ADDRESS,
@@ -468,7 +476,7 @@ impl Parser {
     fn parse(
         first_version: Version,
         mut transactions: Vec<Transaction>,
-        transaction_outputs: Vec<TransactionOutput>,
+        mut transaction_outputs: Vec<TransactionOutput>,
         state_cache: StateCache,
         block_end_info: Option<BlockEndInfo>,
         append_state_checkpoint_to_block: Option<HashValue>,
@@ -477,12 +485,17 @@ impl Parser {
         let is_block = append_state_checkpoint_to_block.is_some();
 
         // Parse all outputs.
-        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
-            { transaction_outputs.into_iter().map(Into::into).collect() };
+        let mut epoch_ending_flags = transaction_outputs
+            .iter()
+            .map(TransactionOutput::has_new_epoch_event)
+            .collect_vec();
 
         // Isolate retries.
-        let (to_retry, has_reconfig) =
-            Self::extract_retries(&mut transactions, &mut transaction_outputs);
+        let (to_retry, has_reconfig) = Self::extract_retries(
+            &mut transactions,
+            &mut transaction_outputs,
+            &mut epoch_ending_flags,
+        );
 
         // Collect all statuses.
         let statuses_for_input_txns = {
@@ -493,10 +506,15 @@ impl Parser {
         };
 
         // Isolate discards.
-        let to_discard = Self::extract_discards(&mut transactions, &mut transaction_outputs);
+        let to_discard = Self::extract_discards(
+            &mut transactions,
+            &mut transaction_outputs,
+            &mut epoch_ending_flags,
+        );
 
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
-        let to_commit = TransactionsWithParsedOutput::new(transactions, transaction_outputs);
+        let to_commit =
+            TransactionsWithOutput::new(transactions, transaction_outputs, epoch_ending_flags);
         let to_commit = Self::maybe_add_block_epilogue(
             to_commit,
             has_reconfig,
@@ -507,7 +525,7 @@ impl Parser {
             .then(|| Self::ensure_next_epoch_state(&to_commit))
             .transpose()?;
         let subscribable_events = to_commit
-            .parsed_outputs()
+            .transaction_outputs()
             .iter()
             .flat_map(|o| {
                 o.events()
@@ -516,13 +534,6 @@ impl Parser {
             })
             .cloned()
             .collect_vec();
-
-        {
-            let _timer = OTHER_TIMERS.timer_with(&["update_counters__by_execution"]);
-            for x in [&to_commit, &to_discard, &to_retry] {
-                update_counters_for_processed_chunk(x.txns(), x.parsed_outputs(), "execution");
-            }
-        }
 
         Ok(ExecutionOutput::new(
             is_block,
@@ -540,12 +551,13 @@ impl Parser {
 
     fn extract_retries(
         transactions: &mut Vec<Transaction>,
-        transaction_outputs: &mut Vec<ParsedTransactionOutput>,
-    ) -> (TransactionsWithParsedOutput, bool) {
+        transaction_outputs: &mut Vec<TransactionOutput>,
+        epoch_ending_flags: &mut Vec<bool>,
+    ) -> (TransactionsWithOutput, bool) {
         // N.B. off-by-1 intentionally, for exclusive index
-        let new_epoch_marker = transaction_outputs
+        let new_epoch_marker = epoch_ending_flags
             .iter()
-            .position(|o| o.is_reconfig())
+            .rposition(|f| *f)
             .map(|idx| idx + 1);
 
         let block_gas_limit_marker = transaction_outputs
@@ -556,49 +568,58 @@ impl Parser {
         // Transactions after the txn that exceeded per-block gas limit are also to be retried.
         if let Some(pos) = new_epoch_marker {
             (
-                TransactionsWithParsedOutput::new(
+                TransactionsWithOutput::new(
                     transactions.drain(pos..).collect(),
                     transaction_outputs.drain(pos..).collect(),
+                    epoch_ending_flags.drain(pos..).collect(),
                 ),
                 true,
             )
         } else if let Some(pos) = block_gas_limit_marker {
             (
-                TransactionsWithParsedOutput::new(
+                TransactionsWithOutput::new(
                     transactions.drain(pos..).collect(),
                     transaction_outputs.drain(pos..).collect(),
+                    epoch_ending_flags.drain(pos..).collect(),
                 ),
                 false,
             )
         } else {
-            (TransactionsWithParsedOutput::new_empty(), false)
+            (TransactionsWithOutput::new_empty(), false)
         }
     }
 
     fn extract_discards(
         transactions: &mut Vec<Transaction>,
-        transaction_outputs: &mut Vec<ParsedTransactionOutput>,
-    ) -> TransactionsWithParsedOutput {
+        transaction_outputs: &mut Vec<TransactionOutput>,
+        epoch_ending_flags: &mut Vec<bool>,
+    ) -> TransactionsWithOutput {
         let to_discard = {
-            let mut res = TransactionsWithParsedOutput::new_empty();
+            let mut res = TransactionsWithOutput::new_empty();
             for idx in 0..transactions.len() {
                 if transaction_outputs[idx].status().is_discarded() {
-                    res.push(transactions[idx].clone(), transaction_outputs[idx].clone());
+                    res.push(
+                        transactions[idx].clone(),
+                        transaction_outputs[idx].clone(),
+                        epoch_ending_flags[idx],
+                    );
                 } else if !res.is_empty() {
                     transactions[idx - res.len()] = transactions[idx].clone();
                     transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
+                    epoch_ending_flags[idx - res.len()] = epoch_ending_flags[idx];
                 }
             }
             if !res.is_empty() {
                 let remaining = transactions.len() - res.len();
                 transactions.truncate(remaining);
                 transaction_outputs.truncate(remaining);
+                epoch_ending_flags.truncate(remaining);
             }
             res
         };
 
         // Sanity check transactions with the Discard status:
-        to_discard.iter().for_each(|(t, o)| {
+        to_discard.iter().for_each(|(t, o, _flag)| {
             // In case a new status other than Retry, Keep and Discard is added:
             if !matches!(o.status(), TransactionStatus::Discard(_)) {
                 error!("Status other than Retry, Keep or Discard; Transaction discarded.");
@@ -619,11 +640,11 @@ impl Parser {
     }
 
     fn maybe_add_block_epilogue(
-        mut to_commit: TransactionsWithParsedOutput,
+        mut to_commit: TransactionsWithOutput,
         is_reconfig: bool,
         block_end_info: Option<&BlockEndInfo>,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> TransactionsWithParsedOutput {
+    ) -> TransactionsWithOutput {
         if !is_reconfig {
             // Append the StateCheckpoint transaction to the end
             if let Some(block_id) = append_state_checkpoint_to_block {
@@ -636,7 +657,8 @@ impl Parser {
 
                 to_commit.push(
                     state_checkpoint_txn,
-                    ParsedTransactionOutput::from(TransactionOutput::new_empty_success()),
+                    TransactionOutput::new_empty_success(),
+                    false,
                 );
             }
         }; // else: not adding block epilogue at epoch ending.
@@ -644,9 +666,9 @@ impl Parser {
         to_commit
     }
 
-    fn ensure_next_epoch_state(to_commit: &TransactionsWithParsedOutput) -> Result<EpochState> {
+    fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
         let last_write_set = to_commit
-            .parsed_outputs()
+            .transaction_outputs()
             .last()
             .ok_or_else(|| anyhow!("to_commit is empty."))?
             .write_set();
