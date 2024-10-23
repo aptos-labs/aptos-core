@@ -27,7 +27,7 @@ on:
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: number
-        default: 1300
+        default: 480
         description: Duration of the forge test run
       FORGE_TEST_SUITE:
         required: false
