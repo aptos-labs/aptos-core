@@ -5,14 +5,14 @@ use crate::metrics::OTHER_TIMERS;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, parsed_transaction_output::TransactionsWithParsedOutput,
-    state_checkpoint_output::StateCheckpointOutput, LedgerUpdateOutput, ParsedTransactionOutput,
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
+    transactions_with_output::TransactionsWithOutput, LedgerUpdateOutput,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
-    transaction::TransactionInfo,
+    transaction::{TransactionInfo, TransactionOutput},
 };
 use itertools::{izip, Itertools};
 use rayon::prelude::*;
@@ -30,7 +30,7 @@ impl DoLedgerUpdate {
 
         // Calculate hashes
         let to_commit = &execution_output.to_commit;
-        let txn_outs = to_commit.parsed_outputs();
+        let txn_outs = to_commit.transaction_outputs();
 
         let (event_hashes, writeset_hashes) = Self::calculate_events_and_writeset_hashes(txn_outs);
 
@@ -55,7 +55,7 @@ impl DoLedgerUpdate {
     }
 
     fn calculate_events_and_writeset_hashes(
-        to_commit: &[ParsedTransactionOutput],
+        to_commit: &[TransactionOutput],
     ) -> (Vec<HashValue>, Vec<HashValue>) {
         let _timer = OTHER_TIMERS.timer_with(&["calculate_events_and_writeset_hashes"]);
 
@@ -79,7 +79,7 @@ impl DoLedgerUpdate {
     }
 
     fn assemble_transaction_infos(
-        to_commit: &TransactionsWithParsedOutput,
+        to_commit: &TransactionsWithOutput,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
         event_hashes: Vec<HashValue>,
         writeset_hashes: Vec<HashValue>,
@@ -93,7 +93,12 @@ impl DoLedgerUpdate {
             writeset_hashes
         )
         .map(
-            |((txn, txn_out), state_checkpoint_hash, event_root_hash, write_set_hash)| {
+            |(
+                (txn, txn_out, _is_reconfig),
+                state_checkpoint_hash,
+                event_root_hash,
+                write_set_hash,
+            )| {
                 TransactionInfo::new(
                     txn.hash(),
                     write_set_hash,

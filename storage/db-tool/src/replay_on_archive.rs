@@ -9,7 +9,6 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
-use aptos_executor_types::ParsedTransactionOutput;
 use aptos_logger::{error, info};
 use aptos_storage_interface::{state_view::DbStateViewAtVersion, AptosDbError, DbReader};
 use aptos_types::{
@@ -193,9 +192,7 @@ impl Verifier {
         let mut chunk_start_version = start;
         for (idx, item) in txn_iter.enumerate() {
             let (input_txn, expected_txn_info, expected_event, expected_writeset) = item?;
-            let is_epoch_ending = ParsedTransactionOutput::parse_reconfig_events(&expected_event)
-                .next()
-                .is_some();
+            let is_epoch_ending = expected_event.iter().any(ContractEvent::is_new_epoch_event);
             cur_txns.push(input_txn);
             expected_txn_infos.push(expected_txn_info);
             expected_events.push(expected_event);
