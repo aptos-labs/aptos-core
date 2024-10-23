@@ -99,14 +99,10 @@ async fn randomness_stall_recovery() {
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
-    info!("Wait for nodes to start.");
-    tokio::time::sleep(Duration::from_secs(10)).await;
-
-    info!("Every node except the last validator should pass liveness check.");
-    for node in swarm.validators().chain(swarm.fullnodes()) {
-        info!("checking node {}", node.index());
-        node.liveness_check(20).await.unwrap();
-    }
+    let liveness_check_result = swarm
+        .liveness_check(Instant::now().add(Duration::from_secs(30)))
+        .await;
+    assert!(liveness_check_result.is_ok());
 
     info!("There should be no randomness at the moment.");
     let block_randomness_seed = get_on_chain_resource::<PerBlockRandomness>(&rest_client).await;
