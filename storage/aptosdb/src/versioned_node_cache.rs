@@ -6,6 +6,7 @@ use crate::{
     metrics::{CONCURRENCY_GAUGE, OTHER_TIMERS_SECONDS},
     state_merkle_db::Node,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_metrics_core::IntGaugeHelper;
@@ -81,15 +82,16 @@ impl VersionedNodeCache {
 
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__set_lru"]);
         if let Some((version, cache)) = to_evict {
-            cache
-                .iter()
-                .collect::<Vec<_>>()
-                .into_par_iter()
-                .with_min_len(100)
-                .for_each(|(node_key, node)| {
-                    lru_cache.put(node_key.clone(), node.clone());
-                });
-
+            THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                cache
+                    .iter()
+                    .collect::<Vec<_>>()
+                    .into_par_iter()
+                    .with_min_len(100)
+                    .for_each(|(node_key, node)| {
+                        lru_cache.put(node_key.clone(), node.clone());
+                    })
+            });
             let evicted = self.inner.write().pop_front();
             assert_eq!(evicted, Some((version, cache)));
         }
