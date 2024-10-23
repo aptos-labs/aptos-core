@@ -13,6 +13,7 @@ use std::time::Instant;
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
+    block_gas_limit_override: Option<u64>,
     accumulated_effective_block_gas: u64,
     accumulated_approx_output_size: u64,
     accumulated_fee_statement: FeeStatement,
@@ -23,9 +24,14 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
-    pub fn new(block_gas_limit_type: BlockGasLimitType, init_size: usize) -> Self {
+    pub fn new(
+        block_gas_limit_type: BlockGasLimitType,
+        block_gas_limit_override: Option<u64>,
+        init_size: usize,
+    ) -> Self {
         Self {
             block_gas_limit_type,
+            block_gas_limit_override,
             accumulated_effective_block_gas: 0,
             accumulated_approx_output_size: 0,
             accumulated_fee_statement: FeeStatement::zero(),
@@ -118,8 +124,16 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.module_rw_conflict = true;
     }
 
+    fn block_gas_limit(&self) -> Option<u64> {
+        if self.block_gas_limit_override.is_some() {
+            self.block_gas_limit_override
+        } else {
+            self.block_gas_limit_type.block_gas_limit()
+        }
+    }
+
     fn should_end_block(&mut self, mode: &str) -> bool {
-        if let Some(per_block_gas_limit) = self.block_gas_limit_type.block_gas_limit() {
+        if let Some(per_block_gas_limit) = self.block_gas_limit() {
             // When the accumulated block gas of the committed txns exceeds
             // PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
             let accumulated_block_gas = self.get_effective_accumulated_block_gas();
@@ -210,8 +224,8 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         info!(
             effective_block_gas = accumulated_effective_block_gas,
             block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
+            block_gas_limit_override = self.block_gas_limit_override.unwrap_or(0),
             block_gas_limit_exceeded = self
-                .block_gas_limit_type
                 .block_gas_limit()
                 .map_or(false, |limit| accumulated_effective_block_gas >= limit),
             approx_output_size = accumulated_approx_output_size,
@@ -255,7 +269,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {
         BlockEndInfo::V0 {
             block_gas_limit_reached: self
-                .block_gas_limit_type
                 .block_gas_limit()
                 .map(|per_block_gas_limit| {
                     self.get_effective_accumulated_block_gas() >= per_block_gas_limit
@@ -302,7 +315,7 @@ mod test {
 
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(DEFAULT_COMPLEX_LIMIT, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(DEFAULT_COMPLEX_LIMIT, None, 10);
         // Assert passing none here doesn't panic.
         processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -326,7 +339,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -350,7 +363,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
         assert_eq!(processor.accumulated_approx_output_size, 10);
@@ -390,7 +403,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -452,7 +465,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(
@@ -494,7 +507,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
         processor.accumulate_fee_statement(
             execution_fee(10),
             Some(ReadWriteSummary::new(

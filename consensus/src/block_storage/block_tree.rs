@@ -209,6 +209,20 @@ impl BlockTree {
             .and_then(|block_id| self.get_block(block_id))
     }
 
+    pub(super) fn ordered_round(&self) -> Option<Round> {
+        match self.get_block(&self.ordered_root_id) {
+            Some(block) => Some(block.round()),
+            None => None,
+        }
+    }
+
+    pub(super) fn commit_round(&self) -> Option<Round> {
+        match self.get_block(&self.commit_root_id) {
+            Some(block) => Some(block.round()),
+            None => None,
+        }
+    }
+
     pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.ordered_root_id)
             .expect("Root must exist")
@@ -216,7 +230,7 @@ impl BlockTree {
 
     pub(super) fn commit_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.commit_root_id)
-            .expect("Commit root must exist")
+            .expect(format!("Commit root must exist: {}", self.commit_root_id).as_str())
     }
 
     pub(super) fn window_root(&self) -> Arc<PipelinedBlock> {
@@ -507,16 +521,19 @@ impl BlockTree {
     }
 
     pub(super) fn update_ordered_root(&mut self, root_id: HashValue) {
+        info!("update_ordered_root: {}", root_id);
         assert!(self.block_exists(&root_id));
         self.ordered_root_id = root_id;
     }
 
     pub(super) fn update_commit_root(&mut self, root_id: HashValue) {
+        info!("update_commit_root: {}", root_id);
         assert!(self.block_exists(&root_id));
         self.commit_root_id = root_id;
     }
 
     pub(super) fn update_window_root(&mut self, root_id: HashValue) {
+        info!("update_window_root: {}", root_id);
         assert!(
             self.block_exists(&root_id),
             "Block {} not found, previous window_root: {}",

@@ -381,13 +381,14 @@ impl PipelineBuilder {
                 },
             }
         };
+        // TODO: share the extra logic that is now in execution_pipeline::prepare_stage
         let sig_verification_start = Instant::now();
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
-            let num_txns = input_txns.len();
+            let num_txns = input_txns.0.len();
             input_txns
                 .into_par_iter()
                 .with_min_len(optimal_min_len(num_txns, 32))
-                .map(|t| Transaction::UserTransaction(t).into())
+                .map(|t| Transaction::UserTransaction(t.0).into())
                 .collect::<Vec<_>>()
         });
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME

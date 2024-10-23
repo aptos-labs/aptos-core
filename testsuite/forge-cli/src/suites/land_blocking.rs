@@ -17,9 +17,8 @@ pub(crate) fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
-        },
+        // TODO: revert for land
+        "removed" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test

@@ -1102,6 +1102,7 @@ mod test {
                 vec![],
                 proofs_of_store.clone(),
                 None,
+                None,
                 vec![],
             );
 

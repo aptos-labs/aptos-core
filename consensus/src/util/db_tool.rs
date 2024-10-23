@@ -101,7 +101,7 @@ pub fn extract_txns_from_block<'a>(
                     .map(|proof| *proof.digest()),
                 all_batches,
             ),
-            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _, _) => {
                 let mut all_txns = extract_txns_from_quorum_store(
                     proof_with_data.proofs.iter().map(|proof| *proof.digest()),
                     all_batches,

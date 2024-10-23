@@ -106,6 +106,7 @@ impl ExecutionPipeline {
     pub async fn queue(
         &self,
         block: PipelinedBlock,
+        max_block_txns: u64,
         metadata: BlockMetadataExt,
         parent_block_id: HashValue,
         txn_generator: BlockPreparer,
@@ -119,6 +120,7 @@ impl ExecutionPipeline {
         self.prepare_block_tx
             .send(PrepareBlockCommand {
                 block,
+                max_block_txns,
                 metadata,
                 block_executor_onchain_config,
                 parent_block_id,
@@ -153,8 +155,9 @@ impl ExecutionPipeline {
     ) {
         let PrepareBlockCommand {
             block,
+            max_block_txns,
             metadata,
-            block_executor_onchain_config,
+            mut block_executor_onchain_config,
             parent_block_id,
             block_preparer,
             pre_commit_hook,
@@ -164,17 +167,19 @@ impl ExecutionPipeline {
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer
+        let prepare_result = block_preparer
             .prepare_block(block.block(), block.block_window())
             .await;
-        if let Err(e) = input_txns {
+        if let Err(e) = prepare_result {
             result_tx
                 .send(Err(e))
                 .unwrap_or_else(log_failed_to_send_result("prepare_block", block.id()));
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let input_txns = input_txns.expect("input_txns must be Some.");
+        let (input_txns, max_txns_to_execute, block_gas_limit) =
+            prepare_result.expect("input_txns must be Some.");
+        block_executor_onchain_config.block_gas_limit_override = block_gas_limit;
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
@@ -194,6 +199,8 @@ impl ExecutionPipeline {
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
+                    max_block_txns,
+                    max_txns_to_execute,
                     pipelined_block: block,
                     block: (block_id, sig_verified_txns).into(),
                     parent_block_id,
@@ -229,6 +236,8 @@ impl ExecutionPipeline {
     ) {
         'outer: while let Some(ExecuteBlockCommand {
             input_txns: _,
+            max_block_txns,
+            max_txns_to_execute,
             pipelined_block,
             block,
             parent_block_id,
@@ -249,11 +258,12 @@ impl ExecutionPipeline {
 
             // TODO: lots of repeated code here
             monitor!("execute_wait_for_committed_transactions", {
+                let num_blocks_in_window = pipelined_block.block_window().pipelined_blocks().len();
                 for b in pipelined_block
                     .block_window()
                     .pipelined_blocks()
                     .iter()
-                    .filter(|window_block| window_block.round() == pipelined_block.round() - 1)
+                    .skip(num_blocks_in_window.saturating_sub(1))
                 {
                     info!(
                         "Execution: Waiting for committed transactions at block {} for block {}",
@@ -292,64 +302,74 @@ impl ExecutionPipeline {
                 }
             });
 
-            let (mut txns, blocking_txn_provider) =
-                monitor!("execute_filter_block_committed_transactions", {
-                    // TODO: Find a better way to do this.
-                    match block.transactions {
-                        ExecutableTransactions::Unsharded(txns) => {
-                            let transactions: Vec<_> = txns
-                                .into_iter()
-                                .filter(|txn| {
-                                    if let Valid(UserTransaction(user_txn)) = txn {
-                                        !committed_transactions.contains(&user_txn.committed_hash())
-                                    } else {
-                                        true
-                                    }
-                                })
-                                .collect();
-                            let transactions_len = transactions.len();
-                            (transactions, BlockingTxnProvider::new(transactions_len))
-                        },
-                        ExecutableTransactions::UnshardedBlocking(_) => {
-                            unimplemented!("Not expecting this yet.")
-                        },
-                        ExecutableTransactions::Sharded(_) => {
-                            unimplemented!("Sharded transactions are not supported yet.")
-                        },
-                    }
-                });
-
-            let blocking_txn_writer = blocking_txn_provider.clone();
-            let join_shuffle = tokio::task::spawn_blocking(move || {
-                // TODO: keep this previously split so we don't have to re-split it here
-                if let Some((first_user_txn_idx, _)) = txns.iter().find_position(|txn| {
+            let mut txns = monitor!("execute_filter_block_committed_transactions", {
+                // TODO: Find a better way to do this.
+                match block.transactions {
+                    ExecutableTransactions::Unsharded(txns) => {
+                        let transactions: Vec<_> = txns
+                            .into_iter()
+                            .filter(|txn| {
+                                if let Valid(UserTransaction(user_txn)) = txn {
+                                    !committed_transactions.contains(&user_txn.committed_hash())
+                                } else {
+                                    true
+                                }
+                            })
+                            .collect();
+                        transactions
+                    },
+                    ExecutableTransactions::UnshardedBlocking(_) => {
+                        unimplemented!("Not expecting this yet.")
+                    },
+                    ExecutableTransactions::Sharded(_) => {
+                        unimplemented!("Sharded transactions are not supported yet.")
+                    },
+                }
+            });
+            let num_validator_txns = if let Some((first_user_txn_idx, _)) =
+                txns.iter().find_position(|txn| {
                     let txn = match txn {
                         Valid(txn) => txn,
                         Invalid(txn) => txn,
                     };
                     matches!(txn, UserTransaction(_))
                 }) {
+                first_user_txn_idx
+            } else {
+                txns.len()
+            };
+            let mut num_txns_to_execute = txns.len().min(max_block_txns as usize);
+            if let Some(max_user_txns_to_execute) = max_txns_to_execute {
+                num_txns_to_execute = num_txns_to_execute
+                    .min(num_validator_txns.saturating_add(max_user_txns_to_execute as usize));
+            }
+            let blocking_txn_provider = BlockingTxnProvider::new(num_txns_to_execute);
+            let blocking_txn_writer = blocking_txn_provider.clone();
+            let join_shuffle = tokio::task::spawn_blocking(move || {
+                // TODO: keep this previously split so we don't have to re-split it here
+                if num_txns_to_execute > num_validator_txns {
                     let timer = Instant::now();
-                    let validator_txns: Vec<_> = txns.drain(0..first_user_txn_idx).collect();
+                    let validator_txns: Vec<_> = txns.drain(0..num_validator_txns).collect();
                     info!(
                         "Execution: Split validator txns from user txns in {} micros",
                         timer.elapsed().as_micros()
                     );
+                    // TODO: we could probably constrain this too with max_txns_to_execute
                     let shuffle_iterator = crate::transaction_shuffler::use_case_aware::iterator::ShuffledTransactionIterator::new(crate::transaction_shuffler::use_case_aware::Config {
                             sender_spread_factor: 32,
                             platform_use_case_spread_factor: 0,
-                            user_use_case_spread_factor: 4,
+                            user_use_case_spread_factor: 16,
                         }).extended_with(txns);
                     for (idx, txn) in validator_txns
                         .into_iter()
                         .chain(shuffle_iterator)
+                        .take(num_txns_to_execute)
                         .enumerate()
                     {
                         blocking_txn_writer.set_txn(idx as TxnIndex, txn);
                     }
                 } else {
-                    // No user transactions in the block.
-                    for (idx, txn) in txns.into_iter().enumerate() {
+                    for (idx, txn) in txns.into_iter().take(num_txns_to_execute).enumerate() {
                         blocking_txn_writer.set_txn(idx as TxnIndex, txn);
                     }
                 }
@@ -568,6 +588,7 @@ impl ExecutionPipeline {
 
 struct PrepareBlockCommand {
     block: PipelinedBlock,
+    max_block_txns: u64,
     metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.
@@ -581,6 +602,8 @@ struct PrepareBlockCommand {
 
 struct ExecuteBlockCommand {
     input_txns: Vec<SignedTransaction>,
+    max_block_txns: u64,
+    max_txns_to_execute: Option<u64>,
     pipelined_block: PipelinedBlock,
     block: ExecutableBlock,
     parent_block_id: HashValue,

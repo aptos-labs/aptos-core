@@ -4,6 +4,7 @@
 
 use super::ungrouped::{
     background_traffic_for_sweep, background_traffic_for_sweep_with_latency,
+    background_traffic_for_sweep_with_latency_1k_tps_low_priority,
     RELIABLE_REAL_ENV_PROGRESS_THRESHOLD,
 };
 use crate::{
@@ -43,6 +44,13 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
+        // TODO: revert for land
+        // "realistic_env_sequential_fairness_workload_sweep" => {
+        //     realistic_env_sequential_fairness_workload_sweep()
+        // },
+        "land_blocking" | "realistic_env_max_load" => {
+            realistic_env_sequential_fairness_workload_sweep()
+        },
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
@@ -182,6 +190,42 @@ pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
             (3.0, 8.0),
             (3.0, 8.0),
             (3.0, 4.0),
+        ]),
+    })
+}
+
+pub(crate) fn realistic_env_sequential_fairness_workload_sweep() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        // Sequential workloads
+        workloads: Workloads::TRANSACTIONS(vec![
+            TransactionWorkload::new(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB, 5_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::TokenV1FTMintAndTransfer, 4_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::LiquidityPoolSwap, 2_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::NoOpFeePayer, 5_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 4_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 30)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(30),
+        ]),
+        criteria: Vec::new(),
+        background_traffic: background_traffic_for_sweep_with_latency_1k_tps_low_priority(&[
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
         ]),
     })
 }
