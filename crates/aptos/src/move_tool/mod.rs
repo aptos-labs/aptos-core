@@ -10,7 +10,7 @@ use crate::{
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
             MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
             ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -270,6 +270,15 @@ impl FrameworkPackageArgs {
             toml::to_string_pretty(&manifest)
                 .map_err(|err| CliError::UnexpectedError(err.to_string()))?
                 .as_bytes(),
+        )?;
+
+        // Write a .gitignore
+        let gitignore = package_dir.join(GIT_IGNORE);
+        check_if_file_exists(gitignore.as_path(), prompt_options)?;
+        write_to_file(
+            gitignore.as_path(),
+            GIT_IGNORE,
+            ".aptos/\nbuild/".as_bytes(),
         )
     }
 }

@@ -385,7 +385,10 @@ impl ProofOfStore {
         }
         let result = validator
             .verify_multi_signatures(&self.info, &self.multi_signature)
-            .context("Failed to verify ProofOfStore");
+            .context(format!(
+                "Failed to verify ProofOfStore for batch: {:?}",
+                self.info
+            ));
         if result.is_ok() {
             cache.insert(self.info.clone(), self.multi_signature.clone());
         }

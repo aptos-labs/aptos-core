@@ -85,7 +85,7 @@ fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
     require_language_version_msg(
         context,
         loc,
-        LanguageVersion::V2,
+        LanguageVersion::V2_0,
         &format!("Move 2 language construct is not enabled: {}", description),
     )
 }
