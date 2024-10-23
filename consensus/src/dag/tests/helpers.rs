@@ -25,9 +25,11 @@ pub(super) struct MockPayloadManager {}
 
 #[async_trait]
 impl TPayloadManager for MockPayloadManager {
-    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
-
     fn notify_commit(&self, _block_timestamp: u64, _block: Option<PipelinedBlock>) {}
+
+    fn notify_ordered(&self, _block: PipelinedBlock) {}
+
+    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
 
     fn check_payload_availability(&self, _block: &Block) -> Result<(), BitVec> {
         unimplemented!()

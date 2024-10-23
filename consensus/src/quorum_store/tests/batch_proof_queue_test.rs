@@ -525,7 +525,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     assert_eq!(pulled_txns.len(), 4);
 
     let result = proof_queue.pull_proofs(
-        &hashset![info_0.clone()],
+        &hashset![(1, info_0.clone())],
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -601,7 +601,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     assert_eq!(result.2, 2);
 
     let result = proof_queue.pull_proofs(
-        &hashset![info_7],
+        &hashset![(1, info_7)],
         PayloadTxnsSize::new(8, 400),
         4,
         4,

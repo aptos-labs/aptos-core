@@ -622,20 +622,22 @@ impl BatchPayload {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
-    InQuorumStore(HashSet<BatchInfo>),
+    InQuorumStore(HashSet<(Round, BatchInfo)>),
     Empty,
 }
 
-impl From<&Vec<&Payload>> for PayloadFilter {
-    fn from(exclude_payloads: &Vec<&Payload>) -> Self {
+impl From<&Vec<(Round, &Payload)>> for PayloadFilter {
+    fn from(exclude_payloads: &Vec<(Round, &Payload)>) -> Self {
         if exclude_payloads.is_empty() {
             return PayloadFilter::Empty;
         }
-        let direct_mode = exclude_payloads.iter().any(|payload| payload.is_direct());
+        let direct_mode = exclude_payloads
+            .iter()
+            .any(|(_, payload)| payload.is_direct());
 
         if direct_mode {
             let mut exclude_txns = Vec::new();
-            for payload in exclude_payloads {
+            for (_, payload) in exclude_payloads {
                 if let Payload::DirectMempool(txns) = payload {
                     for txn in txns {
                         exclude_txns.push(TransactionSummary {
@@ -649,24 +651,24 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             PayloadFilter::DirectMempool(exclude_txns)
         } else {
             let mut exclude_batches = HashSet::new();
-            for payload in exclude_payloads {
+            for (round, payload) in exclude_payloads {
                 match payload {
                     Payload::InQuorumStore(proof_with_status) => {
                         for proof in &proof_with_status.proofs {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert((*round, proof.info().clone()));
                         }
                     },
                     Payload::InQuorumStoreWithLimit(proof_with_status) => {
                         for proof in &proof_with_status.proof_with_data.proofs {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert((*round, proof.info().clone()));
                         }
                     },
                     Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
                         for proof in &proof_with_data.proofs {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert((*round, proof.info().clone()));
                         }
                         for (batch_info, _) in inline_batches {
-                            exclude_batches.insert(batch_info.clone());
+                            exclude_batches.insert((*round, batch_info.clone()));
                         }
                     },
                     Payload::DirectMempool(_) => {
@@ -674,13 +676,13 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                     },
                     Payload::OptQuorumStore(opt_qs_payload) => {
                         for batch in opt_qs_payload.inline_batches().iter() {
-                            exclude_batches.insert(batch.info().clone());
+                            exclude_batches.insert((*round, batch.info().clone()));
                         }
                         for batch_info in &opt_qs_payload.opt_batches().batch_summary {
-                            exclude_batches.insert(batch_info.clone());
+                            exclude_batches.insert((*round, batch_info.clone()));
                         }
                         for proof in &opt_qs_payload.proof_with_data().batch_summary {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert((*round, proof.info().clone()));
                         }
                     },
                 }
@@ -702,8 +704,8 @@ impl fmt::Display for PayloadFilter {
             },
             PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut proofs_str = "".to_string();
-                for proof in excluded_proofs.iter() {
-                    write!(proofs_str, "{} ", proof.digest())?;
+                for (round, proof) in excluded_proofs.iter() {
+                    write!(proofs_str, "({}, {}) ", *round, proof.digest())?;
                 }
                 write!(f, "{}", proofs_str)
             },

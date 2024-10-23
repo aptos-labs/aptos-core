@@ -389,7 +389,7 @@ impl ProposalGenerator {
             // parent (including) up to the root (including).
             let exclude_payload: Vec<_> = pending_blocks
                 .iter()
-                .flat_map(|block| block.payload())
+                .flat_map(|block| block.payload().map(|p| (block.round(), p)))
                 .collect();
             let payload_filter = PayloadFilter::from(&exclude_payload);
 
@@ -469,6 +469,7 @@ impl ProposalGenerator {
                         pending_uncommitted_blocks: pending_blocks.len(),
                         recent_max_fill_fraction: max_fill_fraction,
                         block_timestamp: timestamp,
+                        block_round: round,
                     },
                     validator_txn_filter,
                     wait_callback,

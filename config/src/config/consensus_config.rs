@@ -210,21 +210,21 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 50,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
+                    back_pressure_pipeline_latency_limit_ms: 1900,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1900,
+                    back_pressure_pipeline_latency_limit_ms: 5000,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
@@ -232,25 +232,25 @@ impl Default for ConsensusConfig {
                 },
                 // with execution backpressure, only later start reducing block size
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 5000,
+                    back_pressure_pipeline_latency_limit_ms: 7000,
                     max_sending_block_txns_after_filtering_override: 1000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 7000,
+                    back_pressure_pipeline_latency_limit_ms: 9000,
                     max_sending_block_txns_after_filtering_override: 200,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 9000,
+                    back_pressure_pipeline_latency_limit_ms: 12000,
                     max_sending_block_txns_after_filtering_override: 30,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 12000,
+                    back_pressure_pipeline_latency_limit_ms: 15000,
                     // in practice, latencies and delay make it such that ~2 blocks/s is max,
                     // meaning that most aggressively we limit to ~10 TPS
                     // For transactions that are more expensive than that, we should

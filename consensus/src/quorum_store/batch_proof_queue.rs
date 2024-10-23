@@ -7,8 +7,9 @@ use super::{
 };
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
-    common::{Author, TxnSummaryWithExpiration},
+    common::{Author, PayloadFilter, Round, TxnSummaryWithExpiration},
     payload::TDataInfo,
+    pipelined_block::PipelinedBlock,
     proof_of_store::{BatchInfo, ProofOfStore},
     utils::PayloadTxnsSize,
 };
@@ -16,7 +17,6 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{transaction::SignedTransaction, PeerId};
-use dashmap::DashSet;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::{
     cmp::Reverse,
@@ -55,6 +55,22 @@ impl QueueItem {
     }
 }
 
+struct TxnDuplicatesCache {
+    pub cache: HashMap<TxnSummaryWithExpiration, u64>,
+    pub expiration_rounds: TimeExpirations<TxnSummaryWithExpiration>,
+    pub latest_block_round: Round,
+}
+
+impl TxnDuplicatesCache {
+    fn new() -> Self {
+        Self {
+            cache: HashMap::new(),
+            expiration_rounds: TimeExpirations::new(),
+            latest_block_round: 0,
+        }
+    }
+}
+
 pub struct BatchProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness between peers and priority within peer
@@ -67,6 +83,9 @@ pub struct BatchProofQueue {
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     batch_store: Arc<BatchStore>,
+    // For duplicate accounting
+    txn_duplicates_cache: TxnDuplicatesCache,
+    txn_duplicates_window: u64,
 
     latest_block_timestamp: u64,
     remaining_txns_with_duplicates: u64,
@@ -90,6 +109,9 @@ impl BatchProofQueue {
             txn_summary_num_occurrences: HashMap::new(),
             expirations: TimeExpirations::new(),
             batch_store,
+            txn_duplicates_cache: TxnDuplicatesCache::new(),
+            // TODO: take the block window
+            txn_duplicates_window: 20,
             latest_block_timestamp: 0,
             remaining_txns_with_duplicates: 0,
             remaining_proofs: 0,
@@ -342,14 +364,14 @@ impl BatchProofQueue {
 
     fn log_remaining_data_after_pull(
         &self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<(Round, BatchInfo)>,
         pulled_proofs: &[ProofOfStore],
     ) {
         let mut num_proofs_remaining_after_pull = 0;
         let mut num_txns_remaining_after_pull = 0;
         let excluded_batch_keys = excluded_batches
             .iter()
-            .map(BatchKey::from_info)
+            .map(|(_, batch)| BatchKey::from_info(batch))
             .collect::<HashSet<_>>();
 
         let remaining_batches = self
@@ -401,7 +423,7 @@ impl BatchProofQueue {
     // whether the proof queue is fully utilized.
     pub(crate) fn pull_proofs(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<(Round, BatchInfo)>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -457,7 +479,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<(Round, BatchInfo)>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -490,7 +512,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches_internal(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<(Round, BatchInfo)>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -516,7 +538,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches_with_transactions(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<(Round, BatchInfo)>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
@@ -563,7 +585,7 @@ impl BatchProofQueue {
     fn pull_internal(
         &mut self,
         batches_without_proofs: bool,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<(Round, BatchInfo)>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -580,24 +602,26 @@ impl BatchProofQueue {
         let mut excluded_txns = 0;
         let mut full = false;
 
-        let filtered_txns: DashSet<TxnSummaryWithExpiration> = DashSet::new();
-        // let num_all_txns = excluded_batches
-        //     .iter()
-        //     .map(|batch| batch.num_txns() as usize)
-        //     .sum();
-        // let filtered_txns = DashSet::with_capacity(num_all_txns);
-        // excluded_batches.par_iter().for_each(|batch_info| {
-        //     let batch_key = BatchKey::from_info(batch_info);
-        //     if let Some(txn_summaries) = self
-        //         .items
-        //         .get(&batch_key)
-        //         .and_then(|item| item.txn_summaries.as_ref())
-        //     {
-        //         for txn_summary in txn_summaries {
-        //             filtered_txns.insert(*txn_summary);
-        //         }
-        //     }
-        // });
+        let mut recent_filtered_txns: HashSet<_> = HashSet::new();
+        excluded_batches
+            .iter()
+            .filter(|(round, _)| *round > self.txn_duplicates_cache.latest_block_round)
+            .for_each(|(_, batch_info)| {
+                let batch_key = BatchKey::from_info(batch_info);
+                if let Some(txn_summaries) = self
+                    .items
+                    .get(&batch_key)
+                    .and_then(|item| item.txn_summaries.as_ref())
+                {
+                    for txn_summary in txn_summaries {
+                        recent_filtered_txns.insert(*txn_summary);
+                    }
+                }
+            });
+        let all_excluded_batches: HashSet<_> = excluded_batches
+            .iter()
+            .map(|(_, batch_info)| batch_info)
+            .collect();
         info!(
             "Pull payloads from QuorumStore: building filtered_txns took {} ms",
             start_time.elapsed().as_millis()
@@ -644,7 +668,7 @@ impl BatchProofQueue {
                 }
 
                 if let Some((batch, item)) = iter.next() {
-                    if excluded_batches.contains(batch) {
+                    if all_excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
                     } else {
                         // Calculate the number of unique transactions if this batch is included in the result
@@ -653,7 +677,11 @@ impl BatchProofQueue {
                                 + txn_summaries
                                     .iter()
                                     .filter(|txn_summary| {
-                                        !filtered_txns.contains(txn_summary)
+                                        !(recent_filtered_txns.contains(txn_summary)
+                                            || self
+                                                .txn_duplicates_cache
+                                                .cache
+                                                .contains_key(txn_summary))
                                             && block_timestamp.as_secs()
                                                 < txn_summary.expiration_timestamp_secs
                                     })
@@ -678,7 +706,7 @@ impl BatchProofQueue {
                                     summaries
                                         .iter()
                                         .filter(|summary| {
-                                            filtered_txns.insert(**summary)
+                                            recent_filtered_txns.insert(**summary)
                                                 && block_timestamp.as_secs()
                                                     < summary.expiration_timestamp_secs
                                         })
@@ -854,6 +882,55 @@ impl BatchProofQueue {
 
         counters::PROOF_QUEUE_REMAINING_TXNS_DURATION.observe_duration(start.elapsed());
         (remaining_txns_without_duplicates, self.remaining_proofs)
+    }
+
+    pub(crate) fn handle_ordered(&mut self, block: PipelinedBlock) {
+        let start_time = Instant::now();
+
+        // gc the transactions outside the window
+        for expired_txn in self
+            .txn_duplicates_cache
+            .expiration_rounds
+            .expire(block.round().saturating_sub(self.txn_duplicates_window))
+        {
+            if let Entry::Occupied(mut entry) = self.txn_duplicates_cache.cache.entry(expired_txn) {
+                let count = entry.get_mut();
+                *count -= 1;
+                if *count == 0 {
+                    entry.remove();
+                }
+            }
+        }
+
+        if let Some(payload) = block.block().payload() {
+            let payload_vec = &vec![(block.round(), payload)];
+            let payload_filter: PayloadFilter = payload_vec.into();
+            if let PayloadFilter::InQuorumStore(batches) = payload_filter {
+                // Look up the txns in the block and update the duplicates cache
+                for (_, batch) in batches {
+                    if let Some(item) = self.items.get(&BatchKey::from_info(&batch)) {
+                        if let Some(txn_summaries) = item.txn_summaries.as_ref() {
+                            for txn_summary in txn_summaries {
+                                let entry = self
+                                    .txn_duplicates_cache
+                                    .cache
+                                    .entry(*txn_summary)
+                                    .or_insert(0);
+                                *entry += 1;
+                                self.txn_duplicates_cache
+                                    .expiration_rounds
+                                    .add_item(*txn_summary, block.round());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.txn_duplicates_cache.latest_block_round = block.round();
+        info!(
+            "handle_ordered from QuorumStore: updating txn_duplicates_cache took {} ms",
+            start_time.elapsed().as_millis()
+        );
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire

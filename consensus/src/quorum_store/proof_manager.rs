@@ -9,6 +9,7 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
+    pipelined_block::PipelinedBlock,
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -23,6 +24,7 @@ use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
     ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
+    OrderedNotification(PipelinedBlock),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -82,6 +84,16 @@ impl ProofManager {
         self.update_remaining_txns_and_proofs();
     }
 
+    pub(crate) fn handle_ordered_notification(&mut self, block: PipelinedBlock) {
+        info!(
+            "handle_ordered_notification ({}, {}) {}",
+            block.epoch(),
+            block.round(),
+            block.id()
+        );
+        self.batch_proof_queue.handle_ordered(block);
+    }
+
     pub(crate) fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
@@ -133,7 +145,7 @@ impl ProofManager {
                         &excluded_batches
                             .iter()
                             .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                            .chain(proof_block.iter().map(|proof| (request.block_round, proof.info().clone())))
                             .collect(),
                         &params.exclude_authors,
                         max_opt_batch_txns_size,
@@ -166,8 +178,17 @@ impl ProofManager {
                         &excluded_batches
                             .iter()
                             .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .chain(opt_batches.clone())
+                            .chain(
+                                proof_block
+                                    .iter()
+                                    .map(|proof| (request.block_round, proof.info().clone())),
+                            )
+                            // TODO: better to just return round with the batch info?
+                            .chain(
+                                opt_batches
+                                    .iter()
+                                    .map(|batch| (request.block_round, batch.clone())),
+                            )
                             .collect(),
                         max_inline_txns_to_pull,
                         request.max_txns_after_filtering,
@@ -275,7 +296,11 @@ impl ProofManager {
                             ProofManagerCommand::ReceiveBatches(batches) => {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_batches"]).inc();
                                 self.receive_batches(batches);
-                            }
+                            },
+                            ProofManagerCommand::OrderedNotification(block) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::ordered_notification"]).inc();
+                                self.handle_ordered_notification(block);
+                            },
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::commit_notification"]).inc();
                                 self.handle_commit_notification(

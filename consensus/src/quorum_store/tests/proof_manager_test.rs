@@ -5,7 +5,7 @@ use crate::quorum_store::{
     proof_manager::ProofManager, tests::batch_store_test::batch_store_for_test,
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -50,7 +50,7 @@ fn create_proof_with_gas(
 async fn get_proposal(
     proof_manager: &mut ProofManager,
     max_txns: u64,
-    filter: &[BatchInfo],
+    filter: &[(Round, BatchInfo)],
 ) -> Payload {
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
@@ -59,10 +59,11 @@ async fn get_proposal(
         max_txns_after_filtering: max_txns,
         soft_max_txns_after_filtering: max_txns,
         max_inline_txns: PayloadTxnsSize::new(max(max_txns / 2, 1), 100000),
+        return_non_full: true,
         filter: PayloadFilter::InQuorumStore(filter_set),
         callback: callback_tx,
         block_timestamp: aptos_infallible::duration_since_epoch(),
-        return_non_full: true,
+        block_round: 1,
         maybe_optqs_payload_pull_params: None,
     });
     proof_manager.handle_proposal_request(req);
@@ -104,7 +105,7 @@ fn assert_payload_response(
 async fn get_proposal_and_assert(
     proof_manager: &mut ProofManager,
     max_txns: u64,
-    filter: &[BatchInfo],
+    filter: &[(Round, BatchInfo)],
     expected: &[ProofOfStore],
 ) {
     assert_payload_response(
@@ -192,7 +193,7 @@ async fn test_proposal_priority() {
     get_proposal_and_assert(
         &mut proof_manager,
         1,
-        &[peer0_proof0.info().clone()],
+        &[(1, peer0_proof0.info().clone())],
         &expected,
     )
     .await;
@@ -228,13 +229,13 @@ async fn test_proposal_fairness() {
 
     // The next two proofs are taken from the remaining peer
     let filter = vec![peer0_proofs[0].clone(), peer1_proof_0.clone()];
-    let filter: Vec<_> = filter.iter().map(ProofOfStore::info).cloned().collect();
+    let filter: Vec<_> = filter.iter().map(|p| (1, p.info().clone())).collect();
     get_proposal_and_assert(&mut proof_manager, 2, &filter, &peer0_proofs[1..3]).await;
 
     // The last proof is also taken from the remaining peer
     let mut filter = peer0_proofs[0..3].to_vec();
     filter.push(peer1_proof_0.clone());
-    let filter: Vec<_> = filter.iter().map(ProofOfStore::info).cloned().collect();
+    let filter: Vec<_> = filter.iter().map(|p| (1, p.info().clone())).collect();
     get_proposal_and_assert(&mut proof_manager, 2, &filter, &peer0_proofs[3..4]).await;
 }
 

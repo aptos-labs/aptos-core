@@ -6,7 +6,7 @@ use crate::{
     payload_client::user::UserPayloadClient,
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     payload_pull_params::{OptQSPayloadPullParams, PayloadPullParameters},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -55,6 +55,7 @@ impl QuorumStoreClient {
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
         block_timestamp: Duration,
+        block_round: Round,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
@@ -67,6 +68,7 @@ impl QuorumStoreClient {
             return_non_full,
             callback,
             block_timestamp,
+            block_round,
         });
         // send to shared mempool
         self.consensus_to_quorum_store_sender
@@ -122,6 +124,7 @@ impl UserPayloadClient for QuorumStoreClient {
                     return_non_full || return_empty || done,
                     params.user_txn_filter.clone(),
                     params.block_timestamp,
+                    params.block_round,
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
