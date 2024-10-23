@@ -337,41 +337,42 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             let transactions_clone = transactions.clone();
 
             let senders = self.command_txs.clone();
-            {
-                // send the metadata to the remote executor
-                let PartitionV3 {
-                    block_id: _,
-                    txns: shard_txns,
-                    global_idxs,
-                    local_idx_by_global,
-                    key_sets_by_dep,
-                    follower_shard_sets,
-                } = &transactions_clone.as_v3_ref().partitions[shard_id];
-                let execution_metadata = V3CmdsOrMetaDataRef::MetaData(
-                    V3MetaDataRef {
-                        num_txns: shard_txns.len(),
+
+            let outbound_rpc_scheduler_clone = self.outbound_rpc_scheduler.clone();
+            self.cmd_tx_thread_pool.spawn(move || {
+                {
+                    // send the metadata to the remote executor
+                    let PartitionV3 {
+                        block_id: _,
+                        txns: shard_txns,
                         global_idxs,
                         local_idx_by_global,
                         key_sets_by_dep,
                         follower_shard_sets,
-                        onchain_config: &onchain_config_clone,
-                    });
-                let msg = Message::create_with_metadata(bcs::to_bytes(&execution_metadata).unwrap(), duration_since_epoch, 0, 0);
-                //info!("********* Metadata sent to shard {}; metadata size {}", shard_id, msg.data.len());
+                    } = &transactions_clone.as_v3_ref().partitions[shard_id];
+                    let execution_metadata = V3CmdsOrMetaDataRef::MetaData(
+                        V3MetaDataRef {
+                            num_txns: shard_txns.len(),
+                            global_idxs,
+                            local_idx_by_global,
+                            key_sets_by_dep,
+                            follower_shard_sets,
+                            onchain_config: &onchain_config_clone,
+                        });
+                    let msg = Message::create_with_metadata(bcs::to_bytes(&execution_metadata).unwrap(), duration_since_epoch, 0, 0);
+                    //info!("********* Metadata sent to shard {}; metadata size {}", shard_id, msg.data.len());
 
-                let execute_command_type = format!("execute_command_{}", shard_id);
-                /*senders[shard_id][0]
-                    .lock()
-                    .unwrap()
-                    .send(msg, &MessageType::new(execute_command_type));*/
-                self.outbound_rpc_scheduler.send(msg,
-                                                  MessageType::new(execute_command_type),
-                                                  senders[shard_id][0].clone(),
-                                                  0);
-            }
+                    let execute_command_type = format!("execute_command_{}", shard_id);
+                    /*senders[shard_id][0]
+                        .lock()
+                        .unwrap()
+                        .send(msg, &MessageType::new(execute_command_type));*/
+                    outbound_rpc_scheduler_clone.send(msg,
+                                                     MessageType::new(execute_command_type),
+                                                     senders[shard_id][0].clone(),
+                                                     0);
+                }
 
-            let outbound_rpc_scheduler_clone = self.outbound_rpc_scheduler.clone();
-            self.cmd_tx_thread_pool.spawn(move || {
                 //let shard_txns = &transactions_clone.get_ref().0[shard_id].sub_blocks[0].transactions;
                 //let index_offset = transactions_clone.get_ref().0[shard_id].sub_blocks[0].start_index as usize;
                 let txns_clone = transactions_clone.clone();
