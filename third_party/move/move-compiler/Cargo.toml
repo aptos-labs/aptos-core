@@ -15,7 +15,6 @@ hex = { workspace = true }
 once_cell = { workspace = true }
 petgraph = { workspace = true }
 regex = { workspace = true }
-sha3 = { workspace = true }
 tempfile = { workspace = true }
 
 bcs = { workspace = true }
