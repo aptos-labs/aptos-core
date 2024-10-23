@@ -4,7 +4,7 @@
 //! This file defines the state merkle snapshot committer running in background thread.
 
 use crate::{
-    metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
+    metrics::{CONCURRENCY_GAUGE, LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_store::{buffered_state::CommitMessage, StateDb},
@@ -19,7 +19,6 @@ use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::state_store::state_value::StateValue;
 use std::sync::{mpsc::Receiver, Arc};
-use crate::metrics::CONCURRENCY_GAUGE;
 
 pub struct StateMerkleBatch {
     pub top_levels_batch: SchemaBatch,
@@ -52,7 +51,8 @@ impl StateMerkleBatchCommitter {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
                 CommitMessage::Data(state_merkle_batch) => {
-                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__data"]);
+                    let _guard =
+                        CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__data"]);
                     let StateMerkleBatch {
                         top_levels_batch,
                         batches_for_shards,
@@ -68,11 +68,17 @@ impl StateMerkleBatchCommitter {
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
                         .start_timer();
-                    self.state_db
-                        .state_merkle_db
-                        .commit(current_version, top_levels_batch, batches_for_shards)
-                        .expect("State merkle nodes commit failed.");
+                    {
+                        let _guard = CONCURRENCY_GAUGE
+                            .concurrency_with(&["__state_batch_committer__commit"]);
+                        self.state_db
+                            .state_merkle_db
+                            .commit(current_version, top_levels_batch, batches_for_shards)
+                            .expect("State merkle nodes commit failed.");
+                    }
                     if self.state_db.state_merkle_db.cache_enabled() {
+                        let _guard = CONCURRENCY_GAUGE
+                            .concurrency_with(&["__state_batch_committer__evict_cache"]);
                         self.state_db
                             .state_merkle_db
                             .version_caches()
@@ -105,7 +111,8 @@ impl StateMerkleBatchCommitter {
                     self.smt_ancestors.add(state_delta.current.clone());
                 },
                 CommitMessage::Sync(finish_sender) => {
-                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__sync"]);
+                    let _guard =
+                        CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__sync"]);
                     finish_sender.send(()).unwrap()
                 },
                 CommitMessage::Exit => {

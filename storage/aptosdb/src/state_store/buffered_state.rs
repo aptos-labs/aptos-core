@@ -4,10 +4,11 @@
 //! This file defines state store buffered state that has been committed.
 
 use crate::{
-    metrics::LATEST_CHECKPOINT_VERSION,
+    metrics::{CONCURRENCY_GAUGE, LATEST_CHECKPOINT_VERSION},
     state_store::{state_snapshot_committer::StateSnapshotCommitter, StateDb},
 };
 use aptos_logger::info;
+use aptos_metrics_core::IntGaugeHelper;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta, AptosDbError, Result};
 use aptos_types::{
@@ -22,8 +23,6 @@ use std::{
     },
     thread::JoinHandle,
 };
-use aptos_metrics_core::IntGaugeHelper;
-use crate::metrics::CONCURRENCY_GAUGE;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
@@ -108,7 +107,8 @@ impl BufferedState {
             self.state_commit_sender
                 .send(CommitMessage::Sync(commit_sync_sender))
                 .unwrap();
-            let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__pre_commit_buffered_state_wait_for_sync"]);
+            let _guard =
+                CONCURRENCY_GAUGE.concurrency_with(&["__pre_commit_buffered_state_wait_for_sync"]);
             commit_sync_receiver.recv().unwrap(); // blocks until the to_commit is received.
         } else if self.state_until_checkpoint.is_some() {
             let take_out_to_commit = {
@@ -196,7 +196,8 @@ impl BufferedState {
             );
             self.state_after_checkpoint = new_state_after_checkpoint.clone();
         }
-        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__pre_commit_buffered_state_maybe_commit"]);
+        let _guard =
+            CONCURRENCY_GAUGE.concurrency_with(&["__pre_commit_buffered_state_maybe_commit"]);
         self.maybe_commit(sync_commit);
         self.report_latest_committed_version();
         Ok(())

@@ -4,7 +4,7 @@
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
 use crate::{
-    metrics::OTHER_TIMERS_SECONDS,
+    metrics::{CONCURRENCY_GAUGE, OTHER_TIMERS_SECONDS},
     state_store::{
         buffered_state::CommitMessage,
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
@@ -14,6 +14,7 @@ use crate::{
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::trace;
+use aptos_metrics_core::IntGaugeHelper;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta, Result};
 use aptos_types::state_store::state_value::StateValue;
@@ -27,8 +28,6 @@ use std::{
     },
     thread::JoinHandle,
 };
-use aptos_metrics_core::IntGaugeHelper;
-use crate::metrics::CONCURRENCY_GAUGE;
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
@@ -76,7 +75,8 @@ impl StateSnapshotCommitter {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
                 CommitMessage::Data(delta_to_commit) => {
-                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data"]);
+                    let _guard =
+                        CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data"]);
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
                     let previous_epoch_ending_version = self
@@ -127,7 +127,8 @@ impl StateSnapshotCommitter {
                         })
                     };
 
-                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data__after_pool"]);
+                    let _guard = CONCURRENCY_GAUGE
+                        .concurrency_with(&["__state_snapshot_committer__data__after_pool"]);
                     let (root_hash, top_levels_batch) = {
                         let _timer = OTHER_TIMERS_SECONDS
                             .with_label_values(&["calculate_top_levels_batch"])
@@ -143,7 +144,8 @@ impl StateSnapshotCommitter {
                             .expect("Error calculating StateMerkleBatch for top levels.")
                     };
 
-                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data__send"]);
+                    let _guard = CONCURRENCY_GAUGE
+                        .concurrency_with(&["__state_snapshot_committer__data__send"]);
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleBatch {
                             top_levels_batch,
@@ -154,7 +156,8 @@ impl StateSnapshotCommitter {
                         .unwrap();
                 },
                 CommitMessage::Sync(finish_sender) => {
-                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__sync"]);
+                    let _guard =
+                        CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__sync"]);
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Sync(finish_sender))
                         .unwrap();

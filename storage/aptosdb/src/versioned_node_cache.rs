@@ -1,9 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{lru_node_cache::LruNodeCache, metrics::OTHER_TIMERS_SECONDS, state_merkle_db::Node};
+use crate::{
+    lru_node_cache::LruNodeCache,
+    metrics::{CONCURRENCY_GAUGE, OTHER_TIMERS_SECONDS},
+    state_merkle_db::Node,
+};
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::node_type::NodeKey;
+use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::transaction::Version;
 use rayon::prelude::*;
 use std::{
@@ -57,6 +62,8 @@ impl VersionedNodeCache {
     }
 
     pub fn maybe_evict_version(&self, lru_cache: &LruNodeCache) {
+        let _guard =
+            CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__maybe_evict_version"]);
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["version_cache_evict"])
             .start_timer();
@@ -72,6 +79,7 @@ impl VersionedNodeCache {
             }
         };
 
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__set_lru"]);
         if let Some((version, cache)) = to_evict {
             cache
                 .iter()
