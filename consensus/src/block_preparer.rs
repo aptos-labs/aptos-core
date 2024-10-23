@@ -15,6 +15,7 @@ use aptos_logger::info;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::{stream::FuturesOrdered, StreamExt};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{cmp::Reverse, collections::HashSet, sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
@@ -159,7 +160,7 @@ impl BlockPreparer {
             let batched_txns: Vec<Vec<_>> = monitor!(
                 "filter_committed_transactions",
                 batched_txns
-                    .into_iter()
+                    .into_par_iter()
                     .map(|(txns, _)| {
                         txns.iter()
                             .filter(|txn| !committed_transactions.contains(&txn.committed_hash()))
