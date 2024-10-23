@@ -30,19 +30,14 @@ async fn test_event_v2_translation_simulation() {
         &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
 
     let account1 = &mut context.api_create_account().await;
+    context.wait_for_internal_indexer_caught_up().await;
     // let account1 = &mut context.create_account().await;
-
-    sleep(SLEEP_DURATION).await;
-
     let account2 = &mut context.api_create_account().await;
+    context.wait_for_internal_indexer_caught_up().await;
     // let account2 = &mut context.create_account().await;
-
-    sleep(SLEEP_DURATION).await;
-
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
 
-    // sleep(SLEEP_DURATION).await;
-
+    context.wait_for_internal_indexer_caught_up().await; 
     let payload = json!({
         "type": "entry_function_payload",
         "function": "0x1::coin::transfer",
@@ -51,8 +46,8 @@ async fn test_event_v2_translation_simulation() {
             account1.address().to_hex_literal(), "100"
         ]
     });
+    context.wait_for_internal_indexer_caught_up().await;
     let resp = context.simulate_transaction(account2, payload, 200).await;
-
     // sleep(SLEEP_DURATION).await;
 
     // The V2 event should not appear.

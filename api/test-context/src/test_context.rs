@@ -442,7 +442,7 @@ impl TestContext {
     }
 
     pub async fn api_create_account(&mut self) -> LocalAccount {
-        let root = &mut self.root_account().await;
+        let root: &mut LocalAccount = &mut self.root_account().await;
         let account = self.gen_account();
         self.api_execute_aptos_account_transfer(root, account.address(), TRANSFER_AMOUNT)
             .await;
@@ -911,6 +911,20 @@ impl TestContext {
             .unwrap()
     }
 
+    pub async fn wait_for_internal_indexer_caught_up(&self) {
+        let (internal_indexer_ledger_info_opt, storage_ledger_info) = self
+            .context
+            .get_latest_internal_and_storage_ledger_info::<BasicError>()
+            .expect("cannot get ledger info");
+        if let Some(mut internal_indexer_ledger_info) = internal_indexer_ledger_info_opt {
+            while internal_indexer_ledger_info.version() < storage_ledger_info.version() {
+                println!("Waiting for internal indexer to catch up to storage ledger info. Internal indexer version: {}, storage ledger version: {}", internal_indexer_ledger_info.version(), storage_ledger_info.version());
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                internal_indexer_ledger_info = self.context.get_latest_internal_indexer_ledger_info::<BasicError>().expect("cannot get internal indexer version");
+            }
+        }
+    }
+
     pub async fn api_execute_entry_function(
         &mut self,
         account: &mut LocalAccount,
@@ -961,6 +975,7 @@ impl TestContext {
         payload: Value,
         status_code: u16,
     ) {
+        println!("bowu: {}, {}", account.address(), account.sequence_number());
         let mut request = json!({
             "sender": account.address(),
             "sequence_number": account.sequence_number().to_string(),
