@@ -176,8 +176,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         };
         self.stop_condition_per_stage
             .get_mut(stage)
-            .unwrap()
-            .reduce_txn_count(result.len());
+            .map(|stop_condition| stop_condition.reduce_txn_count(result.len()));
 
         result
     }
