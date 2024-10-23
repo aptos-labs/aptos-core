@@ -79,6 +79,7 @@ async fn randomness_stall_recovery() {
         validator_override_config.save_config(config_path).unwrap();
         info!("Restarting validator {}.", idx);
         validator.start().unwrap();
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     info!("Hot-fixing the VFNs.");
@@ -94,13 +95,15 @@ async fn randomness_stall_recovery() {
         vfn_override_config.save_config(config_path).unwrap();
         info!("Restarting VFN {}.", idx);
         vfn.start().unwrap();
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     info!("Wait for nodes to start.");
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     info!("Every node except the last validator should pass liveness check.");
     for node in swarm.validators().take(num_validators - 1).chain(swarm.fullnodes()) {
+        info!("checking node {}", node.index());
         node.liveness_check(20).await.unwrap();
     }
 
