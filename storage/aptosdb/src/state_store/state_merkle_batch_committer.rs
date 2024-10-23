@@ -13,12 +13,13 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::state_store::state_value::StateValue;
 use std::sync::{mpsc::Receiver, Arc};
+use crate::metrics::CONCURRENCY_GAUGE;
 
 pub struct StateMerkleBatch {
     pub top_levels_batch: SchemaBatch,
@@ -51,6 +52,7 @@ impl StateMerkleBatchCommitter {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
                 CommitMessage::Data(state_merkle_batch) => {
+                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__data"]);
                     let StateMerkleBatch {
                         top_levels_batch,
                         batches_for_shards,
@@ -102,7 +104,10 @@ impl StateMerkleBatchCommitter {
 
                     self.smt_ancestors.add(state_delta.current.clone());
                 },
-                CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
+                CommitMessage::Sync(finish_sender) => {
+                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_batch_committer__sync"]);
+                    finish_sender.send(()).unwrap()
+                },
                 CommitMessage::Exit => {
                     break;
                 },

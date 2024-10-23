@@ -27,6 +27,8 @@ use std::{
     },
     thread::JoinHandle,
 };
+use aptos_metrics_core::IntGaugeHelper;
+use crate::metrics::CONCURRENCY_GAUGE;
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
@@ -74,6 +76,7 @@ impl StateSnapshotCommitter {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
                 CommitMessage::Data(delta_to_commit) => {
+                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data"]);
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
                     let previous_epoch_ending_version = self
@@ -124,6 +127,7 @@ impl StateSnapshotCommitter {
                         })
                     };
 
+                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data__after_pool"]);
                     let (root_hash, top_levels_batch) = {
                         let _timer = OTHER_TIMERS_SECONDS
                             .with_label_values(&["calculate_top_levels_batch"])
@@ -139,6 +143,7 @@ impl StateSnapshotCommitter {
                             .expect("Error calculating StateMerkleBatch for top levels.")
                     };
 
+                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__data__send"]);
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleBatch {
                             top_levels_batch,
@@ -149,6 +154,7 @@ impl StateSnapshotCommitter {
                         .unwrap();
                 },
                 CommitMessage::Sync(finish_sender) => {
+                    let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__state_snapshot_committer__sync"]);
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Sync(finish_sender))
                         .unwrap();

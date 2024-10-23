@@ -31,8 +31,10 @@ impl DbWriter for AptosDB {
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
             {
+                let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__pre_commit_buffered_state_lock"]);
                 let mut buffered_state = self.state_store.buffered_state().lock();
 
+                let _guard = CONCURRENCY_GAUGE.concurrency_with(&["__pre_commit_buffered_state_update"]);
                 let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
                 buffered_state.update(
                     chunk.state_updates_until_last_checkpoint,
