@@ -10890,28 +10890,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-async-vm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "better_any",
- "bytes",
- "datatest-stable",
- "itertools 0.13.0",
- "move-binary-format",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-prover-test-utils",
- "move-stdlib",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "sha3 0.9.1",
- "smallvec",
-]
-
-[[package]]
 name = "move-binary-format"
 version = "0.0.3"
 dependencies = [
@@ -11067,7 +11045,6 @@ dependencies = [
  "pathdiff",
  "petgraph 0.6.5",
  "regex",
- "sha3 0.9.1",
  "tempfile",
 ]
 
