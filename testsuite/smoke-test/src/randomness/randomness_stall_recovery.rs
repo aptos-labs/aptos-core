@@ -24,6 +24,7 @@ async fn randomness_stall_recovery() {
     let epoch_duration_secs = 20;
     let num_validators = 4;
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(num_validators)
+        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
