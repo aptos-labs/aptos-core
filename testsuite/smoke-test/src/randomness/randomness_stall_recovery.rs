@@ -15,6 +15,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use aptos_forge::Node;
 
 /// Chain recovery using a local config from randomness stall should work.
 /// See `randomness_config_seqnum.move` for more details.
