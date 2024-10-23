@@ -63,10 +63,16 @@ async fn randomness_stall_recovery() {
     assert!(liveness_check_result.is_err());
 
     info!("Stopping all nodes first.");
-    for node in swarm.fullnodes_mut().chain(swarm.validators_mut()) {
+    for node in swarm.fullnodes_mut() {
         info!("Stopping node {}.", node.index());
         node.stop();
     }
+    for node in swarm.validators_mut() {
+        info!("Stopping node {}.", node.index());
+        node.stop();
+    }
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     info!("Hot-fixing all validators.");
     for (idx, validator) in swarm.validators_mut().enumerate() {
@@ -84,7 +90,6 @@ async fn randomness_stall_recovery() {
         validator_override_config.save_config(config_path).unwrap();
         info!("Restarting validator {}.", idx);
         validator.start().unwrap();
-        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     info!("Hot-fixing the VFNs.");
@@ -98,7 +103,6 @@ async fn randomness_stall_recovery() {
         vfn_override_config.save_config(config_path).unwrap();
         info!("Restarting VFN {}.", idx);
         vfn.start().unwrap();
-        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     let liveness_check_result = swarm
