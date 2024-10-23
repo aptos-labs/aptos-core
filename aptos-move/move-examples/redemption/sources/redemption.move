@@ -1,4 +1,8 @@
 /// This module implements a simple redemption pool that allows users to redeem wrapped coins for native fungible assets.
+/// A single redemption pool can support multiple types of redemptions (pairs of coin and fungible asset).
+///
+/// Taken as is, this contract needs to deploy to a private key-based account (EOA) that by default has permission to
+/// create new pools. If more adjustable control is desired, developers should add a separate admin address.
 ///
 /// A new pool can only be created by the deployer of the contract.
 /// Any operator can deposit native fungible assets into the pool.
@@ -8,14 +12,14 @@ module redemption::redemption {
     use aptos_framework::aptos_account;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::dispatchable_fungible_asset;
-    use aptos_framework::fungible_asset::{Self, Metadata};
+    use aptos_framework::event;
+    use aptos_framework::fungible_asset::{Self, Metadata, FungibleStore};
     use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::primary_fungible_store;
     use aptos_std::table::{Self, Table};
+    use aptos_std::type_info;
     use std::signer;
     use std::string::String;
-    use aptos_std::type_info;
-    use aptos_framework::event;
 
     /// Caller is not authorized to perform the operation.
     const EUNAUTHORIZED: u64 = 1;
@@ -58,6 +62,19 @@ module redemption::redemption {
         redemption_fa: Object<Metadata>,
         user: address,
         amount: u64,
+    }
+
+    #[view]
+    public fun native_balance<WrappedCoin>(): u64 acquires RedemptionPool {
+        let pool = borrow_global<RedemptionPool<WrappedCoin>>(@redemption);
+        let native_store = object::address_to_object(object::address_from_extend_ref(&pool.native_store));
+        fungible_asset::balance<FungibleStore>(native_store)
+    }
+
+    #[view]
+    public fun wrapped_balance<WrappedCoin>(): u64 acquires RedemptionPool {
+        let pool = borrow_global<RedemptionPool<WrappedCoin>>(@redemption);
+        coin::value(&pool.wrapped_coins)
     }
 
     /// Create a new pool for exchanging wrapped coins for native fungible assets.
