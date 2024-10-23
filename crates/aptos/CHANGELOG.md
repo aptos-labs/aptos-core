@@ -5,6 +5,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## Unreleased
 - [`Fix`] Remove unwraps to make outputs go through regular error handling
 
+## [4.2.6] - 2024/10/23
+- Fixing issue with `--move-2` flag which was still selecting language version 2.0 instead of 2.1.
+
 ## [4.2.5] - 2024/10/23
 - Bump to resolve issue with release version inconsistency.
 
