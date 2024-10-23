@@ -91,7 +91,6 @@ impl BlockGasLimitType {
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 9,
             use_granular_resource_group_conflicts: false,
-            use_module_publishing_block_conflict: true,
             block_output_limit: Some(5 * 1024 * 1024),
             include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: true,
@@ -210,11 +209,6 @@ pub enum BlockGasLimitType {
         /// If false, we treat any conclicts inside of resource groups (even across
         /// non-overlapping tags) as conflicts).
         use_granular_resource_group_conflicts: bool,
-        /// Module publishing today fallbacks to sequential execution,
-        /// even though there is no read-write conflict.
-        /// When enabled, this flag allows us to account for that conflict.
-        /// NOTE: Currently not supported.
-        use_module_publishing_block_conflict: bool,
 
         /// Block limit on the total (approximate) txn output size in bytes.
         block_output_limit: Option<u64>,
@@ -287,17 +281,6 @@ impl BlockGasLimitType {
                     None
                 }
             },
-        }
-    }
-
-    pub fn use_module_publishing_block_conflict(&self) -> bool {
-        match self {
-            BlockGasLimitType::NoLimit => false,
-            BlockGasLimitType::Limit(_) => false,
-            BlockGasLimitType::ComplexLimitV1 {
-                use_module_publishing_block_conflict,
-                ..
-            } => *use_module_publishing_block_conflict,
         }
     }
 

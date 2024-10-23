@@ -53,7 +53,7 @@ fn run(
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new(vec![]);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();

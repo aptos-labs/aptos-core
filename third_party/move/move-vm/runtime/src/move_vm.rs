@@ -3,27 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
-    data_cache::TransactionDataCache,
-    loader::{Loader, ModuleStorage, ModuleStorageAdapter},
-    native_extensions::NativeContextExtensions,
-    native_functions::{NativeFunction, NativeFunctions},
-    runtime::VMRuntime,
-    session::Session,
-    RuntimeEnvironment,
-};
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    CompiledModule,
-};
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, vm_status::StatusCode,
+    config::VMConfig, data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
+    runtime::VMRuntime, session::Session, RuntimeEnvironment,
 };
 use move_vm_types::resolver::MoveResolver;
-use std::{ops::Deref, sync::Arc};
 
-#[derive(Clone)]
 pub struct MoveVM {
     pub(crate) runtime: VMRuntime,
 }
@@ -31,39 +15,27 @@ pub struct MoveVM {
 impl MoveVM {
     /// Creates a new VM instance, using default configurations. Panics if there are duplicated
     /// natives.
-    pub fn new(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-    ) -> Self {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         let vm_config = VMConfig {
             // Keep the paranoid mode on as we most likely want this for tests.
             paranoid_type_checks: true,
             ..VMConfig::default()
         };
-        Self::new_with_config(natives, vm_config)
+        Self::new_with_config(vm_config)
     }
 
     /// Creates a new VM instance, with provided VM configurations. Panics if there are duplicated
     /// natives.
-    pub fn new_with_config(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        vm_config: VMConfig,
-    ) -> Self {
-        let natives = NativeFunctions::new(natives)
-            .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
+    pub fn new_with_config(vm_config: VMConfig) -> Self {
         Self {
-            runtime: VMRuntime::new(natives, vm_config),
+            runtime: VMRuntime::new(vm_config),
         }
     }
 
     pub fn new_with_runtime_environment(runtime_environment: &RuntimeEnvironment) -> Self {
-        // Loader V2 does not store any natives, so we save the clone here.
-        let natives = if runtime_environment.vm_config().use_loader_v2 {
-            NativeFunctions::new(vec![]).unwrap()
-        } else {
-            runtime_environment.natives().clone()
-        };
         Self {
-            runtime: VMRuntime::new(natives, runtime_environment.vm_config().clone()),
+            runtime: VMRuntime::new(runtime_environment.vm_config().clone()),
         }
     }
 
@@ -98,98 +70,8 @@ impl MoveVM {
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
-                remote,
-            ),
-            module_store: ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
+            data_cache: TransactionDataCache::new(remote),
             native_extensions,
         }
-    }
-
-    /// DO NOT USE THIS API!
-    ///
-    /// Existing uses of this API is to fetch metadata from compiled modules on the client
-    /// side. With loader V2 design clients can fetch it directly from the module storage.
-    #[deprecated]
-    pub fn load_module(
-        &self,
-        module_id: &ModuleId,
-        remote: &impl MoveResolver,
-    ) -> VMResult<Arc<CompiledModule>> {
-        match self.runtime.loader() {
-            Loader::V1(loader) => {
-                let module = loader.load_module(
-                    module_id,
-                    &mut TransactionDataCache::new(
-                        self.runtime
-                            .loader()
-                            .vm_config()
-                            .deserializer_config
-                            .clone(),
-                        remote,
-                    ),
-                    &ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
-                )?;
-                Ok(module.as_ref().deref().clone())
-            },
-            Loader::V2(_) => Err(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            )
-            .with_message("Loader V2 implementation never calls move_vm::load_module".to_string())
-            .finish(Location::Undefined)),
-        }
-    }
-
-    /// Allows the adapter to announce to the VM that the code loading cache should be considered
-    /// outdated. This can happen if the adapter executed a particular code publishing transaction
-    /// but decided to not commit the result to the data store. Because the code cache currently
-    /// does not support deletion, the cache will, incorrectly, still contain this module.
-    #[deprecated]
-    pub fn mark_loader_cache_as_invalid(&self) {
-        #[allow(deprecated)]
-        self.runtime.loader().mark_v1_as_invalid()
-    }
-
-    /// Returns true if the loader cache has been invalidated (either by explicit call above
-    /// or by the runtime)
-    #[deprecated]
-    pub fn is_loader_cache_invalidated(&self) -> bool {
-        #[allow(deprecated)]
-        self.runtime.loader().is_v1_invalidated()
-    }
-
-    /// If the loader cache has been invalidated (either by the above call or by internal logic)
-    /// flush it so it is valid again. Notice that should only be called if there are no
-    /// outstanding sessions created from this VM.
-    #[deprecated]
-    pub fn flush_loader_cache_if_invalidated(&self) {
-        // Flush the module cache inside the VMRuntime. This code is there for a legacy reason:
-        // - In the old session api that we provide, MoveVM will hold a cache for loaded module and the session will be created against that cache.
-        //   Thus if an module invalidation event happens (e.g, by upgrade request), we will need to flush this internal cache as well.
-        // - If we can deprecate this session api, we will be able to get rid of this internal loaded cache and make the MoveVM "stateless" and
-        //   invulnerable to module invalidation.
-        #[allow(deprecated)]
-        if self.runtime.loader().is_v1_invalidated() {
-            self.runtime.module_cache.flush();
-        };
-        #[allow(deprecated)]
-        self.runtime.loader().flush_v1_if_invalidated()
-    }
-
-    /// DO NOT USE THIS API!
-    ///
-    /// Currently, metadata is owned by module which is owned by the VM. In the new loader
-    /// V2 design, clients can fetch metadata and apply this function directly!
-    #[deprecated]
-    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, f: F) -> Option<T>
-    where
-        F: FnOnce(&[Metadata]) -> Option<T>,
-    {
-        f(&self.runtime.module_cache.fetch_module(module)?.metadata)
     }
 }

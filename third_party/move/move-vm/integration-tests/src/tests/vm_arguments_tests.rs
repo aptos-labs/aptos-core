@@ -255,7 +255,7 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let move_vm = MoveVM::new(vec![]);
+    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let storage = InMemoryStorage::new();
     let code_storage = storage.as_unsync_code_storage(runtime_environment);
     let mut session = move_vm.new_session(&storage);
@@ -286,7 +286,7 @@ fn call_function_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let move_vm = MoveVM::new(vec![]);
+    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut storage = InMemoryStorage::new();
 
     let module_id = module.self_id();
@@ -781,7 +781,7 @@ fn call_missing_item() {
     let function_name = ident_str!("foo");
 
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let move_vm = MoveVM::new(vec![]);
+    let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut storage = InMemoryStorage::new();
     let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
     let mut session = move_vm.new_session(&storage);

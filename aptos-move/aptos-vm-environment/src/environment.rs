@@ -15,15 +15,12 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{
-        ConfigurationResource, FeatureFlag, Features, OnChainConfig, TimedFeatures,
-        TimedFeaturesBuilder,
+        ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
 use aptos_vm_types::storage::StorageGasParameters;
-use move_vm_runtime::{
-    config::VMConfig, use_loader_v1_based_on_env, RuntimeEnvironment, WithRuntimeEnvironment,
-};
+use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -109,15 +106,6 @@ impl AptosEnvironment {
     pub fn storage_gas_params(&self) -> &Result<StorageGasParameters, String> {
         &self.0.storage_gas_params
     }
-
-    /// Returns true if create_signer native was injected for the government proposal simulation.
-    /// Deprecated, and should not be used.
-    #[inline]
-    #[deprecated]
-    pub fn inject_create_signer_for_gov_sim(&self) -> bool {
-        #[allow(deprecated)]
-        self.0.inject_create_signer_for_gov_sim
-    }
 }
 
 impl Clone for AptosEnvironment {
@@ -161,11 +149,6 @@ struct Environment {
     /// The runtime environment, containing global struct type and name caches, and VM configs.
     runtime_environment: RuntimeEnvironment,
 
-    /// True if we need to inject create signer native for government proposal simulation.
-    /// Deprecated, and will be removed in the future.
-    #[deprecated]
-    inject_create_signer_for_gov_sim: bool,
-
     /// Hash of configs used in this environment. Used to be able to compare environments.
     hash: [u8; 32],
 }
@@ -178,15 +161,8 @@ impl Environment {
     ) -> Self {
         // We compute and store a hash of configs in order to distinguish different environments.
         let mut sha3_256 = Sha3_256::new();
-        let mut features =
+        let features =
             fetch_config_and_update_hash::<Features>(&mut sha3_256, state_view).unwrap_or_default();
-
-        // TODO(loader_v2): Remove before rolling out. This allows us to replay with V2.
-        if use_loader_v1_based_on_env() {
-            features.disable(FeatureFlag::ENABLE_LOADER_V2);
-        } else {
-            features.enable(FeatureFlag::ENABLE_LOADER_V2);
-        }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
         let chain_id = fetch_config_and_update_hash::<ChainId>(&mut sha3_256, state_view)
@@ -247,7 +223,6 @@ impl Environment {
 
         let hash = sha3_256.finalize().into();
 
-        #[allow(deprecated)]
         Self {
             chain_id,
             features,
@@ -256,7 +231,6 @@ impl Environment {
             gas_params,
             storage_gas_params,
             runtime_environment,
-            inject_create_signer_for_gov_sim,
             hash,
         }
     }

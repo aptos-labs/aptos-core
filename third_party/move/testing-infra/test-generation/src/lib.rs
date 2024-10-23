@@ -147,8 +147,8 @@ fn execute_function_in_module(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         );
-        let runtime_environment = RuntimeEnvironment::new(natives.clone());
-        let vm = MoveVM::new(natives);
+        let runtime_environment = RuntimeEnvironment::new(natives);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
         let storage = storage_with_stdlib_and_modules(vec![&module]);
         let module_storage = storage.as_unsync_module_storage(runtime_environment);

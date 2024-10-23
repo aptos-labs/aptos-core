@@ -21,7 +21,6 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     error::PanicError,
-    executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
@@ -476,13 +475,7 @@ impl BlockAptosVM {
             global_module_cache.as_ref(),
         )?;
 
-        let executor = BlockExecutor::<
-            SignatureVerifiedTransaction,
-            AptosExecutorTask,
-            S,
-            L,
-            ExecutableTestType,
-        >::new(
+        let executor = BlockExecutor::<SignatureVerifiedTransaction, AptosExecutorTask, S, L>::new(
             config,
             executor_thread_pool,
             global_module_cache,

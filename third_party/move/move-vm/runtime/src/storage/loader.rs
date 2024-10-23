@@ -29,8 +29,7 @@ use move_vm_types::{
 use std::{collections::BTreeMap, sync::Arc};
 use typed_arena::Arena;
 
-/// V2 implementation of loader, which is stateless - i.e., it does not contain module or script
-/// cache. Instead, module and script storages are passed to all APIs by reference.
+/// Loader is responsible for fetching functions, scripts, types and modules from the storage.
 pub(crate) struct LoaderV2 {
     vm_config: VMConfig,
 }
@@ -140,7 +139,7 @@ impl LoaderV2 {
             .map(|ty_tag| self.load_ty(code_storage, ty_tag))
             .collect::<PartialVMResult<Vec<_>>>()
             // TODO(loader_v2):
-            //   Loader V1 implementation returns undefined here, causing some tests to fail. We
+            //   Loader V1 implementation returned undefined here, causing some tests to fail. We
             //   should probably map this to script.
             .map_err(|e| e.finish(Location::Undefined))?;
 
@@ -228,7 +227,7 @@ impl LoaderV2 {
         module_storage: &impl ModuleStorage,
         ty_tag: &TypeTag,
     ) -> PartialVMResult<Type> {
-        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
+        // TODO(loader_v2): Loader V1 used VMResults everywhere, but partial VM errors
         //                  seem better fit. Here we map error to VMError to reuse existing
         //                  type builder implementation, and then strip the location info.
         self.ty_builder()

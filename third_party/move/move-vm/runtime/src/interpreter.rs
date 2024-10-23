@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    loader::{Loader, ModuleStorageAdapter, Resolver},
+    loader::{Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -91,7 +91,6 @@ impl Interpreter {
         function: LoadedFunction,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -108,7 +107,6 @@ impl Interpreter {
         .execute_main(
             loader,
             data_store,
-            module_store,
             module_storage,
             gas_meter,
             traversal_context,
@@ -128,7 +126,6 @@ impl Interpreter {
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -157,7 +154,7 @@ impl Interpreter {
             .map_err(|e| self.set_location(e))?;
 
         loop {
-            let resolver = current_frame.resolver(loader, module_store, module_storage);
+            let resolver = current_frame.resolver(loader, module_storage);
             let exit_code = current_frame
                 .execute_code(&resolver, &mut self, data_store, gas_meter)
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
@@ -574,23 +571,6 @@ impl Interpreter {
                 args,
             } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
-
-                // Note(loader_v2): when V2 loader fetches the function, the defining module is
-                // automatically loaded as well, and there is no need for preloading of a module
-                // into the cache like in V1 design.
-                if let Loader::V1(loader) = resolver.loader() {
-                    // Load the module that contains this function regardless of the traversal context.
-                    //
-                    // This is just a precautionary step to make sure that caching status of the VM will not alter execution
-                    // result in case framework code forgot to use LoadFunction result to load the modules into cache
-                    // and charge properly.
-                    loader
-                        .load_module(&module_name, data_store, resolver.module_store())
-                        .map_err(|_| {
-                            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                                .with_message(format!("Module {} doesn't exist", module_name))
-                        })?;
-                }
                 let target_func = resolver.build_loaded_function_from_name_and_ty_args(
                     &module_name,
                     &func_name,
@@ -651,8 +631,6 @@ impl Interpreter {
                 resolver
                     .loader()
                     .check_dependencies_and_charge_gas(
-                        resolver.module_store(),
-                        data_store,
                         gas_meter,
                         &mut traversal_context.visited,
                         traversal_context.referenced_modules,
@@ -664,20 +642,6 @@ impl Interpreter {
                         .append_message_with_separator('.',
                             format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
                         ))?;
-
-                // Note(loader_v2): same as above, when V2 loader fetches the function, the module
-                // where it is defined automatically loaded from ModuleStorage as well. There is
-                // no resolution via ModuleStorageAdapter like in V1 design, and it will be soon
-                // removed.
-                if let Loader::V1(loader) = resolver.loader() {
-                    loader
-                        .load_module(&module_name, data_store, resolver.module_store())
-                        .map_err(|_| {
-                            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                                .with_message(format!("Module {} doesn't exist", module_name))
-                        })?;
-                }
-
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
             },
@@ -762,13 +726,7 @@ impl Interpreter {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        match data_store.load_resource(
-            resolver.loader(),
-            resolver.module_storage(),
-            addr,
-            ty,
-            resolver.module_store(),
-        ) {
+        match data_store.load_resource(resolver.loader(), resolver.module_storage(), addr, ty) {
             Ok((gv, load_res)) => {
                 if let Some(bytes_loaded) = load_res {
                     gas_meter.charge_load_resource(
@@ -836,8 +794,9 @@ impl Interpreter {
             },
         };
         let struct_name = resolver
-            .loader()
-            .struct_name_index_map(resolver.module_storage())
+            .module_storage()
+            .runtime_environment()
+            .struct_name_index_map()
             .idx_to_struct_name(struct_idx)?;
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
@@ -1324,11 +1283,9 @@ fn check_depth_of_type_impl(
         },
         Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx, .. } => {
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-            )?;
+            let formula = resolver
+                .loader()
+                .calculate_depth_of_struct(*idx, resolver.module_storage())?;
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
@@ -1341,11 +1298,9 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula = resolver.loader().calculate_depth_of_struct(
-                *idx,
-                resolver.module_store(),
-                resolver.module_storage(),
-            )?;
+            let formula = resolver
+                .loader()
+                .calculate_depth_of_struct(*idx, resolver.module_storage())?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::TyParam(_) => {
@@ -3136,11 +3091,9 @@ impl Frame {
     fn resolver<'a>(
         &self,
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
         module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
-        self.function
-            .get_resolver(loader, module_store, module_storage)
+        self.function.get_resolver(loader, module_storage)
     }
 
     fn location(&self) -> Location {

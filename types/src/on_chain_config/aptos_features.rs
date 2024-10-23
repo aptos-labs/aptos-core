@@ -10,7 +10,6 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
-use move_vm_runtime::use_loader_v1_based_on_env;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
@@ -195,13 +194,6 @@ impl Default for Features {
 
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
-        }
-
-        // TODO(loader_v2): Remove before rolling out. This allows us to replay with V2.
-        if use_loader_v1_based_on_env() {
-            features.disable(FeatureFlag::ENABLE_LOADER_V2);
-        } else {
-            features.enable(FeatureFlag::ENABLE_LOADER_V2);
         }
 
         features

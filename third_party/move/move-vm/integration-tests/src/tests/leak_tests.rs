@@ -49,7 +49,7 @@ fn leak_with_abort() {
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new(vec![]);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);

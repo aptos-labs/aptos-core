@@ -188,8 +188,8 @@ pub trait StateStorageView {
 ///   state values.
 /// - The `ExecutorView` trait is used at executor level, e.g. BlockSTM. When
 ///   a block is executed, the types of accesses are always known (for example,
-///   whether a resource is accessed or a module). Fine-grained structure of
-///   `ExecutorView` allows to:
+///   whether a resource is accessed). Fine-grained structure of `ExecutorView`
+///   allows to:
 ///     1. Specialize on access type,
 ///     2. Separate execution and storage abstractions.
 ///
@@ -200,7 +200,6 @@ pub trait StateStorageView {
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, I, V>:
     TResourceView<Key = K, Layout = L>
-    + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
@@ -209,7 +208,6 @@ pub trait TExecutorView<K, T, L, I, V>:
 
 impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
     A: TResourceView<Key = K, Layout = L>
-        + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
@@ -252,22 +250,6 @@ where
         self.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for resource at {:?}: {:?}",
-                state_key, e
-            ))
-        })
-    }
-}
-
-impl<S> TModuleView for S
-where
-    S: StateView,
-{
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for module at {:?}: {:?}",
                 state_key, e
             ))
         })

@@ -5,7 +5,7 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{Function, Loader, Resolver},
+    loader::{Function, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
 };
@@ -145,7 +145,6 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                 self.resolver.module_storage(),
                 address,
                 ty,
-                self.resolver.module_store(),
             )
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
@@ -203,37 +202,15 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> PartialVMResult<Arc<Function>> {
-        let (_, function) = match self.resolver.loader() {
-            Loader::V1(loader) => {
-                // Load the module that contains this function regardless of the traversal context.
-                //
-                // This is just a precautionary step to make sure that caching status of the VM will not alter execution
-                // result in case framework code forgot to use LoadFunction result to load the modules into cache
-                // and charge properly.
-                loader
-                    .load_module(module_id, self.data_store, self.resolver.module_store())
-                    .map_err(|_| {
-                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                            .with_message(format!("Module {} doesn't exist", module_id))
-                    })?;
-
-                self.resolver
-                    .module_store()
-                    .resolve_module_and_function_by_name(module_id, function_name)?
-            },
-            Loader::V2(loader) => loader
-                .load_function_without_ty_args(
-                    self.resolver.module_storage(),
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
-                // Note: Keeping this consistent with Loader V1 implementation.
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                        .with_message(format!("Module {} doesn't exist", module_id))
-                })?,
-        };
+        let (_, function) = self
+            .resolver
+            .loader()
+            .load_function_without_ty_args(module_id, function_name, self.resolver.module_storage())
+            // Note: Keeping this consistent with Loader V1 implementation.
+            .map_err(|_| {
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!("Module {} doesn't exist", module_id))
+            })?;
         Ok(function)
     }
 }

@@ -152,18 +152,13 @@ where
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
-    /// Wrapping the types used for testing to add ModulePath trait implementation (below).
+    /// Wrapping the types used for testing.
     pub K,
-    /// The bool field determines for testing purposes, whether the key will be interpreted
-    /// as a module access path. In this case, if a module path is both read and written
-    /// during parallel execution, ModulePathReadWrite must be returned and the
-    /// block execution must fall back to the sequential execution.
-    pub bool,
 );
 
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
     fn is_module_path(&self) -> bool {
-        self.1
+        false
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
@@ -503,7 +498,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // TODO: disentangle writes and deltas.
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
-        module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
     ) -> Vec<(
@@ -521,7 +515,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
                     match delta_fn(i, &value) {
-                        Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
+                        Some(delta) => incarnation_deltas.push((KeyType(key), delta)),
                         None => {
                             // One out of 23 writes will be a deletion
                             let val_u128 = ValueType::from_value(value.clone(), true)
@@ -531,7 +525,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                             let is_deletion = allow_deletes && val_u128 % 23 == 0;
                             let mut value = ValueType::from_value(value.clone(), !is_deletion);
                             value.metadata = raw_metadata((val_u128 >> 64) as u64);
-                            incarnation_writes.push((KeyType(key, module_write_fn(i)), value));
+                            incarnation_writes.push((KeyType(key), value));
                         },
                     }
                 }
@@ -544,7 +538,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     fn reads_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<Index>>,
-        module_read_fn: &dyn Fn(usize) -> bool,
     ) -> Vec<Vec<KeyType<K>>> {
         let mut ret = vec![];
         for read_gen in gen.into_iter() {
@@ -552,7 +545,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             for idx in read_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
-                incarnation_reads.push(KeyType(key, module_read_fn(i)));
+                incarnation_reads.push(KeyType(key));
             }
             ret.push(incarnation_reads);
         }
@@ -588,18 +581,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     >(
         self,
         universe: &[K],
-        module_read_fn: &dyn Fn(usize) -> bool,
-        module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
     ) -> MockTransaction<KeyType<K>, E> {
-        let reads = Self::reads_from_gen(universe, self.reads, &module_read_fn);
+        let reads = Self::reads_from_gen(universe, self.reads);
         let gas = Self::gas_from_gen(self.gas);
 
         let behaviors = Self::writes_and_deltas_from_gen(
             universe,
             self.modifications,
-            &module_write_fn,
             &delta_fn,
             allow_deletes,
         )
@@ -633,6 +623,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         MockTransaction::from_behaviors(behaviors)
     }
 
+    // TODO(loader_v2): Connect new code cache to proptests.
     pub(crate) fn materialize<
         K: Clone + Hash + Debug + Eq + Ord,
         E: Send + Sync + Debug + Clone + TransactionEvent,
@@ -642,19 +633,11 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
     ) -> MockTransaction<KeyType<K>, E> {
-        let is_module_read = |_| -> bool { module_access.1 };
-        let is_module_write = |_| -> bool { module_access.0 };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
         // Module deletion isn't allowed.
         let allow_deletes = !(module_access.0 || module_access.1);
 
-        self.new_mock_write_txn(
-            universe,
-            &is_module_read,
-            &is_module_write,
-            &is_delta,
-            allow_deletes,
-        )
+        self.new_mock_write_txn(universe, &is_delta, allow_deletes)
     }
 
     // Generates a mock txn without group reads/writes and converts it to have group
@@ -669,21 +652,12 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     ) -> MockTransaction<KeyType<K>, E> {
         let universe_len = universe.len();
         assert_ge!(universe_len, 3, "Universe must have size >= 3");
-
-        let is_module_read = |_| -> bool { false };
-        let is_module_write = |_| -> bool { false };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
         let group_size_query_indicators =
             Self::group_size_indicator_from_gen(self.group_size_indicators.clone());
         let mut behaviors = self
-            .new_mock_write_txn(
-                &universe[0..universe.len() - 3],
-                &is_module_read,
-                &is_module_write,
-                &is_delta,
-                false,
-            )
+            .new_mock_write_txn(&universe[0..universe.len() - 3], &is_delta, false)
             .into_behaviors();
 
         let key_to_group = |key: &KeyType<K>| -> Option<(usize, u32)> {
@@ -702,14 +676,13 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             let mut reads = vec![];
             let mut group_reads = vec![];
             for read_key in behavior.reads.clone() {
-                assert!(read_key != KeyType(universe[universe_len - 1].clone(), false));
-                assert!(read_key != KeyType(universe[universe_len - 2].clone(), false));
-                assert!(read_key != KeyType(universe[universe_len - 3].clone(), false));
+                assert!(read_key != KeyType(universe[universe_len - 1].clone()));
+                assert!(read_key != KeyType(universe[universe_len - 2].clone()));
+                assert!(read_key != KeyType(universe[universe_len - 3].clone()));
                 match key_to_group(&read_key) {
-                    Some((idx, tag)) => group_reads.push((
-                        KeyType(universe[universe_len - 1 - idx].clone(), false),
-                        tag,
-                    )),
+                    Some((idx, tag)) => {
+                        group_reads.push((KeyType(universe[universe_len - 1 - idx].clone()), tag))
+                    },
                     None => reads.push(read_key),
                 }
             }
@@ -730,7 +703,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             for (idx, inner_ops) in inner_ops.into_iter().enumerate() {
                 if !inner_ops.is_empty() {
                     group_writes.push((
-                        KeyType(universe[universe_len - 1 - idx].clone(), false),
+                        KeyType(universe[universe_len - 1 - idx].clone()),
                         raw_metadata(behavior.metadata_seeds[idx]),
                         inner_ops,
                     ));
@@ -758,7 +731,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                         };
                         (indicator < *size_query_pct).then(|| {
                             (
-                                KeyType(universe[universe_len - 1 - idx].clone(), false),
+                                KeyType(universe[universe_len - 1 - idx].clone()),
                                 // TODO: handle metadata queries more uniformly w. size.
                                 indicator % 2 == 0,
                             )
@@ -781,8 +754,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         delta_threshold: usize,
         allow_deletes: bool,
     ) -> MockTransaction<KeyType<K>, E> {
-        let is_module_read = |_| -> bool { false };
-        let is_module_write = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
             if i >= delta_threshold {
                 let val = ValueType::from_value(v.clone(), true)
@@ -801,15 +772,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             }
         };
 
-        self.new_mock_write_txn(
-            universe,
-            &is_module_read,
-            &is_module_write,
-            &is_delta,
-            allow_deletes,
-        )
+        self.new_mock_write_txn(universe, &is_delta, allow_deletes)
     }
 
+    // TODO(loader_v2): Test new code cache with proptest.
     pub(crate) fn materialize_disjoint_module_rw<
         K: Clone + Hash + Debug + Eq + Ord,
         E: Send + Sync + Debug + Clone + TransactionEvent,
@@ -827,16 +793,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
 
-        let is_module_read = |i| -> bool { i >= read_threshold && i < write_threshold };
-        let is_module_write = |i| -> bool { i >= write_threshold };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
-
         self.new_mock_write_txn(
-            universe,
-            &is_module_read,
-            &is_module_write,
-            &is_delta,
-            false, // Module deletion isn't allowed
+            universe, &is_delta, false, // Module deletion isn't allowed
         )
     }
 }
@@ -916,16 +875,9 @@ where
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
-                    if k.is_module_path() {
-                        match view.get_module_bytes(k) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
-                    } else {
-                        match view.get_resource_bytes(k, None) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
+                    match view.get_resource_bytes(k, None) {
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
                     }
                 }
                 // Read from groups.

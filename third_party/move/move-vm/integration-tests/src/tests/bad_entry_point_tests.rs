@@ -21,7 +21,7 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 #[test]
 fn call_non_existent_module() {
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new(vec![]);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let storage = BlankStorage;
 
     let mut sess = vm.new_session(&storage);
@@ -62,7 +62,7 @@ fn call_non_existent_function() {
     storage.add_module_bytes(module_id.address(), module_id.name(), blob.into());
 
     let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new(vec![]);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();

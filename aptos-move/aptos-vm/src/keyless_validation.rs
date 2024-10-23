@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{aptos_vm::fetch_module_metadata_for_struct_tag, move_vm_ext::AptosMoveResolver};
+use crate::move_vm_ext::AptosMoveResolver;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
@@ -46,7 +46,9 @@ fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
     module_storage: &impl AptosModuleStorage,
 ) -> anyhow::Result<T, VMStatus> {
-    let metadata = fetch_module_metadata_for_struct_tag(&T::struct_tag(), resolver, module_storage)
+    let struct_tag = T::struct_tag();
+    let metadata = module_storage
+        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
         .map_err(|e| e.into_vm_status())?;
     let bytes = resolver
         .get_resource_bytes_with_metadata_and_layout(addr, &T::struct_tag(), &metadata, None)
