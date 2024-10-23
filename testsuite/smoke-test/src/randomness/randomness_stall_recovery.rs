@@ -24,7 +24,6 @@ async fn randomness_stall_recovery() {
     let epoch_duration_secs = 20;
     let num_validators = 4;
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(num_validators)
-        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
@@ -83,21 +82,21 @@ async fn randomness_stall_recovery() {
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
-    info!("Hot-fixing the VFNs.");
-    for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
-        info!("Stopping VFN {}.", idx);
-        vfn.stop();
-        let config_path = vfn.config_path();
-        let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
-        vfn_override_config
-            .override_config_mut()
-            .randomness_override_seq_num = 1;
-        info!("Updating VFN {} config.", idx);
-        vfn_override_config.save_config(config_path).unwrap();
-        info!("Restarting VFN {}.", idx);
-        vfn.start().unwrap();
-        tokio::time::sleep(Duration::from_secs(5)).await;
-    }
+    // info!("Hot-fixing the VFNs.");
+    // for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
+    //     info!("Stopping VFN {}.", idx);
+    //     vfn.stop();
+    //     let config_path = vfn.config_path();
+    //     let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
+    //     vfn_override_config
+    //         .override_config_mut()
+    //         .randomness_override_seq_num = 1;
+    //     info!("Updating VFN {} config.", idx);
+    //     vfn_override_config.save_config(config_path).unwrap();
+    //     info!("Restarting VFN {}.", idx);
+    //     vfn.start().unwrap();
+    //     tokio::time::sleep(Duration::from_secs(5)).await;
+    // }
 
     info!("Wait for nodes to start.");
     tokio::time::sleep(Duration::from_secs(10)).await;
