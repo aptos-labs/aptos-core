@@ -62,10 +62,14 @@ async fn randomness_stall_recovery() {
     info!("liveness_check_result={:?}", liveness_check_result);
     assert!(liveness_check_result.is_err());
 
+    info!("Stopping all nodes first.");
+    for node in swarm.fullnodes_mut().chain(swarm.validators_mut()) {
+        info!("Stopping node {}.", node.index());
+        node.stop();
+    }
+
     info!("Hot-fixing all validators.");
     for (idx, validator) in swarm.validators_mut().enumerate() {
-        info!("Stopping validator {}.", idx);
-        validator.stop();
         let config_path = validator.config_path();
         let mut validator_override_config =
             OverrideNodeConfig::load_config(config_path.clone()).unwrap();
@@ -85,8 +89,6 @@ async fn randomness_stall_recovery() {
 
     info!("Hot-fixing the VFNs.");
     for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
-        info!("Stopping VFN {}.", idx);
-        vfn.stop();
         let config_path = vfn.config_path();
         let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
         vfn_override_config
