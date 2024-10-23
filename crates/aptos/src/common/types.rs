@@ -1921,6 +1921,12 @@ pub struct MultisigAccount {
     pub(crate) multisig_address: AccountAddress,
 }
 
+impl MultisigAccount {
+    pub fn multisig_address(&self) -> AccountAddress {
+        self.multisig_address
+    }
+}
+
 #[derive(Clone, Debug, Parser, Serialize)]
 pub struct MultisigAccountWithSequenceNumber {
     #[clap(flatten)]
@@ -1928,6 +1934,16 @@ pub struct MultisigAccountWithSequenceNumber {
     /// Multisig account sequence number to interact with
     #[clap(long)]
     pub(crate) sequence_number: u64,
+}
+
+impl MultisigAccountWithSequenceNumber {
+    pub fn multisig_account(&self) -> &MultisigAccount {
+        &self.multisig_account
+    }
+
+    pub fn sequence_number(&self) -> u64 {
+        self.sequence_number
+    }
 }
 
 #[derive(Debug, Parser)]
