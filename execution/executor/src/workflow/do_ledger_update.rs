@@ -26,7 +26,7 @@ impl DoLedgerUpdate {
         state_checkpoint_output: &StateCheckpointOutput,
         parent_accumulator: Arc<InMemoryTransactionAccumulator>,
     ) -> Result<LedgerUpdateOutput> {
-        let _timer = OTHER_TIMERS.timer_with(&["assemble_ledger_diff_for_block"]);
+        let _timer = OTHER_TIMERS.timer_with(&["do_ledger_update"]);
 
         // Calculate hashes
         let to_commit = &execution_output.to_commit;
@@ -84,7 +84,7 @@ impl DoLedgerUpdate {
         event_hashes: Vec<HashValue>,
         writeset_hashes: Vec<HashValue>,
     ) -> Vec<TransactionInfo> {
-        let _timer = OTHER_TIMERS.timer_with(&["process_events_and_writeset_hashes"]);
+        let _timer = OTHER_TIMERS.timer_with(&["assemble_transaction_infos"]);
 
         izip!(
             to_commit.iter(),
