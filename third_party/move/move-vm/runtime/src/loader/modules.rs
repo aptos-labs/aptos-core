@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::StructNameCache;
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
@@ -10,6 +9,7 @@ use crate::{
         BinaryCache,
     },
     native_functions::NativeFunctions,
+    storage::struct_name_index_map::StructNameIndexMap,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -35,6 +35,7 @@ use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
+    ops::Deref,
     sync::Arc,
 };
 
@@ -49,7 +50,7 @@ pub trait ModuleStorage {
     fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
-pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
+pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Arc<Module>>>);
 
 impl ModuleCache {
     pub fn new() -> Self {
@@ -69,7 +70,12 @@ impl Clone for ModuleCache {
 
 impl ModuleStorage for ModuleCache {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
-        self.0.write().insert(module_id.clone(), binary).clone()
+        let mut cache = self.0.write();
+
+        if let Some(existing_binary) = cache.get(module_id) {
+            return existing_binary.clone();
+        }
+        cache.insert(module_id.clone(), Arc::new(binary)).clone()
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
@@ -109,17 +115,16 @@ impl ModuleStorageAdapter {
         natives: &NativeFunctions,
         id: ModuleId,
         module_size: usize,
-        module: Arc<CompiledModule>,
-        name_cache: &StructNameCache,
+        compiled_module: Arc<CompiledModule>,
+        struct_name_index_map: &StructNameIndexMap,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        match Module::new(natives, module_size, module, self, name_cache) {
-            Ok(module) => Ok(self.modules.store_module(&id, module)),
-            Err((err, _)) => Err(err.finish(Location::Undefined)),
-        }
+        let module = Module::new(natives, module_size, compiled_module, struct_name_index_map)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        Ok(self.modules.store_module(&id, module))
     }
 
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
@@ -281,9 +286,8 @@ impl Module {
         natives: &NativeFunctions,
         size: usize,
         module: Arc<CompiledModule>,
-        cache: &ModuleStorageAdapter,
-        name_cache: &StructNameCache,
-    ) -> Result<Self, (PartialVMError, Arc<CompiledModule>)> {
+        struct_name_index_map: &StructNameIndexMap,
+    ) -> PartialVMResult<Self> {
         let id = module.self_id();
 
         let mut structs = vec![];
@@ -311,17 +315,12 @@ impl Module {
                 let module_handle = module.module_handle_at(struct_handle.module);
                 let module_id = module.module_id_for_handle(module_handle);
 
-                if module_handle != module.self_handle() {
-                    cache
-                        .get_struct_type_by_identifier(struct_name, &module_id)?
-                        .check_compatibility(struct_handle)?;
-                }
-                let name = StructIdentifier {
+                let struct_name = StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
                 };
-                struct_idxs.push(name_cache.insert_or_get(name.clone()));
-                struct_names.push(name)
+                struct_idxs.push(struct_name_index_map.struct_name_to_idx(struct_name.clone())?);
+                struct_names.push(struct_name)
             }
 
             // Build signature table
@@ -561,7 +560,7 @@ impl Module {
                 struct_map,
                 single_signature_token_map,
             }),
-            Err(err) => Err((err, module)),
+            Err(err) => Err(err),
         }
     }
 
@@ -671,14 +670,6 @@ impl Module {
         self.struct_instantiations[idx as usize].field_count
     }
 
-    pub(crate) fn module(&self) -> &CompiledModule {
-        &self.module
-    }
-
-    pub(crate) fn arc_module(&self) -> Arc<CompiledModule> {
-        self.module.clone()
-    }
-
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         self.field_handles[idx.0 as usize].offset
     }
@@ -700,5 +691,13 @@ impl Module {
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
+    }
+}
+
+impl Deref for Module {
+    type Target = Arc<CompiledModule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.module
     }
 }

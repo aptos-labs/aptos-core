@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -53,6 +54,13 @@ impl ModuleBundle {
 
     pub fn into_inner(self) -> Vec<Vec<u8>> {
         self.codes.into_iter().map(Module::into_inner).collect()
+    }
+
+    pub fn into_bytes(self) -> Vec<Bytes> {
+        self.codes
+            .into_iter()
+            .map(|m| m.into_inner().into())
+            .collect()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Module> {

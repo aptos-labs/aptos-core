@@ -14,7 +14,10 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     AptosVM,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
+    storage::change_set_configs::ChangeSetConfigs,
+};
 use derive_more::{Deref, DerefMut};
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
@@ -51,6 +54,7 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
         resolver: &'r impl AptosMoveResolver,
         gas_feature_version: u64,
         change_set_configs: &ChangeSetConfigs,
+        module_storage: &impl AptosModuleStorage,
     ) -> Result<(SystemSessionChangeSet, UserSession<'r, 'l>), VMStatus> {
         let Self { session } = self;
 
@@ -63,8 +67,11 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
 
-            let (change_set, empty_module_write_set) =
-                session.finish_with_squashed_change_set(change_set_configs, false)?;
+            let (change_set, empty_module_write_set) = session.finish_with_squashed_change_set(
+                change_set_configs,
+                module_storage,
+                false,
+            )?;
             let prologue_session_change_set =
                 SystemSessionChangeSet::new(change_set.clone(), change_set_configs)?;
 

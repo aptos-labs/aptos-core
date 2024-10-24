@@ -41,7 +41,6 @@ hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
@@ -96,6 +95,7 @@ url = { workspace = true }
 
 [features]
 default = []
+testing = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing", "arbitrary"]
 
 [[bench]]
