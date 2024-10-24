@@ -9,6 +9,7 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
+    pipelined_block::PipelinedBlock,
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -24,6 +25,7 @@ pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
     ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
     CommitNotification(u64, Vec<BatchInfo>),
+    OrderedNotification(PipelinedBlock),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -97,6 +99,16 @@ impl ProofManager {
         self.update_remaining_txns_and_proofs();
     }
 
+    pub(crate) fn handle_ordered_notification(&mut self, block: PipelinedBlock) {
+        info!(
+            "handle_ordered_notification ({}, {}) {}",
+            block.epoch(),
+            block.round(),
+            block.id()
+        );
+        self.batch_proof_queue.handle_ordered(block);
+    }
+
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
             GetPayloadCommand::GetPayloadRequest(request) => {
@@ -136,7 +148,7 @@ impl ProofManager {
                                 &excluded_batches
                                     .iter()
                                     .cloned()
-                                    .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                    .chain(proof_block.iter().map(|proof| (request.block_round, proof.info().clone())))
                                     .collect(),
                                 &params.exclude_authors,
                                 max_opt_batch_txns_size,
@@ -170,7 +182,11 @@ impl ProofManager {
                                 &excluded_batches
                                     .iter()
                                     .cloned()
-                                    .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                    .chain(
+                                        proof_block.iter().map(|proof| {
+                                            (request.block_round, proof.info().clone())
+                                        }),
+                                    )
                                     .collect(),
                                 max_inline_txns_to_pull,
                                 request.max_txns_after_filtering,
@@ -292,6 +308,10 @@ impl ProofManager {
                                     batches,
                                 );
                             },
+                            ProofManagerCommand::OrderedNotification(block) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::ordered_notification"]).inc();
+                                self.handle_ordered_notification(block);
+                            }
                         }
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {

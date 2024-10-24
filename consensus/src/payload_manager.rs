@@ -44,6 +44,8 @@ pub trait TPayloadManager: Send + Sync {
     /// transactions in the block's payload are no longer required for consensus.
     fn notify_commit(&self, block_timestamp: u64, block: Option<PipelinedBlock>);
 
+    fn notify_ordered(&self, block: PipelinedBlock);
+
     /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
     /// available when block is executed.
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
@@ -72,6 +74,8 @@ impl DirectMempoolPayloadManager {
 #[async_trait]
 impl TPayloadManager for DirectMempoolPayloadManager {
     fn notify_commit(&self, _block_timestamp: u64, _block: Option<PipelinedBlock>) {}
+
+    fn notify_ordered(&self, _block: PipelinedBlock) {}
 
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
 
@@ -248,6 +252,16 @@ impl TPayloadManager for QuorumStorePayloadManager {
         )) {
             warn!(
                 "CommitNotification failed. Is the epoch shutting down? error: {}",
+                e
+            );
+        }
+    }
+
+    fn notify_ordered(&self, block: PipelinedBlock) {
+        let mut tx = self.coordinator_tx.clone();
+        if let Err(e) = tx.try_send(CoordinatorCommand::OrderedNotification(block)) {
+            warn!(
+                "BlockOrdered notification failed. Is the epoch shutting down? error: {}",
                 e
             );
         }
@@ -807,6 +821,10 @@ impl ConsensusObserverPayloadManager {
 #[async_trait]
 impl TPayloadManager for ConsensusObserverPayloadManager {
     fn notify_commit(&self, _block_timestamp: u64, _block: Option<PipelinedBlock>) {
+        // noop
+    }
+
+    fn notify_ordered(&self, _block: PipelinedBlock) {
         // noop
     }
 

@@ -39,6 +39,7 @@ async fn test_block_request_no_txns() {
             filter: PayloadFilter::DirectMempool(vec![]),
             callback: consensus_callback,
             block_timestamp: aptos_infallible::duration_since_epoch(),
+            block_round: 1,
             maybe_optqs_payload_pull_params: None,
         }))
         .unwrap();

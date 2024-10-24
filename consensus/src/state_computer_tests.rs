@@ -168,6 +168,7 @@ async fn should_see_and_notify_validator_txns() {
         &Handle::current(),
         TransactionFilter::new(Filter::empty()),
         true,
+        3000,
     );
 
     let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
