@@ -908,7 +908,6 @@ where
                         .as_ref()
                         .run_sharding_msg_loop(&versioned_cache, &scheduler);
                 });
-
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         &executor_initial_arguments,
@@ -933,9 +932,9 @@ where
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
-                    if num_active_workers.fetch_sub(1, Ordering::SeqCst) == 1 {
+                    //if num_active_workers.fetch_sub(1, Ordering::SeqCst) == 1 {
                         txn_provider.shutdown_receiver();
-                    }
+                    //}
                 });
             }
         });

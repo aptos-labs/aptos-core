@@ -381,6 +381,7 @@ where
     }
 
     fn shutdown_receiver(&self) {
+        info!("Shutting down receiver for shard {}", self.shard_idx);
         self.cross_shard_client
             .send(self.shard_idx, CrossShardMessage::Shutdown);
     }

@@ -14,6 +14,8 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use rand::{Rng, thread_rng};
+use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 
@@ -73,20 +75,27 @@ impl CrossShardClient for RemoteCrossShardClient {
 }
 
 pub struct RemoteCrossShardClientV3 {
+    num_sender_threads: usize,
     // The senders of cross-shard messages to other shards per round.
-    message_txs: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+    message_txs: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
     // The receivers of cross shard messages from other shards per round.
     message_rx: Arc<Receiver<Message>>,
 }
 
 impl RemoteCrossShardClientV3 {
     pub fn new(controller: &mut NetworkController, shard_addresses: &Vec<SocketAddr>) -> Self {
+        let num_sender_threads = 4;
         let mut message_txs = vec![];
         let self_addr = controller.get_self_addr();
         let outbound_rpc_runtime = controller.get_outbound_rpc_runtime();
         // Create outbound channels for each shard.
         for remote_address in shard_addresses.iter() {
-            message_txs.push(Mutex::new(OutboundRpcHelper::new(self_addr, *remote_address, outbound_rpc_runtime.clone())));
+            //message_txs.push(Mutex::new(OutboundRpcHelper::new(self_addr, *remote_address, outbound_rpc_runtime.clone())));
+            let mut shard_txs = vec![];
+            for _ in 0..num_sender_threads {
+                shard_txs.push(Mutex::new(OutboundRpcHelper::new(self_addr, *remote_address, outbound_rpc_runtime.clone())));
+            }
+            message_txs.push(shard_txs);
         }
 
         // Create inbound channels for each round
@@ -94,6 +103,7 @@ impl RemoteCrossShardClientV3 {
         let message_rx = controller.create_inbound_channel(cross_shard_msg_type);
 
         Self {
+            num_sender_threads,
             message_txs: Arc::new(message_txs),
             message_rx: Arc::new(message_rx),
         }
@@ -108,12 +118,22 @@ impl CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus> for RemoteCro
     ) {
         let msg = Message::new(bcs::to_bytes(&output).unwrap());
         let cross_shard_msg_type = "cross_shard_msg".to_string();
-        self.message_txs[shard_idx].lock().unwrap().send(msg, &MessageType::new(cross_shard_msg_type));
+        let random_idx = thread_rng().gen_range(0, self.num_sender_threads);
+        self.message_txs[shard_idx][random_idx].lock().unwrap().send(msg, &MessageType::new(cross_shard_msg_type));
     }
 
     fn recv(&self) -> CrossShardMessage<SignatureVerifiedTransaction, VMStatus> {
-        let message = self.message_rx.recv().unwrap();
-        let result: CrossShardMessage<SignatureVerifiedTransaction, VMStatus> = bcs::from_bytes(&message.to_bytes()).unwrap();
-        result
+        match self.message_rx.recv() {
+            Ok(message) => {
+                let result: CrossShardMessage<SignatureVerifiedTransaction, VMStatus> = bcs::from_bytes(&message.to_bytes()).unwrap();
+                result
+            },
+            Err(e) => {
+                info!("Cross shard message error (probably shutdown): {:?}", e);
+                // Handle the error appropriately, e.g., return a default value or propagate the error
+                // For this example, we will panic
+                CrossShardMessage::Shutdown
+            }
+        }
     }
 }
