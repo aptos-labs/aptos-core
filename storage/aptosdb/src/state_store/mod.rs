@@ -107,7 +107,7 @@ pub(crate) struct StateStore {
     buffered_state: Mutex<BufferedState>,
     buffered_state_target_items: usize,
     smt_ancestors: Mutex<SmtAncestors<StateValue>>,
-    internal_indexer_db: Option<InternalIndexerDB>,
+    pub internal_indexer_db: Option<InternalIndexerDB>,
 }
 
 impl Deref for StateStore {
