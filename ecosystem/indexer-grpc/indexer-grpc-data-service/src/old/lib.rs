@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod config;
-mod data_service;
 mod metrics;
 mod service;
 
