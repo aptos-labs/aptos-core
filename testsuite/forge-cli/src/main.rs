@@ -237,6 +237,8 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
+    println!("Args: {:?}", args);
+    process::exit(1);
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
