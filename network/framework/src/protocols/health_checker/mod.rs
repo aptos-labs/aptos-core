@@ -23,7 +23,6 @@ use crate::{
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
-    peer::{DisconnectReason, PingDisconnectContext},
     peer_manager::ConnectionNotification,
     protocols::{
         health_checker::interface::HealthCheckNetworkInterface,
@@ -49,7 +48,6 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::time::timeout;
 
 pub mod builder;
 mod interface;
@@ -354,10 +352,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 self.network_interface
                     .increment_peer_round_failure(peer_id, round);
 
-                // If the ping failures are now more than
-                // `self.ping_failures_tolerated`, we disconnect from the node.
-                // The HealthChecker only performs the disconnect. It relies on
-                // ConnectivityManager or the remote peer to re-establish the connection.
+                // The HealthChecker no longer disconnects from the node. That functionality has
+                // moved to the peer monitoring service
                 let failures = self
                     .network_interface
                     .get_peer_failures(peer_id)
