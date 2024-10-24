@@ -2534,7 +2534,7 @@ fn pfn_const_tps(
         .with_emit_job(EmitJobRequest::default()
                                         .mode(EmitJobMode::MaxLoad { mempool_backlog: 10240 })
                                         .coins_per_account_override(1_0000_0000_0000)
-                                        .num_accounts_mode(NumAccountsMode::NumAccounts(512)),
+                                        .num_accounts_mode(NumAccountsMode::NumAccounts(256)),
                     )
         .add_network_test(PFNPerformance::new(
             7,
