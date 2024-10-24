@@ -256,20 +256,27 @@ impl Parser {
         let is_block = append_state_checkpoint_to_block.is_some();
 
         // Parse all outputs.
-        let mut epoch_ending_flags = transaction_outputs
-            .iter()
-            .map(TransactionOutput::has_new_epoch_event)
-            .collect_vec();
+        let mut epoch_ending_flags = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__epoch_ending_flags"]);
+            transaction_outputs
+                .iter()
+                .map(TransactionOutput::has_new_epoch_event)
+                .collect_vec()
+        };
 
         // Isolate retries.
-        let (to_retry, has_reconfig) = Self::extract_retries(
-            &mut transactions,
-            &mut transaction_outputs,
-            &mut epoch_ending_flags,
-        );
+        let (to_retry, has_reconfig) = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__retries"]);
+            Self::extract_retries(
+                &mut transactions,
+                &mut transaction_outputs,
+                &mut epoch_ending_flags,
+            )
+        };
 
         // Collect all statuses.
         let statuses_for_input_txns = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__all_statuses"]);
             let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
             // Forcibly overwriting statuses for retries, since VM can output otherwise.
             let retries = iter::repeat(TransactionStatus::Retry).take(to_retry.len());
@@ -277,34 +284,46 @@ impl Parser {
         };
 
         // Isolate discards.
-        let to_discard = Self::extract_discards(
-            &mut transactions,
-            &mut transaction_outputs,
-            &mut epoch_ending_flags,
-        );
+        let to_discard = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__discards"]);
+            Self::extract_discards(
+                &mut transactions,
+                &mut transaction_outputs,
+                &mut epoch_ending_flags,
+            )
+        };
 
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
-        let to_commit =
-            TransactionsWithOutput::new(transactions, transaction_outputs, epoch_ending_flags);
-        let to_commit = Self::maybe_add_block_epilogue(
-            to_commit,
-            has_reconfig,
-            block_end_info.as_ref(),
-            append_state_checkpoint_to_block,
-        );
-        let next_epoch_state = has_reconfig
-            .then(|| Self::ensure_next_epoch_state(&to_commit))
-            .transpose()?;
-        let subscribable_events = to_commit
-            .transaction_outputs()
-            .iter()
-            .flat_map(|o| {
-                o.events()
-                    .iter()
-                    .filter(|e| should_forward_to_subscription_service(e))
-            })
-            .cloned()
-            .collect_vec();
+        let to_commit = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
+            let to_commit =
+                TransactionsWithOutput::new(transactions, transaction_outputs, epoch_ending_flags);
+            Self::maybe_add_block_epilogue(
+                to_commit,
+                has_reconfig,
+                block_end_info.as_ref(),
+                append_state_checkpoint_to_block,
+            )
+        };
+        let next_epoch_state = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__next_epoch_state"]);
+            has_reconfig
+                .then(|| Self::ensure_next_epoch_state(&to_commit))
+                .transpose()?
+        };
+        let subscribable_events = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__subscribable_events"]);
+            to_commit
+                .transaction_outputs()
+                .iter()
+                .flat_map(|o| {
+                    o.events()
+                        .iter()
+                        .filter(|e| should_forward_to_subscription_service(e))
+                })
+                .cloned()
+                .collect_vec()
+        };
 
         Ok(ExecutionOutput::new(
             is_block,
