@@ -6,6 +6,7 @@ module aptos_framework::randomness_config {
     use aptos_std::fixed_point64::FixedPoint64;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
+    friend aptos_framework::async_reconfig;
 
     friend aptos_framework::reconfiguration_with_dkg;
 

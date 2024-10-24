@@ -23,6 +23,7 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::genesis;
     friend aptos_framework::version;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     #[event]
     /// Event that signals consensus to start a new epoch,
