@@ -26,7 +26,10 @@ use crate::{
     utils::{
         iterators::PrefixedStateValueIterator,
         new_sharded_kv_schema_batch,
-        truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
+        truncation_helper::{
+            find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
+            truncate_state_kv_db, truncate_state_merkle_db,
+        },
         ShardedStateKvSchemaBatch,
     },
 };
@@ -297,6 +300,7 @@ impl StateStore {
             Self::sync_commit_progress(
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
+                Arc::clone(&state_merkle_db),
                 /*crash_if_difference_is_too_large=*/ true,
             );
         }
@@ -339,6 +343,7 @@ impl StateStore {
     pub fn sync_commit_progress(
         ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
+        state_merkle_db: Arc<StateMerkleDb>,
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
@@ -393,6 +398,36 @@ impl StateStore {
                 std::cmp::max(difference as usize, 1), /* batch_size */
             )
             .expect("Failed to truncate state K/V db.");
+
+            let state_merkle_max_version = get_max_version_in_state_merkle_db(&state_merkle_db)
+                .expect("Failed to get state merkle max version.")
+                .expect("State merkle max version cannot be None.");
+            if state_merkle_max_version > overall_commit_progress {
+                let difference = state_merkle_max_version - overall_commit_progress;
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
+
+                let state_merkle_target_version = find_tree_root_at_or_before(
+                    &ledger_db.metadata_db_arc(),
+                    &state_merkle_db,
+                    overall_commit_progress,
+                )?
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Could not find a valid root before or at version {}, maybe it was pruned?",
+                        overall_commit_progress
+                    )
+                });
+
+                info!(
+                    state_merkle_max_version = state_merkle_max_version,
+                    target_version = state_merkle_target_version,
+                    "Start state merkle truncation..."
+                );
+                truncate_state_merkle_db(&state_merkle_db, state_merkle_target_version)
+                    .expect("Failed to truncate state merkle db.");
+            }
         } else {
             info!("No overall commit progress was found!");
         }
@@ -448,7 +483,7 @@ impl StateStore {
 
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(Version::MAX)
+            .get_state_snapshot_version_before(u64::MAX)
             .expect("Failed to query latest node on initialization.");
 
         info!(
@@ -457,6 +492,10 @@ impl StateStore {
             "Initializing BufferedState."
         );
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
+            ensure!(
+                version < num_transactions,
+                "State merkle commit progress cannot go beyond overall commit progress."
+            );
             state_db
                 .state_merkle_db
                 .get_root_hash(version)
