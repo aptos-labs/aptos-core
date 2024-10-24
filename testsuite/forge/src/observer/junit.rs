@@ -30,6 +30,7 @@ impl TestObserver for JunitTestObserver {
     }
 
     fn handle_result(&self, test_name: String, result: &TestResult) -> Result<()> {
+        println!("JUNIT: {}: {:?}", test_name, result);
         self.results
             .lock()
             .unwrap()
@@ -60,6 +61,8 @@ impl TestObserver for JunitTestObserver {
         }
 
         report.add_test_suite(suite);
+
+        println!("Writing JUnit report to {}", self.path);
 
         let writer = std::fs::File::create(self.path.clone())?;
         report.serialize(writer)?;
