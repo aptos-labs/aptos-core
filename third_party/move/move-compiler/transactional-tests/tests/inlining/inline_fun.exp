@@ -1,0 +1,70 @@
+processed 1 task
+
+task 0 'publish'. lines 1-35:
+
+
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module 42.Test {
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+
+
+public test_filter(): vector<u64> /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: vector<u64>
+L3:	loc3: &mut vector<u64>
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[2](loc2: vector<u64>)
+	2: MutBorrowLoc[2](loc2: vector<u64>)
+	3: StLoc[3](loc3: &mut vector<u64>)
+	4: LdU64(0)
+	5: StLoc[1](loc1: u64)
+B1:
+	6: Nop
+	7: CopyLoc[1](loc1: u64)
+	8: CopyLoc[3](loc3: &mut vector<u64>)
+	9: FreezeRef
+	10: VecLen(3)
+	11: Lt
+	12: BrFalse(34)
+B2:
+	13: Branch(14)
+B3:
+	14: CopyLoc[3](loc3: &mut vector<u64>)
+	15: CopyLoc[1](loc1: u64)
+	16: StLoc[0](loc0: u64)
+	17: FreezeRef
+	18: MoveLoc[0](loc0: u64)
+	19: VecImmBorrow(3)
+	20: ReadRef
+	21: LdU64(1)
+	22: Gt
+	23: BrFalse(29)
+B4:
+	24: CopyLoc[3](loc3: &mut vector<u64>)
+	25: CopyLoc[1](loc1: u64)
+	26: Call vector::swap_remove<u64>(&mut vector<u64>, u64): u64
+	27: Pop
+	28: Branch(33)
+B5:
+	29: MoveLoc[1](loc1: u64)
+	30: LdU64(1)
+	31: Add
+	32: StLoc[1](loc1: u64)
+B6:
+	33: Branch(6)
+B7:
+	34: MoveLoc[3](loc3: &mut vector<u64>)
+	35: Pop
+	36: MoveLoc[2](loc2: vector<u64>)
+	37: Ret
+}
+}
+== END Bytecode ==
+}

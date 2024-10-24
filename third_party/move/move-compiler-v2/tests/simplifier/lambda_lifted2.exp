@@ -1,0 +1,44 @@
+// -- Model dump before bytecode pipeline
+module 0x42::example2 {
+    private entry fun foo(): u64 {
+        {
+          let a: u64 = 2;
+          {
+            let (z: u64): (u64) = Tuple(a: u64 = Add<u64>(a, 1);
+            Mul<u64>(3, a));
+            a: u64 = Add<u64>(a, 1);
+            Mul<u64>(z, a)
+          }
+        }
+    }
+    private entry fun foo1(): u64 {
+        {
+          let a: u64 = 2;
+          {
+            let z: u64 = a: u64 = Add<u64>(a, 1);
+            Mul<u64>(3, a);
+            a: u64 = Add<u64>(a, 1);
+            Mul<u64>(z, a)
+          }
+        }
+    }
+    private entry fun foo2(): u64 {
+        {
+          let a: u64 = 2;
+          {
+            let r: u64 = example2::lifted_lambda(Borrow(Mutable)(a), 3);
+            example2::lifted_lambda(Borrow(Mutable)(a), r)
+          }
+        }
+    }
+    private fun lifted_lambda(ap: &mut u64,z: u64): u64 {
+        ap = Add<u64>(Deref(ap), 1);
+        Mul<u64>(z, Deref(ap))
+    }
+    private inline fun twice(f: |u64|u64,x: u64): u64 {
+        (f)((f)(x))
+    }
+} // end 0x42::example2
+
+
+============ bytecode verification succeeded ========
