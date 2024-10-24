@@ -23,6 +23,7 @@ pub struct BlockPreparer {
     txn_filter: Arc<TransactionFilter>,
     txn_deduper: Arc<dyn TransactionDeduper>,
     txn_shuffler: Arc<dyn TransactionShuffler>,
+    max_block_txns: u64,
 }
 
 impl BlockPreparer {
@@ -31,12 +32,14 @@ impl BlockPreparer {
         txn_filter: Arc<TransactionFilter>,
         txn_deduper: Arc<dyn TransactionDeduper>,
         txn_shuffler: Arc<dyn TransactionShuffler>,
+        max_block_txns: u64,
     ) -> Self {
         Self {
             payload_manager,
             txn_filter,
             txn_deduper,
             txn_shuffler,
+            max_block_txns,
         }
     }
 
@@ -152,6 +155,7 @@ impl BlockPreparer {
         let txn_deduper = self.txn_deduper.clone();
         let block_id = block.id();
         let block_timestamp_usecs = block.timestamp_usecs();
+        let max_prepared_block_txns = self.max_block_txns as usize * 2;
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         let result = tokio::task::spawn_blocking(move || {
             // stable sort to ensure batches with same gas are in the same order
@@ -171,7 +175,11 @@ impl BlockPreparer {
             );
             let txns: Vec<_> = monitor!(
                 "flatten_transactions",
-                batched_txns.into_iter().flatten().collect()
+                batched_txns
+                    .into_iter()
+                    .flatten()
+                    .take(max_prepared_block_txns)
+                    .collect()
             );
             let filtered_txns = monitor!("filter_transactions", {
                 txn_filter.filter(block_id, block_timestamp_usecs, txns)

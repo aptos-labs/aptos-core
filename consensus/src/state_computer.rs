@@ -78,6 +78,7 @@ pub struct ExecutionProxy {
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
+    max_block_txns: u64,
 }
 
 impl ExecutionProxy {
@@ -88,6 +89,7 @@ impl ExecutionProxy {
         handle: &tokio::runtime::Handle,
         txn_filter: TransactionFilter,
         enable_pre_commit: bool,
+        max_block_txns: u64,
     ) -> Self {
         let pre_commit_notifier = Self::spawn_future_runner(
             handle,
@@ -109,6 +111,7 @@ impl ExecutionProxy {
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
             state: RwLock::new(None),
+            max_block_txns,
         }
     }
 
@@ -213,6 +216,7 @@ impl StateComputer for ExecutionProxy {
             self.transaction_filter.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
+            self.max_block_txns,
         );
 
         let block_executor_onchain_config = block_executor_onchain_config.clone();
@@ -568,6 +572,7 @@ async fn test_commit_sync_race() {
         &tokio::runtime::Handle::current(),
         TransactionFilter::new(Filter::empty()),
         true,
+        3000,
     );
 
     executor.new_epoch(
