@@ -7,7 +7,7 @@ use aptos_consensus_types::{
     common::Author, payload_pull_params::OptQSPayloadPullParams, round_timeout::RoundTimeoutReason,
 };
 use aptos_infallible::Mutex;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 pub trait TPastProposalStatusTracker: Send + Sync {
     fn push(&self, status: NewRoundReason);
@@ -133,7 +133,7 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
         let exclude_authors = tracker.get_exclude_authors();
         Some(OptQSPayloadPullParams {
             exclude_authors,
-            minimum_batch_age_usecs: 50_000_000,
+            minimum_batch_age_usecs: Duration::from_millis(10).as_micros() as u64,
         })
     }
 }
