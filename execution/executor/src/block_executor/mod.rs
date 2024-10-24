@@ -338,6 +338,7 @@ where
             };
 
         block.output.set_ledger_update_output(output);
+
         Ok(block.output.expect_complete_result())
     }
 
