@@ -244,6 +244,7 @@ members = [
     "third_party/move/tools/move-bytecode-viewer",
     "third_party/move/tools/move-cli",
     "third_party/move/tools/move-coverage",
+    "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-explain",
     "third_party/move/tools/move-package",
@@ -826,6 +827,7 @@ move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-compiler = { path = "third_party/move/move-compiler" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
+move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
