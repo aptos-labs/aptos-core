@@ -47,6 +47,14 @@ pub fn total_weight_upper_bound(
         .to_num::<usize>()
 }
 
+#[test]
+fn hihi() {
+    let n = U64F64::from_num(7);
+    let two = U64F64::from_num(3);
+    let x = n / two;
+    println!("x={x}");
+}
+
 #[derive(Clone, Debug)]
 pub struct DKGRounding {
     /// Currently either "binary_search" or "infallible".
@@ -280,6 +288,12 @@ impl DKGRoundingProfile {
             fast_secrecy_threshold_in_stake_ratio,
         )
     }
+}
+
+#[test]
+fn hihihi() {
+    let x = U64F64::from_bits(12174851088648304066);
+    println!("x={x}");
 }
 
 fn is_valid_profile(

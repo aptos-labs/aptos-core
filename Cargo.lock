@@ -1837,6 +1837,7 @@ dependencies = [
  "codespan-reporting",
  "curve25519-dalek-ng",
  "either",
+ "fixed",
  "flate2",
  "hex",
  "itertools 0.13.0",
