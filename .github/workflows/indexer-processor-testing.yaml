@@ -39,10 +39,22 @@ jobs:
       - name: Update Rust toolchain
         run: rustup update
 
+      - name: Prepare and Replace API Keys in Yaml
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            testnet_api_key:aptos-ci/TESTNET_INDEXER_API_KEY
+            mainnet_aptos_api_key:aptos-ci/MAINNET_INDEXER_API_KEY
+
       - name: Run CLI to Generate JSON Files
+        id: api_key_update
         run: |
           cd ecosystem/indexer-grpc/indexer-transaction-generator
-          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/new_json_transactions
+          echo "Updating API keys in YAML files..."
+          sed -i "s/TESTNET_API_KEY/${{ steps.api_key_update.testnet_api_key }}/g" tests/imported_transactions.yaml
+          sed -i "s/MAINNET_API_KEY/${{ steps.api_key_update.testnet_api_key }}/g" tests/imported_transactions.yaml
+
+          cargo run -- --testing-folder ./tests --output-folder ../indexer-test-transactions/new_json_transactions
 
       - name: Install jq
         run: sudo apt-get install jq  # Ensure jq is installed for JSON processing
