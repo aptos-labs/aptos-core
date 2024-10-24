@@ -163,15 +163,15 @@ impl ReceivedMessage {
                 None
             },
             NetworkMessage::DirectSendMsg(msg) => Some(msg.protocol_id),
-        }
-    }
-
-    pub fn protocol_id_as_str(&self) -> &'static str {
-        match &self.message {
-            NetworkMessage::Error(_) => "error",
-            NetworkMessage::RpcRequest(rr) => rr.protocol_id.as_str(),
-            NetworkMessage::RpcResponse(_) => "rpc response",
-            NetworkMessage::DirectSendMsg(dm) => dm.protocol_id.as_str(),
+            NetworkMessage::DirectSendWithMetadata(message_with_metadata) => {
+                Some(message_with_metadata.message_metadata.protocol_id)
+            },
+            NetworkMessage::RpcRequestWithMetadata(request_with_metadata) => {
+                Some(request_with_metadata.message_metadata.protocol_id)
+            },
+            NetworkMessage::RpcResponseWithMetadata(response_with_metadata) => {
+                Some(response_with_metadata.message_metadata.protocol_id)
+            },
         }
     }
 }

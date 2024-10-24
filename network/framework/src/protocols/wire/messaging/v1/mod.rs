@@ -25,6 +25,7 @@ use std::{
     io,
     pin::Pin,
     task::{Context, Poll},
+    time::SystemTime,
 };
 use thiserror::Error;
 use tokio_util::{
@@ -35,7 +36,7 @@ use tokio_util::{
 #[cfg(test)]
 mod test;
 
-/// Most primitive message type set on the network.
+/// Most primitive message type sent on the network.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum NetworkMessage {
@@ -43,6 +44,11 @@ pub enum NetworkMessage {
     RpcRequest(RpcRequest),
     RpcResponse(RpcResponse),
     DirectSendMsg(DirectSendMsg),
+
+    // New message types with additional metadata for improved monitoring and observability
+    DirectSendWithMetadata(DirectSendWithMetadata),
+    RpcRequestWithMetadata(RpcRequestWithMetadata),
+    RpcResponseWithMetadata(RpcResponseWithMetadata),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -60,6 +66,9 @@ impl NetworkMessage {
             NetworkMessage::RpcRequest(request) => request.raw_request.len(),
             NetworkMessage::RpcResponse(response) => response.raw_response.len(),
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
+            NetworkMessage::DirectSendWithMetadata(message) => message.serialized_message.len(),
+            NetworkMessage::RpcRequestWithMetadata(request) => request.serialized_request.len(),
+            NetworkMessage::RpcResponseWithMetadata(response) => response.serialized_response.len(),
         }
     }
 }
@@ -171,6 +180,51 @@ impl IncomingRequest for DirectSendMsg {
     fn data(&self) -> &Vec<u8> {
         &self.raw_msg
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct DirectSendWithMetadata {
+    #[serde(with = "serde_bytes")]
+    pub serialized_message: Vec<u8>, // The serialized (raw) direct send message
+    pub message_metadata: MessageMetadata, // Message metadata for the direct send
+    pub latency_metadata: LatencyMetadata, // Latency metadata for the direct send
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct RpcRequestWithMetadata {
+    pub request_id: RequestId, // The unique ID for the RPC request
+    #[serde(with = "serde_bytes")]
+    pub serialized_request: Vec<u8>, // The serialized (raw) RPC request
+    pub message_metadata: MessageMetadata, // Message metadata for the RPC request
+    pub latency_metadata: LatencyMetadata, // Latency metadata for the RPC request
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct RpcResponseWithMetadata {
+    pub request_id: RequestId, // The unique ID of the RPC request that this is a response to
+    #[serde(with = "serde_bytes")]
+    pub serialized_response: Vec<u8>, // The serialized (raw) RPC response
+    pub message_metadata: MessageMetadata, // Message metadata for the RPC response
+    pub latency_metadata: LatencyMetadata, // Latency metadata for the RPC response
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct MessageMetadata {
+    pub protocol_id: ProtocolId, // The application-level protocol ID for the message
+    pub priority: Priority,      // The priority of the message
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct LatencyMetadata {
+    pub application_send_time: Option<SystemTime>, // The time the application originally sent the message
+    pub network_send_time: Option<SystemTime>,     // The time the message was sent over the wire
+    pub network_receive_time: Option<SystemTime>, // The time the message was received over the wire
+    pub application_receive_time: Option<SystemTime>, // The time the application received the message
 }
 
 /// Errors from reading and deserializing network messages off the wire.

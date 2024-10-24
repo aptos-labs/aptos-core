@@ -142,6 +142,15 @@ impl InboundStream {
             NetworkMessage::RpcRequest(request) => request.raw_request.append(raw_data),
             NetworkMessage::RpcResponse(response) => response.raw_response.append(raw_data),
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.append(raw_data),
+            NetworkMessage::DirectSendWithMetadata(message_with_metadata) => {
+                message_with_metadata.serialized_message.append(raw_data)
+            },
+            NetworkMessage::RpcRequestWithMetadata(request_with_metadata) => {
+                request_with_metadata.serialized_request.append(raw_data)
+            },
+            NetworkMessage::RpcResponseWithMetadata(response_with_metadata) => {
+                response_with_metadata.serialized_response.append(raw_data)
+            },
         }
         Ok(self.current_fragment_id == self.num_fragments)
     }
@@ -206,6 +215,17 @@ impl OutboundStream {
             },
             NetworkMessage::DirectSendMsg(message) => {
                 message.raw_msg.split_off(self.max_frame_size)
+            },
+            NetworkMessage::DirectSendWithMetadata(message_with_metadata) => message_with_metadata
+                .serialized_message
+                .split_off(self.max_frame_size),
+            NetworkMessage::RpcRequestWithMetadata(request_with_metadata) => request_with_metadata
+                .serialized_request
+                .split_off(self.max_frame_size),
+            NetworkMessage::RpcResponseWithMetadata(response_with_metadata) => {
+                response_with_metadata
+                    .serialized_response
+                    .split_off(self.max_frame_size)
             },
         };
         let chunks = rest.chunks(self.max_frame_size);
