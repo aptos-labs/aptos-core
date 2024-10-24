@@ -15,10 +15,10 @@ use aptos_channels::aptos_channel;
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
-    channel::oneshot,
+    channel::{oneshot, oneshot::Sender},
     stream::{FusedStream, Stream, StreamExt},
     task::{Context, Poll},
 };
@@ -163,15 +163,15 @@ impl ReceivedMessage {
                 None
             },
             NetworkMessage::DirectSendMsg(msg) => Some(msg.protocol_id),
-        }
-    }
-
-    pub fn protocol_id_as_str(&self) -> &'static str {
-        match &self.message {
-            NetworkMessage::Error(_) => "error",
-            NetworkMessage::RpcRequest(rr) => rr.protocol_id.as_str(),
-            NetworkMessage::RpcResponse(_) => "rpc response",
-            NetworkMessage::DirectSendMsg(dm) => dm.protocol_id.as_str(),
+            NetworkMessage::DirectSendWithMetadata(message_with_metadata) => {
+                Some(message_with_metadata.message_metadata.protocol_id())
+            },
+            NetworkMessage::RpcRequestWithMetadata(request_with_metadata) => {
+                Some(request_with_metadata.message_metadata.protocol_id())
+            },
+            NetworkMessage::RpcResponseWithMetadata(response_with_metadata) => {
+                Some(response_with_metadata.message_metadata.protocol_id())
+            },
         }
     }
 }
@@ -214,6 +214,7 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
         // Determine the number of parallel deserialization tasks to use
         let max_parallel_deserialization_tasks = max_parallel_deserialization_tasks.unwrap_or(1);
 
+        // Transform the received message into an event
         let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
             tokio::task::spawn_blocking(move || received_message_to_event(notification))
         });
@@ -272,30 +273,102 @@ fn unix_micros() -> u64 {
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
 /// type, logging and dropping messages that fail to deserialize.
 fn received_message_to_event<TMessage: Message>(
-    message: ReceivedMessage,
+    received_message: ReceivedMessage,
 ) -> Option<Event<TMessage>> {
-    let peer_id = message.sender.peer_id();
+    // Unpack the received message
     let ReceivedMessage {
-        message,
+        message: network_message,
         sender: _sender,
         receive_timestamp_micros: rx_at,
         rpc_replier,
-    } = message;
+    } = received_message;
+
+    // Calculate the time it took to dequeue the message
     let dequeue_at = unix_micros();
     let dt_micros = dequeue_at - rx_at;
     let dt_seconds = (dt_micros as f64) / 1000000.0;
-    match message {
-        NetworkMessage::RpcRequest(rpc_req) => {
-            crate::counters::inbound_queue_delay_observe(rpc_req.protocol_id, dt_seconds);
-            let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
-            request_to_network_event(peer_id, &rpc_req)
-                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
+
+    // Transform the received message into an event
+    let peer_id = received_message.sender.peer_id();
+    match network_message {
+        NetworkMessage::RpcRequest(request) => {
+            // Update the inbound queue delay metric
+            let protocol_id = request.protocol_id;
+            crate::counters::inbound_queue_delay_observe(protocol_id, dt_seconds);
+
+            // Unpack the RPC replier
+            let rpc_replier = match unpack_rpc_replier(rpc_replier, peer_id, protocol_id) {
+                Some(replier) => replier,
+                None => return None,
+            };
+
+            // Transform the request into an event
+            request_to_network_event(peer_id, &request).map(|message| {
+                Event::RpcRequest(peer_id, message, request.protocol_id, rpc_replier)
+            })
+        },
+        NetworkMessage::RpcRequestWithMetadata(request_with_metadata) => {
+            // Update the inbound queue delay metric
+            let protocol_id = request_with_metadata.message_metadata.protocol_id();
+            crate::counters::inbound_queue_delay_observe(protocol_id, dt_seconds);
+
+            // Unpack the RPC replier
+            let rpc_replier = match unpack_rpc_replier(rpc_replier, peer_id, protocol_id) {
+                Some(replier) => replier,
+                None => return None,
+            };
+
+            // Transform the request into an event
+            request_to_network_event(peer_id, &request_with_metadata)
+                .map(|message| Event::RpcRequest(peer_id, message, protocol_id, rpc_replier))
         },
         NetworkMessage::DirectSendMsg(request) => {
+            // Update the inbound queue delay metric
             crate::counters::inbound_queue_delay_observe(request.protocol_id, dt_seconds);
+
+            // Transform the request into an event
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
         },
+        NetworkMessage::DirectSendWithMetadata(message_with_metadata) => {
+            // Update the inbound queue delay metric
+            let protocol_id = message_with_metadata.message_metadata.protocol_id();
+            crate::counters::inbound_queue_delay_observe(protocol_id, dt_seconds);
+
+            // Transform the request into an event
+            request_to_network_event(peer_id, &message_with_metadata)
+                .map(|msg| Event::Message(peer_id, msg))
+        },
         _ => None,
+    }
+}
+
+/// Unpacks an expected RPC replier, logging an error
+/// and returning `None` if the replier is missing.
+fn unpack_rpc_replier(
+    rpc_replier: Option<Arc<Sender<Result<Bytes, RpcError>>>>,
+    peer_id: AccountAddress,
+    protocol_id: ProtocolId,
+) -> Option<Sender<Result<Bytes, RpcError>>> {
+    match rpc_replier {
+        Some(replier) => match Arc::into_inner(replier) {
+            Some(replier) => Some(replier),
+            None => {
+                warn!(
+                    remote_peer_id = peer_id.short_str(),
+                    protocol_id = protocol_id,
+                    "Failed to unwrap the RPC replier"
+                );
+                None
+            },
+        },
+        None => {
+            warn!(
+                remote_peer_id = peer_id.short_str(),
+                protocol_id = protocol_id,
+                "Received an RPC request without a replier"
+            );
+            None
+        },
     }
 }
 

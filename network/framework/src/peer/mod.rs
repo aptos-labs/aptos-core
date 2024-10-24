@@ -18,7 +18,8 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL, UNKNOWN_LABEL,
+        DECLINED_LABEL, FAILED_LABEL, INBOUND_LABEL, RECEIVED_LABEL, REQUEST_LABEL, SENT_LABEL,
+        UNKNOWN_LABEL,
     },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
@@ -28,8 +29,9 @@ use crate::{
         rpc::{error::RpcError, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
-            DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
-            MultiplexMessageStream, NetworkMessage, Priority, ReadError, WriteError,
+            message_with_metadata::RpcResponseWithMetadata, DirectSendMsg, ErrorCode,
+            MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream, NetworkMessage,
+            Priority, ReadError, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
@@ -439,50 +441,24 @@ where
 
     fn handle_inbound_network_message(
         &mut self,
-        message: NetworkMessage,
+        network_message: NetworkMessage,
     ) -> Result<(), PeerManagerError> {
-        match &message {
-            NetworkMessage::DirectSendMsg(direct) => {
-                let data_len = direct.raw_msg.len();
-                network_application_inbound_traffic(
-                    self.network_context,
-                    direct.protocol_id,
-                    data_len as u64,
-                );
-                match self.upstream_handlers.get(&direct.protocol_id) {
-                    None => {
-                        counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
-                            .inc_by(data_len as u64);
-                    },
-                    Some(handler) => {
-                        let key = (self.connection_metadata.remote_peer_id, direct.protocol_id);
-                        let sender = self.connection_metadata.remote_peer_id;
-                        let network_id = self.network_context.network_id();
-                        let sender = PeerNetworkId::new(network_id, sender);
-                        match handler.push(key, ReceivedMessage::new(message, sender)) {
-                            Err(_err) => {
-                                // NOTE: aptos_channel never returns other than Ok(()), but we might switch to tokio::sync::mpsc and then this would work
-                                counters::direct_send_messages(
-                                    &self.network_context,
-                                    DECLINED_LABEL,
-                                )
-                                .inc();
-                                counters::direct_send_bytes(&self.network_context, DECLINED_LABEL)
-                                    .inc_by(data_len as u64);
-                            },
-                            Ok(_) => {
-                                counters::direct_send_messages(
-                                    &self.network_context,
-                                    RECEIVED_LABEL,
-                                )
-                                .inc();
-                                counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL)
-                                    .inc_by(data_len as u64);
-                            },
-                        }
-                    },
-                }
+        match &network_message {
+            NetworkMessage::DirectSendMsg(message) => {
+                // Extract the message length and protocol
+                let message_length = message.raw_msg.len() as u64;
+                let protocol_id = message.protocol_id;
+
+                // Forward the direct send message to the appropriate message handler
+                self.forward_direct_send_to_handler(network_message, message_length, protocol_id);
+            },
+            NetworkMessage::DirectSendWithMetadata(message_with_metadata) => {
+                // Extract the message length and protocol
+                let message_length = message_with_metadata.serialized_message.len() as u64;
+                let protocol_id = message_with_metadata.message_metadata.protocol_id();
+
+                // Forward the direct send message to the appropriate message handler
+                self.forward_direct_send_to_handler(network_message, message_length, protocol_id);
             },
             NetworkMessage::Error(error_msg) => {
                 warn!(
@@ -496,41 +472,140 @@ where
                 );
             },
             NetworkMessage::RpcRequest(request) => {
-                match self.upstream_handlers.get(&request.protocol_id) {
-                    None => {
-                        counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
-                            .inc_by(request.raw_request.len() as u64);
-                    },
-                    Some(handler) => {
-                        let sender = self.connection_metadata.remote_peer_id;
-                        let network_id = self.network_context.network_id();
-                        let sender = PeerNetworkId::new(network_id, sender);
-                        if let Err(err) = self
-                            .inbound_rpcs
-                            .handle_inbound_request(handler, ReceivedMessage::new(message, sender))
-                        {
-                            warn!(
-                                NetworkSchema::new(&self.network_context)
-                                    .connection_metadata(&self.connection_metadata),
-                                error = %err,
-                                "{} Error handling inbound rpc request: {}",
-                                self.network_context,
-                                err
-                            );
-                        }
-                    },
-                }
+                // Extract the message length and protocol
+                let message_length = request.raw_request.len() as u64;
+                let protocol_id = request.protocol_id;
+
+                // Handle the inbound RPC request
+                self.handle_inbound_rpc_request(network_message, message_length, &protocol_id);
+            },
+            NetworkMessage::RpcRequestWithMetadata(request_with_metadata) => {
+                // Extract the message length and protocol
+                let message_length = request_with_metadata.serialized_request.len() as u64;
+                let protocol_id = request_with_metadata.message_metadata.protocol_id();
+
+                // Handle the inbound RPC request
+                self.handle_inbound_rpc_request(network_message, message_length, &protocol_id);
             },
             NetworkMessage::RpcResponse(_) => {
-                // non-reference cast identical to this match case
-                let NetworkMessage::RpcResponse(response) = message else {
+                // TODO: see if we can avoid the non-reference cast to this match case
+                let NetworkMessage::RpcResponse(response) = network_message else {
                     unreachable!("NetworkMessage type changed between match and let")
                 };
-                self.outbound_rpcs.handle_inbound_response(response)
+                let rpc_response_with_metadata =
+                    RpcResponseWithMetadata::new_from_legacy_response(response);
+                self.outbound_rpcs
+                    .handle_inbound_response(rpc_response_with_metadata)
+            },
+            NetworkMessage::RpcResponseWithMetadata(_) => {
+                // TODO: see if we can avoid the non-reference cast to this match case
+                let NetworkMessage::RpcResponseWithMetadata(response_with_metadata) =
+                    network_message
+                else {
+                    unreachable!("NetworkMessage type changed between match and let")
+                };
+                self.outbound_rpcs
+                    .handle_inbound_response(response_with_metadata)
             },
         };
         Ok(())
+    }
+
+    /// Forwards the given direct send network message to the appropriate message handler
+    fn forward_direct_send_to_handler(
+        &mut self,
+        network_message: NetworkMessage,
+        message_length: u64,
+        protocol_id: ProtocolId,
+    ) {
+        // Create a new received message
+        let network_context = self.network_context;
+        let remote_peer_id = self.connection_metadata.remote_peer_id;
+        let remote_peer = PeerNetworkId::new(network_context.network_id(), remote_peer_id);
+        let received_message = ReceivedMessage::new(network_message, remote_peer);
+
+        // Update the inbound traffic metrics
+        network_application_inbound_traffic(self.network_context, protocol_id, message_length);
+
+        // Get the upstream message handler
+        let message_handler = match self.upstream_handlers.get(&protocol_id) {
+            Some(message_handler) => message_handler,
+            None => {
+                // Update the metrics for the unknown direct send message
+                counters::direct_send_messages(&network_context, UNKNOWN_LABEL).inc();
+                counters::direct_send_bytes(&network_context, UNKNOWN_LABEL).inc_by(message_length);
+                return;
+            },
+        };
+
+        // Send the received message to the message handler
+        let message_key = (remote_peer_id, protocol_id);
+        match message_handler.push(message_key, received_message) {
+            Err(_err) => {
+                // NOTE: aptos_channel never returns other than Ok(()), but we
+                // might switch to tokio::sync::mpsc and then this would work.
+                counters::direct_send_messages(&network_context, DECLINED_LABEL).inc();
+                counters::direct_send_bytes(&network_context, DECLINED_LABEL)
+                    .inc_by(message_length);
+            },
+            Ok(_) => {
+                counters::direct_send_messages(&network_context, RECEIVED_LABEL).inc();
+                counters::direct_send_bytes(&network_context, RECEIVED_LABEL)
+                    .inc_by(message_length);
+            },
+        }
+    }
+
+    /// Handles the inbound RPC request by forwarding it to the appropriate message handler
+    fn handle_inbound_rpc_request(
+        &mut self,
+        network_message: NetworkMessage,
+        message_length: u64,
+        protocol_id: &ProtocolId,
+    ) {
+        // Create a new received message
+        let network_context = self.network_context;
+        let remote_peer_id = self.connection_metadata.remote_peer_id;
+        let remote_peer = PeerNetworkId::new(network_context.network_id(), remote_peer_id);
+        let received_message = ReceivedMessage::new(network_message, remote_peer);
+
+        // Get the upstream message handler
+        let message_handler = match self.upstream_handlers.get(protocol_id) {
+            Some(message_handler) => message_handler,
+            None => {
+                // Update the metrics for the unknown RPC message
+                counters::rpc_messages(
+                    &network_context,
+                    REQUEST_LABEL,
+                    INBOUND_LABEL,
+                    UNKNOWN_LABEL,
+                )
+                .inc();
+                counters::rpc_bytes(
+                    &network_context,
+                    REQUEST_LABEL,
+                    INBOUND_LABEL,
+                    UNKNOWN_LABEL,
+                )
+                .inc_by(message_length);
+                return;
+            },
+        };
+
+        // Handle the inbound RPC request
+        if let Err(err) = self
+            .inbound_rpcs
+            .handle_inbound_request(message_handler, received_message)
+        {
+            warn!(
+                NetworkSchema::new(&network_context)
+                    .connection_metadata(&self.connection_metadata),
+                error = %err,
+                "{} Error handling inbound rpc request: {}",
+                network_context,
+                err
+            );
+        }
     }
 
     fn handle_inbound_stream_message(

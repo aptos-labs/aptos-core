@@ -28,6 +28,9 @@ pub enum RpcError {
     #[error("Received invalid rpc response message")]
     InvalidRpcResponse,
 
+    #[error("Received invalid rpc request message")]
+    InvalidRpcRequest,
+
     #[error("Application layer unexpectedly dropped response channel")]
     UnexpectedResponseChannelCancel,
 

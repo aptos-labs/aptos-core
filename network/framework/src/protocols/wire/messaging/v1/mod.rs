@@ -17,6 +17,9 @@ use futures::{
     sink::Sink,
     stream::Stream,
 };
+use message_with_metadata::{
+    DirectSendWithMetadata, RpcRequestWithMetadata, RpcResponseWithMetadata,
+};
 use pin_project::pin_project;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -32,10 +35,12 @@ use tokio_util::{
     compat::{Compat, FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt},
 };
 
+pub mod message_with_metadata;
+mod metrics;
 #[cfg(test)]
 mod test;
 
-/// Most primitive message type set on the network.
+/// Most primitive message type sent on the network.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum NetworkMessage {
@@ -43,6 +48,11 @@ pub enum NetworkMessage {
     RpcRequest(RpcRequest),
     RpcResponse(RpcResponse),
     DirectSendMsg(DirectSendMsg),
+
+    // New message types with additional metadata for improved monitoring and observability
+    DirectSendWithMetadata(DirectSendWithMetadata),
+    RpcRequestWithMetadata(RpcRequestWithMetadata),
+    RpcResponseWithMetadata(RpcResponseWithMetadata),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -60,6 +70,9 @@ impl NetworkMessage {
             NetworkMessage::RpcRequest(request) => request.raw_request.len(),
             NetworkMessage::RpcResponse(response) => response.raw_response.len(),
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
+            NetworkMessage::DirectSendWithMetadata(message) => message.serialized_message.len(),
+            NetworkMessage::RpcRequestWithMetadata(request) => request.serialized_request.len(),
+            NetworkMessage::RpcResponseWithMetadata(response) => response.serialized_response.len(),
         }
     }
 }
