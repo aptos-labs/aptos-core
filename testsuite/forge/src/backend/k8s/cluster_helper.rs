@@ -511,6 +511,13 @@ fn get_default_helm_release_values_from_cluster(
         "yaml",
     ];
     info!("{:?}", status_args);
+    let cluster_name = get_gke_cluster_name().unwrap_or_else(|_| "unknown-cluster".to_string());
+
+    info!(
+        "Retrieving Helm release values for release: '{}' in GKE cluster: '{}'",
+        helm_release_name, cluster_name
+    );
+
     let raw_helm_values = Command::new(HELM_BIN)
         .args(status_args)
         .output()
@@ -529,6 +536,23 @@ fn get_default_helm_release_values_from_cluster(
         .get("config")
         .ok_or_else(|| anyhow!("Failed to get helm values"))?;
     Ok(config.clone())
+}
+
+fn get_gke_cluster_name() -> Result<String, Box<dyn std::error::Error>> {
+    let metadata_url =
+        "http://metadata.google.internal/computeMetadata/v1/instance/attributes/cluster-name";
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(metadata_url)
+        .header("Metadata-Flavor", "Google")
+        .send()?;
+
+    if response.status().is_success() {
+        let cluster_name = response.text()?;
+        Ok(cluster_name)
+    } else {
+        Err(format!("Failed to fetch cluster name: {}", response.status()).into())
+    }
 }
 
 /// Merges two YAML values in place, with `b` taking precedence over `a`
@@ -1262,6 +1286,60 @@ labels:
             "foo".to_string(),
             time_since_the_epoch
         ));
+    }
+
+    #[test]
+    fn test_merge_yaml_values2() {
+        let base = r#"
+          validator:
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: cloud.google.com/machine-family
+                      operator: In
+                      values:
+                      - t2d
+      "#;
+
+        let overlay = r#"
+          validator:
+            config:
+              storage:
+                rocksdb_configs:
+                  enable_storage_sharding: true
+              indexer_db_config:
+                enable_event: true
+        "#;
+
+        let expected = r#"
+          validator:
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: cloud.google.com/machine-family
+                      operator: In
+                      values:
+                      - t2d
+            config:
+              storage:
+                rocksdb_configs:
+                  enable_storage_sharding: true
+              indexer_db_config:
+                enable_event: true
+        "#;
+
+        let mut base: serde_yaml::Value = serde_yaml::from_str(base).unwrap();
+        let overlay: serde_yaml::Value = serde_yaml::from_str(overlay).unwrap();
+        let expected: serde_yaml::Value = serde_yaml::from_str(expected).unwrap();
+
+        println!("base: {:?}", base);
+        merge_yaml(&mut base, overlay);
+        println!("base: {:?}", base);
+        assert_eq!(expected, base);
     }
 
     #[test]
