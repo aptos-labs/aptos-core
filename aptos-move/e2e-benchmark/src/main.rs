@@ -139,8 +139,8 @@ fn main() {
         (26, EntryPoints::ResourceGroupsSenderMultiChange {
             string_length: 1024,
         }),
-        (350, EntryPoints::TokenV1MintAndTransferFT),
-        (536, EntryPoints::TokenV1MintAndTransferNFTSequential),
+        (281, EntryPoints::TokenV1MintAndTransferFT),
+        (474, EntryPoints::TokenV1MintAndTransferNFTSequential),
         (401, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
         (467, EntryPoints::LiquidityPoolSwap { is_stable: true }),
         (415, EntryPoints::LiquidityPoolSwap { is_stable: false }),

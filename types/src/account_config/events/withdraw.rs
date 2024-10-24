@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
+};
 use serde::{Deserialize, Serialize};
-use move_core_types::account_address::AccountAddress;
 
 /// Struct that represents a SentPaymentEvent.
 #[derive(Debug, Serialize, Deserialize)]

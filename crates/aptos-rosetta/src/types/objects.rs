@@ -31,7 +31,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{
         fungible_store::FungibleStoreResource, AccountResource, CoinStoreResourceUntyped,
-        WithdrawEvent,
+        CoinWithdraw, WithdrawEvent,
     },
     contract_event::{ContractEvent, ContractEventV2, FEE_STATEMENT_EVENT_TYPE},
     event::EventKey,
@@ -57,7 +57,6 @@ use std::{
     hash::Hash,
     str::FromStr,
 };
-use aptos_types::account_config::CoinWithdraw;
 
 static WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
     Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
@@ -2028,7 +2027,12 @@ fn parse_coinstore_changes(
 
     // Skip if there is no currency that can be found
     let mut withdraw_amounts = get_amount_from_event(events, coin_store.withdraw_events().key());
-    withdraw_amounts.append(&mut get_amount_from_event_v2(events, &COIN_WITHDRAW_TYPE_TAG, address, &coin_type));
+    withdraw_amounts.append(&mut get_amount_from_event_v2(
+        events,
+        &COIN_WITHDRAW_TYPE_TAG,
+        address,
+        &coin_type,
+    ));
     for amount in withdraw_amounts {
         operations.push(Operation::withdraw(
             operation_index,
@@ -2041,7 +2045,12 @@ fn parse_coinstore_changes(
     }
 
     let mut deposit_amounts = get_amount_from_event(events, coin_store.deposit_events().key());
-    deposit_amounts.append(&mut get_amount_from_event_v2(events, &COIN_DEPOSIT_TYPE_TAG, address, &coin_type));
+    deposit_amounts.append(&mut get_amount_from_event_v2(
+        events,
+        &COIN_DEPOSIT_TYPE_TAG,
+        address,
+        &coin_type,
+    ));
     for amount in deposit_amounts {
         operations.push(Operation::deposit(
             operation_index,
@@ -2158,7 +2167,12 @@ fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Vec<
     })
 }
 
-fn get_amount_from_event_v2(events: &[ContractEvent], type_tag: &TypeTag, account_address: AccountAddress, coin_type: &String) -> Vec<u64> {
+fn get_amount_from_event_v2(
+    events: &[ContractEvent],
+    type_tag: &TypeTag,
+    account_address: AccountAddress,
+    coin_type: &String,
+) -> Vec<u64> {
     filter_v2_events(type_tag, events, |event| {
         if let Ok(event) = bcs::from_bytes::<CoinWithdraw>(event.event_data()) {
             if event.account == account_address && &event.coin_type == coin_type {
