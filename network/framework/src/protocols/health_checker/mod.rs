@@ -23,7 +23,6 @@ use crate::{
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
-    peer::{DisconnectReason, PingDisconnectContext},
     peer_manager::ConnectionNotification,
     protocols::{
         health_checker::interface::HealthCheckNetworkInterface,
@@ -49,7 +48,6 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::time::timeout;
 
 pub mod builder;
 mod interface;
