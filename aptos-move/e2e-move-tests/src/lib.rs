@@ -7,7 +7,6 @@ pub mod aptos_governance;
 pub mod harness;
 pub mod resource_groups;
 pub mod stake;
-pub mod transaction_fee;
 
 use anyhow::bail;
 use aptos_framework::{BuildOptions, BuiltPackage, UPGRADE_POLICY_CUSTOM_FIELD};

@@ -157,10 +157,8 @@ spec aptos_framework::genesis {
         requires chain_status::is_operating();
         requires len(execution_config) > 0;
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
         include CompareTimeRequires;
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
     }
 
     spec schema CompareTimeRequires {
