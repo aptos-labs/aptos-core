@@ -599,13 +599,15 @@ impl StateMerkleDb {
             lru_cache,
         };
 
-        if let Some(overall_state_merkle_commit_progress) =
-            get_state_merkle_commit_progress(&state_merkle_db)?
-        {
-            truncate_state_merkle_db_shards(
-                &state_merkle_db,
-                overall_state_merkle_commit_progress,
-            )?;
+        if !readonly {
+            if let Some(overall_state_merkle_commit_progress) =
+                get_state_merkle_commit_progress(&state_merkle_db)?
+            {
+                truncate_state_merkle_db_shards(
+                    &state_merkle_db,
+                    overall_state_merkle_commit_progress,
+                )?;
+            }
         }
 
         Ok(state_merkle_db)
