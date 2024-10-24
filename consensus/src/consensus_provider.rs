@@ -187,14 +187,14 @@ pub fn start_consensus_observer(
     };
 
     // Create the consensus observer
-    let (sync_notification_sender, sync_notification_listener) =
+    let (state_sync_notification_sender, state_sync_notification_listener) =
         tokio::sync::mpsc::unbounded_channel();
     let consensus_observer = ConsensusObserver::new(
         node_config.clone(),
         consensus_observer_client,
         aptos_db.reader.clone(),
         execution_client,
-        sync_notification_sender,
+        state_sync_notification_sender,
         reconfig_events,
         consensus_publisher,
         TimeService::real(),
@@ -204,6 +204,6 @@ pub fn start_consensus_observer(
     consensus_observer_runtime.spawn(consensus_observer.start(
         node_config.consensus_observer,
         consensus_observer_message_receiver,
-        sync_notification_listener,
+        state_sync_notification_listener,
     ));
 }

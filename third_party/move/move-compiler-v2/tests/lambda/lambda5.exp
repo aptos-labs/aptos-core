@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Functions may not return function-typed values, but function `M::macro_result_lambda_not_allowed` return type is the function type `|u64|`:
+   ┌─ tests/lambda/lambda5.move:86:58
+   │
+86 │     public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                                                          ^^^^^

@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    asset_uploader::{config::AssetUploaderConfig, AssetUploaderContext},
+    asset_uploader::{
+        api::AssetUploaderApiContext,
+        throttler::{config::AssetUploaderThrottlerConfig, AssetUploaderThrottlerContext},
+        worker::{config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext},
+    },
     parser::{config::ParserConfig, ParserContext},
     utils::database::{establish_connection_pool, run_migrations},
 };
@@ -27,7 +31,9 @@ pub trait Server: Send + Sync {
 #[serde(tag = "type")]
 pub enum ServerConfig {
     Parser(ParserConfig),
-    AssetUploader(AssetUploaderConfig),
+    AssetUploaderWorker(AssetUploaderWorkerConfig),
+    AssetUploaderApi,
+    AssetUploaderThrottler(AssetUploaderThrottlerConfig),
 }
 
 /// Structs to hold config from YAML
@@ -43,7 +49,9 @@ pub struct NFTMetadataCrawlerConfig {
 #[enum_dispatch(Server)]
 pub enum ServerContext {
     Parser(ParserContext),
-    AssetUploader(AssetUploaderContext),
+    AssetUploaderWorker(AssetUploaderWorkerContext),
+    AssetUploaderApi(AssetUploaderApiContext),
+    AssetUploaderThrottler(AssetUploaderThrottlerContext),
 }
 
 impl ServerConfig {
@@ -55,9 +63,20 @@ impl ServerConfig {
             ServerConfig::Parser(parser_config) => {
                 ServerContext::Parser(ParserContext::new(parser_config.clone(), pool).await)
             },
-            ServerConfig::AssetUploader(asset_uploader_config) => ServerContext::AssetUploader(
-                AssetUploaderContext::new(asset_uploader_config.clone(), pool),
-            ),
+            ServerConfig::AssetUploaderWorker(asset_uploader_worker_config) => {
+                ServerContext::AssetUploaderWorker(AssetUploaderWorkerContext::new(
+                    asset_uploader_worker_config.clone(),
+                ))
+            },
+            ServerConfig::AssetUploaderApi => {
+                ServerContext::AssetUploaderApi(AssetUploaderApiContext::new(pool))
+            },
+            ServerConfig::AssetUploaderThrottler(asset_uploader_throttler_config) => {
+                ServerContext::AssetUploaderThrottler(AssetUploaderThrottlerContext::new(
+                    asset_uploader_throttler_config.clone(),
+                    pool,
+                ))
+            },
         }
     }
 }
@@ -85,9 +104,12 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
     }
 
     fn get_server_name(&self) -> String {
-        match &self.server_config {
-            ServerConfig::Parser(_) => "parser".to_string(),
-            ServerConfig::AssetUploader(_) => "asset_uploader".to_string(),
+        match self.server_config {
+            ServerConfig::Parser(_) => "parser",
+            ServerConfig::AssetUploaderWorker(_) => "asset_uploader_worker",
+            ServerConfig::AssetUploaderApi => "asset_uploader_api",
+            ServerConfig::AssetUploaderThrottler(_) => "asset_uploader_throttler",
         }
+        .to_string()
     }
 }

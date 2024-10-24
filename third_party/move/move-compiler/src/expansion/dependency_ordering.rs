@@ -435,8 +435,8 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
 
         E::Unit { .. }
         | E::UnresolvedError
-        | E::Break
-        | E::Continue
+        | E::Break(_)
+        | E::Continue(_)
         | E::Spec(_, _, _)
         | E::Value(_)
         | E::Move(_)
@@ -478,7 +478,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             }
         },
 
-        E::BinopExp(e1, _, e2) | E::Mutate(e1, e2) | E::While(e1, e2) | E::Index(e1, e2) => {
+        E::BinopExp(e1, _, e2) | E::Mutate(e1, e2) | E::While(_, e1, e2) | E::Index(e1, e2) => {
             exp(context, e1);
             exp(context, e2)
         },
@@ -492,7 +492,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             exp(context, e);
         },
 
-        E::Loop(e)
+        E::Loop(_, e)
         | E::Return(e)
         | E::Abort(e)
         | E::Dereference(e)

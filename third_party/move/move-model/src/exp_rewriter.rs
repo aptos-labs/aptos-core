@@ -518,10 +518,10 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            LoopCont(id, do_cont) => {
+            LoopCont(id, nest, do_cont) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 if id_changed {
-                    LoopCont(new_id, *do_cont).into_exp()
+                    LoopCont(new_id, *nest, *do_cont).into_exp()
                 } else {
                     exp
                 }
@@ -729,8 +729,6 @@ pub trait ExpRewriterFunctions {
     }
 
     fn internal_rewrite_vec(&mut self, exps: &[Exp]) -> Option<Vec<Exp>> {
-        // The vector rewrite works a bit different as we try to avoid constructing
-        // new vectors if nothing changed, and optimize common cases of 0-3 arguments.
         let (changevec, resvec): (Vec<_>, Vec<_>) = exps
             .iter()
             .map(|exp| self.internal_rewrite_exp(exp))

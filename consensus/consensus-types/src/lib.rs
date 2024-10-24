@@ -13,6 +13,7 @@ pub mod order_vote;
 pub mod order_vote_msg;
 pub mod order_vote_proposal;
 pub mod payload;
+pub mod payload_pull_params;
 pub mod pipeline;
 pub mod pipeline_execution_result;
 pub mod pipelined_block;

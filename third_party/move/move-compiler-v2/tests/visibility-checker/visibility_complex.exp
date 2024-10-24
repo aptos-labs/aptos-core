@@ -23,3 +23,29 @@ module 0x42::D {
         Tuple()
     }
 } // end 0x42::D
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::B {
+    friend 0x42::C;
+    friend 0x42::D;
+    friend fun foo() {
+    }
+}
+module 0x42::A {
+    friend 0x42::C;
+    friend fun foo() {
+    }
+}
+module 0x42::C {
+    friend 0x42::D;
+    friend fun foo() {
+        0x42::A::foo();
+        0x42::B::foo();
+    }
+}
+module 0x42::D {
+    friend fun bar() {
+        0x42::B::foo();
+        0x42::C::foo();
+    }
+}

@@ -7,7 +7,9 @@ use anyhow::Context;
 use aptos_crypto::{bls12381, CryptoMaterialError};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
-    block_info::BlockInfo, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, SignatureWithStatus},
+    validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +19,8 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct CommitVote {
     author: Author,
     ledger_info: LedgerInfo,
-    signature: bls12381::Signature,
+    /// Signature on the LedgerInfo along with a status on whether the signature is verified.
+    signature: SignatureWithStatus,
 }
 
 // this is required by structured log
@@ -62,7 +65,7 @@ impl CommitVote {
         Self {
             author,
             ledger_info,
-            signature,
+            signature: SignatureWithStatus::from(signature),
         }
     }
 
@@ -78,6 +81,13 @@ impl CommitVote {
 
     /// Return the signature of the vote
     pub fn signature(&self) -> &bls12381::Signature {
+        self.signature.signature()
+    }
+
+    /// Returns the signature along with the verification status of the signature.
+    // Note: SignatureWithStatus has interior mutability for verification status.
+    // Need to make sure the verification status is set to true only the verification is successful.
+    pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
     }
 
@@ -93,7 +103,7 @@ impl CommitVote {
     /// and then verifies the signature.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
-            .verify(self.author(), &self.ledger_info, &self.signature)
+            .optimistic_verify(self.author(), &self.ledger_info, &self.signature)
             .context("Failed to verify Commit Vote")
     }
 

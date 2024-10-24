@@ -1,20 +1,41 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M1 {
-    struct S1 {
+    struct S1<T> {
         a: u64,
     }
-    struct S2 {
-        a: M1::S1<#0>,
-        b: vector<M1::S1<#0>>,
+    struct S2<T> {
+        a: S1<T>,
+        b: vector<S1<T>>,
     }
-    struct S3 {
-        a: #1,
-        b: #3,
+    struct S3<T1,T2,T3,T4> {
+        a: T2,
+        b: T4,
     }
-    struct S4 {
+    struct S4<T> {
         a: u64,
     }
-    struct S5 {
-        a: M1::S4<#0>,
+    struct S5<T> {
+        a: S4<T>,
     }
 } // end 0x42::M1
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M1 {
+    struct S1<phantom T> {
+        a: u64,
+    }
+    struct S2<phantom T> {
+        a: S1<T>,
+        b: vector<S1<T>>,
+    }
+    struct S3<phantom T1, T2, phantom T3, T4> {
+        a: T2,
+        b: T4,
+    }
+    struct S4<phantom T: copy> {
+        a: u64,
+    }
+    struct S5<phantom T: copy + drop + store> {
+        a: S4<T>,
+    }
+}

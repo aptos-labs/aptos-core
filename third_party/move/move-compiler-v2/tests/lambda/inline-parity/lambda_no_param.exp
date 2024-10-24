@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::foo` has a function parameter:
+  ┌─ tests/lambda/inline-parity/lambda_no_param.move:2:9
+  │
+2 │     fun foo(f: ||) {
+  │         ^^^ - Parameter `f` has function-valued type `|()|`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `m::bar` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda_no_param.move:10:9
+   │
+10 │     fun bar(f:||u64): u64 {
+   │         ^^^ - Parameter `f` has function-valued type `|()|u64`.

@@ -106,3 +106,24 @@ module <SELF>_0 {
         Tuple()
     }
 } // end <SELF>_0
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::N {
+    friend 0x42::M;
+    public fun bar() {
+    }
+}
+module 0x42::M {
+    use 0x42::N;
+    struct S {
+    }
+    public fun foo() {
+        N::bar()
+    }
+}
+script {
+    use 0x42::M;
+    fun main() {
+        M::foo();
+    }
+}

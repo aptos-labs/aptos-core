@@ -33,11 +33,15 @@ public fun m::test() {
      # live vars: $t0, $t1
   5: $t2 := >($t0, $t1)
      # live vars: $t0, $t2
-  6: if ($t2) goto 7 else goto 1
+  6: if ($t2) goto 9 else goto 7
      # live vars: $t0
-  7: label L2
+  7: label L3
+     # live vars: $t0
+  8: goto 1
+     # live vars: $t0
+  9: label L2
      # live vars:
-  8: return ()
+ 10: return ()
 }
 
 
@@ -67,9 +71,11 @@ B1:
 	5: CopyLoc[0](loc0: u64)
 	6: LdU64(10)
 	7: Gt
-	8: BrFalse(2)
+	8: BrTrue(10)
 B2:
-	9: Ret
+	9: Branch(2)
+B3:
+	10: Ret
 }
 }
 ============ bytecode verification succeeded ========

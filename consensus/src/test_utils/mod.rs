@@ -5,11 +5,16 @@
 #![allow(clippy::unwrap_used)]
 use crate::{
     block_storage::{BlockReader, BlockStore},
+    liveness::{
+        proposal_status_tracker::{TOptQSPullParamsProvider, TPastProposalStatusTracker},
+        round_state::NewRoundReason,
+    },
     payload_manager::DirectMempoolPayloadManager,
 };
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
+    payload_pull_params::OptQSPayloadPullParams,
     pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -269,4 +274,18 @@ pub(crate) fn create_vec_signed_transactions_with_gas(
     (0..size)
         .map(|_| create_signed_transaction(gas_unit_price))
         .collect()
+}
+
+pub struct MockOptQSPayloadProvider {}
+
+impl TOptQSPullParamsProvider for MockOptQSPayloadProvider {
+    fn get_params(&self) -> Option<OptQSPayloadPullParams> {
+        None
+    }
+}
+
+pub struct MockPastProposalStatusTracker {}
+
+impl TPastProposalStatusTracker for MockPastProposalStatusTracker {
+    fn push(&self, _status: NewRoundReason) {}
 }

@@ -3,10 +3,10 @@ module 0x7b::M {
     struct S {
         dummy_field: bool,
     }
-    public fun s(): M::S {
+    public fun s(): S {
         pack M::S(false)
     }
-    public fun take(_s: M::S) {
+    public fun take(_s: S) {
         Tuple()
     }
 } // end 0x7b::M
@@ -19,3 +19,22 @@ module <SELF>_0 {
         Tuple()
     }
 } // end <SELF>_0
+
+// -- Sourcified model before bytecode pipeline
+module 0x7b::M {
+    struct S has copy, drop {
+    }
+    public fun s(): S {
+        S{}
+    }
+    public fun take(_s: S) {
+    }
+}
+script {
+    fun main() {
+        0x7b::M::take(0x7b::M::s());
+        0x7b::M::take(0x7b::M::s());
+        0x7b::M::take(0x7b::M::s());
+        0x7b::M::take(0x7b::M::s());
+    }
+}

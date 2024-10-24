@@ -1,0 +1,184 @@
+// -- Model dump before env processor pipeline:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor unused checks:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor type parameter check:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor inlining:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor acquires check:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor simplifier:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor specification checker:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun M::fun_result_lambda_not_allowed(): |u64| {
+     var $t0: |u64|
+     var $t1: u64
+  0: $t1 := 1
+  1: abort($t1)
+  2: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun M::fun_result_lambda_not_allowed(): |u64| {
+     var $t0: |u64| [unused]
+     var $t1: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: abort($t1)
+}
+
+
+Diagnostics:
+error: Unexpected type: |u64|
+   ┌─ tests/lambda/lambda4.move:89:16
+   │
+89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

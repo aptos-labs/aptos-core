@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: type `S<T>` is missing required ability `drop`
+  ┌─ tests/checking/abilities/bug_14490_field_abilities.move:7:16
+  │
+7 │         entry: S<T>,
+  │                ^^^^
+  │
+  = required by declaration of field `entry`

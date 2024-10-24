@@ -598,9 +598,6 @@ impl CompiledPackage {
             Some(x) => {
                 match x {
                     Architecture::Move => (),
-                    Architecture::AsyncMove => {
-                        flags = flags.set_flavor("async");
-                    },
                     Architecture::Ethereum => {
                         flags = flags.set_flavor("evm");
                     },
@@ -712,7 +709,7 @@ impl CompiledPackage {
         for annot_unit in all_compiled_units {
             let source_path_str = file_map
                 .get(&annot_unit.loc().file_hash())
-                .ok_or(anyhow::anyhow!("invalid transaction script bytecode"))?
+                .ok_or_else(|| anyhow::anyhow!("invalid transaction script bytecode"))?
                 .0
                 .as_str();
             let source_path = PathBuf::from(source_path_str);

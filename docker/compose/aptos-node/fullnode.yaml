@@ -7,6 +7,10 @@ base:
 execution:
   genesis_file_location: "/opt/aptos/genesis/genesis.blob"
 
+storage:
+  rocksdb_configs:
+    enable_storage_sharding: true
+
 full_node_networks:
 - network_id:
     private: "vfn"

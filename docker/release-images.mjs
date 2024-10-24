@@ -249,6 +249,7 @@ async function main() {
           const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
           console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
           if (parsedArgs.DRY_RUN) {
+            console.info(chalk.yellow(`INFO: skipping copy of ${imageSource} to ${imageTarget} due to dry run`));
             continue;
           }
           await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);

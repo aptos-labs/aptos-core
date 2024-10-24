@@ -1,0 +1,336 @@
+// -- Model dump before env processor pipeline:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor unused checks:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor inlining:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor simplifier:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, closure m::no_name_clash$lambda$1(c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash1$lambda$1(c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash2$lambda$1(c))
+    }
+    private fun no_name_clash$lambda$1(c: u64,y: u64): u64 {
+        Add<u64>(y, c)
+    }
+    private fun with_name_clash1$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>(x, c)
+    }
+    private fun with_name_clash2$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x)
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor specification checker:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, closure m::no_name_clash$lambda$1(c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash1$lambda$1(c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash2$lambda$1(c))
+    }
+    private fun no_name_clash$lambda$1(c: u64,y: u64): u64 {
+        Add<u64>(y, c)
+    }
+    private fun with_name_clash1$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>(x, c)
+    }
+    private fun with_name_clash2$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x)
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, closure m::no_name_clash$lambda$1(c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash1$lambda$1(c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash2$lambda$1(c))
+    }
+    private fun no_name_clash$lambda$1(c: u64,y: u64): u64 {
+        Add<u64>(y, c)
+    }
+    private fun with_name_clash1$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>(x, c)
+    }
+    private fun with_name_clash2$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x)
+    }
+} // end 0xcafe::m
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet supported
+  ┌─ tests/lambda-lifting/basic.move:5:9
+  │
+5 │         f(x)
+  │         ^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda-lifting/basic.move:10:16
+   │
+10 │         map(x, |y| y + c)
+   │                ^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda-lifting/basic.move:15:16
+   │
+15 │         map(x, |x| x + c)
+   │                ^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda-lifting/basic.move:20:16
+   │
+20 │           map(x, |x| {
+   │ ╭────────────────^
+21 │ │             let x = c + 1;
+22 │ │             x
+23 │ │         } + x)
+   │ ╰─────────────^

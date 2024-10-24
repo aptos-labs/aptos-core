@@ -1,7 +1,7 @@
 processed 1 task
 
 task 0 'print-bytecode'. lines 1-31:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 

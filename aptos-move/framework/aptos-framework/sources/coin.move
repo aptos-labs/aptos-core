@@ -9,7 +9,7 @@ module aptos_framework::coin {
 
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
-    use aptos_framework::aggregator::{Self, Aggregator};
+    use aptos_framework::aggregator::Aggregator;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
@@ -122,9 +122,8 @@ module aptos_framework::coin {
         value: u64,
     }
 
-    /// Represents a coin with aggregator as its value. This allows to update
-    /// the coin in every transaction avoiding read-modify-write conflicts. Only
-    /// used for gas fees distribution by Aptos Framework (0x1).
+    #[deprecated]
+    /// DEPRECATED
     struct AggregatableCoin<phantom CoinType> has store {
         /// Amount of aggregatable coin this address has.
         value: Aggregator,
@@ -554,93 +553,6 @@ module aptos_framework::coin {
         system_addresses::assert_aptos_framework(aptos_framework);
         let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
         *allow_upgrades = allowed;
-    }
-
-    //
-    //  Aggregatable coin functions
-    //
-
-    /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
-    /// only be called by Aptos Framework (0x1) account for now because of `create_aggregator`.
-    public(friend) fun initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
-        let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
-        AggregatableCoin<CoinType> {
-            value: aggregator,
-        }
-    }
-
-    /// Returns true if the value of aggregatable coin is zero.
-    public(friend) fun is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
-        let amount = aggregator::read(&coin.value);
-        amount == 0
-    }
-
-    /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
-    public(friend) fun drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
-        spec {
-            // TODO: The data invariant is not properly assumed from CollectedFeesPerBlock.
-            assume aggregator::spec_get_limit(coin.value) == MAX_U64;
-        };
-        let amount = aggregator::read(&coin.value);
-        assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATABLE_COIN_VALUE_TOO_LARGE));
-        spec {
-            update aggregate_supply<CoinType> = aggregate_supply<CoinType> - amount;
-        };
-        aggregator::sub(&mut coin.value, amount);
-        spec {
-            update supply<CoinType> = supply<CoinType> + amount;
-        };
-        Coin<CoinType> {
-            value: (amount as u64),
-        }
-    }
-
-    /// Merges `coin` into aggregatable coin (`dst_coin`).
-    public(friend) fun merge_aggregatable_coin<CoinType>(
-        dst_coin: &mut AggregatableCoin<CoinType>,
-        coin: Coin<CoinType>
-    ) {
-        spec {
-            update supply<CoinType> = supply<CoinType> - coin.value;
-        };
-        let Coin { value } = coin;
-        let amount = (value as u128);
-        spec {
-            update aggregate_supply<CoinType> = aggregate_supply<CoinType> + amount;
-        };
-        aggregator::add(&mut dst_coin.value, amount);
-    }
-
-    /// Collects a specified amount of coin form an account into aggregatable coin.
-    public(friend) fun collect_into_aggregatable_coin<CoinType>(
-        account_addr: address,
-        amount: u64,
-        dst_coin: &mut AggregatableCoin<CoinType>,
-    ) acquires CoinStore, CoinConversionMap, CoinInfo, PairedCoinType {
-        // Skip collecting if amount is zero.
-        if (amount == 0) {
-            return
-        };
-
-        let (coin_amount_to_collect, fa_amount_to_collect) = calculate_amount_to_withdraw<CoinType>(
-            account_addr,
-            amount
-        );
-        let coin = if (coin_amount_to_collect > 0) {
-            let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-            extract(&mut coin_store.coin, coin_amount_to_collect)
-        } else {
-            zero()
-        };
-        if (fa_amount_to_collect > 0) {
-            let store_addr = primary_fungible_store::primary_store_address(
-                account_addr,
-                option::destroy_some(paired_metadata<CoinType>())
-            );
-            let fa = fungible_asset::withdraw_internal(store_addr, fa_amount_to_collect);
-            merge(&mut coin, fungible_asset_to_coin<CoinType>(fa));
-        };
-        merge_aggregatable_coin(dst_coin, coin);
     }
 
     inline fun calculate_amount_to_withdraw<CoinType>(
@@ -1273,6 +1185,9 @@ module aptos_framework::coin {
     }
 
     #[test_only]
+    use aptos_framework::aggregator;
+
+    #[test_only]
     struct FakeMoney {}
 
     #[test_only]
@@ -1839,51 +1754,6 @@ module aptos_framework::coin {
     fun destroy_aggregatable_coin_for_test<CoinType>(aggregatable_coin: AggregatableCoin<CoinType>) {
         let AggregatableCoin { value } = aggregatable_coin;
         aggregator::destroy(value);
-    }
-
-    #[test(framework = @aptos_framework)]
-    public entry fun test_collect_from_and_drain(
-        framework: signer,
-    ) acquires CoinInfo, CoinStore, CoinConversionMap, PairedCoinType {
-        let framework_addr = signer::address_of(&framework);
-        account::create_account_for_test(framework_addr);
-        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&framework, 1, true);
-
-        // Collect from coin store only.
-        let coins_minted = mint<FakeMoney>(100, &mint_cap);
-        deposit(framework_addr, coins_minted);
-        let aggregatable_coin = initialize_aggregatable_coin<FakeMoney>(&framework);
-        collect_into_aggregatable_coin<FakeMoney>(framework_addr, 50, &mut aggregatable_coin);
-
-        let fa_minted = coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap));
-        primary_fungible_store::deposit(framework_addr, fa_minted);
-        assert!(balance<FakeMoney>(framework_addr) == 150, 0);
-        assert!(*option::borrow(&supply<FakeMoney>()) == 200, 0);
-
-        // Collect from coin store and fungible store.
-        collect_into_aggregatable_coin<FakeMoney>(framework_addr, 100, &mut aggregatable_coin);
-
-        assert!(balance<FakeMoney>(framework_addr) == 50, 0);
-        maybe_convert_to_fungible_store<FakeMoney>(framework_addr);
-        // Collect from fungible store only.
-        collect_into_aggregatable_coin<FakeMoney>(framework_addr, 30, &mut aggregatable_coin);
-
-        // Check that aggregatable coin has the right amount.
-        let collected_coin = drain_aggregatable_coin(&mut aggregatable_coin);
-        assert!(is_aggregatable_coin_zero(&aggregatable_coin), 0);
-        assert!(value(&collected_coin) == 180, 0);
-
-        // Supply of coins should be unchanged, but the balance on the account should decrease.
-        assert!(balance<FakeMoney>(framework_addr) == 20, 0);
-        assert!(*option::borrow(&supply<FakeMoney>()) == 200, 0);
-
-        burn(collected_coin, &burn_cap);
-        destroy_aggregatable_coin_for_test(aggregatable_coin);
-        move_to(&framework, FakeMoneyCapabilities {
-            burn_cap,
-            freeze_cap,
-            mint_cap,
-        });
     }
 
     #[test_only]

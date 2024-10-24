@@ -76,13 +76,13 @@ object "test_A2_M_h1" {
                     $MemoryStoreU64($t5, 3)
                     $MemoryStoreU64(add($t5, 8), $ClosestGreaterPowerOfTwo(3))
                     copy_literal_string_to_memory_2053440334(add($t5, 32))
-                    // $t6 := pack M::T($t5)
+                    // $t6 := pack 0x2::M::T($t5)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t5)
                         $t6 := $mem
                     }
-                    // move_to<M::T>($t6, $t4)
+                    // move_to<0x2::M::T>($t6, $t4)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $LoadU256($t4))
                         if $AlignedStorageLoad($base_offset) {
@@ -111,7 +111,7 @@ object "test_A2_M_h1" {
                     }
                     // $t7 := 0x3
                     $t7 := 0x3
-                    // $t8 := borrow_global<M::T>($t7)
+                    // $t8 := borrow_global<0x2::M::T>($t7)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $t7)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -119,7 +119,7 @@ object "test_A2_M_h1" {
                         }
                         $t8 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t9 := borrow_field<M::T>.s($t8)
+                    // $t9 := borrow_field<0x2::M::T>.s($t8)
                     $t9 := $t8
                     // $t1 := read_ref($t9)
                     mstore(add($locals, 32), $LoadU256($t9))
@@ -253,7 +253,7 @@ object "test_A2_M_h1" {
                     copy_literal_string_to_memory_2788570470(add($t36, 32))
                     // $t37 := 0x3
                     $t37 := 0x3
-                    // $t38 := borrow_global<M::T>($t37)
+                    // $t38 := borrow_global<0x2::M::T>($t37)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $t37)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -261,7 +261,7 @@ object "test_A2_M_h1" {
                         }
                         $t38 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t39 := borrow_field<M::T>.s($t38)
+                    // $t39 := borrow_field<0x2::M::T>.s($t38)
                     $t39 := $t38
                     // write_ref($t39, $t36)
                     if $IsStoragePtr($t39){
@@ -279,7 +279,7 @@ object "test_A2_M_h1" {
                     $StoreU256($t39, $t36)
                     // $t40 := 0x3
                     $t40 := 0x3
-                    // $t41 := borrow_global<M::T>($t40)
+                    // $t41 := borrow_global<0x2::M::T>($t40)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x3948ca0a, $t40)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -287,7 +287,7 @@ object "test_A2_M_h1" {
                         }
                         $t41 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t42 := borrow_field<M::T>.s($t41)
+                    // $t42 := borrow_field<0x2::M::T>.s($t41)
                     $t42 := $t41
                     // $t2 := read_ref($t42)
                     mstore(add($locals, 64), $LoadU256($t42))

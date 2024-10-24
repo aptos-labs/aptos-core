@@ -578,7 +578,7 @@ where
                     let config = OnChainJWKConsensusConfig::default_enabled();
                     println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
                     Some(config)
-                },
+                }
                 _ => None,
             };
         })))
@@ -704,6 +704,7 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
+        mempool_client_sender,
     ) = services::bootstrap_api_and_indexer(
         &node_config,
         db_rw.clone(),
@@ -713,6 +714,9 @@ pub fn setup_environment_and_start_node(
         api_port_tx,
         indexer_grpc_port_tx,
     )?;
+
+    // Set mempool client sender in order to enable the Mempool API in the admin service
+    admin_service.set_mempool_client_sender(mempool_client_sender);
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =

@@ -154,8 +154,8 @@ impl BufferedState {
     /// This method updates the buffered state with new data.
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
-        new_state_after_checkpoint: StateDelta,
+        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
+        new_state_after_checkpoint: &StateDelta,
         sync_commit: bool,
     ) -> Result<()> {
         assert!(new_state_after_checkpoint
@@ -180,7 +180,7 @@ impl BufferedState {
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             let state_after_checkpoint = self
                 .state_after_checkpoint
-                .replace_with(new_state_after_checkpoint);
+                .replace_with(new_state_after_checkpoint.clone());
             if let Some(ref mut delta) = self.state_until_checkpoint {
                 delta.merge(state_after_checkpoint);
             } else {
@@ -191,7 +191,7 @@ impl BufferedState {
                 new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version,
                 "Diff between base and latest checkpoints not provided.",
             );
-            self.state_after_checkpoint = new_state_after_checkpoint;
+            self.state_after_checkpoint = new_state_after_checkpoint.clone();
         }
         self.maybe_commit(sync_commit);
         self.report_latest_committed_version();

@@ -200,11 +200,11 @@ impl CliCommand<serde_json::Value> for VerifyProposal {
                     .to_hex_literal()
             // If full payload not provided, get payload hash directly from transaction proposal:
             } else {
-                view_json_option_str(&multisig_transaction["payload_hash"])?.ok_or(
+                view_json_option_str(&multisig_transaction["payload_hash"])?.ok_or_else(|| {
                     CliError::UnexpectedError(
                         "Neither payload nor payload hash provided on-chain".to_string(),
-                    ),
-                )?
+                    )
+                })?
             };
         // Get verification result based on if expected and actual payload hashes match.
         if expected_payload_hash.eq(&actual_payload_hash) {

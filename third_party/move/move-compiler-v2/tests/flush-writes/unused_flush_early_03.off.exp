@@ -22,31 +22,35 @@ L2:	loc2: u64
 L3:	loc3: u64
 B0:
 	0: Call foo(): u64 * u64 * u64
-	1: LdU64(0)
-	2: StLoc[0](loc0: u64)
-	3: StLoc[1](loc1: u64)
-	4: StLoc[2](loc2: u64)
-	5: MoveLoc[0](loc0: u64)
-	6: Eq
-	7: BrFalse(9)
+	1: StLoc[1](loc1: u64)
+	2: StLoc[2](loc2: u64)
+	3: LdU64(0)
+	4: Eq
+	5: BrTrue(7)
 B1:
-	8: Call bar()
+	6: Branch(8)
 B2:
-	9: MoveLoc[2](loc2: u64)
-	10: LdU64(0)
-	11: Eq
-	12: BrFalse(14)
+	7: Call bar()
 B3:
-	13: Call bar()
+	8: MoveLoc[2](loc2: u64)
+	9: LdU64(0)
+	10: Eq
+	11: BrTrue(13)
 B4:
+	12: Branch(14)
+B5:
+	13: Call bar()
+B6:
 	14: MoveLoc[1](loc1: u64)
 	15: LdU64(0)
 	16: Eq
-	17: BrFalse(19)
-B5:
-	18: Call bar()
-B6:
-	19: Ret
+	17: BrTrue(19)
+B7:
+	18: Branch(20)
+B8:
+	19: Call bar()
+B9:
+	20: Ret
 }
 }
 ============ bytecode verification succeeded ========

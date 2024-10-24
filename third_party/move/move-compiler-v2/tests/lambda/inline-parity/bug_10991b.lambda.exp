@@ -1,0 +1,255 @@
+// -- Model dump before env processor pipeline:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(|(_: u64, y: u64): (u64, u64)| y, 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+    private fun test$lambda$1(param$0: u64,y: u64): u64 {
+        {
+          let _: u64 = param$0;
+          y
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+    private fun test$lambda$1(param$0: u64,y: u64): u64 {
+        {
+          let _: u64 = param$0;
+          y
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+    private fun test$lambda$1(param$0: u64,y: u64): u64 {
+        {
+          let _: u64 = param$0;
+          y
+        }
+    }
+} // end 0x42::Test
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet supported
+  ┌─ tests/lambda/inline-parity/bug_10991b.move:4:9
+  │
+4 │         g(x, _y)
+  │         ^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+  ┌─ tests/lambda/inline-parity/bug_10991b.move:8:21
+  │
+8 │         assert!(foo(|_, y| y,
+  │                     ^^^^^^^^

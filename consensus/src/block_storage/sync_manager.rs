@@ -432,7 +432,7 @@ impl BlockStore {
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         execution_client
-            .sync_to(highest_commit_cert.ledger_info().clone())
+            .sync_to_target(highest_commit_cert.ledger_info().clone())
             .await?;
 
         // we do not need to update block_tree.highest_commit_decision_ledger_info here

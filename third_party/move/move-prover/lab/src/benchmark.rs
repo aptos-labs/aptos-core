@@ -98,7 +98,7 @@ pub fn benchmark(args: &[String]) {
     let matches = cmd_line_parser.get_matches_from(args);
     let get_vec = |s: &str| -> Vec<String> {
         let vs = matches.get_many::<String>(s);
-        vs.map_or(vec![], |v| v.cloned().collect())
+        vs.map_or_else(Vec::new, |v| v.cloned().collect())
     };
     let sources = get_vec("sources");
     let deps = get_vec("dependencies");
@@ -178,11 +178,7 @@ fn run_benchmark(
                     "../../../../../aptos-move/framework/src/aptos-natives.bpl"
                 )
                 .to_vec(),
-                module_instance_names: vec![(
-                    "0x1::object".to_string(),
-                    "object_instances".to_string(),
-                    true,
-                )],
+                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
             });
     }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually

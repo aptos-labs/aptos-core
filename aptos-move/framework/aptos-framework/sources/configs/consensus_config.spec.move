@@ -47,15 +47,12 @@ spec aptos_framework::consensus_config {
         use aptos_framework::chain_status;
         use aptos_framework::timestamp;
         use std::signer;
-        use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 600;
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         let addr = signer::address_of(account);
         /// [high-level-req-2]
@@ -66,7 +63,6 @@ spec aptos_framework::consensus_config {
 
         requires chain_status::is_genesis();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         ensures global<ConsensusConfig>(@aptos_framework).config == config;
     }

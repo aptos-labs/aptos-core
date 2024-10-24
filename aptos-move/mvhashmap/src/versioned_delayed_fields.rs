@@ -402,7 +402,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// Part of the big multi-versioned data-structure, which creates different types of
     /// versioned maps (including this one for delayed fields), and delegates access. Hence,
     /// new should only be used from the crate.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             values: DashMap::new(),
             next_idx_to_commit: CachePadded::new(AtomicTxnIndex::new(0)),

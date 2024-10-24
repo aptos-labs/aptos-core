@@ -588,9 +588,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             .advertised_data
             .highest_synced_ledger_info()
             .map(|ledger_info| ledger_info.ledger_info().version())
-            .ok_or(aptos_data_client::error::Error::UnexpectedErrorEncountered(
-                "The highest synced ledger info is missing from the global data summary!".into(),
-            ))?;
+            .ok_or_else(|| {
+                aptos_data_client::error::Error::UnexpectedErrorEncountered(
+                    "The highest synced ledger info is missing from the global data summary!"
+                        .into(),
+                )
+            })?;
 
         // If the stream is not lagging behind, reset the lag and return
         if highest_response_version >= highest_advertised_version {

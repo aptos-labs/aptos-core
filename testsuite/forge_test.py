@@ -64,7 +64,8 @@ unittest.util._MAX_LENGTH = 2000  # type: ignore
 
 
 class HasAssertMultiLineEqual(Protocol):
-    def assertMultiLineEqual(self, first: str, second: str, msg: Any = ...) -> None: ...
+    def assertMultiLineEqual(self, first: str, second: str, msg: Any = ...) -> None:
+        ...
 
 
 def get_cwd() -> Path:
@@ -148,6 +149,7 @@ def fake_context(
             forge_namespace_keep="false",
             forge_enable_haproxy="false",
             forge_enable_indexer="false",
+            forge_deployer_profile="",
             cargo_args=["--cargo-arg"],
             forge_cli_args=["--forge-cli-arg"],
             test_args=["--test-arg"],

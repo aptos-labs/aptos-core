@@ -42,7 +42,7 @@ impl Display for SyncInfo {
             self.highest_timeout_round(),
             self.highest_commit_round(),
             self.highest_quorum_cert,
-            self.highest_ordered_cert.as_ref().map_or("None".to_string(), |cert| cert.to_string()),
+            self.highest_ordered_cert.as_ref().map_or_else(|| "None".to_string(), |cert| cert.to_string()),
             self.highest_commit_cert,
         )
     }

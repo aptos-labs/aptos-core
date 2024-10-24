@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: type `V` is missing required ability `drop`
+  ┌─ tests/checking/abilities/bug_14813_fun_call_ability.move:6:9
+  │
+6 │         self.search(key)
+  │         ^^^^^^^^^^^^^^^^
+  ·
+9 │     fun search<V: drop>(self: &Map<V>, key: u256): bool {
+  │                - declaration of type parameter `V`
+  │
+  = required by instantiating type parameter `V:drop` of function `search`

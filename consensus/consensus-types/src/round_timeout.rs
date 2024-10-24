@@ -7,15 +7,18 @@ use crate::{
     timeout_2chain::TwoChainTimeout,
 };
 use anyhow::{ensure, Context};
+use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum RoundTimeoutReason {
     Unknown,
     ProposalNotReceived,
+    PayloadUnavailable { missing_authors: BitVec },
+    NoQC,
 }
 
 impl std::fmt::Display for RoundTimeoutReason {
@@ -23,6 +26,10 @@ impl std::fmt::Display for RoundTimeoutReason {
         match self {
             RoundTimeoutReason::Unknown => write!(f, "Unknown"),
             RoundTimeoutReason::ProposalNotReceived => write!(f, "ProposalNotReceived"),
+            RoundTimeoutReason::PayloadUnavailable { .. } => {
+                write!(f, "PayloadUnavailable",)
+            },
+            RoundTimeoutReason::NoQC => write!(f, "NoQC"),
         }
     }
 }

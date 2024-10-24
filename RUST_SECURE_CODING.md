@@ -6,7 +6,7 @@ These Rust Secure Coding Guidelines are essential for anyone contributing to Apt
 
 ### Rustup
 
-Utilize Rustup for managing Rust toolchains. However, keep in mind that, from a security perspective, Rustup performs all downloads over HTTPS, but it does not yet validate signatures of downloads. Security is shifted to [create.io](http://create.io) and GitHub repository hosting the code [[rustup]](https://www.rust-lang.org/tools/install).
+Utilize Rustup for managing Rust toolchains. However, keep in mind that, from a security perspective, Rustup performs all downloads over HTTPS, but it does not yet validate signatures of downloads. Security is shifted to [crates.io](http://crates.io) and GitHub repository hosting the code [[rustup]](https://www.rust-lang.org/tools/install).
 
 ### Stable Toolchain
 

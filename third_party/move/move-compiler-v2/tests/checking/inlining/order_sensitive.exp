@@ -92,5 +92,99 @@ module 0x42::OrderSensitiveTest3 {
     }
 } // end 0x42::OrderSensitiveTest3
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::OrderSensitiveTest1 {
+    public inline fun inline_fun1(a: u64, b: u64): u64 {
+        a * b
+    }
+    public inline fun inline_fun2(a: u64, b: u64): u64 {
+        {
+            let (a,b) = (a, b);
+            a * b
+        } + 2 * {
+            let (a,b) = (a, b);
+            a * b + 2
+        }
+    }
+    public inline fun inline_fun3(a: u64, b: u64): u64 {
+        a * b + 2
+    }
+}
+module 0x42::OrderSensitiveTest2 {
+    use 0x42::OrderSensitiveTest1;
+    public inline fun inline_fun1(a: u64, b: u64): u64 {
+        a * b + 3
+    }
+    public inline fun inline_fun2(a: u64, b: u64): u64 {
+        {
+            let (a,b) = ({
+                let (a,b) = (a, b);
+                a * b + 3
+            }, {
+                let (a,b) = (a, b);
+                a * b + 4
+            });
+            {
+                let (a,b) = (a, b);
+                a * b
+            } + 2 * {
+                let (a,b) = (a, b);
+                a * b + 2
+            }
+        } + 3 * {
+            let (a,b) = (a, b);
+            a * b + 3
+        } + 5 * {
+            let (a,b) = (a, b);
+            a * b + 4
+        }
+    }
+    public inline fun inline_fun3(a: u64, b: u64): u64 {
+        a * b + 4
+    }
+}
+module 0x42::OrderSensitiveTest3 {
+    use 0x42::OrderSensitiveTest2;
+    public inline fun fun1(a: u64, b: u64): u64 {
+        a * b + 5
+    }
+    public fun fun2(a: u64, b: u64): u64 {
+        {
+            let (a,b) = (7 * {
+                let (a,b) = (a, b);
+                a * b + 5
+            }, b);
+            {
+                let (a,b) = ({
+                    let (a,b) = (a, b);
+                    a * b + 3
+                }, {
+                    let (a,b) = (a, b);
+                    a * b + 4
+                });
+                {
+                    let (a,b) = (a, b);
+                    a * b
+                } + 2 * {
+                    let (a,b) = (a, b);
+                    a * b + 2
+                }
+            } + 3 * {
+                let (a,b) = (a, b);
+                a * b + 3
+            } + 5 * {
+                let (a,b) = (a, b);
+                a * b + 4
+            }
+        } + 9 * {
+            let (a,b) = (a, b);
+            a * b + 6
+        }
+    }
+    public inline fun fun3(a: u64, b: u64): u64 {
+        a * b + 6
+    }
+}
+
 
 ============ bytecode verification succeeded ========

@@ -91,7 +91,7 @@ fn test_docgen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
 
     if path.to_str().is_some_and(|s| s.contains(V2_TEST_DIR)) {
         options.compiler_v2 = true;
-        options.language_version = Some(LanguageVersion::V2_0);
+        options.language_version = Some(LanguageVersion::latest_stable());
     }
 
     let mut error_writer = Buffer::no_color();

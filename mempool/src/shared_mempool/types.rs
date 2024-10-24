@@ -21,7 +21,8 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
-    mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
@@ -235,8 +236,13 @@ pub type SubmissionStatus = (MempoolStatus, Option<DiscardedVMStatus>);
 pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 
 pub enum MempoolClientRequest {
+    /// Submits a transaction to the mempool and returns its submission status
     SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
+    /// Retrieves a signed transaction from the mempool using its hash
     GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
+    /// Retrieves all addresses with transactions in the mempool's parking lot and
+    /// the number of transactions for each address
+    GetAddressesFromParkingLot(oneshot::Sender<Vec<(AccountAddress, u64)>>),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;

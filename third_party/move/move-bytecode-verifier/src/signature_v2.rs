@@ -812,7 +812,13 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         for (offset, instr) in code.code.iter().enumerate() {
             let map_err = |res: PartialVMResult<()>| {
                 res.map_err(|err| {
-                    err.append_message_with_separator(' ', format!("at offset {}", offset))
+                    err.append_message_with_separator(
+                        ' ',
+                        format!(
+                            "missing abilities for `{:?}` at code offset {}",
+                            instr, offset
+                        ),
+                    )
                 })
             };
             match instr {

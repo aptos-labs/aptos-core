@@ -25,9 +25,11 @@ B1:
 	5: CopyLoc[0](loc0: u64)
 	6: LdU64(10)
 	7: Gt
-	8: BrFalse(2)
+	8: BrTrue(10)
 B2:
-	9: Ret
+	9: Branch(2)
+B3:
+	10: Ret
 }
 }
 ============ bytecode verification succeeded ========

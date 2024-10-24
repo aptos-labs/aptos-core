@@ -38,7 +38,6 @@ fn default_testing_addresses() -> BTreeMap<String, NumericalAddress> {
         ("A", "0x42"),
         ("B", "0x42"),
         ("K", "0x19"),
-        ("Async", "0x20"),
     ];
     mapping
         .iter()

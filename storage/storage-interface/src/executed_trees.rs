@@ -20,7 +20,7 @@ type Result<T, E = StateviewError> = std::result::Result<T, E>;
 #[derive(Clone, Debug)]
 pub struct ExecutedTrees {
     /// The in-memory representation of state after execution.
-    pub state: StateDelta,
+    pub state: Arc<StateDelta>,
 
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
@@ -28,7 +28,7 @@ pub struct ExecutedTrees {
 }
 
 impl ExecutedTrees {
-    pub fn state(&self) -> &StateDelta {
+    pub fn state(&self) -> &Arc<StateDelta> {
         &self.state
     }
 
@@ -49,7 +49,7 @@ impl ExecutedTrees {
     }
 
     pub fn new(
-        state: StateDelta,
+        state: Arc<StateDelta>,
         transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
     ) -> Self {
         assert_eq!(
@@ -68,11 +68,11 @@ impl ExecutedTrees {
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
-        let state = StateDelta::new_at_checkpoint(
+        let state = Arc::new(StateDelta::new_at_checkpoint(
             state_root_hash,
             state_usage,
             num_leaves_in_accumulator.checked_sub(1),
-        );
+        ));
         let transaction_accumulator = Arc::new(
             InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
                 .expect("The startup info read from storage should be valid."),
@@ -83,7 +83,7 @@ impl ExecutedTrees {
 
     pub fn new_empty() -> Self {
         Self::new(
-            StateDelta::new_empty(),
+            Arc::new(StateDelta::new_empty()),
             Arc::new(InMemoryAccumulator::new_empty()),
         )
     }

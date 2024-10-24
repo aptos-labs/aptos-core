@@ -75,10 +75,7 @@ where
                     output.root_hash(),
                     self.version,
                 );
-                let parent_block_id = self.executor.committed_block_id();
-                self.executor
-                    .pre_commit_block(block_id, parent_block_id)
-                    .unwrap();
+                self.executor.pre_commit_block(block_id).unwrap();
                 self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
             },
             CommitProcessing::Skip => {},
