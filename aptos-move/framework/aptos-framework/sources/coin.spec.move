@@ -578,46 +578,4 @@ spec aptos_framework::coin {
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
     }
-
-    spec initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
-        include system_addresses::AbortsIfNotAptosFramework { account: aptos_framework };
-        include aggregator_factory::CreateAggregatorInternalAbortsIf;
-    }
-
-    spec is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
-        aborts_if false;
-        ensures result == (aggregator::spec_read(coin.value) == 0);
-    }
-
-    spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
-        aborts_if aggregator::spec_read(coin.value) > MAX_U64;
-        ensures result.value == aggregator::spec_aggregator_get_val(old(coin).value);
-    }
-
-    spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
-        let aggr = dst_coin.value;
-        let post p_aggr = dst_coin.value;
-        aborts_if aggregator::spec_aggregator_get_val(aggr)
-            + coin.value > aggregator::spec_get_limit(aggr);
-        aborts_if aggregator::spec_aggregator_get_val(aggr)
-            + coin.value > MAX_U128;
-        ensures aggregator::spec_aggregator_get_val(aggr) + coin.value == aggregator::spec_aggregator_get_val(p_aggr);
-    }
-
-    spec collect_into_aggregatable_coin<CoinType>(account_addr: address, amount: u64, dst_coin: &mut AggregatableCoin<CoinType>) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        let aggr = dst_coin.value;
-        let post p_aggr = dst_coin.value;
-        let coin_store = global<CoinStore<CoinType>>(account_addr);
-        let post p_coin_store = global<CoinStore<CoinType>>(account_addr);
-        aborts_if amount > 0 && !exists<CoinStore<CoinType>>(account_addr);
-        aborts_if amount > 0 && coin_store.coin.value < amount;
-        aborts_if amount > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + amount > aggregator::spec_get_limit(aggr);
-        aborts_if amount > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + amount > MAX_U128;
-        ensures aggregator::spec_aggregator_get_val(aggr) + amount == aggregator::spec_aggregator_get_val(p_aggr);
-        ensures coin_store.coin.value - amount == p_coin_store.coin.value;
-    }
 }
