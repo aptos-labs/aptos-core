@@ -48,7 +48,10 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{fmt, fmt::Formatter, ops::BitOr};
+use std::{
+    fmt::{self, Formatter},
+    ops::BitOr,
+};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -1425,6 +1428,33 @@ impl SignatureToken {
 
     pub fn num_nodes(&self) -> usize {
         self.preorder_traversal().count()
+    }
+
+    pub fn instantiate(&self, subst_mapping: &[SignatureToken]) -> SignatureToken {
+        use SignatureToken::*;
+        match self {
+            Bool => Bool,
+            U8 => U8,
+            U16 => U16,
+            U32 => U32,
+            U64 => U64,
+            U128 => U128,
+            U256 => U256,
+            Address => Address,
+            Signer => Signer,
+            Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
+            Struct(idx) => Struct(*idx),
+            StructInstantiation(idx, struct_type_args) => StructInstantiation(
+                *idx,
+                struct_type_args
+                    .iter()
+                    .map(|ty| ty.instantiate(subst_mapping))
+                    .collect(),
+            ),
+            Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
+            MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
+            TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
+        }
     }
 }
 

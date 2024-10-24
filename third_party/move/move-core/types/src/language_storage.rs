@@ -5,7 +5,7 @@
 use crate::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    parser::{parse_struct_tag, parse_type_tag},
+    parser::{parse_module_id, parse_struct_tag, parse_type_tag},
     safe_serialize,
 };
 #[cfg(any(test, feature = "fuzzing"))]
@@ -223,6 +223,14 @@ pub struct ModuleId {
 impl From<ModuleId> for (AccountAddress, Identifier) {
     fn from(module_id: ModuleId) -> Self {
         (module_id.address, module_id.name)
+    }
+}
+
+impl FromStr for ModuleId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_module_id(s)
     }
 }
 
