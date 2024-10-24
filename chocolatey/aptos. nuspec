@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Do not remove this test for UTF-8: if “Ω” doesn’t appear as greek uppercase omega letter
+enclosed in quotation marks, you should use an editor that supports UTF-8, not this one. -->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+	<metadata>
+		<id>aptos</id>
+		<version>$version$</version>
+		<owners>WGB5445</owners>
+		<title>Aptos Binary</title>
+		<authors>aptos</authors>
+		<projectUrl>https://aptosfoundation.org/</projectUrl>
+		<licenseUrl>https://github.com/aptos-labs/aptos-core/blob/main/LICENSE</licenseUrl>
+		<iconUrl>https://avatars.githubusercontent.com/u/99841612</iconUrl>
+		<projectSourceUrl>https://github.com/aptos-labs/aptos-core/</projectSourceUrl>
+		<bugTrackerUrl>https://github.com/aptos-labs/aptos-core/issues</bugTrackerUrl>
+		<tags>aptos</tags>
+		<packageSourceUrl>https://community.chocolatey.org/packages/aptos</packageSourceUrl>
+		<summary>Run a local aptos binary</summary>
+		<description>Aptos is a layer 1 blockchain built to support the widespread use of blockchain through better technology and user experience.</description>
+		<releaseNotes>https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v$version$</releaseNotes>
+	</metadata>
+	<files>
+		<file src="../target/cli/aptos.exe" target="bin/aptos.exe" />
+		<file src="../LICENSE" target="bin/LICENSE.txt" />
+		<file src="./VERIFICATION.txt" target="bin/VERIFICATION.txt" />
+	</files>
+</package>
