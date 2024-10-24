@@ -17,7 +17,7 @@ static NODE_URL: Lazy<Url> = Lazy::new(|| {
         std::env::var("APTOS_NODE_URL")
             .as_ref()
             .map(|s| s.as_str())
-            .unwrap_or("https://fullnode.devnet.aptoslabs.com"),
+            .unwrap_or("https://api.testnet.aptoslabs.com/v1"),
     )
     .unwrap()
 });
@@ -27,7 +27,7 @@ static FAUCET_URL: Lazy<Url> = Lazy::new(|| {
         std::env::var("APTOS_FAUCET_URL")
             .as_ref()
             .map(|s| s.as_str())
-            .unwrap_or("https://faucet.devnet.aptoslabs.com"),
+            .unwrap_or("https://faucet.testnet.aptoslabs.com"),
     )
     .unwrap()
 });
