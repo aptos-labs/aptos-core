@@ -256,6 +256,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         let mut summary = TestSummary::new(test_count, filtered_out);
 
         // Optionally write junit xml test report for external processing
+        println!("Before junit: {:?}", self.options.junit_xml_path);
         if let Some(junit_xml_path) = self.options.junit_xml_path.as_ref() {
             let junit_observer = JunitTestObserver::new(
                 self.tests.get_suite_name().unwrap_or("local".to_string()),

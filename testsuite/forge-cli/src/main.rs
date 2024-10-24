@@ -35,6 +35,7 @@ mod suites;
 // Useful constants
 const KILOBYTE: usize = 1000;
 const MEGABYTE: usize = KILOBYTE * 1000;
+const BWAHAHA: &str = "banana";
 
 #[cfg(unix)]
 #[global_allocator]
@@ -236,6 +237,12 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
+    println!("\nArgs: {:?}\n", args);
+    println!(
+        "\nEnv: {:?}\n",
+        std::env::vars().collect::<Vec<(String, String)>>()
+    );
+    process::exit(1);
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 

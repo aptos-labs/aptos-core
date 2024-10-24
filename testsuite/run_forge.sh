@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
@@ -18,10 +18,23 @@ if grep -v '^#' testsuite/forge.env | grep -q .; then
     FAIL_AFTER_FORGE_RUNS=true
 
 fi
+
+echo "BEFORE"
+echo
+echo $(env)
+echo
+echo "BEFORE"
+
 # source the forge.env file to set the environment variables which are used as feature flags for the forge script
 set -a # export all variables when we source the file
 source testsuite/forge.env
 set +a # stop exporting variables
+
+echo "AFTER"
+echo
+echo $(env)
+echo
+echo "AFTER"
 
 echo "Executing python testsuite/forge.py test $@"
 exec python3 testsuite/forge.py test "$@"
