@@ -148,7 +148,6 @@ fn main() {
 
     let mut failures = Vec::new();
     let mut json_lines = Vec::new();
-
     println!(
         "{:>15}  {:>15}  {:>15}   entry point",
         "wall time (us)", "expected (us)", "diff(- is impr)"
