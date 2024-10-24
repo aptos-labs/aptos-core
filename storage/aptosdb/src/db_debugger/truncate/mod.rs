@@ -12,8 +12,9 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     utils::truncation_helper::{
-        find_closest_node_version_at_or_before, get_current_version_in_state_merkle_db,
-        get_state_kv_commit_progress, truncate_state_merkle_db,
+        find_closest_node_version_at_or_before, find_tree_root_at_or_before,
+        get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
+        truncate_state_merkle_db,
     },
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
@@ -127,30 +128,7 @@ impl Cmd {
                 .0;
         }
 
-        // TODO(grao): We are using a brute force implementation for now. We might be able to make
-        // it faster, since our data is append only.
-        if target_version < state_merkle_db_version {
-            let state_merkle_target_version = Self::find_tree_root_at_or_before(
-                &ledger_db.metadata_db_arc(),
-                &state_merkle_db,
-                target_version,
-            )?
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not find a valid root before or at version {}, maybe it was pruned?",
-                    target_version
-                )
-            });
-
-            println!(
-                "Starting state merkle db truncation... target_version: {}",
-                state_merkle_target_version
-            );
-            truncate_state_merkle_db(&state_merkle_db, state_merkle_target_version)?;
-            println!("Done!");
-        }
-
-        println!("Starting ledger db and state kv db truncation...");
+        println!("Starting db truncation...");
         let batch = SchemaBatch::new();
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
@@ -161,6 +139,7 @@ impl Cmd {
         StateStore::sync_commit_progress(
             Arc::clone(&ledger_db),
             Arc::clone(&state_kv_db),
+            Arc::clone(&state_merkle_db),
             /*crash_if_difference_is_too_large=*/ false,
         );
         println!("Done!");
@@ -182,40 +161,6 @@ impl Cmd {
         }
 
         Ok(())
-    }
-
-    fn find_tree_root_at_or_before(
-        ledger_metadata_db: &DB,
-        state_merkle_db: &StateMerkleDb,
-        version: Version,
-    ) -> Result<Option<Version>> {
-        match find_closest_node_version_at_or_before(state_merkle_db, version)? {
-            Some(closest_version) => {
-                if Self::root_exists_at_version(state_merkle_db, closest_version)? {
-                    return Ok(Some(closest_version));
-                }
-                let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>()?;
-                iter.seek_for_prev(&version)?;
-                match iter.next().transpose()? {
-                    Some((closest_epoch_version, _)) => {
-                        if Self::root_exists_at_version(state_merkle_db, closest_epoch_version)? {
-                            Ok(Some(closest_epoch_version))
-                        } else {
-                            Ok(None)
-                        }
-                    },
-                    None => Ok(None),
-                }
-            },
-            None => Ok(None),
-        }
-    }
-
-    fn root_exists_at_version(state_merkle_db: &StateMerkleDb, version: Version) -> Result<bool> {
-        Ok(state_merkle_db
-            .metadata_db()
-            .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
-            .is_some())
     }
 }
 
