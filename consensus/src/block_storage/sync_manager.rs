@@ -42,11 +42,17 @@ use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };
+use claims::assert_ge;
 use fail::fail_point;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
-use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
+use std::{
+    clone::Clone,
+    cmp::{max, min},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{time, time::timeout};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -224,7 +230,8 @@ impl BlockStore {
                 .retrieve_blocks_in_range(
                     retrieve_qc.certified_block().id(),
                     1,
-                    retrieve_qc.certified_block().id(),
+                    retrieve_qc.certified_block().epoch(),
+                    retrieve_qc.certified_block().round(),
                     qc.ledger_info()
                         .get_voters(&retriever.validator_addresses()),
                 )
@@ -267,6 +274,7 @@ impl BlockStore {
             self.execution_client.clone(),
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            self.window_size,
         )
         .await?
         .take();
@@ -298,6 +306,7 @@ impl BlockStore {
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
+        window_size: usize,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -306,10 +315,24 @@ impl BlockStore {
             highest_quorum_cert,
         );
 
-        // we fetch the blocks from
-        let num_blocks = highest_quorum_cert.certified_block().round()
-            - highest_commit_cert.ledger_info().ledger_info().round()
-            + 1;
+        // For execution, we need the window starting from the highest_commit_cert + 1.
+        // TODO: what happens cross-epoch?
+        let highest_commit_cert_round = highest_commit_cert.ledger_info().ledger_info().round();
+        // TODO: we should not retrieve genesis, double check this is the right way to do that
+        let target_round = max(
+            1,
+            min(
+                highest_commit_cert_round,
+                // commit_cert + 1 - (window_size - 1)
+                highest_commit_cert_round.saturating_sub(window_size as u64),
+            ),
+        );
+
+        let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
+        info!(
+            "fast_forward_sync window_size: {}, target_round: {}, num_blocks: {}",
+            window_size, target_round, num_blocks
+        );
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
@@ -319,7 +342,8 @@ impl BlockStore {
             .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
                 num_blocks,
-                highest_commit_cert.commit_info().id(),
+                highest_commit_cert.commit_info().epoch(),
+                target_round,
                 highest_quorum_cert
                     .ledger_info()
                     .get_voters(&retriever.validator_addresses()),
@@ -334,10 +358,12 @@ impl BlockStore {
             blocks.first().expect("blocks are empty").id(),
         );
 
-        // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
-        assert_eq!(
-            blocks.last().expect("blocks are empty").id(),
-            highest_commit_cert.commit_info().id()
+        // Confirm retrieval hit at least the last round we care about
+        assert!(
+            blocks.last().expect("blocks are empty").round() <= target_round,
+            "Expecting in the retrieval response, last block should be <= {}, but got {}",
+            target_round,
+            blocks.last().expect("blocks are empty").round()
         );
 
         let mut quorum_certs = vec![highest_quorum_cert.clone()];
@@ -349,14 +375,14 @@ impl BlockStore {
         );
 
         if !order_vote_enabled {
+            // TODO: this is probably still necessary, but need to think harder, it's pretty subtle
             // check if highest_commit_cert comes from a fork
             // if so, we need to fetch it's block as well, to have a proof of commit.
-            let highest_commit_certified_block_id = highest_commit_cert
-                .certified_block(order_vote_enabled)?
-                .id();
+            let highest_commit_certified_block =
+                highest_commit_cert.certified_block(order_vote_enabled)?;
             if !blocks
                 .iter()
-                .any(|block| block.id() == highest_commit_certified_block_id)
+                .any(|block| block.id() == highest_commit_certified_block.id())
             {
                 info!(
                     "Found forked QC {}, fetching it as well",
@@ -365,9 +391,10 @@ impl BlockStore {
                 BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(1);
                 let mut additional_blocks = retriever
                     .retrieve_blocks_in_range(
-                        highest_commit_certified_block_id,
+                        highest_commit_certified_block.id(),
                         1,
-                        highest_commit_certified_block_id,
+                        highest_commit_certified_block.epoch(),
+                        highest_commit_certified_block.round(),
                         highest_commit_cert
                             .ledger_info()
                             .get_voters(&retriever.validator_addresses()),
@@ -378,9 +405,9 @@ impl BlockStore {
                 let block = additional_blocks.pop().expect("blocks are empty");
                 assert_eq!(
                     block.id(),
-                    highest_commit_certified_block_id,
+                    highest_commit_certified_block.id(),
                     "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-                    highest_commit_certified_block_id,
+                    highest_commit_certified_block.id(),
                     block.id(),
                 );
                 blocks.push(block);
@@ -409,6 +436,7 @@ impl BlockStore {
                 &mut blocks.clone(),
                 &mut quorum_certs.clone(),
                 order_vote_enabled,
+                window_size,
             )
             .with_context(|| {
                 // for better readability
@@ -438,7 +466,7 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = match storage.start(order_vote_enabled) {
+        let recovery_data = match storage.start(order_vote_enabled, window_size) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Failed to construct recovery data after fast forward sync"),
         };
@@ -480,13 +508,37 @@ impl BlockStore {
         let mut id = request.req.block_id();
         while (blocks.len() as u64) < request.req.num_blocks() {
             if let Some(executed_block) = self.get_block(id) {
-                blocks.push(executed_block.block().clone());
-                if request.req.match_target_id(id) {
+                info!(
+                    "Block found: {}, round: ({}, {})",
+                    executed_block.block().id(),
+                    executed_block.epoch(),
+                    executed_block.round()
+                );
+                if !executed_block.block().is_genesis_block() {
+                    blocks.push(executed_block.block().clone());
+                } else {
+                    info!(
+                        "Skipping genesis block: ({}, {})",
+                        executed_block.epoch(),
+                        executed_block.round()
+                    );
+                }
+                if request
+                    .req
+                    .match_target_round(executed_block.epoch(), executed_block.round())
+                {
+                    info!(
+                        "SucceededWithTarget: ({}, {}) <= {:?}",
+                        executed_block.epoch(),
+                        executed_block.round(),
+                        request.req.target_epoch_and_round(),
+                    );
                     status = BlockRetrievalStatus::SucceededWithTarget;
                     break;
                 }
                 id = executed_block.parent_id();
             } else {
+                info!("NotEnoughBlocks: {}", id);
                 status = BlockRetrievalStatus::NotEnoughBlocks;
                 break;
             }
@@ -540,7 +592,9 @@ impl BlockRetriever {
     async fn retrieve_block_for_id_chunk(
         &mut self,
         block_id: HashValue,
-        target_block_id: HashValue,
+        // TODO: epoch is unneeded?
+        target_epoch: u64,
+        target_round: u64,
         retrieve_batch_size: u64,
         mut peers: Vec<AccountAddress>,
     ) -> anyhow::Result<BlockRetrievalResponse> {
@@ -557,9 +611,7 @@ impl BlockRetriever {
             let mut futures = FuturesUnordered::new();
             if retrieve_batch_size == 1 {
                 let (tx, rx) = oneshot::channel();
-                self.pending_blocks
-                    .lock()
-                    .insert_request(target_block_id, tx);
+                self.pending_blocks.lock().insert_request(target_round, tx);
                 let author = self.network.author();
                 futures.push(
                     async move {
@@ -576,22 +628,23 @@ impl BlockRetriever {
                     .boxed(),
                 )
             }
-            let request = BlockRetrievalRequest::new_with_target_block_id(
+            let request = BlockRetrievalRequest::new_with_target_round(
                 block_id,
                 retrieve_batch_size,
-                target_block_id,
+                target_epoch,
+                target_round,
             );
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
                         // send batch request to a set of peers of size request_num_peers (or 1 for the first time)
                         let next_peers = if cur_retry < num_retries {
-                            let first_atempt = cur_retry == 0;
+                            let first_attempt = cur_retry == 0;
                             cur_retry += 1;
                             self.pick_peers(
-                                first_atempt,
+                                first_attempt,
                                 &mut peers,
-                                if first_atempt { 1 } else {request_num_peers}
+                                if first_attempt { 1 } else {request_num_peers}
                             )
                         } else {
                             Vec::new()
@@ -650,13 +703,14 @@ impl BlockRetriever {
     async fn retrieve_block_for_id(
         &mut self,
         block_id: HashValue,
-        target_block_id: HashValue,
+        target_epoch: u64,
+        target_round: u64,
         peers: Vec<AccountAddress>,
         num_blocks: u64,
     ) -> anyhow::Result<Vec<Block>> {
         info!(
-            "Retrieving {} blocks starting from {}",
-            num_blocks, block_id
+            "Retrieving {} blocks starting from {} with target_epoch {} and target_round {}",
+            num_blocks, block_id, target_epoch, target_round
         );
         let mut progress = 0;
         let mut last_block_id = block_id;
@@ -677,7 +731,8 @@ impl BlockRetriever {
             let response = self
                 .retrieve_block_for_id_chunk(
                     last_block_id,
-                    target_block_id,
+                    target_epoch,
+                    target_round,
                     retrieve_batch_size,
                     peers.clone(),
                 )
@@ -707,12 +762,26 @@ impl BlockRetriever {
                 },
             }
         }
-        assert_eq!(
+
+        info!(
+            "Retrieved {} blocks: {:?}",
+            result_blocks.len(),
+            result_blocks
+        );
+
+        assert_ge!(
+            target_epoch,
             result_blocks
                 .last()
                 .expect("Expected at least a result_block")
-                .id(),
-            target_block_id
+                .epoch()
+        );
+        assert_ge!(
+            target_round,
+            result_blocks
+                .last()
+                .expect("Expected at least a result_block")
+                .round()
         );
         Ok(result_blocks)
     }
@@ -722,12 +791,19 @@ impl BlockRetriever {
         &mut self,
         initial_block_id: HashValue,
         num_blocks: u64,
-        target_block_id: HashValue,
+        target_epoch: u64,
+        target_round: u64,
         peers: Vec<AccountAddress>,
     ) -> anyhow::Result<Vec<Block>> {
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER.inc_by(num_blocks);
-        self.retrieve_block_for_id(initial_block_id, target_block_id, peers, num_blocks)
-            .await
+        self.retrieve_block_for_id(
+            initial_block_id,
+            target_epoch,
+            target_round,
+            peers,
+            num_blocks,
+        )
+        .await
     }
 
     fn pick_peer(&self, first_atempt: bool, peers: &mut Vec<AccountAddress>) -> AccountAddress {
