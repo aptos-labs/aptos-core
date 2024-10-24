@@ -273,8 +273,8 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::StableCoinMint => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
-                    num_minter_accounts: 30000,
-                    num_user_accounts: 600000,
+                    num_minter_accounts: 1000,
+                    num_user_accounts: 1000000,
                     batch_size: 1,
                     num_mint_transactions: 2_000_000,
                 },
@@ -284,9 +284,9 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::StableCoinBatchMint => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
-                    num_minter_accounts: 30000,
-                    num_user_accounts: 600000,
-                    batch_size: 50,
+                    num_minter_accounts: 1000,
+                    num_user_accounts: 1000000,
+                    batch_size: 8,
                     num_mint_transactions: 2_000_000,
                 },
                 num_modules: 1,

@@ -134,7 +134,7 @@ impl TransactionGenerator for BucketedAccountsPoolWrapperGenerator {
             .flat_map(|account| self.generator.generate_transactions(account, 1))
             .collect();
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
-            destination_accounts_pool.add_to_pool(accounts_to_use, &mut self.rng);
+            destination_accounts_pool.add_to_pool(accounts_to_use);
         }
         txns
     }

@@ -412,6 +412,8 @@ pub async fn create_txn_generator_creator(
 
 pub struct BucketedObjectPool<T> {
     pool: RwLock<HashMap<AccountAddress, Vec<T>>>,
+    all_addresses: Arc<Vec<AccountAddress>>,
+    current_index: AtomicUsize,
 }
 
 impl<T> BucketedObjectPool<T> {
@@ -422,6 +424,8 @@ impl<T> BucketedObjectPool<T> {
         }
         Self {
             pool: RwLock::new(pool),
+            all_addresses: addresses,
+            current_index: AtomicUsize::new(0),
         }
     }
 
@@ -435,16 +439,17 @@ impl<T> BucketedObjectPool<T> {
     }
 
 
-    pub(crate) fn add_to_pool(&self, addition: Vec<T>, rng: &mut StdRng) {
+    pub(crate) fn add_to_pool(&self, addition: Vec<T>) {
         assert!(!addition.is_empty());
         let mut current = self.pool.write();
-        let addresses = current.keys().cloned().collect::<Vec<_>>();
         for object in addition {
-            let address = addresses[rng.gen_range(0, addresses.len())];
+            let current_index = self.current_index.load(Ordering::Relaxed);
+            let current_address = self.all_addresses[current_index];
             current
-                .entry(address)
+                .entry(current_address)
                 .or_insert_with(Vec::new)
                 .append(&mut vec![object]);
+            self.current_index.store((current_index + 1) % self.all_addresses.len(), Ordering::Relaxed);
         }
     }
 
