@@ -15,14 +15,15 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use aptos_forge::Node;
 
 /// Chain recovery using a local config from randomness stall should work.
 /// See `randomness_config_seqnum.move` for more details.
 #[tokio::test]
 async fn randomness_stall_recovery() {
     let epoch_duration_secs = 20;
-
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let num_validators = 4;
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
@@ -51,7 +52,7 @@ async fn randomness_stall_recovery() {
 
     info!("Halting the chain by putting every validator into sync_only mode.");
     for validator in swarm.validators_mut() {
-        enable_sync_only_mode(4, validator).await;
+        enable_sync_only_mode(num_validators, validator).await;
     }
 
     info!("Chain should have halted.");
@@ -79,7 +80,6 @@ async fn randomness_stall_recovery() {
         validator_override_config.save_config(config_path).unwrap();
         info!("Restarting validator {}.", idx);
         validator.start().unwrap();
-        info!("Let validator {} bake for 5 secs.", idx);
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
@@ -96,7 +96,6 @@ async fn randomness_stall_recovery() {
         vfn_override_config.save_config(config_path).unwrap();
         info!("Restarting VFN {}.", idx);
         vfn.start().unwrap();
-        info!("Let VFN {} bake for 5 secs.", idx);
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
