@@ -1550,6 +1550,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-drop-helper",
+ "aptos-infallible",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-storage-interface",
@@ -1558,6 +1559,8 @@ dependencies = [
  "criterion",
  "derive_more",
  "itertools 0.13.0",
+ "once_cell",
+ "rayon",
  "serde",
  "thiserror",
 ]
