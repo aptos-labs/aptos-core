@@ -10,7 +10,7 @@ use crate::{
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
+use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
@@ -56,11 +56,11 @@ where
 {
     pub fn new(
         executor: BlockExecutor<V>,
-        version: Version,
+        start_version: Version,
         config: &PipelineConfig,
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
-    ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {
+    ) -> (Self, SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
@@ -113,22 +113,20 @@ where
         let mut partitioning_stage =
             BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
 
-        let mut exe = TransactionExecutor::new(
-            executor_1,
-            parent_block_id,
-            ledger_update_sender,
-            config.allow_aborts,
-            config.allow_discards,
-            config.allow_retries,
-        );
+        let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 
         let commit_processing = if config.skip_commit {
             CommitProcessing::Skip
         } else {
             CommitProcessing::SendToQueue(commit_sender)
         };
-        let mut ledger_update_stage =
-            LedgerUpdateStage::new(executor_2, commit_processing, version);
+        let mut ledger_update_stage = LedgerUpdateStage::new(
+            executor_2,
+            commit_processing,
+            config.allow_aborts,
+            config.allow_discards,
+            config.allow_retries,
+        );
 
         let (executable_block_sender, executable_block_receiver) =
             mpsc::sync_channel::<ExecuteBlockMessage>(3);
@@ -210,11 +208,9 @@ where
             .name("ledger_update".to_string())
             .spawn(move || {
                 while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
-                    let input_block_size =
-                        ledger_update_msg.state_checkpoint_output.input_txns_len();
                     NUM_TXNS
                         .with_label_values(&["ledger_update"])
-                        .inc_by(input_block_size as u64);
+                        .inc_by(ledger_update_msg.num_input_txns as u64);
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
             })
@@ -228,7 +224,7 @@ where
                     start_commit_rx.map(|rx| rx.recv());
                     info!("Starting commit thread");
                     let mut committer =
-                        TransactionCommitter::new(executor_3, version, commit_receiver);
+                        TransactionCommitter::new(executor_3, start_version, commit_receiver);
                     committer.run();
                 })
                 .expect("Failed to spawn transaction committer thread.");
@@ -264,22 +260,21 @@ pub struct ExecuteBlockMessage {
 }
 
 pub struct LedgerUpdateMessage {
+    pub first_block_start_time: Instant,
     pub current_block_start_time: Instant,
     pub execution_time: Duration,
     pub partition_time: Duration,
     pub block_id: HashValue,
     pub parent_block_id: HashValue,
-    pub state_checkpoint_output: StateCheckpointOutput,
-    pub first_block_start_time: Instant,
+    pub num_input_txns: usize,
 }
 
 /// Message from execution stage to commit stage.
 pub struct CommitBlockMessage {
     pub(crate) block_id: HashValue,
-    pub(crate) root_hash: HashValue,
     pub(crate) first_block_start_time: Instant,
     pub(crate) current_block_start_time: Instant,
-    pub(crate) partition_time: Duration,
     pub(crate) execution_time: Duration,
-    pub(crate) num_txns: usize,
+    pub(crate) partition_time: Duration,
+    pub(crate) output: StateComputeResult,
 }

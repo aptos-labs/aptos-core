@@ -551,7 +551,7 @@ pub trait DbWriter: Send + Sync {
         }
 
         if !chunk.is_empty() {
-            self.pre_commit_ledger(chunk, sync_commit)?;
+            self.pre_commit_ledger(chunk.clone(), sync_commit)?;
         }
         let version_to_commit = if let Some(ledger_info_with_sigs) = ledger_info_with_sigs {
             ledger_info_with_sigs.ledger_info().version()

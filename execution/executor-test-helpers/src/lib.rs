@@ -50,7 +50,7 @@ pub fn gen_ledger_info_with_sigs(
             0, /* round */
             commit_block_id,
             output.root_hash(),
-            output.version(),
+            output.expect_last_version(),
             0, /* timestamp */
             output.epoch_state().clone(),
         ),

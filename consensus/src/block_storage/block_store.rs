@@ -177,7 +177,7 @@ impl BlockStore {
             root_metadata.accu_hash,
         );
 
-        let result = StateComputeResult::new_empty(Arc::new(
+        let result = StateComputeResult::new_dummy_with_accumulator(Arc::new(
             InMemoryTransactionAccumulator::new(
                 root_metadata.frozen_root_hashes,
                 root_metadata.num_leaves,

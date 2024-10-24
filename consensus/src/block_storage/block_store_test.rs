@@ -290,7 +290,7 @@ async fn test_insert_vote() {
             VoteData::new(
                 block.block().gen_block_info(
                     block.compute_result().root_hash(),
-                    block.compute_result().version(),
+                    block.compute_result().last_version_or_0(),
                     block.compute_result().epoch_state().clone(),
                 ),
                 block.quorum_cert().certified_block().clone(),
@@ -319,7 +319,7 @@ async fn test_insert_vote() {
         VoteData::new(
             block.block().gen_block_info(
                 block.compute_result().root_hash(),
-                block.compute_result().version(),
+                block.compute_result().last_version_or_0(),
                 block.compute_result().epoch_state().clone(),
             ),
             block.quorum_cert().certified_block().clone(),

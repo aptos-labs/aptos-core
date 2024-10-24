@@ -17,8 +17,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ParsedTransactionOutput, TransactionReplayer,
-    VerifyExecutionMode,
+    ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
@@ -258,7 +257,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         };
 
         let output = chunk.output.expect_complete_result();
-        let num_txns = output.transactions_to_commit_len();
+        let num_txns = output.num_transactions_to_commit();
         if chunk.ledger_info_opt.is_some() || num_txns != 0 {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__save_txns"]);
             fail_point!("executor::commit_chunk", |_| {
@@ -302,27 +301,27 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let num_txns = chunk.len();
 
         let state_view = self.latest_state_view(&parent_state)?;
-        let chunk_output = chunk.into_output::<V>(state_view)?;
+        let execution_output = chunk.into_output::<V>(state_view)?;
 
         // Calculate state snapshot
-        let (result_state, next_epoch_state, state_checkpoint_output) = DoStateCheckpoint::run(
-            chunk_output,
+        let state_checkpoint_output = DoStateCheckpoint::run(
+            &execution_output,
             &self.commit_queue.lock().latest_state(),
-            None, // append_state_checkpoint_to_block
-            Some(chunk_verifier.state_checkpoint_hashes()),
-            false, // is_block
+            Some(
+                chunk_verifier
+                    .transaction_infos()
+                    .iter()
+                    .map(|t| t.state_checkpoint_hash()),
+            ),
         )?;
+        let output = PartialStateComputeResult::new(execution_output);
+        output.set_state_checkpoint_output(state_checkpoint_output);
 
         // Enqueue for next stage.
         self.commit_queue
             .lock()
             .enqueue_for_ledger_update(ChunkToUpdateLedger {
-                output: PartialStateComputeResult::new(
-                    parent_state.clone(),
-                    result_state,
-                    next_epoch_state,
-                ),
-                state_checkpoint_output,
+                output,
                 chunk_verifier,
             })?;
 
@@ -346,23 +345,24 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         };
         let ChunkToUpdateLedger {
             output,
-            state_checkpoint_output,
             chunk_verifier,
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        let (ledger_update_output, to_discard, to_retry) = {
+        let ledger_update_output = {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__calculate"]);
-            DoLedgerUpdate::run(state_checkpoint_output, parent_accumulator.clone())?
+            DoLedgerUpdate::run(
+                &output.execution_output,
+                output.expect_state_checkpoint_output(),
+                parent_accumulator.clone(),
+            )?
         };
 
-        ensure!(to_discard.is_empty(), "Unexpected discard.");
-        ensure!(to_retry.is_empty(), "Unexpected retry.");
         chunk_verifier.verify_chunk_result(&parent_accumulator, &ledger_update_output)?;
 
         let ledger_info_opt = chunk_verifier.maybe_select_chunk_ending_ledger_info(
             &ledger_update_output,
-            output.next_epoch_state.as_ref(),
+            output.execution_output.next_epoch_state.as_ref(),
         )?;
         output.set_ledger_update_output(ledger_update_output);
 
@@ -373,7 +373,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let num_txns = executed_chunk
             .output
             .expect_complete_result()
-            .transactions_to_commit_len();
+            .num_transactions_to_commit();
 
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__save"]);
         self.commit_queue
@@ -456,9 +456,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let mut epochs = Vec::new();
         let mut epoch_begin = chunk_begin; // epoch begin version
         for (version, events) in multizip((chunk_begin..chunk_end, event_vecs.iter())) {
-            let is_epoch_ending = ParsedTransactionOutput::parse_reconfig_events(events)
-                .next()
-                .is_some();
+            let is_epoch_ending = events.iter().any(ContractEvent::is_new_epoch_event);
             if is_epoch_ending {
                 epochs.push((epoch_begin, version + 1));
                 epoch_begin = version + 1;
@@ -497,14 +495,14 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let chunk = self.commit_chunk_impl()?;
         let output = chunk.output.expect_complete_result();
 
-        let num_committed = output.transactions_to_commit_len();
+        let num_committed = output.num_transactions_to_commit();
         info!(
             num_committed = num_committed,
             tps = num_committed as f64 / started.elapsed().as_secs_f64(),
             "TransactionReplayer::commit() OK"
         );
 
-        Ok(output.version())
+        Ok(output.expect_last_version())
     }
 
     /// Remove `end_version - begin_version` transactions from the mutable input arguments and replay.
@@ -600,15 +598,16 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
-        let chunk_output = DoGetExecutionOutput::by_transaction_execution::<V>(
+        let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            None,
         )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,
-            chunk_output.transaction_outputs.iter(),
+            execution_output.to_commit.transaction_outputs(),
             transaction_infos.iter(),
             write_sets.iter(),
             event_vecs.iter(),
@@ -619,13 +618,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 Some(write_set),
                 Some(events),
             ) {
-                if verify_execution_mode.is_lazy_quit() {
+                return if verify_execution_mode.is_lazy_quit() {
                     error!("(Not quitting right away.) {}", err);
                     verify_execution_mode.mark_seen_error();
-                    return Ok(version + 1);
+                    Ok(version + 1)
                 } else {
-                    return Err(err);
-                }
+                    Err(err)
+                };
             }
         }
         Ok(end_version)
