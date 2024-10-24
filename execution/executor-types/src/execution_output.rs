@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::transactions_with_output::TransactionsWithOutput;
+use crate::{planned::Planned, transactions_with_output::TransactionsWithOutput};
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::{
@@ -34,7 +34,7 @@ impl ExecutionOutput {
         state_cache: StateCache,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
-        subscribable_events: Vec<ContractEvent>,
+        subscribable_events: Planned<Vec<ContractEvent>>,
     ) -> Self {
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
@@ -73,7 +73,7 @@ impl ExecutionOutput {
             state_cache: StateCache::new_empty(state.current.clone()),
             block_end_info: None,
             next_epoch_state: None,
-            subscribable_events: vec![],
+            subscribable_events: Planned::ready(vec![]),
         })
     }
 
@@ -90,7 +90,7 @@ impl ExecutionOutput {
             state_cache: StateCache::new_dummy(),
             block_end_info: None,
             next_epoch_state: None,
-            subscribable_events: vec![],
+            subscribable_events: Planned::ready(vec![]),
         })
     }
 
@@ -109,7 +109,7 @@ impl ExecutionOutput {
             state_cache: StateCache::new_dummy(),
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
-            subscribable_events: vec![],
+            subscribable_events: Planned::ready(vec![]),
         })
     }
 
@@ -155,7 +155,7 @@ pub struct Inner {
     /// Only present if the block is the last block of an epoch, and is parsed output of the
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
-    pub subscribable_events: Vec<ContractEvent>,
+    pub subscribable_events: Planned<Vec<ContractEvent>>,
 }
 
 impl Inner {

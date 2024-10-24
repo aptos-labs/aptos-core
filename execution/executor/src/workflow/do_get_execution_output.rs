@@ -12,7 +12,7 @@ use aptos_executor_service::{
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, should_forward_to_subscription_service,
+    execution_output::ExecutionOutput, planned::Planned, should_forward_to_subscription_service,
     transactions_with_output::TransactionsWithOutput,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -24,6 +24,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
+    contract_event::ContractEvent,
     epoch_state::EpochState,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{
@@ -311,21 +312,8 @@ impl Parser {
                 .then(|| Self::ensure_next_epoch_state(&to_commit))
                 .transpose()?
         };
-        let subscribable_events = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__subscribable_events"]);
-            to_commit
-                .transaction_outputs()
-                .iter()
-                .flat_map(|o| {
-                    o.events()
-                        .iter()
-                        .filter(|e| should_forward_to_subscription_service(e))
-                })
-                .cloned()
-                .collect_vec()
-        };
 
-        Ok(ExecutionOutput::new(
+        let out = ExecutionOutput::new(
             is_block,
             first_version,
             statuses_for_input_txns,
@@ -335,8 +323,24 @@ impl Parser {
             state_cache,
             block_end_info,
             next_epoch_state,
-            subscribable_events,
-        ))
+            Planned::place_holder(),
+        );
+        let ret = out.clone();
+        ret.subscribable_events
+            .plan(THREAD_MANAGER.get_non_exe_cpu_pool(), move || {
+                Self::get_subscribable_events(&out)
+            });
+        Ok(ret)
+    }
+
+    fn get_subscribable_events(out: &ExecutionOutput) -> Vec<ContractEvent> {
+        out.to_commit
+            .transaction_outputs
+            .iter()
+            .flat_map(TransactionOutput::events)
+            .filter(|e| should_forward_to_subscription_service(e))
+            .cloned()
+            .collect_vec()
     }
 
     fn extract_retries(
@@ -543,6 +547,9 @@ mod tests {
         ];
         let execution_output =
             Parser::parse(0, txns, txn_outs, StateCache::new_dummy(), None, None).unwrap();
-        assert_eq!(vec![event_0, event_2], execution_output.subscribable_events);
+        assert_eq!(
+            vec![event_0, event_2],
+            *execution_output.subscribable_events
+        );
     }
 }
