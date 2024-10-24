@@ -49,7 +49,7 @@ use std::sync::atomic::AtomicBool;
 use std::thread;
 use std::time::SystemTime;
 use rand::prelude::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, thread_rng};
 use serde::{Deserialize, Serialize};
 use aptos_block_executor::txn_commit_hook::OutputStreamHook;
 use aptos_block_executor::txn_provider::sharded::ShardedTransaction;
@@ -356,8 +356,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         let batch_size = 200;
                         let mut num_outputs_received: usize = 0;
                         let mut seq_num: u64 = 0;
-                        let mut rng = StdRng::from_entropy();
-                        let random_number = rng.gen_range(0, u64::MAX);
+                        let random_number = thread_rng().gen_range(0, u64::MAX);
                         let mut curr_batch = vec![];
                         loop {
                             let ret = stream_results_receiver.recv().unwrap();

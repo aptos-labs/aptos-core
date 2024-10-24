@@ -15,7 +15,7 @@ use itertools::Itertools;
 use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, thread_rng};
 use tokio::runtime;
 use tokio::runtime::Runtime;
 use tokio::sync::Notify;
@@ -176,14 +176,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                             pq: Arc<MpmcCpq<Message>>,
                             recv_condition: Arc<(tokio::sync::Mutex<bool>, Condvar)>,
                             outbound_rpc_scheduler: Arc<OutboundRpcScheduler>,) {
-        let mut rng = StdRng::from_entropy();
         loop {
             let message = pq.recv().await;
             let state_view = state_view.clone();
             let kv_txs = kv_tx.clone();
 
             let outbound_rpc_scheduler_clone = outbound_rpc_scheduler.clone();
-            Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_scheduler_clone);
+            Self::handle_message(message, state_view, kv_txs, thread_rng().gen_range(0, kv_tx[0].len()), outbound_rpc_scheduler_clone);
         }
     }
 

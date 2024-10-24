@@ -29,7 +29,7 @@ use std::thread::JoinHandle;
 use std::time::SystemTime;
 use itertools::Itertools;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, thread_rng};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSlice;
 use aptos_drop_helper::DEFAULT_DROPPER;
@@ -402,8 +402,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                             .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
                         let execute_command_type = format!("execute_command_{}", shard_id);
-                        let mut rng = StdRng::from_entropy();
-                        let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
+                        let rand_send_thread_idx = thread_rng().gen_range(0, senders[shard_id].len());
 
                         let timer_1 = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&["0", "cmd_tx_lock_send"])

@@ -15,7 +15,7 @@ use std::{net::SocketAddr, sync::Arc,};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use aptos_block_executor::txn_provider::sharded::{BlockingTransaction, CrossShardClientForV3, ShardedTransaction, ShardedTxnProvider};
 use rand::prelude::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, thread_rng};
 use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
@@ -147,7 +147,6 @@ impl RemoteCoordinatorClient {
         let mut num_txns_processed = Arc::new(AtomicUsize::new(num_txns_recvd));
         let mut all_cmds_recvd = Arc::new(AtomicBool::new(false));
         let mut stream_init_done = Arc::new(AtomicBool::new(init_sender.is_none()));
-        let mut rng = StdRng::from_entropy();
 
         loop {
             if stream_init_done.load(std::sync::atomic::Ordering::Relaxed)
@@ -167,7 +166,7 @@ impl RemoteCoordinatorClient {
                     let blocking_transactions_clone = blocking_transactions.clone();
                     let init_sender_clone = init_sender.clone();
                     let all_cmds_recvd_clone = all_cmds_recvd.clone();
-                    let random_number = rng.gen_range(0, u64::MAX);
+                    let random_number = thread_rng().gen_range(0, u64::MAX);
 
                     if message.seq_num.unwrap() == 0 {
                         stream_init_done.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -358,7 +357,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                         let state_keys = Self::extract_state_keys_from_txns(&transactions);
 
                         state_view_client_clone.pre_fetch_state_values(
-                            state_keys, false, StdRng::from_entropy().gen_range(0, u64::MAX), message.shard_id.unwrap());
+                            state_keys, false, thread_rng().gen_range(0, u64::MAX), message.shard_id.unwrap());
 
                         let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
                             blocking_txns[idx + batch_start_index].set_txn(txn.into_txn());
