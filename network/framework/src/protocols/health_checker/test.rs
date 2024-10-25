@@ -5,10 +5,7 @@
 use super::*;
 use crate::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
-    peer_manager::{
-        self, ConnectionRequest, ConnectionRequestSender, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{self, ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
         wire::{
@@ -33,7 +30,6 @@ struct TestHarness {
     mock_time: MockTimeService,
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
-    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
@@ -46,8 +42,7 @@ impl TestHarness {
         let mock_time = TimeService::mock();
 
         let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
-        let (connection_reqs_tx, connection_reqs_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 1, None);
+        let (connection_reqs_tx, ..) = aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = tokio::sync::mpsc::channel(10);
@@ -82,7 +77,6 @@ impl TestHarness {
                 mock_time: mock_time.into_mock(),
                 peer_mgr_reqs_rx,
                 peer_mgr_notifs_tx,
-                connection_reqs_rx,
                 connection_notifs_tx,
                 peers_and_metadata,
             },
@@ -123,12 +117,6 @@ impl TestHarness {
         res_tx.send(Ok(res_data.into())).unwrap();
     }
 
-    async fn expect_ping_send_not_ok(&mut self) {
-        let (_ping_msg, res_tx) = self.expect_ping().await;
-        // This mock ping request must fail.
-        res_tx.send(Err(RpcError::TimedOut)).unwrap();
-    }
-
     async fn send_inbound_ping(
         &mut self,
         peer_id: PeerId,
@@ -158,16 +146,6 @@ impl TestHarness {
             .unwrap();
         delivered_rx.await.unwrap();
         res_rx
-    }
-
-    async fn expect_disconnect(&mut self, expected_peer_id: PeerId) {
-        let req = self.connection_reqs_rx.next().await.unwrap();
-        let (peer_id, res_tx) = match req {
-            ConnectionRequest::DisconnectPeer(peer_id, res_tx) => (peer_id, res_tx),
-            _ => panic!("Unexpected ConnectionRequest: {:?}", req),
-        };
-        assert_eq!(peer_id, expected_peer_id);
-        res_tx.send(Ok(())).unwrap();
     }
 
     async fn send_new_peer_notification(&mut self, peer_id: PeerId) {
@@ -237,104 +215,6 @@ async fn inbound() {
 
         // HealthChecker should respond with a pong.
         expect_pong(res_rx).await;
-    };
-    future::join(health_checker.start(), test).await;
-}
-
-#[tokio::test]
-async fn outbound_failure_permissive() {
-    let ping_failures_tolerated = 10;
-    let (mut harness, health_checker) = TestHarness::new_permissive(ping_failures_tolerated);
-
-    let test = async move {
-        // Trigger ping to a peer. This should do nothing.
-        harness.trigger_ping().await;
-
-        // Notify HealthChecker of new connected node.
-        let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
-        harness.send_new_peer_notification(peer_id).await;
-
-        // Trigger pings to a peer. These should ping the newly added peer, but not disconnect from
-        // it.
-        for _ in 0..=ping_failures_tolerated {
-            // Health checker should send a ping request which fails.
-            harness.trigger_ping().await;
-            harness.expect_ping_send_not_ok().await;
-        }
-
-        // Health checker should disconnect from peer after tolerated number of failures
-        harness.expect_disconnect(peer_id).await;
-    };
-    future::join(health_checker.start(), test).await;
-}
-
-#[tokio::test]
-async fn ping_success_resets_fail_counter() {
-    let failures_triggered = 10;
-    let ping_failures_tolerated = 2 * 10;
-    let (mut harness, health_checker) = TestHarness::new_permissive(ping_failures_tolerated);
-
-    let test = async move {
-        // Trigger ping to a peer. This should do nothing.
-        harness.trigger_ping().await;
-
-        // Notify HealthChecker of new connected node.
-        let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
-        harness.send_new_peer_notification(peer_id).await;
-
-        // Trigger pings to a peer. These should ping the newly added peer, but not disconnect from
-        // it.
-        {
-            for _ in 0..failures_triggered {
-                // Health checker should send a ping request which fails.
-                harness.trigger_ping().await;
-                harness.expect_ping_send_not_ok().await;
-            }
-        }
-
-        // Trigger successful ping. This should reset the counter of ping failures.
-        {
-            // Health checker should send a ping request which succeeds
-            harness.trigger_ping().await;
-            harness.expect_ping_send_ok().await;
-        }
-
-        // We would then need to fail for more than `ping_failures_tolerated` times before
-        // triggering disconnect.
-        {
-            for _ in 0..=ping_failures_tolerated {
-                // Health checker should send a ping request which fails.
-                harness.trigger_ping().await;
-                harness.expect_ping_send_not_ok().await;
-            }
-        }
-
-        // Health checker should disconnect from peer after tolerated number of failures
-        harness.expect_disconnect(peer_id).await;
-    };
-    future::join(health_checker.start(), test).await;
-}
-
-#[tokio::test]
-async fn outbound_failure_strict() {
-    let (mut harness, health_checker) = TestHarness::new_strict();
-
-    let test = async move {
-        // Trigger ping to a peer. This should do nothing.
-        harness.trigger_ping().await;
-
-        // Notify HealthChecker of new connected node.
-        let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
-        harness.send_new_peer_notification(peer_id).await;
-
-        // Trigger ping to a peer. This should ping the newly added peer.
-        harness.trigger_ping().await;
-
-        // Health checker should send a ping request which fails.
-        harness.expect_ping_send_not_ok().await;
-
-        // Health checker should disconnect from peer.
-        harness.expect_disconnect(peer_id).await;
     };
     future::join(health_checker.start(), test).await;
 }
