@@ -25,6 +25,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
@@ -423,6 +424,7 @@ impl VMRuntime {
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 
+        let timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
         let return_values = Interpreter::entrypoint(
             function,
             deserialized_args,
@@ -434,6 +436,7 @@ impl VMRuntime {
             extensions,
             &self.loader,
         )?;
+        drop(timer);
 
         let serialized_return_values = self
             .serialize_return_values(module_store, module_storage, &return_tys, return_values)

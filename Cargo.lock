@@ -4510,6 +4510,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-unit-test",
+ "move-vm-metrics",
  "move-vm-runtime",
  "move-vm-types",
  "num_cpus",
@@ -11759,6 +11760,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-vm-metrics"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "prometheus",
+]
+
+[[package]]
 name = "move-vm-paranoid-tests"
 version = "0.1.0"
 dependencies = [
@@ -11786,6 +11795,7 @@ dependencies = [
  "move-compiler",
  "move-core-types",
  "move-ir-compiler",
+ "move-vm-metrics",
  "move-vm-test-utils",
  "move-vm-types",
  "once_cell",

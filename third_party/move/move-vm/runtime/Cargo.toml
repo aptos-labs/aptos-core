@@ -29,6 +29,7 @@ typed-arena = { workspace = true }
 
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-core-types = { path = "../../move-core/types" }
+move-vm-metrics = { workspace = true }
 move-vm-types = { path = "../types" }
 
 [dev-dependencies]
