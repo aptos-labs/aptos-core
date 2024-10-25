@@ -15636,6 +15636,7 @@ dependencies = [
  "futures",
  "hex",
  "hyper 0.14.28",
+ "itertools 0.13.0",
  "move-core-types",
  "num_cpus",
  "once_cell",
