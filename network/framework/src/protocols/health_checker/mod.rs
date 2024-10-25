@@ -225,6 +225,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         }
                     }
                 }
+                // TODO @hariria deprecate
                 _ = ticker.select_next_some() => {
                     self.round += 1;
                     let connected = self.network_interface.connected_peers();
@@ -251,6 +252,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                             nonce
                         );
 
+                        // TODO @hariria deprecate
                         tick_handlers.push(Self::ping_peer(
                             self.network_context,
                             self.network_interface.network_client(),
