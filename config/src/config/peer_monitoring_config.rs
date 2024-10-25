@@ -49,7 +49,7 @@ impl Default for LatencyMonitoringConfig {
         Self {
             latency_ping_interval_ms: 30_000, // 30 seconds
             latency_ping_timeout_ms: 20_000,  // 20 seconds
-            max_latency_ping_failures: 3,
+            max_latency_ping_failures: 10,
             max_num_latency_pings_to_retain: 10,
         }
     }

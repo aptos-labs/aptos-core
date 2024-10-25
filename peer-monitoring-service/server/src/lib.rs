@@ -178,7 +178,11 @@ impl<T: StorageReaderInterface> Handler<T> {
                 self.get_server_protocol_version()
             },
             PeerMonitoringServiceRequest::GetNodeInformation => self.get_node_information(),
-            PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
+            // TODO this is just for forge testing, drop this commit
+            // PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
+            PeerMonitoringServiceRequest::LatencyPing(_) => Err(Error::UnexpectedErrorEncountered(
+                "For Forge test, not responding to ping".to_string(),
+            )),
         };
 
         // Process the response and handle any errors
@@ -280,7 +284,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         ))
     }
 
-    fn handle_latency_ping(
+    fn _handle_latency_ping(
         &self,
         latency_ping_request: &LatencyPingRequest,
     ) -> Result<PeerMonitoringServiceResponse, Error> {
