@@ -177,11 +177,13 @@ pub fn new_test_context_inner(
     node_config
         .storage
         .set_data_dir(tmp_dir.path().to_path_buf());
+
     let mock_indexer_service = MockInternalIndexerDBService::new_for_test(
         db_rw.reader.clone(),
         &node_config,
         recver,
         end_version,
+        mempool.ac_client.clone(),
     );
 
     let context = Context::new(

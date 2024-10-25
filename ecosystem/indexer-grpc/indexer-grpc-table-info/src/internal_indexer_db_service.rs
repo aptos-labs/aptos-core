@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use crate::{
+    backup_restore::gcs::GcsBackupRestoreOperator, internal_indexer_snapshot_folder_name,
+    internal_indexer_snapshot_folder_prefix, snapshot_folder_name, snapshot_folder_prefix,
+    table_info_service::TableInfoService,
+};
+use anyhow::{Context, Result};
+use aptos_api::context::Context as ApiContext;
 use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
 use aptos_db_indexer::{
     db_indexer::{DBIndexer, InternalIndexerDB},
@@ -10,8 +16,11 @@ use aptos_db_indexer::{
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::info;
+use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
-use aptos_types::{indexer::indexer_db_reader::IndexerReader, transaction::Version};
+use aptos_types::{
+    chain_id::ChainId, indexer::indexer_db_reader::IndexerReader, transaction::Version,
+};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -21,10 +30,15 @@ use tokio::{runtime::Handle, sync::watch::Receiver as WatchReceiver};
 
 const SERVICE_TYPE: &str = "internal_indexer_db_service";
 const INTERNAL_INDEXER_DB: &str = "internal_indexer_db";
+const INTERNAL_INDEXER_SNAPSHOT_CHECK_INTERVAL_IN_SECS: u64 = 5;
 
 pub struct InternalIndexerDBService {
     pub db_indexer: Arc<DBIndexer>,
     pub update_receiver: WatchReceiver<Version>,
+    pub context: Arc<ApiContext>,
+
+    // Backup and restore service. If not enabled, this will be None.
+    backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
 }
 
 impl InternalIndexerDBService {
@@ -32,11 +46,15 @@ impl InternalIndexerDBService {
         db_reader: Arc<dyn DbReader>,
         internal_indexer_db: InternalIndexerDB,
         update_receiver: WatchReceiver<Version>,
+        context: Arc<ApiContext>,
+        backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
     ) -> Self {
         let internal_db_indexer = Arc::new(DBIndexer::new(internal_indexer_db, db_reader));
         Self {
             db_indexer: internal_db_indexer,
             update_receiver,
+            context,
+            backup_restore_operator,
         }
     }
 
@@ -76,7 +94,7 @@ impl InternalIndexerDBService {
         );
         Some(InternalIndexerDB::new(
             arc_db,
-            node_config.indexer_db_config,
+            node_config.indexer_db_config.clone(),
         ))
     }
 
@@ -140,9 +158,43 @@ impl InternalIndexerDBService {
         Ok(start_version)
     }
 
-    pub async fn run(&mut self, node_config: &NodeConfig) -> Result<()> {
-        let mut start_version = self.get_start_version(node_config).await?;
+    fn get_epoch(&self, version: Version) -> u64 {
+        let (_, _, block_epoch) = self
+            .context
+            .db
+            .get_block_info_by_version(version)
+            .unwrap_or_else(|_| panic!("Could not get block_info for version {}", version));
+        block_epoch.epoch()
+    }
 
+    pub async fn run(&mut self, node_config: &NodeConfig) -> Result<()> {
+        let backup_is_enabled = match self.backup_restore_operator.clone() {
+            Some(backup_restore_operator) => {
+                let context = self.context.clone();
+                let _task = tokio::spawn(async move {
+                    loop {
+                        aptos_logger::info!("[Internal Indexer] Checking for snapshots to backup.");
+                        TableInfoService::backup_snapshot_if_present(
+                            context.clone(),
+                            backup_restore_operator.clone(),
+                            internal_indexer_snapshot_folder_prefix(context.chain_id().id() as u64),
+                            "Internal Indexer".to_string(),
+                        )
+                        .await;
+                        tokio::time::sleep(Duration::from_secs(
+                            INTERNAL_INDEXER_SNAPSHOT_CHECK_INTERVAL_IN_SECS,
+                        ))
+                        .await;
+                    }
+                });
+                true
+            },
+            None => false,
+        };
+        println!("backup_is_enabled: {}", backup_is_enabled);
+
+        let mut start_version = self.get_start_version(node_config).await?;
+        let mut last_epoch = self.get_epoch(start_version);
         loop {
             let start_time: std::time::Instant = std::time::Instant::now();
             let next_version = self.db_indexer.process_a_batch(start_version)?;
@@ -159,6 +211,15 @@ impl InternalIndexerDBService {
                 }
                 continue;
             };
+
+            let current_epoch = self.get_epoch(next_version - 1);
+            if last_epoch < current_epoch {
+                if backup_is_enabled {
+                    self.snapshot_internal_indexer_db(current_epoch - 1)?
+                }
+                last_epoch = current_epoch;
+            }
+
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::InternalIndexerDBProcessed,
@@ -173,6 +234,26 @@ impl InternalIndexerDBService {
             );
             start_version = next_version;
         }
+    }
+
+    fn snapshot_internal_indexer_db(&self, epoch: u64) -> anyhow::Result<()> {
+        let chain_id = self.context.chain_id().id();
+        // temporary path to store the snapshot
+        let snapshot_dir =
+            self.context
+                .node_config
+                .get_data_dir()
+                .join(internal_indexer_snapshot_folder_name(
+                    chain_id as u64,
+                    epoch,
+                ));
+        // rocksdb will create a checkpoint to take a snapshot of full db and then save it to snapshot_path
+        self.db_indexer
+            .indexer_db
+            .create_checkpoint(&snapshot_dir)
+            .context(format!("DB checkpoint failed at epoch {}", epoch))?;
+
+        Ok(())
     }
 
     // For internal testing
@@ -208,6 +289,7 @@ impl MockInternalIndexerDBService {
         node_config: &NodeConfig,
         update_receiver: WatchReceiver<Version>,
         end_version: Option<Version>,
+        mp_sender: MempoolClientSender,
     ) -> Self {
         if !node_config
             .indexer_db_config
@@ -221,8 +303,17 @@ impl MockInternalIndexerDBService {
 
         let db = InternalIndexerDBService::get_indexer_db(node_config).unwrap();
         let handle = Handle::current();
+
+        let context = Arc::new(aptos_api::Context::new(
+            ChainId::test(),
+            db_reader.clone(),
+            mp_sender,
+            node_config.clone(),
+            None,
+        ));
+
         let mut internal_indexer_db_service =
-            InternalIndexerDBService::new(db_reader, db, update_receiver);
+            InternalIndexerDBService::new(db_reader, db, update_receiver, context, None);
         let db_indexer = internal_indexer_db_service.get_db_indexer();
         let config_clone = node_config.to_owned();
         handle.spawn(async move {

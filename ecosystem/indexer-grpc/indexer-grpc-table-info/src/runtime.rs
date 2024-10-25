@@ -6,7 +6,9 @@ use crate::{
     internal_indexer_db_service::InternalIndexerDBService, table_info_service::TableInfoService,
 };
 use aptos_api::context::Context;
-use aptos_config::config::{NodeConfig, TableInfoServiceMode};
+use aptos_config::config::{
+    internal_indexer_db_config::InternalIndexerServiceMode, NodeConfig, TableInfoServiceMode,
+};
 use aptos_db_indexer::{
     db_indexer::{DBIndexer, InternalIndexerDB},
     db_ops::open_db,
@@ -23,18 +25,40 @@ const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 pub fn bootstrap_internal_indexer_db(
     config: &NodeConfig,
     db_rw: DbReaderWriter,
+    chain_id: ChainId,
     internal_indexer_db: Option<InternalIndexerDB>,
     update_receiver: Option<WatchReceiver<Version>>,
+    mp_sender: MempoolClientSender,
 ) -> Option<(Runtime, Arc<DBIndexer>)> {
     if !config.indexer_db_config.is_internal_indexer_db_enabled() || internal_indexer_db.is_none() {
         return None;
     }
     let runtime = aptos_runtimes::spawn_named_runtime("index-db".to_string(), None);
+
+    let context = Arc::new(Context::new(
+        chain_id,
+        db_rw.reader.clone(),
+        mp_sender,
+        config.clone(),
+        None,
+    ));
+
     // Set up db config and open up the db initially to read metadata
+    let backup_restore_operator = match &config.indexer_db_config.internal_indexer_service_mode {
+        InternalIndexerServiceMode::Backup(gcs_bucket_name) => {
+            Some(Arc::new(runtime.handle().block_on(
+                GcsBackupRestoreOperator::new(gcs_bucket_name.to_string()),
+            )))
+        },
+        _ => None,
+    };
+
     let mut indexer_service = InternalIndexerDBService::new(
         db_rw.reader,
         internal_indexer_db.unwrap(),
         update_receiver.expect("Internal indexer db update receiver is missing"),
+        context,
+        backup_restore_operator,
     );
     let db_indexer = indexer_service.get_db_indexer();
     // Spawn task for db indexer

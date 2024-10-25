@@ -7,13 +7,30 @@ use crate::config::{
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub enum InternalIndexerServiceMode {
+    /// Backup service mode with GCS bucket name.
+    Backup(String),
+    /// Restore service mode with GCS bucket name.
+    Restore(String),
+    IndexingOnly,
+    Disabled,
+}
+
+impl InternalIndexerServiceMode {
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self, InternalIndexerServiceMode::Disabled)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct InternalIndexerDBConfig {
     pub enable_transaction: bool,
     pub enable_event: bool,
     pub enable_statekeys: bool,
     pub batch_size: usize,
+    pub internal_indexer_service_mode: InternalIndexerServiceMode,
 }
 
 impl InternalIndexerDBConfig {
@@ -28,6 +45,7 @@ impl InternalIndexerDBConfig {
             enable_event,
             enable_statekeys,
             batch_size,
+            internal_indexer_service_mode: InternalIndexerServiceMode::Disabled,
         }
     }
 
@@ -59,6 +77,7 @@ impl Default for InternalIndexerDBConfig {
             enable_event: false,
             enable_statekeys: false,
             batch_size: 10_000,
+            internal_indexer_service_mode: InternalIndexerServiceMode::Disabled,
         }
     }
 }
@@ -70,7 +89,7 @@ impl ConfigSanitizer for InternalIndexerDBConfig {
         _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
-        let config = node_config.indexer_db_config;
+        let config = node_config.indexer_db_config.clone();
 
         // Shouldn't turn on internal indexer for db without sharding
         if !node_config.storage.rocksdb_configs.enable_storage_sharding

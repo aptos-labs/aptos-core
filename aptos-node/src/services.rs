@@ -80,8 +80,10 @@ pub fn bootstrap_api_and_indexer(
     let (db_indexer_runtime, txn_event_reader) = match bootstrap_internal_indexer_db(
         node_config,
         db_rw.clone(),
+        chain_id,
         internal_indexer_db,
         update_receiver,
+        mempool_client_sender.clone(),
     ) {
         Some((runtime, db_indexer)) => (Some(runtime), Some(db_indexer)),
         None => (None, None),

@@ -15,3 +15,16 @@ pub fn snapshot_folder_prefix(chain_id: u64) -> String {
 pub fn snapshot_folder_name(chain_id: u64, epoch: u64) -> String {
     format!("snapshot_chain_{}_epoch_{}", chain_id, epoch)
 }
+
+/// Internal indexer snapshot folder prefix for a chain; this is used to identify the snapshot folder and backup.
+pub fn internal_indexer_snapshot_folder_prefix(chain_id: u64) -> String {
+    format!("internal_indexer_snapshot_chain_{}_epoch_", chain_id)
+}
+
+/// Internal indexer snapshot folder name for a chain and epoch.
+pub fn internal_indexer_snapshot_folder_name(chain_id: u64, epoch: u64) -> String {
+    format!(
+        "internal_indexer_snapshot_chain_{}_epoch_{}",
+        chain_id, epoch
+    )
+}

@@ -33,6 +33,8 @@ use aptos_types::{
 };
 use std::{
     cmp::min,
+    fs,
+    path::PathBuf,
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc,
@@ -272,6 +274,11 @@ impl InternalIndexerDB {
             .db
             .get::<InternalIndexerMetadataSchema>(key)?
             .map(|v| v.expect_version()))
+    }
+
+    pub fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {
+        fs::remove_dir_all(path).unwrap_or(());
+        self.db.create_checkpoint(path)
     }
 }
 

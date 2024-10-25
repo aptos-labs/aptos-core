@@ -12,7 +12,7 @@ use aptos_indexer_grpc_fullnode::stream_coordinator::{
     IndexerStreamCoordinator, TransactionBatchInfo,
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
-use aptos_logger::{debug, error, info, sample, sample::SampleRate};
+use aptos_logger::{aptos_logger::LogEntry, debug, error, info, sample, sample::SampleRate};
 use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
 use std::{sync::Arc, time::Duration};
@@ -70,6 +70,8 @@ impl TableInfoService {
                         Self::backup_snapshot_if_present(
                             context.clone(),
                             backup_restore_operator.clone(),
+                            snapshot_folder_prefix(context.chain_id().id() as u64),
+                            "Table Info".to_string(),
                         )
                         .await;
                         tokio::time::sleep(Duration::from_secs(
@@ -394,12 +396,12 @@ impl TableInfoService {
     /// 2. If the chain id in the backup metadata does not match with the current network, it will panic.
     /// Not thread safe.
     /// TODO(larry): improve the error handling.
-    async fn backup_snapshot_if_present(
+    pub(crate) async fn backup_snapshot_if_present(
         context: Arc<ApiContext>,
         backup_restore_operator: Arc<GcsBackupRestoreOperator>,
+        target_snapshot_directory_prefix: String,
+        log_prefix: String,
     ) {
-        let target_snapshot_directory_prefix =
-            snapshot_folder_prefix(context.chain_id().id() as u64);
         // Scan the data directory to find the latest epoch to upload.
         let mut epochs_to_backup = vec![];
         for entry in std::fs::read_dir(context.node_config.get_data_dir()).unwrap() {
@@ -418,18 +420,23 @@ impl TableInfoService {
         // If nothing to backup, return.
         if epochs_to_backup.is_empty() {
             // No snapshot to backup.
-            aptos_logger::info!("[Table Info] No snapshot to backup. Skipping the backup.");
+            aptos_logger::info!(
+                "[{}] No snapshot to backup. Skipping the backup.",
+                log_prefix
+            );
             return;
         }
         aptos_logger::info!(
             epochs_to_backup = format!("{:?}", epochs_to_backup),
-            "[Table Info] Found snapshots to backup."
+            "[{}] Found snapshots to backup.",
+            log_prefix
         );
         // Sort the epochs to backup.
         epochs_to_backup.sort();
         aptos_logger::info!(
             epochs_to_backup = format!("{:?}", epochs_to_backup),
-            "[Table Info] Sorted snapshots to backup."
+            "[{}] Sorted snapshots to backup.",
+            log_prefix
         );
         // Backup the existing snapshots and cleanup.
         for epoch in epochs_to_backup {
@@ -437,6 +444,8 @@ impl TableInfoService {
                 context.clone(),
                 backup_restore_operator.clone(),
                 epoch,
+                target_snapshot_directory_prefix.clone(),
+                log_prefix.clone(),
             )
             .await;
         }
@@ -483,12 +492,15 @@ async fn backup_the_snapshot_and_cleanup(
     context: Arc<ApiContext>,
     backup_restore_operator: Arc<GcsBackupRestoreOperator>,
     epoch: u64,
+    target_snapshot_directory_prefix: String,
+    log_prefix: String,
 ) {
-    let snapshot_folder_name = snapshot_folder_name(context.chain_id().id() as u64, epoch);
+    let snapshot_folder_name = format!("{}{}", target_snapshot_directory_prefix, epoch);
     aptos_logger::info!(
         epoch = epoch,
         snapshot_folder_name = snapshot_folder_name,
-        "[Table Info] Backing up the snapshot and cleaning up the old snapshot."
+        "[{}] Backing up the snapshot and cleaning up the old snapshot.",
+        log_prefix
     );
     let ledger_chain_id = context.chain_id().id();
     // Validate the runtime.
@@ -496,7 +508,8 @@ async fn backup_the_snapshot_and_cleanup(
     if let Some(metadata) = backup_metadata {
         if metadata.chain_id != (ledger_chain_id as u64) {
             panic!(
-                "Table Info backup chain id does not match with current network. Expected: {}, found in backup: {}",
+                "{} backup chain id does not match with current network. Expected: {}, found in backup: {}",
+                log_prefix,
                 context.chain_id().id(),
                 metadata.chain_id
             );
@@ -505,7 +518,8 @@ async fn backup_the_snapshot_and_cleanup(
         aptos_logger::warn!(
             epoch = epoch,
             snapshot_folder_name = snapshot_folder_name,
-            "[Table Info] No backup metadata found. Skipping the backup."
+            "[{}] No backup metadata found. Skipping the backup.",
+            log_prefix
         );
     }
 
@@ -521,7 +535,8 @@ async fn backup_the_snapshot_and_cleanup(
             aptos_logger::info!(
                 epoch = epoch,
                 snapshot_folder_name = snapshot_folder_name,
-                "[Table Info] Snapshot already backed up. Skipping the backup."
+                "[{}] Snapshot already backed up. Skipping the backup.",
+                log_prefix
             );
             // Remove the snapshot directory.
             std::fs::remove_dir_all(snapshot_dir).unwrap();
@@ -531,14 +546,16 @@ async fn backup_the_snapshot_and_cleanup(
         aptos_logger::warn!(
             epoch = epoch,
             snapshot_folder_name = snapshot_folder_name,
-            "[Table Info] No backup metadata found."
+            "[{}] No backup metadata found.",
+            log_prefix
         );
     }
     aptos_logger::info!(
         epoch = epoch,
         snapshot_folder_name = snapshot_folder_name,
         snapshot_dir = snapshot_dir.to_str(),
-        "[Table Info] Backing up the snapshot."
+        "[{}] Backing up the snapshot.",
+        log_prefix
     );
     // TODO: add checks to handle concurrent backup jobs.
     backup_restore_operator
@@ -550,7 +567,8 @@ async fn backup_the_snapshot_and_cleanup(
     info!(
         backup_epoch = epoch,
         backup_millis = start_time.elapsed().as_millis(),
-        "[Table Info] Table info db backed up successfully"
+        "[{}] Table info db backed up successfully",
+        log_prefix
     );
 }
 
