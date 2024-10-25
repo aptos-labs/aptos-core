@@ -134,6 +134,8 @@ pub enum FeatureFlag {
     NativeMemoryOperations,
     EnableLoaderV2,
     DisallowInitModuleToPublishModules,
+    TransactionContextHashFunctionUpdate,
+    FakeFeatureForComparisonTesting,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -356,6 +358,11 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DisallowInitModuleToPublishModules => {
                 AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
+            FeatureFlag::TransactionContextHashFunctionUpdate => {
+                AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE
+            },
+            FeatureFlag::FakeFeatureForComparisonTesting => {
+                AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING
             },
         }
     }
@@ -506,6 +513,11 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
             AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
+            AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE => {
+                FeatureFlag::TransactionContextHashFunctionUpdate
+            },
+            AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING => {
+                FeatureFlag::FakeFeatureForComparisonTesting
             },
         }
     }

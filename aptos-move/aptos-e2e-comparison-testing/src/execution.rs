@@ -22,7 +22,7 @@ use aptos_types::{
 use aptos_validator_interface::AptosValidatorInterface;
 use clap::ValueEnum;
 use itertools::Itertools;
-use move_binary_format::file_format_common::VERSION_6;
+use move_binary_format::file_format_common::VERSION_DEFAULT;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, env, path::PathBuf, sync::Arc};
@@ -123,7 +123,7 @@ impl Execution {
         Self {
             input_path,
             execution_mode,
-            bytecode_version: VERSION_6,
+            bytecode_version: VERSION_DEFAULT,
             skip_ref_packages,
         }
     }
@@ -397,11 +397,9 @@ impl Execution {
 
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
+        features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
         if v2_flag {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
-        } else {
-            features.disable(FeatureFlag::VM_BINARY_FORMAT_V7);
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
+            features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
         }
         state.set_features(features);
 
@@ -514,9 +512,7 @@ impl Execution {
             (Ok((res_1, txn_status_1, gas_used_1)), Ok((res_2, txn_status_2, gas_used_2))) => {
                 // compare txn status
                 if txn_status_1 != txn_status_2 {
-                    println!("txn status is different at version: {}", cur_version);
-                    println!("status from V1:{:?}", txn_status_1);
-                    println!("status from V2:{:?}", txn_status_2);
+                    self.output_result_str(format!("txn status is different at version: {}, status from V1:{:?}, gas used:{}, status from V2:{:?}, gas used:{}", cur_version, txn_status_1, gas_used_1, txn_status_2, gas_used_2));
                     return;
                 }
                 // compare events
