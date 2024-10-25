@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: signer_native_format_fix
+proposals:
+  - name: enable_signer_native_format_fix
+    metadata:
+      title: "Enable the signer native format fix"
+      description: "Fixes the issue of string_utils::native_format in formatting signer values"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - signer_native_format_fix
