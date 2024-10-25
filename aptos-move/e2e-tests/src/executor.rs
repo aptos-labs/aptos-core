@@ -46,9 +46,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
