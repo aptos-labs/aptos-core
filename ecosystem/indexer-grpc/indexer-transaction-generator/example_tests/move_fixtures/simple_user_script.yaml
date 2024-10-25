@@ -1,0 +1,8 @@
+transactions:
+  - output_name: simple_user_script1
+    script_path: simple_user_script
+    sender_address: __ACCOUNT_A__
+  - output_name: simple_user_script2
+    script_path: simple_user_script2
+    sender_address: __ACCOUNT_A__
+    

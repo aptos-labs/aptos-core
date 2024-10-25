@@ -58,7 +58,7 @@ cargo run -p aptos-indexer-transaction-generator -- \
       ``` 
 
 
-You can check the example [here](tests).
+You can check the example [here](example_tests).
 
 
 ### Account Management
