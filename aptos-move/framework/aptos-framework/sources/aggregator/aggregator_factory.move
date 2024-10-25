@@ -16,6 +16,11 @@ module aptos_framework::aggregator_factory {
     /// Aggregator factory is not published yet.
     const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 1;
 
+    /// Aggregator V1 only supports limit == MAX_U128
+    const EAGG_V1_LIMIT_DEPRECATED: u64 = 2;
+
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
+
     /// Creates new aggregators. Used to control the numbers of aggregators in the
     /// system and who can create them. At the moment, only Aptos Framework (0x1)
     /// account can.
@@ -34,6 +39,11 @@ module aptos_framework::aggregator_factory {
 
     /// Creates a new aggregator instance which overflows on exceeding a `limit`.
     public(friend) fun create_aggregator_internal(limit: u128): Aggregator acquires AggregatorFactory {
+        assert!(
+            limit == MAX_U128,
+            error::invalid_argument(EAGG_V1_LIMIT_DEPRECATED)
+        );
+
         assert!(
             exists<AggregatorFactory>(@aptos_framework),
             error::not_found(EAGGREGATOR_FACTORY_NOT_FOUND)
