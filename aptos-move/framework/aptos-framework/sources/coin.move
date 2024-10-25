@@ -141,9 +141,6 @@ module aptos_framework::coin {
         withdraw_events: EventHandle<WithdrawEvent>,
     }
 
-    /// Maximum possible coin supply.
-    const MAX_U128: u128 = 340282366920938463463374607431768211455;
-
     #[deprecated]
     /// Configuration that controls the behavior of total coin supply. If the field
     /// is set, coin creators are allowed to upgrade to parallelizable implementations.
@@ -978,7 +975,7 @@ module aptos_framework::coin {
             decimals,
             supply: if (monitor_supply) {
                 option::some(
-                    optional_aggregator::new(MAX_U128, parallelizable)
+                    optional_aggregator::new(parallelizable)
                 )
             } else { option::none() },
         };
@@ -1664,6 +1661,10 @@ module aptos_framework::coin {
         optional_aggregator::add(supply, 950);
         assert!(optional_aggregator::read(supply) == 1000, 0);
     }
+
+    #[test_only]
+    /// Maximum possible coin supply.
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     #[test(framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x20001, location = aptos_framework::aggregator)]

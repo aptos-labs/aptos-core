@@ -16,8 +16,10 @@ module aptos_framework::optional_aggregator {
     /// Aggregator feature is not supported. Raised by native code.
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
 
-    /// OptionalAggregator (Agg V1) switch not supported any more
+    /// OptionalAggregator (Agg V1) switch not supported any more.
     const ESWITCH_DEPRECATED: u64 = 3;
+
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     /// Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like `Aggregator`.
     struct Integer has store {
@@ -72,16 +74,16 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Creates a new optional aggregator.
-    public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator {
+    public(friend) fun new(parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
-                aggregator: option::some(aggregator_factory::create_aggregator_internal(limit)),
+                aggregator: option::some(aggregator_factory::create_aggregator_internal()),
                 integer: option::none(),
             }
         } else {
             OptionalAggregator {
                 aggregator: option::none(),
-                integer: option::some(new_integer(limit)),
+                integer: option::some(new_integer(MAX_U128)),
             }
         }
     }
@@ -157,10 +159,19 @@ module aptos_framework::optional_aggregator {
     }
 
     #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x030003, location = Self)]
+    fun optional_aggregator_swith_fail_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(true);
+        switch(&mut aggregator);
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
     fun optional_aggregator_test_integer(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
 
-        let aggregator = new(30, false);
+        let aggregator = new(false);
         assert!(!is_parallelizable(&aggregator), 0);
 
         add(&mut aggregator, 12);
@@ -168,15 +179,6 @@ module aptos_framework::optional_aggregator {
         assert!(read(&aggregator) == 15, 0);
 
         sub(&mut aggregator, 10);
-        assert!(read(&aggregator) == 5, 0);
-    }
-
-    #[test(account = @aptos_framework)]
-    fun optional_aggregator_test_aggregator(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(5, true);
-
-        assert!(is_parallelizable(&aggregator), 0);
         assert!(read(&aggregator) == 5, 0);
 
         add(&mut aggregator, 12);
@@ -186,9 +188,27 @@ module aptos_framework::optional_aggregator {
         sub(&mut aggregator, 10);
         assert!(read(&aggregator) == 10, 0);
 
-        // Switch back!
-        switch(&mut aggregator);
-        assert!(!is_parallelizable(&aggregator), 0);
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_test_aggregator(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(true);
+        assert!(is_parallelizable(&aggregator), 0);
+
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 15, 0);
+
+        sub(&mut aggregator, 10);
+        assert!(read(&aggregator) == 5, 0);
+
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 20, 0);
+
+        sub(&mut aggregator, 10);
         assert!(read(&aggregator) == 10, 0);
 
         destroy(aggregator);
@@ -198,24 +218,25 @@ module aptos_framework::optional_aggregator {
     fun optional_aggregator_destroy_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
 
-        let aggregator = new(30, false);
+        let aggregator = new(false);
         destroy(aggregator);
 
-        let aggregator = new(30, true);
+        let aggregator = new(true);
         destroy(aggregator);
 
-        let aggregator = new(12, false);
-        assert!(destroy_optional_integer(aggregator) == 12, 0);
+        let aggregator = new(false);
+        assert!(destroy_optional_integer(aggregator) == MAX_U128, 0);
 
-        let aggregator = new(21, true);
-        assert!(destroy_optional_aggregator(aggregator) == 21, 0);
+        let aggregator = new(true);
+        assert!(destroy_optional_aggregator(aggregator) == MAX_U128, 0);
     }
 
     #[test(account = @aptos_framework)]
     #[expected_failure(abort_code = 0x020001, location = Self)]
     fun non_parallelizable_aggregator_overflow_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(15, false);
+        let aggregator = new(false);
+        add(&mut aggregator, MAX_U128 - 15);
 
         // Overflow!
         add(&mut aggregator, 16);
@@ -227,7 +248,7 @@ module aptos_framework::optional_aggregator {
     #[expected_failure(abort_code = 0x020002, location = Self)]
     fun non_parallelizable_aggregator_underflow_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(100, false);
+        let aggregator = new(false);
 
         // Underflow!
         sub(&mut aggregator, 100);
@@ -240,7 +261,8 @@ module aptos_framework::optional_aggregator {
     #[expected_failure(abort_code = 0x020001, location = aptos_framework::aggregator)]
     fun parallelizable_aggregator_overflow_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(15, true);
+        let aggregator = new(true);
+        add(&mut aggregator, MAX_U128 - 15);
 
         // Overflow!
         add(&mut aggregator, 16);
@@ -252,7 +274,7 @@ module aptos_framework::optional_aggregator {
     #[expected_failure(abort_code = 0x020002, location = aptos_framework::aggregator)]
     fun parallelizable_aggregator_underflow_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(100, true);
+        let aggregator = new(true);
 
         // Underflow!
         add(&mut aggregator, 99);
