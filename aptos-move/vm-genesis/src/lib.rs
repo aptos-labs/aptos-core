@@ -17,9 +17,9 @@ use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
-    account_config::{self, aptos_test_root_address, CORE_CODE_ADDRESS},
+    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, ContractEventV1},
     jwks::{
         patch::{PatchJWKMoveStruct, PatchUpsertJWK},
         secure_test_rsa_jwk,
@@ -804,11 +804,11 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 
 /// Verify the consistency of the genesis `WriteSet`
 fn verify_genesis_write_set(events: &[(ContractEvent, Option<MoveTypeLayout>)]) {
-    let new_epoch_events: Vec<&ContractEvent> = events
+    let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
         .filter_map(|(e, _)| {
-            if e.is_new_epoch_event() {
-                Some(e)
+            if e.event_key() == Some(&NewEpochEvent::event_key()) {
+                Some(e.v1().unwrap())
             } else {
                 None
             }
@@ -819,9 +819,7 @@ fn verify_genesis_write_set(events: &[(ContractEvent, Option<MoveTypeLayout>)]) 
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    if let Ok(e) = new_epoch_events[0].v1() {
-        assert_eq!(e.sequence_number(), 0);
-    }
+    assert_eq!(new_epoch_events[0].sequence_number(), 0);
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions

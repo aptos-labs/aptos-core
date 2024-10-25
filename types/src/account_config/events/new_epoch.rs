@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::event::EventKey;
 use anyhow::Result;
 use move_core_types::{
     ident_str, identifier::IdentStr, language_storage::TypeTag, move_resource::MoveStructType,
@@ -28,6 +29,10 @@ impl NewEpochEvent {
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         bcs::from_bytes(bytes).map_err(Into::into)
+    }
+
+    pub fn event_key() -> EventKey {
+        crate::on_chain_config::new_epoch_event_key()
     }
 }
 
