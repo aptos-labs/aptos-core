@@ -396,9 +396,10 @@ impl EntryPoints {
             },
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
-            | EntryPoints::DeserializeU256 => "bcs_stream",
-            EntryPoints::APTPermissionedTransfer
-            | EntryPoints::APTTransfer => "permissioned_transfer",
+            EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::APTPermissionedTransfer | EntryPoints::APTTransfer => {
+                "permissioned_transfer"
+            },
         }
     }
 
@@ -759,14 +760,12 @@ impl EntryPoints {
                     bcs::to_bytes(&1u64).unwrap(),
                 ],
             ),
-            EntryPoints::APTTransfer => get_payload(
-                module_id,
-                ident_str!("transfer").to_owned(),
-                vec![
+            EntryPoints::APTTransfer => {
+                get_payload(module_id, ident_str!("transfer").to_owned(), vec![
                     bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
                     bcs::to_bytes(&1u64).unwrap(),
-                ],
-            )
+                ])
+            },
         }
     }
 
@@ -877,8 +876,9 @@ impl EntryPoints {
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
-            EntryPoints::APTPermissionedTransfer
-            | EntryPoints::APTTransfer => AutomaticArgs::Signer,
+            EntryPoints::APTPermissionedTransfer | EntryPoints::APTTransfer => {
+                AutomaticArgs::Signer
+            },
         }
     }
 }
