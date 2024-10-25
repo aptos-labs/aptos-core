@@ -12,8 +12,8 @@ use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
 use aptos_consensus_types::{block::Block, block_data::BlockData};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorResult,
-    StateComputeResult,
+    state_checkpoint_output::StateCheckpointOutput, state_compute_result::StateComputeResult,
+    BlockExecutorTrait, ExecutorResult,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -144,11 +144,7 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         Ok(StateComputeResult::new_dummy_with_input_txns(txns))
     }
 
-    fn pre_commit_block(
-        &self,
-        _block_id: HashValue,
-        _parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
         Ok(())
     }
 

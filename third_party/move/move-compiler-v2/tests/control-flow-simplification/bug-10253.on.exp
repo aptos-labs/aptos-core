@@ -290,23 +290,27 @@ B1:
 	7: MoveLoc[2](loc1: u64)
 	8: MoveLoc[3](loc2: u64)
 	9: Lt
-	10: BrFalse(18)
+	10: BrTrue(12)
 B2:
-	11: ImmBorrowLoc[0](Arg0: vector<u8>)
-	12: CopyLoc[1](loc0: u64)
-	13: VecImmBorrow(2)
-	14: ReadRef
-	15: LdU8(0)
-	16: Neq
-	17: BrFalse(19)
+	11: Branch(20)
 B3:
-	18: Ret
+	12: ImmBorrowLoc[0](Arg0: vector<u8>)
+	13: CopyLoc[1](loc0: u64)
+	14: VecImmBorrow(2)
+	15: ReadRef
+	16: LdU8(0)
+	17: Neq
+	18: BrFalse(21)
 B4:
-	19: MoveLoc[1](loc0: u64)
-	20: LdU64(1)
-	21: Add
-	22: StLoc[1](loc0: u64)
-	23: Branch(2)
+	19: Branch(20)
+B5:
+	20: Ret
+B6:
+	21: MoveLoc[1](loc0: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[1](loc0: u64)
+	25: Branch(2)
 }
 entry public guess_with_break_without_inline(Arg0: vector<u8>) /* def_idx: 2 */ {
 B0:

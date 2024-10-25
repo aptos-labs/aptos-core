@@ -1532,8 +1532,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
+            let is_lang_version_2 = et.env().language_version.is_at_least(LanguageVersion::V2_0);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
-                et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                let symbol_pool = et.parent.parent.env.symbol_pool();
+                if !is_lang_version_2 || symbol_pool.string(*n).as_ref() != "_" {
+                    et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                }
             }
             let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);

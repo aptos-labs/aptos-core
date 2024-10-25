@@ -135,6 +135,8 @@ fullnode:
 service:
   # -- If set, the base domain name to use for External DNS
   domain:
+  # -- If set, the base domain name to use for internal LBs
+  internalDomain:
   validator:
     external:
       # -- The Kubernetes ServiceType to use for validator's HAProxy
@@ -143,6 +145,7 @@ service:
       # -- The Kubernetes ServiceType to use for validator
       type: ClusterIP
       headless: false
+      annotations: {}
     # -- The externalTrafficPolicy for the validator service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
@@ -161,6 +164,7 @@ service:
       # -- The Kubernetes ServiceType to use for fullnodes
       type: ClusterIP
       headless: false
+      annotations: {}
     # -- The externalTrafficPolicy for the fullnode service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs

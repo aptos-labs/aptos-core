@@ -150,7 +150,7 @@ pub enum Constraint {
     /// as a type argument for a phantom type parameter.
     NoPhantom,
     /// The type must have the given set of abilities.
-    HasAbilities(AbilitySet),
+    HasAbilities(AbilitySet, AbilityCheckingScope),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
@@ -158,6 +158,19 @@ pub enum Constraint {
     /// The type must not be function because it is used as the type of some field or
     /// as a type argument.
     NoFunction,
+}
+
+/// Scope of ability checking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AbilityCheckingScope {
+    /// Type parameters are excluded from ability checking. This is in usages the case
+    /// where we check abilities for field types, for example, since those constraints
+    /// are modulo an actual type instantiation.
+    ExcludeTypeParams,
+    /// Type parameters are included in ability checking. This is the case if
+    /// we check ability constraints for a type instantiation, as in `S<T>`,
+    /// and we have `struct S<X:A>`.
+    IncludeTypeParams,
 }
 
 /// A type to describe the context from where a constraint stems. Used for
@@ -403,7 +416,7 @@ impl Constraint {
     pub fn accumulating(&self) -> bool {
         matches!(
             self,
-            Constraint::HasAbilities(_)
+            Constraint::HasAbilities(..)
                 | Constraint::WithDefault(_)
                 | Constraint::NoPhantom
                 | Constraint::NoTuple
@@ -519,7 +532,9 @@ impl Constraint {
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
             (Constraint::NoPhantom, Constraint::NoPhantom) => Ok(true),
-            (Constraint::HasAbilities(a1), Constraint::HasAbilities(a2)) => {
+            (Constraint::HasAbilities(a1, scope1), Constraint::HasAbilities(a2, scope2))
+                if scope1 == scope2 =>
+            {
                 *a1 = a1.union(*a2);
                 Ok(true)
             },
@@ -556,7 +571,10 @@ impl Constraint {
             result.push(Constraint::NoPhantom)
         }
         if !abilities.is_empty() {
-            result.push(Constraint::HasAbilities(*abilities));
+            result.push(Constraint::HasAbilities(
+                *abilities,
+                AbilityCheckingScope::IncludeTypeParams,
+            ));
         }
         result
     }
@@ -573,23 +591,22 @@ impl Constraint {
 
     /// Returns the constraints which need to be satisfied for a field type,
     /// given a struct with declared abilities.
-    pub fn for_field(struct_abilities: AbilitySet, field_ty: &Type) -> Vec<Constraint> {
+    pub fn for_field(struct_abilities: AbilitySet, _field_ty: &Type) -> Vec<Constraint> {
         let mut result = vec![
             Constraint::NoPhantom,
             Constraint::NoTuple,
             Constraint::NoReference,
             Constraint::NoFunction,
         ];
-        let abilities = if !field_ty.depends_from_type_parameter() {
-            if struct_abilities.has_ability(Ability::Key) {
-                struct_abilities.remove(Ability::Key).add(Ability::Store)
-            } else {
-                struct_abilities
-            }
+        let abilities = if struct_abilities.has_ability(Ability::Key) {
+            struct_abilities.remove(Ability::Key).add(Ability::Store)
         } else {
-            AbilitySet::EMPTY
+            struct_abilities
         };
-        result.push(Constraint::HasAbilities(abilities));
+        result.push(Constraint::HasAbilities(
+            abilities,
+            AbilityCheckingScope::ExcludeTypeParams,
+        ));
         result
     }
 
@@ -652,7 +669,7 @@ impl Constraint {
             Constraint::NoFunction => "no-func".to_string(),
             Constraint::NoTuple => "no-tuple".to_string(),
             Constraint::NoPhantom => "no-phantom".to_string(),
-            Constraint::HasAbilities(required_abilities) => {
+            Constraint::HasAbilities(required_abilities, _) => {
                 format!("{}", required_abilities)
             },
             Constraint::WithDefault(_ty) => "".to_owned(),
@@ -798,20 +815,6 @@ impl Type {
     /// Determines whether this is a type parameter.
     pub fn is_type_parameter(&self) -> bool {
         matches!(self, Type::TypeParameter(..))
-    }
-
-    /// Returns true if the type depends on type parameters.
-    pub fn depends_from_type_parameter(&self) -> bool {
-        use Type::*;
-        match self {
-            TypeParameter(_) => true,
-            Tuple(ts) | Struct(_, _, ts) | ResourceDomain(_, _, Some(ts)) => {
-                ts.iter().any(|t| t.depends_from_type_parameter())
-            },
-            Vector(t) | Reference(_, t) | TypeDomain(t) => t.depends_from_type_parameter(),
-            Fun(t, r) => t.depends_from_type_parameter() || r.depends_from_type_parameter(),
-            _ => false,
-        }
     }
 
     /// Determines whether this is a primitive.
@@ -1513,6 +1516,10 @@ pub trait UnificationContext: AbilityContext {
 pub struct ReceiverFunctionInstance {
     /// Qualified id
     pub id: QualifiedId<FunId>,
+    /// Function name
+    pub fun_name: Symbol,
+    /// Type parameters
+    pub type_params: Vec<TypeParameter>,
     /// Type instantiation of the function
     pub type_inst: Vec<Type>,
     /// Types of the arguments, instantiated
@@ -1786,6 +1793,7 @@ impl Substitution {
                     if let Some(receiver) = context.get_receiver_function(ty, *name) {
                         self.eval_receiver_function_constraint(
                             context,
+                            loc,
                             variance,
                             ty_args_opt,
                             args_loc,
@@ -1797,9 +1805,15 @@ impl Substitution {
                         constraint_unsatisfied_error()
                     }
                 },
-                (Constraint::HasAbilities(required_abilities), ty) => {
-                    self.eval_ability_constraint(context, loc, *required_abilities, ty, ctx_opt)
-                },
+                (Constraint::HasAbilities(required_abilities, scope), ty) => self
+                    .eval_ability_constraint(
+                        context,
+                        loc,
+                        *required_abilities,
+                        *scope,
+                        ty,
+                        ctx_opt,
+                    ),
                 (Constraint::NoReference, ty) => {
                     if ty.is_reference() {
                         constraint_unsatisfied_error()
@@ -1838,6 +1852,7 @@ impl Substitution {
         context: &mut impl UnificationContext,
         loc: &Loc,
         required_abilities: AbilitySet,
+        required_abilities_scope: AbilityCheckingScope,
         ty: &Type,
         ctx_opt: Option<ConstraintContext>,
     ) -> Result<(), TypeUnificationError> {
@@ -1865,6 +1880,7 @@ impl Substitution {
                         context,
                         loc,
                         required_abilities,
+                        required_abilities_scope,
                         t,
                         ctx_opt.clone().map(|ctx| ctx.derive_tuple_element(i)),
                     )?;
@@ -1877,6 +1893,7 @@ impl Substitution {
                     context,
                     loc,
                     required_abilities,
+                    required_abilities_scope,
                     t,
                     ctx_opt.map(|ctx| ctx.derive_vector_type_param()),
                 )
@@ -1900,6 +1917,7 @@ impl Substitution {
                             context,
                             loc,
                             required,
+                            required_abilities_scope,
                             t,
                             ctx_opt
                                 .clone()
@@ -1926,8 +1944,12 @@ impl Substitution {
                 Ok(())
             },
             TypeParameter(idx) => {
-                let tparam = context.type_param(*idx);
-                check(tparam.1.abilities)
+                if required_abilities_scope == AbilityCheckingScope::IncludeTypeParams {
+                    let tparam = context.type_param(*idx);
+                    check(tparam.1.abilities)
+                } else {
+                    Ok(())
+                }
             },
             Fun(_, _) => check(AbilitySet::FUNCTIONS),
             Reference(_, _) => check(AbilitySet::REFERENCES),
@@ -1941,7 +1963,7 @@ impl Substitution {
                     *idx,
                     loc.clone(),
                     WideningOrder::LeftToRight,
-                    Constraint::HasAbilities(required_abilities),
+                    Constraint::HasAbilities(required_abilities, required_abilities_scope),
                     ctx_opt,
                 )
             },
@@ -1951,6 +1973,7 @@ impl Substitution {
     fn eval_receiver_function_constraint(
         &mut self,
         context: &mut impl UnificationContext,
+        loc: &Loc,
         variance: Variance,
         ty_args_opt: &Option<(Vec<Loc>, Vec<Type>)>,
         args_loc: &[Loc],
@@ -1977,6 +2000,24 @@ impl Substitution {
                 &ty_args.1,
                 &receiver.type_inst,
             )?;
+        }
+        // Need to add any constraints for type parameters.
+        for (tparam, targ) in receiver.type_params.iter().zip(&receiver.type_inst) {
+            for ctr in Constraint::for_type_parameter(tparam) {
+                self.eval_constraint(
+                    context,
+                    loc,
+                    &self.specialize(targ),
+                    Variance::NoVariance,
+                    WideningOrder::LeftToRight,
+                    ctr,
+                    Some(ConstraintContext::default().for_type_param(
+                        false,
+                        receiver.fun_name,
+                        tparam.clone(),
+                    )),
+                )?
+            }
         }
         self.unify_vec(
             context,
@@ -2997,7 +3038,7 @@ impl TypeUnificationError {
                             ty.display(display_context)
                         )
                     },
-                    Constraint::HasAbilities(_) | Constraint::WithDefault(_) => {
+                    Constraint::HasAbilities(..) | Constraint::WithDefault(_) => {
                         unreachable!("unexpected constraint in error message")
                     },
                 };
@@ -3311,6 +3352,8 @@ pub struct TypeDisplayContext<'a> {
     pub used_modules: BTreeSet<ModuleId>,
     /// Whether to use `m::T` for representing types, for stable output in docgen
     pub use_module_qualification: bool,
+    /// Var types that are recursive and should appear as `..` in display
+    pub recursive_vars: Option<BTreeSet<u32>>,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -3324,6 +3367,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -3347,6 +3391,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -3354,6 +3399,19 @@ impl<'a> TypeDisplayContext<'a> {
         Self {
             subs_opt: Some(subs),
             ..self
+        }
+    }
+
+    pub fn map_var_to_self(&self, idx: u32) -> Self {
+        Self {
+            recursive_vars: if let Some(existing_set) = &self.recursive_vars {
+                let mut new_set = existing_set.clone();
+                new_set.insert(idx);
+                Some(new_set)
+            } else {
+                Some(BTreeSet::from([idx]))
+            },
+            ..self.clone()
         }
     }
 }
@@ -3447,6 +3505,11 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
             },
             Var(idx) => {
+                if let Some(recursive_vars) = &self.context.recursive_vars {
+                    if recursive_vars.contains(idx) {
+                        return f.write_str("..");
+                    }
+                }
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
                     write!(f, "{}", ty.display(self.context))
                 } else if let Some(ctrs) =
@@ -3456,9 +3519,10 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                     if ctrs.is_empty() {
                         f.write_str(&self.type_var_str(*idx))
                     } else {
+                        let recursive_context = self.context.map_var_to_self(*idx);
                         let out = ctrs
                             .iter()
-                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .map(|(_, _, c)| c.display(&recursive_context).to_string())
                             .join(" + ");
                         f.write_str(&out)
                     }

@@ -214,7 +214,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
         match f {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::CollectAndDistributeGasFees => {
-                AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES
+                AptosFeatureFlag::_DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES
             },
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::Sha512AndRipeMd160Natives => {
@@ -356,7 +356,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
     fn from(f: AptosFeatureFlag) -> Self {
         match f {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
-            AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES => {
+            AptosFeatureFlag::_DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES => {
                 FeatureFlag::CollectAndDistributeGasFees
             },
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,

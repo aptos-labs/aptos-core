@@ -1,0 +1,412 @@
+// -- Model dump before env processor pipeline:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor unused checks:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, |x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, |_x: u64| 1);
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, |_: u64| 1);
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor inlining:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_: u64): (u64) = Tuple(p);
+            1
+          }
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor simplifier:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        1;
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        1;
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor specification checker:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        1;
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        1;
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+
+Diagnostics:
+warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/lambda/unused_lambda_param.move:7:18
+  │
+7 │         test(0, |x| 1);
+  │                  ^
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::unused_lambda() {
+     var $t0: u64
+  0: $t0 := 1
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::unused_lambda_suppressed1() {
+     var $t0: u64
+  0: $t0 := 1
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::unused_lambda_suppressed2() {
+     var $t0: u64
+  0: $t0 := 1
+  1: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::unused_lambda() {
+     var $t0: u64 [unused]
+     # live vars:
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::unused_lambda_suppressed1() {
+     var $t0: u64 [unused]
+     # live vars:
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::unused_lambda_suppressed2() {
+     var $t0: u64 [unused]
+     # live vars:
+  0: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+unused_lambda() /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+unused_lambda_suppressed1() /* def_idx: 1 */ {
+B0:
+	0: Ret
+}
+unused_lambda_suppressed2() /* def_idx: 2 */ {
+B0:
+	0: Ret
+}
+}
+============ bytecode verification succeeded ========

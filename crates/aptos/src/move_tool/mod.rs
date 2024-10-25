@@ -10,7 +10,7 @@ use crate::{
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
             MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
             ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -270,6 +270,15 @@ impl FrameworkPackageArgs {
             toml::to_string_pretty(&manifest)
                 .map_err(|err| CliError::UnexpectedError(err.to_string()))?
                 .as_bytes(),
+        )?;
+
+        // Write a .gitignore
+        let gitignore = package_dir.join(GIT_IGNORE);
+        check_if_file_exists(gitignore.as_path(), prompt_options)?;
+        write_to_file(
+            gitignore.as_path(),
+            GIT_IGNORE,
+            ".aptos/\nbuild/".as_bytes(),
         )
     }
 }
@@ -644,14 +653,21 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
+
         let result = task::spawn_blocking(move || {
             prover_options.prove(
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
-                move_options.compiler_version,
-                move_options.language_version,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],
@@ -768,8 +784,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
     type Error = CliError;
 
     fn try_into(self) -> Result<PackagePublicationData, Self::Error> {
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
 
         let package_publication_data =
             create_package_publication_data(package, PublishType::AccountDeploy, None)?;
@@ -799,8 +814,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
     type Error = CliError;
 
     async fn async_try_into(self) -> Result<ChunkedPublishPayloads, Self::Error> {
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
 
         let chunked_publish_payloads =
             create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?;
@@ -1130,8 +1144,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let package =
-                build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
             let mock_payloads =
                 create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?
                     .payloads;
@@ -1146,8 +1159,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let message = format!(
             "Do you want to publish this package at object address {}",
             object_address
@@ -1230,7 +1242,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let built_package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+            build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let url = self
             .txn_options
             .rest_options
@@ -1341,8 +1353,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let package =
-                build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
             let mock_payloads =
                 create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?
                     .payloads;
@@ -1357,8 +1368,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let message = format!(
             "Do you want to deploy this package at object address {}",
             object_address
@@ -1447,8 +1457,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         self.move_options
             .add_named_address(self.address_name, self.object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let url = self
             .txn_options
             .rest_options

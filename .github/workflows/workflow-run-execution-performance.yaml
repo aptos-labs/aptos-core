@@ -49,6 +49,8 @@ on:
         type: choice
         options:
         - executor-benchmark-runner
+        - executor-benchmark-ext4
+        - executor-benchmark-xfs
         - benchmark-t2d-32
         - benchmark-t2d-60
         - benchmark-c3d-30
@@ -63,6 +65,7 @@ on:
         required: false
         default: "32"
         type: string
+        description: Number of execution threads to use for the tests.
       FLOW:
         required: false
         default: LAND_BLOCKING

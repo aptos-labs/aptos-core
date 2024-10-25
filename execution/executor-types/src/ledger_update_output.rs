@@ -3,19 +3,17 @@
 
 #![forbid(unsafe_code)]
 
-use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
-    epoch_state::EpochState,
     proof::accumulator::InMemoryTransactionAccumulator,
     state_store::ShardedStateUpdates,
     transaction::{
-        block_epilogue::BlockEndInfo, TransactionInfo, TransactionStatus, TransactionToCommit,
-        Version,
+        block_epilogue::BlockEndInfo, Transaction, TransactionInfo, TransactionOutput,
+        TransactionStatus, Version,
     },
 };
 use derive_more::Deref;
@@ -34,13 +32,8 @@ impl LedgerUpdateOutput {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
+    pub fn new_dummy_with_input_txns(txns: Vec<Transaction>) -> Self {
         Self::new_impl(Inner::new_dummy_with_input_txns(txns))
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
-        Self::new_impl(Inner::new_dummy_with_txns_to_commit(txns))
     }
 
     pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
@@ -53,7 +46,10 @@ impl LedgerUpdateOutput {
 
     pub fn new(
         statuses_for_input_txns: Vec<TransactionStatus>,
-        to_commit: Vec<TransactionToCommit>,
+        transactions: Vec<Transaction>,
+        transaction_outputs: Vec<TransactionOutput>,
+        transaction_infos: Vec<TransactionInfo>,
+        per_version_state_updates: Vec<ShardedStateUpdates>,
         subscribable_events: Vec<ContractEvent>,
         transaction_info_hashes: Vec<HashValue>,
         state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
@@ -64,7 +60,10 @@ impl LedgerUpdateOutput {
     ) -> Self {
         Self::new_impl(Inner {
             statuses_for_input_txns,
-            to_commit,
+            transactions,
+            transaction_outputs,
+            transaction_infos,
+            per_version_state_updates,
             subscribable_events,
             transaction_info_hashes,
             state_updates_until_last_checkpoint,
@@ -80,19 +79,15 @@ impl LedgerUpdateOutput {
             inner: Arc::new(DropHelper::new(inner)),
         }
     }
-
-    pub fn as_state_compute_result(
-        &self,
-        next_epoch_state: Option<EpochState>,
-    ) -> StateComputeResult {
-        StateComputeResult::new(self.clone(), next_epoch_state)
-    }
 }
 
 #[derive(Default, Debug)]
 pub struct Inner {
     pub statuses_for_input_txns: Vec<TransactionStatus>,
-    pub to_commit: Vec<TransactionToCommit>,
+    pub transactions: Vec<Transaction>,
+    pub transaction_outputs: Vec<TransactionOutput>,
+    pub transaction_infos: Vec<TransactionInfo>,
+    pub per_version_state_updates: Vec<ShardedStateUpdates>,
     pub subscribable_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
@@ -114,31 +109,16 @@ impl Inner {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_input_txns(txns: Vec<aptos_types::transaction::Transaction>) -> Self {
-        let num_txns = txns.len();
-        let to_commit = txns
-            .into_iter()
-            .chain(std::iter::once(
-                aptos_types::transaction::Transaction::StateCheckpoint(HashValue::zero()),
-            ))
-            .map(TransactionToCommit::dummy_with_transaction)
-            .collect();
+    pub fn new_dummy_with_input_txns(transactions: Vec<Transaction>) -> Self {
+        let num_txns = transactions.len();
         Self {
-            to_commit,
+            transactions,
             statuses_for_input_txns: vec![
                 TransactionStatus::Keep(
                     aptos_types::transaction::ExecutionStatus::Success
                 );
                 num_txns
             ],
-            ..Default::default()
-        }
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_txns_to_commit(txns: Vec<TransactionToCommit>) -> Self {
-        Self {
-            to_commit: txns,
             ..Default::default()
         }
     }
@@ -158,19 +138,15 @@ impl Inner {
         &self.transaction_accumulator
     }
 
-    pub fn transactions_to_commit(&self) -> &Vec<TransactionToCommit> {
-        &self.to_commit
-    }
-
     /// Ensure that every block committed by consensus ends with a state checkpoint. That can be
     /// one of the two cases: 1. a reconfiguration (txns in the proposed block after the txn caused
     /// the reconfiguration will be retried) 2. a Transaction::StateCheckpoint at the end of the
     /// block.
     pub fn ensure_ends_with_state_checkpoint(&self) -> Result<()> {
         ensure!(
-            self.to_commit
+            self.transactions
                 .last()
-                .map_or(true, |txn| txn.transaction().is_non_reconfig_block_ending()),
+                .map_or(true, |t| t.is_non_reconfig_block_ending()),
             "Block not ending with a state checkpoint.",
         );
         Ok(())
@@ -180,20 +156,17 @@ impl Inner {
         &self,
         transaction_infos: &[TransactionInfo],
     ) -> Result<()> {
-        let first_version =
-            self.transaction_accumulator.version() + 1 - self.to_commit.len() as Version;
         ensure!(
-            self.transactions_to_commit().len() == transaction_infos.len(),
+            self.transaction_infos.len() == transaction_infos.len(),
             "Lengths don't match. {} vs {}",
-            self.transactions_to_commit().len(),
+            self.transaction_infos.len(),
             transaction_infos.len(),
         );
 
-        let mut version = first_version;
-        for (txn_to_commit, expected_txn_info) in
-            zip_eq(self.to_commit.iter(), transaction_infos.iter())
+        let mut version = self.first_version();
+        for (txn_info, expected_txn_info) in
+            zip_eq(self.transaction_infos.iter(), transaction_infos.iter())
         {
-            let txn_info = txn_to_commit.transaction_info();
             ensure!(
                 txn_info == expected_txn_info,
                 "Transaction infos don't match. version:{version}, txn_info:{txn_info}, expected_txn_info:{expected_txn_info}",
@@ -208,10 +181,10 @@ impl Inner {
     }
 
     pub fn first_version(&self) -> Version {
-        self.transaction_accumulator.num_leaves() - self.to_commit.len() as Version
+        self.parent_accumulator.num_leaves
     }
 
     pub fn num_txns(&self) -> usize {
-        self.to_commit.len()
+        self.transactions.len()
     }
 }

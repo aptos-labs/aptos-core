@@ -143,6 +143,8 @@ backup:
     state_snapshot_interval_epochs: 2
     # -- Transaction batch size
     transaction_batch_size: 1000000
+    # -- Number of concurrent requests to the PFN backup port
+    concurrent_data_requests:
 
 backup_verify:
   # -- The schedule for backup verification
@@ -150,9 +152,9 @@ backup_verify:
   resources:
     limits:
       cpu: 8
-      memory: 32Gi
+      memory: 16Gi
     requests:
-      cpu: 4
+      cpu: 8
       memory: 16Gi
   nodeSelector: {}
   tolerations: []

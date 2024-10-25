@@ -13,8 +13,8 @@ use crate::{
 use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExecutionResult};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
-    ExecutorResult, StateComputeResult,
+    state_checkpoint_output::StateCheckpointOutput, state_compute_result::StateComputeResult,
+    BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, warn};
@@ -293,7 +293,7 @@ impl ExecutionPipeline {
                         let executor = executor.clone();
                         Box::pin(async move {
                             tokio::task::spawn_blocking(move || {
-                                executor.pre_commit_block(block_id, parent_block_id)
+                                executor.pre_commit_block(block_id)
                             })
                             .await
                             .expect("failed to spawn_blocking")?;
@@ -307,7 +307,6 @@ impl ExecutionPipeline {
                         pre_commit_tx
                             .send(PreCommitCommand {
                                 block_id,
-                                parent_block_id,
                                 pre_commit_hook_fut,
                                 result_tx: pre_commit_result_tx,
                                 lifetime_guard,
@@ -335,7 +334,6 @@ impl ExecutionPipeline {
     ) {
         while let Some(PreCommitCommand {
             block_id,
-            parent_block_id,
             pre_commit_hook_fut,
             result_tx,
             lifetime_guard,
@@ -346,9 +344,7 @@ impl ExecutionPipeline {
                 let executor = executor.clone();
                 monitor!(
                     "pre_commit",
-                    tokio::task::spawn_blocking(move || {
-                        executor.pre_commit_block(block_id, parent_block_id)
-                    })
+                    tokio::task::spawn_blocking(move || { executor.pre_commit_block(block_id) })
                 )
                 .await
                 .expect("Failed to spawn_blocking().")?;
@@ -402,7 +398,6 @@ struct LedgerApplyCommand {
 
 struct PreCommitCommand {
     block_id: HashValue,
-    parent_block_id: HashValue,
     pre_commit_hook_fut: BoxFuture<'static, ()>,
     result_tx: oneshot::Sender<ExecutorResult<()>>,
     lifetime_guard: CountedRequest<()>,

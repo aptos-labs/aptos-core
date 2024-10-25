@@ -598,9 +598,6 @@ impl CompiledPackage {
             Some(x) => {
                 match x {
                     Architecture::Move => (),
-                    Architecture::AsyncMove => {
-                        flags = flags.set_flavor("async");
-                    },
                     Architecture::Ethereum => {
                         flags = flags.set_flavor("evm");
                     },

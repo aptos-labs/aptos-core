@@ -1177,7 +1177,7 @@ impl BlockGen {
                 Some(HashValue::random()),
                 ExecutionStatus::Success,
             ),
-            arr_macro::arr![HashMap::new(); 16],
+            arr![HashMap::new(); 16],
             WriteSet::default(),
             Vec::new(),
             false,

@@ -177,34 +177,43 @@ B2:
 B3:
 	9: CopyLoc[0](Arg0: &Option<Option<u64>>)
 	10: TestVariantGeneric[3](Option/Some<Option<u64>>)
-	11: BrFalse(21)
+	11: BrTrue(28)
 B4:
-	12: CopyLoc[0](Arg0: &Option<Option<u64>>)
-	13: ImmBorrowVariantFieldGeneric[0](Some.value: Ty0)
-	14: TestVariantGeneric[4](Option/None<u64>)
-	15: BrFalse(21)
+	12: Branch(13)
 B5:
+	13: CopyLoc[0](Arg0: &Option<Option<u64>>)
+	14: TestVariantGeneric[3](Option/Some<Option<u64>>)
+	15: BrTrue(20)
+B6:
 	16: MoveLoc[0](Arg0: &Option<Option<u64>>)
 	17: Pop
-	18: LdFalse
-	19: StLoc[1](loc0: bool)
-	20: Branch(7)
-B6:
-	21: CopyLoc[0](Arg0: &Option<Option<u64>>)
-	22: TestVariantGeneric[3](Option/Some<Option<u64>>)
-	23: BrFalse(31)
 B7:
-	24: MoveLoc[0](Arg0: &Option<Option<u64>>)
-	25: ImmBorrowVariantFieldGeneric[0](Some.value: Ty0)
-	26: TestVariantGeneric[5](Option/Some<u64>)
-	27: BrFalse(31)
+	18: LdU64(14566554180833181697)
+	19: Abort
 B8:
-	28: LdTrue
-	29: StLoc[1](loc0: bool)
-	30: Branch(7)
+	20: MoveLoc[0](Arg0: &Option<Option<u64>>)
+	21: ImmBorrowVariantFieldGeneric[0](Some.value: Ty0)
+	22: TestVariantGeneric[4](Option/Some<u64>)
+	23: BrTrue(25)
 B9:
-	31: LdU64(14566554180833181697)
-	32: Abort
+	24: Branch(18)
+B10:
+	25: LdTrue
+	26: StLoc[1](loc0: bool)
+	27: Branch(7)
+B11:
+	28: CopyLoc[0](Arg0: &Option<Option<u64>>)
+	29: ImmBorrowVariantFieldGeneric[0](Some.value: Ty0)
+	30: TestVariantGeneric[5](Option/None<u64>)
+	31: BrTrue(33)
+B12:
+	32: Branch(13)
+B13:
+	33: MoveLoc[0](Arg0: &Option<Option<u64>>)
+	34: Pop
+	35: LdFalse
+	36: StLoc[1](loc0: bool)
+	37: Branch(7)
 }
 public outer_value(Arg0: Outer): u64 /* def_idx: 5 */ {
 L1:	loc0: &Outer
@@ -280,50 +289,54 @@ B2:
 B3:
 	13: CopyLoc[1](loc0: &Outer)
 	14: TestVariant[5](Outer/One)
-	15: BrFalse(27)
+	15: BrTrue(42)
 B4:
-	16: CopyLoc[1](loc0: &Outer)
-	17: ImmBorrowVariantField[1](One.i: Inner)
-	18: TestVariant[0](Inner/Inner1)
-	19: BrFalse(27)
+	16: Branch(17)
 B5:
+	17: CopyLoc[1](loc0: &Outer)
+	18: TestVariant[5](Outer/One)
+	19: BrFalse(27)
+B6:
 	20: MoveLoc[1](loc0: &Outer)
 	21: Pop
 	22: MoveLoc[0](Arg0: Outer)
 	23: UnpackVariant[5](Outer/One)
-	24: UnpackVariant[0](Inner/Inner1)
+	24: Call inner_value(Inner): u64
 	25: StLoc[2](loc1: u64)
 	26: Branch(11)
-B6:
-	27: CopyLoc[1](loc0: &Outer)
-	28: TestVariant[5](Outer/One)
-	29: BrFalse(37)
 B7:
-	30: MoveLoc[1](loc0: &Outer)
-	31: Pop
-	32: MoveLoc[0](Arg0: Outer)
-	33: UnpackVariant[5](Outer/One)
-	34: Call inner_value(Inner): u64
-	35: StLoc[2](loc1: u64)
-	36: Branch(11)
+	27: MoveLoc[1](loc0: &Outer)
+	28: TestVariant[6](Outer/Two)
+	29: BrFalse(40)
 B8:
-	37: MoveLoc[1](loc0: &Outer)
-	38: TestVariant[6](Outer/Two)
-	39: BrFalse(50)
+	30: MoveLoc[0](Arg0: Outer)
+	31: UnpackVariant[6](Outer/Two)
+	32: StLoc[3](loc2: Box)
+	33: Call inner_value(Inner): u64
+	34: ImmBorrowLoc[3](loc2: Box)
+	35: ImmBorrowField[0](Box.x: u64)
+	36: ReadRef
+	37: Add
+	38: StLoc[2](loc1: u64)
+	39: Branch(11)
 B9:
-	40: MoveLoc[0](Arg0: Outer)
-	41: UnpackVariant[6](Outer/Two)
-	42: StLoc[3](loc2: Box)
-	43: Call inner_value(Inner): u64
-	44: ImmBorrowLoc[3](loc2: Box)
-	45: ImmBorrowField[0](Box.x: u64)
-	46: ReadRef
-	47: Add
-	48: StLoc[2](loc1: u64)
-	49: Branch(11)
+	40: LdU64(14566554180833181697)
+	41: Abort
 B10:
-	50: LdU64(14566554180833181697)
-	51: Abort
+	42: CopyLoc[1](loc0: &Outer)
+	43: ImmBorrowVariantField[1](One.i: Inner)
+	44: TestVariant[0](Inner/Inner1)
+	45: BrTrue(47)
+B11:
+	46: Branch(17)
+B12:
+	47: MoveLoc[1](loc0: &Outer)
+	48: Pop
+	49: MoveLoc[0](Arg0: Outer)
+	50: UnpackVariant[5](Outer/One)
+	51: UnpackVariant[0](Inner/Inner1)
+	52: StLoc[2](loc1: u64)
+	53: Branch(11)
 }
 public outer_value_with_cond(Arg0: Outer): u64 /* def_idx: 7 */ {
 L1:	loc0: &Outer
@@ -348,52 +361,56 @@ B2:
 B3:
 	13: CopyLoc[1](loc0: &Outer)
 	14: TestVariant[5](Outer/One)
-	15: BrFalse(29)
+	15: BrTrue(42)
 B4:
-	16: CopyLoc[1](loc0: &Outer)
-	17: ImmBorrowVariantField[1](One.i: Inner)
-	18: Call is_inner1(&Inner): bool
-	19: BrFalse(29)
+	16: Branch(17)
 B5:
+	17: CopyLoc[1](loc0: &Outer)
+	18: TestVariant[5](Outer/One)
+	19: BrFalse(27)
+B6:
 	20: MoveLoc[1](loc0: &Outer)
 	21: Pop
 	22: MoveLoc[0](Arg0: Outer)
 	23: UnpackVariant[5](Outer/One)
 	24: Call inner_value(Inner): u64
-	25: LdU64(2)
-	26: Mod
-	27: StLoc[2](loc1: u64)
-	28: Branch(11)
-B6:
-	29: CopyLoc[1](loc0: &Outer)
-	30: TestVariant[5](Outer/One)
-	31: BrFalse(39)
+	25: StLoc[2](loc1: u64)
+	26: Branch(11)
 B7:
-	32: MoveLoc[1](loc0: &Outer)
-	33: Pop
-	34: MoveLoc[0](Arg0: Outer)
-	35: UnpackVariant[5](Outer/One)
-	36: Call inner_value(Inner): u64
-	37: StLoc[2](loc1: u64)
-	38: Branch(11)
+	27: MoveLoc[1](loc0: &Outer)
+	28: TestVariant[6](Outer/Two)
+	29: BrFalse(40)
 B8:
-	39: MoveLoc[1](loc0: &Outer)
-	40: TestVariant[6](Outer/Two)
-	41: BrFalse(52)
+	30: MoveLoc[0](Arg0: Outer)
+	31: UnpackVariant[6](Outer/Two)
+	32: StLoc[3](loc2: Box)
+	33: Call inner_value(Inner): u64
+	34: ImmBorrowLoc[3](loc2: Box)
+	35: ImmBorrowField[0](Box.x: u64)
+	36: ReadRef
+	37: Add
+	38: StLoc[2](loc1: u64)
+	39: Branch(11)
 B9:
-	42: MoveLoc[0](Arg0: Outer)
-	43: UnpackVariant[6](Outer/Two)
-	44: StLoc[3](loc2: Box)
-	45: Call inner_value(Inner): u64
-	46: ImmBorrowLoc[3](loc2: Box)
-	47: ImmBorrowField[0](Box.x: u64)
-	48: ReadRef
-	49: Add
-	50: StLoc[2](loc1: u64)
-	51: Branch(11)
+	40: LdU64(14566554180833181697)
+	41: Abort
 B10:
-	52: LdU64(14566554180833181697)
-	53: Abort
+	42: CopyLoc[1](loc0: &Outer)
+	43: ImmBorrowVariantField[1](One.i: Inner)
+	44: Call is_inner1(&Inner): bool
+	45: BrTrue(47)
+B11:
+	46: Branch(17)
+B12:
+	47: MoveLoc[1](loc0: &Outer)
+	48: Pop
+	49: MoveLoc[0](Arg0: Outer)
+	50: UnpackVariant[5](Outer/One)
+	51: Call inner_value(Inner): u64
+	52: LdU64(2)
+	53: Mod
+	54: StLoc[2](loc1: u64)
+	55: Branch(11)
 }
 public outer_value_with_cond_ref(Arg0: &Outer): bool /* def_idx: 8 */ {
 L1:	loc0: bool
@@ -412,43 +429,47 @@ B2:
 B3:
 	9: CopyLoc[0](Arg0: &Outer)
 	10: TestVariant[5](Outer/One)
-	11: BrFalse(21)
+	11: BrTrue(33)
 B4:
-	12: CopyLoc[0](Arg0: &Outer)
-	13: ImmBorrowVariantField[1](One.i: Inner)
-	14: Call is_inner1(&Inner): bool
-	15: BrFalse(21)
+	12: Branch(13)
 B5:
+	13: CopyLoc[0](Arg0: &Outer)
+	14: TestVariant[5](Outer/One)
+	15: BrFalse(21)
+B6:
 	16: MoveLoc[0](Arg0: &Outer)
-	17: Pop
-	18: LdTrue
+	17: ImmBorrowVariantField[1](One.i: Inner)
+	18: Call is_inner1(&Inner): bool
 	19: StLoc[1](loc0: bool)
 	20: Branch(7)
-B6:
-	21: CopyLoc[0](Arg0: &Outer)
-	22: TestVariant[5](Outer/One)
-	23: BrFalse(29)
 B7:
+	21: CopyLoc[0](Arg0: &Outer)
+	22: TestVariant[6](Outer/Two)
+	23: BrFalse(29)
+B8:
 	24: MoveLoc[0](Arg0: &Outer)
-	25: ImmBorrowVariantField[1](One.i: Inner)
+	25: ImmBorrowVariantField[2](Two.i: Inner)
 	26: Call is_inner1(&Inner): bool
 	27: StLoc[1](loc0: bool)
 	28: Branch(7)
-B8:
-	29: CopyLoc[0](Arg0: &Outer)
-	30: TestVariant[6](Outer/Two)
-	31: BrFalse(37)
 B9:
-	32: MoveLoc[0](Arg0: &Outer)
-	33: ImmBorrowVariantField[2](Two.i: Inner)
-	34: Call is_inner1(&Inner): bool
-	35: StLoc[1](loc0: bool)
-	36: Branch(7)
+	29: MoveLoc[0](Arg0: &Outer)
+	30: Pop
+	31: LdU64(14566554180833181697)
+	32: Abort
 B10:
-	37: MoveLoc[0](Arg0: &Outer)
-	38: Pop
-	39: LdU64(14566554180833181697)
-	40: Abort
+	33: CopyLoc[0](Arg0: &Outer)
+	34: ImmBorrowVariantField[1](One.i: Inner)
+	35: Call is_inner1(&Inner): bool
+	36: BrTrue(38)
+B11:
+	37: Branch(13)
+B12:
+	38: MoveLoc[0](Arg0: &Outer)
+	39: Pop
+	40: LdTrue
+	41: StLoc[1](loc0: bool)
+	42: Branch(7)
 }
 select_common_fields(Arg0: CommonFields): u64 /* def_idx: 9 */ {
 L1:	loc0: &CommonFields
@@ -498,24 +519,28 @@ B0:
 	1: StLoc[1](loc0: &CommonFieldsAtDifferentOffset)
 	2: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
 	3: TestVariant[9](CommonFieldsAtDifferentOffset/Bar)
-	4: BrTrue(14)
+	4: BrFalse(12)
 B1:
-	5: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
-	6: TestVariant[10](CommonFieldsAtDifferentOffset/Balt)
-	7: BrTrue(14)
+	5: Branch(6)
 B2:
-	8: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
-	9: ImmBorrowVariantField[4](Baz.z: u64)
-	10: StLoc[2](loc1: &u64)
+	6: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	7: ImmBorrowVariantField[4](Bar.z|Balt.z: u64)
+	8: StLoc[2](loc1: &u64)
 B3:
-	11: MoveLoc[2](loc1: &u64)
-	12: ReadRef
-	13: Ret
+	9: MoveLoc[2](loc1: &u64)
+	10: ReadRef
+	11: Ret
 B4:
-	14: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
-	15: ImmBorrowVariantField[5](Bar.z|Balt.z: u64)
-	16: StLoc[2](loc1: &u64)
-	17: Branch(11)
+	12: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	13: TestVariant[10](CommonFieldsAtDifferentOffset/Balt)
+	14: BrFalse(16)
+B5:
+	15: Branch(6)
+B6:
+	16: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	17: ImmBorrowVariantField[5](Baz.z: u64)
+	18: StLoc[2](loc1: &u64)
+	19: Branch(9)
 }
 }
 ============ bytecode verification succeeded ========
