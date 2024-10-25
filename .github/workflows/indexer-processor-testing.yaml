@@ -56,9 +56,10 @@ jobs:
         id: api_key_update
         run: |
           cd ecosystem/indexer-grpc/indexer-transaction-generator
+          ls -al ./tests
           echo "Updating API keys in YAML files..."
-          sed -i "s/TESTNET_API_KEY/${{ steps.api_key_update.testnet_api_key }}/g" tests/imported_transactions.yaml
-          sed -i "s/MAINNET_API_KEY/${{ steps.api_key_update.testnet_api_key }}/g" tests/imported_transactions.yaml
+          sed -i "s/TESTNET_API_KEY/${{ steps.api_key_update.testnet_api_key }}/g" ./tests/imported_transactions.yaml
+          sed -i "s/MAINNET_API_KEY/${{ steps.api_key_update.testnet_api_key }}/g" ./tests/imported_transactions.yaml
 
           cargo run -- --testing-folder ./tests --output-folder ../indexer-test-transactions/new_json_transactions
 
