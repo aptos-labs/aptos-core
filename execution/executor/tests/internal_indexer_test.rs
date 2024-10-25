@@ -318,7 +318,6 @@ fn test_db_indexer_data() {
         (false, "0x1::version::Version"),
         (false, "0x1::jwks::PatchedJWKs"),
         (false, "0x1::chain_id::ChainId"),
-        (false, "0x1::coin::SupplyConfig"),
         (false, "0x1::jwks::ObservedJWKs"),
         (false, "0x1::features::Features"),
         (false, "0x1::stake::ValidatorSet"),

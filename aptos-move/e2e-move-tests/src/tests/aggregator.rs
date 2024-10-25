@@ -146,7 +146,7 @@ proptest! {
     }
 
     #[test]
-    fn test_aggregator_lifetime_lower_limit(block_split in BlockSplit::arbitrary(15)) {
+    fn test_aggregator_lifetime_lower_limit(block_split in BlockSplit::arbitrary(14)) {
         let (mut h, acc) = setup();
 
         let txns = vec![

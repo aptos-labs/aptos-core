@@ -987,16 +987,6 @@ Maximum possible aggregatable coin value.
 
 
 
-<a id="0x1_coin_MAX_U128"></a>
-
-Maximum possible coin supply.
-
-
-<pre><code><b>const</b> <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>: u128 = 340282366920938463463374607431768211455;
-</code></pre>
-
-
-
 <a id="0x1_coin_EINSUFFICIENT_BALANCE"></a>
 
 Not enough coins to complete transaction
@@ -2984,7 +2974,7 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
         decimals,
         <a href="coin.md#0x1_coin_supply">supply</a>: <b>if</b> (monitor_supply) {
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                <a href="optional_aggregator.md#0x1_optional_aggregator_new">optional_aggregator::new</a>(<a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>, parallelizable)
+                <a href="optional_aggregator.md#0x1_optional_aggregator_new">optional_aggregator::new</a>(parallelizable)
             )
         } <b>else</b> { <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() },
     };
@@ -4256,7 +4246,7 @@ Only the creator of <code>CoinType</code> can initialize.
     && coin_info.symbol == symbol
     && coin_info.decimals == decimals;
 <b>ensures</b> <b>if</b> (monitor_supply) {
-    value == 0 && limit == <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>
+    value == 0 && limit == MAX_U128
         && (parallelizable == <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="coin.md#0x1_coin_supply">supply</a>))
 } <b>else</b> {
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(coin_info.<a href="coin.md#0x1_coin_supply">supply</a>)
