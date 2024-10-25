@@ -596,19 +596,20 @@ module aptos_framework::vesting {
                     commission_percentage,
                 },
             );
+        } else {
+            emit_event(
+                &mut admin_store.create_events,
+                CreateVestingContractEvent {
+                    operator,
+                    voter,
+                    withdrawal_address,
+                    grant_amount,
+                    vesting_contract_address: contract_address,
+                    staking_pool_address: pool_address,
+                    commission_percentage,
+                },
+            );
         };
-        emit_event(
-            &mut admin_store.create_events,
-            CreateVestingContractEvent {
-                operator,
-                voter,
-                withdrawal_address,
-                grant_amount,
-                vesting_contract_address: contract_address,
-                staking_pool_address: pool_address,
-                commission_percentage,
-            },
-        );
 
         move_to(&contract_signer, VestingContract {
             state: VESTING_POOL_ACTIVE,
@@ -705,17 +706,18 @@ module aptos_framework::vesting {
                     amount: vested_amount,
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.vest_events,
+                VestEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    staking_pool_address: vesting_contract.staking.pool_address,
+                    period_vested: next_period_to_vest,
+                    amount: vested_amount,
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.vest_events,
-            VestEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                staking_pool_address: vesting_contract.staking.pool_address,
-                period_vested: next_period_to_vest,
-                amount: vested_amount,
-            },
-        );
     }
 
     /// Call `vest` for many vesting contracts.
@@ -769,15 +771,16 @@ module aptos_framework::vesting {
                     amount: total_distribution_amount,
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.distribute_events,
+                DistributeEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    amount: total_distribution_amount,
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.distribute_events,
-            DistributeEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                amount: total_distribution_amount,
-            },
-        );
     }
 
     /// Call `distribute` for many vesting contracts.
@@ -816,14 +819,15 @@ module aptos_framework::vesting {
                     vesting_contract_address: contract_address,
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.terminate_events,
+                TerminateEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.terminate_events,
-            TerminateEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-            },
-        );
     }
 
     /// Withdraw all funds to the preset vesting contract's withdrawal address. This can only be called if the contract
@@ -853,15 +857,16 @@ module aptos_framework::vesting {
                     amount,
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.admin_withdraw_events,
+                AdminWithdrawEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    amount,
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.admin_withdraw_events,
-            AdminWithdrawEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                amount,
-            },
-        );
     }
 
     public entry fun update_operator(
@@ -889,18 +894,19 @@ module aptos_framework::vesting {
                     commission_percentage,
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.update_operator_events,
+                UpdateOperatorEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    staking_pool_address: vesting_contract.staking.pool_address,
+                    old_operator,
+                    new_operator,
+                    commission_percentage,
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.update_operator_events,
-            UpdateOperatorEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                staking_pool_address: vesting_contract.staking.pool_address,
-                old_operator,
-                new_operator,
-                commission_percentage,
-            },
-        );
     }
 
     public entry fun update_operator_with_same_commission(
@@ -949,17 +955,18 @@ module aptos_framework::vesting {
                     new_voter,
                 },
             );
-        };
-        emit_event(
-            &mut vesting_contract.update_voter_events,
-            UpdateVoterEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                staking_pool_address: vesting_contract.staking.pool_address,
-                old_voter,
-                new_voter,
-            },
-        );
+        } else {
+            emit_event(
+                &mut vesting_contract.update_voter_events,
+                UpdateVoterEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    staking_pool_address: vesting_contract.staking.pool_address,
+                    old_voter,
+                    new_voter,
+                },
+            );
+        }
     }
 
     public entry fun reset_lockup(
@@ -980,16 +987,17 @@ module aptos_framework::vesting {
                     new_lockup_expiration_secs: stake::get_lockup_secs(vesting_contract.staking.pool_address),
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.reset_lockup_events,
+                ResetLockupEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    staking_pool_address: vesting_contract.staking.pool_address,
+                    new_lockup_expiration_secs: stake::get_lockup_secs(vesting_contract.staking.pool_address),
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.reset_lockup_events,
-            ResetLockupEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                staking_pool_address: vesting_contract.staking.pool_address,
-                new_lockup_expiration_secs: stake::get_lockup_secs(vesting_contract.staking.pool_address),
-            },
-        );
     }
 
     public entry fun set_beneficiary(
@@ -1024,17 +1032,18 @@ module aptos_framework::vesting {
                     new_beneficiary,
                 },
             );
+        } else {
+            emit_event(
+                &mut vesting_contract.set_beneficiary_events,
+                SetBeneficiaryEvent {
+                    admin: vesting_contract.admin,
+                    vesting_contract_address: contract_address,
+                    shareholder,
+                    old_beneficiary,
+                    new_beneficiary,
+                },
+            );
         };
-        emit_event(
-            &mut vesting_contract.set_beneficiary_events,
-            SetBeneficiaryEvent {
-                admin: vesting_contract.admin,
-                vesting_contract_address: contract_address,
-                shareholder,
-                old_beneficiary,
-                new_beneficiary,
-            },
-        );
     }
 
     /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder

@@ -2620,11 +2620,12 @@ Deposit the coin balance into the recipient's account and emit an event.
             <a href="event.md#0x1_event_emit">event::emit</a>(
                 <a href="coin.md#0x1_coin_CoinDeposit">CoinDeposit</a> { coin_type: type_name&lt;CoinType&gt;(), <a href="account.md#0x1_account">account</a>: account_addr, amount: <a href="coin.md#0x1_coin">coin</a>.value }
             );
+        } <b>else</b> {
+            <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a>&gt;(
+                &<b>mut</b> coin_store.deposit_events,
+                <a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
+            );
         };
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a>&gt;(
-            &<b>mut</b> coin_store.deposit_events,
-            <a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
-        );
         <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
     } <b>else</b> {
         <b>let</b> metadata = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
@@ -3244,11 +3245,12 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
                     coin_type: type_name&lt;CoinType&gt;(), <a href="account.md#0x1_account">account</a>: account_addr, amount: coin_amount_to_withdraw
                 }
             );
+        } <b>else</b> {
+            <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
+                &<b>mut</b> coin_store.withdraw_events,
+                <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount: coin_amount_to_withdraw },
+            );
         };
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
-            &<b>mut</b> coin_store.withdraw_events,
-            <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount: coin_amount_to_withdraw },
-        );
         <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, coin_amount_to_withdraw)
     } <b>else</b> {
         <a href="coin.md#0x1_coin_zero">zero</a>()
