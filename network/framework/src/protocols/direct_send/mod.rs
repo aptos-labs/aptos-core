@@ -5,10 +5,12 @@
 use crate::{protocols::network::SerializedRequest, ProtocolId};
 use bytes::Bytes;
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{fmt::Debug, time::SystemTime};
 
 #[derive(Clone, Eq, PartialEq, Serialize)]
 pub struct Message {
+    /// The time at which the message was sent by the application
+    pub application_send_time: SystemTime,
     /// The [`ProtocolId`] for which of our upstream application modules should
     /// handle (i.e., deserialize and then respond to) this inbound rpc request.
     ///
@@ -20,6 +22,16 @@ pub struct Message {
     /// deserialized later in the handling application module.
     #[serde(skip)]
     pub mdata: Bytes,
+}
+
+impl Message {
+    pub fn new(protocol_id: ProtocolId, mdata: Bytes) -> Self {
+        Self {
+            application_send_time: SystemTime::now(),
+            protocol_id,
+            mdata,
+        }
+    }
 }
 
 impl Debug for Message {

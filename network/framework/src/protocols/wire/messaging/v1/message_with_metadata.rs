@@ -169,9 +169,9 @@ impl LatencyMetadata {
         self.message_streamed = true;
     }
 
-    /// Sets the application send time to now
-    pub fn set_application_send_time(&mut self) {
-        self.application_send_time = Some(SystemTime::now());
+    /// Sets the application send time to the given time
+    pub fn set_application_send_time(&mut self, time: SystemTime) {
+        self.application_send_time = Some(time);
     }
 
     /// Sets the network send time to now

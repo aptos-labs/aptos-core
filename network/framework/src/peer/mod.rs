@@ -489,23 +489,21 @@ where
             },
             NetworkMessage::RpcResponse(_) => {
                 // TODO: see if we can avoid the non-reference cast to this match case
-                let NetworkMessage::RpcResponse(response) = network_message else {
-                    unreachable!("NetworkMessage type changed between match and let")
-                };
-                let rpc_response_with_metadata =
-                    RpcResponseWithMetadata::new_from_legacy_response(response);
-                self.outbound_rpcs
-                    .handle_inbound_response(rpc_response_with_metadata)
+                if let NetworkMessage::RpcResponse(response) = network_message {
+                    let rpc_response_with_metadata =
+                        RpcResponseWithMetadata::new_from_legacy_response(response);
+                    self.outbound_rpcs
+                        .handle_inbound_response(rpc_response_with_metadata)
+                }
             },
             NetworkMessage::RpcResponseWithMetadata(_) => {
                 // TODO: see if we can avoid the non-reference cast to this match case
-                let NetworkMessage::RpcResponseWithMetadata(response_with_metadata) =
+                if let NetworkMessage::RpcResponseWithMetadata(response_with_metadata) =
                     network_message
-                else {
-                    unreachable!("NetworkMessage type changed between match and let")
-                };
-                self.outbound_rpcs
-                    .handle_inbound_response(response_with_metadata)
+                {
+                    self.outbound_rpcs
+                        .handle_inbound_response(response_with_metadata)
+                }
             },
         };
         Ok(())

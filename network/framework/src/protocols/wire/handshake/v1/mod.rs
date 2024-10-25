@@ -73,7 +73,7 @@ pub enum ProtocolId {
     JWKConsensusRpcJson = 26,
     ConsensusObserver = 27,
     ConsensusObserverRpc = 28,
-    Unknown = 255, // Represents an unknown protocol (this should only be used in exceptional cases)
+    Unknown = 255, // Represents an unknown protocol (use of this should be avoided)
 }
 
 /// The encoding types for Protocols

@@ -47,9 +47,10 @@ impl PeerManagerRequestSender {
         protocol_id: ProtocolId,
         mdata: Bytes,
     ) -> Result<(), PeerManagerError> {
+        let message = Message::new(protocol_id, mdata);
         self.inner.push(
             (peer_id, protocol_id),
-            PeerManagerRequest::SendDirectSend(peer_id, Message { protocol_id, mdata }),
+            PeerManagerRequest::SendDirectSend(peer_id, message),
         )?;
         Ok(())
     }
@@ -71,7 +72,7 @@ impl PeerManagerRequestSender {
         protocol_id: ProtocolId,
         mdata: Bytes,
     ) -> Result<(), PeerManagerError> {
-        let msg = Message { protocol_id, mdata };
+        let msg = Message::new(protocol_id, mdata);
         for recipient in recipients {
             // We return `Err` early here if the send fails. Since sending will
             // only fail if the queue is unexpectedly shutdown (i.e., receiver
@@ -94,12 +95,7 @@ impl PeerManagerRequestSender {
         timeout: Duration,
     ) -> Result<Bytes, RpcError> {
         let (res_tx, res_rx) = oneshot::channel();
-        let request = OutboundRpcRequest {
-            protocol_id,
-            data: req,
-            res_tx,
-            timeout,
-        };
+        let request = OutboundRpcRequest::new(protocol_id, req, res_tx, timeout);
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendRpc(peer_id, request),

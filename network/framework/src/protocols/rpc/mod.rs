@@ -76,7 +76,13 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    cmp::PartialEq,
+    collections::HashMap,
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 pub mod error;
 
@@ -121,6 +127,8 @@ impl SerializedRequest for InboundRpcRequest {
 /// A wrapper struct for an outbound rpc request and its associated context.
 #[derive(Debug, Serialize)]
 pub struct OutboundRpcRequest {
+    /// The time at which the rpc request was sent by the application
+    pub application_send_time: SystemTime,
     /// The remote peer's application module that should handle our outbound rpc
     /// request.
     ///
@@ -143,6 +151,23 @@ pub struct OutboundRpcRequest {
     /// rpc layer will send an [`RpcError::TimedOut`] error over the
     /// `res_tx` channel to the upper client layer.
     pub timeout: Duration,
+}
+
+impl OutboundRpcRequest {
+    pub fn new(
+        protocol_id: ProtocolId,
+        data: Bytes,
+        res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
+        timeout: Duration,
+    ) -> Self {
+        Self {
+            application_send_time: SystemTime::now(),
+            protocol_id,
+            data,
+            res_tx,
+            timeout,
+        }
+    }
 }
 
 impl SerializedRequest for OutboundRpcRequest {
@@ -461,6 +486,7 @@ impl OutboundRpcs {
 
         // Unpack request.
         let OutboundRpcRequest {
+            application_send_time: _,
             protocol_id,
             data: request_data,
             timeout,
