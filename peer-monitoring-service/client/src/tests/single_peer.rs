@@ -10,6 +10,7 @@ use crate::{
             config_with_node_info_requests, config_with_only_latency_and_network_requests,
             create_connected_peers_map, create_network_info_response,
             create_random_network_info_response, create_random_node_info_response,
+            disabled_network_monitoring_config, disabled_node_monitoring_config,
             elapse_latency_update_interval, elapse_metadata_updater_interval,
             elapse_network_info_update_interval, elapse_node_info_update_interval,
             initialize_and_verify_peer_states, start_peer_metadata_updater, start_peer_monitor,
@@ -27,7 +28,7 @@ use crate::{
     PeerState,
 };
 use aptos_config::{
-    config::{NodeConfig, PeerRole},
+    config::{LatencyMonitoringConfig, NodeConfig, PeerMonitoringServiceConfig, PeerRole},
     network_id::NetworkId,
 };
 use aptos_time_service::TimeServiceTrait;
@@ -135,7 +136,11 @@ async fn test_basic_peer_updater_loop() {
 
     // Create a peer state for the fullnode
     let node_config = NodeConfig::default();
-    let mut peer_state = PeerState::new(node_config.clone(), time_service.clone());
+    let mut peer_state = PeerState::new(
+        node_config.clone(),
+        time_service.clone(),
+        &peer_monitoring_client,
+    );
     peer_monitor_state
         .peer_states
         .write()
@@ -288,7 +293,21 @@ async fn test_latency_ping_failures() {
         MockMonitoringServer::new(vec![network_id]);
 
     // Create a node config where only latency pings refresh
-    let node_config = config_with_latency_ping_requests();
+    let node_config = NodeConfig {
+        peer_monitoring_service: PeerMonitoringServiceConfig {
+            latency_monitoring: LatencyMonitoringConfig {
+                // To ensure the peer does not disconnect during the test, the max ping failure
+                // has been set to 20 (greater than the number of pings that will be triggered
+                // by this test)
+                max_latency_ping_failures: 20,
+                ..LatencyMonitoringConfig::default()
+            },
+            network_monitoring: disabled_network_monitoring_config(),
+            node_monitoring: disabled_node_monitoring_config(),
+            ..PeerMonitoringServiceConfig::default()
+        },
+        ..config_with_latency_ping_requests()
+    };
 
     // Spawn the peer monitoring client
     start_peer_monitor(
@@ -413,6 +432,72 @@ async fn test_latency_ping_failures() {
     // Verify the new latency state of the peer monitor (the number
     // of failures should have been reset).
     verify_peer_latency_state(&peer_monitor_state, &validator_peer, 3, 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_disconnect_from_peer() {
+    // Create the peer monitoring client and server
+    let network_id = NetworkId::Validator;
+    let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
+        MockMonitoringServer::new(vec![network_id]);
+
+    let peers = peer_monitoring_client.get_peers_and_metadata();
+
+    // Create a node config where only latency pings refresh
+    // Note: By default, this will have a max latency ping tolerated of 3
+    let node_config = config_with_latency_ping_requests();
+
+    // Spawn the peer monitoring client
+    start_peer_monitor(
+        peer_monitoring_client,
+        &peer_monitor_state,
+        &time_service,
+        &node_config,
+    )
+    .await;
+
+    // Add a connected validator peer
+    let validator_peer = mock_monitoring_server.add_new_peer(network_id, PeerRole::Validator);
+
+    // Initialize all the peer states by running the peer monitor once
+    let mock_time = time_service.into_mock();
+    let _ = initialize_and_verify_peer_states(
+        &network_id,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
+
+    // Handle several latency ping requests with bad responses
+    for i in 0..node_config
+        .peer_monitoring_service
+        .latency_monitoring
+        .max_latency_ping_failures
+    {
+        elapse_latency_update_interval(node_config.clone(), mock_time.clone()).await;
+
+        // Verify that a single latency request is received and send a bad response
+        verify_latency_request_and_respond(
+            &network_id,
+            &mut mock_monitoring_server,
+            i + 1,
+            false,
+            true,
+            false,
+        )
+        .await;
+
+        // Wait until the latency peer state is updated with the failure
+        wait_for_latency_ping_failure(&peer_monitor_state, &validator_peer, i + 1).await;
+    }
+
+    let peer_metadata = peers.get_metadata_for_peer(validator_peer).unwrap();
+
+    // Should NOT be connected to this peer anymore
+    assert!(!peer_metadata.is_connected());
 }
 
 #[tokio::test(flavor = "multi_thread")]
