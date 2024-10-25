@@ -146,7 +146,8 @@ impl MoveVmExt {
                 builder,
                 vm_config,
                 resolver,
-                env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+                env.features()
+                    .is_enabled(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING),
                 inject_create_signer_for_gov_sim,
             )
             .expect("should be able to create Move VM; check if there are duplicated natives"),

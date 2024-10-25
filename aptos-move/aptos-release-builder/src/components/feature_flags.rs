@@ -132,6 +132,7 @@ pub enum FeatureFlag {
     TransactionSimulationEnhancement,
     CollectionOwner,
     TransactionContextHashFunctionUpdate,
+    FakeFeatureForComparisonTesting,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -351,6 +352,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::TransactionContextHashFunctionUpdate => {
                 AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE
             },
+            FeatureFlag::FakeFeatureForComparisonTesting => {
+                AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING
+            },
         }
     }
 }
@@ -496,6 +500,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE => {
                 FeatureFlag::TransactionContextHashFunctionUpdate
+            },
+            AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING => {
+                FeatureFlag::FakeFeatureForComparisonTesting
             },
         }
     }
