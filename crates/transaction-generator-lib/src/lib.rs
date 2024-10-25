@@ -23,6 +23,7 @@ use std::{
         Arc,
     },
     time::Duration,
+    hash::Hash,
 };
 
 mod account_generator;
@@ -138,9 +139,9 @@ pub trait TransactionGenerator: Sync + Send {
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
 
-    // fn update_sequence_numbers(&mut self, _latest_fetched_sequence_numbers: &HashMap<AccountAddress, u64>) {
-    //     // Default implementation does nothing
-    // }
+    fn update_sequence_numbers(&mut self, _latest_fetched_sequence_numbers: &HashMap<AccountAddress, u64>) {
+        // Default implementation does nothing
+    }
 }
 
 #[async_trait]
@@ -410,30 +411,36 @@ pub async fn create_txn_generator_creator(
     )
 }
 
-pub struct BucketedObjectPool<T> {
-    pool: RwLock<HashMap<AccountAddress, Vec<T>>>,
-    all_addresses: Arc<Vec<AccountAddress>>,
+pub trait Object {
+    fn address(&self) -> AccountAddress;
+}
+pub struct BucketedObjectPool<Bucket, T> {
+    pool: RwLock<HashMap<Bucket, Vec<T>>>,
+    all_buckets: Arc<Vec<Bucket>>,
     current_index: AtomicUsize,
+    object_to_bucket_map: HashMap<AccountAddress, Bucket>,
 }
 
-impl<T> BucketedObjectPool<T> {
-    pub(crate) fn new(addresses: Arc<Vec<AccountAddress>>) -> Self {
+impl<Bucket: Clone + Eq + PartialEq + Hash, T: Object> BucketedObjectPool<Bucket, T> {
+    pub(crate) fn new(buckets: Arc<Vec<Bucket>>) -> Self {
         let mut pool = HashMap::new();
-        for address in addresses.iter() {
-            pool.insert(address.clone(), Vec::new());
+        for bucket in buckets.iter() {
+            pool.insert(bucket.clone(), Vec::new());
         }
         Self {
             pool: RwLock::new(pool),
-            all_addresses: addresses,
+            all_buckets: buckets,
             current_index: AtomicUsize::new(0),
+            object_to_bucket_map: HashMap::new(),
         }
     }
 
-    pub(crate) fn add_to_bucket(&self, address: AccountAddress, mut addition: Vec<T>) {
+    pub(crate) fn add_to_bucket(&self, bucket: Bucket, mut addition: Vec<T>) {
         assert!(!addition.is_empty());
         let mut current = self.pool.write();
+        self.object_to_bucket_map.extend(addition.iter().map(|object| (object.address(), bucket.clone())));
         current
-            .entry(address)
+            .entry(bucket)
             .or_insert_with(Vec::new)
             .append(&mut addition);
     }
@@ -444,24 +451,25 @@ impl<T> BucketedObjectPool<T> {
         let mut current = self.pool.write();
         for object in addition {
             let current_index = self.current_index.load(Ordering::Relaxed);
-            let current_address = self.all_addresses[current_index];
+            let current_bucket = self.all_buckets[current_index].clone();
             current
-                .entry(current_address)
+                .entry(current_bucket)
                 .or_insert_with(Vec::new)
                 .append(&mut vec![object]);
-            self.current_index.store((current_index + 1) % self.all_addresses.len(), Ordering::Relaxed);
+            self.current_index.store((current_index + 1) % self.all_buckets.len(), Ordering::Relaxed);
+            self.object_to_bucket_map.insert(object.address(), current_bucket);
         }
     }
 
     pub(crate) fn take_from_pool(
         &self,
-        address: AccountAddress,
+        bucket: Bucket,
         needed: usize,
         return_partial: bool,
         rng: &mut StdRng,
     ) -> Vec<T> {
         let mut current = self.pool.write();
-        let num_in_pool = current.get_mut(&address).map_or(0, |v| v.len());
+        let num_in_pool = current.get_mut(&bucket).map_or(0, |v| v.len());
         if !return_partial && num_in_pool < needed {
             sample!(
                 SampleRate::Duration(Duration::from_secs(10)),
@@ -470,7 +478,7 @@ impl<T> BucketedObjectPool<T> {
             return Vec::new();
         }
         let num_to_return = std::cmp::min(num_in_pool, needed);
-        let current_bucket = current.get_mut(&address).unwrap();
+        let current_bucket = current.get_mut(&bucket).unwrap();
         let mut result = current_bucket
             .drain((num_in_pool - num_to_return)..)
             .collect::<Vec<_>>();
@@ -480,6 +488,21 @@ impl<T> BucketedObjectPool<T> {
             current_bucket[start..start + num_to_return].swap_with_slice(&mut result);
         }
         result
+    }
+
+    pub(crate) fn update_sequence_number(
+        &self,
+        object_address: AccountAddress,
+        sequence_number: u64,
+    ) {
+        let mut current = self.pool.write();
+        if let Some(bucket) = self.object_to_bucket_map.get(&object_address).and_then(|bucket| current.get_mut(bucket)) {
+            for object in bucket.iter_mut() {
+                if object.address() == object_address {
+                    object.update_sequence_number(sequence_number);
+                }
+            }
+        }
     }
 }
 

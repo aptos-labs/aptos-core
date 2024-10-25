@@ -294,7 +294,7 @@ impl WorkflowTxnGeneratorCreator {
                 )
                 .await;
 
-                let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                let (mint_worker, mint_sequence_number_update_worker) = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
@@ -304,7 +304,7 @@ impl WorkflowTxnGeneratorCreator {
                     },
                 )
                 .await;
-                let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                let (burn_worker, burn_sequence_number_update_worker) = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
@@ -330,6 +330,7 @@ impl WorkflowTxnGeneratorCreator {
                             txn_factory.clone(),
                             packages.clone(),
                             mint_worker,
+                            mint_sequence_number_update_worker,
                         )),
                         created_pool.clone(),
                         Some(minted_pool.clone()),
@@ -339,6 +340,7 @@ impl WorkflowTxnGeneratorCreator {
                             txn_factory.clone(),
                             packages.clone(),
                             burn_worker,
+                            burn_sequence_number_update_worker,
                         )),
                         minted_pool.clone(),
                         Some(burnt_pool.clone()),
@@ -396,7 +398,7 @@ impl WorkflowTxnGeneratorCreator {
                 ));
 
                 // Stage 2: For each minter account, add controller in the stablecoin module
-                let configure_controllers_worker =
+                let (configure_controllers_worker, configure_controller_stage_seq_num_updater) =
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
                         root_account,
@@ -407,7 +409,7 @@ impl WorkflowTxnGeneratorCreator {
                     .await;
 
                 // Stage 3: For each minter account, set minter allowance in the stablecoin module
-                let set_minter_allowance_worker =
+                let (set_minter_allowance_worker, set_minter_allowance_stage_seq_num_updater) =
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
                         root_account,
@@ -418,7 +420,7 @@ impl WorkflowTxnGeneratorCreator {
                     .await;
 
                 // Stage 4: Let minter accounts mint transactions for the users
-                let mint_stage_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                let (mint_stage_worker, mint_stage_seq_number_updater) = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
@@ -439,6 +441,7 @@ impl WorkflowTxnGeneratorCreator {
                         txn_factory.clone(),
                         packages.clone(),
                         configure_controllers_worker,
+                        configure_controller_stage_seq_num_updater,
                     )),
                     created_minter_pool.clone(),
                     Some(configured_minter_pool.clone()),
@@ -449,6 +452,7 @@ impl WorkflowTxnGeneratorCreator {
                         txn_factory.clone(),
                         packages.clone(),
                         set_minter_allowance_worker,
+                        set_minter_allowance_stage_seq_num_updater,
                     )),
                     configured_minter_pool.clone(),
                     Some(minters_with_allowance_pool.clone()),
@@ -458,6 +462,7 @@ impl WorkflowTxnGeneratorCreator {
                     txn_factory.clone(),
                     packages.clone(),
                     mint_stage_worker,
+                    mint_stage_seq_number_updater,
                 ));
 
                 let stages: Vec<Box<dyn TransactionGeneratorCreator>> = vec![

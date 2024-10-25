@@ -3,7 +3,7 @@
 
 use super::{publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter};
 use crate::{
-    call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, BucketedObjectPool, RootAccountHandle
+    call_custom_modules::{SequenceNumberUpdateWorker, TransactionGeneratorWorker, UserModuleTransactionGenerator}, BucketedObjectPool, RootAccountHandle
 };
 use aptos_sdk::{
     bcs,
@@ -62,6 +62,12 @@ impl UserModuleTransactionGenerator for StableCoinConfigureControllerGenerator {
             Some(txn)
         })
     }
+
+    async fn create_sequence_number_update_fn(
+        &self,
+    ) -> Option<Arc<SequenceNumberUpdateWorker>> {
+        None
+    }
 }
 
 pub struct StableCoinSetMinterAllowanceGenerator {}
@@ -108,6 +114,12 @@ impl UserModuleTransactionGenerator for StableCoinSetMinterAllowanceGenerator {
             ));
             Some(txn)
         })
+    }
+
+    async fn create_sequence_number_update_fn(
+        &self,
+    ) -> Option<Arc<SequenceNumberUpdateWorker>> {
+        None
     }
 }
 
@@ -199,5 +211,18 @@ impl UserModuleTransactionGenerator for StableCoinMinterGenerator {
             destination_accounts.add_to_pool(destinations);
             txn
         })
+    }
+
+    async fn create_sequence_number_update_fn(
+        &self,
+    ) -> Option<Arc<SequenceNumberUpdateWorker>> {
+        let minter_accounts = self.minter_accounts.clone();
+        Some(
+            Arc::new(move |latest_fetched_sequence_numbers| {
+                for (minter_account, sequence_number) in latest_fetched_sequence_numbers {
+                    minter_accounts.update_sequence_number(minter_account, *sequence_number);
+                }
+            })
+        )
     }
 }

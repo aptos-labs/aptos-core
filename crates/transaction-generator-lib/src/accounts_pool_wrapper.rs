@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{BucketedObjectPool, ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::{
+    types::{transaction::SignedTransaction, LocalAccount},
+    move_types::account_address::AccountAddress,
+};
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
@@ -98,7 +101,7 @@ pub struct BucketedAccountsPoolWrapperGenerator {
     rng: StdRng,
     generator: Box<dyn TransactionGenerator>,
     source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-    destination_accounts_pool: Option<Arc<BucketedObjectPool<LocalAccount>>>,
+    destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
 }
 
 impl BucketedAccountsPoolWrapperGenerator {
@@ -106,7 +109,7 @@ impl BucketedAccountsPoolWrapperGenerator {
         rng: StdRng,
         generator: Box<dyn TransactionGenerator>,
         source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-        destination_accounts_pool: Option<Arc<BucketedObjectPool<LocalAccount>>>,
+        destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
     ) -> Self {
         Self {
             rng,
@@ -143,14 +146,14 @@ impl TransactionGenerator for BucketedAccountsPoolWrapperGenerator {
 pub struct BucketedAccountsPoolWrapperCreator {
     creator: Box<dyn TransactionGeneratorCreator>,
     source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-    destination_accounts_pool: Option<Arc<BucketedObjectPool<LocalAccount>>>,
+    destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
 }
 
 impl BucketedAccountsPoolWrapperCreator {
     pub fn new(
         creator: Box<dyn TransactionGeneratorCreator>,
         source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-        destination_accounts_pool: Option<Arc<BucketedObjectPool<LocalAccount>>>,
+        destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
     ) -> Self {
         Self {
             creator,
