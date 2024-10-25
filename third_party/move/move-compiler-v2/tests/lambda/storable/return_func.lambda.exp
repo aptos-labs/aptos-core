@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/lambda/storable/return_func.move:14:41
+   │
+14 │     fun multiply_by_x(x: u64): |u64|u64 has store {
+   │                                         ^^^
+   │                                         │
+   │                                         Unexpected 'has'
+   │                                         Expected '{'

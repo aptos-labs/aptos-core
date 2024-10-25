@@ -146,7 +146,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::SPLIT_CRITICAL_EDGES.to_string(),
             description: "Turns on or off splitting of critical edges".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
@@ -166,7 +166,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::CFG_SIMPLIFICATION.to_string(),
             description: "Whether to do the control flow graph simplification".to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),

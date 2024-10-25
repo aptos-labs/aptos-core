@@ -113,7 +113,7 @@ impl FmtCommand {
         } else {
             None
         };
-        let package_path = dir_default_to_current(package_opt.clone()).unwrap();
+        let package_path = dir_default_to_current(package_opt.clone())?;
         let root_res = SourcePackageLayout::try_find_root(&package_path.clone());
         if let Ok(root_package_path) = root_res {
             let mut path_vec = vec![];

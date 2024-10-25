@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "4.2.3"
+version = "4.2.6"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1603,6 +1603,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-executor",
+ "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
@@ -3109,6 +3110,7 @@ dependencies = [
 name = "aptos-nft-metadata-crawler"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-metrics-core",
@@ -3126,6 +3128,7 @@ dependencies = [
  "google-cloud-storage",
  "image",
  "once_cell",
+ "rayon",
  "regex",
  "reqwest 0.11.23",
  "serde",
@@ -3134,6 +3137,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -7265,6 +7269,7 @@ dependencies = [
  "pq-sys",
  "r2d2",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -10885,28 +10890,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-async-vm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "better_any",
- "bytes",
- "datatest-stable",
- "itertools 0.13.0",
- "move-binary-format",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-prover-test-utils",
- "move-stdlib",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "sha3 0.9.1",
- "smallvec",
-]
-
-[[package]]
 name = "move-binary-format"
 version = "0.0.3"
 dependencies = [
@@ -11062,7 +11045,6 @@ dependencies = [
  "pathdiff",
  "petgraph 0.6.5",
  "regex",
- "sha3 0.9.1",
  "tempfile",
 ]
 
@@ -12265,9 +12247,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.66"
+version = "0.10.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9529f4786b70a3e8c61e11179af17ab6188ad8d0ded78c5529441ed39d4bd9c1"
+checksum = "8cde4d2d9200ad5909f8dac647e29482e07c3a35de8a13fce7c9c7747ad9f671"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
@@ -12297,9 +12279,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.103"
+version = "0.9.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f9e8deee91df40a943c71b917e5874b951d32a802526c85721ce3b776c929d6"
+checksum = "c1665caf8ab2dc9aef43d1c0023bd904633a6a05cb30b0ad59bec2ae986e57a7"
 dependencies = [
  "cc",
  "libc",
@@ -15881,9 +15863,9 @@ dependencies = [
 
 [[package]]
 name = "strum"
-version = "0.26.3"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
+checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
 
 [[package]]
 name = "strum_macros"
@@ -16728,7 +16710,7 @@ dependencies = [
  "prost 0.12.3",
  "rustls-native-certs 0.7.0",
  "rustls-pemfile 2.1.1",
- "strum 0.26.3",
+ "strum 0.26.2",
  "strum_macros 0.26.4",
  "tokio",
  "tokio-rustls 0.26.0",

@@ -1,0 +1,257 @@
+// -- Model dump before env processor pipeline:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        {
+          let x: u64 = 3;
+          (f)(x);
+          Tuple()
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::Test {
+    public fun foo(f: |u64|) {
+        (f)(3);
+        Tuple()
+    }
+    public fun test_shadowing() {
+        {
+          let x: u64 = 1;
+          Test::foo(|y: u64| x: u64 = y);
+          if Eq<u64>(x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+
+Diagnostics:
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/shadowing_renamed.move:12:13
+   │
+12 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^
