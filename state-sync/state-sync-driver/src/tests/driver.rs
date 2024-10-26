@@ -7,7 +7,8 @@ use crate::{
     metadata_storage::PersistentMetadataStorage,
     notification_handlers::CommitNotification,
     tests::utils::{
-        create_event, create_ledger_info_at_version, create_transaction, verify_commit_notification,
+        create_event, create_ledger_info_at_version, create_reconfig_event, create_transaction,
+        verify_commit_notification,
     },
 };
 use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
@@ -30,7 +31,6 @@ use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
-    on_chain_config::new_epoch_event_key,
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
@@ -200,18 +200,18 @@ async fn test_reconfiguration_notifications() {
 
     // Wait for validator auto bootstrapping
     wait_for_auto_bootstrapping(validator_driver, time_service).await;
+    let reconfig_event = create_reconfig_event();
 
     // Test different events
-    let reconfiguration_event = new_epoch_event_key();
-    for event_key in [
-        EventKey::random(),
-        reconfiguration_event,
-        EventKey::random(),
-        reconfiguration_event,
+    for event in [
+        create_event(Some(EventKey::random())),
+        reconfig_event.clone(),
+        create_event(Some(EventKey::random())),
+        reconfig_event.clone(),
     ] {
         // Create commit data for testing
         let transactions = vec![create_transaction(), create_transaction()];
-        let events = vec![create_event(Some(event_key))];
+        let events = vec![event.clone()];
 
         // Send a new consensus commit notification to the driver
         let committed_transactions = transactions.clone();
@@ -236,7 +236,7 @@ async fn test_reconfiguration_notifications() {
         .await;
 
         // Verify the reconfiguration listener is notified if a reconfiguration occurred
-        if event_key == reconfiguration_event {
+        if event == reconfig_event {
             let reconfig_notification = reconfig_listener.select_next_some().await;
             assert_eq!(reconfig_notification.version, 0);
         } else {

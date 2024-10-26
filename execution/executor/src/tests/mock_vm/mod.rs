@@ -15,6 +15,7 @@ use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
@@ -23,7 +24,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
-    on_chain_config::{new_epoch_event_key, ConfigurationResource, ValidatorSet},
+    on_chain_config::{ConfigurationResource, ValidatorSet},
     state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
@@ -115,10 +116,8 @@ impl VMExecutor for MockVM {
                     // WriteSet cannot be empty so use genesis writeset only for testing.
                     gen_genesis_writeset(),
                     // mock the validator set event
-                    vec![ContractEvent::new_v1(
-                        new_epoch_event_key(),
-                        0,
-                        TypeTag::Bool,
+                    vec![ContractEvent::new_v2(
+                        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
                         bcs::to_bytes(&0).unwrap(),
                     )],
                     0,
