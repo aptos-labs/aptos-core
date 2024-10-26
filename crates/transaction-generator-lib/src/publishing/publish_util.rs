@@ -9,11 +9,15 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
-        transaction::{SignedTransaction, TransactionPayload},
+        transaction::{Script, SignedTransaction, TransactionPayload},
         LocalAccount,
     },
 };
-use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{CompiledScript, SignatureToken},
+    CompiledModule,
+};
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -123,6 +127,23 @@ impl Package {
             &raw_module_data::PACKAGE_TO_MODULES[name],
         );
         Self::Simple(modules, metadata)
+    }
+
+    pub fn script(publisher: AccountAddress) -> TransactionPayload {
+        let code = &*raw_module_data::SCRIPT_SIMPLE;
+        let mut script = CompiledScript::deserialize(code).expect("Script must deserialize");
+
+        // Change the constant to the sender's address to change script's hash.
+        for constant in &mut script.constant_pool {
+            if constant.type_ == SignatureToken::Address {
+                constant.data = bcs::to_bytes(&publisher).expect("Address must serialize");
+                break;
+            }
+        }
+
+        let mut code = vec![];
+        script.serialize(&mut code).expect("Script must serialize");
+        TransactionPayload::Script(Script::new(code, vec![], vec![]))
     }
 
     fn load_package(
