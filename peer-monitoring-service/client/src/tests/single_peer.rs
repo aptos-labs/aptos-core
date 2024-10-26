@@ -30,8 +30,9 @@ use aptos_config::{
     config::{NodeConfig, PeerRole},
     network_id::NetworkId,
 };
+use aptos_infallible::RwLock;
 use aptos_time_service::TimeServiceTrait;
-use std::cmp::min;
+use std::{cmp::min, sync::Arc};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_basic_peer_monitor_loop() {
@@ -125,9 +126,10 @@ async fn test_basic_peer_updater_loop() {
     let network_id = NetworkId::Public;
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
+    let peer_monitoring_client = Arc::new(RwLock::new(peer_monitoring_client));
 
     // Verify peers and metadata is empty
-    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
+    let peers_and_metadata = peer_monitoring_client.read().get_peers_and_metadata();
     assert!(peers_and_metadata.get_all_peers().is_empty());
 
     // Add a connected fullnode peer
@@ -138,7 +140,7 @@ async fn test_basic_peer_updater_loop() {
     let mut peer_state = PeerState::new(
         node_config.clone(),
         time_service.clone(),
-        &peer_monitoring_client,
+        peer_monitoring_client.clone(),
     );
     peer_monitor_state
         .peer_states
@@ -157,7 +159,7 @@ async fn test_basic_peer_updater_loop() {
     );
 
     // Spawn the peer metadata updater
-    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
+    let peers_and_metadata = peer_monitoring_client.read().get_peers_and_metadata();
     start_peer_metadata_updater(
         &peer_monitor_state,
         peers_and_metadata.clone(),

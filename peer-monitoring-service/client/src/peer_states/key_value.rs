@@ -113,8 +113,8 @@ impl PeerStateValue {
         node_config: NodeConfig,
         time_service: TimeService,
         peer_state_key: &PeerStateKey,
-        peer_monitoring_service_client: &PeerMonitoringServiceClient<
-            NetworkClient<PeerMonitoringServiceMessage>,
+        peer_monitoring_service_client: Arc<
+            RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
         >,
     ) -> Self {
         match peer_state_key {

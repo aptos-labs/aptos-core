@@ -41,15 +41,15 @@ pub struct LatencyInfoState {
     request_tracker: Arc<RwLock<RequestTracker>>,
     // Peer monitoring service for disconnecting peers and other network functionality
     peer_monitoring_service_client:
-        PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
+        Arc<RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>>,
 }
 
 impl LatencyInfoState {
     pub fn new(
         latency_monitoring_config: LatencyMonitoringConfig,
         time_service: TimeService,
-        peer_monitoring_service_client: &PeerMonitoringServiceClient<
-            NetworkClient<PeerMonitoringServiceMessage>,
+        peer_monitoring_service_client: Arc<
+            RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
         >,
     ) -> Self {
         let request_tracker = RequestTracker::new(
@@ -90,8 +90,14 @@ impl LatencyInfoState {
             let peer_network_id = *peer_network_id;
             let max_latency_ping_failures =
                 self.latency_monitoring_config.max_latency_ping_failures;
+
             tokio::spawn(async move {
-                let result = service_client
+                let client = {
+                    let read_guard = service_client.read();
+                    read_guard.clone()
+                };
+
+                let result = client
                     .disconnect_from_peer(
                         peer_network_id,
                         DisconnectReason::FailedPeerMonitoringPing(PingDisconnectContext::new(
@@ -285,6 +291,7 @@ mod test {
         config::{LatencyMonitoringConfig, PeerRole},
         network_id::{NetworkId, PeerNetworkId},
     };
+    use aptos_infallible::RwLock;
     use aptos_netcore::transport::ConnectionOrigin;
     use aptos_network::{
         application::metadata::PeerMetadata,
@@ -297,7 +304,7 @@ mod test {
     };
     use aptos_types::{network_address::NetworkAddress, PeerId};
     use rand::{rngs::OsRng, Rng};
-    use std::{cmp::min, str::FromStr};
+    use std::{cmp::min, str::FromStr, sync::Arc};
 
     // Useful test constants
     const TEST_NETWORK_ADDRESS: &str = "/ip4/127.0.0.1/tcp/8081";
@@ -309,10 +316,11 @@ mod test {
         let (peer_monitoring_client, .., time_service) =
             MockMonitoringServer::new(all_network_ids.clone());
         let latency_monitoring_config = LatencyMonitoringConfig::default();
+        let peer_monitoring_client = Arc::new(RwLock::new(peer_monitoring_client));
         let mut latency_info_state = LatencyInfoState::new(
             latency_monitoring_config,
             time_service,
-            &peer_monitoring_client,
+            peer_monitoring_client,
         );
 
         // Verify the initial latency info state
@@ -360,10 +368,11 @@ mod test {
         let all_network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
         let (peer_monitoring_client, .., time_service) = MockMonitoringServer::new(all_network_ids);
         let latency_monitoring_config = LatencyMonitoringConfig::default();
+        let peer_monitoring_client = Arc::new(RwLock::new(peer_monitoring_client));
         let mut latency_info_state = LatencyInfoState::new(
             latency_monitoring_config,
             time_service,
-            &peer_monitoring_client,
+            peer_monitoring_client,
         );
 
         // Verify the initial latency info state

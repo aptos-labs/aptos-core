@@ -6,12 +6,13 @@ use crate::{
     PeerState,
 };
 use aptos_config::{config::PeerMonitoringServiceConfig, network_id::PeerNetworkId};
+use aptos_infallible::RwLock;
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_time_service::TimeService;
 use key_value::PeerStateKey;
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 pub mod key_value;
@@ -29,8 +30,8 @@ const METRICS_FREQUENCY_SECS: u64 = 60; // 1 minute
 pub fn refresh_peer_states(
     monitoring_service_config: &PeerMonitoringServiceConfig,
     peer_monitor_state: PeerMonitorState,
-    peer_monitoring_client: PeerMonitoringServiceClient<
-        NetworkClient<PeerMonitoringServiceMessage>,
+    peer_monitoring_client: Arc<
+        RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
     >,
     connected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
     time_service: TimeService,
