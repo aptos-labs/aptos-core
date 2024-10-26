@@ -407,19 +407,18 @@ impl StateStore {
                 if crash_if_difference_is_too_large {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
-
-                let state_merkle_target_version = find_tree_root_at_or_before(
-                    &ledger_db.metadata_db_arc(),
-                    &state_merkle_db,
-                    overall_commit_progress,
-                )?
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Could not find a valid root before or at version {}, maybe it was pruned?",
-                        overall_commit_progress
-                    )
-                });
-
+            }
+            let db = state_merkle_db.metadata_db();
+            let state_merkle_target_version =
+                find_tree_root_at_or_before(db, &state_merkle_db, overall_commit_progress)
+                    .expect("DB read failed.")
+                    .unwrap_or_else(|| {
+                        panic!(
+                    "Could not find a valid root before or at version {}, maybe it was pruned?",
+                    overall_commit_progress
+                )
+                    });
+            if state_merkle_target_version < state_merkle_max_version {
                 info!(
                     state_merkle_max_version = state_merkle_max_version,
                     target_version = state_merkle_target_version,
@@ -483,7 +482,7 @@ impl StateStore {
 
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(u64::MAX)
+            .get_state_snapshot_version_before(Version::MAX)
             .expect("Failed to query latest node on initialization.");
 
         info!(
@@ -492,10 +491,6 @@ impl StateStore {
             "Initializing BufferedState."
         );
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
-            ensure!(
-                version < num_transactions,
-                "State merkle commit progress cannot go beyond overall commit progress."
-            );
             state_db
                 .state_merkle_db
                 .get_root_hash(version)

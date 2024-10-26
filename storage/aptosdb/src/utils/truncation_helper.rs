@@ -202,26 +202,35 @@ pub(crate) fn find_tree_root_at_or_before(
     state_merkle_db: &StateMerkleDb,
     version: Version,
 ) -> Result<Option<Version>> {
-    match find_closest_node_version_at_or_before(state_merkle_db, version)? {
-        Some(closest_version) => {
+    if let Some(closest_version) =
+        find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), version)?
+    {
+        if root_exists_at_version(state_merkle_db, closest_version)? {
+            return Ok(Some(closest_version));
+        }
+
+        // It's possible that it's a partial commit when sharding is not enabled,
+        // look again for the previous version:
+        if let Some(closest_version) =
+            find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), version)?
+        {
             if root_exists_at_version(state_merkle_db, closest_version)? {
                 return Ok(Some(closest_version));
             }
+
+            // Now we are probably looking at a pruned version in this epoch, look for the previous
+            // epoch ending:
             let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>()?;
             iter.seek_for_prev(&version)?;
-            match iter.next().transpose()? {
-                Some((closest_epoch_version, _)) => {
-                    if root_exists_at_version(state_merkle_db, closest_epoch_version)? {
-                        Ok(Some(closest_epoch_version))
-                    } else {
-                        Ok(None)
-                    }
-                },
-                None => Ok(None),
+            if let Some((closest_epoch_version, _)) = iter.next().transpose()? {
+                if root_exists_at_version(state_merkle_db, closest_epoch_version)? {
+                    return Ok(Some(closest_epoch_version));
+                }
             }
-        },
-        None => Ok(None),
+        }
     }
+
+    Ok(None)
 }
 
 pub(crate) fn root_exists_at_version(
@@ -237,29 +246,29 @@ pub(crate) fn root_exists_at_version(
 pub(crate) fn get_current_version_in_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
-    find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), u64::max_value())
+    find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), Version::MAX)
 }
 
 pub(crate) fn get_max_version_in_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
     let mut version = get_current_version_in_state_merkle_db(state_merkle_db)?;
-    for shard_id in 0..16 {
-        let shard_version = find_closest_node_version_at_or_before(
-            state_merkle_db.db_shard(shard_id),
-            u64::max_value(),
-        )?;
-        if version.is_none() {
-            version = shard_version;
-        } else {
-            if let Some(shard_version) = shard_version {
+    let num_real_shards = state_merkle_db.hack_num_real_shards() as u8;
+    if num_real_shards > 1 {
+        for shard_id in 0..num_real_shards {
+            let shard_version = find_closest_node_version_at_or_before(
+                state_merkle_db.db_shard(shard_id),
+                Version::MAX,
+            )?;
+            if version.is_none() {
+                version = shard_version;
+            } else if let Some(shard_version) = shard_version {
                 if shard_version > version.unwrap() {
                     version = Some(shard_version);
                 }
             }
         }
     }
-
     Ok(version)
 }
 

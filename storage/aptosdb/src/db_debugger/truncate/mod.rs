@@ -4,24 +4,15 @@
 use crate::{
     db::AptosDB,
     db_debugger::ShardingConfig,
-    schema::{
-        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        epoch_by_version::EpochByVersionSchema,
-        jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    },
-    state_merkle_db::StateMerkleDb,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     state_store::StateStore,
     utils::truncation_helper::{
-        find_closest_node_version_at_or_before, find_tree_root_at_or_before,
         get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
-        truncate_state_merkle_db,
     },
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
-use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
-use aptos_types::transaction::Version;
 use claims::assert_le;
 use clap::Parser;
 use std::{fs, path::PathBuf, sync::Arc};
@@ -174,7 +165,8 @@ mod test {
             AptosDB,
         },
         schema::{
-            epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
+            epoch_by_version::EpochByVersionSchema,
+            jellyfish_merkle_node::JellyfishMerkleNodeSchema, ledger_info::LedgerInfoSchema,
             stale_node_index::StaleNodeIndexSchema,
             stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
             stale_state_value_index::StaleStateValueIndexSchema,
@@ -325,16 +317,12 @@ mod test {
                 }
 
                 let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>().unwrap();
-            iter.seek_to_first();
-            for item in iter {
-                let version = item.unwrap().0.stale_since_version;
-                prop_assert!(version <= target_version);
+                iter.seek_to_first();
+                for item in iter {
+                    let version = item.unwrap().0.stale_since_version;
+                    prop_assert!(version <= target_version);
+                }
             }
-            }
-
-
-
-
 
             let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>().unwrap();
             iter.seek_to_first();
