@@ -181,6 +181,8 @@ struct ShardingOpt {
     pub fanout_probability: f32,
     #[clap(long, default_value_t = 1.0)]
     pub fanout_move_probability: f64,
+    #[clap(long, default_value_t = 2.0)]
+    pub acceptable_shard_imbalance: f32,
 }
 
 impl ShardingOpt {
@@ -219,6 +221,7 @@ impl ShardingOpt {
                 fanout_init_randomly: self.fanout_init_randomly,
                 fanout_move_probability: self.fanout_move_probability,
                 fanout_probability: self.fanout_probability,
+                acceptable_shard_imbalance: self.acceptable_shard_imbalance,
             }),
             None => Box::<PartitionerV2Config>::default(),
             _ => panic!(

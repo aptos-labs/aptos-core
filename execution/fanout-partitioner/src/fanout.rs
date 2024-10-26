@@ -11,7 +11,7 @@ use aptos_types::{
 };
 use ordered_float::NotNan;
 use rand::Rng;
-use std::{cmp::Reverse, collections::{BinaryHeap, HashMap}, mem, ops::Range};
+use std::{cmp::Reverse, collections::{BinaryHeap, HashMap, VecDeque}, mem, ops::Range};
 use aptos_block_partitioner::v3::build_partitioning_result;
 use itertools::Itertools;
 use aptos_logger::info;
@@ -31,6 +31,7 @@ pub struct V3FanoutPartitionerConfig {
     pub fanout_init_randomly: bool,
     pub fanout_move_probability: f64,
     pub fanout_probability: f32,
+    pub acceptable_shard_imbalance: f32,
 }
 
 impl PartitionerConfig for V3FanoutPartitionerConfig {
@@ -42,6 +43,7 @@ impl PartitionerConfig for V3FanoutPartitionerConfig {
             init_strategy: if self.fanout_init_randomly { InitStrategy::Random } else { InitStrategy::PriorityBfs },
             move_probability: self.fanout_move_probability,
             init_fanout_formula: FanoutFormula::new(self.fanout_probability),
+            acceptable_shard_imbalance: self.acceptable_shard_imbalance,
         })
     }
 }
@@ -55,6 +57,7 @@ pub struct FanoutPartitioner {
     pub init_strategy: InitStrategy,
     pub move_probability: f64,
     pub init_fanout_formula: FanoutFormula,
+    pub acceptable_shard_imbalance: f32,
 }
 
 impl BlockPartitioner for FanoutPartitioner {
@@ -78,6 +81,7 @@ impl BlockPartitioner for FanoutPartitioner {
         let sender_to_shard_idxs = self.optimize_probabilistic_fanout(sender_to_shard_idxs, &compressed_graph, num_shards as u16);
 
         self.optimize_transaction_order(&mut transactions, &sender_to_shard_idxs, &compressed_graph, num_shards as u16);
+        self.correct_same_sender_transactions_order(&mut transactions);
         //transactions.sort_by_key(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize]);
         //transactions = Self::optimize_order(transactions, &sender_to_shard_idxs, &compressed_graph, num_shards);
 
@@ -290,7 +294,7 @@ impl FanoutPartitioner {
         let any_vertex_end_index = graph.access_end_idx.max(graph.sender_end_idx);
 
         let total_weight = graph.sender_weights.iter().sum::<u32>();
-        let max_shard_weight = 1 + total_weight / num_shards as u32;
+        let max_shard_weight = 1 + total_weight / num_shards as u32; // this can be higher like 1.2x
 
         if self.print_debug_stats {
             println!("Total {} txns, to split across {} shards, with at most {} in each.", total_weight, num_shards, max_shard_weight);
@@ -637,7 +641,7 @@ impl FanoutPartitioner {
 
     fn optimize_probabilistic_fanout_iteration(&self, sender_shard: &mut Vec<u16>, shard_weights: &mut Vec<u32>, access_shards: &mut Vec<Vec<u32>>, sender_shard_weights: &mut Vec<Vec<f32>>, graph: &CompressedGraph, num_shards: u16, fanout_formula: &FanoutFormula) -> usize {
         let target_shard_weight = shard_weights.iter().sum::<u32>() / shard_weights.len() as u32;
-        let max_shard_weight = 1 + target_shard_weight * 102 / 100;
+        let max_shard_weight = (1f32 + target_shard_weight as f32 * (100.0 + self.acceptable_shard_imbalance) / 100.0) as u32;
 
         let mut overall_queue: BinaryHeap<(NotNan<f32>, u32, u16, u16)> = BinaryHeap::new();
         let mut best_queue: Vec<Vec<BinaryHeap<(NotNan<f32>, u32)>>> = vec![vec![BinaryHeap::new(); num_shards as usize]; num_shards as usize];
@@ -833,9 +837,10 @@ impl FanoutPartitioner {
 
         constrained.sort_by_key(|(_txn, sum, count, shard)| (Reverse(NotNan::new(*sum / (*count as f32)).unwrap()), *shard));
 
-        let mut shard_to_unconstrained = vec![vec![]; num_shards as usize];
+        //let mut shard_to_unconstrained = vec![vec![]; num_shards as usize];
+        let mut shard_to_unconstrained: Vec<VecDeque<AnalyzedTransaction>> = vec![VecDeque::new(); num_shards as usize];
         for (txn, _sum, _count, shard) in unconstrained {
-            shard_to_unconstrained[shard as usize].push(txn);
+            shard_to_unconstrained[shard as usize].push_back(txn);
         }
 
         println!("Starting unconstrained counts {:?}", shard_to_unconstrained.iter().map(|v| v.len()).collect::<Vec<_>>());
@@ -870,7 +875,7 @@ impl FanoutPartitioner {
                     for shard in 0..num_shards {
                         let cur_unconstrained = &mut shard_to_unconstrained[shard as usize];
                         while !cur_unconstrained.is_empty() && shard_fill[shard as usize] < fill_max {
-                            transactions.push(cur_unconstrained.pop().unwrap());
+                            transactions.push(cur_unconstrained.pop_front().unwrap());
                             shard_fill[shard as usize] += 1;
                             if cur_unconstrained.is_empty() {
                                 println!("Run out of unconstrained on {}", shard);
@@ -898,7 +903,7 @@ impl FanoutPartitioner {
 
         for shard in 0..num_shards {
             shard_fill[shard as usize] += shard_to_unconstrained[shard as usize].len() as u32;
-            transactions.append(&mut shard_to_unconstrained[shard as usize]);
+            transactions.append(&mut shard_to_unconstrained[shard as usize].make_contiguous().to_vec());
         }
 
         if self.print_debug_stats {
@@ -909,4 +914,29 @@ impl FanoutPartitioner {
 
     }
 
+    fn correct_same_sender_transactions_order(&self, transactions: &mut Vec<AnalyzedTransaction>) {
+        let mut sender_to_idxs_and_seqnos: HashMap<AccountAddress, Vec<(usize, u64)>>  = HashMap::new();
+
+        for (idx, txn) in transactions.iter().enumerate() {
+            let sender = txn.sender().unwrap();
+            let seqno = txn.transaction().expect_valid().try_as_signed_user_txn().unwrap().sequence_number();;
+            sender_to_idxs_and_seqnos.entry(sender).or_insert(vec![]).push((idx, seqno));
+        }
+
+        let mut count_non_monotonic_sender_txns = 0;
+        for (_sender, idxs_and_seqnos) in sender_to_idxs_and_seqnos.iter_mut() {
+            let mut prev_seqno = 0;
+            let mut prev_idx = 0;
+            for (idx, seqno) in idxs_and_seqnos.iter() {
+                if *seqno < prev_seqno {
+                    count_non_monotonic_sender_txns += 1;
+                    println!("Non-monotonic sender txns: sender {:?}", idxs_and_seqnos);
+                    transactions.swap(*idx, prev_idx);
+                }
+                prev_seqno = *seqno;
+                prev_idx = *idx;
+            }
+        }
+        println!("Non-monotonic senders txns count: {}", count_non_monotonic_sender_txns);
+    }
 }

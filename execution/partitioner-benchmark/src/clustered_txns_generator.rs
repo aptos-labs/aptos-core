@@ -33,6 +33,7 @@ pub struct ClusteredTxnsGenerator {
     all_user_accounts: Vec<TestAccount>,
     cluster_resource_addresses: Vec<Vec<TestAccount>>,
     print_debug_stats: bool,
+    slow_gen_accounts: bool,
 }
 
 impl ClusteredTxnsGenerator {
@@ -46,6 +47,7 @@ impl ClusteredTxnsGenerator {
         fraction_of_external_txns: f64,
         print_debug_stats: bool,
         gen_accounts: bool,
+        slow_gen_accounts: bool,
     ) -> Self {
         let all_user_accounts = if gen_accounts {
             (0..total_user_accounts)
@@ -76,6 +78,7 @@ impl ClusteredTxnsGenerator {
             all_user_accounts,
             cluster_resource_addresses,
             print_debug_stats,
+            slow_gen_accounts,
         }
     }
 
@@ -246,21 +249,25 @@ impl ClusteredTxnsGenerator {
         info!("Time taken to generate txn_indices: {:?}", duration);
 
         let start_time = Instant::now();
-        /*let mut by_sender = HashMap::new();
-        for (sender_idx, (recvr_cluster, recvr_resource_idx)) in txn_indices {
-            by_sender.entry(sender_idx).or_insert(Vec::new()).push((recvr_cluster, recvr_resource_idx));
-        }
 
-        let mut txns: Vec<AnalyzedTransaction> = by_sender.par_iter().map(|(sender_idx, recvs)| {
-            let receivers = recvs.iter().map(|(recvr_cluster, recvr_resource_idx)| &self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]).collect::<Vec<_>>();
-            let sender = &self.all_user_accounts[*sender_idx];
-            create_signed_p2p_transaction(sender, receivers)
-        }).flatten().collect();*/
-        let mut txns: Vec<AnalyzedTransaction> = txn_indices.iter().map(|(sender_idx, (recvr_cluster, recvr_resource_idx))| {
-            let receivers = vec![&self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]];
-            let sender = &self.all_user_accounts[*sender_idx];
-            create_signed_p2p_transaction(sender, receivers)
-        }).flatten().collect();
+        let mut txns: Vec<AnalyzedTransaction> =
+            if !self.slow_gen_accounts {
+                let mut by_sender = HashMap::new();
+                for (sender_idx, (recvr_cluster, recvr_resource_idx)) in txn_indices {
+                    by_sender.entry(sender_idx).or_insert(Vec::new()).push((recvr_cluster, recvr_resource_idx));
+                }
+                by_sender.par_iter().map(|(sender_idx, recvs)| {
+                    let receivers = recvs.iter().map(|(recvr_cluster, recvr_resource_idx)| &self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]).collect::<Vec<_>>();
+                    let sender = &self.all_user_accounts[*sender_idx];
+                    create_signed_p2p_transaction(sender, receivers)
+                }).flatten().collect()
+            } else {
+                txn_indices.iter().map(|(sender_idx, (recvr_cluster, recvr_resource_idx))| {
+                    let receivers = vec![&self.cluster_resource_addresses[*recvr_cluster][*recvr_resource_idx]];
+                    let sender = &self.all_user_accounts[*sender_idx];
+                    create_signed_p2p_transaction(sender, receivers)
+                }).flatten().collect()
+            };
 
         for (idx, txn) in txns.iter_mut().enumerate() {
             txn.id = idx;

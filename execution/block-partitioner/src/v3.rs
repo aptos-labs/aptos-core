@@ -14,6 +14,7 @@ use aptos_types::{
 use std::collections::{HashMap, HashSet};
 use aptos_logger::info;
 use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
+use move_core_types::account_address::AccountAddress;
 
 /// A partitioner that does not reorder and assign txns to shards in a round-robin way.
 /// Only for testing the correctness or sharded execution V3.
@@ -93,8 +94,19 @@ pub fn build_partitioning_result(num_shards: usize, transactions: Vec<AnalyzedTr
     let mut remote_dependency_positions: Vec<HashMap<usize, HashSet<(usize, usize)>>> = vec![HashMap::new(); num_shards];
     let mut all_owners_by_key: HashMap<StateKey, HashSet<u32>> = HashMap::new();
 
+    let mut highest_seq_num_by_sender: HashMap<AccountAddress, u64> = HashMap::new();
+
     for (cur_txn_idx, transaction) in transactions.into_iter().enumerate() {
         let cur_shard_idx = shard_idxs[cur_txn_idx];
+        let curr_txn_sender = transaction.sender().unwrap();
+        let curr_txn_seq_num = transaction.transaction().expect_valid().try_as_signed_user_txn().unwrap().sequence_number();
+        if let Some(highest_seq_num) = highest_seq_num_by_sender.get(&curr_txn_sender) {
+            assert!(curr_txn_seq_num > *highest_seq_num,
+                    "Assertion failed: curr_txn_seq_num ({}) <= highest_seq_num ({})",
+                    curr_txn_seq_num,
+                    highest_seq_num);
+        }
+        highest_seq_num_by_sender.insert(curr_txn_sender, curr_txn_seq_num);
 
         // Find remote dependencies with reads + writes.
         for loc in transaction

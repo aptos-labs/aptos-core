@@ -49,6 +49,9 @@ struct Args {
     #[clap(long)]
     pub debug_logs: bool,
 
+    #[clap(long)]
+    pub slow_gen_accounts: bool,
+
     #[clap(long, default_value_t = 100)]
     pub v3_reorderer_min_ordered_transaction_before_execution: usize,
 
@@ -69,6 +72,9 @@ struct Args {
 
     #[clap(long, default_value_t = 1.0)]
     pub fanout_move_probability: f64,
+
+    #[clap(long, default_value_t = 2.0)]
+    pub acceptable_shard_imbalance: f32,
 }
 
 fn main() {
@@ -86,6 +92,7 @@ fn main() {
         args.fraction_of_external_txns,
         args.debug_logs,
         true,
+        args.slow_gen_accounts,
     );
 
     info!("Generating {} transactions", args.num_txns);
@@ -109,13 +116,14 @@ fn main() {
             init_strategy: if args.fanout_init_randomly { InitStrategy::Random } else { InitStrategy::PriorityBfs },
             move_probability: args.fanout_move_probability,
             init_fanout_formula: FanoutFormula::new(args.fanout_probability),
+            acceptable_shard_imbalance: args.acceptable_shard_imbalance,
         })],
         "fanout_sweep" => vec![
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 50, init_strategy: InitStrategy::Random, move_probability: 0.8, init_fanout_formula: FanoutFormula::new(args.fanout_probability) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 0, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(args.fanout_probability) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.2) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.5) }),
-            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.8) }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 50, init_strategy: InitStrategy::Random, move_probability: 0.8, init_fanout_formula: FanoutFormula::new(args.fanout_probability), acceptable_shard_imbalance: args.acceptable_shard_imbalance }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 0, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(args.fanout_probability), acceptable_shard_imbalance: args.acceptable_shard_imbalance }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.2), acceptable_shard_imbalance: args.acceptable_shard_imbalance }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.5), acceptable_shard_imbalance: args.acceptable_shard_imbalance }),
+            Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs, print_detailed_debug_stats: args.fanout_detailed_debug_logs, num_iterations: 10, init_strategy: InitStrategy::PriorityBfs, move_probability: 1.0, init_fanout_formula: FanoutFormula::new(0.8), acceptable_shard_imbalance: args.acceptable_shard_imbalance }),
             Box::new(V3FennelBasedPartitioner { print_debug_stats: args.debug_logs }),
         ],
         _ => {

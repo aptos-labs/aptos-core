@@ -642,6 +642,7 @@ impl TransactionGenerator {
             config.fraction_of_external_txns,
             config.print_debug_stats,
             false,
+            false,
         );
 
         let max_sender_idx = block_size / config.mean_txns_per_user;
