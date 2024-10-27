@@ -14,7 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

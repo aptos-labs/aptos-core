@@ -40,9 +40,8 @@ use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, db_ensure as ensure, db_other_bail as bail,
-    state_delta::StateDelta, AptosDbError, DbReader, DbWriter, ExecutedTrees, Order, Result,
-    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, DbWriter, ExecutedTrees,
+    Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -63,12 +62,11 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
-        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionToCommit, TransactionWithProof, Version,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };

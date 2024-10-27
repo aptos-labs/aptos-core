@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `Test1::apply` has a function parameter:
+  ┌─ tests/lambda/inline-parity/nested_lambda_module.move:3:16
+  │
+3 │     public fun apply(f: |u64, u64|u64, x: u64, y: u64): u64 {
+  │                ^^^^^ - Parameter `f` has function-valued type `|(u64, u64)|u64`.

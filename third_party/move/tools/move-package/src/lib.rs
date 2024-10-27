@@ -39,9 +39,6 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Architecture {
     Move,
-
-    AsyncMove,
-
     Ethereum,
 }
 
@@ -49,9 +46,6 @@ impl fmt::Display for Architecture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Move => write!(f, "move"),
-
-            Self::AsyncMove => write!(f, "async-move"),
-
             Self::Ethereum => write!(f, "ethereum"),
         }
     }
@@ -61,7 +55,6 @@ impl Architecture {
     fn all() -> impl Iterator<Item = Self> {
         IntoIterator::into_iter([
             Self::Move,
-            Self::AsyncMove,
             #[cfg(feature = "evm-backend")]
             Self::Ethereum,
         ])
@@ -70,11 +63,7 @@ impl Architecture {
     fn try_parse_from_str(s: &str) -> Result<Self> {
         Ok(match s {
             "move" => Self::Move,
-
-            "async-move" => Self::AsyncMove,
-
             "ethereum" => Self::Ethereum,
-
             _ => {
                 let supported_architectures = Self::all()
                     .map(|arch| format!("\"{}\"", arch))

@@ -161,46 +161,46 @@ CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
 CALIBRATION = """
-no-op	1	VM	59	0.815	1.101	37283.8
-no-op	1000	VM	59	0.679	1.036	22232.7
-apt-fa-transfer	1	VM	59	0.779	1.064	28096.3
-account-generation	1	VM	59	0.763	1.046	22960.6
-account-resource32-b	1	VM	59	0.794	1.085	34394.7
-modify-global-resource	1	VM	59	0.849	1.029	2784.1
-modify-global-resource	100	VM	17	0.845	1.071	33592.9
-publish-package	1	VM	59	0.926	1.076	142.6
-mix_publish_transfer	1	VM	59	0.917	1.134	2145.5
-batch100-transfer	1	VM	59	0.695	1.028	740.9
-vector-picture30k	1	VM	59	0.891	1.027	111.2
-vector-picture30k	100	VM	17	0.593	1.042	1982.6
-smart-table-picture30-k-with200-change	1	VM	59	0.844	1.078	21.5
-smart-table-picture30-k-with200-change	100	VM	17	0.786	1.018	405.6
-modify-global-resource-agg-v2	1	VM	59	0.706	1.113	35274.8
-modify-global-flag-agg-v2	1	VM	59	0.818	1.023	5508.5
-modify-global-bounded-agg-v2	1	VM	59	0.766	1.089	9840.3
-modify-global-milestone-agg-v2	1	VM	59	0.723	1.038	28560.2
-resource-groups-global-write-tag1-kb	1	VM	59	0.872	1.046	9198.2
-resource-groups-global-write-and-read-tag1-kb	1	VM	59	0.867	1.023	6174.8
-resource-groups-sender-write-tag1-kb	1	VM	59	0.843	1.129	19680.5
-resource-groups-sender-multi-change1-kb	1	VM	59	0.825	1.074	16174.0
-token-v1ft-mint-and-transfer	1	VM	59	0.811	1.045	1262.2
-token-v1ft-mint-and-transfer	100	VM	17	0.718	1.041	17535.3
-token-v1nft-mint-and-transfer-sequential	1	VM	59	0.820	1.032	795.5
-token-v1nft-mint-and-transfer-sequential	100	VM	17	0.586	1.035	12683.5
-coin-init-and-mint	1	VM	59	0.704	1.073	28612.4
-coin-init-and-mint	100	VM	17	0.716	1.087	23415.6
-fungible-asset-mint	1	VM	59	0.644	1.052	26193.9
-fungible-asset-mint	100	VM	17	0.698	1.070	20606.2
-no-op5-signers	1	VM	59	0.783	1.124	37424.8
-token-v2-ambassador-mint	1	VM	59	0.670	1.035	17671.5
-token-v2-ambassador-mint	100	VM	17	0.717	1.058	15617.8
-liquidity-pool-swap	1	VM	59	0.728	1.021	963.2
-liquidity-pool-swap	100	VM	17	0.717	1.019	11116.3
-liquidity-pool-swap-stable	1	VM	59	0.776	1.023	934.6
-liquidity-pool-swap-stable	100	VM	17	0.796	1.021	10839.9
-deserialize-u256	1	VM	59	0.817	1.093	37002.8
-no-op-fee-payer	1	VM	59	0.775	1.027	2103.7
-no-op-fee-payer	100	VM	17	0.585	1.021	27642.4
+no-op	1	VM	15	0.922	1.06	42737.7
+no-op	1000	VM	15	0.879	1.024	23373.9
+apt-fa-transfer	1	VM	15	0.934	1.068	29963.1
+account-generation	1	VM	15	0.871	1.016	24567.9
+account-resource32-b	1	VM	8	0.879	1.048	38063.3
+modify-global-resource	1	VM	15	0.971	1.023	2839.5
+modify-global-resource	100	VM	8	0.927	1.015	37424.8
+publish-package	1	VM	15	0.963	1.036	143.4
+mix_publish_transfer	1	VM	15	0.968	1.048	2175
+batch100-transfer	1	VM	15	0.88	1.014	770.5
+vector-picture30k	1	VM	15	0.98	1.025	110.6
+vector-picture30k	100	VM	8	0.894	1.029	2033.8
+smart-table-picture30-k-with200-change	1	VM	15	0.974	1.062	21.5
+smart-table-picture30-k-with200-change	100	VM	8	0.983	1.038	411.5
+modify-global-resource-agg-v2	1	VM	15	0.867	1.082	38997.7
+modify-global-flag-agg-v2	1	VM	8	0.989	1.008	5648.5
+modify-global-bounded-agg-v2	1	VM	8	0.942	1.02	10303.1
+modify-global-milestone-agg-v2	1	VM	8	0.957	1.017	29851.6
+resource-groups-global-write-tag1-kb	1	VM	15	0.869	1.052	9391.5
+resource-groups-global-write-and-read-tag1-kb	1	VM	8	0.963	1.008	6432.7
+resource-groups-sender-write-tag1-kb	1	VM	8	0.982	1.086	20121.2
+resource-groups-sender-multi-change1-kb	1	VM	15	0.857	1.065	16862.9
+token-v1ft-mint-and-transfer	1	VM	8	0.962	1.035	1292.6
+token-v1ft-mint-and-transfer	100	VM	8	0.918	1.025	18747.7
+token-v1nft-mint-and-transfer-sequential	1	VM	8	0.973	1.023	805.5
+token-v1nft-mint-and-transfer-sequential	100	VM	8	0.902	1.015	13333.2
+coin-init-and-mint	1	VM	8	0.878	1.036	31056.8
+coin-init-and-mint	100	VM	8	0.906	1.032	25868.8
+fungible-asset-mint	1	VM	15	0.874	1.019	28045.4
+fungible-asset-mint	100	VM	8	0.928	1.047	21876
+no-op5-signers	1	VM	8	0.897	1.056	42970.1
+token-v2-ambassador-mint	1	VM	15	0.942	1.031	17842.6
+token-v2-ambassador-mint	100	VM	8	0.944	1.042	16270.3
+liquidity-pool-swap	1	VM	15	0.968	1.024	972.4
+liquidity-pool-swap	100	VM	8	0.964	1.043	11297.1
+liquidity-pool-swap-stable	1	VM	8	0.955	1.03	936.3
+liquidity-pool-swap-stable	100	VM	8	0.949	1.04	11116.3
+deserialize-u256	1	VM	8	0.935	1.043	41589.9
+no-op-fee-payer	1	VM	15	0.97	1.044	2124.5
+no-op-fee-payer	100	VM	8	0.934	1.023	28717.2
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
@@ -622,30 +622,27 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         else:
             assert test.key in calibrated_expected_tps, test
             cur_calibration = calibrated_expected_tps[test.key]
-            if cur_calibration.count > 20:
-                criteria = Criteria(
-                    expected_tps=cur_calibration.expected_tps,
-                    min_tps=cur_calibration.expected_tps
-                    * (cur_calibration.min_ratio - 0.01),
-                    min_warn_tps=cur_calibration.expected_tps
-                    * pow(cur_calibration.min_ratio, 0.5),
-                    max_tps=cur_calibration.expected_tps
-                    * (cur_calibration.max_ratio + 0.01),
-                    max_warn_tps=cur_calibration.expected_tps
-                    * pow(cur_calibration.max_ratio, 0.5),
-                )
-            else:
-                criteria = Criteria(
-                    expected_tps=cur_calibration.expected_tps,
-                    min_tps=cur_calibration.expected_tps
-                    * (cur_calibration.min_ratio - 0.1),
-                    min_warn_tps=cur_calibration.expected_tps
-                    * min(cur_calibration.min_ratio, 0.95),
-                    max_tps=cur_calibration.expected_tps
-                    * (cur_calibration.max_ratio + 0.1),
-                    max_warn_tps=cur_calibration.expected_tps
-                    * max(cur_calibration.max_ratio, 1.05),
-                )
+            criteria = Criteria(
+                expected_tps=cur_calibration.expected_tps,
+                min_tps=cur_calibration.expected_tps
+                * (
+                    1
+                    - (1 - cur_calibration.min_ratio)
+                    * (1 + 10.0 / cur_calibration.count)
+                    - 1.0 / cur_calibration.count
+                ),
+                min_warn_tps=cur_calibration.expected_tps
+                * pow(cur_calibration.min_ratio, 0.8),
+                max_tps=cur_calibration.expected_tps
+                * (
+                    1
+                    + (cur_calibration.max_ratio - 1)
+                    * (1 + 10.0 / cur_calibration.count)
+                    + 1.0 / cur_calibration.count
+                ),
+                max_warn_tps=cur_calibration.expected_tps
+                * pow(cur_calibration.max_ratio, 0.8),
+            )
 
         cur_block_size = int(min([criteria.expected_tps, MAX_BLOCK_SIZE]))
 
@@ -793,19 +790,19 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             print_table(results, by_levels=False, single_field=None)
 
         if single_node_result.tps < criteria.min_tps:
-            text = f"regression detected {single_node_result.tps} < {criteria.min_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
+            text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
         elif single_node_result.tps < criteria.min_warn_tps:
-            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {criteria.min_warn_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
+            text = f"potential (but within normal noise) regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_warn_tps}), {test.key} didn't meet TPS requirements"
             warnings.append(text)
         elif (
             not SKIP_PERF_IMPROVEMENT_NOTICE
             and single_node_result.tps > criteria.max_tps
         ):
-            text = f"perf improvement detected {single_node_result.tps} > {criteria.max_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if not test.waived:
                 errors.append(text)
             else:
@@ -814,7 +811,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             not SKIP_PERF_IMPROVEMENT_NOTICE
             and single_node_result.tps > criteria.max_warn_tps
         ):
-            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {criteria.max_warn_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_warn_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             warnings.append(text)
 
 if HIDE_OUTPUT:
@@ -831,10 +828,10 @@ if errors:
     # exit(1)
     print(
         """If you expect your PR to change the performance, you need to recalibrate the values.
-To do so, you should run the test on your branch 6 times 
-(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml).
+To do so, you should run the test on your branch 6 times
+(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS).
 Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
-update it to your branch, and export values as CSV, and then open and copy values inside 
+update it to your branch, and export values as CSV, and then open and copy values inside
 testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
 """
     )

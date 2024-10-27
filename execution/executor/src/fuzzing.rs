@@ -4,11 +4,11 @@
 
 use crate::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
-    components::chunk_output::ChunkOutput,
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{execution_output::ExecutionOutput, BlockExecutorTrait};
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter,
     DbWriter,
@@ -72,8 +72,14 @@ impl TransactionBlockExecutor for FakeVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, onchain_config)
+        append_state_checkpoint_to_block: Option<HashValue>,
+    ) -> Result<ExecutionOutput> {
+        DoGetExecutionOutput::by_transaction_execution::<FakeVM>(
+            transactions,
+            state_view,
+            onchain_config,
+            append_state_checkpoint_to_block,
+        )
     }
 }
 
