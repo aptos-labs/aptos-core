@@ -36,7 +36,7 @@ pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> 
 ///
 /// Note: If `add_cpu_chaos` is true, CPU chaos is enabled on the entire swarm.
 /// Likewise, if `add_network_emulation` is true, network chaos is enabled.
-fn pfn_const_tps(
+pub fn pfn_const_tps(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
@@ -51,7 +51,11 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .with_emit_job(EmitJobRequest::default()
+            .mode(EmitJobMode::MaxLoad { mempool_backlog: 10240 })
+            .coins_per_account_override(1_0000_0000_0000)
+            .num_accounts_mode(NumAccountsMode::NumAccounts(256)),
+        )
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
