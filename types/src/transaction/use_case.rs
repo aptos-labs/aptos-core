@@ -49,6 +49,9 @@ impl UseCaseAwareTransaction for SignedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            NestedTransactionPayload(
+                v1(_)
+            ) => Others,
         }
     }
 }

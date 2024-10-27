@@ -421,6 +421,35 @@ pub enum TransactionPayload {
     /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
     /// transaction as the multisig account.
     Multisig(Multisig),
+    NestedTransactionPayload(NestedTransactionPayload),
+}
+
+/// Different kinds of transactions.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+enum NestedTransactionPayload {
+    V1 {
+	    inner: TransactionPayloadInner,
+	    extra: TransactionPayloadExtra,
+	  }
+}
+
+/// Different kinds of transactions.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TransactionPayloadInner {
+    Script(Script),
+    EntryFunction(EntryFunction),
+}
+
+/// Different kinds of transactions.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TransactionPayloadExtra {
+    V1 {
+		// Set for multisig transactions
+        multisig_address: Option<AccountAddress>,
+	    // None for regular transactions.
+	    // Some(nonce) for orderless transactions.
+        relay_protection_nonce: Option<u64>,
+    },
 }
 
 impl TransactionPayload {
