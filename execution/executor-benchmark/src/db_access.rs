@@ -4,16 +4,14 @@
 use anyhow::Result;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
-    account_address::AccountAddress,
-    state_store::{state_key::StateKey, StateView},
-    write_set::TOTAL_SUPPLY_STATE_KEY,
+    account_address::AccountAddress, account_config::{CoinStoreResource, FungibleStoreResource, ObjectGroupResource}, state_store::{state_key::StateKey, StateView}, write_set::TOTAL_SUPPLY_STATE_KEY, AptosCoinType
 };
 use move_core_types::{
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{StructTag, TypeTag}, move_resource::MoveStructType,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct CoinStore {
@@ -88,15 +86,12 @@ impl DbAccessUtil {
         Self::new_state_key(address, AccountAddress::ONE, "account", "Account", vec![])
     }
 
-    pub fn new_state_key_aptos_coin(address: AccountAddress) -> StateKey {
-        Self::new_state_key(address, AccountAddress::ONE, "coin", "CoinStore", vec![
-            TypeTag::Struct(Box::new(Self::new_struct_tag(
-                AccountAddress::ONE,
-                "aptos_coin",
-                "AptosCoin",
-                vec![],
-            ))),
-        ])
+    pub fn new_state_key_aptos_coin(address: &AccountAddress) -> StateKey {
+        StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(address).unwrap()
+    }
+
+    pub fn new_state_key_object_resource_group(address: &AccountAddress) -> StateKey {
+        StateKey::resource_group(address, &ObjectGroupResource::struct_tag())
     }
 
     pub fn get_account(
@@ -104,6 +99,13 @@ impl DbAccessUtil {
         state_view: &impl StateView,
     ) -> Result<Option<Account>> {
         Self::get_value(account_key, state_view)
+    }
+
+    pub fn get_fa_store(
+        store_key: &StateKey,
+        state_view: &impl StateView,
+    ) -> Result<Option<FungibleStoreResource>> {
+        Self::get_value(store_key, state_view)
     }
 
     pub fn get_coin_store(
@@ -121,6 +123,13 @@ impl DbAccessUtil {
             .get_state_value_bytes(state_key)?
             .map(move |value| bcs::from_bytes(&value));
         value.transpose().map_err(anyhow::Error::msg)
+    }
+
+    pub fn get_resource_group(
+        state_key: &StateKey,
+        state_view: &impl StateView,
+    ) -> Result<Option<BTreeMap<StructTag, Vec<u8>>>> {
+        Self::get_value(state_key, state_view)
     }
 
     pub fn get_db_value<T: DeserializeOwned>(

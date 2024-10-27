@@ -16,7 +16,7 @@ use aptos_crypto::{
 };
 use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData};
 use aptos_types::{
-    account_config::fungible_store::FungibleStoreResource,
+    account_config::{fungible_store::FungibleStoreResource, DepositFAEvent, MoveEventV2, WithdrawFAEvent},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::{EventHandle, EventKey},
@@ -126,35 +126,23 @@ impl FaData {
         };
 
         let (new_balance, contract_event) = if self.deposit {
-            let type_tag = TypeTag::Struct(Box::new(StructTag {
-                address: AccountAddress::ONE,
-                module: ident_str!(FUNGIBLE_ASSET_MODULE).into(),
-                name: ident_str!("Deposit").into(),
-                type_args: vec![],
-            }));
-            let event = FungibleAssetChangeEvent {
+            let event = DepositFAEvent {
                 store: self.store_address,
                 amount: self.amount,
             };
             (
                 self.previous_balance + self.amount,
-                ContractEvent::new_v2(type_tag, bcs::to_bytes(&event).unwrap()),
+                event.create_event_v2(),
             )
         } else {
-            let event = FungibleAssetChangeEvent {
+            let event = WithdrawFAEvent {
                 store: self.store_address,
                 amount: self.amount,
             };
-            let type_tag = TypeTag::Struct(Box::new(StructTag {
-                address: AccountAddress::ONE,
-                module: ident_str!(FUNGIBLE_ASSET_MODULE).into(),
-                name: ident_str!("Withdraw").into(),
-                type_args: vec![],
-            }));
 
             (
                 self.previous_balance - self.amount,
-                ContractEvent::new_v2(type_tag, bcs::to_bytes(&event).unwrap()),
+                event.create_event_v2(),
             )
         };
 

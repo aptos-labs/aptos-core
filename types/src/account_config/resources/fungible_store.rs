@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::aggregator::AggregatorResource;
-use crate::account_address::create_derived_object_address;
+use crate::{account_address::create_derived_object_address, contract_event::ContractEvent};
 use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    identifier::IdentStr,
-    move_resource::{MoveResource, MoveStructType},
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag, move_resource::{MoveResource, MoveStructType}
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -94,3 +91,40 @@ impl MoveStructType for MigrationFlag {
 }
 
 impl MoveResource for MigrationFlag {}
+
+pub trait MoveEventV2: MoveStructType + Serialize {
+    fn create_event_v2(&self) -> ContractEvent {
+        ContractEvent::new_v2(
+            TypeTag::Struct(Box::new(Self::struct_tag())),
+            bcs::to_bytes(self).unwrap()
+        )
+    }
+}
+
+/// Struct that represents a Withdraw event.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WithdrawFAEvent {
+    pub store: AccountAddress,
+    pub amount: u64,
+}
+
+impl MoveEventV2 for WithdrawFAEvent {}
+
+impl MoveStructType for WithdrawFAEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungble_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Withdraw");
+}
+
+/// Struct that represents a Deposit event.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DepositFAEvent {
+    pub store: AccountAddress,
+    pub amount: u64,
+}
+
+impl MoveEventV2 for DepositFAEvent {}
+
+impl MoveStructType for DepositFAEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungble_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Deposit");
+}
