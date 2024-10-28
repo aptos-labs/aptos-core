@@ -74,7 +74,9 @@ use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_safety_rules::{safety_rules_manager, PersistentSafetyStorage, SafetyRulesManager};
+use aptos_safety_rules::{
+    safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
+};
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
@@ -772,12 +774,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let mut safety_rules =
             MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
-        if let Err(error) = safety_rules.perform_initialize() {
-            error!(
-                epoch = epoch,
-                error = error,
-                "Unable to initialize safety rules.",
-            );
+        match safety_rules.perform_initialize() {
+            Err(e) if matches!(e, Error::ValidatorNotInSet(_)) => {
+                warn!(
+                    epoch = epoch,
+                    error = e,
+                    "Unable to initialize safety rules.",
+                );
+            },
+            Err(e) => {
+                error!(
+                    epoch = epoch,
+                    error = e,
+                    "Unable to initialize safety rules.",
+                );
+            },
+            Ok(()) => (),
         }
 
         info!(epoch = epoch, "Create RoundState");
