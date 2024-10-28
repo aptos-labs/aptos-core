@@ -5,7 +5,7 @@ use crate::{
     account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BucketedAccountsPoolWrapperCreator}, call_custom_modules::CustomModulesDelegationGeneratorCreator, entry_points::EntryPointTransactionGenerator, stable_coin_minter::{
         StableCoinConfigureControllerGenerator, StableCoinMinterGenerator,
         StableCoinSetMinterAllowanceGenerator,
-    }, BucketedObjectPool, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
+    }, BucketedAccountPool, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -367,7 +367,7 @@ impl WorkflowTxnGeneratorCreator {
                 let created_minter_pool = Arc::new(ObjectPool::new());
                 let destination_pool = Arc::new(ObjectPool::new());
                 let configured_minter_pool = Arc::new(ObjectPool::new());
-                let minters_with_allowance_pool = Arc::new(BucketedObjectPool::new(txn_emitter_account_pool.unwrap()));
+                let minters_with_allowance_pool = Arc::new(BucketedAccountPool::new(txn_emitter_account_pool.unwrap()));
 
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),

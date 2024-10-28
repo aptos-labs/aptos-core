@@ -411,17 +411,14 @@ pub async fn create_txn_generator_creator(
     )
 }
 
-pub trait Object {
-    fn address(&self) -> AccountAddress;
-}
-pub struct BucketedObjectPool<Bucket, T> {
-    pool: RwLock<HashMap<Bucket, Vec<T>>>,
+pub struct BucketedAccountPool<Bucket> {
+    pool: RwLock<HashMap<Bucket, Vec<LocalAccount>>>,
     all_buckets: Arc<Vec<Bucket>>,
     current_index: AtomicUsize,
-    object_to_bucket_map: HashMap<AccountAddress, Bucket>,
+    object_to_bucket_map: RwLock<HashMap<AccountAddress, Bucket>>,
 }
 
-impl<Bucket: Clone + Eq + PartialEq + Hash, T: Object> BucketedObjectPool<Bucket, T> {
+impl<Bucket: Clone + Eq + PartialEq + Hash> BucketedAccountPool<Bucket> {
     pub(crate) fn new(buckets: Arc<Vec<Bucket>>) -> Self {
         let mut pool = HashMap::new();
         for bucket in buckets.iter() {
@@ -431,14 +428,15 @@ impl<Bucket: Clone + Eq + PartialEq + Hash, T: Object> BucketedObjectPool<Bucket
             pool: RwLock::new(pool),
             all_buckets: buckets,
             current_index: AtomicUsize::new(0),
-            object_to_bucket_map: HashMap::new(),
+            object_to_bucket_map: RwLock::new(HashMap::new()),
         }
     }
 
-    pub(crate) fn add_to_bucket(&self, bucket: Bucket, mut addition: Vec<T>) {
+    pub(crate) fn add_to_bucket(&self, bucket: Bucket, mut addition: Vec<LocalAccount>) {
         assert!(!addition.is_empty());
         let mut current = self.pool.write();
-        self.object_to_bucket_map.extend(addition.iter().map(|object| (object.address(), bucket.clone())));
+        let mut object_to_bucket_map = self.object_to_bucket_map.write();
+        object_to_bucket_map.extend(addition.iter().map(|object| (object.address(), bucket.clone())));
         current
             .entry(bucket)
             .or_insert_with(Vec::new)
@@ -446,18 +444,20 @@ impl<Bucket: Clone + Eq + PartialEq + Hash, T: Object> BucketedObjectPool<Bucket
     }
 
 
-    pub(crate) fn add_to_pool(&self, addition: Vec<T>) {
+    pub(crate) fn add_to_pool(&self, addition: Vec<LocalAccount>) {
         assert!(!addition.is_empty());
         let mut current = self.pool.write();
+        let mut object_to_bucket_map = self.object_to_bucket_map.write();
         for object in addition {
             let current_index = self.current_index.load(Ordering::Relaxed);
             let current_bucket = self.all_buckets[current_index].clone();
+            let object_address = object.address();
             current
-                .entry(current_bucket)
+                .entry(current_bucket.clone())
                 .or_insert_with(Vec::new)
                 .append(&mut vec![object]);
             self.current_index.store((current_index + 1) % self.all_buckets.len(), Ordering::Relaxed);
-            self.object_to_bucket_map.insert(object.address(), current_bucket);
+            object_to_bucket_map.insert(object_address, current_bucket);
         }
     }
 
@@ -467,7 +467,7 @@ impl<Bucket: Clone + Eq + PartialEq + Hash, T: Object> BucketedObjectPool<Bucket
         needed: usize,
         return_partial: bool,
         rng: &mut StdRng,
-    ) -> Vec<T> {
+    ) -> Vec<LocalAccount> {
         let mut current = self.pool.write();
         let num_in_pool = current.get_mut(&bucket).map_or(0, |v| v.len());
         if !return_partial && num_in_pool < needed {
@@ -492,14 +492,19 @@ impl<Bucket: Clone + Eq + PartialEq + Hash, T: Object> BucketedObjectPool<Bucket
 
     pub(crate) fn update_sequence_number(
         &self,
-        object_address: AccountAddress,
+        object_address: &AccountAddress,
         sequence_number: u64,
     ) {
         let mut current = self.pool.write();
-        if let Some(bucket) = self.object_to_bucket_map.get(&object_address).and_then(|bucket| current.get_mut(bucket)) {
+        if let Some(bucket) = self.object_to_bucket_map.read().get(object_address).and_then(|bucket| current.get_mut(bucket)) {
             for object in bucket.iter_mut() {
-                if object.address() == object_address {
-                    object.update_sequence_number(sequence_number);
+                if object.address() == *object_address {
+                    if sequence_number < object.sequence_number() {
+                        info!("Sequence number for {} decreased from {} to {}", object_address, object.sequence_number(), sequence_number);
+                        object.set_sequence_number(sequence_number);
+                    } else {
+                        info!("Sequence number for {} not updated", object_address);
+                    }
                 }
             }
         }

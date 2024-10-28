@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{BucketedObjectPool, ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
+use crate::{BucketedAccountPool, ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
     move_types::account_address::AccountAddress,
@@ -101,7 +101,7 @@ pub struct BucketedAccountsPoolWrapperGenerator {
     rng: StdRng,
     generator: Box<dyn TransactionGenerator>,
     source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-    destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
+    destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
 }
 
 impl BucketedAccountsPoolWrapperGenerator {
@@ -109,7 +109,7 @@ impl BucketedAccountsPoolWrapperGenerator {
         rng: StdRng,
         generator: Box<dyn TransactionGenerator>,
         source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-        destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
+        destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
     ) -> Self {
         Self {
             rng,
@@ -146,14 +146,14 @@ impl TransactionGenerator for BucketedAccountsPoolWrapperGenerator {
 pub struct BucketedAccountsPoolWrapperCreator {
     creator: Box<dyn TransactionGeneratorCreator>,
     source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-    destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
+    destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
 }
 
 impl BucketedAccountsPoolWrapperCreator {
     pub fn new(
         creator: Box<dyn TransactionGeneratorCreator>,
         source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-        destination_accounts_pool: Option<Arc<BucketedObjectPool<AccountAddress, LocalAccount>>>,
+        destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
     ) -> Self {
         Self {
             creator,

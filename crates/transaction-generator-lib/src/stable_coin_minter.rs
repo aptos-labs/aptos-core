@@ -3,11 +3,11 @@
 
 use super::{publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter};
 use crate::{
-    call_custom_modules::{SequenceNumberUpdateWorker, TransactionGeneratorWorker, UserModuleTransactionGenerator}, BucketedObjectPool, RootAccountHandle
+    call_custom_modules::{SequenceNumberUpdateWorker, TransactionGeneratorWorker, UserModuleTransactionGenerator}, BucketedAccountPool, RootAccountHandle
 };
 use aptos_sdk::{
     bcs,
-    move_types::{ident_str, language_storage::ModuleId},
+    move_types::{ident_str, language_storage::ModuleId, account_address::AccountAddress},
     transaction_builder::TransactionFactory,
     types::{
         transaction::{EntryFunction, SignedTransaction, TransactionPayload},
@@ -126,7 +126,7 @@ impl UserModuleTransactionGenerator for StableCoinSetMinterAllowanceGenerator {
 pub struct StableCoinMinterGenerator {
     pub max_mint_amount: u64,
     pub batch_size: usize,
-    pub minter_accounts: Arc<BucketedObjectPool<LocalAccount>>,
+    pub minter_accounts: Arc<BucketedAccountPool<AccountAddress>>,
     pub destination_accounts: Arc<ObjectPool<LocalAccount>>,
 }
 
@@ -134,7 +134,7 @@ impl StableCoinMinterGenerator {
     pub fn new(
         max_mint_amount: u64,
         batch_size: usize,
-        minter_accounts: Arc<BucketedObjectPool<LocalAccount>>,
+        minter_accounts: Arc<BucketedAccountPool<AccountAddress>>,
         destination_accounts: Arc<ObjectPool<LocalAccount>>,
     ) -> Self {
         Self {
