@@ -4,7 +4,7 @@
 
 use super::ungrouped::mixed_emit_job;
 use crate::{suites::{pfn::pfn_const_tps, realistic_environment::realistic_env_max_load_test}, TestCommand};
-use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
+use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig, TransactionType};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
 };
