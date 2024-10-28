@@ -72,8 +72,30 @@ pub enum TransactionTypeArg {
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
-    StableCoinMint,
-    StableCoinBatchMint,
+    
+    StableCoinMint1024AccountBatch1,
+    StableCoinBatchMint1024AccountBatch2,
+    StableCoinBatchMint1024AccountBatch4,
+    StableCoinBatchMint1024AccountBatch8,
+    StableCoinBatchMint1024AccountBatch16,
+
+    StableCoinMint512AccountBatch1,
+    StableCoinBatchMint512AccountBatch2,
+    StableCoinBatchMint512AccountBatch4,
+    StableCoinBatchMint512AccountBatch8,
+    StableCoinBatchMint512AccountBatch16,
+
+    StableCoinMint256AccountBatch1,
+    StableCoinBatchMint256AccountBatch2,
+    StableCoinBatchMint256AccountBatch4,
+    StableCoinBatchMint256AccountBatch8,
+    StableCoinBatchMint256AccountBatch16,
+
+    StableCoinMint128AccountBatch1,
+    StableCoinBatchMint128AccountBatch2,
+    StableCoinBatchMint128AccountBatch4,
+    StableCoinBatchMint128AccountBatch8,
+    StableCoinBatchMint128AccountBatch16,
 }
 
 impl TransactionTypeArg {
@@ -271,7 +293,7 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
             },
-            TransactionTypeArg::StableCoinMint => TransactionType::Workflow {
+            TransactionTypeArg::StableCoinMint1024AccountBatch1 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
                     num_user_accounts: 1000000,
@@ -282,11 +304,209 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
             },
-            TransactionTypeArg::StableCoinBatchMint => TransactionType::Workflow {
+            TransactionTypeArg::StableCoinBatchMint1024AccountBatch2 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 1024,
+                    num_user_accounts: 1000000,
+                    batch_size: 2,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint1024AccountBatch4 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 1024,
+                    num_user_accounts: 1000000,
+                    batch_size: 4,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint1024AccountBatch8 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
                     num_user_accounts: 1000000,
                     batch_size: 8,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint1024AccountBatch16 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 1024,
+                    num_user_accounts: 1000000,
+                    batch_size: 16,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinMint512AccountBatch1 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 512,
+                    num_user_accounts: 1000000,
+                    batch_size: 1,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint512AccountBatch2 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 512,
+                    num_user_accounts: 1000000,
+                    batch_size: 2,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint512AccountBatch4 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 512,
+                    num_user_accounts: 1000000,
+                    batch_size: 4,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint512AccountBatch8 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 512,
+                    num_user_accounts: 1000000,
+                    batch_size: 8,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint512AccountBatch16 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 512,
+                    num_user_accounts: 1000000,
+                    batch_size: 16,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinMint256AccountBatch1 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 256,
+                    num_user_accounts: 1000000,
+                    batch_size: 1,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint256AccountBatch2 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 256,
+                    num_user_accounts: 1000000,
+                    batch_size: 2,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint256AccountBatch4 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 256,
+                    num_user_accounts: 1000000,
+                    batch_size: 4,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint256AccountBatch8 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 256,
+                    num_user_accounts: 1000000,
+                    batch_size: 8,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint256AccountBatch16 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 256,
+                    num_user_accounts: 1000000,
+                    batch_size: 16,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinMint128AccountBatch1 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 128,
+                    num_user_accounts: 1000000,
+                    batch_size: 1,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint128AccountBatch2 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 128,
+                    num_user_accounts: 1000000,
+                    batch_size: 2,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint128AccountBatch4 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 128,
+                    num_user_accounts: 1000000,
+                    batch_size: 4,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint128AccountBatch8 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 128,
+                    num_user_accounts: 1000000,
+                    batch_size: 8,
+                    num_mint_transactions: 2_000_000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::StableCoinBatchMint128AccountBatch16 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::StableCoinMint {
+                    num_minter_accounts: 128,
+                    num_user_accounts: 1000000,
+                    batch_size: 16,
                     num_mint_transactions: 2_000_000,
                 },
                 num_modules: 1,

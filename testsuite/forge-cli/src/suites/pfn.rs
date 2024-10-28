@@ -5,17 +5,43 @@
 use super::ungrouped::RELIABLE_PROGRESS_THRESHOLD;
 use aptos_config::config::NodeConfig;
 use aptos_forge::{
-    emitter::NumAccountsMode, success_criteria::{LatencyType, SuccessCriteria}, EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn
+    args::TransactionTypeArg, emitter::NumAccountsMode, success_criteria::{LatencyType, SuccessCriteria}, EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn, TransactionType
 };
 use aptos_testcases::public_fullnode_performance::PFNPerformance;
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
+
 /// Attempts to match the test name to a PFN test
 pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
     let test = match test_name {
-        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, true, TransactionType::default()),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false, TransactionType::default()),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false, TransactionType::default()),
+        
+        "pfn_const_tps_with_realistic_env_1024account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint1024AccountBatch1.materialize_default()),
+        "pfn_const_tps_with_realistic_env_1024account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1024AccountBatch2.materialize_default()),
+        "pfn_const_tps_with_realistic_env_1024account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1024AccountBatch4.materialize_default()),
+        "pfn_const_tps_with_realistic_env_1024account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1024AccountBatch8.materialize_default()),
+        "pfn_const_tps_with_realistic_env_1024account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1024AccountBatch16.materialize_default()),
+        
+        "pfn_const_tps_with_realistic_env_512account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint512AccountBatch1.materialize_default()),
+        "pfn_const_tps_with_realistic_env_512account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint512AccountBatch2.materialize_default()),
+        "pfn_const_tps_with_realistic_env_512account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint512AccountBatch4.materialize_default()),
+        "pfn_const_tps_with_realistic_env_512account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint512AccountBatch8.materialize_default()),
+        "pfn_const_tps_with_realistic_env_512account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint512AccountBatch16.materialize_default()),
+        
+        "pfn_const_tps_with_realistic_env_256account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint256AccountBatch1.materialize_default()),
+        "pfn_const_tps_with_realistic_env_256account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint256AccountBatch2.materialize_default()),
+        "pfn_const_tps_with_realistic_env_256account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint256AccountBatch4.materialize_default()),
+        "pfn_const_tps_with_realistic_env_256account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint256AccountBatch8.materialize_default()),
+        "pfn_const_tps_with_realistic_env_256account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint256AccountBatch16.materialize_default()),
+        
+        "pfn_const_tps_with_realistic_env_128account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint128AccountBatch1.materialize_default()),
+        "pfn_const_tps_with_realistic_env_128account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch2.materialize_default()),
+        "pfn_const_tps_with_realistic_env_128account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch4.materialize_default()),
+        "pfn_const_tps_with_realistic_env_128account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch8.materialize_default()),
+        "pfn_const_tps_with_realistic_env_128account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch16.materialize_default()),
+                
         "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
         "pfn_performance_with_network_chaos" => {
             pfn_performance(duration, false, true, false, 7, 1, false)
@@ -40,6 +66,7 @@ pub fn pfn_const_tps(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    transaction_type: TransactionType,
 ) -> ForgeConfig {
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
@@ -53,7 +80,8 @@ pub fn pfn_const_tps(
         .with_emit_job(EmitJobRequest::default()
             .mode(EmitJobMode::MaxLoad { mempool_backlog: 10240 })
             .coins_per_account_override(4_0000_0000_0000)
-            .num_accounts_mode(NumAccountsMode::NumAccounts(1024)),
+            .num_accounts_mode(NumAccountsMode::NumAccounts(1024))
+            .transaction_type(transaction_type),
         )
         .add_network_test(PFNPerformance::new(
             7,

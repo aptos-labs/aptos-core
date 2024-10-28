@@ -128,7 +128,7 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::StableCoinBatchMint.materialize_default()
+        TransactionTypeArg::StableCoinBatchMint1024AccountBatch2.materialize_default()
     }
 }
 
