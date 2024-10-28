@@ -57,13 +57,13 @@ jobs:
         id: api_key_update
         run: |
           cd ecosystem/indexer-grpc/indexer-transaction-generator
-          ls -al ./example_tests
+          ls -al ./imported_transactions
           echo "Updating API keys in YAML files..."
-          sed -i "s/TESTNET_API_KEY/${{ steps.api_key_tokens.outputs.testnet_api_key }}/g" ./example_tests/imported_transactions.yaml
-          sed -i "s/MAINNET_API_KEY/${{ steps.api_key_tokens.outputs.mainnet_api_key }}/g" ./example_tests/imported_transactions.yaml
+          sed -i "s/TESTNET_API_KEY/${{ steps.api_key_tokens.outputs.testnet_api_key }}/g" ./imported_transactions/imported_transactions.yaml
+          sed -i "s/MAINNET_API_KEY/${{ steps.api_key_tokens.outputs.mainnet_api_key }}/g" ./imported_transactions/imported_transactions.yaml
           
-          cat ./example_tests/imported_transactions.yaml  # Print the updated file for verification
-          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/new_json_transactions
+          cat ./imported_transactions/imported_transactions.yaml  # Print the updated file for verification
+          cargo run -- --testing-folder ./imported_transactions --output-folder ../indexer-test-transactions/new_json_transactions
 
       - name: Install jq
         run: sudo apt-get install jq  # Ensure jq is installed for JSON processing
