@@ -361,12 +361,12 @@ impl WorkflowTxnGeneratorCreator {
                 // Stages:
                 // 0. Create minter accounts
                 // 1. Create user accounts
-                // 2. For each minter account, add controller in the stablecoin module
-                // 3. For each minter account, set minter allowance in the stablecoin module
-                // 4. Let minter accounts mint transactions for the users
+                        // // 2. For each minter account, add controller in the stablecoin module
+                // 2. For each minter account, set minter allowance in the stablecoin module
+                // 3. Let minter accounts mint transactions for the users
                 let created_minter_pool = Arc::new(ObjectPool::new());
                 let destination_pool = Arc::new(ObjectPool::new());
-                let configured_minter_pool = Arc::new(ObjectPool::new());
+                // let configured_minter_pool = Arc::new(ObjectPool::new());
                 let minters_with_allowance_pool = Arc::new(BucketedAccountPool::new(txn_emitter_account_pool.unwrap()));
 
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
@@ -385,7 +385,7 @@ impl WorkflowTxnGeneratorCreator {
                     None,
                     Some(created_minter_pool.clone()),
                     num_minter_accounts,
-                    100_0000_0000,
+                    300_0000_0000,
                 ));
 
                 // Stage 1: Create user accounts
@@ -397,18 +397,18 @@ impl WorkflowTxnGeneratorCreator {
                     10_0000,
                 ));
 
-                // Stage 2: For each minter account, add controller in the stablecoin module
-                let (configure_controllers_worker, configure_controller_stage_seq_num_updater) =
-                    CustomModulesDelegationGeneratorCreator::create_worker(
-                        init_txn_factory.clone(),
-                        root_account,
-                        txn_executor,
-                        &mut packages,
-                        &mut StableCoinConfigureControllerGenerator::default(),
-                    )
-                    .await;
+                // // Stage 2: For each minter account, add controller in the stablecoin module
+                // let (configure_controllers_worker, configure_controller_stage_seq_num_updater) =
+                //     CustomModulesDelegationGeneratorCreator::create_worker(
+                //         init_txn_factory.clone(),
+                //         root_account,
+                //         txn_executor,
+                //         &mut packages,
+                //         &mut StableCoinConfigureControllerGenerator::default(),
+                //     )
+                //     .await;
 
-                // Stage 3: For each minter account, set minter allowance in the stablecoin module
+                // Stage 2: For each minter account, set minter allowance in the stablecoin module
                 let (set_minter_allowance_worker, set_minter_allowance_stage_seq_num_updater) =
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
@@ -419,7 +419,7 @@ impl WorkflowTxnGeneratorCreator {
                     )
                     .await;
 
-                // Stage 4: Let minter accounts mint transactions for the users
+                // Stage 3: Let minter accounts mint transactions for the users
                 let (mint_stage_worker, mint_stage_seq_number_updater) = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
@@ -436,16 +436,16 @@ impl WorkflowTxnGeneratorCreator {
 
                 let packages = Arc::new(packages);
 
-                let configure_controllers_stage = Box::new(AccountsPoolWrapperCreator::new(
-                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                        txn_factory.clone(),
-                        packages.clone(),
-                        configure_controllers_worker,
-                        configure_controller_stage_seq_num_updater,
-                    )),
-                    created_minter_pool.clone(),
-                    Some(configured_minter_pool.clone()),
-                ));
+                // let configure_controllers_stage = Box::new(AccountsPoolWrapperCreator::new(
+                //     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                //         txn_factory.clone(),
+                //         packages.clone(),
+                //         configure_controllers_worker,
+                //         configure_controller_stage_seq_num_updater,
+                //     )),
+                //     created_minter_pool.clone(),
+                //     Some(configured_minter_pool.clone()),
+                // ));
 
                 let set_minter_allowance_stage = Box::new(BucketedAccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -454,7 +454,7 @@ impl WorkflowTxnGeneratorCreator {
                         set_minter_allowance_worker,
                         set_minter_allowance_stage_seq_num_updater,
                     )),
-                    configured_minter_pool.clone(),
+                    created_minter_pool.clone(),
                     Some(minters_with_allowance_pool.clone()),
                 ));
 
@@ -468,7 +468,7 @@ impl WorkflowTxnGeneratorCreator {
                 let stages: Vec<Box<dyn TransactionGeneratorCreator>> = vec![
                     minter_account_creation_stage,
                     destination_account_creation_stage,
-                    configure_controllers_stage,
+                    // configure_controllers_stage,
                     set_minter_allowance_stage,
                     mint_stage,
                 ];
@@ -481,7 +481,6 @@ impl WorkflowTxnGeneratorCreator {
                         num_user_accounts,
                     ))),
                     StageStopCondition::WhenPoolBecomesEmpty(created_minter_pool),
-                    StageStopCondition::WhenPoolBecomesEmpty(configured_minter_pool),
                     StageStopCondition::MaxTransactions(Arc::new(AtomicUsize::new(
                         num_mint_transactions,
                     ))),

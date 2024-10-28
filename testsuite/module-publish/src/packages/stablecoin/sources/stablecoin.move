@@ -393,10 +393,12 @@ const ICON_URI: vector<u8> = b"https://tether.to/images/logoCircle.png"; // TODO
     public entry fun configure_minter(caller: &signer, allowance: u64) acquires State {
         pausable::assert_not_paused(stablecoin_address());
 
-        let controller = signer::address_of(caller);
-        assert_is_controller(controller);
+        // let controller = signer::address_of(caller);
+        // assert_is_controller(controller);
 
-        let minter = get_minter_inlined(controller);
+        // let minter = get_minter_inlined(controller);
+        let controller = signer::address_of(caller);
+        let minter = signer::address_of(caller);
         set_mint_allowance(minter, allowance);
 
         event::emit(MinterConfigured { controller, minter, allowance });
