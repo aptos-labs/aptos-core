@@ -18,7 +18,7 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            pfn_const_tps(duration, true, true, false)
+            pfn_const_tps(duration, true, true, false, TransactionType::default())
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
