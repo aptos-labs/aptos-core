@@ -426,7 +426,7 @@ pub enum TransactionPayload {
 
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-enum NestedTransactionPayload {
+pub enum NestedTransactionPayload {
     V1 {
 	    inner: TransactionPayloadInner,
 	    extra: TransactionPayloadExtra,
@@ -445,7 +445,10 @@ pub enum TransactionPayloadInner {
 pub enum TransactionPayloadExtra {
     V1 {
 		// Set for multisig transactions
+        // Question: Multisig can now be set for even script transactions, which was not the case before. Is this okay?
         multisig_address: Option<AccountAddress>,
+        secondary_signers: Vec<AccountAddress>,
+        fee_payer: Option<AccountAddress>,
 	    // None for regular transactions.
 	    // Some(nonce) for orderless transactions.
         relay_protection_nonce: Option<u64>,
