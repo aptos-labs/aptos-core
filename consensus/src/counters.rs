@@ -8,9 +8,9 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     quorum_store,
 };
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
+use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
 use aptos_logger::prelude::{error, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
@@ -1239,51 +1239,53 @@ pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
+pub fn update_counters_for_block(block: &Block) {
+    observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
+    NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
+    COMMITTED_BLOCKS_COUNT.inc();
+    LAST_COMMITTED_ROUND.set(block.round() as i64);
+    let failed_rounds = block
+        .block_data()
+        .failed_authors()
+        .map(|v| v.len())
+        .unwrap_or(0);
+    if failed_rounds > 0 {
+        COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
+    }
+    quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
+}
+
+pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
+    let txn_status = compute_result.compute_status_for_input_txns();
+    LAST_COMMITTED_VERSION.set(compute_result.last_version_or_0() as i64);
+    NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+    for status in txn_status.iter() {
+        let commit_status = match status {
+            TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
+            TransactionStatus::Discard(reason) => {
+                if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                    TXN_COMMIT_RETRY_LABEL
+                } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                    TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                    TXN_COMMIT_FAILED_EXPIRED_LABEL
+                } else {
+                    TXN_COMMIT_FAILED_LABEL
+                }
+            },
+            TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
+        };
+        COMMITTED_TXNS_COUNT
+            .with_label_values(&[commit_status])
+            .inc();
+    }
+}
+
 /// Update various counters for committed blocks
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
     for block in blocks_to_commit {
-        observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
-        let txn_status = block.compute_result().compute_status_for_input_txns();
-        NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
-        NUM_BYTES_PER_BLOCK
-            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
-        COMMITTED_BLOCKS_COUNT.inc();
-        LAST_COMMITTED_ROUND.set(block.round() as i64);
-        LAST_COMMITTED_VERSION.set(block.compute_result().last_version_or_0() as i64);
-
-        let failed_rounds = block
-            .block()
-            .block_data()
-            .failed_authors()
-            .map(|v| v.len())
-            .unwrap_or(0);
-        if failed_rounds > 0 {
-            COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
-        }
-
-        // Quorum store metrics
-        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
-
-        for status in txn_status.iter() {
-            let commit_status = match status {
-                TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
-                TransactionStatus::Discard(reason) => {
-                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                        TXN_COMMIT_RETRY_LABEL
-                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
-                        TXN_COMMIT_FAILED_DUPLICATE_LABEL
-                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
-                        TXN_COMMIT_FAILED_EXPIRED_LABEL
-                    } else {
-                        TXN_COMMIT_FAILED_LABEL
-                    }
-                },
-                TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
-            };
-            COMMITTED_TXNS_COUNT
-                .with_label_values(&[commit_status])
-                .inc();
-        }
+        update_counters_for_block(block.block());
+        update_counters_for_compute_result(block.compute_result());
     }
 }
 
