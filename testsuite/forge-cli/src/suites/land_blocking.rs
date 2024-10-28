@@ -14,7 +14,7 @@ use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 pub(crate) fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    test_cmd: &TestCommand,
+    _test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {

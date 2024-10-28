@@ -5,8 +5,7 @@
 use super::ungrouped::RELIABLE_PROGRESS_THRESHOLD;
 use aptos_config::config::NodeConfig;
 use aptos_forge::{
-    success_criteria::{LatencyType, SuccessCriteria},
-    EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn,
+    emitter::NumAccountsMode, success_criteria::{LatencyType, SuccessCriteria}, EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn
 };
 use aptos_testcases::public_fullnode_performance::PFNPerformance;
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
