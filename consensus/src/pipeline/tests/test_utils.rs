@@ -101,7 +101,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     let li = LedgerInfo::new(
         proposals.last().unwrap().block().gen_block_info(
             compute_result.root_hash(),
-            compute_result.version(),
+            compute_result.last_version_or_0(),
             compute_result.epoch_state().clone(),
         ),
         consensus_hash,

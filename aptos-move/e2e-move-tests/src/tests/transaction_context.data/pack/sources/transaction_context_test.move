@@ -24,6 +24,7 @@ module admin::transaction_context_test {
         type_arg_names: vector<String>,
         args: vector<vector<u8>>,
         multisig_address: address,
+        raw_transaction_hash: vector<u8>,
     }
 
     /// Called when the module is first deployed at address `signer`, which is supposed to be @admin (= 0x1).
@@ -44,6 +45,7 @@ module admin::transaction_context_test {
                 args: vector[],
                 type_arg_names: vector[],
                 multisig_address: @0x0,
+                raw_transaction_hash: vector[],
             }
         );
     }
@@ -140,5 +142,15 @@ module admin::transaction_context_test {
         multisig_account::create_transaction(s, multisig_account, payload);
 
         store.multisig_address = multisig_account;
+    }
+
+    entry fun store_raw_transaction_hash_from_native_txn_context(_s: &signer) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+        store.raw_transaction_hash = transaction_context::raw_transaction_hash();
+    }
+
+    entry fun store_raw_transaction_hash_from_native_txn_context_multi(_s: &signer, _s2: &signer) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+        store.raw_transaction_hash = transaction_context::raw_transaction_hash();
     }
 }

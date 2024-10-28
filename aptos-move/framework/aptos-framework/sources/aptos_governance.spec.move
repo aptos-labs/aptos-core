@@ -120,7 +120,9 @@ spec aptos_framework::aptos_governance {
         let post new_governance_config = global<GovernanceConfig>(@aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if !exists<GovernanceConfig>(@aptos_framework);
-        aborts_if !exists<GovernanceEvents>(@aptos_framework);
+        aborts_if !features::spec_is_enabled(features::MODULE_EVENT_MIGRATION) && !exists<GovernanceEvents>(
+            @aptos_framework
+        );
         modifies global<GovernanceConfig>(addr);
 
         ensures new_governance_config.voting_duration_secs == voting_duration_secs;

@@ -10,6 +10,7 @@ use aptos_types::{
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
     },
+    contract_event::ContractEvent,
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
@@ -412,11 +413,10 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
 }
 
 fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
-    let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
     vm_output
         .events()
         .iter()
-        .any(|event| event.event_key() == Some(&new_epoch_event_key))
+        .any(ContractEvent::is_new_epoch_event)
 }
 
 fn execute_block_no_limit(
