@@ -13,8 +13,8 @@ use aptos_block_partitioner::{
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
-use aptos_executor::block_executor::TransactionBlockExecutor;
-use aptos_executor_benchmark::{native_loose_block_executor::NativeLooseBlockExecutor, pipeline::PipelineConfig, BenchmarkWorkload};
+use aptos_executor::block_executor::{AptosVMBlockExecutor, TransactionBlockExecutor};
+use aptos_executor_benchmark::{native_executor_task::NativeVMBlockExecutor, native_loose_block_executor::{NativeNoStorageLooseSpeculativeBlockExecutor, NativeLooseSpeculativeBlockExecutor}, native_transaction::NativeConfig, pipeline::PipelineConfig, BenchmarkWorkload};
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
@@ -28,7 +28,7 @@ use aptos_types::{
     vm::configs::set_paranoid_type_checks,
 };
 use aptos_vm::AptosVM;
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
     net::SocketAddr,
@@ -206,17 +206,14 @@ struct ProfilerOpt {
     memory_profiling: bool,
 }
 
-#[derive(Parser, Debug)]
-#[clap(group(
-    ArgGroup::new("vm_selection")
-    .args(&["use_native_loose_block_executor", "use_ptx_executor"]),
-))]
-pub struct VmSelectionOpt {
-    #[clap(long)]
-    use_native_loose_block_executor: bool,
-
-    #[clap(long)]
-    use_ptx_executor: bool,
+#[derive(Parser, Debug, ValueEnum, Clone, Default)]
+enum BlockExecutorTypeOpt {
+    #[default]
+    AptosVMWithBlockSTM,
+    NativeVMWithBlockSTM,
+    NativeLooseSpeculative,
+    NativeNoStorageLooseSpeculative,
+    PtxExecutor,
 }
 
 #[derive(Parser, Debug)]
@@ -260,8 +257,12 @@ struct Opt {
     #[clap(long)]
     verify_sequence_numbers: bool,
 
-    #[clap(flatten)]
-    vm_selection_opt: VmSelectionOpt,
+    #[clap(
+        long,
+        value_enum,
+        ignore_case = true,
+    )]
+    block_executor_type: BlockExecutorTypeOpt,
 
     #[clap(flatten)]
     profiler_opt: ProfilerOpt,
@@ -564,7 +565,7 @@ fn main() {
     }
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
-    NativeLooseBlockExecutor::set_concurrency_level_once(execution_threads_per_shard);
+    NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
     AptosVM::set_processed_transactions_detailed_counters();
 
     let config = ProfilerConfig::new_with_defaults();
@@ -583,14 +584,24 @@ fn main() {
         let _mem_start = memory_profiler.start_profiling();
     }
 
-    if opt.vm_selection_opt.use_native_loose_block_executor {
-        run::<NativeLooseBlockExecutor>(opt);
-    } else if opt.vm_selection_opt.use_ptx_executor {
-        #[cfg(target_os = "linux")]
-        ThreadManagerBuilder::set_thread_config_strategy(ThreadConfigStrategy::ThreadsPriority(48));
-        run::<PtxBlockExecutor>(opt);
-    } else {
-        run::<AptosVM>(opt);
+    match opt.block_executor_type {
+        BlockExecutorTypeOpt::AptosVMWithBlockSTM => {
+            run::<AptosVMBlockExecutor>(opt);
+        },
+        BlockExecutorTypeOpt::NativeVMWithBlockSTM => {
+            run::<NativeVMBlockExecutor>(opt);
+        },
+        BlockExecutorTypeOpt::NativeLooseSpeculative => {
+            run::<NativeLooseSpeculativeBlockExecutor>(opt);
+        },
+        BlockExecutorTypeOpt::NativeNoStorageLooseSpeculative => {
+            run::<NativeNoStorageLooseSpeculativeBlockExecutor>(opt);
+        },
+        BlockExecutorTypeOpt::PtxExecutor => {
+            #[cfg(target_os = "linux")]
+            ThreadManagerBuilder::set_thread_config_strategy(ThreadConfigStrategy::ThreadsPriority(48));
+            run::<PtxBlockExecutor>(opt);
+        },
     }
 
     if cpu_profiling {

@@ -9,6 +9,8 @@ pub mod db_generator;
 mod db_reliable_submitter;
 mod ledger_update_stage;
 mod metrics;
+pub mod native_transaction;
+pub mod native_executor_task;
 pub mod native_loose_block_executor;
 pub mod pipeline;
 pub mod transaction_committer;
@@ -25,8 +27,7 @@ use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
     metrics::{
-        COMMIT_BLOCKS, EXECUTE_BLOCK, OTHER_TIMERS, PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
-        VM_EXECUTE_BLOCK,
+        BLOCK_EXECUTOR_EXECUTE_BLOCK, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, COMMIT_BLOCKS, EXECUTE_BLOCK, OTHER_TIMERS, PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER
     },
 };
 use aptos_jellyfish_merkle::metrics::{
@@ -542,7 +543,8 @@ struct ExecutionTimeMeasurement {
     sig_verify_total_time: f64,
     partitioning_total_time: f64,
     execution_total_time: f64,
-    vm_total_time: f64,
+    block_executor_total_time: f64,
+    block_executor_inner_total_time: f64,
     by_other: HashMap<&'static str, f64>,
     ledger_update_total: f64,
     commit_total_time: f64,
@@ -557,7 +559,8 @@ impl ExecutionTimeMeasurement {
         let sig_verify_total = TIMER.with_label_values(&["sig_verify"]).get_sample_sum();
         let partitioning_total = TIMER.with_label_values(&["partition"]).get_sample_sum();
         let execution_total = EXECUTE_BLOCK.get_sample_sum();
-        let vm_total = VM_EXECUTE_BLOCK.get_sample_sum();
+        let block_executor_total = BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum();
+        let block_executor_inner_total = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.get_sample_sum();
 
         let by_other = OTHER_LABELS
             .iter()
@@ -578,7 +581,8 @@ impl ExecutionTimeMeasurement {
             sig_verify_total_time: sig_verify_total,
             partitioning_total_time: partitioning_total,
             execution_total_time: execution_total,
-            vm_total_time: vm_total,
+            block_executor_total_time: block_executor_total,
+            block_executor_inner_total_time: block_executor_inner_total,
             by_other,
             ledger_update_total,
             commit_total_time: commit_total,
@@ -593,7 +597,8 @@ impl ExecutionTimeMeasurement {
             sig_verify_total_time: end.sig_verify_total_time - self.sig_verify_total_time,
             partitioning_total_time: end.partitioning_total_time - self.partitioning_total_time,
             execution_total_time: end.execution_total_time - self.execution_total_time,
-            vm_total_time: end.vm_total_time - self.vm_total_time,
+            block_executor_total_time: end.block_executor_total_time - self.block_executor_total_time,
+            block_executor_inner_total_time: end.block_executor_inner_total_time - self.block_executor_inner_total_time,
             by_other: end
                 .by_other
                 .into_iter()
@@ -695,10 +700,16 @@ impl OverallMeasuring {
             num_txns / delta_execution.execution_total_time
         );
         info!(
-            "{} fraction of execution {:.4} in VM (component TPS: {:.1})",
+            "{} fraction of execution {:.4} in block executor (component TPS: {:.1})",
             prefix,
-            delta_execution.vm_total_time / delta_execution.execution_total_time,
-            num_txns / delta_execution.vm_total_time
+            delta_execution.block_executor_total_time / delta_execution.execution_total_time,
+            num_txns / delta_execution.block_executor_total_time
+        );
+        info!(
+            "{} fraction of execution {:.4} in inner block executor (component TPS: {:.1})",
+            prefix,
+            delta_execution.block_executor_inner_total_time / delta_execution.execution_total_time,
+            num_txns / delta_execution.block_executor_inner_total_time
         );
         for (prefix, top_level, other_label) in OTHER_LABELS {
             let time_in_label = delta_execution.by_other.get(other_label).unwrap();
@@ -740,10 +751,10 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
 mod tests {
     use std::fs;
 
-    use crate::{db_generator::bootstrap_with_genesis, init_db_and_executor, native_loose_block_executor::NativeLooseBlockExecutor, pipeline::PipelineConfig, transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG, transaction_generator::TransactionGenerator, BenchmarkWorkload};
+    use crate::{db_generator::bootstrap_with_genesis, init_db_and_executor, native_executor_task::NativeVMBlockExecutor, native_loose_block_executor::{NativeNoStorageLooseSpeculativeBlockExecutor, NativeLooseSpeculativeBlockExecutor}, native_transaction::NativeConfig, pipeline::PipelineConfig, transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG, transaction_generator::TransactionGenerator, BenchmarkWorkload};
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
-    use aptos_executor::block_executor::TransactionBlockExecutor;
+    use aptos_executor::block_executor::{AptosVMBlockExecutor, TransactionBlockExecutor};
     use aptos_sdk::{transaction_builder::{aptos_stdlib, TransactionFactory}, types::LocalAccount};
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
@@ -773,7 +784,7 @@ mod tests {
         config.storage.rocksdb_configs.enable_storage_sharding = false;
 
         let (txn, vm_result) = {
-            let (vm_db, vm_executor) = init_db_and_executor::<AptosVM>(&config);
+            let (vm_db, vm_executor) = init_db_and_executor::<AptosVMBlockExecutor>(&config);
             let root_account = TransactionGenerator::read_root_account(genesis_key, &vm_db);
             let dst = LocalAccount::generate(&mut thread_rng());
             let num_coins = 1000;
@@ -793,7 +804,7 @@ mod tests {
             (txn, vm_result)
         };
 
-        let (native_db, native_executor) = init_db_and_executor::<NativeLooseBlockExecutor>(&config);
+        let (native_db, native_executor) = init_db_and_executor::<NativeLooseSpeculativeBlockExecutor>(&config);
         let native_result = native_executor
                 .execute_and_state_checkpoint(
                     (HashValue::zero(), vec![txn]).into(),
@@ -851,6 +862,10 @@ mod tests {
 
         println!("db_generator::create_db_with_accounts");
 
+        let mut features = Features::default();
+        features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+        features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+
         crate::db_generator::create_db_with_accounts::<E>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
@@ -861,7 +876,7 @@ mod tests {
             verify_sequence_numbers,
             false,
             PipelineConfig::default(),
-            Features::default(),
+            features.clone(),
         );
 
         println!("run_benchmark");
@@ -882,30 +897,48 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             PipelineConfig::default(),
-            Features::default(),
+            features,
         );
     }
 
     #[test]
     fn test_benchmark_default() {
-        test_generic_benchmark::<AptosVM>(None, true);
+        test_generic_benchmark::<AptosVMBlockExecutor>(None, true);
     }
 
     #[test]
     fn test_benchmark_transaction() {
         AptosVM::set_num_shards_once(1);
-        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_concurrency_level_once(1);
         AptosVM::set_processed_transactions_detailed_counters();
-        NativeLooseBlockExecutor::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVM>(
+        NativeConfig::set_concurrency_level_once(1);
+        test_generic_benchmark::<AptosVMBlockExecutor>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
             true,
         );
     }
 
     #[test]
-    fn test_native_benchmark() {
+    fn test_native_vm_benchmark_transaction() {
+        AptosVM::set_num_shards_once(1);
+        AptosVM::set_concurrency_level_once(1);
+        AptosVM::set_processed_transactions_detailed_counters();
+        NativeConfig::set_concurrency_level_once(1);
+        test_generic_benchmark::<NativeVMBlockExecutor>(
+            Some(TransactionTypeArg::NoOp),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_native_loose_block_executor_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
-        test_generic_benchmark::<NativeLooseBlockExecutor>(Some(TransactionTypeArg::AptFaTransfer), false);
+        test_generic_benchmark::<NativeLooseSpeculativeBlockExecutor>(Some(TransactionTypeArg::AptFaTransfer), false);
+    }
+
+    #[test]
+    fn test_native_direct_raw_loose_block_executor_benchmark() {
+        // correct execution not yet implemented, so cannot be checked for validity
+        test_generic_benchmark::<NativeNoStorageLooseSpeculativeBlockExecutor>(Some(TransactionTypeArg::AptFaTransfer), false);
     }
 }

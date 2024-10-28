@@ -50,7 +50,7 @@ RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 DEFAULT_NUM_INIT_ACCOUNTS = (
     "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
 )
-DEFAULT_MAX_BLOCK_SIZE = "20000"
+DEFAULT_MAX_BLOCK_SIZE = "30000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
@@ -163,11 +163,15 @@ CALIBRATION = """
 no-op	1	VM	57	0.758	1.079	40390.5
 no-op	1000	VM	57	0.740	1.040	22473.1
 apt-fa-transfer	1	VM	57	0.762	1.070	28769.8
-apt-fa-transfer	1	native	57	0.762	1.070	28769.8
-apt_fa_transfer_by_stages	1	VM	57	0.762	1.070	28769.8
-apt_fa_transfer_by_stages	1	native	57	0.762	1.070	28769.8
+apt-fa-transfer	1	NativeVM	57	0.762	1.070	28769.8
+apt_fa_transfer_by_stages	1	VM	57	0.762	1.070	30000.
+apt_fa_transfer_by_stages	1	NativeVM	57	0.762	1.070	30000.
+apt_fa_transfer_by_stages	1	NativeSpeculative	57	0.762	1.070	30000.
+apt_fa_transfer_by_stages	1	NativeNoStorageSpeculative	57	0.762	1.070	30000.
 apt_fa_transfer_sequential_by_stages	1	VM	57	0.762	1.070	10000.
-apt_fa_transfer_sequential_by_stages	1	native	57	0.762	1.070	10000.
+apt_fa_transfer_sequential_by_stages	1	NativeVM	57	0.762	1.070	10000.
+apt_fa_transfer_sequential_by_stages	1	NativeSpeculative	57	0.762	1.070	10000.
+apt_fa_transfer_sequential_by_stages	1	NativeNoStorageSpeculative	57	0.762	1.070	10000.
 account-generation	1	VM	57	0.774	1.055	23332.3
 account-resource32-b	1	VM	57	0.799	1.084	35822.6
 modify-global-resource	1	VM	57	0.810	1.022	2789.1
@@ -216,25 +220,49 @@ TESTS = [
     # RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     # RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
-    RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="NativeVM"), included_in=LAND_BLOCKING_AND_C),
 
     RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         split_stages_override=True,
         sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
     ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="native"), key_extra=RunGroupKeyExtra(
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeVM"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         split_stages_override=True,
         sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
     ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeNoStorageSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+
+
     RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         sig_verify_num_threads_override=1,
         execution_num_threads_override=1,
         split_stages_override=True,
     ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="native"), key_extra=RunGroupKeyExtra(
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeVM"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        sig_verify_num_threads_override=1,
+        execution_num_threads_override=1,
+        split_stages_override=True,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        sig_verify_num_threads_override=1,
+        execution_num_threads_override=1,
+        split_stages_override=True,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeNoStorageSpeculative"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         sig_verify_num_threads_override=1,
         execution_num_threads_override=1,
@@ -384,7 +412,8 @@ class RunResults:
     output_bps: float
     fraction_in_sig_verify: float
     fraction_in_execution: float
-    fraction_of_execution_in_vm: float
+    fraction_of_execution_in_block_executor: float
+    fraction_of_execution_in_inner_block_executor: float
     fraction_in_ledger_update: float
     fraction_in_commit: float
 
@@ -441,7 +470,8 @@ def extract_run_results(
         output_bps = 0
         fraction_in_sig_verify = 0
         fraction_in_execution = 0
-        fraction_of_execution_in_vm = 0
+        fraction_of_execution_in_block_executor = 0
+        fraction_of_execution_in_inner_block_executor = 0
         fraction_in_ledger_update = 0
         fraction_in_commit = 0
     else:
@@ -477,8 +507,11 @@ def extract_run_results(
                 prefix + r" fraction of total: (\d+\.?\d*) in execution", output
             )[-1]
         )
-        fraction_of_execution_in_vm = float(
-            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
+        fraction_of_execution_in_block_executor = float(
+            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in block executor", output)[-1]
+        )
+        fraction_of_execution_in_inner_block_executor = float(
+            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in inner block executor", output)[-1]
         )
         fraction_in_ledger_update = float(
             re.findall(prefix + r" fraction of total: (\d+\.?\d*) in ledger update", output)[
@@ -502,7 +535,8 @@ def extract_run_results(
         output_bps=output_bps,
         fraction_in_sig_verify=fraction_in_sig_verify,
         fraction_in_execution=fraction_in_execution,
-        fraction_of_execution_in_vm=fraction_of_execution_in_vm,
+        fraction_of_execution_in_block_executor=fraction_of_execution_in_block_executor,
+        fraction_of_execution_in_inner_block_executor=fraction_of_execution_in_inner_block_executor,
         fraction_in_ledger_update=fraction_in_ledger_update,
         fraction_in_commit=fraction_in_commit,
     )
@@ -543,7 +577,7 @@ def print_table(
                 "t/s",
                 "sigver/total",
                 "exe/total",
-                "vm/exe",
+                "block_exe/exe",
                 "commit/total",
                 "g/s",
                 "eff g/s",
@@ -561,8 +595,6 @@ def print_table(
             result.key.transaction_type,
             result.key.module_working_set_size,
             result.key.executor_type,
-            result.block_size,
-            result.expected_tps,
         ]
         if not only_fields:
             row.extend(
@@ -588,7 +620,7 @@ def print_table(
             row.append(int(round(result.single_node_result.tps)))
             row.append(round(result.single_node_result.fraction_in_sig_verify, 3))
             row.append(round(result.single_node_result.fraction_in_execution, 3))
-            row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
+            row.append(round(result.single_node_result.fraction_of_execution_in_block_executor, 3))
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
             row.append(int(round(result.single_node_result.effective_gps)))
@@ -642,7 +674,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -727,10 +759,18 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         sharding_traffic_flags = test.key_extra.sharding_traffic_flags or ""
 
         if test.key.executor_type == "VM":
-            executor_type_str = "--transactions-per-sender 1"
-        elif test.key.executor_type == "native":
+            executor_type_str = "--block-executor-type aptos-vm-with-block-stm --transactions-per-sender 1"
+        elif test.key.executor_type == "NativeVM":
             executor_type_str = (
-                "--use-native-loose-block-executor --transactions-per-sender 1"
+                "--block-executor-type native-vm-with-block-stm --transactions-per-sender 1"
+            )
+        elif test.key.executor_type == "NativeSpeculative":
+            executor_type_str = (
+                "--block-executor-type native-loose-speculative --transactions-per-sender 1"
+            )
+        elif test.key.executor_type == "NativeNoStorageSpeculative":
+            executor_type_str = (
+                "--block-executor-type native-no-storage-loose-speculative --transactions-per-sender 1"
             )
         elif test.key.executor_type == "sharded":
             executor_type_str = f"--num-executor-shards {number_of_execution_threads} {sharding_traffic_flags}"
@@ -817,7 +857,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "gpt": single_node_result.gpt,
                     "fraction_in_sig_verify": single_node_result.fraction_in_sig_verify,
                     "fraction_in_execution": single_node_result.fraction_in_execution,
-                    "fraction_of_execution_in_vm": single_node_result.fraction_of_execution_in_vm,
+                    "fraction_of_execution_in_block_executor": single_node_result.fraction_of_execution_in_block_executor,
+                    "fraction_of_execution_in_inner_block_executor": single_node_result.fraction_of_execution_in_inner_block_executor,
                     "fraction_in_ledger_update": single_node_result.fraction_in_ledger_update,
                     "fraction_in_commit": single_node_result.fraction_in_commit,
                     "code_perf_version": CODE_PERF_VERSION,
@@ -862,9 +903,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                         lambda r: round(r.single_node_result.fraction_in_execution, 3),
                     ),
                     (
-                        "vm/exe",
+                        "block_exe/exe",
                         lambda r: round(
-                            r.single_node_result.fraction_of_execution_in_vm, 3
+                            r.single_node_result.fraction_of_execution_in_block_executor, 3
                         ),
                     ),
                     (
@@ -898,11 +939,20 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                         ),
                     ),
                     (
-                        "vm tps",
+                        "block exe tps",
                         lambda r: round(
                             r.single_node_result.tps
                             / max(r.single_node_result.fraction_in_execution, 0.001)
-                            / max(r.single_node_result.fraction_of_execution_in_vm, 0.001),
+                            / max(r.single_node_result.fraction_of_execution_in_block_executor, 0.001),
+                            1,
+                        ),
+                    ),
+                    (
+                        "inner block exe tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(r.single_node_result.fraction_in_execution, 0.001)
+                            / max(r.single_node_result.fraction_of_execution_in_inner_block_executor, 0.001),
                             1,
                         ),
                     ),

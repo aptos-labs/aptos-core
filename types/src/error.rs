@@ -27,7 +27,8 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
         "Code invariant broken (there is a bug in the code), {:?}",
         message
     );
-    error!("{}", msg);
+    // error!("{}", msg);
+    panic!("{}", msg);
     PanicError::CodeInvariantError(msg)
 }
 

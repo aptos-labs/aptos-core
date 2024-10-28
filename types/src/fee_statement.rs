@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
+
+use crate::move_event_v2::MoveEventV2;
 
 /// Breakdown of fee charge and refund for a transaction.
 /// The structure is:
@@ -96,4 +99,11 @@ impl FeeStatement {
         self.storage_fee_octas += other.storage_fee_octas;
         self.storage_fee_refund_octas += other.storage_fee_refund_octas;
     }
+}
+
+impl MoveEventV2 for FeeStatement {}
+
+impl MoveStructType for FeeStatement {
+    const MODULE_NAME: &'static IdentStr = ident_str!("transaction_fee");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("FeeStatement");
 }

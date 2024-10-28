@@ -42,12 +42,23 @@ pub static COMMIT_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static VM_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+pub static BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_vm_execute_block_seconds",
+        "aptos_executor_block_executor_inner_execute_block_seconds",
         // metric description
-        "The time spent in seconds of vm block execution in Aptos executor",
+        "The time spent in seconds of BlockExecutor inner block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_executor_block_executor_execute_block_seconds",
+        // metric description
+        "The time spent in seconds of BlockExecutor block execution in Aptos executor",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()

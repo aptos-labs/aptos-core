@@ -7,7 +7,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
-    metrics::{COMMIT_BLOCKS, EXECUTE_BLOCK, VM_EXECUTE_BLOCK},
+    metrics::{BLOCK_EXECUTOR_EXECUTE_BLOCK, COMMIT_BLOCKS, EXECUTE_BLOCK},
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
@@ -129,18 +129,18 @@ fn report_block(
         total_versions / first_block_start_time.elapsed().as_secs_f64(),
     );
     info!(
-            "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
-            VM_EXECUTE_BLOCK.get_sample_sum(),
-            EXECUTE_BLOCK.get_sample_sum() - VM_EXECUTE_BLOCK.get_sample_sum(),
+            "Accumulative total: BlockSTM+VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
+            BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum(),
+            EXECUTE_BLOCK.get_sample_sum() - BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum(),
             COMMIT_BLOCKS.get_sample_sum(),
             API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
-            "Accumulative per transaction: VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
-            VM_EXECUTE_BLOCK.get_sample_sum() * NANOS_PER_SEC
+            "Accumulative per transaction: BlockSTM+VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
+            BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            (EXECUTE_BLOCK.get_sample_sum() - VM_EXECUTE_BLOCK.get_sample_sum()) * NANOS_PER_SEC
+            (EXECUTE_BLOCK.get_sample_sum() - BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum()) * NANOS_PER_SEC
                 / total_versions,
             COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
