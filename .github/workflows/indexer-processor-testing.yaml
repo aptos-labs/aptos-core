@@ -97,6 +97,7 @@ jobs:
                       .user.request.sender,
                       .user.request.expirationTimestampSecs.seconds,
                       .user.request.signature.ed25519.publicKey,
+                      .user.request.payload.scriptPayload.code.bytecode,
                       .user.request.signature.ed25519.signature)
                   | (.info.changes[].writeResource.data |=
                   if type == "string" then
