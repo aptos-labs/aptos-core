@@ -14,6 +14,7 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
+use aptos_types::transaction::TransactionPayload;
 use aptos_transaction_generator_lib::TransactionGenerator;
 use core::{
     cmp::{max, min},
@@ -437,9 +438,25 @@ pub async fn submit_transactions(
                 .fetch_add(txns.len() as u64, Ordering::Relaxed);
             // sample!(
             //     SampleRate::Duration(Duration::from_secs(60)),
+                let mut balances = Vec::new();
+                for txn in txns.iter() {
+                    let balance = client.view_apt_account_balance(txn.sender()).await.map_or(-1, |v| v.into_inner() as i64);
+                    balances.push(balance);
+                }
+                
                 warn!(
-                    "[{:?}] Failed to submit batch request: {:?}",
+                    "[{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
                     client.path_prefix_string(),
+                    txns.len(),
+                    txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
+                        TransactionPayload::EntryFunction(entry_function) => {
+                            Some((entry_function.module(), entry_function.function()))
+                        },
+                        _ => None,
+                    }).collect::<Vec<_>>(),
+                    txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
+                    txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
+                    balances,
                     e
                 );
             // );

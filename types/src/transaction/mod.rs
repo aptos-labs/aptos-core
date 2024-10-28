@@ -351,6 +351,10 @@ impl RawTransaction {
         self.payload
     }
 
+    pub fn payload(&self) -> &TransactionPayload {
+        &self.payload
+    }
+
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         self.sender
