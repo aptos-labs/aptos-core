@@ -27,7 +27,7 @@ use aptos_types::{
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -602,10 +602,39 @@ pub fn explorer_transaction_link(
 ///
 /// [Read about AIP-80](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-80.md)
 pub fn strip_private_key_prefix(key: &String) -> String {
-    let prefixes = ["ed25519-priv-", "secp256k1-priv-"];
-    prefixes
-        .iter()
-        .find_map(|prefix| key.strip_prefix(prefix))
-        .unwrap_or(key) // If no prefix is found, return the original key
+    key.strip_prefix("ed25519-priv-")
+        .unwrap_or(key) // If the prefix is not found, return the original key
         .to_string()
+}
+
+/// Deserializes an Ed25519 private key with a prefix AIP-80 prefix if present.
+///
+/// [Read about AIP-80](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-80.md)
+pub fn deserialize_private_key_with_prefix<'de, D>(
+    deserializer: D,
+) -> Result<Option<Ed25519PrivateKey>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    // Deserialize the field as an Option<String>
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+
+    // Transform Option<String> into Option<Ed25519PrivateKey>
+    opt.map_or(Ok(None), |s| {
+        if let Some(stripped) = s.strip_prefix("ed25519-priv-") {
+            // Deserialize using Ed25519PrivateKey's DeserializeKey implementation
+            Ed25519PrivateKey::deserialize(serde::de::value::StrDeserializer::<D::Error>::new(
+                stripped,
+            ))
+            .map(Some)
+            .map_err(D::Error::custom)
+        } else {
+            // Attempt normal deserialization
+            Ed25519PrivateKey::deserialize(serde::de::value::StrDeserializer::<D::Error>::new(&s))
+                .map(Some)
+                .map_err(D::Error::custom)
+        }
+    })
 }

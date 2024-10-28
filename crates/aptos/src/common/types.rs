@@ -7,10 +7,10 @@ use crate::{
         init::Network,
         local_simulation,
         utils::{
-            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_account_with_state, get_auth_key, get_sequence_number, parse_json_file,
-            prompt_yes_with_override, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
+            check_if_file_exists, create_dir_if_not_exist, deserialize_private_key_with_prefix,
+            dir_default_to_current, get_account_with_state, get_auth_key, get_sequence_number,
+            parse_json_file, prompt_yes_with_override, read_from_file, start_logger,
+            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
@@ -251,6 +251,7 @@ pub struct ProfileConfig {
     pub network: Option<Network>,
     /// Private key for commands.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_private_key_with_prefix")]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     #[serde(skip_serializing_if = "Option::is_none")]
