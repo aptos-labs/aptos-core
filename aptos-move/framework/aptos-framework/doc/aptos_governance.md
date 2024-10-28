@@ -946,16 +946,17 @@ AptosGovernance.
                 voting_duration_secs
             },
         )
+    } <b>else</b> {
+        <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="aptos_governance.md#0x1_aptos_governance_UpdateConfigEvent">UpdateConfigEvent</a>&gt;(
+            &<b>mut</b> events.update_config_events,
+            <a href="aptos_governance.md#0x1_aptos_governance_UpdateConfigEvent">UpdateConfigEvent</a> {
+                min_voting_threshold,
+                required_proposer_stake,
+                voting_duration_secs
+            },
+        );
     };
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="aptos_governance.md#0x1_aptos_governance_UpdateConfigEvent">UpdateConfigEvent</a>&gt;(
-        &<b>mut</b> events.update_config_events,
-        <a href="aptos_governance.md#0x1_aptos_governance_UpdateConfigEvent">UpdateConfigEvent</a> {
-            min_voting_threshold,
-            required_proposer_stake,
-            voting_duration_secs
-        },
-    );
 }
 </code></pre>
 
@@ -1320,18 +1321,19 @@ Return proposal_id when a proposal is successfully created.
                 proposal_metadata,
             },
         );
+    } <b>else</b> {
+        <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="aptos_governance.md#0x1_aptos_governance_CreateProposalEvent">CreateProposalEvent</a>&gt;(
+            &<b>mut</b> events.create_proposal_events,
+            <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalEvent">CreateProposalEvent</a> {
+                proposal_id,
+                proposer: proposer_address,
+                stake_pool,
+                execution_hash,
+                proposal_metadata,
+            },
+        );
     };
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="aptos_governance.md#0x1_aptos_governance_CreateProposalEvent">CreateProposalEvent</a>&gt;(
-        &<b>mut</b> events.create_proposal_events,
-        <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalEvent">CreateProposalEvent</a> {
-            proposal_id,
-            proposer: proposer_address,
-            stake_pool,
-            execution_hash,
-            proposal_metadata,
-        },
-    );
     proposal_id
 }
 </code></pre>
@@ -1548,18 +1550,19 @@ cannot vote on the proposal even after partial governance voting is enabled.
                 should_pass,
             },
         );
+    } <b>else</b> {
+        <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VoteEvent">VoteEvent</a>&gt;(
+            &<b>mut</b> events.vote_events,
+            <a href="aptos_governance.md#0x1_aptos_governance_VoteEvent">VoteEvent</a> {
+                proposal_id,
+                voter: voter_address,
+                stake_pool,
+                num_votes: voting_power,
+                should_pass,
+            },
+        );
     };
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VoteEvent">VoteEvent</a>&gt;(
-        &<b>mut</b> events.vote_events,
-        <a href="aptos_governance.md#0x1_aptos_governance_VoteEvent">VoteEvent</a> {
-            proposal_id,
-            voter: voter_address,
-            stake_pool,
-            num_votes: voting_power,
-            should_pass,
-        },
-    );
 
     <b>let</b> proposal_state = <a href="voting.md#0x1_voting_get_proposal_state">voting::get_proposal_state</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
     <b>if</b> (proposal_state == <a href="aptos_governance.md#0x1_aptos_governance_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>) {
@@ -2183,7 +2186,9 @@ Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 <b>let</b> <b>post</b> new_governance_config = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_MODULE_EVENT_MIGRATION">features::MODULE_EVENT_MIGRATION</a>) && !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(
+    @aptos_framework
+);
 <b>modifies</b> <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(addr);
 <b>ensures</b> new_governance_config.voting_duration_secs == voting_duration_secs;
 <b>ensures</b> new_governance_config.min_voting_threshold == min_voting_threshold;

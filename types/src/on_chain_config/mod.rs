@@ -14,11 +14,11 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::StructTag,
+    language_storage::{StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
 mod approved_execution_hashes;
 mod aptos_features;
@@ -202,6 +202,10 @@ impl<S: StateView> ConfigStorage for S {
 
 pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
+}
+
+pub fn new_epoch_event_type_tag() -> TypeTag {
+    TypeTag::from_str("0x1::reconfiguration::NewEpoch").expect("cannot fail")
 }
 
 pub fn access_path_for_config(config_id: ConfigID) -> anyhow::Result<AccessPath> {

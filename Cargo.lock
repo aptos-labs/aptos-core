@@ -1253,6 +1253,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.4.14",
  "itertools 0.13.0",
+ "rayon",
  "serde_json",
  "tokio",
 ]
@@ -1549,6 +1550,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-drop-helper",
+ "aptos-infallible",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-storage-interface",
@@ -1558,6 +1560,7 @@ dependencies = [
  "derive_more",
  "itertools 0.13.0",
  "once_cell",
+ "rayon",
  "serde",
  "thiserror",
 ]
@@ -1602,6 +1605,7 @@ name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-executor",
  "aptos-executor-types",
  "aptos-experimental-runtimes",
@@ -15636,6 +15640,7 @@ dependencies = [
  "futures",
  "hex",
  "hyper 0.14.28",
+ "itertools 0.13.0",
  "move-core-types",
  "num_cpus",
  "once_cell",

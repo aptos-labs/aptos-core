@@ -48,8 +48,6 @@ fn single_peer_to_peer_with_event() {
     assert_eq!(receiver_balance, updated_receiver_balance.coin());
     assert_eq!(sender_balance, updated_sender_balance.coin());
     assert_eq!(11, updated_sender.sequence_number());
-    assert_eq!(0, updated_sender_balance.deposit_events().count(),);
-    assert_eq!(1, updated_receiver_balance.deposit_events().count());
 
     let rec_ev_path = receiver.received_events_key();
     let sent_ev_path = sender.sent_events_key();
@@ -124,11 +122,6 @@ fn few_peer_to_peer_with_event() {
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());
         assert_eq!(11 + idx as u64, updated_sender.sequence_number());
-        assert_eq!(0, updated_sender_balance.deposit_events().count());
-        assert_eq!(
-            idx as u64 + 1,
-            updated_receiver_balance.deposit_events().count()
-        );
     }
 }
 
