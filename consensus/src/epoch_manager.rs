@@ -152,7 +152,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
-    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     batch_retrieval_tx:
@@ -1593,7 +1593,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn forward_event(
-        quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
@@ -1613,7 +1613,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
             | VerifiedEvent::BatchMsg(_)) => {
-                Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
+                Self::forward_event_to(quorum_store_msg_tx, peer_id, (peer_id, quorum_store_event))
                     .context("quorum store sender")
             },
             proposal_event @ VerifiedEvent::ProposalMsg(_) => {

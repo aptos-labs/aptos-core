@@ -58,6 +58,7 @@ async fn test_proof_coordinator_basic() {
         tx,
         proof_cache.clone(),
         true,
+        10,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
@@ -75,6 +76,7 @@ async fn test_proof_coordinator_basic() {
         let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer).unwrap();
         assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(
+                signer.author(),
                 SignedBatchInfoMsg::new(vec![signed_batch_info])
             ))
             .await
@@ -108,6 +110,7 @@ async fn test_proof_coordinator_with_unverified_signatures() {
         tx,
         proof_cache.clone(),
         true,
+        10,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
@@ -127,6 +130,7 @@ async fn test_proof_coordinator_with_unverified_signatures() {
                     .expect("Failed to create SignedBatchInfo");
                 assert!(proof_coordinator_tx
                     .send(ProofCoordinatorCommand::AppendSignature(
+                        signer.author(),
                         SignedBatchInfoMsg::new(vec![signed_batch_info]),
                     ))
                     .await
@@ -136,6 +140,7 @@ async fn test_proof_coordinator_with_unverified_signatures() {
                     SignedBatchInfo::dummy(batch.batch_info().clone(), signer.author());
                 assert!(proof_coordinator_tx
                     .send(ProofCoordinatorCommand::AppendSignature(
+                        signer.author(),
                         SignedBatchInfoMsg::new(vec![signed_batch_info]),
                     ))
                     .await
