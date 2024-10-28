@@ -286,7 +286,7 @@ impl TransactionTypeArg {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
                     num_user_accounts: 1000000,
-                    batch_size: 4,
+                    batch_size: 8,
                     num_mint_transactions: 2_000_000,
                 },
                 num_modules: 1,
