@@ -9,6 +9,7 @@ mainnet:
     # example:
     # 123: "example_transaction"
   }
+
 # testnet:
 #   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
 #   api_key: YOUR_KEY_HERE

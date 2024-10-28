@@ -16,7 +16,7 @@ cargo run -p aptos-indexer-transaction-generator -- \
 
 ```bash
 ./aptos-indexer-transaction-generator \
-  --testing-folder /your/aptos-core/ecosystem/indexer-grpc/indexer-transaction-generator/example_tests \ 
+  --testing-folder /your/aptos-core/ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions \ 
   --output-folder /tmp/ttt
 ```
 
@@ -58,7 +58,7 @@ cargo run -p aptos-indexer-transaction-generator -- \
       ``` 
 
 
-You can check the example [here](example_tests).
+You can check the example [here](imported_transactions).
 
 
 ### Account Management
