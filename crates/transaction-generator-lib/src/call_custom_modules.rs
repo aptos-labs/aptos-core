@@ -116,7 +116,9 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
     }
 
     fn update_sequence_numbers(&mut self, latest_fetched_sequence_numbers: &HashMap<AccountAddress, u64>) {
+        info!("Custom modules called update_sequence_numbers");
         if let Some(sequence_number_updater) = &self.sequence_number_updater {
+            info!("Custom modules calling update_sequence_numbers");
             (sequence_number_updater)(latest_fetched_sequence_numbers);
         }
     }

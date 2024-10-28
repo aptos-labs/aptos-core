@@ -495,6 +495,7 @@ impl<Bucket: Clone + Eq + PartialEq + Hash> BucketedAccountPool<Bucket> {
         object_address: &AccountAddress,
         sequence_number: u64,
     ) {
+        info!("Called update sequence number for {} {}", object_address, sequence_number);
         let mut current = self.pool.write();
         if let Some(bucket) = self.object_to_bucket_map.read().get(object_address).and_then(|bucket| current.get_mut(bucket)) {
             for object in bucket.iter_mut() {

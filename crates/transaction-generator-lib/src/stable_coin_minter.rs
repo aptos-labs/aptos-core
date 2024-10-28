@@ -14,6 +14,7 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
+use aptos_logger::info;
 use async_trait::async_trait;
 use rand::{rngs::StdRng, Rng};
 use std::sync::Arc;
@@ -219,6 +220,7 @@ impl UserModuleTransactionGenerator for StableCoinMinterGenerator {
         let minter_accounts = self.minter_accounts.clone();
         Some(
             Arc::new(move |latest_fetched_sequence_numbers| {
+                info!("Calling update sequence number for minter accounts {:?}", latest_fetched_sequence_numbers);
                 for (minter_account, sequence_number) in latest_fetched_sequence_numbers {
                     minter_accounts.update_sequence_number(minter_account, *sequence_number);
                 }
