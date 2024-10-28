@@ -293,6 +293,9 @@ impl ProofCoordinator {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
             if let Some(state) = self.batch_info_to_proof.remove(&signed_batch_info_info) {
+                if !state.completed {
+                    batch_ids.push(signed_batch_info_info.batch_id());
+                }
                 Self::update_counters_on_expire(&state);
 
                 // We skip metrics if the proof did not complete and did not get a self vote, as it
@@ -302,8 +305,6 @@ impl ProofCoordinator {
                 }
 
                 if !state.completed {
-                    batch_ids.push(signed_batch_info_info.batch_id());
-
                     counters::TIMEOUT_BATCHES_COUNT.inc();
                     info!(
                         LogSchema::new(LogEvent::IncrementalProofExpired),

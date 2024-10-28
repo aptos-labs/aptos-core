@@ -14,11 +14,13 @@ use aptos_consensus_types::{
 };
 use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_metrics_core::TimerHelper;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{prelude::SliceRandom, thread_rng};
 use std::{
     cmp::Reverse,
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    ops::Bound,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -192,10 +194,21 @@ impl BatchProofQueue {
         let expiration = proof.expiration();
 
         let batch_sort_key = BatchSortKey::from_info(proof.info());
-        self.author_to_batches
-            .entry(author)
-            .or_default()
-            .insert(batch_sort_key.clone(), proof.info().clone());
+        let batches_for_author = self.author_to_batches.entry(author).or_default();
+        batches_for_author.insert(batch_sort_key.clone(), proof.info().clone());
+
+        // Check if a batch with a higher batch Id (reverse sorted) exists
+        if let Some((prev_batch_key, _)) = batches_for_author
+            .range((Bound::Unbounded, Bound::Excluded(batch_sort_key.clone())))
+            .next_back()
+        {
+            if prev_batch_key.gas_bucket_start() == batch_sort_key.gas_bucket_start() {
+                counters::PROOF_MANAGER_OUT_OF_ORDER_PROOF_INSERTION
+                    .with_label_values(&[author.short_str().as_str()])
+                    .inc();
+            }
+        }
+
         self.expirations.add_item(batch_sort_key, expiration);
 
         // If we are here, then proof is added for the first time. Otherwise, we will

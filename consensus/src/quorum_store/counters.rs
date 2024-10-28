@@ -986,3 +986,12 @@ pub static BATCH_VOTE_PROGRESS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PROOF_MANAGER_OUT_OF_ORDER_PROOF_INSERTION: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_proof_manager_ooo_proof_insert",
+        "Number of ooo proof insertions into proof manager",
+        &["author"]
+    )
+    .unwrap()
+});
