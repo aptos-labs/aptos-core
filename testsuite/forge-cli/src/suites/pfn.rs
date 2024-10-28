@@ -52,7 +52,7 @@ pub fn pfn_const_tps(
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default()
             .mode(EmitJobMode::MaxLoad { mempool_backlog: 10240 })
-            .coins_per_account_override(1_0000_0000_0000)
+            .coins_per_account_override(4_0000_0000_0000)
             .num_accounts_mode(NumAccountsMode::NumAccounts(1024)),
         )
         .add_network_test(PFNPerformance::new(
