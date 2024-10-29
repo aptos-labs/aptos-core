@@ -441,53 +441,32 @@ pub async fn submit_transactions(
                     balances.push(balance);
                 }
                 
-                match e {
-                    RestError::Unknown(e) => {
-                        let error_message = e.to_string();
-                        let n = 500;
-                        let last_n_chars = &error_message[error_message.len().saturating_sub(n)..];
-                        
-                        warn!(
-                            "Unknown: [{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
-                            client.path_prefix_string(),
-                            txns.len(),
-                            txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
-                                TransactionPayload::EntryFunction(entry_function) => {
-                                    Some((entry_function.module(), entry_function.function()))
-                                },
-                                _ => None,
-                            }).collect::<Vec<_>>(),
-                            txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
-                            txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
-                            balances,
-                            error_message
-                        );
-                    },
-                    _ => {
-                        warn!(
-                            "Other: [{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
-                            client.path_prefix_string(),
-                            txns.len(),
-                            txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
-                                TransactionPayload::EntryFunction(entry_function) => {
-                                    Some((entry_function.module(), entry_function.function()))
-                                },
-                                _ => None,
-                            }).collect::<Vec<_>>(),
-                            txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
-                            txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
-                            balances,
-                            e
-                        );
-                    },
-                }
-
-                
+                warn!(
+                    "Unknown: [{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
+                    client.path_prefix_string(),
+                    txns.len(),
+                    txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
+                        TransactionPayload::EntryFunction(entry_function) => {
+                            Some((entry_function.module(), entry_function.function()))
+                        },
+                        _ => None,
+                    }).collect::<Vec<_>>(),
+                    txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
+                    txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
+                    balances,
+                    e
+                );
             // );
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
-            info!("Submission to {:?} succeeded. Successes: {:?} Failures: {:?}. Entry functions: {:?}. Senders: {:?}, Sequence numbers: {:?}", client.path_prefix_string(), txns.len(), failures.len(), txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
+            let mut balances = Vec::new();
+            for txn in txns.iter() {
+                let balance = client.view_apt_account_balance(txn.sender()).await.map_or(-1, |v| v.into_inner() as i64);
+                balances.push(balance);
+            }
+                
+            info!("Submission to {:?} succeeded. Successes: {:?} Failures: {:?}. Entry functions: {:?}. Senders: {:?}, Sequence numbers: {:?}, balances: {:?}", client.path_prefix_string(), txns.len(), failures.len(), txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
                 TransactionPayload::EntryFunction(entry_function) => {
                     Some((entry_function.module(), entry_function.function()))
                 },
@@ -495,6 +474,7 @@ pub async fn submit_transactions(
             }).collect::<Vec<_>>(),
             txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
             txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
+            balances,
         );
             stats
                 .failed_submission
