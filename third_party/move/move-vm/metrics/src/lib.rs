@@ -4,7 +4,11 @@
 use once_cell::sync::Lazy;
 use prometheus::{register_histogram_vec, HistogramTimer, HistogramVec};
 
+/// Helper trait to encapsulate [HistogramVec] functionality. Users can use this trait to time
+/// different VM parts collecting metrics for different labels. Use wisely as timers do introduce
+/// an overhead, so using on a hot path is not recommended.
 pub trait Timer {
+    /// Returns a new timer for the specified label.
     fn timer_with_label(&self, label: &str) -> HistogramTimer;
 }
 
@@ -14,6 +18,11 @@ impl Timer for HistogramVec {
     }
 }
 
+/// Timer that can be used to instrument the VM to collect metrics for different parts of the code.
+/// To access and view the metrics, set up where to send them, e.g., `PUSH_METRICS_NAMESPACE` and
+/// `PUSH_METRICS_ENDPOINT`. Then, metrics can be seen on Grafana dashboard, for instance.
+///
+/// Note: the timer uses "exponential" buckets with a factor of 2.
 pub static VM_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     let factor = 2.0;
     let num_buckets = 32;
@@ -33,5 +42,5 @@ pub static VM_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         &["name"],
         buckets,
     )
-    .unwrap()
+    .expect("Registering the histogram should always succeed")
 });
