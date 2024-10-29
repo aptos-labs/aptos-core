@@ -531,7 +531,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
     let t_mut_ref_vec = Type::Reference(ReferenceKind::Mutable, Box::new(t_vec.clone()));
     let t_u64 = Type::new_prim(PrimitiveType::U64);
     let mk_param = |n, t| Parameter(env.symbol_pool().make(n), t, env.unknown_loc());
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "empty",
@@ -539,7 +539,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         vec![],
         t_vec.clone(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "length",
@@ -547,7 +547,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         vec![mk_param("self", t_ref_vec.clone())],
         t_u64.clone(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "borrow",
@@ -555,7 +555,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         vec![mk_param("self", t_ref_vec), mk_param("i", t_u64.clone())],
         t_ref_T.clone(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "borrow_mut",
@@ -566,7 +566,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         ],
         t_mut_ref_T.clone(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "push_back",
@@ -577,7 +577,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         ],
         Type::unit(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "pop_back",
@@ -585,7 +585,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         vec![mk_param("self", t_mut_ref_vec.clone())],
         t_T.clone(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "destroy_empty",
@@ -593,7 +593,7 @@ fn add_well_known_vector_funs(env: &GlobalEnv, module_data: &mut ModuleData) {
         vec![mk_param("self", t_vec)],
         Type::unit(),
     );
-    add_fun(
+    add_native_public_fun(
         env,
         module_data,
         "swap",
