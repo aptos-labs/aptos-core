@@ -800,7 +800,7 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
 
     for (state_key, write_op) in write_set {
         if let StateKeyInner::AccessPath(ap) = state_key.inner() {
-            if let Some(module_id) = ap.get_module_id() {
+            if let Some(module_id) = ap.try_get_module_id() {
                 module_write_ops.insert(state_key, ModuleWrite::new(module_id, write_op));
                 continue;
             }

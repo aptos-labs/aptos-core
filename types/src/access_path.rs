@@ -162,7 +162,7 @@ impl AccessPath {
     }
 
     /// Extracts a [ModuleId]. Returns [None] if this is not a module access.
-    pub fn get_module_id(&self) -> Option<ModuleId> {
+    pub fn try_get_module_id(&self) -> Option<ModuleId> {
         match self.get_path() {
             Path::Code(module_id) => Some(module_id),
             Path::Resource(_) | Path::ResourceGroup(_) => None,

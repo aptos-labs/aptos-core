@@ -11809,6 +11809,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde",
+ "sha3 0.9.1",
  "smallbitvec",
  "smallvec",
  "triomphe",

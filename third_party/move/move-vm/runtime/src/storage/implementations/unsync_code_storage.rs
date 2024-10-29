@@ -114,8 +114,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> AsUnsyncCodeStorage<'
 mod test {
     use super::*;
     use crate::storage::{
-        code_storage::{compute_code_hash, CodeStorage},
-        implementations::unsync_module_storage::test::add_module_bytes,
+        code_storage::CodeStorage, implementations::unsync_module_storage::test::add_module_bytes,
     };
     use claims::assert_ok;
     use move_binary_format::{
@@ -123,6 +122,7 @@ mod test {
     };
     use move_core_types::{identifier::Identifier, language_storage::ModuleId};
     use move_vm_test_utils::InMemoryStorage;
+    use move_vm_types::sha3_256;
 
     fn make_script<'a>(dependencies: impl IntoIterator<Item = &'a str>) -> Vec<u8> {
         let mut script = empty_script_with_dependencies(dependencies);
@@ -144,11 +144,11 @@ mod test {
         let code_storage = module_bytes_storage.into_unsync_code_storage(runtime_environment);
 
         let serialized_script = make_script(vec!["a"]);
-        let hash_1 = compute_code_hash(&serialized_script);
+        let hash_1 = sha3_256(&serialized_script);
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
 
         let serialized_script = make_script(vec!["b"]);
-        let hash_2 = compute_code_hash(&serialized_script);
+        let hash_2 = sha3_256(&serialized_script);
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
 
         code_storage.assert_cached_state(vec![&hash_1, &hash_2], vec![]);
@@ -170,7 +170,7 @@ mod test {
         let code_storage = module_bytes_storage.into_unsync_code_storage(runtime_environment);
 
         let serialized_script = make_script(vec!["a"]);
-        let hash = compute_code_hash(&serialized_script);
+        let hash = sha3_256(&serialized_script);
         assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
 
         // Nothing gets loaded into module cache.

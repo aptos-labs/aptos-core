@@ -16,10 +16,7 @@ use aptos_vm_environment::{
     prod_configs::{aptos_default_ty_builder, aptos_prod_vm_config},
 };
 use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
-use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, native_functions::NativeFunctionTable, RuntimeEnvironment,
-    WithRuntimeEnvironment,
-};
+use move_vm_runtime::{move_vm::MoveVM, RuntimeEnvironment, WithRuntimeEnvironment};
 use std::ops::Deref;
 
 /// Used by genesis to create runtime environment and VM ([GenesisMoveVM]), encapsulating all
@@ -27,8 +24,7 @@ use std::ops::Deref;
 pub struct GenesisRuntimeBuilder {
     chain_id: ChainId,
     features: Features,
-    vm_config: VMConfig,
-    natives: NativeFunctionTable,
+    runtime_environment: RuntimeEnvironment,
 }
 
 impl GenesisRuntimeBuilder {
@@ -51,24 +47,23 @@ impl GenesisRuntimeBuilder {
             None,
         );
         let natives = aptos_natives_with_builder(&mut native_builder, false);
-
+        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
         Self {
             chain_id,
             features,
-            vm_config,
-            natives,
+            runtime_environment,
         }
     }
 
     /// Returns the runtime environment used for any genesis sessions.
     pub fn build_genesis_runtime_environment(&self) -> RuntimeEnvironment {
-        RuntimeEnvironment::new_with_config(self.natives.clone(), self.vm_config.clone())
+        self.runtime_environment.clone()
     }
 
     /// Returns MoveVM for the genesis.
     pub fn build_genesis_vm(&self) -> GenesisMoveVM {
         GenesisMoveVM {
-            vm: MoveVM::new_with_config(self.natives.clone(), self.vm_config.clone()),
+            vm: MoveVM::new_with_runtime_environment(&self.runtime_environment),
             chain_id: self.chain_id,
             features: self.features.clone(),
         }

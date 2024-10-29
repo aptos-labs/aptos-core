@@ -7,7 +7,6 @@ use crate::{
     data_cache::TransactionDataCache,
     loader::{Loader, ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
-    native_functions::{NativeFunction, NativeFunctions},
     runtime::VMRuntime,
     session::Session,
     RuntimeEnvironment,
@@ -16,10 +15,7 @@ use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, vm_status::StatusCode,
-};
+use move_core_types::{language_storage::ModuleId, metadata::Metadata, vm_status::StatusCode};
 use move_vm_types::resolver::MoveResolver;
 use std::{ops::Deref, sync::Arc};
 
@@ -29,41 +25,10 @@ pub struct MoveVM {
 }
 
 impl MoveVM {
-    /// Creates a new VM instance, using default configurations. Panics if there are duplicated
-    /// natives.
-    pub fn new(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-    ) -> Self {
-        let vm_config = VMConfig {
-            // Keep the paranoid mode on as we most likely want this for tests.
-            paranoid_type_checks: true,
-            ..VMConfig::default()
-        };
-        Self::new_with_config(natives, vm_config)
-    }
-
-    /// Creates a new VM instance, with provided VM configurations. Panics if there are duplicated
-    /// natives.
-    pub fn new_with_config(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        vm_config: VMConfig,
-    ) -> Self {
-        let natives = NativeFunctions::new(natives)
-            .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
-        Self {
-            runtime: VMRuntime::new(natives, vm_config),
-        }
-    }
-
+    /// Creates a new VM instance for the given [RuntimeEnvironment].
     pub fn new_with_runtime_environment(runtime_environment: &RuntimeEnvironment) -> Self {
-        // Loader V2 does not store any natives, so we save the clone here.
-        let natives = if runtime_environment.vm_config().use_loader_v2 {
-            NativeFunctions::new(vec![]).unwrap()
-        } else {
-            runtime_environment.natives().clone()
-        };
         Self {
-            runtime: VMRuntime::new(natives, runtime_environment.vm_config().clone()),
+            runtime: VMRuntime::new(runtime_environment),
         }
     }
 

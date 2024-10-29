@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    compute_code_hash, config::VMConfig, data_cache::TransactionDataCache,
-    logging::expect_no_verification_errors, module_traversal::TraversalContext,
-    storage::module_storage::ModuleStorage as ModuleStorageV2, CodeStorage,
+    config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
+    module_traversal::TraversalContext, storage::module_storage::ModuleStorage as ModuleStorageV2,
+    CodeStorage,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -35,6 +35,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{
         AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
     },
+    sha3_256,
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -442,8 +443,8 @@ impl LoaderV1 {
         traversal_context: &mut TraversalContext,
         script_blob: &[u8],
     ) -> VMResult<()> {
-        let script = data_store
-            .load_compiled_script_to_cache(script_blob, compute_code_hash(script_blob))?;
+        let script =
+            data_store.load_compiled_script_to_cache(script_blob, sha3_256(script_blob))?;
         let script = traversal_context.referenced_scripts.alloc(script);
 
         // TODO(Gas): Should we charge dependency gas for the script itself?
@@ -475,7 +476,7 @@ impl LoaderV1 {
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
-        let hash_value = compute_code_hash(script_blob);
+        let hash_value = sha3_256(script_blob);
         let mut scripts = self.scripts.write();
         let script = match scripts.get(&hash_value) {
             Some(cached) => cached,

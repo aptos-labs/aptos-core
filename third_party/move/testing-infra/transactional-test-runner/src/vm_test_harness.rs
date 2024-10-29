@@ -169,11 +169,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         }
 
         let vm_config = vm_config();
-        let vm = vm_config
-            .use_loader_v2
-            .then_some(Rc::new(create_vm(vm_config.clone())));
+        let use_loader_v2 = vm_config.use_loader_v2;
+
         let runtime_environment =
-            RuntimeEnvironmentAdapter::new(create_runtime_environment(vm_config.clone()));
+            RuntimeEnvironmentAdapter::new(create_runtime_environment(vm_config));
+        let vm = use_loader_v2.then(|| {
+            let vm = MoveVM::new_with_runtime_environment(&runtime_environment.0);
+            Rc::new(vm)
+        });
         let vm_and_runtime_environment = (vm, runtime_environment);
 
         let mut adapter = Self {
@@ -196,7 +199,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .clone()
             .into_unsync_module_storage(runtime_environment.clone());
 
-        if vm_config.use_loader_v2 {
+        if runtime_environment.0.vm_config().use_loader_v2 {
             let addresses = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
                 .iter()
                 .map(|tmod| *tmod.named_module.module.self_addr())
@@ -502,7 +505,11 @@ impl<'a> SimpleVMTestAdapter<'a> {
     fn vm_and_runtime_environment(&self) -> (Rc<MoveVM>, RuntimeEnvironmentAdapter) {
         let vm = match &self.vm_and_runtime_environment.0 {
             Some(vm) => vm.clone(),
-            None => Rc::new(create_vm(vm_config())),
+            None => {
+                let vm =
+                    MoveVM::new_with_runtime_environment(&self.vm_and_runtime_environment.1 .0);
+                Rc::new(vm)
+            },
         };
         (vm, self.vm_and_runtime_environment.1.clone())
     }
@@ -544,17 +551,6 @@ fn vm_config() -> VMConfig {
 
 fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
     RuntimeEnvironment::new_with_config(
-        move_stdlib::natives::all_natives(
-            STD_ADDR,
-            // TODO: come up with a suitable gas schedule
-            move_stdlib::natives::GasParameters::zeros(),
-        ),
-        vm_config,
-    )
-}
-
-fn create_vm(vm_config: VMConfig) -> MoveVM {
-    MoveVM::new_with_config(
         move_stdlib::natives::all_natives(
             STD_ADDR,
             // TODO: come up with a suitable gas schedule

@@ -32,8 +32,8 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         );
-        let runtime_environment = RuntimeEnvironment::new(natives.clone());
-        let vm = MoveVM::new(natives);
+        let runtime_environment = RuntimeEnvironment::new(natives);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         if vm.vm_config().use_loader_v2 {
@@ -80,9 +80,8 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             ),
             ..Default::default()
         };
-        let runtime_environment =
-            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
-        let vm = MoveVM::new_with_config(natives, vm_config);
+        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         if vm.vm_config().use_loader_v2 {
@@ -140,8 +139,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         );
-        let runtime_environment = RuntimeEnvironment::new(natives.clone());
-        let vm = MoveVM::new(natives);
+        let runtime_environment = RuntimeEnvironment::new(natives);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
         let code_storage = storage.as_unsync_code_storage(runtime_environment);
 
@@ -181,9 +180,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             ),
             ..Default::default()
         };
-        let runtime_environment =
-            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
-        let vm = MoveVM::new_with_config(natives, vm_config);
+        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
         let code_storage = storage.as_unsync_code_storage(runtime_environment);
 

@@ -95,8 +95,8 @@ fn test_malformed_resource() {
         AccountAddress::from_hex_literal("0x1").unwrap(),
         move_stdlib::natives::GasParameters::zeros(),
     );
-    let runtime_environment = RuntimeEnvironment::new(natives.clone());
-    let vm = MoveVM::new(natives);
+    let runtime_environment = RuntimeEnvironment::new(natives);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -198,7 +198,7 @@ fn test_malformed_module() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -230,7 +230,7 @@ fn test_malformed_module() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -276,7 +276,7 @@ fn test_unverifiable_module() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
@@ -305,7 +305,7 @@ fn test_unverifiable_module() {
         storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -362,7 +362,7 @@ fn test_missing_module_dependency() {
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
@@ -386,7 +386,7 @@ fn test_missing_module_dependency() {
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -443,7 +443,7 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
@@ -473,7 +473,7 @@ fn test_malformed_module_dependency() {
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -531,7 +531,7 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment.clone());
@@ -561,7 +561,7 @@ fn test_unverifiable_module_dependency() {
         storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -668,7 +668,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
         };
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let vm = MoveVM::new(vec![]);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage.as_unsync_module_storage(runtime_environment);
@@ -759,8 +759,8 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         );
-        let runtime_environment = RuntimeEnvironment::new(natives.clone());
-        let vm = MoveVM::new(natives);
+        let runtime_environment = RuntimeEnvironment::new(natives);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let mut sess = vm.new_session(&storage);
 
         let module_storage = storage

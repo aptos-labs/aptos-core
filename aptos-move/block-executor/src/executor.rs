@@ -237,10 +237,11 @@ where
             }
 
             for (k, v) in output.module_write_set().into_iter() {
-                if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
-                }
                 if !runtime_environment.vm_config().use_loader_v2 {
+                    if prev_modified_keys.remove(&k).is_none() {
+                        needs_suffix_validation = true;
+                    }
+
                     #[allow(deprecated)]
                     versioned_cache.deprecated_modules().write(
                         k,

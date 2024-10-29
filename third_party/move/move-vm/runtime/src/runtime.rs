@@ -3,15 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
     loader::{LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
-    native_functions::NativeFunctions,
     session::SerializedReturnValues,
     storage::{code_storage::CodeStorage, module_storage::ModuleStorage as ModuleStorageV2},
+    RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -48,16 +47,20 @@ impl Clone for VMRuntime {
 
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
-    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+    pub(crate) fn new(runtime_environment: &RuntimeEnvironment) -> Self {
+        let vm_config = runtime_environment.vm_config().clone();
         let loader = if vm_config.use_loader_v2 {
             Loader::v2(vm_config)
         } else {
+            let natives = runtime_environment.natives().clone();
             Loader::v1(natives, vm_config)
         };
 
         VMRuntime {
             loader,
-            // Note(loader_v2): We still create this cache, but if V2 loader is used, it is not used.
+            // TODO(loader_v2):
+            //   We still create this cache, but if V2 loader is used, it is not used. We will
+            //   remove it in the future together with other V1 components.
             module_cache: Arc::new(ModuleCache::new()),
         }
     }

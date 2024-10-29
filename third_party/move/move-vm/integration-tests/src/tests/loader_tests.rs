@@ -67,8 +67,8 @@ impl Adapter {
             },
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config.clone());
-        let vm = Arc::new(MoveVM::new_with_config(vec![], config));
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config);
+        let vm = Arc::new(MoveVM::new_with_runtime_environment(&runtime_environment));
 
         Self {
             store,
@@ -85,8 +85,8 @@ impl Adapter {
             },
             ..Default::default()
         };
-        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config.clone());
-        let vm = Arc::new(MoveVM::new_with_config(vec![], config));
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config);
+        let vm = Arc::new(MoveVM::new_with_runtime_environment(&runtime_environment));
 
         Self {
             store: self.store,

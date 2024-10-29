@@ -228,7 +228,9 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                     module_id.name(),
                     function_name,
                 )
-                // Note: Keeping this consistent with Loader V1 implementation.
+                // TODO(loader_v2):
+                //   Keeping this consistent with loader V1 implementation which returned that
+                //   error. Check if we can avoid remapping by replaying transactions.
                 .map_err(|_| {
                     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(format!("Module {} doesn't exist", module_id))

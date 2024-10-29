@@ -138,7 +138,7 @@ where
     ///
     /// Notes:
     ///   1. Only verified modules are inserted.
-    ///   2. Versions of inserted modules is set to [None] (storage version).
+    ///   2. Versions of inserted modules are set to [None] (storage version).
     ///   3. Valid modules should not be removed, and new modules should have unique ownership. If
     ///      these constraints are violated, a panic error is returned.
     ///   4. If the cache size exceeds its capacity after all verified modules have been inserted,
@@ -147,21 +147,31 @@ where
         &self,
         modules: impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>)>,
     ) -> Result<(), PanicError> {
+        use hashbrown::hash_map::Entry::*;
+
         let mut guard = self.module_cache.acquire();
         let module_cache = guard.dereference_mut();
 
         for (key, module) in modules {
+            if let Occupied(entry) = module_cache.entry(key.clone()) {
+                if entry.get().is_valid() {
+                    return Err(PanicError::CodeInvariantError(
+                        "Should never overwrite a valid module".to_string(),
+                    ));
+                } else {
+                    // Otherwise, remove the invalid entry.
+                    entry.remove();
+                }
+            }
+
             if module.code().is_verified() {
                 let mut module = module.as_ref().clone();
                 module.set_version(None);
                 let prev =
                     module_cache.insert(key.clone(), ImmutableModuleCode::new(Arc::new(module))?);
 
-                if prev.is_some_and(|prev_module| prev_module.is_valid()) {
-                    return Err(PanicError::CodeInvariantError(
-                        "Overwriting a valid module".to_string(),
-                    ));
-                }
+                // At this point, we must have removed the entry, or returned a panic error.
+                assert!(prev.is_none())
             }
         }
 

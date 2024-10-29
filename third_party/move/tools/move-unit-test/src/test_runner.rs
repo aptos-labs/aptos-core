@@ -255,7 +255,7 @@ impl SharedTestingConfig {
         // Note: While Move unit tests run concurrently, there is no publishing involved. To keep
         // things simple, we create a new VM instance for each test.
         let runtime_environment = RuntimeEnvironment::new(self.native_function_table.clone());
-        let move_vm = MoveVM::new(self.native_function_table.clone());
+        let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
         let module_storage = self
             .starting_storage_state
             .as_unsync_module_storage(runtime_environment.clone());

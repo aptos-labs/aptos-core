@@ -113,8 +113,8 @@ fn instantiation_err() {
         paranoid_type_checks: false,
         ..VMConfig::default()
     };
-    let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config.clone());
-    let vm = MoveVM::new_with_config(vec![], vm_config);
+    let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);

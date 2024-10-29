@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    compute_code_hash,
     config::VMConfig,
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
@@ -26,6 +25,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+use move_vm_types::sha3_256;
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -201,7 +201,7 @@ impl RuntimeEnvironment {
                     .finish(Location::Undefined)
             })?;
 
-        Ok((compiled_module, bytes.len(), compute_code_hash(bytes)))
+        Ok((compiled_module, bytes.len(), sha3_256(bytes)))
     }
 
     /// Deserializes bytes into a compiled script.

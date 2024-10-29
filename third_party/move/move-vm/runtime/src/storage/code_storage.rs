@@ -6,17 +6,9 @@ use ambassador::delegatable_trait;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use move_vm_types::{
     code::{Code, ScriptCache},
-    module_linker_error,
+    module_linker_error, sha3_256,
 };
-use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
-
-/// Returns the hash (SHA-3-256) of the bytes. Used for both modules and scripts.
-pub fn compute_code_hash(bytes: &[u8]) -> [u8; 32] {
-    let mut sha3_256 = Sha3_256::new();
-    sha3_256.update(bytes);
-    sha3_256.finalize().into()
-}
 
 /// Represents storage which in addition to modules, also caches scripts. The clients can implement
 /// this trait to ensure that even script dependency is upgraded, the correct script is still
@@ -45,7 +37,7 @@ where
         &self,
         serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
-        let hash = compute_code_hash(serialized_script);
+        let hash = sha3_256(serialized_script);
         Ok(match self.get_script(&hash) {
             Some(script) => script.deserialized().clone(),
             None => {
@@ -60,7 +52,7 @@ where
     fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         use Code::*;
 
-        let hash = compute_code_hash(serialized_script);
+        let hash = sha3_256(serialized_script);
         let deserialized_script = match self.get_script(&hash) {
             Some(Verified(script)) => return Ok(script),
             Some(Deserialized(deserialized_script)) => deserialized_script,

@@ -3,8 +3,10 @@
 
 use crate::state_store::state_value::{StateValue, StateValueMetadata};
 use bytes::Bytes;
-use move_vm_runtime::compute_code_hash;
-use move_vm_types::code::{WithBytes, WithHash};
+use move_vm_types::{
+    code::{WithBytes, WithHash},
+    sha3_256,
+};
 
 /// Additional data stored alongside deserialized or verified modules.
 pub struct AptosModuleExtension {
@@ -21,7 +23,7 @@ impl AptosModuleExtension {
     /// Creates new extension based on [StateValue].
     pub fn new(state_value: StateValue) -> Self {
         let (state_value_metadata, bytes) = state_value.unpack();
-        let hash = compute_code_hash(&bytes);
+        let hash = sha3_256(&bytes);
         Self {
             bytes,
             hash,

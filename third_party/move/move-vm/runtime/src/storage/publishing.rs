@@ -26,7 +26,7 @@ use std::{
     sync::Arc,
 };
 
-/// Represents a verified module pundle that can be extracted from [StagingModuleStorage].
+/// Represents a verified module bundle that can be extracted from [StagingModuleStorage].
 pub struct VerifiedModuleBundle<K: Ord, V: Clone> {
     bundle: BTreeMap<K, V>,
 }

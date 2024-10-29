@@ -70,9 +70,8 @@ fn test_publish_module_with_nested_loops() {
             },
             ..Default::default()
         };
-        let runtime_environment =
-            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
-        let vm = MoveVM::new_with_config(natives, vm_config);
+        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let module_storage = storage.as_unsync_code_storage(runtime_environment);
