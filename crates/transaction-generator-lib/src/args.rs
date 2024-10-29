@@ -296,7 +296,7 @@ impl TransactionTypeArg {
             TransactionTypeArg::StableCoinMint1024AccountBatch1 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
-                    num_user_accounts: 10000,
+                    num_user_accounts: 100000,
                     batch_size: 1,
                     num_mint_transactions: 2_000_000,
                 },
@@ -307,7 +307,7 @@ impl TransactionTypeArg {
             TransactionTypeArg::StableCoinBatchMint1024AccountBatch2 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
-                    num_user_accounts: 10000,
+                    num_user_accounts: 100000,
                     batch_size: 2,
                     num_mint_transactions: 2_000_000,
                 },
@@ -318,7 +318,7 @@ impl TransactionTypeArg {
             TransactionTypeArg::StableCoinBatchMint1024AccountBatch4 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
-                    num_user_accounts: 10000,
+                    num_user_accounts: 100000,
                     batch_size: 4,
                     num_mint_transactions: 2_000_000,
                 },
@@ -329,7 +329,7 @@ impl TransactionTypeArg {
             TransactionTypeArg::StableCoinBatchMint1024AccountBatch8 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
-                    num_user_accounts: 10000,
+                    num_user_accounts: 100000,
                     batch_size: 8,
                     num_mint_transactions: 2_000_000,
                 },
@@ -340,7 +340,7 @@ impl TransactionTypeArg {
             TransactionTypeArg::StableCoinBatchMint1024AccountBatch16 => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::StableCoinMint {
                     num_minter_accounts: 1024,
-                    num_user_accounts: 10000,
+                    num_user_accounts: 100000,
                     batch_size: 16,
                     num_mint_transactions: 2_000_000,
                 },
