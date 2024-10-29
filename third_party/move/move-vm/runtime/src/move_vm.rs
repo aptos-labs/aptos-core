@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    loader::{Loader, ModuleStorage, ModuleStorageAdapter},
+    loader::{LegacyModuleStorage, LegacyModuleStorageAdapter, Loader},
     native_extensions::NativeContextExtensions,
     runtime::VMRuntime,
     session::Session,
@@ -71,7 +71,7 @@ impl MoveVM {
                     .clone(),
                 remote,
             ),
-            module_store: ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
+            module_store: LegacyModuleStorageAdapter::new(self.runtime.module_storage_v1()),
             native_extensions,
         }
     }
@@ -98,7 +98,7 @@ impl MoveVM {
                             .clone(),
                         remote,
                     ),
-                    &ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
+                    &LegacyModuleStorageAdapter::new(self.runtime.module_storage_v1()),
                 )?;
                 Ok(module.as_ref().deref().clone())
             },

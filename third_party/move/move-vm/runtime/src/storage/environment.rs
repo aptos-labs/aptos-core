@@ -64,6 +64,9 @@ pub struct RuntimeEnvironment {
     ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
     ///     possible to mutate this global cache speculatively.
     ///  Importantly, this SHOULD NOT be mutated by speculative module publish.
+    // TODO(loader_v2):
+    //   Provide a generic (trait) implementation for clients to implement their own type caching
+    //   logic.
     ty_cache: StructInfoCache,
 }
 

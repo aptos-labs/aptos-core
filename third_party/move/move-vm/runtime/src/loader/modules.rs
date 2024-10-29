@@ -44,17 +44,17 @@ use std::{
 /// The default api will store the modules inside MoveVM structure but the caller can also choose to store it
 /// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
-pub trait ModuleStorage {
+pub trait LegacyModuleStorage {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
     fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
-pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Arc<Module>>>);
+pub(crate) struct LegacyModuleCache(RwLock<BinaryCache<ModuleId, Arc<Module>>>);
 
-impl ModuleCache {
+impl LegacyModuleCache {
     pub fn new() -> Self {
-        ModuleCache(RwLock::new(BinaryCache::new()))
+        LegacyModuleCache(RwLock::new(BinaryCache::new()))
     }
 
     pub fn flush(&self) {
@@ -62,13 +62,13 @@ impl ModuleCache {
     }
 }
 
-impl Clone for ModuleCache {
+impl Clone for LegacyModuleCache {
     fn clone(&self) -> Self {
-        ModuleCache(RwLock::new(self.0.read().clone()))
+        LegacyModuleCache(RwLock::new(self.0.read().clone()))
     }
 }
 
-impl ModuleStorage for ModuleCache {
+impl LegacyModuleStorage for LegacyModuleCache {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
         let mut cache = self.0.write();
 
@@ -87,12 +87,13 @@ impl ModuleStorage for ModuleCache {
     }
 }
 
-pub(crate) struct ModuleStorageAdapter {
-    modules: Arc<dyn ModuleStorage>,
+// TODO(loader_v2): Remove legacy V1 loader types.
+pub(crate) struct LegacyModuleStorageAdapter {
+    modules: Arc<dyn LegacyModuleStorage>,
 }
 
-impl ModuleStorageAdapter {
-    pub(crate) fn new(modules: Arc<dyn ModuleStorage>) -> Self {
+impl LegacyModuleStorageAdapter {
+    pub(crate) fn new(modules: Arc<dyn LegacyModuleStorage>) -> Self {
         Self { modules }
     }
 

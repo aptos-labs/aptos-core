@@ -4,7 +4,7 @@
 
 use crate::{
     loader::{
-        access_specifier_loader::load_access_specifier, Loader, Module, ModuleStorageAdapter,
+        access_specifier_loader::load_access_specifier, LegacyModuleStorageAdapter, Loader, Module,
         Resolver, Script,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -144,7 +144,7 @@ impl LoadedFunction {
     pub(crate) fn get_resolver<'a>(
         &self,
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
+        module_store: &'a LegacyModuleStorageAdapter,
         module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
         match &self.owner {

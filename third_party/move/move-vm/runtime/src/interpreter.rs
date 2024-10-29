@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    loader::{Loader, ModuleStorageAdapter, Resolver},
+    loader::{LegacyModuleStorageAdapter, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -91,7 +91,7 @@ impl Interpreter {
         function: LoadedFunction,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -128,7 +128,7 @@ impl Interpreter {
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -3136,7 +3136,7 @@ impl Frame {
     fn resolver<'a>(
         &self,
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
+        module_store: &'a LegacyModuleStorageAdapter,
         module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
         self.function

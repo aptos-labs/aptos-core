@@ -5,11 +5,13 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
+    loader::{
+        LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter, LoadedFunction, Loader,
+    },
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
-    storage::{code_storage::CodeStorage, module_storage::ModuleStorage as ModuleStorageV2},
+    storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
     RuntimeEnvironment,
 };
 use move_binary_format::{
@@ -33,14 +35,14 @@ use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {
     loader: Loader,
-    pub(crate) module_cache: Arc<ModuleCache>,
+    pub(crate) module_cache: Arc<LegacyModuleCache>,
 }
 
 impl Clone for VMRuntime {
     fn clone(&self) -> Self {
         Self {
             loader: self.loader.clone(),
-            module_cache: Arc::new(ModuleCache::clone(&self.module_cache)),
+            module_cache: Arc::new(LegacyModuleCache::clone(&self.module_cache)),
         }
     }
 }
@@ -61,7 +63,7 @@ impl VMRuntime {
             // TODO(loader_v2):
             //   We still create this cache, but if V2 loader is used, it is not used. We will
             //   remove it in the future together with other V1 components.
-            module_cache: Arc::new(ModuleCache::new()),
+            module_cache: Arc::new(LegacyModuleCache::new()),
         }
     }
 
@@ -71,7 +73,7 @@ impl VMRuntime {
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         _gas_meter: &mut impl GasMeter,
         compat: Compatibility,
     ) -> VMResult<()> {
@@ -237,8 +239,8 @@ impl VMRuntime {
 
     fn deserialize_arg(
         &self,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
@@ -275,8 +277,8 @@ impl VMRuntime {
 
     fn deserialize_args(
         &self,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
         param_tys: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
     ) -> PartialVMResult<(Locals, Vec<Value>)> {
@@ -317,8 +319,8 @@ impl VMRuntime {
 
     fn serialize_return_value(
         &self,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
         ty: &Type,
         value: Value,
     ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
@@ -359,8 +361,8 @@ impl VMRuntime {
 
     fn serialize_return_values(
         &self,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
         return_types: &[Type],
         return_values: Vec<Value>,
     ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
@@ -388,8 +390,8 @@ impl VMRuntime {
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -463,11 +465,11 @@ impl VMRuntime {
         func: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        module_storage: &impl ModuleStorageV2,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         self.execute_function_impl(
             func,
@@ -487,7 +489,7 @@ impl VMRuntime {
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -519,7 +521,7 @@ impl VMRuntime {
         &self.loader
     }
 
-    pub(crate) fn module_storage_v1(&self) -> Arc<dyn ModuleStorage> {
-        self.module_cache.clone() as Arc<dyn ModuleStorage>
+    pub(crate) fn module_storage_v1(&self) -> Arc<dyn LegacyModuleStorage> {
+        self.module_cache.clone() as Arc<dyn LegacyModuleStorage>
     }
 }

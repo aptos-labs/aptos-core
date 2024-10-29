@@ -4,8 +4,7 @@
 
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    module_traversal::TraversalContext, storage::module_storage::ModuleStorage as ModuleStorageV2,
-    CodeStorage,
+    module_traversal::TraversalContext, storage::module_storage::ModuleStorage, CodeStorage,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -61,7 +60,7 @@ use crate::{
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
 pub use modules::Module;
-pub(crate) use modules::{ModuleCache, ModuleStorage, ModuleStorageAdapter};
+pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
     VariantFieldInstantiationIndex, VariantIndex,
@@ -148,7 +147,7 @@ impl Loader {
 
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
-    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorageV2) -> &StructInfoCache {
+    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorage) -> &StructInfoCache {
         match self {
             Self::V1(loader) => &loader.type_cache,
             Self::V2(_) => module_storage.runtime_environment().ty_cache(),
@@ -157,7 +156,7 @@ impl Loader {
 
     pub(crate) fn struct_name_index_map<'a>(
         &'a self,
-        module_storage: &'a dyn ModuleStorageV2,
+        module_storage: &'a dyn ModuleStorage,
     ) -> &StructNameIndexMap {
         match self {
             Self::V1(loader) => &loader.name_cache,
@@ -220,7 +219,7 @@ impl Loader {
 
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -246,13 +245,13 @@ impl Loader {
 
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
         referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
-        module_storage: &dyn ModuleStorageV2,
+        module_storage: &dyn ModuleStorage,
     ) -> VMResult<()>
     where
         I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
@@ -282,7 +281,7 @@ impl Loader {
         script_blob: &[u8],
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         code_storage: &impl CodeStorage,
     ) -> VMResult<LoadedFunction> {
         match self {
@@ -296,8 +295,8 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         match self {
             Loader::V1(loader) => {
@@ -324,8 +323,8 @@ impl Loader {
         &self,
         ty_tag: &TypeTag,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<Type> {
         match self {
             Self::V1(loader) => loader.load_type(ty_tag, data_store, module_store),
@@ -342,8 +341,8 @@ impl Loader {
     pub fn fetch_struct_ty_by_idx(
         &self,
         idx: StructNameIndex,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Arc<StructType>> {
         // Ensure we do not return a guard here (still holding the lock) because loading the struct
         // type below can fetch struct type by index recursively.
@@ -437,7 +436,7 @@ impl LoaderV1 {
 
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -473,7 +472,7 @@ impl LoaderV1 {
         script_blob: &[u8],
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
         let hash_value = sha3_256(script_blob);
@@ -524,7 +523,7 @@ impl LoaderV1 {
         script: &[u8],
         hash_value: ScriptHash,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<Arc<CompiledScript>> {
         let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
 
@@ -560,8 +559,8 @@ impl Loader {
         function_name: &IdentStr,
         expected_return_type: &Type,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<LoadedFunction> {
         let (module, function) = self.load_function_without_type_args(
             module_id,
@@ -619,8 +618,8 @@ impl Loader {
         function_name: &IdentStr,
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<LoadedFunction> {
         let (module, function) = self.load_function_without_type_args(
             module_id,
@@ -662,7 +661,7 @@ impl LoaderV1 {
         &self,
         modules: &[CompiledModule],
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<()> {
         let mut bundle_unverified: BTreeSet<_> = modules.iter().map(|m| m.self_id()).collect();
         let mut bundle_verified = BTreeMap::new();
@@ -699,7 +698,7 @@ impl LoaderV1 {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<()> {
         // Performs all verification steps to load the module without loading it, i.e., the new
         // module will NOT show up in `module_cache`. In the module republishing case, it means
@@ -755,7 +754,7 @@ impl LoaderV1 {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<()> {
         // let module_cache = self.module_cache.read();
         cyclic_dependencies::verify_module(
@@ -802,7 +801,7 @@ impl LoaderV1 {
         &self,
         ty_tag: &TypeTag,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<Type> {
         let resolver = |struct_tag: &StructTag| -> VMResult<Arc<StructType>> {
             let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
@@ -832,7 +831,7 @@ impl LoaderV1 {
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
@@ -904,7 +903,7 @@ impl LoaderV1 {
         &self,
         id: &ModuleId,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
         if let Some(cached) = module_store.module_at(id) {
@@ -973,7 +972,7 @@ impl LoaderV1 {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_module_loading_failure: bool,
@@ -1015,7 +1014,7 @@ impl LoaderV1 {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_dependency_loading_failure: bool,
@@ -1069,7 +1068,7 @@ impl LoaderV1 {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         allow_module_loading_failure: bool,
     ) -> VMResult<Arc<Module>> {
         // load the closure of the module in terms of dependency relation
@@ -1106,7 +1105,7 @@ impl LoaderV1 {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
         allow_friend_loading_failure: bool,
     ) -> VMResult<()> {
         // for each new module discovered in the frontier, load them fully and expand the frontier.
@@ -1163,17 +1162,17 @@ enum BinaryType {
 // needs.
 pub(crate) struct Resolver<'a> {
     loader: &'a Loader,
-    module_store: &'a ModuleStorageAdapter,
+    module_store: &'a LegacyModuleStorageAdapter,
     binary: BinaryType,
 
-    module_storage: &'a dyn ModuleStorageV2,
+    module_storage: &'a dyn ModuleStorage,
 }
 
 impl<'a> Resolver<'a> {
     fn for_module(
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
-        module_storage: &'a dyn ModuleStorageV2,
+        module_store: &'a LegacyModuleStorageAdapter,
+        module_storage: &'a dyn ModuleStorage,
         module: Arc<Module>,
     ) -> Self {
         let binary = BinaryType::Module(module);
@@ -1187,8 +1186,8 @@ impl<'a> Resolver<'a> {
 
     fn for_script(
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
-        module_storage: &'a dyn ModuleStorageV2,
+        module_store: &'a LegacyModuleStorageAdapter,
+        module_storage: &'a dyn ModuleStorage,
         script: Arc<Script>,
     ) -> Self {
         let binary = BinaryType::Script(script);
@@ -1630,11 +1629,11 @@ impl<'a> Resolver<'a> {
         self.loader
     }
 
-    pub(crate) fn module_store(&self) -> &ModuleStorageAdapter {
+    pub(crate) fn module_store(&self) -> &LegacyModuleStorageAdapter {
         self.module_store
     }
 
-    pub(crate) fn module_storage(&self) -> &dyn ModuleStorageV2 {
+    pub(crate) fn module_storage(&self) -> &dyn ModuleStorage {
         self.module_storage
     }
 
@@ -1679,7 +1678,7 @@ impl Loader {
         struct_name_idx: StructNameIndex,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
-        module_storage: &dyn ModuleStorageV2,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<StructTag> {
         let ty_cache = self.ty_cache(module_storage);
         if let Some((struct_tag, gas)) = ty_cache.get_struct_tag(&struct_name_idx, ty_args) {
@@ -1713,7 +1712,7 @@ impl Loader {
         &self,
         ty: &Type,
         gas_context: &mut PseudoGasContext,
-        module_storage: &dyn ModuleStorageV2,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<TypeTag> {
         gas_context.charge(gas_context.cost_base)?;
         Ok(match ty {
@@ -1751,8 +1750,8 @@ impl Loader {
     fn struct_name_to_type_layout(
         &self,
         struct_name_idx: StructNameIndex,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -1895,8 +1894,8 @@ impl Loader {
     fn type_to_type_layout_impl(
         &self,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
@@ -2003,8 +2002,8 @@ impl Loader {
     fn struct_name_to_fully_annotated_layout(
         &self,
         struct_name_idx: StructNameIndex,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -2080,8 +2079,8 @@ impl Loader {
     fn type_to_fully_annotated_layout_impl(
         &self,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
@@ -2149,8 +2148,8 @@ impl Loader {
     pub(crate) fn calculate_depth_of_struct(
         &self,
         struct_name_idx: StructNameIndex,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<DepthFormula> {
         let ty_cache = self.ty_cache(module_storage);
         if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
@@ -2185,8 +2184,8 @@ impl Loader {
     fn calculate_depth_of_type(
         &self,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
             Type::Bool
@@ -2240,7 +2239,7 @@ impl Loader {
     pub(crate) fn type_to_type_tag(
         &self,
         ty: &Type,
-        module_storage: &dyn ModuleStorageV2,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<TypeTag> {
         let mut gas_context = PseudoGasContext {
             cost: 0,
@@ -2254,8 +2253,8 @@ impl Loader {
     pub(crate) fn type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let mut count = 0;
         self.type_to_type_layout_impl(ty, module_store, module_storage, &mut count, 1)
@@ -2264,8 +2263,8 @@ impl Loader {
     pub(crate) fn type_to_type_layout(
         &self,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<MoveTypeLayout> {
         let mut count = 0;
         let (layout, _has_identifier_mappings) =
@@ -2276,8 +2275,8 @@ impl Loader {
     pub(crate) fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &dyn ModuleStorageV2,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<MoveTypeLayout> {
         let mut count = 0;
         self.type_to_fully_annotated_layout_impl(ty, module_store, module_storage, &mut count, 1)
@@ -2290,8 +2289,8 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         move_storage: &mut TransactionDataCache,
-        module_storage_adapter: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_storage_adapter: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<MoveTypeLayout> {
         let ty = self.load_type(
             type_tag,
@@ -2307,8 +2306,8 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         move_storage: &mut TransactionDataCache,
-        module_storage_adapter: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        module_storage_adapter: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<MoveTypeLayout> {
         let ty = self.load_type(
             type_tag,

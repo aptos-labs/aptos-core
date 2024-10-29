@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Loader, ModuleStorageAdapter},
+    loader::{LegacyModuleStorageAdapter, Loader},
     logging::expect_no_verification_errors,
     ModuleStorage,
 };
@@ -209,7 +209,7 @@ impl<'r> TransactionDataCache<'r> {
         module_storage: &dyn ModuleStorage,
         addr: AccountAddress,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
+        module_store: &LegacyModuleStorageAdapter,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
