@@ -231,36 +231,40 @@ impl RawTransaction {
         secondary_signers: Vec<AccountAddress>,
         secondary_private_keys: Vec<&Ed25519PrivateKey>,
     ) -> Result<SignatureCheckedTransaction> {
-        let message =
-            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
-        let sender_signature = sender_private_key.sign(&message)?;
-        let sender_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(sender_private_key),
-            sender_signature,
-        );
+        if self.payload.is_nested_transaction_payload {
+            // Sign RawTransaction as the secondary signers are already inside the payload
+        } else {
+            // Sign RawTransactionWithData
+            let message = RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
+            let sender_signature = sender_private_key.sign(&message)?;
+            let sender_authenticator = AccountAuthenticator::ed25519(
+                Ed25519PublicKey::from(sender_private_key),
+                sender_signature,
+            );
 
-        if secondary_private_keys.len() != secondary_signers.len() {
-            return Err(format_err!(
-                "number of secondary private keys and number of secondary signers don't match"
-            ));
-        }
-        let mut secondary_authenticators = vec![];
-        for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message)?;
-            secondary_authenticators.push(AccountAuthenticator::ed25519(
-                Ed25519PublicKey::from(priv_key),
-                signature,
-            ));
-        }
+            if secondary_private_keys.len() != secondary_signers.len() {
+                return Err(format_err!(
+                    "number of secondary private keys and number of secondary signers don't match"
+                ));
+            }
+            let mut secondary_authenticators = vec![];
+            for priv_key in secondary_private_keys {
+                let signature = priv_key.sign(&message)?;
+                secondary_authenticators.push(AccountAuthenticator::ed25519(
+                    Ed25519PublicKey::from(priv_key),
+                    signature,
+                ));
+            }
 
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multi_agent(
-                self,
-                sender_authenticator,
-                secondary_signers,
-                secondary_authenticators,
-            ),
-        ))
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_multi_agent(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                ),
+            ))
+        }
     }
 
     /// Signs the given fee-payer `RawTransaction`, which is a transaction with secondary
@@ -277,47 +281,55 @@ impl RawTransaction {
         fee_payer_address: AccountAddress,
         fee_payer_private_key: &Ed25519PrivateKey,
     ) -> Result<SignatureCheckedTransaction> {
-        let message = RawTransactionWithData::new_fee_payer(
-            self.clone(),
-            secondary_signers.clone(),
-            fee_payer_address,
-        );
-        let sender_signature = sender_private_key.sign(&message)?;
-        let sender_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(sender_private_key),
-            sender_signature,
-        );
-
-        if secondary_private_keys.len() != secondary_signers.len() {
-            return Err(format_err!(
-                "number of secondary private keys and number of secondary signers don't match"
-            ));
-        }
-        let mut secondary_authenticators = vec![];
-        for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message)?;
-            secondary_authenticators.push(AccountAuthenticator::ed25519(
-                Ed25519PublicKey::from(priv_key),
-                signature,
-            ));
-        }
-
-        let fee_payer_signature = fee_payer_private_key.sign(&message)?;
-        let fee_payer_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(fee_payer_private_key),
-            fee_payer_signature,
-        );
-
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_fee_payer(
-                self,
-                sender_authenticator,
-                secondary_signers,
-                secondary_authenticators,
+        if self.payload.is_nested_transaction_payload() {
+            // Secondary signers sign RawTransaction
+            // Fee payer signs RawTransactionWithData::FeePayer
+        } else {
+            // Sign RawTransactionWithData::MultiAgentWithFeePayer like now
+            let message = RawTransactionWithData::new_multi_agent_with_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
                 fee_payer_address,
-                fee_payer_authenticator,
-            ),
-        ))
+            );
+            let sender_signature = sender_private_key.sign(&message)?;
+            let sender_authenticator = AccountAuthenticator::ed25519(
+                Ed25519PublicKey::from(sender_private_key),
+                sender_signature,
+            );
+    
+            if secondary_private_keys.len() != secondary_signers.len() {
+                return Err(format_err!(
+                    "number of secondary private keys and number of secondary signers don't match"
+                ));
+            }
+            let mut secondary_authenticators = vec![];
+            for priv_key in secondary_private_keys {
+                let signature = priv_key.sign(&message)?;
+                secondary_authenticators.push(AccountAuthenticator::ed25519(
+                    Ed25519PublicKey::from(priv_key),
+                    signature,
+                ));
+            }
+    
+            let fee_payer_signature = fee_payer_private_key.sign(&message)?;
+            let fee_payer_authenticator = AccountAuthenticator::ed25519(
+                Ed25519PublicKey::from(fee_payer_private_key),
+                fee_payer_signature,
+            );
+    
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_fee_payer(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                    fee_payer_address,
+                    fee_payer_authenticator,
+                ),
+            ))
+        }
+
+        
     }
 
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
@@ -366,6 +378,9 @@ impl RawTransaction {
     Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub enum RawTransactionWithData {
+    // These old variants are used when transaction payload is not of type NestedTransactionPayload
+    // Question: To ensure replayability, do we have to support these variants forever? (To ensure the old signed transactions can still be verified, and to be able to compute raw_transaction_hash)
+    // Question: If we have to support these 2 variants forever, then adding secondary signers to TransactionPayload adds more confusion?
     MultiAgent {
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
@@ -375,10 +390,31 @@ pub enum RawTransactionWithData {
         secondary_signer_addresses: Vec<AccountAddress>,
         fee_payer_address: AccountAddress,
     },
+    
+    // Used when transaction payload is of type NestedTransactionPayload
+    FeePayer {
+        raw_txn: RawTransaction,
+        fee_payer_address: AccountAddress,
+    },
+    
+    // For future use case where a few signers can sign a message, and then pass on to the next set of signers
+    NestedSigners(
+        NestedRawTransactionWithData,
+    )
+}
+
+enum NestedRawTransactionWithData {
+    Inner {
+        signers: Vec<AccountAddress>,
+        inner: Box<RawTransactionWithData>,
+    },
+    End {
+        raw_txn: RawTransaction,
+    }
 }
 
 impl RawTransactionWithData {
-    pub fn new_fee_payer(
+    pub fn new_multi_agent_with_fee_payer(
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
         fee_payer_address: AccountAddress,
@@ -389,7 +425,6 @@ impl RawTransactionWithData {
             fee_payer_address,
         }
     }
-
     pub fn new_multi_agent(
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
@@ -397,6 +432,15 @@ impl RawTransactionWithData {
         Self::MultiAgent {
             raw_txn,
             secondary_signer_addresses,
+        }
+    }
+    pub fn new_fee_payer(
+        raw_txn: RawTransaction,
+        fee_payer_address: AccountAddress,
+    ) -> Self {
+        Self::FeePayer {
+            raw_txn,
+            fee_payer_address,
         }
     }
 }
@@ -430,7 +474,7 @@ pub enum NestedTransactionPayload {
     V1 {
 	    inner: TransactionPayloadInner,
 	    extra: TransactionPayloadExtra,
-	  }
+	}
 }
 
 /// Different kinds of transactions.
@@ -448,10 +492,9 @@ pub enum TransactionPayloadExtra {
         // Question: Multisig can now be set for even script transactions, which was not the case before. Is this okay?
         multisig_address: Option<AccountAddress>,
         secondary_signers: Vec<AccountAddress>,
-        fee_payer: Option<AccountAddress>,
-	    // None for regular transactions.
+        // None for regular transactions.
 	    // Some(nonce) for orderless transactions.
-        relay_protection_nonce: Option<u64>,
+        replay_protection_nonce: Option<u64>,
     },
 }
 

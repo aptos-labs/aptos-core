@@ -67,6 +67,7 @@ pub enum TransactionAuthenticator {
     /// Optional Multi-agent transaction with a fee payer.
     FeePayer {
         sender: AccountAuthenticator,
+        // Question: Should these addresses be included in TransactionAuthenticator even if they are already present in TransactionPayload?
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
         fee_payer_address: AccountAddress,
@@ -75,6 +76,14 @@ pub enum TransactionAuthenticator {
     SingleSender {
         sender: AccountAuthenticator,
     },
+
+    // For future use case where a few signers can sign a message, and then pass on to the next set of signers
+    // Need to use RawTransactionWithData::NestedSigners for signing and verifying this
+    NestedTransactionAuthenticator {
+        signers: Vec<AccountAuthenticator>,
+        nested_signer: Vec<AccountAuthenticator>,
+        inner: Box<TransactionAuthenticator>,
+    }
 }
 
 impl TransactionAuthenticator {
