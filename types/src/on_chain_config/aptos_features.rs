@@ -10,7 +10,6 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
-use move_vm_runtime::use_loader_v1_based_on_env;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
@@ -177,7 +176,8 @@ impl FeatureFlag {
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE,
-            FeatureFlag::ENABLE_LOADER_V2,
+            // TODO(loader_v2): Enable V2 loader.
+            // FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
@@ -198,14 +198,6 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-
-        // TODO(loader_v2): Remove before rolling out. This allows us to replay with V2.
-        if use_loader_v1_based_on_env() {
-            features.disable(FeatureFlag::ENABLE_LOADER_V2);
-        } else {
-            features.enable(FeatureFlag::ENABLE_LOADER_V2);
-        }
-
         features
     }
 }

@@ -4377,7 +4377,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-table-extension",
- "move-vm-runtime",
  "move-vm-types",
  "num-bigint 0.3.3",
  "num-derive",
