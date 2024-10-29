@@ -135,7 +135,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
-                let ret = BlockAptosVM::execute_block_on_thread_pool(
+                let ret = BlockAptosVM::execute_block_on_thread_pool_without_global_module_cache(
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
