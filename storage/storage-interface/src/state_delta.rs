@@ -2,59 +2,94 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
-use aptos_drop_helper::DropHelper;
-use aptos_scratchpad::SparseMerkleTree;
+use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_types::{
     state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
+    write_set::{TransactionWrite, WriteSet},
 };
+use derive_more::Deref;
+use itertools::Itertools;
 
-/// This represents two state sparse merkle trees at their versions in memory with the updates
-/// reflecting the difference of `current` on top of `base`.
-///
-/// The `base` is the state SMT that current is based on.
-/// The `current` is the state SMT that results from applying updates_since_base on top of `base`.
-/// `updates_since_base` tracks all those key-value pairs that's changed since `base`, useful
-///  when the next checkpoint is calculated.
 #[derive(Clone, Debug)]
+pub struct StateUpdate {
+    pub version: Version,
+    pub value: Option<StateValue>,
+}
+
+impl StateUpdate {
+    pub fn new(version: Version, value: Option<StateValue>) -> Self {
+        Self { version, value }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct InMemState {
+    next_version: Version,
+    updates: MapLayer<StateKey, StateUpdate>,
+    usage: StateStorageUsage,
+}
+
+impl InMemState {
+    pub fn new_empty() -> Self {
+        // FIXME(aldenh): check call site and implement
+        todo!()
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.next_version
+    }
+
+    pub fn updates(&self) -> &MapLayer<StateKey, StateUpdate> {
+        &self.updates
+    }
+
+    pub fn usage(&self) -> StateStorageUsage {
+        self.usage
+    }
+
+    pub fn into_delta(self, base: InMemState) -> StateDelta {
+        StateDelta::new(base, self)
+    }
+}
+
+/// Represents all state updates in the (base, current] range
+#[derive(Clone, Debug, Deref)]
 pub struct StateDelta {
-    pub base: SparseMerkleTree<StateValue>,
-    pub base_version: Option<Version>,
-    pub current: SparseMerkleTree<StateValue>,
-    pub current_version: Option<Version>,
-    pub updates_since_base: DropHelper<ShardedStateUpdates>,
+    // exclusive
+    pub base: InMemState,
+    pub current: InMemState,
+    #[deref]
+    pub updates: LayeredMap<StateKey, StateUpdate>,
 }
 
 impl StateDelta {
-    pub fn new(
-        base: SparseMerkleTree<StateValue>,
-        base_version: Option<Version>,
-        current: SparseMerkleTree<StateValue>,
-        current_version: Option<Version>,
-        updates_since_base: ShardedStateUpdates,
-    ) -> Self {
-        assert!(base.is_family(&current));
-        assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
+    pub fn new(base: InMemState, current: InMemState) -> Self {
+        let updates = current.updates().view_layers_after(base.updates());
         Self {
             base,
-            base_version,
             current,
-            current_version,
-            updates_since_base: DropHelper::new(updates_since_base),
+            updates,
         }
     }
 
-    pub fn new_empty_with_version(version: Option<u64>) -> StateDelta {
-        let smt = SparseMerkleTree::new_empty();
-        Self::new(
-            smt.clone(),
-            version,
-            smt,
-            version,
-            ShardedStateUpdates::new_empty(),
-        )
+    pub fn new_empty_with_version(_version: Option<u64>) -> StateDelta {
+        /*
+        }
+            let smt = SparseMerkleTree::new_empty();
+            Self::new(
+                smt.clone(),
+                version,
+                smt,
+                version,
+                ShardedStateUpdates::new_empty(),
+            )
+
+             */
+        // FIXME(aldenhu)
+        todo!()
     }
 
     pub fn new_empty() -> Self {
@@ -62,10 +97,11 @@ impl StateDelta {
     }
 
     pub fn new_at_checkpoint(
-        root_hash: HashValue,
-        usage: StateStorageUsage,
-        checkpoint_version: Option<Version>,
+        _root_hash: HashValue,
+        _usage: StateStorageUsage,
+        _checkpoint_version: Option<Version>,
     ) -> Self {
+        /* FIXME(aldenhu):
         let smt = SparseMerkleTree::new(root_hash, usage);
         Self::new(
             smt.clone(),
@@ -74,41 +110,71 @@ impl StateDelta {
             checkpoint_version,
             ShardedStateUpdates::new_empty(),
         )
+
+         */
+        todo!()
     }
 
-    pub fn merge(&mut self, other: StateDelta) {
-        assert!(other.follow(self));
-
-        self.current = other.current;
-        self.current_version = other.current_version;
-        self.updates_since_base
-            .merge(other.updates_since_base.into_inner());
+    pub fn merge(&mut self, _other: StateDelta) {
+        // FIXME(aldenhu)
+        todo!()
     }
 
-    pub fn follow(&self, other: &StateDelta) -> bool {
-        self.base_version == other.current_version && other.current.has_same_root_hash(&self.base)
-    }
-
-    pub fn has_same_current_state(&self, other: &StateDelta) -> bool {
+    pub fn has_same_current_state(&self, _other: &StateDelta) -> bool {
+        /* FIXME(aldenhu):
         self.current_version == other.current_version
             && self.current.has_same_root_hash(&other.current)
-    }
-
-    pub fn base_root_hash(&self) -> HashValue {
-        self.base.root_hash()
-    }
-
-    pub fn root_hash(&self) -> HashValue {
-        self.current.root_hash()
+         */
+        todo!()
     }
 
     pub fn next_version(&self) -> Version {
-        self.current_version.map_or(0, |v| v + 1)
+        self.current.next_version()
     }
 
-    pub fn replace_with(&mut self, mut rhs: Self) -> Self {
+    pub fn base_version(&self) -> Option<Version> {
+        self.base.next_version.checked_sub(1)
+    }
+
+    pub fn replace_with(&mut self, mut _rhs: Self) -> Self {
+        /* FIXME(aldenhu):
         std::mem::swap(self, &mut rhs);
         rhs
+         */
+        todo!()
+    }
+
+    pub fn update<'a>(&self, write_sets: impl IntoIterator<Item = &'a WriteSet>) -> InMemState {
+        let mut next_version = self.next_version();
+        let kvs = write_sets
+            .into_iter()
+            .flat_map(|write_set| {
+                write_set.iter().map(move |(state_key, write_op)| {
+                    let version = next_version;
+                    next_version += 1;
+                    (
+                        state_key.clone(),
+                        StateUpdate::new(version, write_op.as_state_value()),
+                    )
+                })
+            })
+            .collect_vec();
+        let updates = self.updates.new_layer(&kvs);
+        let usage = Self::caculate_usage(self.current.usage, &kvs);
+
+        InMemState {
+            next_version,
+            updates,
+            usage,
+        }
+    }
+
+    fn caculate_usage(
+        _base_usage: StateStorageUsage,
+        _updates: &[(StateKey, StateUpdate)],
+    ) -> StateStorageUsage {
+        // FIXME(aldenhu)
+        todo!()
     }
 }
 

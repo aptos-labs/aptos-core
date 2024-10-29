@@ -19,10 +19,10 @@ struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
     children: Mutex<Vec<Arc<LayerInner<K, V>>>>,
     use_case: &'static str,
     family: HashValue,
-    layer: u64,
-    // Base layer when self is created -- `self` won't even weak-link to a node created in
-    // the base or an older layer.
-    base_layer: u64,
+    layer_num: u64,
+    /// Base layer when self is created -- `self` won't even weak-link to a node created in
+    /// the base or an older layer.
+    base_layer_num: u64,
 }
 
 impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Drop for LayerInner<K, V> {
@@ -53,8 +53,8 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
             children: Mutex::new(Vec::new()),
             use_case,
             family,
-            layer: 0,
-            base_layer: 0,
+            layer_num: 0,
+            base_layer_num: 0,
         })
     }
 
@@ -64,8 +64,8 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
             children: Mutex::new(Vec::new()),
             use_case: self.use_case,
             family: self.family,
-            layer: self.layer + 1,
-            base_layer,
+            layer_num: self.layer_num + 1,
+            base_layer_num: base_layer,
         });
         self.children.lock().push(child.clone());
         child.log_layer("spawn");
@@ -78,7 +78,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
     }
 
     fn log_layer(&self, event: &'static str) {
-        LAYER.set_with(&[self.use_case, event], self.layer as i64);
+        LAYER.set_with(&[self.use_case, event], self.layer_num as i64);
     }
 }
 
@@ -110,8 +110,8 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
 
     pub fn into_layers_view_after(self, base_layer: MapLayer<K, V>) -> LayeredMap<K, V> {
         assert!(base_layer.is_family(&self));
-        assert!(base_layer.inner.layer >= self.inner.base_layer);
-        assert!(base_layer.inner.layer <= self.inner.layer);
+        assert!(base_layer.inner.layer_num >= self.inner.base_layer_num);
+        assert!(base_layer.inner.layer_num <= self.inner.layer_num);
 
         self.log_layer("view");
         base_layer.log_layer("as_view_base");
@@ -135,8 +135,8 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         Arc::ptr_eq(&self.inner, &other.inner)
     }
 
-    pub(crate) fn layer(&self) -> u64 {
-        self.inner.layer
+    pub(crate) fn layer_num(&self) -> u64 {
+        self.inner.layer_num
     }
 
     pub(crate) fn use_case(&self) -> &'static str {

@@ -40,16 +40,16 @@ where
         let height = Self::new_peak_height(self.top_layer.peak().num_leaves(), items.len());
         let mut new_peak = FlattenPerfectTree::new_with_empty_nodes(height);
         let builder = SubTreeBuilder {
-            layer: self.top_layer.layer() + 1,
-            base_layer: self.base_layer(),
+            layer: self.top_layer.layer_num() + 1,
+            base_layer: self.base_layer_num(),
             depth: 0,
-            position_info: PositionInfo::new(self.top_layer.peak(), self.base_layer()),
+            position_info: PositionInfo::new(self.top_layer.peak(), self.base_layer_num()),
             output_position_info: OutputPositionInfo::new(new_peak.get_mut()),
             items: &items,
         };
         builder.build().finalize();
 
-        self.top_layer.spawn(new_peak, self.base_layer())
+        self.top_layer.spawn(new_peak, self.base_layer_num())
     }
 
     fn new_peak_height(previous_peak_feet: usize, items_in_new_layer: usize) -> usize {

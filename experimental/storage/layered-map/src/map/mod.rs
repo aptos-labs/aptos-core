@@ -33,18 +33,22 @@ where
         }
     }
 
-    pub fn unpack(self) -> (MapLayer<K, V>, MapLayer<K, V>) {
+    pub fn into_top_layer(self) -> MapLayer<K, V> {
         let Self {
-            base_layer,
+            base_layer: _,
             top_layer,
             _hash_builder,
         } = self;
 
-        (base_layer, top_layer)
+        top_layer
     }
 
-    pub(crate) fn base_layer(&self) -> u64 {
-        self.base_layer.layer()
+    pub fn base_layer(&self) -> &MapLayer<K, V> {
+        &self.base_layer
+    }
+
+    pub(crate) fn base_layer_num(&self) -> u64 {
+        self.base_layer.layer_num()
     }
 }
 
@@ -66,7 +70,11 @@ where
             foot = foot << 1 | bits.next().expect("bits exhausted") as usize;
         }
 
-        self.get_under_node(peak.expect_foot(foot, self.base_layer()), key, &mut bits)
+        self.get_under_node(
+            peak.expect_foot(foot, self.base_layer_num()),
+            key,
+            &mut bits,
+        )
     }
 
     fn get_under_node(
@@ -82,7 +90,7 @@ where
             match cur_node {
                 NodeStrongRef::Empty => return None,
                 NodeStrongRef::Leaf(leaf) => {
-                    return leaf.get_value(key, self.base_layer()).cloned()
+                    return leaf.get_value(key, self.base_layer_num()).cloned()
                 },
                 NodeStrongRef::Internal(internal) => match bits.next() {
                     None => {
@@ -90,9 +98,9 @@ where
                     },
                     Some(bit) => {
                         if bit {
-                            cur_node = internal.right.get_strong(self.base_layer());
+                            cur_node = internal.right.get_strong(self.base_layer_num());
                         } else {
-                            cur_node = internal.left.get_strong(self.base_layer());
+                            cur_node = internal.left.get_strong(self.base_layer_num());
                         }
                     },
                 },
@@ -111,6 +119,6 @@ where
         self.top_layer
             .peak()
             .into_feet_iter()
-            .flat_map(|node| DescendantIterator::new(node, self.base_layer()))
+            .flat_map(|node| DescendantIterator::new(node, self.base_layer_num()))
     }
 }
