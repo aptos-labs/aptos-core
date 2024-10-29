@@ -8,6 +8,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 
+#[derive(Debug)]
 pub enum NativeTransaction {
     Nop { sender: AccountAddress, sequence_number: u64, },
     FaTransfer { sender: AccountAddress, sequence_number: u64, recipient: AccountAddress, amount: u64},

@@ -207,8 +207,9 @@ impl NativeExecutorTask {
                 Self::check_and_set_sequence_number(sender, sequence_number, view, &mut resource_write_set)?;
                 Self::withdraw_fa_apt_from_signer(sender, amount, view, gas, &mut resource_write_set, &mut events)?;
 
-                Self::check_or_create_account(recipient, fail_on_account_existing, fail_on_account_missing, view, &mut resource_write_set)?;
-                Self::deposit_fa_apt(recipient, amount, view, gas, &mut resource_write_set, &mut events)?;
+                if !Self::deposit_fa_apt(recipient, amount, view, gas, &mut resource_write_set, &mut events)? {
+                    Self::check_or_create_account(recipient, fail_on_account_existing, fail_on_account_missing, view, &mut resource_write_set)?;
+                }
             },
             NativeTransaction::BatchTransfer { .. } => {
                 todo!("to implement");
@@ -341,7 +342,7 @@ impl NativeExecutorTask {
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
         events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
-    ) -> Result<(), ()> {
+    ) -> Result<bool, ()> {
         let recipient_store_address = primary_apt_store(recipient_address);
         let recipient_fa_store_object_key = DbAccessUtil::new_state_key_object_resource_group(&recipient_store_address);
         let fungible_store_rg_tag = FungibleStoreResource::struct_tag();
@@ -356,7 +357,7 @@ impl NativeExecutorTask {
                     store: recipient_store_address,
                     amount: transfer_amount,
                 }.create_event_v2(), None));
-                Ok(())
+                Ok(true)
             },
             None => {
                 let receipeint_fa_store = FungibleStoreResource::new(AccountAddress::TEN, transfer_amount, false);
@@ -367,7 +368,7 @@ impl NativeExecutorTask {
                     store: recipient_store_address,
                     amount: transfer_amount,
                 }.create_event_v2(), None));
-                Ok(())
+                Ok(false)
             },
         }
     }

@@ -53,7 +53,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "30000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=30))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [
@@ -128,6 +128,7 @@ class RunGroupKeyExtra:
     sig_verify_num_threads_override: Optional[int] = field(default=None)
     execution_num_threads_override: Optional[int] = field(default=None)
     split_stages_override: bool = field(default=False)
+    single_block_dst_working_set: bool = field(default=False)
 
 
 @dataclass
@@ -167,10 +168,12 @@ apt-fa-transfer	1	NativeVM	57	0.762	1.070	28769.8
 apt_fa_transfer_by_stages	1	VM	57	0.762	1.070	30000.
 apt_fa_transfer_by_stages	1	NativeVM	57	0.762	1.070	30000.
 apt_fa_transfer_by_stages	1	NativeSpeculative	57	0.762	1.070	30000.
+apt_fa_transfer_by_stages	1	NativeValueCacheSpeculative	57	0.762	1.070	30000.
 apt_fa_transfer_by_stages	1	NativeNoStorageSpeculative	57	0.762	1.070	30000.
 apt_fa_transfer_sequential_by_stages	1	VM	57	0.762	1.070	10000.
 apt_fa_transfer_sequential_by_stages	1	NativeVM	57	0.762	1.070	10000.
 apt_fa_transfer_sequential_by_stages	1	NativeSpeculative	57	0.762	1.070	10000.
+apt_fa_transfer_sequential_by_stages	1	NativeValueCacheSpeculative	57	0.762	1.070	10000.
 apt_fa_transfer_sequential_by_stages	1	NativeNoStorageSpeculative	57	0.762	1.070	10000.
 account-generation	1	VM	57	0.774	1.055	23332.3
 account-resource32-b	1	VM	57	0.799	1.084	35822.6
@@ -217,31 +220,6 @@ no-op-fee-payer	100	VM	58	0.799	1.038	27842.9
 DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
-    # RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
-    # RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
-    # RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="NativeVM"), included_in=LAND_BLOCKING_AND_C),
-
-    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages"), key_extra=RunGroupKeyExtra(
-        transaction_type_override="apt-fa-transfer",
-        split_stages_override=True,
-        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
-    ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeVM"), key_extra=RunGroupKeyExtra(
-        transaction_type_override="apt-fa-transfer",
-        split_stages_override=True,
-        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
-    ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeSpeculative"), key_extra=RunGroupKeyExtra(
-        transaction_type_override="apt-fa-transfer",
-        split_stages_override=True,
-        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
-    ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeNoStorageSpeculative"), key_extra=RunGroupKeyExtra(
-        transaction_type_override="apt-fa-transfer",
-        split_stages_override=True,
-        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
-    ), included_in=LAND_BLOCKING_AND_C),
 
 
     RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages"), key_extra=RunGroupKeyExtra(
@@ -249,25 +227,75 @@ TESTS = [
         sig_verify_num_threads_override=1,
         execution_num_threads_override=1,
         split_stages_override=True,
+        single_block_dst_working_set=True,
     ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeVM"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         sig_verify_num_threads_override=1,
         execution_num_threads_override=1,
         split_stages_override=True,
+        single_block_dst_working_set=True,
     ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeSpeculative"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         sig_verify_num_threads_override=1,
         execution_num_threads_override=1,
         split_stages_override=True,
+        single_block_dst_working_set=True,
     ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeNoStorageSpeculative"), key_extra=RunGroupKeyExtra(
         transaction_type_override="apt-fa-transfer",
         sig_verify_num_threads_override=1,
         execution_num_threads_override=1,
         split_stages_override=True,
+        single_block_dst_working_set=True,
     ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_sequential_by_stages", executor_type="NativeValueCacheSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        sig_verify_num_threads_override=1,
+        execution_num_threads_override=1,
+        split_stages_override=True,
+        single_block_dst_working_set=True,
+    ), included_in=LAND_BLOCKING_AND_C),
+
+
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        single_block_dst_working_set=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeVM"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        single_block_dst_working_set=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        single_block_dst_working_set=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeNoStorageSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        single_block_dst_working_set=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt_fa_transfer_by_stages", executor_type="NativeValueCacheSpeculative"), key_extra=RunGroupKeyExtra(
+        transaction_type_override="apt-fa-transfer",
+        split_stages_override=True,
+        single_block_dst_working_set=True,
+        sig_verify_num_threads_override=NUMBER_OF_EXECUTION_THREADS,
+    ), included_in=LAND_BLOCKING_AND_C),
+
+
+    # RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
+    # RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="NativeVM"), included_in=LAND_BLOCKING_AND_C),
+
 
     # RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     # RunGroupConfig(key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
@@ -768,6 +796,10 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             executor_type_str = (
                 "--block-executor-type native-loose-speculative --transactions-per-sender 1"
             )
+        elif test.key.executor_type == "NativeValueCacheSpeculative":
+            executor_type_str = (
+                "--block-executor-type native-value-cache-loose-speculative --transactions-per-sender 1"
+            )
         elif test.key.executor_type == "NativeNoStorageSpeculative":
             executor_type_str = (
                 "--block-executor-type native-no-storage-loose-speculative --transactions-per-sender 1"
@@ -782,9 +814,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
         pipeline_extra_args_str = " ".join(pipeline_extra_args)
 
-        ADDITIONAL_DST_POOL_ACCOUNTS = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
+        if test.key_extra.single_block_dst_working_set:
+            additional_dst_pool_accounts = MAX_BLOCK_SIZE
+        else:
+            additional_dst_pool_accounts = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
 
-        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         number_of_threads_results = {}
 

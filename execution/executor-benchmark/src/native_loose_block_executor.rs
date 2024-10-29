@@ -8,9 +8,10 @@ use crate::{
 use anyhow::Result;
 use aptos_executor::{block_executor::TransactionBlockExecutor, metrics::BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK};
 use aptos_executor_types::execution_output::ExecutionOutput;
+use aptos_logger::info;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    account_address::AccountAddress, account_config::{deposit::DepositEvent, primary_apt_store, withdraw::WithdrawEvent, DepositFAEvent, FungibleStoreResource, WithdrawFAEvent}, block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableTransactions}, contract_event::ContractEvent, event::EventKey, fee_statement::FeeStatement, move_event_v2::MoveEventV2, on_chain_config::{FeatureFlag, Features}, state_store::state_key::StateKey, transaction::{
+    account_address::AccountAddress, account_config::{account, deposit::DepositEvent, primary_apt_store, withdraw::WithdrawEvent, DepositFAEvent, FungibleStoreResource, WithdrawFAEvent}, block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableTransactions}, contract_event::ContractEvent, event::EventKey, fee_statement::FeeStatement, move_event_v2::MoveEventV2, on_chain_config::{FeatureFlag, Features}, state_store::state_key::StateKey, transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionStatus
     }, vm_status::AbortLocation, write_set::{WriteOp, WriteSet, WriteSetMut}
 };
@@ -602,14 +603,17 @@ impl TransactionBlockExecutor  for NativeNoStorageLooseSpeculativeBlockExecutor 
             native_transactions
                 .into_par_iter()
                 .map(|txn| {
+                    let gas_units = 4;
+                    let gas = gas_units * 100;
                     match txn {
                         NativeTransaction::Nop { sender, sequence_number } => {
                             self.seq_nums.insert(sender, sequence_number);
+                            *self.balances.entry(sender).or_insert(100_000_000_000_000_000) -= gas;
                         },
                         NativeTransaction::FaTransfer { sender, sequence_number, recipient, amount }
                         | NativeTransaction::Transfer { sender, sequence_number, recipient, amount, .. } => {
                             self.seq_nums.insert(sender, sequence_number);
-                            *self.balances.entry(sender).or_insert(100_000_000_000_000_000) -= amount;
+                            *self.balances.entry(sender).or_insert(100_000_000_000_000_000) -= amount + gas;
                             *self.balances.entry(recipient).or_insert(100_000_000_000_000_000) += amount;
                         },
                         NativeTransaction::BatchTransfer { sender, sequence_number, recipients, amounts, .. } => {
@@ -646,5 +650,155 @@ impl TransactionBlockExecutor  for NativeNoStorageLooseSpeculativeBlockExecutor 
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
         })
+    }
+}
+
+enum CachedResource {
+    Account(Account),
+    FungibleStore(FungibleStoreResource),
+}
+
+pub struct NativeValueCacheLooseSpeculativeBlockExecutor {
+    cache: DashMap<StateKey, CachedResource>,
+}
+
+impl TransactionBlockExecutor for NativeValueCacheLooseSpeculativeBlockExecutor {
+    fn new() -> Self {
+        Self {
+            cache: DashMap::new(),
+        }
+    }
+
+    fn execute_transaction_block(
+        &self,
+        transactions: ExecutableTransactions,
+        state_view: CachedStateView,
+        _onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<ExecutionOutput> {
+        let transactions = match transactions {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            _ => todo!("sharded execution not yet supported"),
+        };
+        let native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
+            transactions
+                .par_iter()
+                .map(NativeTransaction::parse)
+                .collect::<Vec<_>>()
+        });
+
+        let timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
+
+        let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
+            native_transactions
+                .into_par_iter()
+                .map(|txn| {
+                    let gas_units = 4;
+                    let gas = gas_units * 100;
+
+                    match txn {
+                        NativeTransaction::Nop { sender, sequence_number } => {
+                            self.update_sequence_number(sender, &state_view, sequence_number);
+                            self.update_fa_balance(sender, &state_view, 0, gas, true);
+                        },
+                        NativeTransaction::FaTransfer { sender, sequence_number, recipient, amount } => {
+                            self.update_sequence_number(sender, &state_view, sequence_number);
+                            self.update_fa_balance(sender, &state_view, 0, gas + amount, true);
+                            self.update_fa_balance(recipient, &state_view, amount, 0, false);
+                        },
+                        NativeTransaction::Transfer { sender, sequence_number, recipient, amount, fail_on_account_existing, fail_on_account_missing } => {
+                            self.update_sequence_number(sender, &state_view, sequence_number);
+                            self.update_fa_balance(sender, &state_view, 0, gas + amount, true);
+
+                            if !self.update_fa_balance(recipient, &state_view, amount, 0, fail_on_account_missing) {
+                                self.check_or_create_account(recipient, &state_view, fail_on_account_existing, fail_on_account_missing);
+                            }
+                        },
+                        NativeTransaction::BatchTransfer { .. } => {
+                            todo!("")
+                        },
+                    }
+                    TransactionOutput::new(
+                        Default::default(),
+                        vec![],
+                        0,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                        TransactionAuxiliaryData::default(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+
+        drop(timer);
+
+        Ok(ExecutionOutput {
+            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
+            transaction_outputs,
+            state_cache: state_view.into_state_cache(),
+            block_end_info: None,
+        })
+    }
+}
+
+impl NativeValueCacheLooseSpeculativeBlockExecutor {
+    fn update_sequence_number(&self, sender: AccountAddress, state_view: &CachedStateView, sequence_number: u64) {
+        let sender_account_key = DbAccessUtil::new_state_key_account(sender);
+        match self.cache.entry(sender_account_key.clone()).or_insert_with(|| {
+            CachedResource::Account(DbAccessUtil::get_account(&sender_account_key, state_view).unwrap().unwrap())
+        }).value_mut() {
+            CachedResource::Account(account) => {
+                account.sequence_number = sequence_number
+            }
+            CachedResource::FungibleStore(_) => panic!("wrong type"),
+        };
+    }
+
+    fn check_or_create_account(&self, sender: AccountAddress, state_view: &CachedStateView, fail_on_existing: bool, fail_on_missing: bool) {
+        let sender_account_key = DbAccessUtil::new_state_key_account(sender);
+        let mut missing = false;
+        self.cache.entry(sender_account_key.clone()).or_insert_with(|| {
+            CachedResource::Account(match DbAccessUtil::get_account(&sender_account_key, state_view).unwrap() {
+                Some(account) => account,
+                None => {
+                    missing = true;
+                    assert!(!fail_on_missing);
+                    Account {
+                        authentication_key: sender.to_vec(),
+                        ..Default::default()
+                    }
+                },
+            })
+        });
+        if fail_on_existing {
+            assert!(missing);
+        }
+    }
+
+    fn update_fa_balance(&self, sender: AccountAddress, state_view: &CachedStateView, increment: u64, decrement: u64, fail_on_missing: bool) -> bool {
+        let sender_store_address = primary_apt_store(sender);
+        let fungible_store_rg_tag = FungibleStoreResource::struct_tag();
+        let cache_key = StateKey::resource(&sender_store_address, &fungible_store_rg_tag).unwrap();
+
+        let mut exists = false;
+        match self.cache.entry(cache_key).or_insert_with(|| {
+            let sender_fa_store_object_key = DbAccessUtil::new_state_key_object_resource_group(&sender_store_address);
+            let rg_opt = DbAccessUtil::get_resource_group( &sender_fa_store_object_key, state_view).unwrap();
+            CachedResource::FungibleStore(match rg_opt {
+                Some(mut rg) => {
+                    exists = true;
+                    bcs::from_bytes(&rg.remove(&fungible_store_rg_tag).unwrap()).unwrap()
+                },
+                None => {
+                    assert!(!fail_on_missing);
+                    FungibleStoreResource::new(AccountAddress::TEN, 0, false)
+                },
+            })
+        }).value_mut() {
+            CachedResource::FungibleStore(fungible_store_resource) => {
+                fungible_store_resource.balance += increment;
+                fungible_store_resource.balance -= decrement;
+            },
+            CachedResource::Account(_) => panic!("wrong type"),
+        };
+        exists
     }
 }

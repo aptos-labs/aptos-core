@@ -14,7 +14,7 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::{AptosVMBlockExecutor, TransactionBlockExecutor};
-use aptos_executor_benchmark::{native_executor_task::NativeVMBlockExecutor, native_loose_block_executor::{NativeNoStorageLooseSpeculativeBlockExecutor, NativeLooseSpeculativeBlockExecutor}, native_transaction::NativeConfig, pipeline::PipelineConfig, BenchmarkWorkload};
+use aptos_executor_benchmark::{native_executor_task::NativeVMBlockExecutor, native_loose_block_executor::{NativeLooseSpeculativeBlockExecutor, NativeNoStorageLooseSpeculativeBlockExecutor, NativeValueCacheLooseSpeculativeBlockExecutor}, native_transaction::NativeConfig, pipeline::PipelineConfig, BenchmarkWorkload};
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
@@ -213,6 +213,7 @@ enum BlockExecutorTypeOpt {
     NativeVMWithBlockSTM,
     NativeLooseSpeculative,
     NativeNoStorageLooseSpeculative,
+    NativeValueCacheLooseSpeculative,
     PtxExecutor,
 }
 
@@ -594,6 +595,9 @@ fn main() {
         BlockExecutorTypeOpt::NativeLooseSpeculative => {
             run::<NativeLooseSpeculativeBlockExecutor>(opt);
         },
+        BlockExecutorTypeOpt::NativeValueCacheLooseSpeculative => {
+            run::<NativeValueCacheLooseSpeculativeBlockExecutor>(opt);
+        }
         BlockExecutorTypeOpt::NativeNoStorageLooseSpeculative => {
             run::<NativeNoStorageLooseSpeculativeBlockExecutor>(opt);
         },

@@ -1098,23 +1098,25 @@ module aptos_framework::fungible_asset {
         };
         let metadata_address = object::object_address(metadata);
 
-        if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
+        if (amount == 0) {
+            if (exists<ConcurrentSupply>(metadata_address)) {
+                let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
 
-            assert!(
-                aggregator_v2::try_sub(&mut supply.current, (amount as u128)),
-                error::out_of_range(ESUPPLY_UNDERFLOW)
-            );
-        } else if (exists<Supply>(metadata_address)) {
-            assert!(exists<Supply>(metadata_address), error::not_found(ESUPPLY_NOT_FOUND));
-            let supply = borrow_global_mut<Supply>(metadata_address);
-            assert!(
-                supply.current >= (amount as u128),
-                error::invalid_state(ESUPPLY_UNDERFLOW)
-            );
-            supply.current = supply.current - (amount as u128);
-        } else {
-            assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
+                assert!(
+                    aggregator_v2::try_sub(&mut supply.current, (amount as u128)),
+                    error::out_of_range(ESUPPLY_UNDERFLOW)
+                );
+            } else if (exists<Supply>(metadata_address)) {
+                assert!(exists<Supply>(metadata_address), error::not_found(ESUPPLY_NOT_FOUND));
+                let supply = borrow_global_mut<Supply>(metadata_address);
+                assert!(
+                    supply.current >= (amount as u128),
+                    error::invalid_state(ESUPPLY_UNDERFLOW)
+                );
+                supply.current = supply.current - (amount as u128);
+            } else {
+                assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
+            }
         }
     }
 

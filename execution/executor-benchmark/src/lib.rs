@@ -751,7 +751,7 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
 mod tests {
     use std::fs;
 
-    use crate::{db_generator::bootstrap_with_genesis, init_db_and_executor, native_executor_task::NativeVMBlockExecutor, native_loose_block_executor::{NativeNoStorageLooseSpeculativeBlockExecutor, NativeLooseSpeculativeBlockExecutor}, native_transaction::NativeConfig, pipeline::PipelineConfig, transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG, transaction_generator::TransactionGenerator, BenchmarkWorkload};
+    use crate::{db_generator::bootstrap_with_genesis, init_db_and_executor, native_executor_task::NativeVMBlockExecutor, native_loose_block_executor::{NativeLooseSpeculativeBlockExecutor, NativeNoStorageLooseSpeculativeBlockExecutor, NativeValueCacheLooseSpeculativeBlockExecutor}, native_transaction::NativeConfig, pipeline::PipelineConfig, transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG, transaction_generator::TransactionGenerator, BenchmarkWorkload};
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
     use aptos_executor::block_executor::{AptosVMBlockExecutor, TransactionBlockExecutor};
@@ -866,7 +866,7 @@ mod tests {
         features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
 
-        crate::db_generator::create_db_with_accounts::<E>(
+        crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000_000, /* init_account_balance */
@@ -924,8 +924,8 @@ mod tests {
         AptosVM::set_concurrency_level_once(1);
         AptosVM::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(1);
-        test_generic_benchmark::<NativeVMBlockExecutor>(
-            Some(TransactionTypeArg::NoOp),
+        test_generic_benchmark::<NativeValueCacheLooseSpeculativeBlockExecutor>(
+            Some(TransactionTypeArg::AptFaTransfer),
             true,
         );
     }
