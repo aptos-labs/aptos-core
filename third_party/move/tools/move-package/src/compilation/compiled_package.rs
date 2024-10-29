@@ -806,7 +806,8 @@ impl CompiledPackage {
                 .flat_map(|package| {
                     let name = package.name.unwrap();
                     package.paths.iter().map(move |pkg_path| {
-                        get_addr_from_module_in_package(name, pkg_path.as_str()).map(|addr| (name, addr))
+                        get_addr_from_module_in_package(name, pkg_path.as_str())
+                            .map(|addr| (name, addr))
                     })
                 })
                 .try_collect()?,
@@ -904,8 +905,8 @@ impl CompiledPackage {
                     .collect(),
                 bytecode_deps: self
                     .bytecode_deps
-                    .iter()
-                    .map(|(package_name, _)| *package_name)
+                    .keys()
+                    .copied()
                     .collect::<BTreeSet<_>>()
                     .into_iter()
                     .collect(),
