@@ -266,7 +266,6 @@ where
                         Some(block_id),
                     )?
                 };
-
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 let state_checkpoint_output = THREAD_MANAGER.get_exe_cpu_pool().install(|| {

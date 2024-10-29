@@ -50,7 +50,7 @@ impl InMemoryStateCalculatorV2 {
         // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
         // hash) for the last one.
         let last_checkpoint_index = execution_output.to_commit.get_last_checkpoint_index();
-
+        info!("gas_used: {:?}", execution_output.to_commit.transaction_outputs.iter().map(|txn_output| txn_output.gas_used()).collect::<Vec<_>>());
         Self::calculate_impl(
             parent_state,
             &execution_output.state_cache,
