@@ -487,7 +487,15 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
-            info!("Submission to {:?} succeeded. Successes: {:?} Failures: {:?}", client.path_prefix_string(), txns.len(), failures.len());
+            info!("Submission to {:?} succeeded. Successes: {:?} Failures: {:?}. Entry functions: {:?}. Senders: {:?}, Sequence numbers: {:?}", client.path_prefix_string(), txns.len(), failures.len(), txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
+                TransactionPayload::EntryFunction(entry_function) => {
+                    Some((entry_function.module(), entry_function.function()))
+                },
+                _ => None,
+            }).collect::<Vec<_>>(),
+            txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
+            txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
+        );
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
