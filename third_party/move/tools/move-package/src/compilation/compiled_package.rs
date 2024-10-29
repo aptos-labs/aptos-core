@@ -82,7 +82,7 @@ pub struct CompiledPackage {
     /// The output compiled bytecode for dependencies
     pub deps_compiled_units: Vec<(PackageName, CompiledUnitWithSource)>,
     /// Bytecode dependencies of this compiled package
-    pub bytecode_deps: Vec<(PackageName, NumericalAddress)>,
+    pub bytecode_deps: BTreeMap<PackageName, NumericalAddress>,
 
     // Optional artifacts from compilation
     //
@@ -156,18 +156,6 @@ impl OnDiskCompiledPackage {
                 deps_compiled_units.push((dep_name, self.decode_unit(dep_name, &bytecode_path)?))
             }
         }
-        let mut bytecode_deps = vec![];
-        for dep_name in self.package.bytecode_deps.iter().copied() {
-            let bytecode_paths = self.get_compiled_units_paths(dep_name)?;
-            let mut addrs = BTreeSet::new();
-            for bytecode_path in bytecode_paths {
-                let addr = get_module_addr(dep_name, bytecode_path.as_str())?;
-                addrs.insert(addr);
-            }
-            for addr in addrs {
-                bytecode_deps.push((dep_name, addr));
-            }
-        }
 
         let docs_path = self
             .root_path
@@ -213,7 +201,8 @@ impl OnDiskCompiledPackage {
             compiled_package_info: self.package.compiled_package_info.clone(),
             root_compiled_units,
             deps_compiled_units,
-            bytecode_deps,
+            // TODO: support bytecode deps
+            bytecode_deps: BTreeMap::new(),
             compiled_docs,
             compiled_abis,
         })
@@ -817,7 +806,7 @@ impl CompiledPackage {
                 .flat_map(|package| {
                     let name = package.name.unwrap();
                     package.paths.iter().map(move |pkg_path| {
-                        get_module_addr(name, pkg_path.as_str()).map(|addr| (name, addr))
+                        get_addr_from_module_in_package(name, pkg_path.as_str()).map(|addr| (name, addr))
                     })
                 })
                 .try_collect()?,
@@ -1172,7 +1161,7 @@ pub fn build_and_report_no_exit_v2_driver(
 }
 
 /// Returns the address of the module
-fn get_module_addr(pkg_name: Symbol, pkg_path: &str) -> Result<NumericalAddress> {
+fn get_addr_from_module_in_package(pkg_name: Symbol, pkg_path: &str) -> Result<NumericalAddress> {
     // Read the bytecode file
     let mut bytecode = Vec::new();
     std::fs::File::open(pkg_path)
