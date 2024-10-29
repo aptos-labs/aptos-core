@@ -10,6 +10,7 @@ use aptos_sdk::{
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
+use aptos_logger::info;
 
 pub struct AccountGenerator {
     rng: StdRng,
@@ -58,6 +59,7 @@ impl TransactionGenerator for AccountGenerator {
                 &self.txn_factory,
                 self.creation_balance,
             );
+            info!("Aptos account transfer transaction. Sender: {:?} Receiver: {:?} Creation balance {:?} Sequence number {:?}", account.address(), receiver_address, self.creation_balance, account.sequence_number());
             requests.push(request);
             new_accounts.push(receiver);
             new_account_addresses.push(receiver_address);

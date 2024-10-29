@@ -297,12 +297,19 @@ impl<'t> AccountMinter<'t> {
         )
         .await?;
 
+        let mut balances = Vec::new();
+        for account in &seed_accounts {
+            balances.push(txn_executor.get_account_balance(account.address()).await);
+        }
         info!(
-            "Completed creating {} seed accounts in {}s, each with {} coins, request stats: {}",
+            "Completed creating {} seed accounts in {}s, each with {} coins, request stats: {}. seed addresses: {:?}, sequence numbers: {:?}, balances: {:?}",
             seed_accounts.len(),
             start.elapsed().as_secs(),
             coins_per_seed_account,
             request_counters.show_simple(),
+            seed_accounts.iter().map(|a| a.address()).collect::<Vec<_>>(),
+            seed_accounts.iter().map(|a| a.sequence_number()).collect::<Vec<_>>(),
+            balances,
         );
         info!(
             "Creating additional {} accounts with {} coins each (txn {} gas price)",
@@ -317,6 +324,7 @@ impl<'t> AccountMinter<'t> {
         let approx_accounts_per_seed =
             (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
 
+        info!("Creating accounts in groups of {} per seed account", approx_accounts_per_seed);
         let local_accounts_by_seed: Vec<Vec<Arc<LocalAccount>>> = local_accounts
             .chunks(approx_accounts_per_seed)
             .map(|chunk| chunk.to_vec())
@@ -350,12 +358,24 @@ impl<'t> AccountMinter<'t> {
             .into_iter()
             .collect::<Result<Vec<_>>>()
             .map_err(|e| format_err!("Failed to create accounts: {:?}", e))?;
+        
 
+        let mut balances = Vec::new();
+        let mut anomalies = Vec::new();
+        for account in &local_accounts {
+            let balance = txn_executor.get_account_balance(account.address()).await?;
+            balances.push(balance);
+            if balance < coins_per_account {
+                anomalies.push((account.address(), balance));
+            }
+        }
         info!(
-            "Successfully completed creating {} accounts in {}s, request stats: {}",
+            "Successfully completed creating {} accounts in {}s, request stats: {}. anamolies: {:?} balances: {:?}",
             local_accounts.len(),
             start.elapsed().as_secs(),
             request_counters.show_simple(),
+            anomalies,
+            balances,
         );
         Ok(())
     }
