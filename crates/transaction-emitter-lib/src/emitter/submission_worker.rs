@@ -9,7 +9,7 @@ use crate::{
     EmitModeParams,
 };
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
@@ -26,10 +26,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
 use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    sync::{atomic::AtomicU64, Arc},
-    time::Instant,
+    borrow::Borrow, collections::HashMap, f32::consts::E, sync::{atomic::AtomicU64, Arc}, time::Instant
 };
 use tokio::time::sleep;
 
@@ -444,21 +441,48 @@ pub async fn submit_transactions(
                     balances.push(balance);
                 }
                 
-                warn!(
-                    "[{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
-                    client.path_prefix_string(),
-                    txns.len(),
-                    txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
-                        TransactionPayload::EntryFunction(entry_function) => {
-                            Some((entry_function.module(), entry_function.function()))
-                        },
-                        _ => None,
-                    }).collect::<Vec<_>>(),
-                    txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
-                    txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
-                    balances,
-                    e
-                );
+                match e {
+                    RestError::Unknown(e) => {
+                        let error_message = e.to_string();
+                        let n = 500;
+                        let last_n_chars = &error_message[error_message.len().saturating_sub(n)..];
+                        
+                        warn!(
+                            "[{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
+                            client.path_prefix_string(),
+                            txns.len(),
+                            txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
+                                TransactionPayload::EntryFunction(entry_function) => {
+                                    Some((entry_function.module(), entry_function.function()))
+                                },
+                                _ => None,
+                            }).collect::<Vec<_>>(),
+                            txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
+                            txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
+                            balances,
+                            last_n_chars
+                        );
+                    },
+                    _ => {
+                        warn!(
+                            "[{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
+                            client.path_prefix_string(),
+                            txns.len(),
+                            txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
+                                TransactionPayload::EntryFunction(entry_function) => {
+                                    Some((entry_function.module(), entry_function.function()))
+                                },
+                                _ => None,
+                            }).collect::<Vec<_>>(),
+                            txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
+                            txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
+                            balances,
+                            e
+                        );
+                    },
+                }
+
+                
             // );
         },
         Ok(v) => {
