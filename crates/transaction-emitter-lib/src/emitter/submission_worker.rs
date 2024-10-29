@@ -448,7 +448,7 @@ pub async fn submit_transactions(
                         let last_n_chars = &error_message[error_message.len().saturating_sub(n)..];
                         
                         warn!(
-                            "[{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
+                            "Unknown: [{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
                             client.path_prefix_string(),
                             txns.len(),
                             txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
@@ -460,12 +460,12 @@ pub async fn submit_transactions(
                             txns.iter().map(|t| t.sender()).collect::<Vec<_>>(),
                             txns.iter().map(|t| t.sequence_number()).collect::<Vec<_>>(),
                             balances,
-                            last_n_chars
+                            error_message
                         );
                     },
                     _ => {
                         warn!(
-                            "[{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
+                            "Other: [{:?}] Failed to submit batch request. failed_submissions = {:?}, payloads = {:?}, senders = {:?}, sequence_numbers = {:?}, balances = {:?}, error = {:?}",
                             client.path_prefix_string(),
                             txns.len(),
                             txns.iter().flat_map(|t| match t.raw_transaction_ref().payload() {
