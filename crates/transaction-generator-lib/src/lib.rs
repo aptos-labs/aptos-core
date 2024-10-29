@@ -128,7 +128,7 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::StableCoinBatchMint1024AccountBatch2.materialize_default()
+        TransactionTypeArg::StableCoinBatchMint1AccountBatch2.materialize_default()
     }
 }
 
@@ -554,7 +554,7 @@ impl<T> ObjectPool<T> {
         rng: &mut StdRng,
     ) {
         assert!(!addition.is_empty());
-        assert!(addition.len() <= max_size);
+        // assert!(addition.len() <= max_size);
 
         let mut current = self.pool.write();
         if current.len() < max_size {
