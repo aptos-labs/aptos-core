@@ -1,40 +1,34 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
-    natives::aptos_natives_with_builder,
-};
+use crate::move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId};
 use aptos_crypto::HashValue;
-use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{
-    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{FeatureFlag, Features, TimedFeaturesBuilder},
+    on_chain_config::{Features, TimedFeaturesBuilder},
     transaction::user_transaction_context::UserTransactionContext,
-    vm::configs::aptos_prod_vm_config,
 };
-use aptos_vm_types::{
-    environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
-    storage::change_set_configs::ChangeSetConfigs,
+use aptos_vm_environment::{
+    environment::AptosEnvironment,
+    natives::aptos_natives_with_builder,
+    prod_configs::{aptos_default_ty_builder, aptos_prod_vm_config},
 };
-use move_vm_runtime::move_vm::MoveVM;
-use std::{ops::Deref, sync::Arc};
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use move_vm_runtime::{move_vm::MoveVM, RuntimeEnvironment, WithRuntimeEnvironment};
+use std::ops::Deref;
 
-/// MoveVM wrapper which is used to run genesis initializations. Designed as a
-/// stand-alone struct to ensure all genesis configurations are in one place,
-/// and are modified accordingly. The VM is initialized with default parameters,
-/// and should only be used to run genesis sessions.
-pub struct GenesisMoveVM {
-    vm: MoveVM,
+/// Used by genesis to create runtime environment and VM ([GenesisMoveVM]), encapsulating all
+/// configs.
+pub struct GenesisRuntimeBuilder {
     chain_id: ChainId,
     features: Features,
+    runtime_environment: RuntimeEnvironment,
 }
 
-impl GenesisMoveVM {
+impl GenesisRuntimeBuilder {
+    /// Returns a builder, capable of creating VM and runtime environment to run genesis.
     pub fn new(chain_id: ChainId) -> Self {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
@@ -52,25 +46,41 @@ impl GenesisMoveVM {
             features.clone(),
             None,
         );
-
-        let vm = MoveVM::new_with_config(
-            aptos_natives_with_builder(&mut native_builder, false),
-            vm_config.clone(),
-        );
-
+        let natives = aptos_natives_with_builder(&mut native_builder, false);
+        let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
         Self {
-            vm,
             chain_id,
             features,
+            runtime_environment,
         }
     }
 
-    pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
-        // Because genesis sessions are not metered, there are no change set
-        // (storage) costs as well.
-        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
+    /// Returns the runtime environment used for any genesis sessions.
+    pub fn build_genesis_runtime_environment(&self) -> RuntimeEnvironment {
+        self.runtime_environment.clone()
     }
 
+    /// Returns MoveVM for the genesis.
+    pub fn build_genesis_vm(&self) -> GenesisMoveVM {
+        GenesisMoveVM {
+            vm: MoveVM::new_with_runtime_environment(&self.runtime_environment),
+            chain_id: self.chain_id,
+            features: self.features.clone(),
+        }
+    }
+}
+
+/// MoveVM wrapper which is used to run genesis initializations. Designed as a stand-alone struct
+/// to ensure all genesis configurations are in one place, and are modified accordingly. The VM is
+/// created via [GenesisRuntimeBuilder], and should only be used to run genesis sessions.
+pub struct GenesisMoveVM {
+    vm: MoveVM,
+    chain_id: ChainId,
+    features: Features,
+}
+
+impl GenesisMoveVM {
+    /// Returns a new genesis session.
     pub fn new_genesis_session<'r, R: AptosMoveResolver>(
         &self,
         resolver: &'r R,
@@ -86,99 +96,34 @@ impl GenesisMoveVM {
             resolver,
         )
     }
+
+    /// Returns the set of features used by genesis VM.
+    pub fn genesis_features(&self) -> &Features {
+        &self.features
+    }
+
+    /// Returns change set configs used by genesis VM sessions. Because genesis sessions are not
+    /// metered, there are no change set (storage) costs.
+    pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
+        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
+    }
 }
 
 pub struct MoveVmExt {
     inner: MoveVM,
-    pub(crate) env: Arc<Environment>,
+    pub(crate) env: AptosEnvironment,
 }
 
 impl MoveVmExt {
-    fn new_impl(
-        gas_feature_version: u64,
-        gas_params: Result<&AptosGasParameters, &String>,
-        env: Arc<Environment>,
-        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
-        inject_create_signer_for_gov_sim: bool,
-        resolver: &impl AptosMoveResolver,
-    ) -> Self {
-        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
-        //            This only happens in a edge case that is probably related to write set transactions or genesis,
-        //            which logically speaking, shouldn't be handled by the VM at all.
-        //            We should clean up the logic here once we get that refactored.
-        let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
-            Ok(gas_params) => {
-                let ty_builder = aptos_prod_ty_builder(gas_feature_version, gas_params);
-                (
-                    gas_params.natives.clone(),
-                    gas_params.vm.misc.clone(),
-                    ty_builder,
-                )
-            },
-            Err(_) => {
-                let ty_builder = aptos_default_ty_builder();
-                (
-                    NativeGasParameters::zeros(),
-                    MiscGasParameters::zeros(),
-                    ty_builder,
-                )
-            },
+    pub fn new(env: AptosEnvironment, resolver: &impl AptosMoveResolver) -> Self {
+        let vm = if env.features().is_loader_v2_enabled() {
+            MoveVM::new_with_runtime_environment(env.runtime_environment())
+        } else {
+            WarmVmCache::get_warm_vm(&env, resolver)
+                .expect("should be able to create Move VM; check if there are duplicated natives")
         };
 
-        let builder = SafeNativeBuilder::new(
-            gas_feature_version,
-            native_gas_params,
-            misc_gas_params,
-            env.timed_features().clone(),
-            env.features().clone(),
-            gas_hook,
-        );
-
-        // TODO(George): Move gas configs to environment to avoid this clone!
-        let mut vm_config = env.vm_config().clone();
-        vm_config.ty_builder = ty_builder;
-        vm_config.disallow_dispatch_for_native = env
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
-
-        Self {
-            inner: WarmVmCache::get_warm_vm(
-                builder,
-                vm_config,
-                resolver,
-                env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
-                inject_create_signer_for_gov_sim,
-            )
-            .expect("should be able to create Move VM; check if there are duplicated natives"),
-            env,
-        }
-    }
-
-    pub fn new(
-        gas_feature_version: u64,
-        gas_params: Result<&AptosGasParameters, &String>,
-        env: Arc<Environment>,
-        resolver: &impl AptosMoveResolver,
-    ) -> Self {
-        Self::new_impl(gas_feature_version, gas_params, env, None, false, resolver)
-    }
-
-    pub fn new_with_extended_options(
-        gas_feature_version: u64,
-        gas_params: Result<&AptosGasParameters, &String>,
-        env: Arc<Environment>,
-        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
-        inject_create_signer_for_gov_sim: bool,
-        resolver: &impl AptosMoveResolver,
-    ) -> Self {
-        Self::new_impl(
-            gas_feature_version,
-            gas_params,
-            env,
-            gas_hook,
-            inject_create_signer_for_gov_sim,
-            resolver,
-        )
+        Self { inner: vm, env }
     }
 
     pub fn new_session<'r, R: AptosMoveResolver>(

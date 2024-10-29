@@ -5,14 +5,24 @@ use crate::{
     assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
 };
 use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
+use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
+    move_utils::MemberId,
     on_chain_config::FeatureFlag,
+    transaction::{ExecutionStatus, TransactionPayload},
 };
-use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
+use claims::assert_ok;
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::ModuleId,
+    parser::parse_struct_tag,
+    vm_status::{AbortLocation, StatusCode},
+};
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
@@ -408,5 +418,182 @@ fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<Fe
         assert_success!(result)
     } else {
         assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+    }
+}
+
+#[test]
+fn test_module_publishing_does_not_fallback() {
+    let mut executor = FakeExecutor::from_head_genesis().set_parallel();
+    executor.disable_block_executor_fallback();
+
+    let mut h = MoveHarness::new_with_executor(executor);
+    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
+    let addr = AccountAddress::from_hex_literal("0x123").unwrap();
+    let account = h.new_account_at(addr);
+
+    let module_name = "foo";
+    let function_name = "bar";
+    let member_id =
+        MemberId::from_str(&format!("{}::{}::{}", addr, module_name, function_name)).unwrap();
+
+    let mut txns = vec![];
+    let mut expected_abort_codes: Vec<Option<u64>> = vec![];
+
+    // Generate a simple test workload.
+    for abort_code in [1, 2, 3, 4, 5, 1] {
+        // Transaction that publishes code, must succeed.
+        let source = format!(
+            "module {}::{} {{ public entry fun {}() {{ abort {} }} }}",
+            addr, module_name, function_name, abort_code
+        );
+        let txn = h.create_transaction_payload(&account, publish_module_txn(source, module_name));
+        txns.push(txn);
+        expected_abort_codes.push(None);
+
+        let mut i = 0;
+        while i < abort_code {
+            // Transaction that calls an entry that aborts.
+            let caller = h.new_account_at(AccountAddress::random());
+            let txn = h.create_entry_function(&caller, member_id.clone(), vec![], vec![]);
+            txns.push(txn);
+            expected_abort_codes.push(Some(abort_code));
+
+            i += 1;
+        }
+    }
+
+    for (output, maybe_abort_code) in h
+        .run_block_get_output(txns)
+        .into_iter()
+        .zip(expected_abort_codes.into_iter())
+    {
+        let status = output.status().clone();
+        match maybe_abort_code {
+            Some(abort_code) => {
+                // Transaction aborts with correct code set by the previous module publish.
+                let status = assert_ok!(status.as_kept_status());
+                if let ExecutionStatus::MoveAbort {
+                    location,
+                    code,
+                    info: _,
+                } = status
+                {
+                    assert_eq!(code, abort_code);
+                    assert_eq!(
+                        location,
+                        AbortLocation::Module(ModuleId::new(
+                            addr,
+                            Identifier::new(module_name).unwrap()
+                        ))
+                    );
+                } else {
+                    panic!(
+                        "Transaction is expected to fail with Move abort and code {}",
+                        abort_code
+                    )
+                }
+            },
+            None => {
+                // Module publishing succeeds.
+                assert_success!(status);
+            },
+        }
+    }
+}
+
+fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
+    let mut builder = PackageBuilder::new(module_name).with_policy(UpgradePolicy::compat());
+    builder.add_source(module_name, &source);
+
+    let pack_dir = assert_ok!(builder.write_to_temp());
+    let package = assert_ok!(build_package(
+        pack_dir.path().to_owned(),
+        aptos_framework::BuildOptions::default(),
+    ));
+
+    let code = package.extract_code();
+    let metadata = package.extract_metadata().unwrap();
+    aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
+        bcs::to_bytes(&metadata).unwrap(),
+        code,
+    )
+}
+
+#[derive(Serialize, Deserialize)]
+struct Foo {
+    data: u64,
+}
+
+#[test]
+fn test_module_publishing_does_not_leak_speculative_information() {
+    let mut executor = FakeExecutor::from_head_genesis().set_parallel();
+    executor.disable_block_executor_fallback();
+
+    let mut h = MoveHarness::new_with_executor(executor);
+    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
+    let addr = AccountAddress::random();
+    let account = h.new_account_at(addr);
+
+    let tys_with_abort_codes = [
+        ("u8", Some(1)),
+        ("u16", Some(2)),
+        ("u32", Some(3)),
+        ("u128", Some(4)),
+        ("u256", Some(5)),
+        ("u64", None),
+    ];
+
+    let mut txns = vec![];
+    let mut expected_abort_codes: Vec<Option<u64>> = vec![];
+
+    for (ty, maybe_abort_code) in tys_with_abort_codes {
+        expected_abort_codes.push(maybe_abort_code);
+
+        // Create module to be published that uses the same type name but different layout. For
+        // the first few modules, run 'init_module' to ensure the type is used and then abort the
+        // transaction. This ensures that the struct name re-indexing cache and publishing works as
+        // expected - not caching type layouts for the struct until it is actually committed.
+        let struct_def = format!("struct Foo has key, store {{ data: {}, }}", ty);
+        let init_module = if let Some(abort_code) = maybe_abort_code {
+            format!("fun init_module(sender: &signer) {{ move_to(sender, Foo {{ data: 0 }}); abort {} }}", abort_code)
+        } else {
+            "fun init_module(sender: &signer) { move_to(sender, Foo { data: 77 }) }".to_string()
+        };
+        let source = format!("module {}::foo {{ {} {} }}", addr, struct_def, init_module);
+
+        let txn = h.create_transaction_payload(&account, publish_module_txn(source, "foo"));
+        txns.push(txn);
+    }
+
+    for (output, maybe_abort_code) in h
+        .run_block_get_output(txns)
+        .into_iter()
+        .zip(expected_abort_codes.into_iter())
+    {
+        let status = output.status().clone();
+        match maybe_abort_code {
+            Some(abort_code) => {
+                let status = assert_ok!(status.as_kept_status());
+                if let ExecutionStatus::MoveAbort {
+                    location: _,
+                    code,
+                    info: _,
+                } = status
+                {
+                    assert_eq!(code, abort_code);
+                } else {
+                    panic!(
+                        "Transaction should succeed with abort code {}, got {:?}",
+                        abort_code, status
+                    );
+                }
+            },
+            None => {
+                assert_success!(status);
+                let struct_tag = parse_struct_tag(&format!("{}::foo::Foo", addr)).unwrap();
+                let data = h.read_resource::<Foo>(&addr, struct_tag).unwrap().data;
+                assert_eq!(data, 77);
+            },
+        }
     }
 }
