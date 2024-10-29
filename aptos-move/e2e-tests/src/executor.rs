@@ -1,4 +1,8 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright © Aptos Foundation
+
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -887,7 +891,7 @@ impl FakeExecutor {
             .expect("Must execute transactions");
 
         // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
-        let event = outputs[0].events()[1]
+        let event = outputs[0].events()[0]
             .v1()
             .expect("The first event must be a block metadata v0 event")
             .clone();

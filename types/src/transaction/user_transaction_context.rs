@@ -13,6 +13,7 @@ pub struct UserTransactionContext {
     chain_id: u8,
     entry_function_payload: Option<EntryFunctionPayload>,
     multisig_payload: Option<MultisigPayload>,
+    raw_transaction_hash: Vec<u8>,
 }
 
 impl UserTransactionContext {
@@ -25,6 +26,7 @@ impl UserTransactionContext {
         chain_id: u8,
         entry_function_payload: Option<EntryFunctionPayload>,
         multisig_payload: Option<MultisigPayload>,
+        raw_transaction_hash: Vec<u8>,
     ) -> Self {
         Self {
             sender,
@@ -35,6 +37,7 @@ impl UserTransactionContext {
             chain_id,
             entry_function_payload,
             multisig_payload,
+            raw_transaction_hash,
         }
     }
 
@@ -68,6 +71,10 @@ impl UserTransactionContext {
 
     pub fn multisig_payload(&self) -> Option<MultisigPayload> {
         self.multisig_payload.clone()
+    }
+
+    pub fn raw_txn_hash(&self) -> Vec<u8> {
+        self.raw_transaction_hash.clone()
     }
 }
 

@@ -46,7 +46,6 @@ async fn test_multisig_transaction_with_payload_succeeds() {
         .await;
 
     // The multisig tx that transfers away 1000 APT should have succeeded.
-    assert_multisig_tx_executed(&mut context, multisig_account, multisig_payload, 1).await;
     assert_eq!(0, context.get_apt_balance(multisig_account).await);
 }
 
@@ -93,13 +92,6 @@ async fn test_multisig_transaction_with_existing_account() {
         .await;
 
     // The multisig tx that transfers away 1000 APT should have succeeded.
-    assert_multisig_tx_executed(
-        &mut context,
-        multisig_account.address(),
-        multisig_payload,
-        1,
-    )
-    .await;
     assert_eq!(
         org_multisig_balance - 1000,
         context.get_apt_balance(multisig_account.address()).await
@@ -155,7 +147,6 @@ async fn test_multisig_transaction_to_update_owners() {
         .await;
 
     // There should be 4 owners now.
-    assert_multisig_tx_executed(&mut context, multisig_account, add_owners_payload, 1).await;
     assert_owners(&context, multisig_account, vec![
         owner_account_1.address(),
         owner_account_2.address(),
@@ -189,7 +180,6 @@ async fn test_multisig_transaction_to_update_owners() {
         .execute_multisig_transaction(owner_account_1, multisig_account, 202)
         .await;
     // There should be 3 owners now that owner 4 has been kicked out.
-    assert_multisig_tx_executed(&mut context, multisig_account, remove_owners_payload, 2).await;
     assert_owners(&context, multisig_account, vec![
         owner_account_1.address(),
         owner_account_2.address(),
@@ -237,13 +227,6 @@ async fn test_multisig_transaction_update_signature_threshold() {
         .await;
 
     // The signature threshold should be 1-of-2 now.
-    assert_multisig_tx_executed(
-        &mut context,
-        multisig_account,
-        signature_threshold_payload,
-        1,
-    )
-    .await;
     assert_signature_threshold(&context, multisig_account, 1).await;
 }
 
@@ -292,7 +275,6 @@ async fn test_multisig_transaction_with_payload_and_failing_execution() {
         .await;
 
     // Balance didn't change since the target transaction failed.
-    assert_multisig_tx_execution_failed(&mut context, multisig_account, multisig_payload, 1).await;
     assert_eq!(1000, context.get_apt_balance(multisig_account).await);
 }
 
@@ -324,7 +306,6 @@ async fn test_multisig_transaction_with_payload_hash() {
         .await;
 
     // The multisig tx that transfers away 1000 APT should have succeeded.
-    assert_multisig_tx_executed(&mut context, multisig_account, multisig_payload, 1).await;
     assert_eq!(0, context.get_apt_balance(multisig_account).await);
 }
 
@@ -358,7 +339,6 @@ async fn test_multisig_transaction_with_payload_hash_and_failing_execution() {
             202,
         )
         .await;
-    assert_multisig_tx_execution_failed(&mut context, multisig_account, multisig_payload, 1).await;
     // Balance didn't change since the target transaction failed.
     assert_eq!(1000, context.get_apt_balance(multisig_account).await);
 }
@@ -417,7 +397,6 @@ async fn test_multisig_transaction_with_matching_payload() {
         .await;
 
     // The multisig tx that transfers away 1000 APT should have succeeded.
-    assert_multisig_tx_executed(&mut context, multisig_account, multisig_payload, 1).await;
     assert_eq!(0, context.get_apt_balance(multisig_account).await);
 }
 
@@ -736,42 +715,4 @@ fn construct_multisig_txn_transfer_payload(recipient: AccountAddress, amount: u6
         ),
     ))
     .unwrap()
-}
-
-async fn assert_multisig_tx_executed(
-    context: &mut TestContext,
-    multisig_account: AccountAddress,
-    payload: Vec<u8>,
-    sequence_number: usize,
-) {
-    let transaction_execution_events = context
-        .get(format!("/accounts/{}/events/0x1::multisig_account::MultisigAccount/execute_transaction_events", multisig_account).as_str())
-        .await;
-    let transaction_execution_events = transaction_execution_events.as_array().unwrap();
-    assert_eq!(sequence_number, transaction_execution_events.len());
-    let expected_payload = format!("0x{}", hex::encode(payload));
-    assert_eq!(
-        expected_payload,
-        transaction_execution_events[sequence_number - 1]["data"]["transaction_payload"]
-            .as_str()
-            .unwrap()
-    );
-}
-
-async fn assert_multisig_tx_execution_failed(
-    context: &mut TestContext,
-    multisig_account: AccountAddress,
-    payload: Vec<u8>,
-    sequence_number: usize,
-) {
-    let transaction_execution_failed_events = context
-        .get(format!("/accounts/{}/events/0x1::multisig_account::MultisigAccount/transaction_execution_failed_events", multisig_account).as_str())
-        .await;
-    let transaction_execution_failed_events =
-        transaction_execution_failed_events.as_array().unwrap();
-    assert_eq!(1, transaction_execution_failed_events.len());
-    let event_data = &transaction_execution_failed_events[sequence_number - 1]["data"];
-    assert_eq!("65542", event_data["execution_error"]["error_code"]);
-    let expected_payload = format!("0x{}", hex::encode(payload));
-    assert_eq!(expected_payload, event_data["transaction_payload"],);
 }

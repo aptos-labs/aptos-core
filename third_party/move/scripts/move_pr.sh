@@ -112,7 +112,6 @@ MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p aptos-transactional-test-harness \
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
-  -p move-async-vm \
   -p move-cli \
   -p move-model \
   -p move-package \
@@ -147,6 +146,7 @@ if [ ! -z "$CHECK" ]; then
     cargo xclippy
     cargo +nightly fmt
     cargo sort --grouped --workspace
+    cargo machete
   )
 fi
 

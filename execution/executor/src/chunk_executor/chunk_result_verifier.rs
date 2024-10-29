@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, Result};
-use aptos_crypto::HashValue;
 use aptos_executor_types::LedgerUpdateOutput;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::{
@@ -20,13 +19,6 @@ pub trait ChunkResultVerifier {
     ) -> Result<()>;
 
     fn transaction_infos(&self) -> &[TransactionInfo];
-
-    fn state_checkpoint_hashes(&self) -> Vec<Option<HashValue>> {
-        self.transaction_infos()
-            .iter()
-            .map(|t| t.state_checkpoint_hash())
-            .collect()
-    }
 
     fn maybe_select_chunk_ending_ledger_info(
         &self,

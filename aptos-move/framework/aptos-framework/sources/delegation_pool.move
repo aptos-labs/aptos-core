@@ -975,18 +975,18 @@ module aptos_framework::delegation_pool {
                     should_pass,
                 }
             );
+        } else {
+            event::emit_event(
+                &mut governance_records.vote_events,
+                VoteEvent {
+                    voter: voter_address,
+                    proposal_id,
+                    delegation_pool: pool_address,
+                    num_votes: voting_power,
+                    should_pass,
+                }
+            );
         };
-
-        event::emit_event(
-            &mut governance_records.vote_events,
-            VoteEvent {
-                voter: voter_address,
-                proposal_id,
-                delegation_pool: pool_address,
-                num_votes: voting_power,
-                should_pass,
-            }
-        );
     }
 
     /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
@@ -1032,16 +1032,16 @@ module aptos_framework::delegation_pool {
                     delegation_pool: pool_address,
                 }
             );
+        } else {
+            event::emit_event(
+                &mut governance_records.create_proposal_events,
+                CreateProposalEvent {
+                    proposal_id,
+                    voter: voter_addr,
+                    delegation_pool: pool_address,
+                }
+            );
         };
-
-        event::emit_event(
-            &mut governance_records.create_proposal_events,
-            CreateProposalEvent {
-                proposal_id,
-                voter: voter_addr,
-                delegation_pool: pool_address,
-            }
-        );
     }
 
     fun assert_owner_cap_exists(owner: address) {
@@ -1439,13 +1439,13 @@ module aptos_framework::delegation_pool {
                 delegator: delegator_address,
                 voter: new_voter,
             })
+        } else {
+            event::emit_event(&mut governance_records.delegate_voting_power_events, DelegateVotingPowerEvent {
+                pool_address,
+                delegator: delegator_address,
+                voter: new_voter,
+            });
         };
-
-        event::emit_event(&mut governance_records.delegate_voting_power_events, DelegateVotingPowerEvent {
-            pool_address,
-            delegator: delegator_address,
-            voter: new_voter,
-        });
     }
 
     /// Enable delegators allowlisting as the pool owner.
@@ -1576,17 +1576,17 @@ module aptos_framework::delegation_pool {
                     add_stake_fee,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut pool.add_stake_events,
+                AddStakeEvent {
+                    pool_address,
+                    delegator_address,
+                    amount_added: amount,
+                    add_stake_fee,
+                },
+            );
         };
-
-        event::emit_event(
-            &mut pool.add_stake_events,
-            AddStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_added: amount,
-                add_stake_fee,
-            },
-        );
     }
 
     /// Unlock `amount` from the active + pending_active stake of `delegator` or
@@ -1639,16 +1639,16 @@ module aptos_framework::delegation_pool {
                     amount_unlocked: amount,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut pool.unlock_stake_events,
+                UnlockStakeEvent {
+                    pool_address,
+                    delegator_address,
+                    amount_unlocked: amount,
+                },
+            );
         };
-
-        event::emit_event(
-            &mut pool.unlock_stake_events,
-            UnlockStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_unlocked: amount,
-            },
-        );
     }
 
     /// Move `amount` of coins from pending_inactive to active.
@@ -1689,16 +1689,16 @@ module aptos_framework::delegation_pool {
                     amount_reactivated: amount,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut pool.reactivate_stake_events,
+                ReactivateStakeEvent {
+                    pool_address,
+                    delegator_address,
+                    amount_reactivated: amount,
+                },
+            );
         };
-
-        event::emit_event(
-            &mut pool.reactivate_stake_events,
-            ReactivateStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_reactivated: amount,
-            },
-        );
     }
 
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
@@ -1774,16 +1774,16 @@ module aptos_framework::delegation_pool {
                     amount_withdrawn: amount,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut pool.withdraw_stake_events,
+                WithdrawStakeEvent {
+                    pool_address,
+                    delegator_address,
+                    amount_withdrawn: amount,
+                },
+            );
         };
-
-        event::emit_event(
-            &mut pool.withdraw_stake_events,
-            WithdrawStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_withdrawn: amount,
-            },
-        );
     }
 
     /// Return the unique observed lockup cycle where delegator `delegator_address` may have

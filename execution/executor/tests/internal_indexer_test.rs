@@ -174,7 +174,7 @@ fn test_db_indexer_data() {
 
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert_eq!(res.len(), 27);
+    assert_eq!(res.len(), 4);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(

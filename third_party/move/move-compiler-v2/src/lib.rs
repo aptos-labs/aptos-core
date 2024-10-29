@@ -39,7 +39,6 @@ use crate::{
         variable_coalescing::VariableCoalescing,
     },
 };
-use anyhow::bail;
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
@@ -606,21 +605,13 @@ fn get_vm_error_loc(env: &GlobalEnv, source_map: &SourceMap, e: &VMError) -> Opt
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.
-pub fn check_errors<W>(
-    env: &GlobalEnv,
-    error_writer: &mut W,
-    msg: &'static str,
-) -> anyhow::Result<()>
+pub fn check_errors<W>(env: &GlobalEnv, error_writer: &mut W, msg: &str) -> anyhow::Result<()>
 where
     W: WriteColor + Write,
 {
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
-    if env.has_errors() {
-        bail!("exiting with {}", msg);
-    } else {
-        Ok(())
-    }
+    env.check_diag(error_writer, options.report_severity(), msg)
 }
 
 /// Annotate the given compiled units.

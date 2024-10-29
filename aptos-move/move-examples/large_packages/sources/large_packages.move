@@ -10,7 +10,6 @@
 /// Any missing index in this range will cause the function to fail.
 module large_packages::large_packages {
     use std::error;
-    use std::option::{Self, Option};
     use std::signer;
     use std::vector;
     use aptos_std::smart_table::{Self, SmartTable};
@@ -66,10 +65,10 @@ module large_packages::large_packages {
         metadata_chunk: vector<u8>,
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>,
-        code_object: Option<Object<PackageRegistry>>,
+        code_object: Object<PackageRegistry>,
     ) acquires StagingArea {
         let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
-        upgrade_object_code(owner, staging_area, option::extract(&mut code_object));
+        upgrade_object_code(owner, staging_area, code_object);
         cleanup_staging_area(owner);
     }
 
@@ -148,8 +147,8 @@ module large_packages::large_packages {
         staging_area: &mut StagingArea,
     ): vector<vector<u8>> {
         let last_module_idx = staging_area.last_module_idx;
-        let code: vector<vector<u8>> = vector[];
-        let i: u64 = 0;
+        let code = vector[];
+        let i = 0;
         while (i <= last_module_idx) {
             vector::push_back(
                 &mut code,

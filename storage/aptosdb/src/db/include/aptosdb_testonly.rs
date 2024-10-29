@@ -4,9 +4,11 @@
 use crate::state_store::buffered_state::BufferedState;
 use aptos_config::config::{ BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
 use aptos_infallible::Mutex;
-use aptos_types::state_store::create_empty_sharded_state_updates;
+use aptos_types::state_store::{create_empty_sharded_state_updates, ShardedStateUpdates};
 use std::default::Default;
-use aptos_types::transaction::TransactionStatus;
+use aptos_storage_interface::cached_state_view::ShardedStateCache;
+use aptos_storage_interface::state_delta::StateDelta;
+use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
