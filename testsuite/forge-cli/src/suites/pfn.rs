@@ -41,6 +41,31 @@ pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> 
         "pfn_const_tps_with_realistic_env_128account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch4.materialize_default(), 128, 2048),
         "pfn_const_tps_with_realistic_env_128account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch8.materialize_default(), 128, 1024),
         "pfn_const_tps_with_realistic_env_128account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint128AccountBatch16.materialize_default(), 128, 1024),
+
+
+        "pfn_const_tps_with_realistic_env_8account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint8AccountBatch1.materialize_default(), 8, 2048),
+        "pfn_const_tps_with_realistic_env_8account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint8AccountBatch2.materialize_default(), 8, 1024),
+        "pfn_const_tps_with_realistic_env_8account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint8AccountBatch4.materialize_default(), 8, 1024),
+        "pfn_const_tps_with_realistic_env_8account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint8AccountBatch8.materialize_default(), 8, 1024),
+        "pfn_const_tps_with_realistic_env_8account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint8AccountBatch16.materialize_default(), 8, 512),
+        
+        "pfn_const_tps_with_realistic_env_4account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint4AccountBatch1.materialize_default(), 4, 2048),
+        "pfn_const_tps_with_realistic_env_4account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint4AccountBatch2.materialize_default(), 4, 1024),
+        "pfn_const_tps_with_realistic_env_4account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint4AccountBatch4.materialize_default(), 4, 1024),
+        "pfn_const_tps_with_realistic_env_4account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint4AccountBatch8.materialize_default(), 4, 1024),
+        "pfn_const_tps_with_realistic_env_4account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint4AccountBatch16.materialize_default(), 4, 512),
+        
+        "pfn_const_tps_with_realistic_env_2account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint2AccountBatch1.materialize_default(), 2, 1024),
+        "pfn_const_tps_with_realistic_env_2account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint2AccountBatch2.materialize_default(), 2, 1024),
+        "pfn_const_tps_with_realistic_env_2account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint2AccountBatch4.materialize_default(), 2, 1024),
+        "pfn_const_tps_with_realistic_env_2account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint2AccountBatch8.materialize_default(), 2, 1024),
+        "pfn_const_tps_with_realistic_env_2account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint2AccountBatch16.materialize_default(), 2, 512),
+
+        "pfn_const_tps_with_realistic_env_1account_batch1" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinMint1AccountBatch1.materialize_default(), 1, 1024),
+        "pfn_const_tps_with_realistic_env_1account_batch2" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1AccountBatch2.materialize_default(), 1, 1024),
+        "pfn_const_tps_with_realistic_env_1account_batch4" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1AccountBatch4.materialize_default(), 1, 1024),
+        "pfn_const_tps_with_realistic_env_1account_batch8" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1AccountBatch8.materialize_default(), 1, 1024),
+        "pfn_const_tps_with_realistic_env_1account_batch16" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::StableCoinBatchMint1AccountBatch16.materialize_default(), 1, 512),
                 
         "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
         "pfn_performance_with_network_chaos" => {
