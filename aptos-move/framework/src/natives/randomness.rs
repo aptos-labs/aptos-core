@@ -1,6 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_23,
+    gas_params::natives::aptos_framework::RANDOMNESS_FETCH_AND_INC_COUNTER,
+};
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
@@ -9,8 +13,6 @@ use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_23;
-use aptos_gas_schedule::gas_params::natives::aptos_framework::RANDOMNESS_FETCH_AND_INC_COUNTER;
 
 const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
@@ -53,7 +55,7 @@ impl RandomnessContext {
 }
 
 pub fn fetch_and_increment_txn_counter(
-    mut context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
