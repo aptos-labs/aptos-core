@@ -11156,6 +11156,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-decompiler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs 0.1.4",
+ "clap 4.4.14",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-compiler-v2",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+]
+
+[[package]]
 name = "move-disassembler"
 version = "0.1.0"
 dependencies = [
