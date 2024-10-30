@@ -5,8 +5,8 @@ module 0x42::m {
     use std::vector;
     public entry fun init() {
         {
-          let _: vector<0x1::string::String> = {
-            let result: vector<0x1::string::String> = Vector<0x1::string::String>();
+          let _: vector<string::String> = {
+            let result: vector<string::String> = Vector<string::String>();
             {
               let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple([Vector([Number(3)])]);
               vector::reverse<vector<u8>>(Borrow(Mutable)(v));
@@ -16,7 +16,7 @@ module 0x42::m {
                     let e: vector<u8> = vector::pop_back<vector<u8>>(Borrow(Mutable)(v));
                     {
                       let (elem: vector<u8>): (vector<u8>) = Tuple(e);
-                      vector::push_back<0x1::string::String>(Borrow(Mutable)(result), {
+                      vector::push_back<string::String>(Borrow(Mutable)(result), {
                         let (key: vector<u8>): (vector<u8>) = Tuple(elem);
                         string::utf8(key)
                       })
@@ -76,7 +76,7 @@ module 0x42::m {
                     let e = 0x1::vector::pop_back<vector<u8>>(&mut v);
                     {
                         let (elem) = (e);
-                        0x1::vector::push_back<0x1::string::String>(&mut result, {
+                        0x1::vector::push_back<string::String>(&mut result, {
                             let (key) = (elem);
                             0x1::string::utf8(key)
                         })

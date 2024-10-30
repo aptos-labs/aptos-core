@@ -171,7 +171,7 @@ object "test_A2_M_extract_err_data" {
         }
         function A2_ExternalResult_unwrap_err_data$u64$(result) -> $result {
             let err_data, err_reason, panic_code, $t4, $t5, $t6, $t7, $t8
-            // ($t4, $t5, $t6, $t7) := unpack 0x2::ExternalResult::ExternalResult<#0>($t0)
+            // ($t4, $t5, $t6, $t7) := unpack ExternalResult::ExternalResult<#0>($t0)
             $t4 := $MemoryLoadU256(add(result, 0))
             $t5 := $MemoryLoadU256(add(result, 32))
             $t6 := $MemoryLoadU256(add(result, 64))
@@ -181,7 +181,7 @@ object "test_A2_M_extract_err_data" {
             A1_option_destroy_none$u64$($t4)
             // option::destroy_none<vector<u8>>($t6)
             A1_option_destroy_none$vec$u8$$($t6)
-            // option::destroy_none<0x2::U256::U256>($t7)
+            // option::destroy_none<U256::U256>($t7)
             A1_option_destroy_none$A2_U256_U256$($t7)
             // $t8 := option::destroy_some<vector<u8>>($t5)
             $t8 := A1_option_destroy_some$vec$u8$$($t5)
@@ -221,7 +221,7 @@ object "test_A2_M_extract_err_data" {
                     // label L2
                     // $t6 := move($t0)
                     $t6 := t
-                    // $t2 := unpack 0x1::option::Option<#0>($t6)
+                    // $t2 := unpack option::Option<#0>($t6)
                     mstore($locals, $MemoryLoadU256(add($t6, 0)))
                     $Free($t6, 32)
                     // $t7 := borrow_local($t2)
@@ -274,7 +274,7 @@ object "test_A2_M_extract_err_data" {
         }
         function A1_option_is_some$vec$u8$$(t) -> $result {
             let $t1, $t2, $t3
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$vec$u8$$($t1)
@@ -332,7 +332,7 @@ object "test_A2_M_extract_err_data" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -351,7 +351,7 @@ object "test_A2_M_extract_err_data" {
         }
         function A1_option_is_none$A2_U256_U256$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$A2_U256_U256$($t1)
@@ -407,7 +407,7 @@ object "test_A2_M_extract_err_data" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -420,7 +420,7 @@ object "test_A2_M_extract_err_data" {
 
         function A1_option_is_none$vec$u8$$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$vec$u8$$($t1)
@@ -459,7 +459,7 @@ object "test_A2_M_extract_err_data" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -478,7 +478,7 @@ object "test_A2_M_extract_err_data" {
         }
         function A1_option_is_none$u64$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$u64$($t1)
@@ -505,7 +505,7 @@ object "test_A2_M_extract_err_data" {
         }
         function A2_ExternalResult_is_err_data$u64$(result) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x2::ExternalResult::ExternalResult<#0>>.err_data($t0)
+            // $t1 := borrow_field<ExternalResult::ExternalResult<#0>>.err_data($t0)
             {
                 let $field_ptr := $IndexPtr(result, 32)
                 $t1 := $MakePtr($IsStoragePtr($field_ptr), $LoadU256($field_ptr))
@@ -532,9 +532,9 @@ object "test_A2_M_extract_err_data" {
             $t2 := A1_option_some$vec$u8$$(error)
             // $t3 := option::none<vector<u8>>()
             $t3 := A1_option_none$vec$u8$$()
-            // $t4 := option::none<0x2::U256::U256>()
+            // $t4 := option::none<U256::U256>()
             $t4 := A1_option_none$A2_U256_U256$()
-            // $t5 := pack 0x2::ExternalResult::ExternalResult<#0>($t1, $t2, $t3, $t4)
+            // $t5 := pack ExternalResult::ExternalResult<#0>($t1, $t2, $t3, $t4)
             {
                 let $mem := $Malloc(128)
                 $MemoryStoreU256(add($mem, 0), $t1)
@@ -551,7 +551,7 @@ object "test_A2_M_extract_err_data" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$A2_U256_U256$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -569,7 +569,7 @@ object "test_A2_M_extract_err_data" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$vec$u8$$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -587,7 +587,7 @@ object "test_A2_M_extract_err_data" {
             let $t1, $t2
             // $t1 := vector::singleton<#0>($t0)
             $t1 := A1_vector_singleton$vec$u8$$(e)
-            // $t2 := pack 0x1::option::Option<#0>($t1)
+            // $t2 := pack option::Option<#0>($t1)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t1)
@@ -645,7 +645,7 @@ object "test_A2_M_extract_err_data" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$u64$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -1082,7 +1082,7 @@ object "test_A2_M_extract_err_reason" {
         }
         function A2_ExternalResult_unwrap_err_reason$u64$(result) -> $result {
             let err_data, err_reason, panic_code, $t4, $t5, $t6, $t7, $t8
-            // ($t4, $t5, $t6, $t7) := unpack 0x2::ExternalResult::ExternalResult<#0>($t0)
+            // ($t4, $t5, $t6, $t7) := unpack ExternalResult::ExternalResult<#0>($t0)
             $t4 := $MemoryLoadU256(add(result, 0))
             $t5 := $MemoryLoadU256(add(result, 32))
             $t6 := $MemoryLoadU256(add(result, 64))
@@ -1092,7 +1092,7 @@ object "test_A2_M_extract_err_reason" {
             A1_option_destroy_none$u64$($t4)
             // option::destroy_none<vector<u8>>($t5)
             A1_option_destroy_none$vec$u8$$($t5)
-            // option::destroy_none<0x2::U256::U256>($t7)
+            // option::destroy_none<U256::U256>($t7)
             A1_option_destroy_none$A2_U256_U256$($t7)
             // $t8 := option::destroy_some<vector<u8>>($t6)
             $t8 := A1_option_destroy_some$vec$u8$$($t6)
@@ -1132,7 +1132,7 @@ object "test_A2_M_extract_err_reason" {
                     // label L2
                     // $t6 := move($t0)
                     $t6 := t
-                    // $t2 := unpack 0x1::option::Option<#0>($t6)
+                    // $t2 := unpack option::Option<#0>($t6)
                     mstore($locals, $MemoryLoadU256(add($t6, 0)))
                     $Free($t6, 32)
                     // $t7 := borrow_local($t2)
@@ -1185,7 +1185,7 @@ object "test_A2_M_extract_err_reason" {
         }
         function A1_option_is_some$vec$u8$$(t) -> $result {
             let $t1, $t2, $t3
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$vec$u8$$($t1)
@@ -1243,7 +1243,7 @@ object "test_A2_M_extract_err_reason" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -1262,7 +1262,7 @@ object "test_A2_M_extract_err_reason" {
         }
         function A1_option_is_none$A2_U256_U256$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$A2_U256_U256$($t1)
@@ -1318,7 +1318,7 @@ object "test_A2_M_extract_err_reason" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -1331,7 +1331,7 @@ object "test_A2_M_extract_err_reason" {
 
         function A1_option_is_none$vec$u8$$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$vec$u8$$($t1)
@@ -1370,7 +1370,7 @@ object "test_A2_M_extract_err_reason" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -1389,7 +1389,7 @@ object "test_A2_M_extract_err_reason" {
         }
         function A1_option_is_none$u64$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$u64$($t1)
@@ -1416,7 +1416,7 @@ object "test_A2_M_extract_err_reason" {
         }
         function A2_ExternalResult_is_err_reason$u64$(result) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x2::ExternalResult::ExternalResult<#0>>.err_reason($t0)
+            // $t1 := borrow_field<ExternalResult::ExternalResult<#0>>.err_reason($t0)
             {
                 let $field_ptr := $IndexPtr(result, 64)
                 $t1 := $MakePtr($IsStoragePtr($field_ptr), $LoadU256($field_ptr))
@@ -1443,9 +1443,9 @@ object "test_A2_M_extract_err_reason" {
             $t6 := A1_option_some$vec$u8$$(error)
             // $t7 := option::none<vector<u8>>()
             $t7 := A1_option_none$vec$u8$$()
-            // $t8 := option::none<0x2::U256::U256>()
+            // $t8 := option::none<U256::U256>()
             $t8 := A1_option_none$A2_U256_U256$()
-            // $t9 := pack 0x2::ExternalResult::ExternalResult<#0>($t5, $t7, $t6, $t8)
+            // $t9 := pack ExternalResult::ExternalResult<#0>($t5, $t7, $t6, $t8)
             {
                 let $mem := $Malloc(128)
                 $MemoryStoreU256(add($mem, 0), $t5)
@@ -1462,7 +1462,7 @@ object "test_A2_M_extract_err_reason" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$A2_U256_U256$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -1480,7 +1480,7 @@ object "test_A2_M_extract_err_reason" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$vec$u8$$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -1498,7 +1498,7 @@ object "test_A2_M_extract_err_reason" {
             let $t1, $t2
             // $t1 := vector::singleton<#0>($t0)
             $t1 := A1_vector_singleton$vec$u8$$(e)
-            // $t2 := pack 0x1::option::Option<#0>($t1)
+            // $t2 := pack option::Option<#0>($t1)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t1)
@@ -1556,7 +1556,7 @@ object "test_A2_M_extract_err_reason" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$u64$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -1950,7 +1950,7 @@ object "test_A2_M_extract_panic_code" {
 
         function A2_ExternalResult_unwrap_panic$u64$(result) -> $result {
             let err_data, err_reason, panic_code, $t4, $t5, $t6, $t7, $t8
-            // ($t4, $t5, $t6, $t7) := unpack 0x2::ExternalResult::ExternalResult<#0>($t0)
+            // ($t4, $t5, $t6, $t7) := unpack ExternalResult::ExternalResult<#0>($t0)
             $t4 := $MemoryLoadU256(add(result, 0))
             $t5 := $MemoryLoadU256(add(result, 32))
             $t6 := $MemoryLoadU256(add(result, 64))
@@ -1962,7 +1962,7 @@ object "test_A2_M_extract_panic_code" {
             A1_option_destroy_none$vec$u8$$($t6)
             // option::destroy_none<vector<u8>>($t5)
             A1_option_destroy_none$vec$u8$$($t5)
-            // $t8 := option::destroy_some<0x2::U256::U256>($t7)
+            // $t8 := option::destroy_some<U256::U256>($t7)
             $t8 := A1_option_destroy_some$A2_U256_U256$($t7)
             // return $t8
             $result := $t8
@@ -2000,7 +2000,7 @@ object "test_A2_M_extract_panic_code" {
                     // label L2
                     // $t6 := move($t0)
                     $t6 := t
-                    // $t2 := unpack 0x1::option::Option<#0>($t6)
+                    // $t2 := unpack option::Option<#0>($t6)
                     mstore($locals, $MemoryLoadU256(add($t6, 0)))
                     $Free($t6, 32)
                     // $t7 := borrow_local($t2)
@@ -2036,7 +2036,7 @@ object "test_A2_M_extract_panic_code" {
         }
         function A1_option_is_some$A2_U256_U256$(t) -> $result {
             let $t1, $t2, $t3
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$A2_U256_U256$($t1)
@@ -2094,7 +2094,7 @@ object "test_A2_M_extract_panic_code" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -2113,7 +2113,7 @@ object "test_A2_M_extract_panic_code" {
         }
         function A1_option_is_none$vec$u8$$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$vec$u8$$($t1)
@@ -2169,7 +2169,7 @@ object "test_A2_M_extract_panic_code" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -2188,7 +2188,7 @@ object "test_A2_M_extract_panic_code" {
         }
         function A1_option_is_none$u64$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$u64$($t1)
@@ -2215,12 +2215,12 @@ object "test_A2_M_extract_panic_code" {
         }
         function A2_ExternalResult_is_panic$u64$(result) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x2::ExternalResult::ExternalResult<#0>>.panic_code($t0)
+            // $t1 := borrow_field<ExternalResult::ExternalResult<#0>>.panic_code($t0)
             {
                 let $field_ptr := $IndexPtr(result, 96)
                 $t1 := $MakePtr($IsStoragePtr($field_ptr), $LoadU256($field_ptr))
             }
-            // $t2 := option::is_some<0x2::U256::U256>($t1)
+            // $t2 := option::is_some<U256::U256>($t1)
             $t2 := A1_option_is_some$A2_U256_U256$($t1)
             // return $t2
             $result := $t2
@@ -2242,9 +2242,9 @@ object "test_A2_M_extract_panic_code" {
             $t6 := A1_option_none$vec$u8$$()
             // $t7 := option::none<vector<u8>>()
             $t7 := A1_option_none$vec$u8$$()
-            // $t8 := option::some<0x2::U256::U256>($t0)
+            // $t8 := option::some<U256::U256>($t0)
             $t8 := A1_option_some$A2_U256_U256$(panic_code)
-            // $t9 := pack 0x2::ExternalResult::ExternalResult<#0>($t5, $t7, $t6, $t8)
+            // $t9 := pack ExternalResult::ExternalResult<#0>($t5, $t7, $t6, $t8)
             {
                 let $mem := $Malloc(128)
                 $MemoryStoreU256(add($mem, 0), $t5)
@@ -2261,7 +2261,7 @@ object "test_A2_M_extract_panic_code" {
             let $t1, $t2
             // $t1 := vector::singleton<#0>($t0)
             $t1 := A1_vector_singleton$A2_U256_U256$(e)
-            // $t2 := pack 0x1::option::Option<#0>($t1)
+            // $t2 := pack option::Option<#0>($t1)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t1)
@@ -2309,7 +2309,7 @@ object "test_A2_M_extract_panic_code" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$vec$u8$$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -2327,7 +2327,7 @@ object "test_A2_M_extract_panic_code" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$u64$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -2632,7 +2632,7 @@ object "test_A2_M_extract_value" {
 
         function A2_ExternalResult_unwrap$u64$(result) -> $result {
             let err_data, err_reason, panic_code, value, $t5, $t6, $t7, $t8, $t9
-            // ($t5, $t6, $t7, $t8) := unpack 0x2::ExternalResult::ExternalResult<#0>($t0)
+            // ($t5, $t6, $t7, $t8) := unpack ExternalResult::ExternalResult<#0>($t0)
             $t5 := $MemoryLoadU256(add(result, 0))
             $t6 := $MemoryLoadU256(add(result, 32))
             $t7 := $MemoryLoadU256(add(result, 64))
@@ -2642,7 +2642,7 @@ object "test_A2_M_extract_value" {
             A1_option_destroy_none$vec$u8$$($t6)
             // option::destroy_none<vector<u8>>($t7)
             A1_option_destroy_none$vec$u8$$($t7)
-            // option::destroy_none<0x2::U256::U256>($t8)
+            // option::destroy_none<U256::U256>($t8)
             A1_option_destroy_none$A2_U256_U256$($t8)
             // $t9 := option::destroy_some<#0>($t5)
             $t9 := A1_option_destroy_some$u64$($t5)
@@ -2682,7 +2682,7 @@ object "test_A2_M_extract_value" {
                     // label L2
                     // $t6 := move($t0)
                     $t6 := t
-                    // $t2 := unpack 0x1::option::Option<#0>($t6)
+                    // $t2 := unpack option::Option<#0>($t6)
                     mstore($locals, $MemoryLoadU256(add($t6, 0)))
                     $Free($t6, 32)
                     // $t7 := borrow_local($t2)
@@ -2718,7 +2718,7 @@ object "test_A2_M_extract_value" {
         }
         function A1_option_is_some$u64$(t) -> $result {
             let $t1, $t2, $t3
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$u64$($t1)
@@ -2776,7 +2776,7 @@ object "test_A2_M_extract_value" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -2795,7 +2795,7 @@ object "test_A2_M_extract_value" {
         }
         function A1_option_is_none$A2_U256_U256$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$A2_U256_U256$($t1)
@@ -2851,7 +2851,7 @@ object "test_A2_M_extract_value" {
                     // label L2
                     // $t4 := move($t0)
                     $t4 := t
-                    // $t5 := unpack 0x1::option::Option<#0>($t4)
+                    // $t5 := unpack option::Option<#0>($t4)
                     $t5 := $MemoryLoadU256(add($t4, 0))
                     $Free($t4, 32)
                     // vector::destroy_empty<#0>($t5)
@@ -2870,7 +2870,7 @@ object "test_A2_M_extract_value" {
         }
         function A1_option_is_none$vec$u8$$(t) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$vec$u8$$($t1)
@@ -2897,7 +2897,7 @@ object "test_A2_M_extract_value" {
         }
         function A2_ExternalResult_is_ok$u64$(result) -> $result {
             let $t1, $t2
-            // $t1 := borrow_field<0x2::ExternalResult::ExternalResult<#0>>.value($t0)
+            // $t1 := borrow_field<ExternalResult::ExternalResult<#0>>.value($t0)
             {
                 $t1 := $MakePtr($IsStoragePtr(result), $LoadU256(result))
             }
@@ -2923,9 +2923,9 @@ object "test_A2_M_extract_value" {
             $t2 := A1_option_none$vec$u8$$()
             // $t3 := option::none<vector<u8>>()
             $t3 := A1_option_none$vec$u8$$()
-            // $t4 := option::none<0x2::U256::U256>()
+            // $t4 := option::none<U256::U256>()
             $t4 := A1_option_none$A2_U256_U256$()
-            // $t5 := pack 0x2::ExternalResult::ExternalResult<#0>($t1, $t2, $t3, $t4)
+            // $t5 := pack ExternalResult::ExternalResult<#0>($t1, $t2, $t3, $t4)
             {
                 let $mem := $Malloc(128)
                 $MemoryStoreU256(add($mem, 0), $t1)
@@ -2942,7 +2942,7 @@ object "test_A2_M_extract_value" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$A2_U256_U256$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -2960,7 +2960,7 @@ object "test_A2_M_extract_value" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$vec$u8$$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -2978,7 +2978,7 @@ object "test_A2_M_extract_value" {
             let $t1, $t2
             // $t1 := vector::singleton<#0>($t0)
             $t1 := A1_vector_singleton$u64$(e)
-            // $t2 := pack 0x1::option::Option<#0>($t1)
+            // $t2 := pack option::Option<#0>($t1)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t1)

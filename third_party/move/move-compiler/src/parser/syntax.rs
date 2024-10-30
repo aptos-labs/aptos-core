@@ -276,9 +276,11 @@ where
         }
         v.push(parse_list_item(context)?);
         adjust_token(context.tokens, end_token);
+
         if match_token(context.tokens, end_token)? {
             break Ok(v);
         }
+
         if !match_token(context.tokens, Tok::Comma)? {
             let current_loc = context.tokens.start_loc();
             let loc = make_loc(context.tokens.file_hash(), current_loc, current_loc);
@@ -1842,10 +1844,13 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
 // Parse the arguments to a call:
 //      CallArgs =
 //          "(" Comma<Exp> ")"
+// Result is a list <args>
 fn parse_call_args(context: &mut Context) -> Result<Spanned<Vec<Exp>>, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let args = parse_comma_list(
+    consume_token(context.tokens, Tok::LParen)?;
+    let args = parse_comma_list_after_start(
         context,
+        start_loc,
         Tok::LParen,
         Tok::RParen,
         parse_exp,
@@ -1901,9 +1906,35 @@ fn at_start_of_exp(context: &mut Context) -> bool {
     )
 }
 
+// Parse the rest of a lambda expression, after already processing any capture designator (move/copy/&).
+fn parse_lambda(
+    context: &mut Context,
+    start_loc: usize,
+    capture_kind: LambdaCaptureKind,
+    token: Tok,
+) -> Result<Exp_, Box<Diagnostic>> {
+    let bindings = if token == Tok::Pipe {
+        parse_lambda_bind_list(context)?
+    } else {
+        // token is Tok::PipePipe, i.e., empty bind list in this context.
+        consume_token(context.tokens, Tok::PipePipe)?;
+        spanned(context.tokens.file_hash(), start_loc, start_loc + 1, vec![])
+    };
+    let body = Box::new(parse_exp(context)?);
+    let abilities_start = context.tokens.start_loc();
+    let abilities = parse_abilities(context)?;
+    if !abilities.is_empty() {
+        let abilities_end = context.tokens.previous_end_loc();
+        let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
+        require_move_2(context, loc, "Abilities on function expressions");
+    }
+
+    Ok(Exp_::Lambda(bindings, body, capture_kind, abilities))
+}
+
 // Parse an expression:
 //      Exp =
-//            <LambdaBindList> <Exp>
+//            ( "move" | "copy" | "&" )? <LambdaBindList> <Exp>
 //          | <Quantifier>                  spec only
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
@@ -1913,16 +1944,30 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let token = context.tokens.peek();
     let exp = match token {
-        Tok::Pipe | Tok::PipePipe => {
-            let bindings = if token == Tok::Pipe {
-                parse_lambda_bind_list(context)?
-            } else {
-                // token is Tok::PipePipe, i.e., empty bind list in this context.
-                consume_token(context.tokens, Tok::PipePipe)?;
-                spanned(context.tokens.file_hash(), start_loc, start_loc + 1, vec![])
+        Tok::Move | Tok::Copy | Tok::Amp
+            if matches!(
+                context.tokens.lookahead_with_start_loc(),
+                Ok((Tok::Pipe | Tok::PipePipe, _))
+            ) =>
+        {
+            let _ = require_move_2_and_advance(context, "Modifier on lambda expression"); // consume the Move/Copy/Amp
+            let capture_kind = match token {
+                Tok::Move => LambdaCaptureKind::Move,
+                Tok::Copy => LambdaCaptureKind::Copy,
+                Tok::Amp => LambdaCaptureKind::Borrow,
+                _ => {
+                    panic!("can't happen");
+                },
             };
-            let body = Box::new(parse_exp(context)?);
-            Exp_::Lambda(bindings, body)
+            parse_lambda(
+                context,
+                context.tokens.start_loc(),
+                capture_kind,
+                context.tokens.peek(),
+            )?
+        },
+        Tok::Pipe | Tok::PipePipe => {
+            parse_lambda(context, start_loc, LambdaCaptureKind::default(), token)?
         },
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
         _ => {
@@ -2169,6 +2214,7 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 //      DotOrIndexChain =
 //          <DotOrIndexChain> "." <Identifier> [ ["::" "<" Comma<Type> ">"]? <CallArgs> ]?
 //          | <DotOrIndexChain> "[" <Exp> "]"
+//          | <Term> <CallArgs>              // --> ExpCall
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2208,6 +2254,10 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
                 let exp = Exp_::Index(Box::new(lhs), Box::new(index));
                 consume_token(context.tokens, Tok::RBracket)?;
                 exp
+            },
+            Tok::LParen => {
+                let args = parse_call_args(context)?;
+                Exp_::ExpCall(Box::new(lhs), args)
             },
             _ => break,
         };
@@ -2443,11 +2493,18 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
                     Type_::Unit,
                 )
             };
+            let abilities_start = context.tokens.start_loc();
+            let abilities = parse_type_constraints(context)?;
+            if !abilities.is_empty() {
+                let abilities_end = context.tokens.previous_end_loc();
+                let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
+                require_move_2(context, loc, "Ability constraints on function types");
+            }
             return Ok(spanned(
                 context.tokens.file_hash(),
                 start_loc,
                 context.tokens.previous_end_loc(),
-                Type_::Fun(args, Box::new(result)),
+                Type_::Fun(args, Box::new(result), abilities),
             ));
         },
         _ => {
@@ -2522,6 +2579,27 @@ fn parse_ability(context: &mut Context) -> Result<Ability, Box<Diagnostic>> {
     }
 }
 
+// Parse an optional type constraint:
+//      Constraint =
+//          ( ":" <Ability> (+ <Ability>)* )?
+fn parse_type_constraints(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic>> {
+    if match_token(context.tokens, Tok::Colon)? {
+        parse_list(
+            context,
+            |context| match context.tokens.peek() {
+                Tok::Plus => {
+                    context.tokens.advance()?;
+                    Ok(true)
+                },
+                _ => Ok(false),
+            },
+            parse_ability,
+        )
+    } else {
+        Ok(vec![])
+    }
+}
+
 // Parse a type parameter:
 //      TypeParameter =
 //          <Identifier> <Constraint>?
@@ -2530,30 +2608,7 @@ fn parse_ability(context: &mut Context) -> Result<Ability, Box<Diagnostic>> {
 fn parse_type_parameter(context: &mut Context) -> Result<(Name, Vec<Ability>), Box<Diagnostic>> {
     let n = parse_identifier(context)?;
 
-    let ability_constraints = if match_token(context.tokens, Tok::Colon)? {
-        parse_list(
-            context,
-            |context| match context.tokens.peek() {
-                Tok::Plus => {
-                    context.tokens.advance()?;
-                    Ok(true)
-                },
-                Tok::Greater | Tok::Comma => Ok(false),
-                _ => Err(unexpected_token_error(
-                    context.tokens,
-                    &format!(
-                        "one of: '{}', '{}', or '{}'",
-                        Tok::Plus,
-                        Tok::Greater,
-                        Tok::Comma
-                    ),
-                )),
-            },
-            parse_ability,
-        )?
-    } else {
-        vec![]
-    };
+    let ability_constraints = parse_type_constraints(context)?;
     Ok((n, ability_constraints))
 }
 

@@ -536,10 +536,10 @@ error: Calls to function values other than inline function parameters not yet su
    ┌─ tests/lambda/inline-parity/subtype_args.move:24:9
    │
 24 │         f(&mut 0, &mut 0);
-   │         ^
+   │         ^^^^^^^^^^^^^^^^^
 
 error: Calls to function values other than inline function parameters not yet supported
    ┌─ tests/lambda/inline-parity/subtype_args.move:25:9
    │
 25 │         f(&0, &mut 0);
-   │         ^
+   │         ^^^^^^^^^^^^^

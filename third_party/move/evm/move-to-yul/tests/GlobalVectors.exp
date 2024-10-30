@@ -93,13 +93,13 @@ object "test_A2_GlobalVectors_test_borrow_mut_global" {
                     $t10 := $MakePtr(false, add($locals, 32))
                     // $t11 := move($t2)
                     $t11 := mload($locals)
-                    // $t12 := pack 0x2::GlobalVectors::T<u64>($t11)
+                    // $t12 := pack GlobalVectors::T<u64>($t11)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t11)
                         $t12 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u64>>($t12, $t10)
+                    // move_to<GlobalVectors::T<u64>>($t12, $t10)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $LoadU256($t10))
                         if $AlignedStorageLoad($base_offset) {
@@ -128,7 +128,7 @@ object "test_A2_GlobalVectors_test_borrow_mut_global" {
                     }
                     // $t13 := 0x42
                     $t13 := 0x42
-                    // $t14 := borrow_global<0x2::GlobalVectors::T<u64>>($t13)
+                    // $t14 := borrow_global<GlobalVectors::T<u64>>($t13)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t13)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -136,7 +136,7 @@ object "test_A2_GlobalVectors_test_borrow_mut_global" {
                         }
                         $t14 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t15 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t14)
+                    // $t15 := borrow_field<GlobalVectors::T<u64>>.v($t14)
                     $t15 := $t14
                     // $t16 := 0
                     $t16 := 0
@@ -148,7 +148,7 @@ object "test_A2_GlobalVectors_test_borrow_mut_global" {
                     $StoreU64($t17, $t18)
                     // $t19 := 0x42
                     $t19 := 0x42
-                    // $t20 := borrow_global<0x2::GlobalVectors::T<u64>>($t19)
+                    // $t20 := borrow_global<GlobalVectors::T<u64>>($t19)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t19)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -156,7 +156,7 @@ object "test_A2_GlobalVectors_test_borrow_mut_global" {
                         }
                         $t20 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t21 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t20)
+                    // $t21 := borrow_field<GlobalVectors::T<u64>>.v($t20)
                     $t21 := $t20
                     // $t22 := 0
                     $t22 := 0
@@ -502,13 +502,13 @@ object "test_A2_GlobalVectors_test_move_from" {
                     $t10 := $MakePtr(false, add($locals, 32))
                     // $t11 := move($t1)
                     $t11 := mload($locals)
-                    // $t12 := pack 0x2::GlobalVectors::T<u64>($t11)
+                    // $t12 := pack GlobalVectors::T<u64>($t11)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t11)
                         $t12 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u64>>($t12, $t10)
+                    // move_to<GlobalVectors::T<u64>>($t12, $t10)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $LoadU256($t10))
                         if $AlignedStorageLoad($base_offset) {
@@ -537,7 +537,7 @@ object "test_A2_GlobalVectors_test_move_from" {
                     }
                     // $t13 := 0x42
                     $t13 := 0x42
-                    // $t14 := move_from<0x2::GlobalVectors::T<u64>>($t13)
+                    // $t14 := move_from<GlobalVectors::T<u64>>($t13)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t13)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -569,7 +569,7 @@ object "test_A2_GlobalVectors_test_move_from" {
                             $t14 := $dst
                         }
                     }
-                    // $t2 := unpack 0x2::GlobalVectors::T<u64>($t14)
+                    // $t2 := unpack GlobalVectors::T<u64>($t14)
                     mstore(add($locals, 64), $MemoryLoadU256(add($t14, 0)))
                     $Free($t14, 32)
                     // $t15 := borrow_local($t2)
@@ -1060,7 +1060,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     $Abort($t25)
                 }
                 case 4 {
-                    // $t2 := vector::empty<0x2::GlobalVectors::S>()
+                    // $t2 := vector::empty<GlobalVectors::S>()
                     mstore($locals, A1_vector_empty$A2_GlobalVectors_S$())
                     // $t3 := borrow_local($t2)
                     $t3 := $MakePtr(false, $locals)
@@ -1068,14 +1068,14 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     $t4 := 10
                     // $t5 := 40
                     $t5 := 40
-                    // $t6 := pack 0x2::GlobalVectors::S($t4, $t5)
+                    // $t6 := pack GlobalVectors::S($t4, $t5)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t4)
                         $MemoryStoreU64(add($mem, 16), $t5)
                         $t6 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t3, $t6)
+                    // vector::push_back<GlobalVectors::S>($t3, $t6)
                     A1_vector_push_back$A2_GlobalVectors_S$($t3, $t6)
                     // $t7 := borrow_local($t2)
                     $t7 := $MakePtr(false, $locals)
@@ -1083,14 +1083,14 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     $t8 := 11
                     // $t9 := 41
                     $t9 := 41
-                    // $t10 := pack 0x2::GlobalVectors::S($t8, $t9)
+                    // $t10 := pack GlobalVectors::S($t8, $t9)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t8)
                         $MemoryStoreU64(add($mem, 16), $t9)
                         $t10 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t7, $t10)
+                    // vector::push_back<GlobalVectors::S>($t7, $t10)
                     A1_vector_push_back$A2_GlobalVectors_S$($t7, $t10)
                     // $t11 := borrow_local($t2)
                     $t11 := $MakePtr(false, $locals)
@@ -1098,14 +1098,14 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     $t12 := 12
                     // $t13 := 42
                     $t13 := 42
-                    // $t14 := pack 0x2::GlobalVectors::S($t12, $t13)
+                    // $t14 := pack GlobalVectors::S($t12, $t13)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t12)
                         $MemoryStoreU64(add($mem, 16), $t13)
                         $t14 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t11, $t14)
+                    // vector::push_back<GlobalVectors::S>($t11, $t14)
                     A1_vector_push_back$A2_GlobalVectors_S$($t11, $t14)
                     // $t15 := 0x42
                     $t15 := 0x42
@@ -1115,13 +1115,13 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     $t16 := $MakePtr(false, add($locals, 32))
                     // $t17 := move($t2)
                     $t17 := mload($locals)
-                    // $t18 := pack 0x2::GlobalVectors::T<0x2::GlobalVectors::S>($t17)
+                    // $t18 := pack GlobalVectors::T<GlobalVectors::S>($t17)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t17)
                         $t18 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t18, $t16)
+                    // move_to<GlobalVectors::T<GlobalVectors::S>>($t18, $t16)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $LoadU256($t16))
                         if $AlignedStorageLoad($base_offset) {
@@ -1156,7 +1156,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     }
                     // $t19 := 0x42
                     $t19 := 0x42
-                    // $t1 := move_from<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t19)
+                    // $t1 := move_from<GlobalVectors::T<GlobalVectors::S>>($t19)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t19)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -1197,9 +1197,9 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     }
                     // $t20 := borrow_local($t1)
                     $t20 := $MakePtr(false, local_t)
-                    // $t21 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t20)
+                    // $t21 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t20)
                     $t21 := $t20
-                    // $t22 := vector::length<0x2::GlobalVectors::S>($t21)
+                    // $t22 := vector::length<GlobalVectors::S>($t21)
                     $t22 := A1_vector_length$A2_GlobalVectors_S$($t21)
                     // $t23 := 3
                     $t23 := 3
@@ -1214,13 +1214,13 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     // label L2
                     // $t26 := borrow_local($t1)
                     $t26 := $MakePtr(false, local_t)
-                    // $t27 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t26)
+                    // $t27 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t26)
                     $t27 := $t26
                     // $t28 := 0
                     $t28 := 0
-                    // $t29 := vector::borrow<0x2::GlobalVectors::S>($t27, $t28)
+                    // $t29 := vector::borrow<GlobalVectors::S>($t27, $t28)
                     $t29 := A1_vector_borrow$A2_GlobalVectors_S$($t27, $t28)
-                    // $t30 := borrow_field<0x2::GlobalVectors::S>.x($t29)
+                    // $t30 := borrow_field<GlobalVectors::S>.x($t29)
                     $t30 := $t29
                     // $t31 := read_ref($t30)
                     $t31 := $LoadU128($t30)
@@ -1249,13 +1249,13 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     // label L5
                     // $t35 := borrow_local($t1)
                     $t35 := $MakePtr(false, local_t)
-                    // $t36 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t35)
+                    // $t36 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t35)
                     $t36 := $t35
                     // $t37 := 1
                     $t37 := 1
-                    // $t38 := vector::borrow<0x2::GlobalVectors::S>($t36, $t37)
+                    // $t38 := vector::borrow<GlobalVectors::S>($t36, $t37)
                     $t38 := A1_vector_borrow$A2_GlobalVectors_S$($t36, $t37)
-                    // $t39 := borrow_field<0x2::GlobalVectors::S>.x($t38)
+                    // $t39 := borrow_field<GlobalVectors::S>.x($t38)
                     $t39 := $t38
                     // $t40 := read_ref($t39)
                     $t40 := $LoadU128($t39)
@@ -1284,13 +1284,13 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_struct" {
                     // label L8
                     // $t44 := borrow_local($t1)
                     $t44 := $MakePtr(false, local_t)
-                    // $t45 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t44)
+                    // $t45 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t44)
                     $t45 := $t44
                     // $t46 := 2
                     $t46 := 2
-                    // $t47 := vector::borrow<0x2::GlobalVectors::S>($t45, $t46)
+                    // $t47 := vector::borrow<GlobalVectors::S>($t45, $t46)
                     $t47 := A1_vector_borrow$A2_GlobalVectors_S$($t45, $t46)
-                    // $t48 := borrow_field<0x2::GlobalVectors::S>.x($t47)
+                    // $t48 := borrow_field<GlobalVectors::S>.x($t47)
                     $t48 := $t47
                     // $t49 := read_ref($t48)
                     $t49 := $LoadU128($t48)
@@ -1685,13 +1685,13 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_vector" {
                     $t13 := $MakePtr(false, add($locals, 32))
                     // $t14 := move($t2)
                     $t14 := mload($locals)
-                    // $t15 := pack 0x2::GlobalVectors::T<vector<u64>>($t14)
+                    // $t15 := pack GlobalVectors::T<vector<u64>>($t14)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t14)
                         $t15 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<vector<u64>>>($t15, $t13)
+                    // move_to<GlobalVectors::T<vector<u64>>>($t15, $t13)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $LoadU256($t13))
                         if $AlignedStorageLoad($base_offset) {
@@ -1733,7 +1733,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_vector" {
                     }
                     // $t16 := 0x42
                     $t16 := 0x42
-                    // $t1 := move_from<0x2::GlobalVectors::T<vector<u64>>>($t16)
+                    // $t1 := move_from<GlobalVectors::T<vector<u64>>>($t16)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $t16)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -1783,7 +1783,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_vector" {
                     }
                     // $t17 := borrow_local($t1)
                     $t17 := $MakePtr(false, local_t)
-                    // $t18 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t17)
+                    // $t18 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t17)
                     $t18 := $t17
                     // $t19 := vector::length<vector<u64>>($t18)
                     $t19 := A1_vector_length$vec$u64$$($t18)
@@ -1800,7 +1800,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_vector" {
                     // label L2
                     // $t23 := borrow_local($t1)
                     $t23 := $MakePtr(false, local_t)
-                    // $t24 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t23)
+                    // $t24 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t23)
                     $t24 := $t23
                     // $t25 := 0
                     $t25 := 0
@@ -1837,7 +1837,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_vector" {
                     // label L5
                     // $t33 := borrow_local($t1)
                     $t33 := $MakePtr(false, local_t)
-                    // $t34 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t33)
+                    // $t34 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t33)
                     $t34 := $t33
                     // $t35 := 1
                     $t35 := 1
@@ -1874,7 +1874,7 @@ object "test_A2_GlobalVectors_test_move_from_vector_of_vector" {
                     // label L8
                     // $t43 := borrow_local($t1)
                     $t43 := $MakePtr(false, local_t)
-                    // $t44 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t43)
+                    // $t44 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t43)
                     $t44 := $t43
                     // $t45 := 2
                     $t45 := 2
@@ -2298,13 +2298,13 @@ object "test_A2_GlobalVectors_test_move_to" {
                     $t9 := $MakePtr(false, add($locals, 32))
                     // $t10 := move($t1)
                     $t10 := mload($locals)
-                    // $t11 := pack 0x2::GlobalVectors::T<u64>($t10)
+                    // $t11 := pack GlobalVectors::T<u64>($t10)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t10)
                         $t11 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u64>>($t11, $t9)
+                    // move_to<GlobalVectors::T<u64>>($t11, $t9)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $LoadU256($t9))
                         if $AlignedStorageLoad($base_offset) {
@@ -2333,7 +2333,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                     }
                     // $t12 := 0x42
                     $t12 := 0x42
-                    // $t13 := borrow_global<0x2::GlobalVectors::T<u64>>($t12)
+                    // $t13 := borrow_global<GlobalVectors::T<u64>>($t12)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t12)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2341,7 +2341,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                         }
                         $t13 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t14 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t13)
+                    // $t14 := borrow_field<GlobalVectors::T<u64>>.v($t13)
                     $t14 := $t13
                     // $t15 := vector::length<u64>($t14)
                     $t15 := A1_vector_length$u64$($t14)
@@ -2358,7 +2358,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                     // label L2
                     // $t19 := 0x42
                     $t19 := 0x42
-                    // $t20 := borrow_global<0x2::GlobalVectors::T<u64>>($t19)
+                    // $t20 := borrow_global<GlobalVectors::T<u64>>($t19)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t19)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2366,7 +2366,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                         }
                         $t20 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t21 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t20)
+                    // $t21 := borrow_field<GlobalVectors::T<u64>>.v($t20)
                     $t21 := $t20
                     // $t22 := 0
                     $t22 := 0
@@ -2399,7 +2399,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                     // label L5
                     // $t28 := 0x42
                     $t28 := 0x42
-                    // $t29 := borrow_global<0x2::GlobalVectors::T<u64>>($t28)
+                    // $t29 := borrow_global<GlobalVectors::T<u64>>($t28)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t28)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2407,7 +2407,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                         }
                         $t29 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t30 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t29)
+                    // $t30 := borrow_field<GlobalVectors::T<u64>>.v($t29)
                     $t30 := $t29
                     // $t31 := 1
                     $t31 := 1
@@ -2440,7 +2440,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                     // label L8
                     // $t37 := 0x42
                     $t37 := 0x42
-                    // $t38 := borrow_global<0x2::GlobalVectors::T<u64>>($t37)
+                    // $t38 := borrow_global<GlobalVectors::T<u64>>($t37)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t37)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2448,7 +2448,7 @@ object "test_A2_GlobalVectors_test_move_to" {
                         }
                         $t38 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t39 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t38)
+                    // $t39 := borrow_field<GlobalVectors::T<u64>>.v($t38)
                     $t39 := $t38
                     // $t40 := 2
                     $t40 := 2
@@ -2776,7 +2776,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     $Abort($t24)
                 }
                 case 4 {
-                    // $t1 := vector::empty<0x2::GlobalVectors::S>()
+                    // $t1 := vector::empty<GlobalVectors::S>()
                     mstore($locals, A1_vector_empty$A2_GlobalVectors_S$())
                     // $t2 := borrow_local($t1)
                     $t2 := $MakePtr(false, $locals)
@@ -2784,14 +2784,14 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     $t3 := 10
                     // $t4 := 40
                     $t4 := 40
-                    // $t5 := pack 0x2::GlobalVectors::S($t3, $t4)
+                    // $t5 := pack GlobalVectors::S($t3, $t4)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t3)
                         $MemoryStoreU64(add($mem, 16), $t4)
                         $t5 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t2, $t5)
+                    // vector::push_back<GlobalVectors::S>($t2, $t5)
                     A1_vector_push_back$A2_GlobalVectors_S$($t2, $t5)
                     // $t6 := borrow_local($t1)
                     $t6 := $MakePtr(false, $locals)
@@ -2799,14 +2799,14 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     $t7 := 11
                     // $t8 := 41
                     $t8 := 41
-                    // $t9 := pack 0x2::GlobalVectors::S($t7, $t8)
+                    // $t9 := pack GlobalVectors::S($t7, $t8)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t7)
                         $MemoryStoreU64(add($mem, 16), $t8)
                         $t9 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t6, $t9)
+                    // vector::push_back<GlobalVectors::S>($t6, $t9)
                     A1_vector_push_back$A2_GlobalVectors_S$($t6, $t9)
                     // $t10 := borrow_local($t1)
                     $t10 := $MakePtr(false, $locals)
@@ -2814,14 +2814,14 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     $t11 := 12
                     // $t12 := 42
                     $t12 := 42
-                    // $t13 := pack 0x2::GlobalVectors::S($t11, $t12)
+                    // $t13 := pack GlobalVectors::S($t11, $t12)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t11)
                         $MemoryStoreU64(add($mem, 16), $t12)
                         $t13 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t10, $t13)
+                    // vector::push_back<GlobalVectors::S>($t10, $t13)
                     A1_vector_push_back$A2_GlobalVectors_S$($t10, $t13)
                     // $t14 := 0x42
                     $t14 := 0x42
@@ -2831,13 +2831,13 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     $t15 := $MakePtr(false, add($locals, 32))
                     // $t16 := move($t1)
                     $t16 := mload($locals)
-                    // $t17 := pack 0x2::GlobalVectors::T<0x2::GlobalVectors::S>($t16)
+                    // $t17 := pack GlobalVectors::T<GlobalVectors::S>($t16)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t16)
                         $t17 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t17, $t15)
+                    // move_to<GlobalVectors::T<GlobalVectors::S>>($t17, $t15)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $LoadU256($t15))
                         if $AlignedStorageLoad($base_offset) {
@@ -2872,7 +2872,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     }
                     // $t18 := 0x42
                     $t18 := 0x42
-                    // $t19 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t18)
+                    // $t19 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t18)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t18)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2880,9 +2880,9 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                         }
                         $t19 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t20 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t19)
+                    // $t20 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t19)
                     $t20 := $t19
-                    // $t21 := vector::length<0x2::GlobalVectors::S>($t20)
+                    // $t21 := vector::length<GlobalVectors::S>($t20)
                     $t21 := A1_vector_length$A2_GlobalVectors_S$($t20)
                     // $t22 := 3
                     $t22 := 3
@@ -2897,7 +2897,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     // label L2
                     // $t25 := 0x42
                     $t25 := 0x42
-                    // $t26 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t25)
+                    // $t26 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t25)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t25)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2905,13 +2905,13 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                         }
                         $t26 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t27 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t26)
+                    // $t27 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t26)
                     $t27 := $t26
                     // $t28 := 0
                     $t28 := 0
-                    // $t29 := vector::borrow<0x2::GlobalVectors::S>($t27, $t28)
+                    // $t29 := vector::borrow<GlobalVectors::S>($t27, $t28)
                     $t29 := A1_vector_borrow$A2_GlobalVectors_S$($t27, $t28)
-                    // $t30 := borrow_field<0x2::GlobalVectors::S>.x($t29)
+                    // $t30 := borrow_field<GlobalVectors::S>.x($t29)
                     $t30 := $t29
                     // $t31 := read_ref($t30)
                     $t31 := $LoadU128($t30)
@@ -2940,7 +2940,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     // label L5
                     // $t35 := 0x42
                     $t35 := 0x42
-                    // $t36 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t35)
+                    // $t36 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t35)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t35)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2948,13 +2948,13 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                         }
                         $t36 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t37 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t36)
+                    // $t37 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t36)
                     $t37 := $t36
                     // $t38 := 1
                     $t38 := 1
-                    // $t39 := vector::borrow<0x2::GlobalVectors::S>($t37, $t38)
+                    // $t39 := vector::borrow<GlobalVectors::S>($t37, $t38)
                     $t39 := A1_vector_borrow$A2_GlobalVectors_S$($t37, $t38)
-                    // $t40 := borrow_field<0x2::GlobalVectors::S>.x($t39)
+                    // $t40 := borrow_field<GlobalVectors::S>.x($t39)
                     $t40 := $t39
                     // $t41 := read_ref($t40)
                     $t41 := $LoadU128($t40)
@@ -2983,7 +2983,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                     // label L8
                     // $t45 := 0x42
                     $t45 := 0x42
-                    // $t46 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t45)
+                    // $t46 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t45)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t45)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -2991,13 +2991,13 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_struct" {
                         }
                         $t46 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t47 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t46)
+                    // $t47 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t46)
                     $t47 := $t46
                     // $t48 := 2
                     $t48 := 2
-                    // $t49 := vector::borrow<0x2::GlobalVectors::S>($t47, $t48)
+                    // $t49 := vector::borrow<GlobalVectors::S>($t47, $t48)
                     $t49 := A1_vector_borrow$A2_GlobalVectors_S$($t47, $t48)
-                    // $t50 := borrow_field<0x2::GlobalVectors::S>.x($t49)
+                    // $t50 := borrow_field<GlobalVectors::S>.x($t49)
                     $t50 := $t49
                     // $t51 := read_ref($t50)
                     $t51 := $LoadU128($t50)
@@ -3383,13 +3383,13 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                     $t12 := $MakePtr(false, add($locals, 32))
                     // $t13 := move($t1)
                     $t13 := mload($locals)
-                    // $t14 := pack 0x2::GlobalVectors::T<vector<u64>>($t13)
+                    // $t14 := pack GlobalVectors::T<vector<u64>>($t13)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t13)
                         $t14 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<vector<u64>>>($t14, $t12)
+                    // move_to<GlobalVectors::T<vector<u64>>>($t14, $t12)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $LoadU256($t12))
                         if $AlignedStorageLoad($base_offset) {
@@ -3431,7 +3431,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                     }
                     // $t15 := 0x42
                     $t15 := 0x42
-                    // $t16 := borrow_global<0x2::GlobalVectors::T<vector<u64>>>($t15)
+                    // $t16 := borrow_global<GlobalVectors::T<vector<u64>>>($t15)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $t15)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -3439,7 +3439,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                         }
                         $t16 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t17 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t16)
+                    // $t17 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t16)
                     $t17 := $t16
                     // $t18 := vector::length<vector<u64>>($t17)
                     $t18 := A1_vector_length$vec$u64$$($t17)
@@ -3456,7 +3456,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                     // label L2
                     // $t22 := 0x42
                     $t22 := 0x42
-                    // $t23 := borrow_global<0x2::GlobalVectors::T<vector<u64>>>($t22)
+                    // $t23 := borrow_global<GlobalVectors::T<vector<u64>>>($t22)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $t22)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -3464,7 +3464,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                         }
                         $t23 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t24 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t23)
+                    // $t24 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t23)
                     $t24 := $t23
                     // $t25 := 0
                     $t25 := 0
@@ -3501,7 +3501,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                     // label L5
                     // $t33 := 0x42
                     $t33 := 0x42
-                    // $t34 := borrow_global<0x2::GlobalVectors::T<vector<u64>>>($t33)
+                    // $t34 := borrow_global<GlobalVectors::T<vector<u64>>>($t33)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $t33)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -3509,7 +3509,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                         }
                         $t34 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t35 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t34)
+                    // $t35 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t34)
                     $t35 := $t34
                     // $t36 := 1
                     $t36 := 1
@@ -3546,7 +3546,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                     // label L8
                     // $t44 := 0x42
                     $t44 := 0x42
-                    // $t45 := borrow_global<0x2::GlobalVectors::T<vector<u64>>>($t44)
+                    // $t45 := borrow_global<GlobalVectors::T<vector<u64>>>($t44)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x9947b477, $t44)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -3554,7 +3554,7 @@ object "test_A2_GlobalVectors_test_move_to_vector_of_vector" {
                         }
                         $t45 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t46 := borrow_field<0x2::GlobalVectors::T<vector<u64>>>.v($t45)
+                    // $t46 := borrow_field<GlobalVectors::T<vector<u64>>>.v($t45)
                     $t46 := $t45
                     // $t47 := 2
                     $t47 := 2
@@ -3969,13 +3969,13 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                     $t9 := $MakePtr(false, add($locals, 32))
                     // $t10 := move($t1)
                     $t10 := mload($locals)
-                    // $t11 := pack 0x2::GlobalVectors::T<u64>($t10)
+                    // $t11 := pack GlobalVectors::T<u64>($t10)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t10)
                         $t11 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u64>>($t11, $t9)
+                    // move_to<GlobalVectors::T<u64>>($t11, $t9)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $LoadU256($t9))
                         if $AlignedStorageLoad($base_offset) {
@@ -4004,7 +4004,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                     }
                     // $t12 := 0x42
                     $t12 := 0x42
-                    // $t13 := borrow_global<0x2::GlobalVectors::T<u64>>($t12)
+                    // $t13 := borrow_global<GlobalVectors::T<u64>>($t12)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t12)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4012,7 +4012,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                         }
                         $t13 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t14 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t13)
+                    // $t14 := borrow_field<GlobalVectors::T<u64>>.v($t13)
                     $t14 := $t13
                     // $t15 := vector::pop_back<u64>($t14)
                     $t15 := A1_vector_pop_back$u64$($t14)
@@ -4029,7 +4029,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                     // label L2
                     // $t19 := 0x42
                     $t19 := 0x42
-                    // $t20 := borrow_global<0x2::GlobalVectors::T<u64>>($t19)
+                    // $t20 := borrow_global<GlobalVectors::T<u64>>($t19)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t19)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4037,7 +4037,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                         }
                         $t20 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t21 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t20)
+                    // $t21 := borrow_field<GlobalVectors::T<u64>>.v($t20)
                     $t21 := $t20
                     // $t22 := vector::length<u64>($t21)
                     $t22 := A1_vector_length$u64$($t21)
@@ -4066,7 +4066,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                     // label L5
                     // $t26 := 0x42
                     $t26 := 0x42
-                    // $t27 := borrow_global<0x2::GlobalVectors::T<u64>>($t26)
+                    // $t27 := borrow_global<GlobalVectors::T<u64>>($t26)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t26)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4074,7 +4074,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                         }
                         $t27 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t28 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t27)
+                    // $t28 := borrow_field<GlobalVectors::T<u64>>.v($t27)
                     $t28 := $t27
                     // $t29 := vector::pop_back<u64>($t28)
                     $t29 := A1_vector_pop_back$u64$($t28)
@@ -4103,7 +4103,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                     // label L8
                     // $t33 := 0x42
                     $t33 := 0x42
-                    // $t34 := borrow_global<0x2::GlobalVectors::T<u64>>($t33)
+                    // $t34 := borrow_global<GlobalVectors::T<u64>>($t33)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t33)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4111,7 +4111,7 @@ object "test_A2_GlobalVectors_test_pop_back_global" {
                         }
                         $t34 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t35 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t34)
+                    // $t35 := borrow_field<GlobalVectors::T<u64>>.v($t34)
                     $t35 := $t34
                     // $t36 := vector::length<u64>($t35)
                     $t36 := A1_vector_length$u64$($t35)
@@ -4425,7 +4425,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     // label L1
                     // $t29 := borrow_local($t3)
                     $t29 := $MakePtr(false, e)
-                    // $t30 := borrow_field<0x2::GlobalVectors::S>.y($t29)
+                    // $t30 := borrow_field<GlobalVectors::S>.y($t29)
                     $t30 := $IndexPtr($t29, 16)
                     // $t31 := read_ref($t30)
                     $t31 := $LoadU64($t30)
@@ -4446,7 +4446,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     $block := 5
                 }
                 case 4 {
-                    // $t4 := vector::empty<0x2::GlobalVectors::S>()
+                    // $t4 := vector::empty<GlobalVectors::S>()
                     mstore($locals, A1_vector_empty$A2_GlobalVectors_S$())
                     // $t5 := borrow_local($t4)
                     $t5 := $MakePtr(false, $locals)
@@ -4454,14 +4454,14 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     $t6 := 10
                     // $t7 := 40
                     $t7 := 40
-                    // $t8 := pack 0x2::GlobalVectors::S($t6, $t7)
+                    // $t8 := pack GlobalVectors::S($t6, $t7)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t6)
                         $MemoryStoreU64(add($mem, 16), $t7)
                         $t8 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t5, $t8)
+                    // vector::push_back<GlobalVectors::S>($t5, $t8)
                     A1_vector_push_back$A2_GlobalVectors_S$($t5, $t8)
                     // $t9 := borrow_local($t4)
                     $t9 := $MakePtr(false, $locals)
@@ -4469,14 +4469,14 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     $t10 := 11
                     // $t11 := 41
                     $t11 := 41
-                    // $t12 := pack 0x2::GlobalVectors::S($t10, $t11)
+                    // $t12 := pack GlobalVectors::S($t10, $t11)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t10)
                         $MemoryStoreU64(add($mem, 16), $t11)
                         $t12 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t9, $t12)
+                    // vector::push_back<GlobalVectors::S>($t9, $t12)
                     A1_vector_push_back$A2_GlobalVectors_S$($t9, $t12)
                     // $t13 := borrow_local($t4)
                     $t13 := $MakePtr(false, $locals)
@@ -4484,14 +4484,14 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     $t14 := 12
                     // $t15 := 42
                     $t15 := 42
-                    // $t16 := pack 0x2::GlobalVectors::S($t14, $t15)
+                    // $t16 := pack GlobalVectors::S($t14, $t15)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t14)
                         $MemoryStoreU64(add($mem, 16), $t15)
                         $t16 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t13, $t16)
+                    // vector::push_back<GlobalVectors::S>($t13, $t16)
                     A1_vector_push_back$A2_GlobalVectors_S$($t13, $t16)
                     // $t17 := 0x42
                     $t17 := 0x42
@@ -4501,13 +4501,13 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     $t18 := $MakePtr(false, add($locals, 32))
                     // $t19 := move($t4)
                     $t19 := mload($locals)
-                    // $t20 := pack 0x2::GlobalVectors::T<0x2::GlobalVectors::S>($t19)
+                    // $t20 := pack GlobalVectors::T<GlobalVectors::S>($t19)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t19)
                         $t20 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t20, $t18)
+                    // move_to<GlobalVectors::T<GlobalVectors::S>>($t20, $t18)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $LoadU256($t18))
                         if $AlignedStorageLoad($base_offset) {
@@ -4542,7 +4542,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     }
                     // $t21 := 0x42
                     $t21 := 0x42
-                    // $t22 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t21)
+                    // $t22 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t21)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t21)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4550,13 +4550,13 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                         }
                         $t22 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t23 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t22)
+                    // $t23 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t22)
                     $t23 := $t22
-                    // $t3 := vector::pop_back<0x2::GlobalVectors::S>($t23)
+                    // $t3 := vector::pop_back<GlobalVectors::S>($t23)
                     e := A1_vector_pop_back$A2_GlobalVectors_S$($t23)
                     // $t24 := borrow_local($t3)
                     $t24 := $MakePtr(false, e)
-                    // $t25 := borrow_field<0x2::GlobalVectors::S>.x($t24)
+                    // $t25 := borrow_field<GlobalVectors::S>.x($t24)
                     $t25 := $t24
                     // $t26 := read_ref($t25)
                     $t26 := $LoadU128($t25)
@@ -4592,7 +4592,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     // label L5
                     // $t35 := 0x42
                     $t35 := 0x42
-                    // $t36 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t35)
+                    // $t36 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t35)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t35)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4600,9 +4600,9 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                         }
                         $t36 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t37 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t36)
+                    // $t37 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t36)
                     $t37 := $t36
-                    // $t38 := vector::length<0x2::GlobalVectors::S>($t37)
+                    // $t38 := vector::length<GlobalVectors::S>($t37)
                     $t38 := A1_vector_length$A2_GlobalVectors_S$($t37)
                     // $t39 := 2
                     $t39 := 2
@@ -4629,7 +4629,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     // label L8
                     // $t42 := 0x42
                     $t42 := 0x42
-                    // $t43 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t42)
+                    // $t43 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t42)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t42)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4637,13 +4637,13 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                         }
                         $t43 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t44 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t43)
+                    // $t44 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t43)
                     $t44 := $t43
-                    // $t3 := vector::pop_back<0x2::GlobalVectors::S>($t44)
+                    // $t3 := vector::pop_back<GlobalVectors::S>($t44)
                     e := A1_vector_pop_back$A2_GlobalVectors_S$($t44)
                     // $t45 := borrow_local($t3)
                     $t45 := $MakePtr(false, e)
-                    // $t46 := borrow_field<0x2::GlobalVectors::S>.x($t45)
+                    // $t46 := borrow_field<GlobalVectors::S>.x($t45)
                     $t46 := $t45
                     // $t47 := read_ref($t46)
                     $t47 := $LoadU128($t46)
@@ -4660,7 +4660,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     // label L10
                     // $t50 := borrow_local($t3)
                     $t50 := $MakePtr(false, e)
-                    // $t51 := borrow_field<0x2::GlobalVectors::S>.y($t50)
+                    // $t51 := borrow_field<GlobalVectors::S>.y($t50)
                     $t51 := $IndexPtr($t50, 16)
                     // $t52 := read_ref($t51)
                     $t52 := $LoadU64($t51)
@@ -4703,7 +4703,7 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                     // label L14
                     // $t56 := 0x42
                     $t56 := 0x42
-                    // $t57 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t56)
+                    // $t57 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t56)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t56)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -4711,9 +4711,9 @@ object "test_A2_GlobalVectors_test_pop_back_struct_global" {
                         }
                         $t57 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t58 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t57)
+                    // $t58 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t57)
                     $t58 := $t57
-                    // $t59 := vector::length<0x2::GlobalVectors::S>($t58)
+                    // $t59 := vector::length<GlobalVectors::S>($t58)
                     $t59 := A1_vector_length$A2_GlobalVectors_S$($t58)
                     // $t60 := 1
                     $t60 := 1
@@ -5096,13 +5096,13 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     $t9 := $MakePtr(false, add($locals, 32))
                     // $t10 := copy($t1)
                     $t10 := mload($locals)
-                    // $t11 := pack 0x2::GlobalVectors::T<u64>($t10)
+                    // $t11 := pack GlobalVectors::T<u64>($t10)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t10)
                         $t11 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u64>>($t11, $t9)
+                    // move_to<GlobalVectors::T<u64>>($t11, $t9)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $LoadU256($t9))
                         if $AlignedStorageLoad($base_offset) {
@@ -5131,7 +5131,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     }
                     // $t12 := 0x42
                     $t12 := 0x42
-                    // $t13 := borrow_global<0x2::GlobalVectors::T<u64>>($t12)
+                    // $t13 := borrow_global<GlobalVectors::T<u64>>($t12)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t12)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5139,7 +5139,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t13 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t14 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t13)
+                    // $t14 := borrow_field<GlobalVectors::T<u64>>.v($t13)
                     $t14 := $t13
                     // $t15 := 13
                     $t15 := 13
@@ -5147,7 +5147,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     A1_vector_push_back$u64$($t14, $t15)
                     // $t16 := 0x42
                     $t16 := 0x42
-                    // $t17 := borrow_global<0x2::GlobalVectors::T<u64>>($t16)
+                    // $t17 := borrow_global<GlobalVectors::T<u64>>($t16)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t16)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5155,7 +5155,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t17 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t18 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t17)
+                    // $t18 := borrow_field<GlobalVectors::T<u64>>.v($t17)
                     $t18 := $t17
                     // $t19 := 14
                     $t19 := 14
@@ -5163,7 +5163,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     A1_vector_push_back$u64$($t18, $t19)
                     // $t20 := 0x42
                     $t20 := 0x42
-                    // $t21 := borrow_global<0x2::GlobalVectors::T<u64>>($t20)
+                    // $t21 := borrow_global<GlobalVectors::T<u64>>($t20)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t20)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5171,7 +5171,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t21 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t22 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t21)
+                    // $t22 := borrow_field<GlobalVectors::T<u64>>.v($t21)
                     $t22 := $t21
                     // $t23 := vector::length<u64>($t22)
                     $t23 := A1_vector_length$u64$($t22)
@@ -5188,7 +5188,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     // label L2
                     // $t27 := 0x42
                     $t27 := 0x42
-                    // $t28 := borrow_global<0x2::GlobalVectors::T<u64>>($t27)
+                    // $t28 := borrow_global<GlobalVectors::T<u64>>($t27)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t27)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5196,7 +5196,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t28 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t29 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t28)
+                    // $t29 := borrow_field<GlobalVectors::T<u64>>.v($t28)
                     $t29 := $t28
                     // $t30 := 0
                     $t30 := 0
@@ -5229,7 +5229,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     // label L5
                     // $t36 := 0x42
                     $t36 := 0x42
-                    // $t37 := borrow_global<0x2::GlobalVectors::T<u64>>($t36)
+                    // $t37 := borrow_global<GlobalVectors::T<u64>>($t36)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t36)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5237,7 +5237,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t37 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t38 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t37)
+                    // $t38 := borrow_field<GlobalVectors::T<u64>>.v($t37)
                     $t38 := $t37
                     // $t39 := 1
                     $t39 := 1
@@ -5270,7 +5270,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     // label L8
                     // $t45 := 0x42
                     $t45 := 0x42
-                    // $t46 := borrow_global<0x2::GlobalVectors::T<u64>>($t45)
+                    // $t46 := borrow_global<GlobalVectors::T<u64>>($t45)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t45)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5278,7 +5278,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t46 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t47 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t46)
+                    // $t47 := borrow_field<GlobalVectors::T<u64>>.v($t46)
                     $t47 := $t46
                     // $t48 := 2
                     $t48 := 2
@@ -5311,7 +5311,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     // label L11
                     // $t54 := 0x42
                     $t54 := 0x42
-                    // $t55 := borrow_global<0x2::GlobalVectors::T<u64>>($t54)
+                    // $t55 := borrow_global<GlobalVectors::T<u64>>($t54)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t54)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5319,7 +5319,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t55 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t56 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t55)
+                    // $t56 := borrow_field<GlobalVectors::T<u64>>.v($t55)
                     $t56 := $t55
                     // $t57 := 3
                     $t57 := 3
@@ -5352,7 +5352,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                     // label L14
                     // $t63 := 0x42
                     $t63 := 0x42
-                    // $t64 := borrow_global<0x2::GlobalVectors::T<u64>>($t63)
+                    // $t64 := borrow_global<GlobalVectors::T<u64>>($t63)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t63)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5360,7 +5360,7 @@ object "test_A2_GlobalVectors_test_push_back_global" {
                         }
                         $t64 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t65 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t64)
+                    // $t65 := borrow_field<GlobalVectors::T<u64>>.v($t64)
                     $t65 := $t64
                     // $t66 := 4
                     $t66 := 4
@@ -5688,7 +5688,7 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     $Abort($t36)
                 }
                 case 4 {
-                    // $t1 := vector::empty<0x2::GlobalVectors::S>()
+                    // $t1 := vector::empty<GlobalVectors::S>()
                     mstore($locals, A1_vector_empty$A2_GlobalVectors_S$())
                     // $t2 := borrow_local($t1)
                     $t2 := $MakePtr(false, $locals)
@@ -5696,14 +5696,14 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     $t3 := 10
                     // $t4 := 40
                     $t4 := 40
-                    // $t5 := pack 0x2::GlobalVectors::S($t3, $t4)
+                    // $t5 := pack GlobalVectors::S($t3, $t4)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t3)
                         $MemoryStoreU64(add($mem, 16), $t4)
                         $t5 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t2, $t5)
+                    // vector::push_back<GlobalVectors::S>($t2, $t5)
                     A1_vector_push_back$A2_GlobalVectors_S$($t2, $t5)
                     // $t6 := borrow_local($t1)
                     $t6 := $MakePtr(false, $locals)
@@ -5711,14 +5711,14 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     $t7 := 11
                     // $t8 := 41
                     $t8 := 41
-                    // $t9 := pack 0x2::GlobalVectors::S($t7, $t8)
+                    // $t9 := pack GlobalVectors::S($t7, $t8)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t7)
                         $MemoryStoreU64(add($mem, 16), $t8)
                         $t9 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t6, $t9)
+                    // vector::push_back<GlobalVectors::S>($t6, $t9)
                     A1_vector_push_back$A2_GlobalVectors_S$($t6, $t9)
                     // $t10 := borrow_local($t1)
                     $t10 := $MakePtr(false, $locals)
@@ -5726,14 +5726,14 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     $t11 := 12
                     // $t12 := 42
                     $t12 := 42
-                    // $t13 := pack 0x2::GlobalVectors::S($t11, $t12)
+                    // $t13 := pack GlobalVectors::S($t11, $t12)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t11)
                         $MemoryStoreU64(add($mem, 16), $t12)
                         $t13 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t10, $t13)
+                    // vector::push_back<GlobalVectors::S>($t10, $t13)
                     A1_vector_push_back$A2_GlobalVectors_S$($t10, $t13)
                     // $t14 := 0x42
                     $t14 := 0x42
@@ -5743,13 +5743,13 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     $t15 := $MakePtr(false, add($locals, 32))
                     // $t16 := move($t1)
                     $t16 := mload($locals)
-                    // $t17 := pack 0x2::GlobalVectors::T<0x2::GlobalVectors::S>($t16)
+                    // $t17 := pack GlobalVectors::T<GlobalVectors::S>($t16)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t16)
                         $t17 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t17, $t15)
+                    // move_to<GlobalVectors::T<GlobalVectors::S>>($t17, $t15)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $LoadU256($t15))
                         if $AlignedStorageLoad($base_offset) {
@@ -5784,7 +5784,7 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     }
                     // $t18 := 0x42
                     $t18 := 0x42
-                    // $t19 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t18)
+                    // $t19 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t18)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t18)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5792,24 +5792,24 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                         }
                         $t19 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t20 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t19)
+                    // $t20 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t19)
                     $t20 := $t19
                     // $t21 := 13
                     $t21 := 13
                     // $t22 := 43
                     $t22 := 43
-                    // $t23 := pack 0x2::GlobalVectors::S($t21, $t22)
+                    // $t23 := pack GlobalVectors::S($t21, $t22)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t21)
                         $MemoryStoreU64(add($mem, 16), $t22)
                         $t23 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t20, $t23)
+                    // vector::push_back<GlobalVectors::S>($t20, $t23)
                     A1_vector_push_back$A2_GlobalVectors_S$($t20, $t23)
                     // $t24 := 0x42
                     $t24 := 0x42
-                    // $t25 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t24)
+                    // $t25 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t24)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t24)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5817,24 +5817,24 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                         }
                         $t25 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t26 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t25)
+                    // $t26 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t25)
                     $t26 := $t25
                     // $t27 := 14
                     $t27 := 14
                     // $t28 := 44
                     $t28 := 44
-                    // $t29 := pack 0x2::GlobalVectors::S($t27, $t28)
+                    // $t29 := pack GlobalVectors::S($t27, $t28)
                     {
                         let $mem := $Malloc(24)
                         $MemoryStoreU128(add($mem, 0), $t27)
                         $MemoryStoreU64(add($mem, 16), $t28)
                         $t29 := $mem
                     }
-                    // vector::push_back<0x2::GlobalVectors::S>($t26, $t29)
+                    // vector::push_back<GlobalVectors::S>($t26, $t29)
                     A1_vector_push_back$A2_GlobalVectors_S$($t26, $t29)
                     // $t30 := 0x42
                     $t30 := 0x42
-                    // $t31 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t30)
+                    // $t31 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t30)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t30)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5842,9 +5842,9 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                         }
                         $t31 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t32 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t31)
+                    // $t32 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t31)
                     $t32 := $t31
-                    // $t33 := vector::length<0x2::GlobalVectors::S>($t32)
+                    // $t33 := vector::length<GlobalVectors::S>($t32)
                     $t33 := A1_vector_length$A2_GlobalVectors_S$($t32)
                     // $t34 := 5
                     $t34 := 5
@@ -5859,7 +5859,7 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     // label L2
                     // $t37 := 0x42
                     $t37 := 0x42
-                    // $t38 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t37)
+                    // $t38 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t37)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t37)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5867,13 +5867,13 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                         }
                         $t38 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t39 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t38)
+                    // $t39 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t38)
                     $t39 := $t38
                     // $t40 := 0
                     $t40 := 0
-                    // $t41 := vector::borrow<0x2::GlobalVectors::S>($t39, $t40)
+                    // $t41 := vector::borrow<GlobalVectors::S>($t39, $t40)
                     $t41 := A1_vector_borrow$A2_GlobalVectors_S$($t39, $t40)
-                    // $t42 := borrow_field<0x2::GlobalVectors::S>.x($t41)
+                    // $t42 := borrow_field<GlobalVectors::S>.x($t41)
                     $t42 := $t41
                     // $t43 := read_ref($t42)
                     $t43 := $LoadU128($t42)
@@ -5902,7 +5902,7 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     // label L5
                     // $t47 := 0x42
                     $t47 := 0x42
-                    // $t48 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t47)
+                    // $t48 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t47)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t47)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5910,13 +5910,13 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                         }
                         $t48 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t49 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t48)
+                    // $t49 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t48)
                     $t49 := $t48
                     // $t50 := 1
                     $t50 := 1
-                    // $t51 := vector::borrow<0x2::GlobalVectors::S>($t49, $t50)
+                    // $t51 := vector::borrow<GlobalVectors::S>($t49, $t50)
                     $t51 := A1_vector_borrow$A2_GlobalVectors_S$($t49, $t50)
-                    // $t52 := borrow_field<0x2::GlobalVectors::S>.x($t51)
+                    // $t52 := borrow_field<GlobalVectors::S>.x($t51)
                     $t52 := $t51
                     // $t53 := read_ref($t52)
                     $t53 := $LoadU128($t52)
@@ -5945,7 +5945,7 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                     // label L8
                     // $t57 := 0x42
                     $t57 := 0x42
-                    // $t58 := borrow_global<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>($t57)
+                    // $t58 := borrow_global<GlobalVectors::T<GlobalVectors::S>>($t57)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x27c9b6b7, $t57)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -5953,13 +5953,13 @@ object "test_A2_GlobalVectors_test_push_back_struct_global" {
                         }
                         $t58 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t59 := borrow_field<0x2::GlobalVectors::T<0x2::GlobalVectors::S>>.v($t58)
+                    // $t59 := borrow_field<GlobalVectors::T<GlobalVectors::S>>.v($t58)
                     $t59 := $t58
                     // $t60 := 2
                     $t60 := 2
-                    // $t61 := vector::borrow<0x2::GlobalVectors::S>($t59, $t60)
+                    // $t61 := vector::borrow<GlobalVectors::S>($t59, $t60)
                     $t61 := A1_vector_borrow$A2_GlobalVectors_S$($t59, $t60)
-                    // $t62 := borrow_field<0x2::GlobalVectors::S>.x($t61)
+                    // $t62 := borrow_field<GlobalVectors::S>.x($t61)
                     $t62 := $t61
                     // $t63 := read_ref($t62)
                     $t63 := $LoadU128($t62)
@@ -6327,13 +6327,13 @@ object "test_A2_GlobalVectors_test_read_ref_copy" {
                     $t6 := $MakePtr(false, add($locals, 32))
                     // $t7 := move($t1)
                     $t7 := mload($locals)
-                    // $t8 := pack 0x2::GlobalVectors::T<u8>($t7)
+                    // $t8 := pack GlobalVectors::T<u8>($t7)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t7)
                         $t8 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u8>>($t8, $t6)
+                    // move_to<GlobalVectors::T<u8>>($t8, $t6)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x10b7746c, $LoadU256($t6))
                         if $AlignedStorageLoad($base_offset) {
@@ -6362,7 +6362,7 @@ object "test_A2_GlobalVectors_test_read_ref_copy" {
                     }
                     // $t9 := 0x42
                     $t9 := 0x42
-                    // $t10 := borrow_global<0x2::GlobalVectors::T<u8>>($t9)
+                    // $t10 := borrow_global<GlobalVectors::T<u8>>($t9)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x10b7746c, $t9)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -6370,7 +6370,7 @@ object "test_A2_GlobalVectors_test_read_ref_copy" {
                         }
                         $t10 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t11 := borrow_field<0x2::GlobalVectors::T<u8>>.v($t10)
+                    // $t11 := borrow_field<GlobalVectors::T<u8>>.v($t10)
                     $t11 := $t10
                     // $t2 := read_ref($t11)
                     mstore(add($locals, 64), $LoadU256($t11))
@@ -6802,13 +6802,13 @@ object "test_A2_GlobalVectors_test_swap_global" {
                     $t9 := $MakePtr(false, add($locals, 32))
                     // $t10 := move($t1)
                     $t10 := mload($locals)
-                    // $t11 := pack 0x2::GlobalVectors::T<u64>($t10)
+                    // $t11 := pack GlobalVectors::T<u64>($t10)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t10)
                         $t11 := $mem
                     }
-                    // move_to<0x2::GlobalVectors::T<u64>>($t11, $t9)
+                    // move_to<GlobalVectors::T<u64>>($t11, $t9)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $LoadU256($t9))
                         if $AlignedStorageLoad($base_offset) {
@@ -6837,7 +6837,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                     }
                     // $t12 := 0x42
                     $t12 := 0x42
-                    // $t13 := borrow_global<0x2::GlobalVectors::T<u64>>($t12)
+                    // $t13 := borrow_global<GlobalVectors::T<u64>>($t12)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t12)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -6845,7 +6845,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                         }
                         $t13 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t14 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t13)
+                    // $t14 := borrow_field<GlobalVectors::T<u64>>.v($t13)
                     $t14 := $t13
                     // $t15 := 0
                     $t15 := 0
@@ -6855,7 +6855,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                     A1_vector_swap$u64$($t14, $t15, $t16)
                     // $t17 := 0x42
                     $t17 := 0x42
-                    // $t18 := borrow_global<0x2::GlobalVectors::T<u64>>($t17)
+                    // $t18 := borrow_global<GlobalVectors::T<u64>>($t17)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t17)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -6863,7 +6863,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                         }
                         $t18 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t19 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t18)
+                    // $t19 := borrow_field<GlobalVectors::T<u64>>.v($t18)
                     $t19 := $t18
                     // $t20 := vector::length<u64>($t19)
                     $t20 := A1_vector_length$u64$($t19)
@@ -6880,7 +6880,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                     // label L2
                     // $t24 := 0x42
                     $t24 := 0x42
-                    // $t25 := borrow_global<0x2::GlobalVectors::T<u64>>($t24)
+                    // $t25 := borrow_global<GlobalVectors::T<u64>>($t24)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t24)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -6888,7 +6888,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                         }
                         $t25 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t26 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t25)
+                    // $t26 := borrow_field<GlobalVectors::T<u64>>.v($t25)
                     $t26 := $t25
                     // $t27 := 0
                     $t27 := 0
@@ -6921,7 +6921,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                     // label L5
                     // $t33 := 0x42
                     $t33 := 0x42
-                    // $t34 := borrow_global<0x2::GlobalVectors::T<u64>>($t33)
+                    // $t34 := borrow_global<GlobalVectors::T<u64>>($t33)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t33)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -6929,7 +6929,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                         }
                         $t34 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t35 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t34)
+                    // $t35 := borrow_field<GlobalVectors::T<u64>>.v($t34)
                     $t35 := $t34
                     // $t36 := 1
                     $t36 := 1
@@ -6962,7 +6962,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                     // label L8
                     // $t42 := 0x42
                     $t42 := 0x42
-                    // $t43 := borrow_global<0x2::GlobalVectors::T<u64>>($t42)
+                    // $t43 := borrow_global<GlobalVectors::T<u64>>($t42)
                     {
                         let $base_offset := $MakeTypeStorageBase(0, 0x7da2a540, $t42)
                         if iszero($AlignedStorageLoad($base_offset)) {
@@ -6970,7 +6970,7 @@ object "test_A2_GlobalVectors_test_swap_global" {
                         }
                         $t43 := $MakePtr(true, add($base_offset, 32))
                     }
-                    // $t44 := borrow_field<0x2::GlobalVectors::T<u64>>.v($t43)
+                    // $t44 := borrow_field<GlobalVectors::T<u64>>.v($t43)
                     $t44 := $t43
                     // $t45 := 2
                     $t45 := 2

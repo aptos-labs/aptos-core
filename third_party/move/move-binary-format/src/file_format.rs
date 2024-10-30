@@ -849,10 +849,13 @@ impl AbilitySet {
             | (Ability::Store as u8)
             | (Ability::Key as u8),
     );
+    /// Abilities for user-defined/"primitive" functions (not closures)
+    pub const DEFINED_FUNCTIONS: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
     /// Abilities for `Functions`
-    pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
+    pub const FUNCTIONS: AbilitySet = Self(0);
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));

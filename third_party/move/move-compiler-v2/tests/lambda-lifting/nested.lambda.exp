@@ -152,87 +152,15 @@ module 0xcafe::m {
 } // end 0xcafe::m
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, closure m::nested$lambda$2(c))
-    }
-    private fun nested$lambda$1(c: u64,y: u8): u8 {
-        Add<u8>(y, Cast<u8>(c))
-    }
-    private fun nested$lambda$2(c: u64,y: u64): u64 {
-        Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), closure m::nested$lambda$1(c)))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor specification checker:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, closure m::nested$lambda$2(c))
-    }
-    private fun nested$lambda$1(c: u64,y: u8): u8 {
-        Add<u8>(y, Cast<u8>(c))
-    }
-    private fun nested$lambda$2(c: u64,y: u64): u64 {
-        Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), closure m::nested$lambda$1(c)))
-    }
-} // end 0xcafe::m
-
-
-// -- Model dump after env processor specification rewriter:
-module 0xcafe::m {
-    private fun map1(x: u64,f: |u64|u64): u64 {
-        (f)(x)
-    }
-    private fun map2(x: u8,f: |u8|u8): u8 {
-        (f)(x)
-    }
-    private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, closure m::nested$lambda$2(c))
-    }
-    private fun nested$lambda$1(c: u64,y: u8): u8 {
-        Add<u8>(y, Cast<u8>(c))
-    }
-    private fun nested$lambda$2(c: u64,y: u64): u64 {
-        Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), closure m::nested$lambda$1(c)))
-    }
-} // end 0xcafe::m
-
-
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda-lifting/nested.move:5:9
-  │
-5 │         f(x)
-  │         ^
-
-error: Calls to function values other than inline function parameters not yet supported
-   ┌─ tests/lambda-lifting/nested.move:10:9
-   │
-10 │         f(x)
-   │         ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda-lifting/nested.move:15:42
    │
 15 │         map1(x, |y| (map2((y - c as u8), |y| y + (c as u8)) as u64))
    │                                          ^^^^^^^^^^^^^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda-lifting/nested.move:15:17
    │
 15 │         map1(x, |y| (map2((y - c as u8), |y| y + (c as u8)) as u64))

@@ -14,11 +14,12 @@ use crate::{
     symbol::{Symbol, SymbolPool},
     ty::{ReferenceKind, Type, TypeDisplayContext},
 };
+use either::Either;
 use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::{
     file_format,
-    file_format::{CodeOffset, Visibility},
+    file_format::{AbilitySet, CodeOffset, Visibility},
 };
 use move_core_types::account_address::AccountAddress;
 use num::BigInt;
@@ -349,6 +350,19 @@ impl Spec {
         self.any(move |c| c.kind == kind)
     }
 
+    pub fn used_funs_with_uses(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
+        let mut result = BTreeMap::new();
+        for cond in self.conditions.iter().chain(self.update_map.values()) {
+            for exp in cond.all_exps() {
+                result.append(&mut exp.used_funs_with_uses())
+            }
+        }
+        for on_impl in self.on_impl.values() {
+            result.append(&mut on_impl.used_funs_with_uses())
+        }
+        result
+    }
+
     pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
         let mut result = BTreeMap::new();
         for cond in self.conditions.iter().chain(self.update_map.values()) {
@@ -512,6 +526,34 @@ pub enum AddressSpecifier {
     Call(QualifiedInstId<FunId>, Symbol),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Hash, Default)]
+pub enum LambdaCaptureKind {
+    /// No modifier (e.g., inlining)
+    #[default]
+    Default,
+    /// Copy
+    Copy,
+    /// Move
+    Move,
+    /// Borrow (`&`)
+    Borrow,
+}
+
+impl fmt::Display for LambdaCaptureKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &LambdaCaptureKind::Default => {
+                write!(f, "")
+            },
+            &LambdaCaptureKind::Copy => {
+                write!(f, "copy")
+            },
+            &LambdaCaptureKind::Move => write!(f, "move"),
+            &LambdaCaptureKind::Borrow => write!(f, "&"),
+        }
+    }
+}
+
 impl ResourceSpecifier {
     /// Checks whether this resource specifier matches the given struct. A function
     /// instantiation is passed to instantiate the specifier in the calling context
@@ -598,7 +640,20 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp),
+    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
+    /// Represents a reference to a Move Function as a function value.
+    MoveFunctionExp(NodeId, ModuleId, FunId),
+    /// Represents a Curry expression.  mask has a 1 bit for position of each delayed
+    /// parameter in the function call (e.g.:
+    ///     (move |x, y| f(x, y, z)) === Curry(0b110, f, vec![z])
+    ///     (move |y, z| f(x, y, z)) === Curry(0b011, f, vec![x])
+    /// note that arity(f) = args.len() + bitcount(mask)
+    Curry(
+        NodeId,
+        u128,     // mask: 1 bit for arg position of each delayed paramter
+        Exp,      // f
+        Vec<Exp>, // args to bind early
+    ),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -779,6 +834,8 @@ impl ExpData {
             | Call(node_id, ..)
             | Invoke(node_id, ..)
             | Lambda(node_id, ..)
+            | MoveFunctionExp(node_id, ..)
+            | Curry(node_id, ..)
             | Quant(node_id, ..)
             | Block(node_id, ..)
             | IfElse(node_id, ..)
@@ -889,12 +946,12 @@ impl ExpData {
             use ExpData::*;
             use VisitorPosition::*;
             match (e, pos) {
-                (Lambda(_, pat, _), Pre) | (Block(_, pat, _, _), BeforeBody) => {
+                (Lambda(_, pat, ..), Pre) | (Block(_, pat, _, _), BeforeBody) => {
                     // Add declared variables to shadow; in the Block case,
                     // do it only after processing bindings.
                     for_syms_in_pat_shadow_or_unshadow(pat, true, &mut shadow_map);
                 },
-                (Lambda(_, pat, _), Post) | (Block(_, pat, _, _), Post) => {
+                (Lambda(_, pat, ..), Post) | (Block(_, pat, _, _), Post) => {
                     // Remove declared variables from shadow
                     for_syms_in_pat_shadow_or_unshadow(pat, false, &mut shadow_map);
                 },
@@ -1044,13 +1101,53 @@ impl ExpData {
         temps
     }
 
+    /// Returns the Move functions referenced by this expression
+    pub fn used_funs(&self) -> BTreeSet<QualifiedId<FunId>> {
+        let mut used = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            match e {
+                ExpData::Call(_, Operation::MoveFunction(mid, fid), _) => {
+                    used.insert(mid.qualified(*fid));
+                },
+                ExpData::MoveFunctionExp(_, mid, fid) => {
+                    used.insert(mid.qualified(*fid));
+                },
+                _ => {},
+            }
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        used
+    }
+
+    /// Returns the Move functions called or referenced by this expression, along with nodes of call sites or references.
+    pub fn used_funs_with_uses(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
+        let mut used: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut visitor = |e: &ExpData| {
+            match e {
+                ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _)
+                | ExpData::MoveFunctionExp(node_id, mid, fid) => {
+                    used.entry(mid.qualified(*fid))
+                        .or_default()
+                        .insert(*node_id);
+                },
+                _ => {},
+            };
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        used
+    }
+
     /// Returns the Move functions called by this expression
     pub fn called_funs(&self) -> BTreeSet<QualifiedId<FunId>> {
         let mut called = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
             match e {
-                ExpData::Call(_, Operation::MoveFunction(mid, fid), _)
-                | ExpData::Call(_, Operation::Closure(mid, fid), _) => {
+                ExpData::Call(_, Operation::MoveFunction(mid, fid), _) => {
+                    called.insert(mid.qualified(*fid));
+                },
+                ExpData::MoveFunctionExp(_, mid, fid) => {
                     called.insert(mid.qualified(*fid));
                 },
                 _ => {},
@@ -1366,7 +1463,13 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _, _) => body.visit_positions_impl(visitor)?,
+            Curry(_, _, fnexp, args) => {
+                fnexp.visit_positions_impl(visitor)?;
+                for exp in args {
+                    exp.visit_positions_impl(visitor)?;
+                }
+            },
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -1429,7 +1532,8 @@ impl ExpData {
             },
             SpecBlock(_, spec) => Self::visit_positions_spec_impl(spec, visitor)?,
             // Explicitly list all enum variants
-            LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
+            MoveFunctionExp(..) | LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..)
+            | Invalid(..) => {},
         }
         visitor(VisitorPosition::Post, self)
     }
@@ -1751,7 +1855,6 @@ pub enum Operation {
 
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
-    Closure(ModuleId, FunId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
@@ -2221,7 +2324,7 @@ impl Pattern {
         PatDisplay {
             env: fun_env.module_env.env,
             pat: self,
-            fun_env: Some(fun_env.clone()),
+            fun_env: Some(fun_env),
             show_type: false,
         }
         .to_string()
@@ -2240,7 +2343,7 @@ impl Pattern {
         PatDisplay {
             env: other.env,
             pat: self,
-            fun_env: other.fun_env.clone(),
+            fun_env: other.fun_env,
             show_type: other.show_type,
         }
     }
@@ -2249,7 +2352,7 @@ impl Pattern {
         PatDisplay {
             env: other.env,
             pat: self,
-            fun_env: other.fun_env.clone(),
+            fun_env: other.fun_env,
             show_type: true,
         }
     }
@@ -2259,7 +2362,7 @@ impl Pattern {
 pub struct PatDisplay<'a> {
     env: &'a GlobalEnv,
     pat: &'a Pattern,
-    fun_env: Option<FunctionEnv<'a>>,
+    fun_env: Option<&'a FunctionEnv<'a>>,
     show_type: bool,
 }
 
@@ -2574,7 +2677,6 @@ impl Operation {
         match self {
             MoveFunction(..) => false, // could abort
             SpecFunction(..) => false, // Spec
-            Closure(..) => false,      // Spec
             Pack(..) => false,         // Could yield an undroppable value
             Tuple => true,
             Select(..) => false,         // Move-related
@@ -2805,6 +2907,8 @@ impl ExpData {
                         is_pure = pure_stack.pop().expect("unbalanced");
                     }
                 },
+                MoveFunctionExp(..) => {}, // Like Value(), keep going
+                Curry(..) => {},           // Like a pure Call, keep going.
                 Quant(..) => {
                     // Technically pure, but we don't want to eliminate it.
                     is_pure = false;
@@ -3035,28 +3139,32 @@ impl ExpData {
             fun_env: None,
             verbose: false,
             annotator: None,
+            tctx: Either::Left(TypeDisplayContext::new(env)),
         }
     }
 
     /// Creates a display of an expression which can be used in formatting, based
     /// on a function env for getting names of locals and type parameters.
-    pub fn display_for_fun<'a>(&'a self, fun_env: FunctionEnv<'a>) -> ExpDisplay<'a> {
+    pub fn display_for_fun<'a>(&'a self, fun_env: &'a FunctionEnv<'a>) -> ExpDisplay<'a> {
+        let tctx = Either::Left(fun_env.get_type_display_ctx());
         ExpDisplay {
             env: fun_env.module_env.env,
             exp: self,
             fun_env: Some(fun_env),
             verbose: false,
             annotator: None,
+            tctx,
         }
     }
 
-    fn display_cont<'a>(&'a self, other: &ExpDisplay<'a>) -> ExpDisplay<'a> {
+    fn display_cont<'a>(&'a self, other: &'a ExpDisplay<'a>) -> ExpDisplay<'a> {
         ExpDisplay {
             env: other.env,
             exp: self,
-            fun_env: other.fun_env.clone(),
+            fun_env: other.fun_env,
             verbose: other.verbose,
             annotator: other.annotator,
+            tctx: Either::Right(other.get_tctx()),
         }
     }
 
@@ -3067,6 +3175,7 @@ impl ExpData {
             fun_env: None,
             verbose: true,
             annotator: None,
+            tctx: Either::Left(TypeDisplayContext::new(env)),
         }
     }
 
@@ -3084,6 +3193,7 @@ impl ExpData {
             fun_env: None,
             verbose: false,
             annotator: Some(annotator),
+            tctx: Either::Left(TypeDisplayContext::new(env)),
         }
     }
 }
@@ -3092,9 +3202,19 @@ impl ExpData {
 pub struct ExpDisplay<'a> {
     env: &'a GlobalEnv,
     exp: &'a ExpData,
-    fun_env: Option<FunctionEnv<'a>>,
+    fun_env: Option<&'a FunctionEnv<'a>>,
     verbose: bool,
     annotator: Option<&'a dyn Fn(NodeId) -> String>,
+    tctx: Either<TypeDisplayContext<'a>, &'a TypeDisplayContext<'a>>,
+}
+
+impl<'a> ExpDisplay<'a> {
+    fn get_tctx(&'a self) -> &'a TypeDisplayContext<'a> {
+        match &self.tctx {
+            Either::Left(tctx) => tctx,
+            Either::Right(tctx_ref) => *tctx_ref,
+        }
+    }
 }
 
 impl<'a> fmt::Display for ExpDisplay<'a> {
@@ -3140,23 +3260,77 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body) => {
+            Lambda(id, pat, body, capture_kind, abilities) => {
                 if self.verbose {
                     write!(
                         f,
-                        "{}: |{}| {}",
+                        "{}: {}{}|{}| {}",
                         id.as_usize(),
+                        if *capture_kind != LambdaCaptureKind::Default {
+                            " "
+                        } else {
+                            ""
+                        },
+                        capture_kind,
                         pat.display_for_exp(self),
                         body.display_cont(self)
-                    )
+                    )?;
                 } else {
                     write!(
                         f,
-                        "|{}| {}",
+                        "{}{}|{}| {}",
+                        if *capture_kind != LambdaCaptureKind::Default {
+                            " "
+                        } else {
+                            ""
+                        },
+                        capture_kind,
                         pat.display_for_exp(self),
                         body.display_cont(self)
-                    )
+                    )?;
                 }
+                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                    let abilities_as_str = abilities
+                        .iter()
+                        .map(|a| a.to_string())
+                        .reduce(|l, r| format!("{}, {}", l, r))
+                        .unwrap_or_default();
+                    write!(f, " has {}", abilities_as_str)
+                } else {
+                    Ok(())
+                }
+            },
+            MoveFunctionExp(id, mid, fid) => {
+                write!(
+                    f,
+                    "{}",
+                    self.env
+                        .get_function_opt(mid.qualified(*fid))
+                        .map(|fun| fun.get_full_name_str())
+                        .unwrap_or_else(|| "None".to_string())
+                )?;
+                let type_inst = self.env.get_node_instantiation(*id);
+                if !type_inst.is_empty() {
+                    write!(
+                        f,
+                        "<{}>",
+                        type_inst
+                            .iter()
+                            .map(|ty| ty.display(self.get_tctx()))
+                            .join(", ")
+                    )
+                } else {
+                    Ok(())
+                }
+            },
+            Curry(_id, mask, fnexp, args) => {
+                write!(
+                    f,
+                    "curry({}, {:b}, {})",
+                    fnexp.display_cont(self),
+                    mask,
+                    self.fmt_exps(args)
+                )
             },
             Block(id, pat, binding, body) => {
                 if self.verbose {
@@ -3349,7 +3523,21 @@ impl Operation {
             env,
             oper: self,
             node_id,
-            tctx,
+            tctx: Either::Left(tctx),
+        }
+    }
+
+    fn display_with_context_ref<'a>(
+        &'a self,
+        env: &'a GlobalEnv,
+        node_id: NodeId,
+        tctx: &'a TypeDisplayContext<'a>,
+    ) -> OperationDisplay<'a> {
+        OperationDisplay {
+            env,
+            oper: self,
+            node_id,
+            tctx: Either::Right(tctx),
         }
     }
 
@@ -3373,17 +3561,8 @@ impl Operation {
         exp_display: &'a ExpDisplay,
         node_id: NodeId,
     ) -> OperationDisplay<'a> {
-        let tctx = if let Some(fe) = &exp_display.fun_env {
-            fe.get_type_display_ctx()
-        } else {
-            TypeDisplayContext::new(exp_display.env)
-        };
-        OperationDisplay {
-            env: exp_display.env,
-            oper: self,
-            node_id,
-            tctx,
-        }
+        let tctx = exp_display.get_tctx();
+        self.display_with_context_ref(exp_display.env, node_id, tctx)
     }
 }
 
@@ -3392,7 +3571,16 @@ pub struct OperationDisplay<'a> {
     env: &'a GlobalEnv,
     node_id: NodeId,
     oper: &'a Operation,
-    tctx: TypeDisplayContext<'a>,
+    tctx: Either<TypeDisplayContext<'a>, &'a TypeDisplayContext<'a>>,
+}
+
+impl<'a> OperationDisplay<'a> {
+    fn get_tctx(&'a self) -> &'a TypeDisplayContext<'a> {
+        match &self.tctx {
+            Either::Left(tctx) => tctx,
+            Either::Right(tctx_ref) => *tctx_ref,
+        }
+    }
 }
 
 impl<'a> fmt::Display for OperationDisplay<'a> {
@@ -3401,7 +3589,7 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
         match self.oper {
             Cast => {
                 let ty = self.env.get_node_type(self.node_id);
-                write!(f, "{:?}<{}>", self.oper, ty.display(&self.tctx))
+                write!(f, "{:?}<{}>", self.oper, ty.display(self.get_tctx()))
             },
             SpecFunction(mid, fid, labels_opt) => {
                 write!(f, "{}", self.fun_str(mid, fid))?;
@@ -3419,17 +3607,9 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                     f,
                     "{}",
                     self.env
-                        .get_function(mid.qualified(*fid))
-                        .get_full_name_str()
-                )
-            },
-            Closure(mid, fid) => {
-                write!(
-                    f,
-                    "closure {}",
-                    self.env
-                        .get_function(mid.qualified(*fid))
-                        .get_full_name_str()
+                        .get_function_opt(mid.qualified(*fid))
+                        .map(|fun| fun.get_full_name_str())
+                        .unwrap_or_else(|| "None".to_string())
                 )
             },
             Global(label_opt) => {
@@ -3488,7 +3668,10 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
             write!(
                 f,
                 "<{}>",
-                type_inst.iter().map(|ty| ty.display(&self.tctx)).join(", ")
+                type_inst
+                    .iter()
+                    .map(|ty| ty.display(self.get_tctx()))
+                    .join(", ")
             )?;
         }
         Ok(())
@@ -3507,12 +3690,23 @@ impl<'a> OperationDisplay<'a> {
     }
 
     fn struct_str(&self, mid: &ModuleId, sid: &StructId) -> String {
-        let module_env = self.env.get_module(*mid);
-        let struct_env = module_env.get_struct(*sid);
+        let module_env_opt = self.env.get_module_opt(*mid);
+        let struct_env_str = module_env_opt
+            .clone()
+            .map(|module_env| {
+                module_env
+                    .get_struct(*sid)
+                    .get_name()
+                    .display(self.env.symbol_pool())
+                    .to_string()
+            })
+            .unwrap_or_else(|| "None".to_string());
         format!(
             "{}::{}",
-            module_env.get_name().display(self.env),
-            struct_env.get_name().display(self.env.symbol_pool()),
+            module_env_opt
+                .map(|module_env| module_env.get_name().display(self.env).to_string())
+                .unwrap_or_else(|| "None".to_string()),
+            struct_env_str
         )
     }
 

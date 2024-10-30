@@ -682,8 +682,18 @@ module 0x42::simple_map {
 
 
 Diagnostics:
-error: captured variable `result` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/simple_map_keys.move:28:55
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/simple_map_keys.move:17:28
+   │
+17 │           map_ref(&map.data, |e| {
+   │ ╭────────────────────────────^
+18 │ │             let e: &Element<Key, Value> = e;
+19 │ │             e.key
+20 │ │         })
+   │ ╰─────────^
+
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/simple_map_keys.move:28:25
    │
 28 │         for_each_ref(v, |elem| vector::push_back(&mut result, f(elem)));
-   │                                                       ^^^^^^
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

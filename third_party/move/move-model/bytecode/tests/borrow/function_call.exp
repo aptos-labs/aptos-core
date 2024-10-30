@@ -78,23 +78,23 @@ public intrinsic fun vector::swap_remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64)
 
 
 [variant baseline]
-fun MultiLayerCalling::inner($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVector): &mut 0x2::MultiLayerCalling::HasAnotherVector {
-     var $t1: &mut 0x2::MultiLayerCalling::HasVector
-     var $t2: &mut vector<0x2::MultiLayerCalling::HasAnotherVector>
+fun MultiLayerCalling::inner($t0|has_vector: &mut MultiLayerCalling::HasVector): &mut MultiLayerCalling::HasAnotherVector {
+     var $t1: &mut MultiLayerCalling::HasVector
+     var $t2: &mut vector<MultiLayerCalling::HasAnotherVector>
      var $t3: u64
-     var $t4: &mut 0x2::MultiLayerCalling::HasAnotherVector
+     var $t4: &mut MultiLayerCalling::HasAnotherVector
   0: $t1 := move($t0)
-  1: $t2 := borrow_field<0x2::MultiLayerCalling::HasVector>.v($t1)
+  1: $t2 := borrow_field<MultiLayerCalling::HasVector>.v($t1)
   2: $t3 := 7
-  3: $t4 := vector::borrow_mut<0x2::MultiLayerCalling::HasAnotherVector>($t2, $t3)
+  3: $t4 := vector::borrow_mut<MultiLayerCalling::HasAnotherVector>($t2, $t3)
   4: return $t4
 }
 
 
 [variant baseline]
-fun MultiLayerCalling::mid($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVector): &mut 0x2::MultiLayerCalling::HasAnotherVector {
-     var $t1: &mut 0x2::MultiLayerCalling::HasVector
-     var $t2: &mut 0x2::MultiLayerCalling::HasAnotherVector
+fun MultiLayerCalling::mid($t0|has_vector: &mut MultiLayerCalling::HasVector): &mut MultiLayerCalling::HasAnotherVector {
+     var $t1: &mut MultiLayerCalling::HasVector
+     var $t2: &mut MultiLayerCalling::HasAnotherVector
   0: $t1 := move($t0)
   1: $t2 := MultiLayerCalling::inner($t1)
   2: return $t2
@@ -102,14 +102,14 @@ fun MultiLayerCalling::mid($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVecto
 
 
 [variant baseline]
-fun MultiLayerCalling::outer($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVector) {
-     var $t1: &mut 0x2::MultiLayerCalling::HasVector
-     var $t2: &mut 0x2::MultiLayerCalling::HasAnotherVector
+fun MultiLayerCalling::outer($t0|has_vector: &mut MultiLayerCalling::HasVector) {
+     var $t1: &mut MultiLayerCalling::HasVector
+     var $t2: &mut MultiLayerCalling::HasAnotherVector
      var $t3: &mut vector<u8>
      var $t4: u8
   0: $t1 := move($t0)
   1: $t2 := MultiLayerCalling::mid($t1)
-  2: $t3 := borrow_field<0x2::MultiLayerCalling::HasAnotherVector>.v($t2)
+  2: $t3 := borrow_field<MultiLayerCalling::HasAnotherVector>.v($t2)
   3: $t4 := 42
   4: vector::push_back<u8>($t3, $t4)
   5: return ()
@@ -202,60 +202,60 @@ public intrinsic fun vector::swap_remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64)
 
 
 [variant baseline]
-fun MultiLayerCalling::inner($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVector): &mut 0x2::MultiLayerCalling::HasAnotherVector {
-     var $t1: &mut vector<0x2::MultiLayerCalling::HasAnotherVector>
+fun MultiLayerCalling::inner($t0|has_vector: &mut MultiLayerCalling::HasVector): &mut MultiLayerCalling::HasAnotherVector {
+     var $t1: &mut vector<MultiLayerCalling::HasAnotherVector>
      var $t2: u64
-     var $t3: &mut 0x2::MultiLayerCalling::HasAnotherVector
+     var $t3: &mut MultiLayerCalling::HasAnotherVector
      # live_nodes: Reference($t0)
-  0: $t1 := borrow_field<0x2::MultiLayerCalling::HasVector>.v($t0)
+  0: $t1 := borrow_field<MultiLayerCalling::HasVector>.v($t0)
      # live_nodes: Reference($t1)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>), Reference($t1))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>), Reference($t0))}
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>), Reference($t1))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>), Reference($t0))}
   1: $t2 := 7
      # live_nodes: Reference($t1)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>), Reference($t1))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>), Reference($t0))}
-  2: $t3 := vector::borrow_mut<0x2::MultiLayerCalling::HasAnotherVector>($t1, $t2)
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>), Reference($t1))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>), Reference($t0))}
+  2: $t3 := vector::borrow_mut<MultiLayerCalling::HasAnotherVector>($t1, $t2)
      # live_nodes: Reference($t3)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>), Reference($t1))}, Reference($t1) -> {([], Reference($t3))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>), Reference($t0))}, Reference($t3) -> {([], Reference($t1))}
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>), Reference($t1))}, Reference($t1) -> {([], Reference($t3))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>), Reference($t0))}, Reference($t3) -> {([], Reference($t1))}
   3: return $t3
 }
 
 
 [variant baseline]
-fun MultiLayerCalling::mid($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVector): &mut 0x2::MultiLayerCalling::HasAnotherVector {
-     var $t1: &mut 0x2::MultiLayerCalling::HasAnotherVector
+fun MultiLayerCalling::mid($t0|has_vector: &mut MultiLayerCalling::HasVector): &mut MultiLayerCalling::HasAnotherVector {
+     var $t1: &mut MultiLayerCalling::HasAnotherVector
      # live_nodes: Reference($t0)
   0: $t1 := MultiLayerCalling::inner($t0)
      # live_nodes: Reference($t1)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
   1: return $t1
 }
 
 
 [variant baseline]
-fun MultiLayerCalling::outer($t0|has_vector: &mut 0x2::MultiLayerCalling::HasVector) {
-     var $t1: &mut 0x2::MultiLayerCalling::HasAnotherVector
+fun MultiLayerCalling::outer($t0|has_vector: &mut MultiLayerCalling::HasVector) {
+     var $t1: &mut MultiLayerCalling::HasAnotherVector
      var $t2: &mut vector<u8>
      var $t3: u8
      # live_nodes: Reference($t0)
   0: $t1 := MultiLayerCalling::mid($t0)
      # live_nodes: Reference($t1)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
-  1: $t2 := borrow_field<0x2::MultiLayerCalling::HasAnotherVector>.v($t1)
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
+  1: $t2 := borrow_field<MultiLayerCalling::HasAnotherVector>.v($t1)
      # live_nodes: Reference($t2)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}, Reference($t1) -> {(.v (vector<u8>), Reference($t2))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}, Reference($t2) -> {(.v (vector<u8>), Reference($t1))}
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}, Reference($t1) -> {(.v (vector<u8>), Reference($t2))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}, Reference($t2) -> {(.v (vector<u8>), Reference($t1))}
   2: $t3 := 42
      # live_nodes: Reference($t2)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}, Reference($t1) -> {(.v (vector<u8>), Reference($t2))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}, Reference($t2) -> {(.v (vector<u8>), Reference($t1))}
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}, Reference($t1) -> {(.v (vector<u8>), Reference($t2))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}, Reference($t2) -> {(.v (vector<u8>), Reference($t1))}
   3: vector::push_back<u8>($t2, $t3)
-     # borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}, Reference($t1) -> {(.v (vector<u8>), Reference($t2))}
-     # borrows_from: Reference($t1) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}, Reference($t2) -> {(.v (vector<u8>), Reference($t1))}
+     # borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t1))}, Reference($t1) -> {(.v (vector<u8>), Reference($t2))}
+     # borrows_from: Reference($t1) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}, Reference($t2) -> {(.v (vector<u8>), Reference($t1))}
   4: return ()
 }
 
@@ -268,9 +268,9 @@ borrowed_by: Reference($t0) -> {([], Return(0))}
 borrows_from: Return(0) -> {([], Reference($t0))}
 
 fun MultiLayerCalling::inner[baseline]
-borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Return(0))}
-borrows_from: Return(0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
+borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Return(0))}
+borrows_from: Return(0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
 
 fun MultiLayerCalling::mid[baseline]
-borrowed_by: Reference($t0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Return(0))}
-borrows_from: Return(0) -> {(.v (vector<0x2::MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}
+borrowed_by: Reference($t0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Return(0))}
+borrows_from: Return(0) -> {(.v (vector<MultiLayerCalling::HasAnotherVector>)/[], Reference($t0))}

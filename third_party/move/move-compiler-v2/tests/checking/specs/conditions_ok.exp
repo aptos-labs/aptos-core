@@ -8,7 +8,7 @@ module 0x42::M {
         Deref(x)
     }
     spec {
-      aborts_if Or(Eq<u64>(Freeze(false)($t0), 0), Eq<u64>(select M::Ghost$some_global.v(global<0x42::M::Ghost$some_global>(0x0)), 0));
+      aborts_if Or(Eq<u64>(Freeze(false)($t0), 0), Eq<u64>(select M::Ghost$some_global.v(global<M::Ghost$some_global>(0x0)), 0));
       ensures Gt(Old<u64>($t0), $t0);
       ensures Eq<u64>(result0(), Freeze(false)($t0));
     }

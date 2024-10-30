@@ -15,7 +15,7 @@ module 0x42::test {
 
     fun get_function(v: &vector<Function>, k: u64): Option<Function> {
         mut x = Option<Function>::None;
-        for_each_ref(v, |f: &Function| {
+        vector::for_each_ref(v, |f: &Function| {
             if f.key == k {
                 x = f.f
             }
@@ -25,7 +25,7 @@ module 0x42::test {
 
     fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 has store): Option<Function> {
         mut done = false;
-        for_each_mut(v, |f: &mut Function| {
+        vector::for_each_mut(v, |f: &mut Function| {
             if f.key == k {
                 f.f = f;
                 done = true;
@@ -78,16 +78,20 @@ module 0x42::test {
     }
 
     fun multiply_by_x(x: u64): |u64|u64 has store {
-        curry(&multiply, x)
+        multiply(x..)
     }
 
+    fun multiply_by_x2(x: u64): |u64|u64 has store {
+        move |y| multiply(x, y)
+    }
 
     #[test(a = @0x42)]
     test_registry1(a; signer) {
-        register(a, &double, 2);
-        register(a, &negate, 3);
+        register(a, double, 2);
+        register(a, negate, 3);
         register(a, multiply_by_x(4), 4);
         register(a, multiply_by_x(5), 5);
+        register(a, multiply_by_x2(6), 6);
 
         match invoke(a, 2, 10) {
             Some(x) => { assert!(x == 20); }
@@ -103,6 +107,10 @@ module 0x42::test {
         }
         match invoke(a, 5, 3) {
             Some(x) => { assert!(x == 15); }
+            _ => assert!(false);
+        }
+        match invoke(a, 6, 3) {
+            Some(x) => { assert!(x == 18); }
             _ => assert!(false);
         }
     }

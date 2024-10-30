@@ -25,7 +25,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut m::S, $t1: u64) {
      var $t2: u64
      var $t3: &u64
      var $t4: bool
@@ -36,17 +36,17 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t9: &u64
      var $t10: &mut u64
      var $t11: &mut u64
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<m::S>.x($t0)
   1: $t2 := m::foo($t3)
-  2: $t6 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t6 := borrow_field<m::S>.x($t0)
   3: $t5 := read_ref($t6)
-  4: $t9 := borrow_field<0xc0ffee::m::S>.y($t0)
+  4: $t9 := borrow_field<m::S>.y($t0)
   5: $t8 := read_ref($t9)
   6: $t7 := *($t2, $t8)
   7: $t4 := ==($t5, $t7)
   8: if ($t4) goto 9 else goto 14
   9: label L0
- 10: $t11 := borrow_field<0xc0ffee::m::S>.x($t0)
+ 10: $t11 := borrow_field<m::S>.x($t0)
  11: $t10 := m::bar($t11, $t2)
  12: m::baz($t10, $t1)
  13: goto 15
@@ -87,7 +87,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut m::S, $t1: u64) {
      var $t2: u64
      var $t3: &u64
      var $t4: bool
@@ -99,15 +99,15 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t10: &mut u64 [unused]
      var $t11: &mut u64
      # live vars: $t0, $t1
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<m::S>.x($t0)
      # live vars: $t0, $t1, $t3
   1: $t2 := m::foo($t3)
      # live vars: $t0, $t1, $t2
-  2: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t3 := borrow_field<m::S>.x($t0)
      # live vars: $t0, $t1, $t2, $t3
   3: $t5 := read_ref($t3)
      # live vars: $t0, $t1, $t2, $t5
-  4: $t3 := borrow_field<0xc0ffee::m::S>.y($t0)
+  4: $t3 := borrow_field<m::S>.y($t0)
      # live vars: $t0, $t1, $t2, $t3, $t5
   5: $t8 := read_ref($t3)
      # live vars: $t0, $t1, $t2, $t5, $t8
@@ -119,7 +119,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # live vars: $t0, $t1, $t2
   9: label L0
      # live vars: $t0, $t1, $t2
- 10: $t11 := borrow_field<0xc0ffee::m::S>.x($t0)
+ 10: $t11 := borrow_field<m::S>.x($t0)
      # live vars: $t1, $t2, $t11
  11: $t11 := m::bar($t11, $t2)
      # live vars: $t1, $t11

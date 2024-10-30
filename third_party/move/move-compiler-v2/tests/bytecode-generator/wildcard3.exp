@@ -37,19 +37,19 @@ module 0xc0ffee::m {
 
 [variant baseline]
 public fun m::bar() {
-     var $t0: 0xc0ffee::m::S
+     var $t0: m::S
      var $t1: bool
-     var $t2: 0xc0ffee::m::S
+     var $t2: m::S
   0: $t1 := false
-  1: $t0 := pack 0xc0ffee::m::S($t1)
+  1: $t0 := pack m::S($t1)
   2: $t2 := infer($t0)
   3: return ()
 }
 
 
 [variant baseline]
-public fun m::foo($t0: 0xc0ffee::m::S) {
-     var $t1: 0xc0ffee::m::S
+public fun m::foo($t0: m::S) {
+     var $t1: m::S
   0: $t1 := infer($t0)
   1: return ()
 }

@@ -2,10 +2,10 @@
 
 [variant baseline]
 fun Test::test0() {
-     var $t0: 0x42::Test::Impotent
+     var $t0: Test::Impotent
      var $t1: bool
   0: $t1 := false
-  1: $t0 := pack 0x42::Test::Impotent($t1)
+  1: $t0 := pack Test::Impotent($t1)
   2: label L0
   3: goto 2
   4: label L1
@@ -15,11 +15,11 @@ fun Test::test0() {
 
 [variant baseline]
 fun Test::test1() {
-     var $t0: 0x42::Test::Impotent
+     var $t0: Test::Impotent
      var $t1: bool
      var $t2: bool
   0: $t1 := false
-  1: $t0 := pack 0x42::Test::Impotent($t1)
+  1: $t0 := pack Test::Impotent($t1)
   2: label L0
   3: $t2 := true
   4: if ($t2) goto 5 else goto 7
@@ -36,11 +36,11 @@ fun Test::test1() {
 
 [variant baseline]
 fun Test::test2($t0: bool) {
-     var $t1: 0x42::Test::Impotent
+     var $t1: Test::Impotent
      var $t2: bool
      var $t3: u64
   0: $t2 := false
-  1: $t1 := pack 0x42::Test::Impotent($t2)
+  1: $t1 := pack Test::Impotent($t2)
   2: if ($t0) goto 3 else goto 8
   3: label L0
   4: label L3
@@ -58,7 +58,7 @@ fun Test::test2($t0: bool) {
 
 [variant baseline]
 fun Test::test0() {
-     var $t0: 0x42::Test::Impotent
+     var $t0: Test::Impotent
      var $t1: bool
      # abort state: {}
      # live vars:
@@ -69,7 +69,7 @@ fun Test::test0() {
      # live vars: $t1
      # refs: []
      #
-  1: $t0 := pack 0x42::Test::Impotent($t1)
+  1: $t0 := pack Test::Impotent($t1)
      # abort state: {}
      # live vars:
      # refs: []
@@ -91,7 +91,7 @@ fun Test::test0() {
 
 [variant baseline]
 fun Test::test1() {
-     var $t0: 0x42::Test::Impotent
+     var $t0: Test::Impotent
      var $t1: bool
      var $t2: bool
      # abort state: {returns}
@@ -103,7 +103,7 @@ fun Test::test1() {
      # live vars: $t1
      # refs: []
      #
-  1: $t0 := pack 0x42::Test::Impotent($t1)
+  1: $t0 := pack Test::Impotent($t1)
      # abort state: {returns}
      # live vars:
      # refs: []
@@ -164,7 +164,7 @@ fun Test::test1() {
 
 [variant baseline]
 fun Test::test2($t0: bool) {
-     var $t1: 0x42::Test::Impotent
+     var $t1: Test::Impotent
      var $t2: bool
      var $t3: u64
      # abort state: {aborts}
@@ -176,7 +176,7 @@ fun Test::test2($t0: bool) {
      # live vars: $t0, $t2
      # refs: []
      #
-  1: $t1 := pack 0x42::Test::Impotent($t2)
+  1: $t1 := pack Test::Impotent($t2)
      # abort state: {aborts}
      # live vars: $t0
      # refs: []

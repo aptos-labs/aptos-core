@@ -106,26 +106,26 @@ module 0xc0ffee::m {
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::condition_requires_copy($t0: 0xc0ffee::m::Outer): 0xc0ffee::m::Outer {
-     var $t1: 0xc0ffee::m::Outer
-     var $t2: &0xc0ffee::m::Outer
+public fun m::condition_requires_copy($t0: m::Outer): m::Outer {
+     var $t1: m::Outer
+     var $t2: &m::Outer
      var $t3: bool
-     var $t4: &0xc0ffee::m::Inner
-     var $t5: 0xc0ffee::m::Inner
-     var $t6: 0xc0ffee::m::Inner
-     var $t7: 0xc0ffee::m::Outer
+     var $t4: &m::Inner
+     var $t5: m::Inner
+     var $t6: m::Inner
+     var $t7: m::Outer
      var $t8: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Outer::One($t2)
+  1: $t3 := test_variant m::Outer::One($t2)
   2: if ($t3) goto 3 else goto 12
   3: label L2
-  4: $t4 := borrow_variant_field<0xc0ffee::m::Outer::One>.i($t2)
+  4: $t4 := borrow_variant_field<m::Outer::One>.i($t2)
   5: $t5 := read_ref($t4)
   6: $t3 := m::consume($t5)
   7: if ($t3) goto 8 else goto 12
   8: label L3
-  9: $t6 := unpack_variant 0xc0ffee::m::Outer::One($t0)
- 10: $t1 := pack_variant 0xc0ffee::m::Outer::One($t6)
+  9: $t6 := unpack_variant m::Outer::One($t0)
+ 10: $t1 := pack_variant m::Outer::One($t6)
  11: goto 19
  12: label L1
  13: $t7 := infer($t0)
@@ -140,25 +140,25 @@ public fun m::condition_requires_copy($t0: 0xc0ffee::m::Outer): 0xc0ffee::m::Out
 
 
 [variant baseline]
-fun m::consume($t0: 0xc0ffee::m::Inner): bool {
+fun m::consume($t0: m::Inner): bool {
      var $t1: bool
-     var $t2: &0xc0ffee::m::Inner
+     var $t2: &m::Inner
      var $t3: bool
      var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Inner::Inner1($t2)
+  1: $t3 := test_variant m::Inner::Inner1($t2)
   2: if ($t3) goto 3 else goto 6
   3: label L2
-  4: $t4 := unpack_variant 0xc0ffee::m::Inner::Inner1($t0)
+  4: $t4 := unpack_variant m::Inner::Inner1($t0)
   5: goto 15
   6: label L1
-  7: $t3 := test_variant 0xc0ffee::m::Inner::Inner2($t2)
+  7: $t3 := test_variant m::Inner::Inner2($t2)
   8: if ($t3) goto 9 else goto 12
   9: label L4
- 10: ($t5, $t6) := unpack_variant 0xc0ffee::m::Inner::Inner2($t0)
+ 10: ($t5, $t6) := unpack_variant m::Inner::Inner2($t0)
  11: goto 15
  12: label L3
  13: $t7 := 14566554180833181697
@@ -170,17 +170,17 @@ fun m::consume($t0: 0xc0ffee::m::Inner): bool {
 
 
 [variant baseline]
-public fun m::matched_value_not_consumed($t0: 0xc0ffee::m::Outer) {
-     var $t1: &0xc0ffee::m::Outer
+public fun m::matched_value_not_consumed($t0: m::Outer) {
+     var $t1: &m::Outer
      var $t2: bool
-     var $t3: 0xc0ffee::m::Inner
-     var $t4: 0xc0ffee::m::Outer
+     var $t3: m::Inner
+     var $t4: m::Outer
      var $t5: u64
   0: $t1 := borrow_local($t0)
-  1: $t2 := test_variant 0xc0ffee::m::Outer::One($t1)
+  1: $t2 := test_variant m::Outer::One($t1)
   2: if ($t2) goto 3 else goto 6
   3: label L2
-  4: $t3 := unpack_variant 0xc0ffee::m::Outer::One($t0)
+  4: $t3 := unpack_variant m::Outer::One($t0)
   5: goto 12
   6: label L1
   7: $t4 := infer($t0)

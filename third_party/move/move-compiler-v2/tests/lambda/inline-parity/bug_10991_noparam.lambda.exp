@@ -174,129 +174,15 @@ module 0x42::Test {
 } // end 0x42::Test
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), 10, 100), 13) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(param$0: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          {
-            let _: u64 = param$0;
-            3
-          }
-        }
-    }
-    private fun test$lambda$2(param$0: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          {
-            let _: u64 = param$0;
-            10
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor specification checker:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), 10, 100), 13) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(param$0: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          {
-            let _: u64 = param$0;
-            3
-          }
-        }
-    }
-    private fun test$lambda$2(param$0: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          {
-            let _: u64 = param$0;
-            10
-          }
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor specification rewriter:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
-        Add<u64>((f)(x, _y), (g)(x, _y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), 10, 100), 13) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(param$0: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          {
-            let _: u64 = param$0;
-            3
-          }
-        }
-    }
-    private fun test$lambda$2(param$0: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          {
-            let _: u64 = param$0;
-            10
-          }
-        }
-    }
-} // end 0x42::Test
-
-
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991_noparam.move:4:9
-  │
-4 │         f(x, _y) + g(x, _y)
-  │         ^
-
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991_noparam.move:4:20
-  │
-4 │         f(x, _y) + g(x, _y)
-  │                    ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
   ┌─ tests/lambda/inline-parity/bug_10991_noparam.move:8:21
   │
 8 │         assert!(foo(|_, _| 3, |_, _| 10, 10, 100) == 13, 0);
   │                     ^^^^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
   ┌─ tests/lambda/inline-parity/bug_10991_noparam.move:8:31
   │
 8 │         assert!(foo(|_, _| 3, |_, _| 10, 10, 100) == 13, 0);

@@ -28,16 +28,16 @@ module 0x42::m {
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::foo($t0: &0x42::m::S): u8 {
+public fun m::foo($t0: &m::S): u8 {
      var $t1: u8
-     var $t2: &0x42::m::E
-     var $t3: &vector<0x42::m::E>
+     var $t2: &m::E
+     var $t3: &vector<m::E>
      var $t4: u64
      var $t5: &u8
-  0: $t3 := borrow_field<0x42::m::S>.data($t0)
+  0: $t3 := borrow_field<m::S>.data($t0)
   1: $t4 := 0
-  2: $t2 := vector::borrow<0x42::m::E>($t3, $t4)
-  3: $t5 := borrow_field<0x42::m::E>.k($t2)
+  2: $t2 := vector::borrow<m::E>($t3, $t4)
+  3: $t5 := borrow_field<m::E>.k($t2)
   4: $t1 := read_ref($t5)
   5: return $t1
 }

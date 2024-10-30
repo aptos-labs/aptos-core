@@ -480,13 +480,23 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _) => self.error(
+            ExpData::Lambda(id, _, _, _, _) => self.error(
                 *id,
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),
             // TODO(LAMBDA)
-            ExpData::Invoke(_, exp, _) => self.error(
-                exp.as_ref().node_id(),
+            ExpData::MoveFunctionExp(id, _mid, _fid) => self.error(
+                *id,
+                "Function-typed values not yet supported except as parameters to calls to inline functions",
+            ),
+            // TODO(LAMBDA)
+            ExpData::Curry(id, _mask, _fnexp, _args) => self.error(
+                *id,
+                "Function-typed values not yet supported except as parameters to calls to inline functions",
+            ),
+            // TODO(LAMBDA)
+            ExpData::Invoke(id, _exp, _) => self.error(
+                *id,
                 "Calls to function values other than inline function parameters not yet supported",
             ),
             ExpData::Quant(id, _, _, _, _, _) => {
@@ -812,12 +822,6 @@ impl<'env> Generator<'env> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
-
-            // TODO(LAMBDA)
-            Operation::Closure(..) => self.error(
-                id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
-            ),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))

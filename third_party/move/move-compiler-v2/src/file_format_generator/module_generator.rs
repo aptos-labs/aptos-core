@@ -367,7 +367,7 @@ impl ModuleGenerator {
                     ReferenceKind::Mutable => FF::SignatureToken::MutableReference(target_ty),
                 }
             },
-            Fun(_param_ty, _result_ty) => {
+            Fun(_param_ty, _result_ty, _abilities) => {
                 // TODO(LAMBDA)
                 ctx.error(
                     loc,
@@ -1077,7 +1077,7 @@ impl<'env> ModuleContext<'env> {
                 if fun.is_inline() {
                     continue;
                 }
-                if let Some(callees) = fun.get_called_functions() {
+                if let Some(callees) = fun.get_used_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();
                     // Extend usage by that of callees from the same module. Acquires is only

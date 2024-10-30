@@ -10,7 +10,7 @@ module 0x42::move_function_in_spec {
             let account_address: address = select move_function_in_spec::TypeInfo.account_address<TypeInfo>(type_info);
             spec {
               assert move_function_in_spec::$no_change(account_address, account_address);
-              assert Eq<address>(account_address, select move_function_in_spec::TypeInfo.account_address<0x42::move_function_in_spec::TypeInfo>(move_function_in_spec::$type_of<#0>()));
+              assert Eq<address>(account_address, select move_function_in_spec::TypeInfo.account_address<move_function_in_spec::TypeInfo>(move_function_in_spec::$type_of<#0>()));
             }
             ;
             Tuple()
@@ -30,8 +30,8 @@ module 0x42::move_function_in_spec {
     }
     spec fun $no_change(target: address,new_addr: address): bool {
         {
-          let ty: &0x42::move_function_in_spec::TypeInfo = global<0x42::move_function_in_spec::TypeInfo>(target);
-          Eq<address>(select move_function_in_spec::TypeInfo.account_address<0x42::move_function_in_spec::TypeInfo>(ty), new_addr)
+          let ty: &move_function_in_spec::TypeInfo = global<move_function_in_spec::TypeInfo>(target);
+          Eq<address>(select move_function_in_spec::TypeInfo.account_address<move_function_in_spec::TypeInfo>(ty), new_addr)
         }
     }
     spec fun $type_of<T>(): TypeInfo {
@@ -50,7 +50,7 @@ module 0x42::move_function_in_spec {
 
         /* spec {
           assert move_function_in_spec::$no_change(account_address, account_address);
-          assert Eq<address>(account_address, select move_function_in_spec::TypeInfo.account_address<0x42::move_function_in_spec::TypeInfo>(move_function_in_spec::$type_of<#0>()));
+          assert Eq<address>(account_address, select move_function_in_spec::TypeInfo.account_address<move_function_in_spec::TypeInfo>(move_function_in_spec::$type_of<#0>()));
         }
          */
         ;

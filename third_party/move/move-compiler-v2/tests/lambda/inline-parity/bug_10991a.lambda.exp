@@ -174,153 +174,27 @@ module 0x42::Test {
 } // end 0x42::Test
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,h: |(u64, u64)|u64,i: |(u64, u64)|u64,x: u64,y: u64): u64 {
-        Add<u64>(Add<u64>(Add<u64>((f)(x, y), (g)(x, y)), (h)(x, y)), (i)(x, y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), closure Test::test$lambda$3(), closure Test::test$lambda$4(), 10, 100), 220) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(x: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          x
-        }
-    }
-    private fun test$lambda$2(param$0: u64,y: u64): u64 {
-        {
-          let _: u64 = param$0;
-          y
-        }
-    }
-    private fun test$lambda$3(a: u64,_b: u64): u64 {
-        a
-    }
-    private fun test$lambda$4(_c: u64,d: u64): u64 {
-        d
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor specification checker:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,h: |(u64, u64)|u64,i: |(u64, u64)|u64,x: u64,y: u64): u64 {
-        Add<u64>(Add<u64>(Add<u64>((f)(x, y), (g)(x, y)), (h)(x, y)), (i)(x, y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), closure Test::test$lambda$3(), closure Test::test$lambda$4(), 10, 100), 220) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(x: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          x
-        }
-    }
-    private fun test$lambda$2(param$0: u64,y: u64): u64 {
-        {
-          let _: u64 = param$0;
-          y
-        }
-    }
-    private fun test$lambda$3(a: u64,_b: u64): u64 {
-        a
-    }
-    private fun test$lambda$4(_c: u64,d: u64): u64 {
-        d
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor specification rewriter:
-module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,h: |(u64, u64)|u64,i: |(u64, u64)|u64,x: u64,y: u64): u64 {
-        Add<u64>(Add<u64>(Add<u64>((f)(x, y), (g)(x, y)), (h)(x, y)), (i)(x, y))
-    }
-    public fun test() {
-        if Eq<u64>(Test::foo(closure Test::test$lambda$1(), closure Test::test$lambda$2(), closure Test::test$lambda$3(), closure Test::test$lambda$4(), 10, 100), 220) {
-          Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
-    }
-    private fun test$lambda$1(x: u64,param$1: u64): u64 {
-        {
-          let _: u64 = param$1;
-          x
-        }
-    }
-    private fun test$lambda$2(param$0: u64,y: u64): u64 {
-        {
-          let _: u64 = param$0;
-          y
-        }
-    }
-    private fun test$lambda$3(a: u64,_b: u64): u64 {
-        a
-    }
-    private fun test$lambda$4(_c: u64,d: u64): u64 {
-        d
-    }
-} // end 0x42::Test
-
-
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991a.move:6:13
-  │
-6 │             f(x, y) + g(x, y) + h(x, y) + i(x, y)
-  │             ^
-
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991a.move:6:23
-  │
-6 │             f(x, y) + g(x, y) + h(x, y) + i(x, y)
-  │                       ^
-
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991a.move:6:33
-  │
-6 │             f(x, y) + g(x, y) + h(x, y) + i(x, y)
-  │                                 ^
-
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/bug_10991a.move:6:43
-  │
-6 │             f(x, y) + g(x, y) + h(x, y) + i(x, y)
-  │                                           ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/bug_10991a.move:10:21
    │
 10 │         assert!(foo(|x, _| x, |_, y| y,
    │                     ^^^^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/bug_10991a.move:10:31
    │
 10 │         assert!(foo(|x, _| x, |_, y| y,
    │                               ^^^^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/bug_10991a.move:11:6
    │
 11 │         |a, _b| a, |_c, d| d,
    │         ^^^^^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/bug_10991a.move:11:17
    │
 11 │         |a, _b| a, |_c, d| d,

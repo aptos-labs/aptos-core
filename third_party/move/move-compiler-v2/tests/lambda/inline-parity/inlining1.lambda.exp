@@ -207,90 +207,9 @@ module 0x42::Test {
 } // end 0x42::Test
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0x42::Test {
-    private fun foo(f: |u64|u64,x: u64): u64 {
-        (f)(x)
-    }
-    public fun main() {
-        if Eq<u64>(Test::test(), 3) {
-          Tuple()
-        } else {
-          Abort(5)
-        };
-        Tuple()
-    }
-    public fun test(): u64 {
-        Test::foo(closure Test::test$lambda$1(), 10)
-    }
-    private fun test$lambda$1(param$0: u64): u64 {
-        {
-          let _: u64 = param$0;
-          3
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor specification checker:
-module 0x42::Test {
-    private fun foo(f: |u64|u64,x: u64): u64 {
-        (f)(x)
-    }
-    public fun main() {
-        if Eq<u64>(Test::test(), 3) {
-          Tuple()
-        } else {
-          Abort(5)
-        };
-        Tuple()
-    }
-    public fun test(): u64 {
-        Test::foo(closure Test::test$lambda$1(), 10)
-    }
-    private fun test$lambda$1(param$0: u64): u64 {
-        {
-          let _: u64 = param$0;
-          3
-        }
-    }
-} // end 0x42::Test
-
-
-// -- Model dump after env processor specification rewriter:
-module 0x42::Test {
-    private fun foo(f: |u64|u64,x: u64): u64 {
-        (f)(x)
-    }
-    public fun main() {
-        if Eq<u64>(Test::test(), 3) {
-          Tuple()
-        } else {
-          Abort(5)
-        };
-        Tuple()
-    }
-    public fun test(): u64 {
-        Test::foo(closure Test::test$lambda$1(), 10)
-    }
-    private fun test$lambda$1(param$0: u64): u64 {
-        {
-          let _: u64 = param$0;
-          3
-        }
-    }
-} // end 0x42::Test
-
-
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/inlining1.move:4:9
-  │
-4 │         f(x)
-  │         ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
   ┌─ tests/lambda/inline-parity/inlining1.move:8:13
   │
 8 │         foo(|_| 3, 10)

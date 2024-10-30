@@ -4,7 +4,8 @@
 
 use crate::{
     ast::{
-        AddressSpecifier, Exp, ExpData, Operation, Pattern, ResourceSpecifier, TempIndex, Value,
+        AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, ResourceSpecifier,
+        TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -540,14 +541,53 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             // Following forms may require parenthesis
-            Lambda(_, pat, body) => {
+            Lambda(_, pat, body, capture_kind, abilities) => {
                 self.parenthesize(context_prio, Prio::General, || {
+                    if *capture_kind != LambdaCaptureKind::Default {
+                        emit!(self.wr(), "{} ", capture_kind);
+                    };
                     emit!(self.wr(), "|");
                     self.print_pat(pat);
                     emit!(self.wr(), "| ");
-                    self.print_exp(Prio::General, true, body)
+                    self.print_exp(Prio::General, true, body);
+                    if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                        let abilities_as_str = abilities
+                            .iter()
+                            .map(|a| a.to_string())
+                            .reduce(|l, r| format!("{}, {}", l, r))
+                            .unwrap_or_default();
+                        emit!(self.wr(), " has {}", abilities_as_str);
+                    }
                 });
             },
+            MoveFunctionExp(id, mid, fid) => {
+                emit!(
+                    self.wr(),
+                    "{}",
+                    self.env()
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
+                );
+                let type_inst = self.env().get_node_instantiation(*id);
+                if !type_inst.is_empty() {
+                    emit!(
+                        self.wr(),
+                        "<{}>",
+                        type_inst
+                            .iter()
+                            .map(|ty| ty.display(&self.type_display_context))
+                            .join(", ")
+                    )
+                };
+            },
+            Curry(id, mask, fnexp, args) => self.parenthesize(context_prio, Prio::Postfix, || {
+                emit!(self.wr(), "Curry");
+                self.print_node_inst(*id);
+                emit!(self.wr(), "(");
+                self.print_exp(Prio::General, false, fnexp);
+                emit!(self.wr(), ", {:b}, ", mask);
+                self.print_exp_list("", ")", args);
+            }),
             Block(..) | Sequence(..) => {
                 let mut items = vec![];
                 self.extract_items(&mut items, exp);
@@ -962,7 +1002,6 @@ impl<'a> ExpSourcifier<'a> {
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
             | Operation::SpecFunction(_, _, _)
-            | Operation::Closure(_, _)
             | Operation::UpdateField(_, _, _)
             | Operation::Result(_)
             | Operation::Index
@@ -1024,7 +1063,11 @@ impl<'a> ExpSourcifier<'a> {
         self.parenthesize(context_prio, prio, || {
             self.print_exp(prio, false, &args[0]);
             emit!(self.wr(), " {} ", repr);
-            self.print_exp(prio + 1, false, &args[1])
+            if args.len() > 1 {
+                self.print_exp(prio + 1, false, &args[1])
+            } else {
+                emit!(self.wr(), "ERROR")
+            }
         })
     }
 

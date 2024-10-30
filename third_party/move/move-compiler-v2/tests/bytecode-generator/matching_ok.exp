@@ -339,26 +339,26 @@ module 0xc0ffee::m {
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::inner_value($t0: 0xc0ffee::m::Inner): u64 {
+public fun m::inner_value($t0: m::Inner): u64 {
      var $t1: u64
-     var $t2: &0xc0ffee::m::Inner
+     var $t2: &m::Inner
      var $t3: bool
      var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Inner::Inner1($t2)
+  1: $t3 := test_variant m::Inner::Inner1($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
-  4: $t4 := unpack_variant 0xc0ffee::m::Inner::Inner1($t0)
+  4: $t4 := unpack_variant m::Inner::Inner1($t0)
   5: $t1 := infer($t4)
   6: goto 17
   7: label L1
-  8: $t3 := test_variant 0xc0ffee::m::Inner::Inner2($t2)
+  8: $t3 := test_variant m::Inner::Inner2($t2)
   9: if ($t3) goto 10 else goto 14
  10: label L4
- 11: ($t5, $t6) := unpack_variant 0xc0ffee::m::Inner::Inner2($t0)
+ 11: ($t5, $t6) := unpack_variant m::Inner::Inner2($t0)
  12: $t1 := +($t5, $t6)
  13: goto 17
  14: label L3
@@ -370,12 +370,12 @@ public fun m::inner_value($t0: 0xc0ffee::m::Inner): u64 {
 
 
 [variant baseline]
-public fun m::is_inner1($t0: &0xc0ffee::m::Inner): bool {
+public fun m::is_inner1($t0: &m::Inner): bool {
      var $t1: bool
      var $t2: bool
-     var $t3: &0xc0ffee::m::Inner
+     var $t3: &m::Inner
      var $t4: u64
-  0: $t2 := test_variant 0xc0ffee::m::Inner::Inner1($t0)
+  0: $t2 := test_variant m::Inner::Inner1($t0)
   1: if ($t2) goto 2 else goto 5
   2: label L2
   3: $t1 := true
@@ -393,17 +393,17 @@ public fun m::is_inner1($t0: &0xc0ffee::m::Inner): bool {
 
 
 [variant baseline]
-public fun m::is_some<#0>($t0: &0xc0ffee::m::Option<#0>): bool {
+public fun m::is_some<#0>($t0: &m::Option<#0>): bool {
      var $t1: bool
      var $t2: bool
      var $t3: u64
-  0: $t2 := test_variant 0xc0ffee::m::Option<#0>::None($t0)
+  0: $t2 := test_variant m::Option<#0>::None($t0)
   1: if ($t2) goto 2 else goto 5
   2: label L2
   3: $t1 := false
   4: goto 14
   5: label L1
-  6: $t2 := test_variant 0xc0ffee::m::Option<#0>::Some($t0)
+  6: $t2 := test_variant m::Option<#0>::Some($t0)
   7: if ($t2) goto 8 else goto 11
   8: label L4
   9: $t1 := true
@@ -417,17 +417,17 @@ public fun m::is_some<#0>($t0: &0xc0ffee::m::Option<#0>): bool {
 
 
 [variant baseline]
-public fun m::is_some_dropped<#0>($t0: 0xc0ffee::m::Option<#0>): bool {
+public fun m::is_some_dropped<#0>($t0: m::Option<#0>): bool {
      var $t1: bool
-     var $t2: &0xc0ffee::m::Option<#0>
+     var $t2: &m::Option<#0>
      var $t3: bool
-     var $t4: 0xc0ffee::m::Option<#0>
+     var $t4: m::Option<#0>
      var $t5: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Option<#0>::None($t2)
+  1: $t3 := test_variant m::Option<#0>::None($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
-  4: unpack_variant 0xc0ffee::m::Option<#0>::None($t0)
+  4: unpack_variant m::Option<#0>::None($t0)
   5: $t1 := false
   6: goto 14
   7: label L1
@@ -443,33 +443,33 @@ public fun m::is_some_dropped<#0>($t0: 0xc0ffee::m::Option<#0>): bool {
 
 
 [variant baseline]
-public fun m::is_some_specialized($t0: &0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>): bool {
+public fun m::is_some_specialized($t0: &m::Option<m::Option<u64>>): bool {
      var $t1: bool
      var $t2: bool
-     var $t3: &0xc0ffee::m::Option<u64>
-     var $t4: &0xc0ffee::m::Option<u64>
+     var $t3: &m::Option<u64>
+     var $t4: &m::Option<u64>
      var $t5: u64
-  0: $t2 := test_variant 0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>::None($t0)
+  0: $t2 := test_variant m::Option<m::Option<u64>>::None($t0)
   1: if ($t2) goto 2 else goto 5
   2: label L2
   3: $t1 := false
   4: goto 28
   5: label L1
-  6: $t2 := test_variant 0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>::Some($t0)
+  6: $t2 := test_variant m::Option<m::Option<u64>>::Some($t0)
   7: if ($t2) goto 8 else goto 15
   8: label L4
-  9: $t3 := borrow_variant_field<0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>::Some>.value($t0)
- 10: $t2 := test_variant 0xc0ffee::m::Option<u64>::None($t3)
+  9: $t3 := borrow_variant_field<m::Option<m::Option<u64>>::Some>.value($t0)
+ 10: $t2 := test_variant m::Option<u64>::None($t3)
  11: if ($t2) goto 12 else goto 15
  12: label L5
  13: $t1 := false
  14: goto 28
  15: label L3
- 16: $t2 := test_variant 0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>::Some($t0)
+ 16: $t2 := test_variant m::Option<m::Option<u64>>::Some($t0)
  17: if ($t2) goto 18 else goto 25
  18: label L7
- 19: $t4 := borrow_variant_field<0xc0ffee::m::Option<0xc0ffee::m::Option<u64>>::Some>.value($t0)
- 20: $t2 := test_variant 0xc0ffee::m::Option<u64>::Some($t4)
+ 19: $t4 := borrow_variant_field<m::Option<m::Option<u64>>::Some>.value($t0)
+ 20: $t2 := test_variant m::Option<u64>::Some($t4)
  21: if ($t2) goto 22 else goto 25
  22: label L8
  23: $t1 := true
@@ -483,40 +483,40 @@ public fun m::is_some_specialized($t0: &0xc0ffee::m::Option<0xc0ffee::m::Option<
 
 
 [variant baseline]
-public fun m::outer_value($t0: 0xc0ffee::m::Outer): u64 {
+public fun m::outer_value($t0: m::Outer): u64 {
      var $t1: u64
-     var $t2: &0xc0ffee::m::Outer
+     var $t2: &m::Outer
      var $t3: bool
-     var $t4: 0xc0ffee::m::Inner
-     var $t5: 0xc0ffee::m::Inner
-     var $t6: 0xc0ffee::m::Box
+     var $t4: m::Inner
+     var $t5: m::Inner
+     var $t6: m::Box
      var $t7: u64
      var $t8: u64
-     var $t9: &0xc0ffee::m::Box
+     var $t9: &m::Box
      var $t10: &u64
      var $t11: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Outer::None($t2)
+  1: $t3 := test_variant m::Outer::None($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
-  4: unpack_variant 0xc0ffee::m::Outer::None($t0)
+  4: unpack_variant m::Outer::None($t0)
   5: $t1 := 0
   6: goto 28
   7: label L1
-  8: $t3 := test_variant 0xc0ffee::m::Outer::One($t2)
+  8: $t3 := test_variant m::Outer::One($t2)
   9: if ($t3) goto 10 else goto 14
  10: label L4
- 11: $t4 := unpack_variant 0xc0ffee::m::Outer::One($t0)
+ 11: $t4 := unpack_variant m::Outer::One($t0)
  12: $t1 := m::inner_value($t4)
  13: goto 28
  14: label L3
- 15: $t3 := test_variant 0xc0ffee::m::Outer::Two($t2)
+ 15: $t3 := test_variant m::Outer::Two($t2)
  16: if ($t3) goto 17 else goto 25
  17: label L6
- 18: ($t5, $t6) := unpack_variant 0xc0ffee::m::Outer::Two($t0)
+ 18: ($t5, $t6) := unpack_variant m::Outer::Two($t0)
  19: $t7 := m::inner_value($t5)
  20: $t9 := borrow_local($t6)
- 21: $t10 := borrow_field<0xc0ffee::m::Box>.x($t9)
+ 21: $t10 := borrow_field<m::Box>.x($t9)
  22: $t8 := read_ref($t10)
  23: $t1 := +($t7, $t8)
  24: goto 28
@@ -529,55 +529,55 @@ public fun m::outer_value($t0: 0xc0ffee::m::Outer): u64 {
 
 
 [variant baseline]
-public fun m::outer_value_nested($t0: 0xc0ffee::m::Outer): u64 {
+public fun m::outer_value_nested($t0: m::Outer): u64 {
      var $t1: u64
-     var $t2: &0xc0ffee::m::Outer
+     var $t2: &m::Outer
      var $t3: bool
-     var $t4: &0xc0ffee::m::Inner
+     var $t4: &m::Inner
      var $t5: u64
-     var $t6: 0xc0ffee::m::Inner
-     var $t7: 0xc0ffee::m::Inner
-     var $t8: 0xc0ffee::m::Inner
-     var $t9: 0xc0ffee::m::Box
+     var $t6: m::Inner
+     var $t7: m::Inner
+     var $t8: m::Inner
+     var $t9: m::Box
      var $t10: u64
      var $t11: u64
-     var $t12: &0xc0ffee::m::Box
+     var $t12: &m::Box
      var $t13: &u64
      var $t14: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Outer::None($t2)
+  1: $t3 := test_variant m::Outer::None($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
-  4: unpack_variant 0xc0ffee::m::Outer::None($t0)
+  4: unpack_variant m::Outer::None($t0)
   5: $t1 := 0
   6: goto 40
   7: label L1
-  8: $t3 := test_variant 0xc0ffee::m::Outer::One($t2)
+  8: $t3 := test_variant m::Outer::One($t2)
   9: if ($t3) goto 10 else goto 19
  10: label L4
- 11: $t4 := borrow_variant_field<0xc0ffee::m::Outer::One>.i($t2)
- 12: $t3 := test_variant 0xc0ffee::m::Inner::Inner1($t4)
+ 11: $t4 := borrow_variant_field<m::Outer::One>.i($t2)
+ 12: $t3 := test_variant m::Inner::Inner1($t4)
  13: if ($t3) goto 14 else goto 19
  14: label L5
- 15: $t6 := unpack_variant 0xc0ffee::m::Outer::One($t0)
- 16: $t5 := unpack_variant 0xc0ffee::m::Inner::Inner1($t6)
+ 15: $t6 := unpack_variant m::Outer::One($t0)
+ 16: $t5 := unpack_variant m::Inner::Inner1($t6)
  17: $t1 := infer($t5)
  18: goto 40
  19: label L3
- 20: $t3 := test_variant 0xc0ffee::m::Outer::One($t2)
+ 20: $t3 := test_variant m::Outer::One($t2)
  21: if ($t3) goto 22 else goto 26
  22: label L7
- 23: $t7 := unpack_variant 0xc0ffee::m::Outer::One($t0)
+ 23: $t7 := unpack_variant m::Outer::One($t0)
  24: $t1 := m::inner_value($t7)
  25: goto 40
  26: label L6
- 27: $t3 := test_variant 0xc0ffee::m::Outer::Two($t2)
+ 27: $t3 := test_variant m::Outer::Two($t2)
  28: if ($t3) goto 29 else goto 37
  29: label L9
- 30: ($t8, $t9) := unpack_variant 0xc0ffee::m::Outer::Two($t0)
+ 30: ($t8, $t9) := unpack_variant m::Outer::Two($t0)
  31: $t10 := m::inner_value($t8)
  32: $t12 := borrow_local($t9)
- 33: $t13 := borrow_field<0xc0ffee::m::Box>.x($t12)
+ 33: $t13 := borrow_field<m::Box>.x($t12)
  34: $t11 := read_ref($t13)
  35: $t1 := +($t10, $t11)
  36: goto 40
@@ -590,59 +590,59 @@ public fun m::outer_value_nested($t0: 0xc0ffee::m::Outer): u64 {
 
 
 [variant baseline]
-public fun m::outer_value_with_cond($t0: 0xc0ffee::m::Outer): u64 {
+public fun m::outer_value_with_cond($t0: m::Outer): u64 {
      var $t1: u64
-     var $t2: &0xc0ffee::m::Outer
+     var $t2: &m::Outer
      var $t3: bool
-     var $t4: &0xc0ffee::m::Inner
-     var $t5: &0xc0ffee::m::Inner
-     var $t6: 0xc0ffee::m::Inner
+     var $t4: &m::Inner
+     var $t5: &m::Inner
+     var $t6: m::Inner
      var $t7: u64
      var $t8: u64
-     var $t9: 0xc0ffee::m::Inner
-     var $t10: 0xc0ffee::m::Inner
-     var $t11: 0xc0ffee::m::Box
+     var $t9: m::Inner
+     var $t10: m::Inner
+     var $t11: m::Box
      var $t12: u64
      var $t13: u64
-     var $t14: &0xc0ffee::m::Box
+     var $t14: &m::Box
      var $t15: &u64
      var $t16: u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := test_variant 0xc0ffee::m::Outer::None($t2)
+  1: $t3 := test_variant m::Outer::None($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
-  4: unpack_variant 0xc0ffee::m::Outer::None($t0)
+  4: unpack_variant m::Outer::None($t0)
   5: $t1 := 0
   6: goto 42
   7: label L1
-  8: $t3 := test_variant 0xc0ffee::m::Outer::One($t2)
+  8: $t3 := test_variant m::Outer::One($t2)
   9: if ($t3) goto 10 else goto 21
  10: label L4
- 11: $t4 := borrow_variant_field<0xc0ffee::m::Outer::One>.i($t2)
+ 11: $t4 := borrow_variant_field<m::Outer::One>.i($t2)
  12: $t5 := infer($t4)
  13: $t3 := m::is_inner1($t5)
  14: if ($t3) goto 15 else goto 21
  15: label L5
- 16: $t6 := unpack_variant 0xc0ffee::m::Outer::One($t0)
+ 16: $t6 := unpack_variant m::Outer::One($t0)
  17: $t7 := m::inner_value($t6)
  18: $t8 := 2
  19: $t1 := %($t7, $t8)
  20: goto 42
  21: label L3
- 22: $t3 := test_variant 0xc0ffee::m::Outer::One($t2)
+ 22: $t3 := test_variant m::Outer::One($t2)
  23: if ($t3) goto 24 else goto 28
  24: label L7
- 25: $t9 := unpack_variant 0xc0ffee::m::Outer::One($t0)
+ 25: $t9 := unpack_variant m::Outer::One($t0)
  26: $t1 := m::inner_value($t9)
  27: goto 42
  28: label L6
- 29: $t3 := test_variant 0xc0ffee::m::Outer::Two($t2)
+ 29: $t3 := test_variant m::Outer::Two($t2)
  30: if ($t3) goto 31 else goto 39
  31: label L9
- 32: ($t10, $t11) := unpack_variant 0xc0ffee::m::Outer::Two($t0)
+ 32: ($t10, $t11) := unpack_variant m::Outer::Two($t0)
  33: $t12 := m::inner_value($t10)
  34: $t14 := borrow_local($t11)
- 35: $t15 := borrow_field<0xc0ffee::m::Box>.x($t14)
+ 35: $t15 := borrow_field<m::Box>.x($t14)
  36: $t13 := read_ref($t15)
  37: $t1 := +($t12, $t13)
  38: goto 42
@@ -655,40 +655,40 @@ public fun m::outer_value_with_cond($t0: 0xc0ffee::m::Outer): u64 {
 
 
 [variant baseline]
-public fun m::outer_value_with_cond_ref($t0: &0xc0ffee::m::Outer): bool {
+public fun m::outer_value_with_cond_ref($t0: &m::Outer): bool {
      var $t1: bool
      var $t2: bool
-     var $t3: &0xc0ffee::m::Inner
-     var $t4: &0xc0ffee::m::Inner
-     var $t5: &0xc0ffee::m::Inner
+     var $t3: &m::Inner
+     var $t4: &m::Inner
+     var $t5: &m::Inner
      var $t6: u64
-  0: $t2 := test_variant 0xc0ffee::m::Outer::None($t0)
+  0: $t2 := test_variant m::Outer::None($t0)
   1: if ($t2) goto 2 else goto 5
   2: label L2
   3: $t1 := false
   4: goto 32
   5: label L1
-  6: $t2 := test_variant 0xc0ffee::m::Outer::One($t0)
+  6: $t2 := test_variant m::Outer::One($t0)
   7: if ($t2) goto 8 else goto 15
   8: label L4
-  9: $t3 := borrow_variant_field<0xc0ffee::m::Outer::One>.i($t0)
+  9: $t3 := borrow_variant_field<m::Outer::One>.i($t0)
  10: $t2 := m::is_inner1($t3)
  11: if ($t2) goto 12 else goto 15
  12: label L5
  13: $t1 := true
  14: goto 32
  15: label L3
- 16: $t2 := test_variant 0xc0ffee::m::Outer::One($t0)
+ 16: $t2 := test_variant m::Outer::One($t0)
  17: if ($t2) goto 18 else goto 22
  18: label L7
- 19: $t4 := borrow_variant_field<0xc0ffee::m::Outer::One>.i($t0)
+ 19: $t4 := borrow_variant_field<m::Outer::One>.i($t0)
  20: $t1 := m::is_inner1($t4)
  21: goto 32
  22: label L6
- 23: $t2 := test_variant 0xc0ffee::m::Outer::Two($t0)
+ 23: $t2 := test_variant m::Outer::Two($t0)
  24: if ($t2) goto 25 else goto 29
  25: label L9
- 26: $t5 := borrow_variant_field<0xc0ffee::m::Outer::Two>.i($t0)
+ 26: $t5 := borrow_variant_field<m::Outer::Two>.i($t0)
  27: $t1 := m::is_inner1($t5)
  28: goto 32
  29: label L8
@@ -700,13 +700,13 @@ public fun m::outer_value_with_cond_ref($t0: &0xc0ffee::m::Outer): bool {
 
 
 [variant baseline]
-fun m::select_common_fields($t0: 0xc0ffee::m::CommonFields): u64 {
+fun m::select_common_fields($t0: m::CommonFields): u64 {
      var $t1: u64
      var $t2: u64
-     var $t3: &0xc0ffee::m::CommonFields
+     var $t3: &m::CommonFields
      var $t4: &u64
      var $t5: u64
-     var $t6: &0xc0ffee::m::CommonFields
+     var $t6: &m::CommonFields
      var $t7: bool
      var $t8: u64
      var $t9: u64
@@ -714,20 +714,20 @@ fun m::select_common_fields($t0: 0xc0ffee::m::CommonFields): u64 {
      var $t11: u64
      var $t12: u64
   0: $t3 := borrow_local($t0)
-  1: $t4 := borrow_variant_field<0xc0ffee::m::CommonFields::Foo|Bar>.x($t3)
+  1: $t4 := borrow_variant_field<m::CommonFields::Foo|Bar>.x($t3)
   2: $t2 := read_ref($t4)
   3: $t6 := borrow_local($t0)
-  4: $t7 := test_variant 0xc0ffee::m::CommonFields::Foo($t6)
+  4: $t7 := test_variant m::CommonFields::Foo($t6)
   5: if ($t7) goto 6 else goto 10
   6: label L2
-  7: ($t9, $t8) := unpack_variant 0xc0ffee::m::CommonFields::Foo($t0)
+  7: ($t9, $t8) := unpack_variant m::CommonFields::Foo($t0)
   8: $t5 := infer($t8)
   9: goto 20
  10: label L1
- 11: $t7 := test_variant 0xc0ffee::m::CommonFields::Bar($t6)
+ 11: $t7 := test_variant m::CommonFields::Bar($t6)
  12: if ($t7) goto 13 else goto 17
  13: label L4
- 14: ($t11, $t10) := unpack_variant 0xc0ffee::m::CommonFields::Bar($t0)
+ 14: ($t11, $t10) := unpack_variant m::CommonFields::Bar($t0)
  15: $t5 := infer($t10)
  16: goto 20
  17: label L3
@@ -740,24 +740,24 @@ fun m::select_common_fields($t0: 0xc0ffee::m::CommonFields): u64 {
 
 
 [variant baseline]
-fun m::select_common_fields_different_offset($t0: 0xc0ffee::m::CommonFieldsAtDifferentOffset): u64 {
+fun m::select_common_fields_different_offset($t0: m::CommonFieldsAtDifferentOffset): u64 {
      var $t1: u64
-     var $t2: &0xc0ffee::m::CommonFieldsAtDifferentOffset
+     var $t2: &m::CommonFieldsAtDifferentOffset
      var $t3: &u64
      var $t4: bool
   0: $t2 := borrow_local($t0)
-  1: $t4 := test_variant 0xc0ffee::m::CommonFieldsAtDifferentOffset::Bar($t2)
+  1: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Bar($t2)
   2: if ($t4) goto 8 else goto 3
   3: label L3
-  4: $t4 := test_variant 0xc0ffee::m::CommonFieldsAtDifferentOffset::Balt($t2)
+  4: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Balt($t2)
   5: if ($t4) goto 8 else goto 6
   6: label L4
   7: goto 11
   8: label L2
-  9: $t3 := borrow_variant_field<0xc0ffee::m::CommonFieldsAtDifferentOffset::Bar|Balt>.z($t2)
+  9: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Bar|Balt>.z($t2)
  10: goto 13
  11: label L1
- 12: $t3 := borrow_variant_field<0xc0ffee::m::CommonFieldsAtDifferentOffset::Baz>.z($t2)
+ 12: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Baz>.z($t2)
  13: label L0
  14: $t1 := read_ref($t3)
  15: return $t1
@@ -765,14 +765,14 @@ fun m::select_common_fields_different_offset($t0: 0xc0ffee::m::CommonFieldsAtDif
 
 
 [variant baseline]
-fun m::test_common($t0: 0xc0ffee::m::CommonFields): bool {
+fun m::test_common($t0: m::CommonFields): bool {
      var $t1: bool
-     var $t2: &0xc0ffee::m::CommonFields
+     var $t2: &m::CommonFields
   0: $t2 := borrow_local($t0)
-  1: $t1 := test_variant 0xc0ffee::m::CommonFields::Foo($t2)
+  1: $t1 := test_variant m::CommonFields::Foo($t2)
   2: if ($t1) goto 7 else goto 3
   3: label L1
-  4: $t1 := test_variant 0xc0ffee::m::CommonFields::Bar($t2)
+  4: $t1 := test_variant m::CommonFields::Bar($t2)
   5: if ($t1) goto 7 else goto 6
   6: label L2
   7: label L0
@@ -781,12 +781,12 @@ fun m::test_common($t0: 0xc0ffee::m::CommonFields): bool {
 
 
 [variant baseline]
-fun m::test_common_ref($t0: &0xc0ffee::m::CommonFields): bool {
+fun m::test_common_ref($t0: &m::CommonFields): bool {
      var $t1: bool
-  0: $t1 := test_variant 0xc0ffee::m::CommonFields::Foo($t0)
+  0: $t1 := test_variant m::CommonFields::Foo($t0)
   1: if ($t1) goto 6 else goto 2
   2: label L1
-  3: $t1 := test_variant 0xc0ffee::m::CommonFields::Bar($t0)
+  3: $t1 := test_variant m::CommonFields::Bar($t0)
   4: if ($t1) goto 6 else goto 5
   5: label L2
   6: label L0

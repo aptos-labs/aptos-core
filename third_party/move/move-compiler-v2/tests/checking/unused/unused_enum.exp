@@ -4,10 +4,10 @@ module 0x42::enum_types {
     enum MessageHolder {
         Empty,
         Message {
-            message: 0x1::string::String,
+            message: string::String,
         }
         NewMessage {
-            message: 0x1::string::String,
+            message: string::String,
         }
     }
 } // end 0x42::enum_types
@@ -17,10 +17,10 @@ module 0x42::enum_types {
     enum MessageHolder has drop, key {
         Empty,
         Message {
-            message: 0x1::string::String,
+            message: string::String,
         }
         NewMessage {
-            message: 0x1::string::String,
+            message: string::String,
         }
     }
 }
