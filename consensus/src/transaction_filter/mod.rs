@@ -38,7 +38,9 @@ mod test {
     use aptos_types::{
         chain_id::ChainId,
         move_utils::MemberId,
-        transaction::{EntryFunction, RawTransaction, SignedTransaction, TransactionPayload},
+        transaction::{
+            EntryFunction, RawTransaction, SignedTransaction, TransactionPayloadWrapper,
+        },
     };
     use move_core_types::account_address::AccountAddress;
 
@@ -52,7 +54,7 @@ mod test {
             member_id: function_id,
         } = function;
 
-        let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        let payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             module_id,
             function_id,
             vec![],
@@ -82,21 +84,25 @@ mod test {
 
     fn get_module_address(txn: &SignedTransaction) -> AccountAddress {
         match txn.payload() {
-            TransactionPayload::EntryFunction(entry_func) => *entry_func.module().address(),
+            TransactionPayloadWrapper::EntryFunction(entry_func) => *entry_func.module().address(),
             _ => panic!("Unexpected transaction payload"),
         }
     }
 
     fn get_module_name(txn: &SignedTransaction) -> String {
         match txn.payload() {
-            TransactionPayload::EntryFunction(entry_func) => entry_func.module().name().to_string(),
+            TransactionPayloadWrapper::EntryFunction(entry_func) => {
+                entry_func.module().name().to_string()
+            },
             _ => panic!("Unexpected transaction payload"),
         }
     }
 
     fn get_function_name(txn: &SignedTransaction) -> String {
         match txn.payload() {
-            TransactionPayload::EntryFunction(entry_func) => entry_func.function().to_string(),
+            TransactionPayloadWrapper::EntryFunction(entry_func) => {
+                entry_func.function().to_string()
+            },
             _ => panic!("Unexpected transaction payload"),
         }
     }

@@ -126,6 +126,7 @@ fn get_demo_accounts() -> (
     (account1, privkey1, account2, privkey2)
 }
 
+// TODO[Orderless]: Support orderless transactions here
 fn get_aptos_coin_mint_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
@@ -141,7 +142,8 @@ fn get_aptos_coin_mint_transaction(
     )
 }
 
-fn get_account_transaction(
+// TODO[Orderless]: Support orderless transactions here
+fn get_account_ordered_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
     account: &AccountAddress,
@@ -156,6 +158,7 @@ fn get_account_transaction(
     )
 }
 
+// TODO[Orderless]: Support orderless transactions here
 fn get_aptos_coin_transfer_transaction(
     sender: AccountAddress,
     sender_seq_number: u64,
@@ -202,8 +205,8 @@ fn test_new_genesis() {
 
     // Mint for 2 demo accounts.
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
-    let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
-    let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
+    let txn1 = get_account_ordered_transaction(genesis_key, 0, &account1, &account1_key);
+    let txn2 = get_account_ordered_transaction(genesis_key, 1, &account2, &account2_key);
     let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000);
     let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);

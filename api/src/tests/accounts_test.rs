@@ -10,7 +10,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_sdk::types::APTOS_COIN_TYPE_STR;
 use aptos_types::{
     account_config::{primary_apt_store, ObjectCoreResource},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
     AptosCoinType, CoinType,
 };
 use move_core_types::{
@@ -221,7 +221,7 @@ async fn test_get_account_balance() {
     assert_eq!(coin_balance_after, fa_balance);
     // upgrade to concurrent store
     let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
-        TransactionPayload::EntryFunction(EntryFunction::new(
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::TEN,
                 Identifier::new("fungible_asset").unwrap(),
@@ -247,7 +247,7 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
 
     let root_account = context.root_account().await;
     let txn =
-        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
     context.commit_block(&vec![txn.clone()]).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
@@ -289,7 +289,9 @@ async fn test_get_core_account_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.expect_status_code(404).get("/accounts/0xf").await;
+    // To accommodate stateless accounts, fetching non-existing data should still succeed with 200. 
+    // For stateless_accounts, the output should contain `state_exists: false`.
+    let resp = context.expect_status_code(200).get("/accounts/0xf").await;
     context.check_golden_output(resp);
 }
 

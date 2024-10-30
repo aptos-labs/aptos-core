@@ -16,13 +16,16 @@ use aptos_framework::{
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     object_address::create_object_code_deployment_address,
-    transaction::{AbortInfo, TransactionPayload, TransactionStatus},
+    transaction::{AbortInfo, TransactionPayloadWrapper, TransactionStatus},
 };
 use move_core_types::{
     account_address::AccountAddress, parser::parse_struct_tag, vm_status::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, option::Option, path::Path, str::FromStr};
+
+// TODO[Orderless]: Once Aaron updates `create_object_code_deployment_address` function to not take sequence number as input,
+// revisit these tests and adapt them to orderless accounts
 
 /// Number of transactions needed for staging code chunks before publishing to accounts or objects
 /// This is used to derive object address for testing object code deployment feature
@@ -46,9 +49,10 @@ impl LargePackageTestContext {
         let mut harness = MoveHarness::new();
         let admin_account = harness.new_account_at(
             AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            Some(0)
         );
-        let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-        let sequence_number = harness.sequence_number(account.address());
+        let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+        let sequence_number = harness.sequence_number_opt(account.address()).unwrap();
         let object_address = create_object_code_deployment_address(
             *account.address(),
             sequence_number + NUMBER_OF_TRANSACTIONS_FOR_STAGING + 1,
@@ -130,7 +134,7 @@ impl LargePackageTestContext {
         options: Option<BuildOptions>,
         mut patch_metadata: impl FnMut(&mut PackageMetadata),
         publish_type: PublishType,
-    ) -> Vec<TransactionPayload> {
+    ) -> Vec<TransactionPayloadWrapper> {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap())
             .expect("package build must succeed");
         let package_code = package.extract_code();

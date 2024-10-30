@@ -356,10 +356,15 @@ impl LocalAccount {
     }
 
     pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+        let raw_txn = if builder.has_nonce() {
+            // Do not increment sequence number for orderless transactions.
+            builder.sender(self.address()).build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         self.sign_transaction(raw_txn)
     }
 
@@ -376,10 +381,16 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+
+        let raw_txn = if builder.has_nonce() {
+            // Do not increment sequence number for orderless transactions.
+            builder.sender(self.address()).build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         raw_txn
             .sign_multi_agent(
                 self.private_key(),
@@ -404,10 +415,15 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+        let raw_txn = if builder.has_nonce() {
+            // Do not increment sequence number for orderless transactions.
+            builder.sender(self.address()).build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         raw_txn
             .sign_fee_payer(
                 self.private_key(),
@@ -596,13 +612,21 @@ impl TransactionSigner for HardwareWalletAccount {
         let two_minutes = Duration::from_secs(2 * 60);
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH)? + two_minutes;
         let seconds = current_time.as_secs();
-
+        let orderless = builder.has_nonce();
+        let sequence_number = if orderless {
+            u64::MAX
+        } else {
+            self.sequence_number()
+        };
         let raw_txn = builder
             .sender(self.address())
-            .sequence_number(self.sequence_number())
+            .sequence_number(sequence_number)
             .expiration_timestamp_secs(seconds)
             .build();
-        *self.sequence_number_mut() += 1;
+
+        if !orderless {
+            *self.sequence_number_mut() += 1;
+        }
         self.sign_transaction(raw_txn)
     }
 }
