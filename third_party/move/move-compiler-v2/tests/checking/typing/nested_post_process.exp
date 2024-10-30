@@ -12,7 +12,7 @@ module 0x42::simple_map {
     }
     public fun borrow<Key,Value>(map: &SimpleMap<Key, Value>,key: &Key): &Value {
         {
-          let maybe_idx: 0x1::option::Option<u64> = simple_map::find<Key, Value>(map, key);
+          let maybe_idx: option::Option<u64> = simple_map::find<Key, Value>(map, key);
           if option::is_some<u64>(Borrow(Immutable)(maybe_idx)) {
             Tuple()
           } else {
@@ -24,7 +24,7 @@ module 0x42::simple_map {
           }
         }
     }
-    private fun find<Key,Value>(map: &SimpleMap<Key, Value>,key: &Key): 0x1::option::Option<u64> {
+    private fun find<Key,Value>(map: &SimpleMap<Key, Value>,key: &Key): option::Option<u64> {
         {
           let leng: u64 = vector::length<Element<Key, Value>>(Borrow(Immutable)(select simple_map::SimpleMap.data<&SimpleMap<Key, Value>>(map)));
           {
@@ -66,7 +66,7 @@ module 0x42::simple_map {
         let idx = 0x1::option::extract<u64>(&mut maybe_idx);
         &0x1::vector::borrow<Element<Key, Value>>(&map.data, idx).value
     }
-    fun find<Key: store, Value: store>(map: &SimpleMap<Key, Value>, key: &Key): 0x1::option::Option<u64> {
+    fun find<Key: store, Value: store>(map: &SimpleMap<Key, Value>, key: &Key): option::Option<u64> {
         let leng = 0x1::vector::length<Element<Key, Value>>(&map.data);
         let i = 0;
         while (i < leng) {

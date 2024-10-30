@@ -503,26 +503,52 @@ module 0xcafe::m {
 
 
 Diagnostics:
-error: captured variable `x` cannot be modified inside of a lambda
-   ┌─ tests/lambda-lifting/modify.move:14:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda-lifting/modify.move:13:16
    │
-14 │             x = 2;
-   │             ^
+13 │           map(x, |y| {
+   │ ╭────────────────^
+14 │ │             x = 2;
+15 │ │             y + c
+16 │ │         })
+   │ ╰─────────^
 
-error: captured variable `c` cannot be modified inside of a lambda
-   ┌─ tests/lambda-lifting/modify.move:21:26
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda-lifting/modify.move:20:16
    │
-21 │             let r = &mut c;
-   │                          ^
+20 │           map(x, |y| {
+   │ ╭────────────────^
+21 │ │             let r = &mut c;
+22 │ │             y + *r
+23 │ │         })
+   │ ╰─────────^
 
-error: captured variable `z` cannot be modified inside of a lambda
-   ┌─ tests/lambda-lifting/modify.move:29:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda-lifting/modify.move:28:16
    │
-29 │             z = 2;
-   │             ^
+28 │           map(x, |y| {
+   │ ╭────────────────^
+29 │ │             z = 2;
+30 │ │             y + c
+31 │ │         })
+   │ ╰─────────^
 
-error: captured variable `z` cannot be modified inside of a lambda
-   ┌─ tests/lambda-lifting/modify.move:37:26
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda-lifting/modify.move:36:16
    │
-37 │             let r = &mut z;
-   │                          ^
+36 │           map(x, |y| {
+   │ ╭────────────────^
+37 │ │             let r = &mut z;
+38 │ │             y + *r
+39 │ │         })
+   │ ╰─────────^
+
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda-lifting/modify.move:44:16
+   │
+44 │           map(x, |y| {
+   │ ╭────────────────^
+45 │ │             let r = &z;
+46 │ │             y + *r
+47 │ │         })
+   │ ╰─────────^

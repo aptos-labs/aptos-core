@@ -11,36 +11,57 @@ module 0x42::test {
         x * y
     }
 
-    fun multiply_by_x(x: u64): |u64|u64 has store {
-        curry(&multiply, x)
+    public fun multiply3(x: u64, y: u64, z: u64): u64 {
+        x * y * z
     }
 
-    fun choose_function(key: u64) : |u64|u64 has store {
-        if key == 0 {
+    fun multiply_by_x(x: u64): |u64|u64: store {
+        multiply(x, _)
+    }
+
+    fun choose_function(key: u64) : |u64|u64: store {
+        if (key == 0) {
             &double
-        } else if key == 1 {
+        } else if (key == 1) {
             &triple
         } else {
             multiply_by_x(4)
         }
     }
 
-    fun choose_function2(key: u64) : |u64|u64 has store {
-        if key == 0 {
-            |x| double(x);
-        } else if key == 1 {
-            |x| triple(x);
+    fun choose_function2(key: u64): |u64|u64: store {
+        if (key == 0) {
+            move |x| double(x);
+        } else if (key == 1) {
+            move |x| triple(x);
+        } else if (key == 2) {
+            let f = multiply_by_x(4);
+            move |x| f(x)
+        } else if (key == 3) {
+            let f = multiply_by_x(5);
+            move |x| f(x)
+        } else if (key == 4) {
+            let f = multiply(6, _);
+            f
+        } else if (key == 5) {
+            multiply(_, 7)
+        } else if (key == 6) {
+            let f = multiply(6, _);
+            move |x| f(x)
+        } else if (key == 7) {
+            let f = multiply_by_x(5);
+            move |x| f(x)
         } else {
-            |x| multiply_by_x(4)(x)
+            multiply3(_, 3, 4)
         }
     }
 
-    fun choose_function3(key: u64) : |u64|u64 has store {
-        if key == 0 {
-            let f = |x| double(x);
+    fun choose_function3(key: u64) : |u64|u64: store {
+        if (key == 0) {
+            let f = move |x| double(x);
             f
-        } else if key == 1 {
-            let g = |x| triple(x);
+        } else if (key == 1) {
+            let g = move |x| triple(x);
             g
         } else {
             let h = multiply_by_x(4);
@@ -48,7 +69,7 @@ module 0x42::test {
         }
     }
 
-    public fun test_functions(choose_function: |u64|(|u64|u64 has store)) {
+    public fun test_functions(choose_function: |u64|(|u64|u64: store)) {
         let sum = vector[];
         let x = 3;
         sum.push_back(choose_function(0)(x));

@@ -1,44 +1,44 @@
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
-     var $t5: 0xc0ffee::m::Wrap
-     var $t6: &0xc0ffee::m::S
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): m::Wrap {
+     var $t5: m::Wrap
+     var $t6: &m::S
      var $t7: u64
      var $t8: &u64
      var $t9: u64
      var $t10: &u64
-  0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
-  1: $t8 := borrow_field<0xc0ffee::m::S>.x($t6)
+  0: $t6 := borrow_global<m::S>($t3)
+  1: $t8 := borrow_field<m::S>.x($t6)
   2: $t7 := read_ref($t8)
-  3: $t10 := borrow_field<0xc0ffee::m::S>.y($t6)
+  3: $t10 := borrow_field<m::S>.y($t6)
   4: $t9 := read_ref($t10)
-  5: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t7, $t4, $t9)
+  5: $t5 := pack m::Wrap($t0, $t1, $t2, $t7, $t4, $t9)
   6: return $t5
 }
 
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
-     var $t5: 0xc0ffee::m::Wrap
-     var $t6: &0xc0ffee::m::S
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): m::Wrap {
+     var $t5: m::Wrap
+     var $t6: &m::S
      var $t7: u64
      var $t8: &u64
      var $t9: u64
      var $t10: &u64 [unused]
      # live vars: $t0, $t1, $t2, $t3, $t4
-  0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
+  0: $t6 := borrow_global<m::S>($t3)
      # live vars: $t0, $t1, $t2, $t4, $t6
-  1: $t8 := borrow_field<0xc0ffee::m::S>.x($t6)
+  1: $t8 := borrow_field<m::S>.x($t6)
      # live vars: $t0, $t1, $t2, $t4, $t6, $t8
   2: $t7 := read_ref($t8)
      # live vars: $t0, $t1, $t2, $t4, $t6, $t7
-  3: $t8 := borrow_field<0xc0ffee::m::S>.y($t6)
+  3: $t8 := borrow_field<m::S>.y($t6)
      # live vars: $t0, $t1, $t2, $t4, $t7, $t8
   4: $t9 := read_ref($t8)
      # live vars: $t0, $t1, $t2, $t4, $t7, $t9
-  5: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t7, $t4, $t9)
+  5: $t5 := pack m::Wrap($t0, $t1, $t2, $t7, $t4, $t9)
      # live vars: $t5
   6: return $t5
 }

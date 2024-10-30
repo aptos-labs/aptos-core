@@ -434,8 +434,20 @@ module 0x12391283::M {
 
 
 Diagnostics:
-error: captured variable `accu` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/lambda_cast.move:18:35
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/lambda_cast.move:18:28
    │
 18 │         vector_for_each(v, |elem| accu = f(accu, elem));
-   │                                   ^^^^
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/lambda_cast.move:26:61
+   │
+26 │         vector_fold<u64, u8>(gas_schedule_blob, (0 as u64), |sum, addend| sum + (addend as u64))
+   │                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/lambda_cast.move:33:52
+   │
+33 │         vector_fold(gas_schedule_blob, (0 as u64), |sum, addend| sum + (addend as u64))
+   │                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

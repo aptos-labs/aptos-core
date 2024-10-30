@@ -25,12 +25,12 @@ fun ReachingDefTest::create_resource($t0|sender: &signer) {
      var $t1: &signer
      var $t2: u64
      var $t3: bool
-     var $t4: 0x42::ReachingDefTest::R
+     var $t4: ReachingDefTest::R
   0: $t1 := move($t0)
   1: $t2 := 1
   2: $t3 := false
-  3: $t4 := pack 0x42::ReachingDefTest::R($t2, $t3)
-  4: move_to<0x42::ReachingDefTest::R>($t4, $t1)
+  3: $t4 := pack ReachingDefTest::R($t2, $t3)
+  4: move_to<ReachingDefTest::R>($t4, $t1)
   5: return ()
 }
 
@@ -61,11 +61,11 @@ fun ReachingDefTest::create_resource($t0|sender: &signer) {
      var $t1: &signer
      var $t2: u64
      var $t3: bool
-     var $t4: 0x42::ReachingDefTest::R
+     var $t4: ReachingDefTest::R
   0: $t1 := move($t0)
   1: $t2 := 1
   2: $t3 := false
-  3: $t4 := pack 0x42::ReachingDefTest::R($t2, $t3)
-  4: move_to<0x42::ReachingDefTest::R>($t4, $t0)
+  3: $t4 := pack ReachingDefTest::R($t2, $t3)
+  4: move_to<ReachingDefTest::R>($t4, $t0)
   5: return ()
 }

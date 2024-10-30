@@ -2066,7 +2066,7 @@ impl<'env> FunctionTranslator<'env> {
                             | Type::Struct(_, _, _)
                             | Type::TypeParameter(_)
                             | Type::Reference(_, _)
-                            | Type::Fun(_, _)
+                            | Type::Fun(..)
                             | Type::TypeDomain(_)
                             | Type::ResourceDomain(_, _, _)
                             | Type::Error
@@ -2103,7 +2103,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2160,7 +2160,7 @@ impl<'env> FunctionTranslator<'env> {
                             | Type::Struct(_, _, _)
                             | Type::TypeParameter(_)
                             | Type::Reference(_, _)
-                            | Type::Fun(_, _)
+                            | Type::Fun(..)
                             | Type::TypeDomain(_)
                             | Type::ResourceDomain(_, _, _)
                             | Type::Error
@@ -2197,7 +2197,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2237,7 +2237,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2278,7 +2278,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2309,7 +2309,7 @@ impl<'env> FunctionTranslator<'env> {
                                 | Type::Struct(_, _, _)
                                 | Type::TypeParameter(_)
                                 | Type::Reference(_, _)
-                                | Type::Fun(_, _)
+                                | Type::Fun(..)
                                 | Type::TypeDomain(_)
                                 | Type::ResourceDomain(_, _, _)
                                 | Type::Error
@@ -2349,7 +2349,7 @@ impl<'env> FunctionTranslator<'env> {
                                     | Type::Struct(_, _, _)
                                     | Type::TypeParameter(_)
                                     | Type::Reference(_, _)
-                                    | Type::Fun(_, _)
+                                    | Type::Fun(..)
                                     | Type::TypeDomain(_)
                                     | Type::ResourceDomain(_, _, _)
                                     | Type::Error
@@ -2443,7 +2443,7 @@ impl<'env> FunctionTranslator<'env> {
                                     | Type::Struct(_, _, _)
                                     | Type::TypeParameter(_)
                                     | Type::Reference(_, _)
-                                    | Type::Fun(_, _)
+                                    | Type::Fun(..)
                                     | Type::TypeDomain(_)
                                     | Type::ResourceDomain(_, _, _)
                                     | Type::Error
@@ -3012,7 +3012,7 @@ pub fn has_native_equality(env: &GlobalEnv, options: &BoogieOptions, ty: &Type) 
         | Type::Tuple(_)
         | Type::TypeParameter(_)
         | Type::Reference(_, _)
-        | Type::Fun(_, _)
+        | Type::Fun(..)
         | Type::TypeDomain(_)
         | Type::ResourceDomain(_, _, _)
         | Type::Error

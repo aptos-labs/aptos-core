@@ -26,7 +26,7 @@ object "A2_M" {
             let $t0, $t1
             // $t0 := 0
             $t0 := 0
-            // $t1 := pack 0x2::M::Storage($t0)
+            // $t1 := pack M::Storage($t0)
             {
                 let $mem := $Malloc(8)
                 $MemoryStoreU64(add($mem, 0), $t0)
@@ -139,7 +139,7 @@ object "A2_M" {
             }
             function A2_M_current(self) -> $result {
                 let $t1, $t2
-                // $t1 := borrow_field<0x2::M::Storage>.counter($t0)
+                // $t1 := borrow_field<M::Storage>.counter($t0)
                 $t1 := self
                 // $t2 := read_ref($t1)
                 $t2 := $LoadU64($t1)
@@ -149,7 +149,7 @@ object "A2_M" {
 
             function A2_M_increment(self) {
                 let $t1, $t2, $t3, $t4, $t5
-                // $t1 := borrow_field<0x2::M::Storage>.counter($t0)
+                // $t1 := borrow_field<M::Storage>.counter($t0)
                 $t1 := self
                 // $t2 := read_ref($t1)
                 $t2 := $LoadU64($t1)
@@ -157,7 +157,7 @@ object "A2_M" {
                 $t3 := 1
                 // $t4 := +($t2, $t3)
                 $t4 := $AddU64($t2, $t3)
-                // $t5 := borrow_field<0x2::M::Storage>.counter($t0)
+                // $t5 := borrow_field<M::Storage>.counter($t0)
                 $t5 := self
                 // write_ref($t5, $t4)
                 $StoreU64($t5, $t4)
@@ -166,7 +166,7 @@ object "A2_M" {
 
             function A2_M_receive(self) {
                 let $t1, $t2, $t3, $t4, $t5
-                // $t1 := borrow_field<0x2::M::Storage>.counter($t0)
+                // $t1 := borrow_field<M::Storage>.counter($t0)
                 $t1 := self
                 // $t2 := read_ref($t1)
                 $t2 := $LoadU64($t1)
@@ -174,7 +174,7 @@ object "A2_M" {
                 $t3 := 2
                 // $t4 := +($t2, $t3)
                 $t4 := $AddU64($t2, $t3)
-                // $t5 := borrow_field<0x2::M::Storage>.counter($t0)
+                // $t5 := borrow_field<M::Storage>.counter($t0)
                 $t5 := self
                 // write_ref($t5, $t4)
                 $StoreU64($t5, $t4)

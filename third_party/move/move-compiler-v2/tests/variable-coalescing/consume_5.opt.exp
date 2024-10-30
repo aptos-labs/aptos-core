@@ -7,7 +7,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: m::W) {
   0: return ()
 }
 
@@ -37,8 +37,8 @@ public fun m::test($t0: bool, $t1: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
-     var $t2: 0xc0ffee::m::W
+public fun m::test_struct($t0: bool, $t1: m::W) {
+     var $t2: m::W
      var $t3: bool
   0: $t2 := copy($t1)
   1: if ($t0) goto 2 else goto 5
@@ -68,7 +68,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: m::W) {
   0: return ()
 }
 
@@ -98,8 +98,8 @@ public fun m::test($t0: bool, $t1: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
-     var $t2: 0xc0ffee::m::W
+public fun m::test_struct($t0: bool, $t1: m::W) {
+     var $t2: m::W
      var $t3: bool
   0: $t2 := copy($t1)
   1: if ($t0) goto 2 else goto 14
@@ -131,7 +131,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: m::W) {
      # live vars: $t0
      # events: b:$t0, e:$t0
   0: return ()
@@ -184,8 +184,8 @@ public fun m::test($t0: bool, $t1: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
-     var $t2: 0xc0ffee::m::W
+public fun m::test_struct($t0: bool, $t1: m::W) {
+     var $t2: m::W
      var $t3: bool
      # live vars: $t0, $t1
      # events: b:$t0, b:$t1, b:$t2
@@ -236,7 +236,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: m::W) {
   0: return ()
 }
 
@@ -266,8 +266,8 @@ public fun m::test($t0: bool, $t1: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
-     var $t2: 0xc0ffee::m::W
+public fun m::test_struct($t0: bool, $t1: m::W) {
+     var $t2: m::W
      var $t3: bool
   0: $t2 := copy($t1)
   1: if ($t0) goto 2 else goto 14
@@ -297,7 +297,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: m::W) {
   0: return ()
 }
 
@@ -327,8 +327,8 @@ public fun m::test($t0: bool, $t1: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
-     var $t2: 0xc0ffee::m::W
+public fun m::test_struct($t0: bool, $t1: m::W) {
+     var $t2: m::W
      var $t3: bool
   0: $t2 := copy($t1)
   1: if ($t0) goto 2 else goto 14

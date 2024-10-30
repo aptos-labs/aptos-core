@@ -39,24 +39,24 @@ module 0x42::pack_unpack {
 ============ initial bytecode ================
 
 [variant baseline]
-fun pack_unpack::pack($t0: u64, $t1: u64): 0x42::pack_unpack::S {
-     var $t2: 0x42::pack_unpack::S
-     var $t3: 0x42::pack_unpack::T
-  0: $t3 := pack 0x42::pack_unpack::T($t1)
-  1: $t2 := pack 0x42::pack_unpack::S($t0, $t3)
+fun pack_unpack::pack($t0: u64, $t1: u64): pack_unpack::S {
+     var $t2: pack_unpack::S
+     var $t3: pack_unpack::T
+  0: $t3 := pack pack_unpack::T($t1)
+  1: $t2 := pack pack_unpack::S($t0, $t3)
   2: return $t2
 }
 
 
 [variant baseline]
-fun pack_unpack::unpack($t0: 0x42::pack_unpack::S): (u64, u64) {
+fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
      var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     var $t5: 0x42::pack_unpack::T
-  0: ($t3, $t5) := unpack 0x42::pack_unpack::S($t0)
-  1: $t4 := unpack 0x42::pack_unpack::T($t5)
+     var $t5: pack_unpack::T
+  0: ($t3, $t5) := unpack pack_unpack::S($t0)
+  1: $t4 := unpack pack_unpack::T($t5)
   2: $t1 := infer($t3)
   3: $t2 := infer($t4)
   4: return ($t1, $t2)

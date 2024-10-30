@@ -1,0 +1,20 @@
+
+Diagnostics:
+error: expected `u64` but found a value of type `|u64|u64`
+   ┌─ tests/lambda/storable/doable_func.move:67:17
+   │
+67 │                 g(_, 11)
+   │                 ^^^^^^^^
+
+error: expected `|u64|u64` but found a value of type `u64`
+   ┌─ tests/lambda/storable/doable_func.move:65:20
+   │
+65 │               } else if (key == 11) {
+   │ ╭────────────────────^
+66 │ │                 let g = move |x, y| mod3::multiply(x, y);
+67 │ │                 g(_, 11)
+68 │ │             } else if (key == 12) {
+   · │
+73 │ │                 move |z| i(z)
+74 │ │             };
+   │ ╰─────────────^

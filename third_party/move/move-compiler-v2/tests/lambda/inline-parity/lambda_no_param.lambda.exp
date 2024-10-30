@@ -207,102 +207,15 @@ module 0xdecafbad::m {
 } // end 0xdecafbad::m
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0xdecafbad::m {
-    private fun bar(f: |()|u64): u64 {
-        (f)()
-    }
-    private fun foo(f: |()|) {
-        (f)();
-        Tuple()
-    }
-    public fun one() {
-        m::foo(closure m::one$lambda$1());
-        Tuple()
-    }
-    public fun two(x: u64): u64 {
-        m::bar(closure m::two$lambda$1(x))
-    }
-    private fun one$lambda$1() {
-        Tuple()
-    }
-    private fun two$lambda$1(x: u64): u64 {
-        x
-    }
-} // end 0xdecafbad::m
-
-
-// -- Model dump after env processor specification checker:
-module 0xdecafbad::m {
-    private fun bar(f: |()|u64): u64 {
-        (f)()
-    }
-    private fun foo(f: |()|) {
-        (f)();
-        Tuple()
-    }
-    public fun one() {
-        m::foo(closure m::one$lambda$1());
-        Tuple()
-    }
-    public fun two(x: u64): u64 {
-        m::bar(closure m::two$lambda$1(x))
-    }
-    private fun one$lambda$1() {
-        Tuple()
-    }
-    private fun two$lambda$1(x: u64): u64 {
-        x
-    }
-} // end 0xdecafbad::m
-
-
-// -- Model dump after env processor specification rewriter:
-module 0xdecafbad::m {
-    private fun bar(f: |()|u64): u64 {
-        (f)()
-    }
-    private fun foo(f: |()|) {
-        (f)();
-        Tuple()
-    }
-    public fun one() {
-        m::foo(closure m::one$lambda$1());
-        Tuple()
-    }
-    public fun two(x: u64): u64 {
-        m::bar(closure m::two$lambda$1(x))
-    }
-    private fun one$lambda$1() {
-        Tuple()
-    }
-    private fun two$lambda$1(x: u64): u64 {
-        x
-    }
-} // end 0xdecafbad::m
-
-
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/lambda_no_param.move:3:9
-  │
-3 │         f();
-  │         ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
   ┌─ tests/lambda/inline-parity/lambda_no_param.move:7:13
   │
 7 │         foo(|| {});
   │             ^^^^^
 
-error: Calls to function values other than inline function parameters not yet supported
-   ┌─ tests/lambda/inline-parity/lambda_no_param.move:11:9
-   │
-11 │         f()
-   │         ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/lambda_no_param.move:15:13
    │
 15 │         bar(||x)

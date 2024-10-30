@@ -3,20 +3,20 @@
 [variant baseline]
 fun test::test<#0>($t0: vector<u8>): #0 {
      var $t1: #0
-     var $t2: 0x1::string::String
+     var $t2: string::String
      var $t3: bool
-     var $t4: 0x1::string::String
-     var $t5: 0x1::string::String
+     var $t4: string::String
+     var $t5: string::String
      var $t6: vector<u8>
      var $t7: bool
      var $t8: bool
-     var $t9: 0x1::string::String
-     var $t10: 0x1::string::String
+     var $t9: string::String
+     var $t10: string::String
      var $t11: vector<u8>
      var $t12: bool
      var $t13: bool
-     var $t14: 0x1::string::String
-     var $t15: 0x1::string::String
+     var $t14: string::String
+     var $t15: string::String
      var $t16: vector<u8>
      var $t17: bool
      var $t18: u64
@@ -75,8 +75,8 @@ fun test::baz<#0>($t0: vector<u8>): #0 {
 
 
 [variant baseline]
-fun test::foo<#0>(): 0x1::string::String {
-     var $t0: 0x1::string::String [unused]
+fun test::foo<#0>(): string::String {
+     var $t0: string::String [unused]
      var $t1: u64
   0: $t1 := 0
   1: abort($t1)

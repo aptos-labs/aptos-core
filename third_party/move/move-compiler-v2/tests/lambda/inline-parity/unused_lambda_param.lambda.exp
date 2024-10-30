@@ -218,102 +218,6 @@ module 0xc0ffee::m {
 } // end 0xc0ffee::m
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0xc0ffee::m {
-    private fun test(p: u64,f: |u64|u64): u64 {
-        (f)(p)
-    }
-    private fun unused_lambda() {
-        m::test(0, closure m::unused_lambda$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda_suppressed1() {
-        m::test(0, closure m::unused_lambda_suppressed1$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda_suppressed2() {
-        m::test(0, closure m::unused_lambda_suppressed2$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda$lambda$1(x: u64): u64 {
-        1
-    }
-    private fun unused_lambda_suppressed1$lambda$1(_x: u64): u64 {
-        1
-    }
-    private fun unused_lambda_suppressed2$lambda$1(param$0: u64): u64 {
-        {
-          let _: u64 = param$0;
-          1
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor specification checker:
-module 0xc0ffee::m {
-    private fun test(p: u64,f: |u64|u64): u64 {
-        (f)(p)
-    }
-    private fun unused_lambda() {
-        m::test(0, closure m::unused_lambda$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda_suppressed1() {
-        m::test(0, closure m::unused_lambda_suppressed1$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda_suppressed2() {
-        m::test(0, closure m::unused_lambda_suppressed2$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda$lambda$1(x: u64): u64 {
-        1
-    }
-    private fun unused_lambda_suppressed1$lambda$1(_x: u64): u64 {
-        1
-    }
-    private fun unused_lambda_suppressed2$lambda$1(param$0: u64): u64 {
-        {
-          let _: u64 = param$0;
-          1
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor specification rewriter:
-module 0xc0ffee::m {
-    private fun test(p: u64,f: |u64|u64): u64 {
-        (f)(p)
-    }
-    private fun unused_lambda() {
-        m::test(0, closure m::unused_lambda$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda_suppressed1() {
-        m::test(0, closure m::unused_lambda_suppressed1$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda_suppressed2() {
-        m::test(0, closure m::unused_lambda_suppressed2$lambda$1());
-        Tuple()
-    }
-    private fun unused_lambda$lambda$1(x: u64): u64 {
-        1
-    }
-    private fun unused_lambda_suppressed1$lambda$1(_x: u64): u64 {
-        1
-    }
-    private fun unused_lambda_suppressed2$lambda$1(param$0: u64): u64 {
-        {
-          let _: u64 = param$0;
-          1
-        }
-    }
-} // end 0xc0ffee::m
-
-
 
 Diagnostics:
 warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
@@ -322,27 +226,19 @@ warning: Unused anonymous function parameter `x`. Consider removing or prefixing
 7 │         test(0, |x| 1);
   │                  ^
 
-
-Diagnostics:
-error: Calls to function values other than inline function parameters not yet supported
-  ┌─ tests/lambda/inline-parity/unused_lambda_param.move:3:9
-  │
-3 │         f(p)
-  │         ^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
   ┌─ tests/lambda/inline-parity/unused_lambda_param.move:7:17
   │
 7 │         test(0, |x| 1);
   │                 ^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/unused_lambda_param.move:11:17
    │
 11 │         test(0, |_x| 1);
    │                 ^^^^^^
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
    ┌─ tests/lambda/inline-parity/unused_lambda_param.move:15:17
    │
 15 │         test(0, |_| 1);

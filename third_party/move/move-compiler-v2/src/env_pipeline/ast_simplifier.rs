@@ -214,7 +214,7 @@ fn find_possibly_modified_vars(
     exp.visit_positions(&mut |pos, e| {
         use ExpData::*;
         match e {
-            Invalid(_) | Value(..) | LoopCont(..) => {
+            Invalid(_) | Value(..) | LoopCont(..) | MoveFunctionExp(..) => {
                 // Nothing happens inside these expressions, so don't bother `modifying` state.
             },
             LocalVar(id, sym) => {
@@ -359,7 +359,7 @@ fn find_possibly_modified_vars(
                     _ => {},
                 }
             },
-            Lambda(node_id, pat, _) => {
+            Lambda(node_id, pat, _, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {
@@ -379,6 +379,19 @@ fn find_possibly_modified_vars(
                     },
                     _ => {},
                 };
+            },
+            Curry(_, _mask, _fnexp, _explist) => {
+                // Turn off `modifying` inside.
+                match pos {
+                    VisitorPosition::Pre => {
+                        modifying_stack.push(modifying);
+                        modifying = false;
+                    },
+                    VisitorPosition::Post => {
+                        modifying = modifying_stack.pop().expect("unbalanced visit 10");
+                    },
+                    _ => {},
+                }
             },
             Block(node_id, pat, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.
@@ -978,7 +991,8 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                     let ability_set = self
                         .env()
                         .type_abilities(&ty, self.func_env.get_type_parameters_ref());
-                    ability_set.has_ability(Ability::Drop)
+                    // Don't drop a function-valued expression so we don't lose errors.
+                    !ty.has_function() && ability_set.has_ability(Ability::Drop)
                 } else {
                     // We're missing type info, be conservative
                     false

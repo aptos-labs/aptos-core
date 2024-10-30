@@ -87,65 +87,65 @@ module 0x42::pack_unpack {
 ============ initial bytecode ================
 
 [variant baseline]
-fun pack_unpack::pack1($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
-     var $t3: 0x42::pack_unpack::S
-  0: $t3 := pack 0x42::pack_unpack::S($t0, $t1, $t2)
+fun pack_unpack::pack1($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
+     var $t3: pack_unpack::S
+  0: $t3 := pack pack_unpack::S($t0, $t1, $t2)
   1: return $t3
 }
 
 
 [variant baseline]
-fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
-     var $t3: 0x42::pack_unpack::S
+fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
+     var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t3 := pack 0x42::pack_unpack::S($t4, $t2, $t5)
+  2: $t3 := pack pack_unpack::S($t4, $t2, $t5)
   3: return $t3
 }
 
 
 [variant baseline]
-fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
-     var $t3: 0x42::pack_unpack::S
+fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
+     var $t3: pack_unpack::S
      var $t4: u8
   0: $t4 := infer($t0)
-  1: $t3 := pack 0x42::pack_unpack::S($t1, $t4, $t2)
+  1: $t3 := pack pack_unpack::S($t1, $t4, $t2)
   2: return $t3
 }
 
 
 [variant baseline]
-fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
-     var $t3: 0x42::pack_unpack::S
+fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
+     var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t3 := pack 0x42::pack_unpack::S($t2, $t4, $t5)
+  2: $t3 := pack pack_unpack::S($t2, $t4, $t5)
   3: return $t3
 }
 
 
 [variant baseline]
-fun pack_unpack::pack5($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
-     var $t3: 0x42::pack_unpack::S
+fun pack_unpack::pack5($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
+     var $t3: pack_unpack::S
      var $t4: u8
   0: $t4 := infer($t0)
-  1: $t3 := pack 0x42::pack_unpack::S($t1, $t2, $t4)
+  1: $t3 := pack pack_unpack::S($t1, $t2, $t4)
   2: return $t3
 }
 
 
 [variant baseline]
-fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
-     var $t3: 0x42::pack_unpack::S
+fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
+     var $t3: pack_unpack::S
      var $t4: u8
      var $t5: u8
   0: $t4 := infer($t0)
   1: $t5 := infer($t1)
-  2: $t3 := pack 0x42::pack_unpack::S($t2, $t5, $t4)
+  2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
   3: return $t3
 }
 

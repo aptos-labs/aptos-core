@@ -250,8 +250,12 @@ module 0x42::Test {
 
 
 Diagnostics:
-error: captured variable `x` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/shadowing_renamed.move:12:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/shadowing_renamed.move:11:13
    │
-12 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
-   │             ^
+11 │           foo(|y| {
+   │ ╭─────────────^
+12 │ │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+13 │ │                     // have the value 1.
+14 │ │         });
+   │ ╰─────────^

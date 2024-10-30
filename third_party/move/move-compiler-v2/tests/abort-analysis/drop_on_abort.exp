@@ -1,8 +1,8 @@
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::from_vec<#0>($t0: vector<#0>): 0x42::m::Option<#0> {
-     var $t1: 0x42::m::Option<#0>
+public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
+     var $t1: m::Option<#0>
      var $t2: bool
      var $t3: u64
      var $t4: &vector<#0>
@@ -19,15 +19,15 @@ public fun m::from_vec<#0>($t0: vector<#0>): 0x42::m::Option<#0> {
   8: goto 10
   9: label L1
  10: label L2
- 11: $t1 := pack 0x42::m::Option<#0>($t0)
+ 11: $t1 := pack m::Option<#0>($t0)
  12: return $t1
 }
 
 ============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
-public fun m::from_vec<#0>($t0: vector<#0>): 0x42::m::Option<#0> {
-     var $t1: 0x42::m::Option<#0>
+public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
+     var $t1: m::Option<#0>
      var $t2: bool
      var $t3: u64
      var $t4: &vector<#0>
@@ -94,7 +94,7 @@ public fun m::from_vec<#0>($t0: vector<#0>): 0x42::m::Option<#0> {
      # live vars: $t0
      # refs: []
      #
- 11: $t1 := pack 0x42::m::Option<#0>($t0)
+ 11: $t1 := pack m::Option<#0>($t0)
      # abort state: {returns}
      # live vars: $t1
      # refs: []

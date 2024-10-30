@@ -74,30 +74,30 @@ fun Test::multiple_results($t0|a: u64, $t1|b: u64): (u64, u64) {
 
 
 [variant baseline]
-fun Test::mut_ref_param($t0|r: &mut 0x42::Test::R): u64 {
+fun Test::mut_ref_param($t0|r: &mut Test::R): u64 {
      var $t1|x: u64
-     var $t2: &mut 0x42::Test::R
+     var $t2: &mut Test::R
      var $t3: &u64
      var $t4: u64
-     var $t5: &mut 0x42::Test::R
+     var $t5: &mut Test::R
      var $t6: &u64
      var $t7: u64
      var $t8: u64
      var $t9: u64
-     var $t10: &mut 0x42::Test::R
+     var $t10: &mut Test::R
      var $t11: &mut u64
      var $t12: u64
   0: $t2 := copy($t0)
-  1: $t3 := borrow_field<0x42::Test::R>.v($t2)
+  1: $t3 := borrow_field<Test::R>.v($t2)
   2: $t4 := read_ref($t3)
   3: $t1 := $t4
   4: $t5 := copy($t0)
-  5: $t6 := borrow_field<0x42::Test::R>.v($t5)
+  5: $t6 := borrow_field<Test::R>.v($t5)
   6: $t7 := read_ref($t6)
   7: $t8 := 1
   8: $t9 := -($t7, $t8)
   9: $t10 := move($t0)
- 10: $t11 := borrow_field<0x42::Test::R>.v($t10)
+ 10: $t11 := borrow_field<Test::R>.v($t10)
  11: write_ref($t11, $t9)
  12: $t12 := move($t1)
  13: return $t12
@@ -105,45 +105,45 @@ fun Test::mut_ref_param($t0|r: &mut 0x42::Test::R): u64 {
 
 
 [variant baseline]
-fun Test::ref_param($t0|r: &0x42::Test::R): u64 {
-     var $t1: &0x42::Test::R
+fun Test::ref_param($t0|r: &Test::R): u64 {
+     var $t1: &Test::R
      var $t2: &u64
      var $t3: u64
   0: $t1 := move($t0)
-  1: $t2 := borrow_field<0x42::Test::R>.v($t1)
+  1: $t2 := borrow_field<Test::R>.v($t1)
   2: $t3 := read_ref($t2)
   3: return $t3
 }
 
 
 [variant baseline]
-fun Test::ref_param_return_ref($t0|r: &0x42::Test::R): &u64 {
-     var $t1: &0x42::Test::R
+fun Test::ref_param_return_ref($t0|r: &Test::R): &u64 {
+     var $t1: &Test::R
      var $t2: &u64
   0: $t1 := move($t0)
-  1: $t2 := borrow_field<0x42::Test::R>.v($t1)
+  1: $t2 := borrow_field<Test::R>.v($t1)
   2: return $t2
 }
 
 
 [variant baseline]
 fun Test::resource_with_old($t0|val: u64) {
-     var $t1|r: &mut 0x42::Test::R
+     var $t1|r: &mut Test::R
      var $t2: address
      var $t3: bool
      var $t4: bool
      var $t5: u64
      var $t6: address
-     var $t7: &mut 0x42::Test::R
-     var $t8: &mut 0x42::Test::R
+     var $t7: &mut Test::R
+     var $t8: &mut Test::R
      var $t9: &u64
      var $t10: u64
      var $t11: u64
      var $t12: u64
-     var $t13: &mut 0x42::Test::R
+     var $t13: &mut Test::R
      var $t14: &mut u64
   0: $t2 := 0x0
-  1: $t3 := exists<0x42::Test::R>($t2)
+  1: $t3 := exists<Test::R>($t2)
   2: $t4 := !($t3)
   3: if ($t4) goto 4 else goto 7
   4: label L1
@@ -151,15 +151,15 @@ fun Test::resource_with_old($t0|val: u64) {
   6: abort($t5)
   7: label L0
   8: $t6 := 0x0
-  9: $t7 := borrow_global<0x42::Test::R>($t6)
+  9: $t7 := borrow_global<Test::R>($t6)
  10: $t1 := $t7
  11: $t8 := copy($t1)
- 12: $t9 := borrow_field<0x42::Test::R>.v($t8)
+ 12: $t9 := borrow_field<Test::R>.v($t8)
  13: $t10 := read_ref($t9)
  14: $t11 := move($t0)
  15: $t12 := +($t10, $t11)
  16: $t13 := move($t1)
- 17: $t14 := borrow_field<0x42::Test::R>.v($t13)
+ 17: $t14 := borrow_field<Test::R>.v($t13)
  18: write_ref($t14, $t12)
  19: return ()
 }
@@ -252,9 +252,9 @@ fun Test::multiple_results($t0|a: u64, $t1|b: u64): (u64, u64) {
 
 
 [variant verification]
-fun Test::mut_ref_param($t0|r: &mut 0x42::Test::R): u64 {
+fun Test::mut_ref_param($t0|r: &mut Test::R): u64 {
      var $t1|x: u64
-     var $t2: 0x42::Test::R
+     var $t2: Test::R
      var $t3: u64
      var $t4: u64
      var $t5: u64
@@ -262,72 +262,72 @@ fun Test::mut_ref_param($t0|r: &mut 0x42::Test::R): u64 {
      var $t7: num
      var $t8: &mut u64
   0: $t2 := read_ref($t0)
-  1: $t3 := get_field<0x42::Test::R>.v($t0)
-  2: $t4 := get_field<0x42::Test::R>.v($t0)
+  1: $t3 := get_field<Test::R>.v($t0)
+  2: $t4 := get_field<Test::R>.v($t0)
   3: $t5 := 1
   4: $t6 := -($t4, $t5) on_abort goto 15 with $t7
-  5: $t8 := borrow_field<0x42::Test::R>.v($t0)
+  5: $t8 := borrow_field<Test::R>.v($t0)
   6: write_ref($t8, $t6)
   7: write_back[Reference($t0).v (u64)]($t8)
   8: trace_local[r]($t0)
   9: trace_local[r]($t0)
  10: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:67:6+42
- 11: assert Not(Eq<u64>(select Test::R.v<0x42::Test::R>($t2), 0))
+ 11: assert Not(Eq<u64>(select Test::R.v<Test::R>($t2), 0))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:68:6+27
- 12: assert Eq<u64>($t3, select Test::R.v<0x42::Test::R>($t2))
+ 12: assert Eq<u64>($t3, select Test::R.v<Test::R>($t2))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:69:6+28
- 13: assert Eq<u64>(select Test::R.v<0x42::Test::R>($t0), Add(select Test::R.v<0x42::Test::R>($t2), 1))
+ 13: assert Eq<u64>(select Test::R.v<Test::R>($t0), Add(select Test::R.v<Test::R>($t2), 1))
  14: return $t3
  15: label L2
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/fun_spec.move:66:2+138
- 16: assert Eq<u64>(select Test::R.v<0x42::Test::R>($t2), 0)
+ 16: assert Eq<u64>(select Test::R.v<Test::R>($t2), 0)
      # VC: abort code not covered by any of the `aborts_if` or `aborts_with` clauses at tests/spec_instrumentation/fun_spec.move:66:2+138
- 17: assert And(Eq<u64>(select Test::R.v<0x42::Test::R>($t2), 0), Eq(-1, $t7))
+ 17: assert And(Eq<u64>(select Test::R.v<Test::R>($t2), 0), Eq(-1, $t7))
  18: abort($t7)
 }
 
 
 [variant verification]
-fun Test::ref_param($t0|r: 0x42::Test::R): u64 {
+fun Test::ref_param($t0|r: Test::R): u64 {
      var $t1: u64
-  0: $t1 := get_field<0x42::Test::R>.v($t0)
+  0: $t1 := get_field<Test::R>.v($t0)
   1: label L1
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:51:6+22
-  2: assert Eq<u64>($t1, select Test::R.v<0x42::Test::R>($t0))
+  2: assert Eq<u64>($t1, select Test::R.v<Test::R>($t0))
   3: return $t1
 }
 
 
 [variant verification]
-fun Test::ref_param_return_ref($t0|r: 0x42::Test::R): u64 {
+fun Test::ref_param_return_ref($t0|r: Test::R): u64 {
      var $t1: u64
-  0: $t1 := get_field<0x42::Test::R>.v($t0)
+  0: $t1 := get_field<Test::R>.v($t0)
   1: label L1
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:58:6+22
-  2: assert Eq<u64>($t1, select Test::R.v<0x42::Test::R>($t0))
+  2: assert Eq<u64>($t1, select Test::R.v<Test::R>($t0))
   3: return $t1
 }
 
 
 [variant verification]
 fun Test::resource_with_old($t0|val: u64) {
-     var $t1|r: &mut 0x42::Test::R
+     var $t1|r: &mut Test::R
      var $t2: address
      var $t3: bool
      var $t4: bool
      var $t5: u64
      var $t6: num
      var $t7: address
-     var $t8: &mut 0x42::Test::R
+     var $t8: &mut Test::R
      var $t9: u64
      var $t10: u64
      var $t11: &mut u64
   0: assume Gt($t0, 0)
-  1: assume CanModify<0x42::Test::R>(0x0)
+  1: assume CanModify<Test::R>(0x0)
   2: @0 := save_mem(Test::R)
   3: $t2 := 0x0
-  4: $t3 := exists<0x42::Test::R>($t2)
+  4: $t3 := exists<Test::R>($t2)
   5: $t4 := !($t3)
   6: if ($t4) goto 7 else goto 11
   7: label L1
@@ -337,27 +337,27 @@ fun Test::resource_with_old($t0|val: u64) {
  11: label L0
  12: $t7 := 0x0
      # VC: caller does not have permission to modify `Test::R` at given address at tests/spec_instrumentation/fun_spec.move:36:14+17
- 13: assert CanModify<0x42::Test::R>($t7)
- 14: $t8 := borrow_global<0x42::Test::R>($t7) on_abort goto 26 with $t6
- 15: $t9 := get_field<0x42::Test::R>.v($t8)
+ 13: assert CanModify<Test::R>($t7)
+ 14: $t8 := borrow_global<Test::R>($t7) on_abort goto 26 with $t6
+ 15: $t9 := get_field<Test::R>.v($t8)
  16: $t10 := +($t9, $t0) on_abort goto 26 with $t6
- 17: $t11 := borrow_field<0x42::Test::R>.v($t8)
+ 17: $t11 := borrow_field<Test::R>.v($t8)
  18: write_ref($t11, $t10)
  19: write_back[Reference($t8).v (u64)]($t11)
- 20: write_back[0x42::Test::R@]($t8)
+ 20: write_back[Test::R@]($t8)
  21: label L2
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:41:6+35
- 22: assert Not(Not(exists[@0]<0x42::Test::R>(0x0)))
+ 22: assert Not(Not(exists[@0]<Test::R>(0x0)))
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:42:6+58
- 23: assert Not(Ge(Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>(0x0)), $t0), 18446744073709551615))
+ 23: assert Not(Ge(Add(select Test::R.v<Test::R>(global[@0]<Test::R>(0x0)), $t0), 18446744073709551615))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:43:6+58
- 24: assert Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>(0x0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>(0x0)), $t0))
+ 24: assert Eq<u64>(select Test::R.v<Test::R>(global<Test::R>(0x0)), Add(select Test::R.v<Test::R>(global[@0]<Test::R>(0x0)), $t0))
  25: return ()
  26: label L3
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/fun_spec.move:39:2+250
- 27: assert Or(Not(exists[@0]<0x42::Test::R>(0x0)), Ge(Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>(0x0)), $t0), 18446744073709551615))
+ 27: assert Or(Not(exists[@0]<Test::R>(0x0)), Ge(Add(select Test::R.v<Test::R>(global[@0]<Test::R>(0x0)), $t0), 18446744073709551615))
      # VC: abort code not covered by any of the `aborts_if` or `aborts_with` clauses at tests/spec_instrumentation/fun_spec.move:39:2+250
- 28: assert Or(And(Not(exists[@0]<0x42::Test::R>(0x0)), Eq(33, $t6)), Ge(Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>(0x0)), $t0), 18446744073709551615))
+ 28: assert Or(And(Not(exists[@0]<Test::R>(0x0)), Eq(33, $t6)), Ge(Add(select Test::R.v<Test::R>(global[@0]<Test::R>(0x0)), $t0), 18446744073709551615))
  29: abort($t6)
 }
 
@@ -409,52 +409,52 @@ spec {
 
 fun Test::mut_ref_param[baseline]
 spec {
-  aborts_if Eq<u64>(select Test::R.v<0x42::Test::R>($t0), 0);
-  ensures Eq<u64>(result0(), Old<u64>(select Test::R.v<0x42::Test::R>($t0)));
-  ensures Eq<u64>(select Test::R.v<0x42::Test::R>($t0), Add(Old<u64>(select Test::R.v<0x42::Test::R>($t0)), 1));
+  aborts_if Eq<u64>(select Test::R.v<Test::R>($t0), 0);
+  ensures Eq<u64>(result0(), Old<u64>(select Test::R.v<Test::R>($t0)));
+  ensures Eq<u64>(select Test::R.v<Test::R>($t0), Add(Old<u64>(select Test::R.v<Test::R>($t0)), 1));
 }
 
 fun Test::mut_ref_param[verification]
 spec {
-  aborts_if Eq<u64>(select Test::R.v<0x42::Test::R>($t0), 0);
-  ensures Eq<u64>(result0(), Old<u64>(select Test::R.v<0x42::Test::R>($t0)));
-  ensures Eq<u64>(select Test::R.v<0x42::Test::R>($t0), Add(Old<u64>(select Test::R.v<0x42::Test::R>($t0)), 1));
+  aborts_if Eq<u64>(select Test::R.v<Test::R>($t0), 0);
+  ensures Eq<u64>(result0(), Old<u64>(select Test::R.v<Test::R>($t0)));
+  ensures Eq<u64>(select Test::R.v<Test::R>($t0), Add(Old<u64>(select Test::R.v<Test::R>($t0)), 1));
 }
 
 fun Test::ref_param[baseline]
 spec {
-  ensures Eq<u64>(result0(), select Test::R.v<0x42::Test::R>($t0));
+  ensures Eq<u64>(result0(), select Test::R.v<Test::R>($t0));
 }
 
 fun Test::ref_param[verification]
 spec {
-  ensures Eq<u64>(result0(), select Test::R.v<0x42::Test::R>($t0));
+  ensures Eq<u64>(result0(), select Test::R.v<Test::R>($t0));
 }
 
 fun Test::ref_param_return_ref[baseline]
 spec {
-  ensures Eq<u64>(result0(), select Test::R.v<0x42::Test::R>($t0));
+  ensures Eq<u64>(result0(), select Test::R.v<Test::R>($t0));
 }
 
 fun Test::ref_param_return_ref[verification]
 spec {
-  ensures Eq<u64>(result0(), select Test::R.v<0x42::Test::R>($t0));
+  ensures Eq<u64>(result0(), select Test::R.v<Test::R>($t0));
 }
 
 fun Test::resource_with_old[baseline]
 spec {
   requires Gt($t0, 0);
-  aborts_if Not(exists<0x42::Test::R>(0x0));
-  aborts_if Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>(0x0)), $t0), 18446744073709551615);
-  ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>(0x0)), Add(select Test::R.v<0x42::Test::R>(Old<0x42::Test::R>(global<0x42::Test::R>(0x0))), $t0));
-  modifies global<0x42::Test::R>(0x0);
+  aborts_if Not(exists<Test::R>(0x0));
+  aborts_if Ge(Add(select Test::R.v<Test::R>(global<Test::R>(0x0)), $t0), 18446744073709551615);
+  ensures Eq<u64>(select Test::R.v<Test::R>(global<Test::R>(0x0)), Add(select Test::R.v<Test::R>(Old<Test::R>(global<Test::R>(0x0))), $t0));
+  modifies global<Test::R>(0x0);
 }
 
 fun Test::resource_with_old[verification]
 spec {
   requires Gt($t0, 0);
-  aborts_if Not(exists<0x42::Test::R>(0x0));
-  aborts_if Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>(0x0)), $t0), 18446744073709551615);
-  ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>(0x0)), Add(select Test::R.v<0x42::Test::R>(Old<0x42::Test::R>(global<0x42::Test::R>(0x0))), $t0));
-  modifies global<0x42::Test::R>(0x0);
+  aborts_if Not(exists<Test::R>(0x0));
+  aborts_if Ge(Add(select Test::R.v<Test::R>(global<Test::R>(0x0)), $t0), 18446744073709551615);
+  ensures Eq<u64>(select Test::R.v<Test::R>(global<Test::R>(0x0)), Add(select Test::R.v<Test::R>(Old<Test::R>(global<Test::R>(0x0))), $t0));
+  modifies global<Test::R>(0x0);
 }

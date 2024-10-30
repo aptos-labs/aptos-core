@@ -10,11 +10,11 @@ module 0x42::update_field_ok {
     }
     spec {
       aborts_if false;
-      ensures Eq<0x42::update_field_ok::R>(Freeze(false)($t0), update_field_ok::assign_x_1(Old<0x42::update_field_ok::R>($t0)));
+      ensures Eq<update_field_ok::R>(Freeze(false)($t0), update_field_ok::assign_x_1(Old<update_field_ok::R>($t0)));
     }
 
     spec fun assign_x_1(r: R): R {
-        update update_field_ok::R.x<0x42::update_field_ok::R>(r, 1)
+        update update_field_ok::R.x<update_field_ok::R>(r, 1)
     }
 } // end 0x42::update_field_ok
 

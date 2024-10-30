@@ -101,13 +101,13 @@ object "A2_M" {
                 $t1 := true
                 // $t2 := M::pack_S($t0, $t1)
                 $t2 := A2_M_pack_S($t0, $t1)
-                // $t3 := pack 0x2::M::Event_S($t2)
+                // $t3 := pack M::Event_S($t2)
                 {
                     let $mem := $Malloc(32)
                     $MemoryStoreU256(add($mem, 0), $t2)
                     $t3 := $mem
                 }
-                // Evm::emit<0x2::M::Event_S>($t3)
+                // Evm::emit<M::Event_S>($t3)
                 A2_Evm_emit$A2_M_Event_S$($t3)
                 // return ()
             }
@@ -130,7 +130,7 @@ object "A2_M" {
                 $t1 := $MakePtr(false, $locals)
                 // $t2 := 0
                 $t2 := 0
-                // $t3 := vector::borrow<vector<0x2::M::S>>($t1, $t2)
+                // $t3 := vector::borrow<vector<M::S>>($t1, $t2)
                 $t3 := A1_vector_borrow$vec$A2_M_S$$($t1, $t2)
                 // $t4 := read_ref($t3)
                 $t4 := $LoadU256($t3)
@@ -244,7 +244,7 @@ object "A2_M" {
             function A2_M_pack_S(a, b) -> $result {
                 let s2, $t4, $t5, $t6, $t7, $t8
                 let $locals := $Malloc(32)
-                // $t3 := vector::empty<0x2::M::S2>()
+                // $t3 := vector::empty<M::S2>()
                 mstore($locals, A1_vector_empty$A2_M_S2$())
                 // $t4 := (u128)($t0)
                 $t4 := $CastU128(a)
@@ -252,11 +252,11 @@ object "A2_M" {
                 $t5 := A2_M_pack_S2($t4)
                 // $t6 := borrow_local($t3)
                 $t6 := $MakePtr(false, $locals)
-                // vector::push_back<0x2::M::S2>($t6, $t5)
+                // vector::push_back<M::S2>($t6, $t5)
                 A1_vector_push_back$A2_M_S2$($t6, $t5)
                 // $t7 := move($t3)
                 $t7 := mload($locals)
-                // $t8 := pack 0x2::M::S($t0, $t1, $t7)
+                // $t8 := pack M::S($t0, $t1, $t7)
                 {
                     let $mem := $Malloc(41)
                     $MemoryStoreU64(add($mem, 32), a)
@@ -314,7 +314,7 @@ object "A2_M" {
                 A1_vector_push_back$u128$($t2, x)
                 // $t3 := move($t1)
                 $t3 := mload($locals)
-                // $t4 := pack 0x2::M::S2($t3)
+                // $t4 := pack M::S2($t3)
                 {
                     let $mem := $Malloc(32)
                     $MemoryStoreU256(add($mem, 0), $t3)
@@ -1068,13 +1068,13 @@ object "test_A2_M_test_abi_S" {
                     _s := A2_M_decode_S($t7)
                     // $t8 := borrow_local($t2)
                     $t8 := $MakePtr(false, s)
-                    // $t9 := borrow_field<0x2::M::S>.a($t8)
+                    // $t9 := borrow_field<M::S>.a($t8)
                     $t9 := $IndexPtr($t8, 32)
                     // $t10 := read_ref($t9)
                     $t10 := $LoadU64($t9)
                     // $t11 := borrow_local($t0)
                     $t11 := $MakePtr(false, _s)
-                    // $t12 := borrow_field<0x2::M::S>.a($t11)
+                    // $t12 := borrow_field<M::S>.a($t11)
                     $t12 := $IndexPtr($t11, 32)
                     // $t13 := read_ref($t12)
                     $t13 := $LoadU64($t12)
@@ -1089,7 +1089,7 @@ object "test_A2_M_test_abi_S" {
                     // label L2
                     // $t16 := borrow_local($t0)
                     $t16 := $MakePtr(false, _s)
-                    // $t17 := borrow_field<0x2::M::S>.a($t16)
+                    // $t17 := borrow_field<M::S>.a($t16)
                     $t17 := $IndexPtr($t16, 32)
                     // $t18 := read_ref($t17)
                     $t18 := $LoadU64($t17)
@@ -1118,13 +1118,13 @@ object "test_A2_M_test_abi_S" {
                     // label L5
                     // $t22 := borrow_local($t2)
                     $t22 := $MakePtr(false, s)
-                    // $t23 := borrow_field<0x2::M::S>.b($t22)
+                    // $t23 := borrow_field<M::S>.b($t22)
                     $t23 := $IndexPtr($t22, 40)
                     // $t24 := read_ref($t23)
                     $t24 := $LoadU8($t23)
                     // $t25 := borrow_local($t0)
                     $t25 := $MakePtr(false, _s)
-                    // $t26 := borrow_field<0x2::M::S>.b($t25)
+                    // $t26 := borrow_field<M::S>.b($t25)
                     $t26 := $IndexPtr($t25, 40)
                     // $t27 := read_ref($t26)
                     $t27 := $LoadU8($t26)
@@ -1151,7 +1151,7 @@ object "test_A2_M_test_abi_S" {
                     // label L8
                     // $t30 := borrow_local($t0)
                     $t30 := $MakePtr(false, _s)
-                    // $t31 := borrow_field<0x2::M::S>.b($t30)
+                    // $t31 := borrow_field<M::S>.b($t30)
                     $t31 := $IndexPtr($t30, 40)
                     // $t32 := read_ref($t31)
                     $t32 := $LoadU8($t31)
@@ -1180,7 +1180,7 @@ object "test_A2_M_test_abi_S" {
                     // label L11
                     // $t36 := borrow_local($t2)
                     $t36 := $MakePtr(false, s)
-                    // $t37 := borrow_field<0x2::M::S>.c($t36)
+                    // $t37 := borrow_field<M::S>.c($t36)
                     $t37 := $t36
                     // $t3 := read_ref($t37)
                     mstore($locals, $LoadU256($t37))
@@ -1222,7 +1222,7 @@ object "test_A2_M_test_abi_S" {
                     }
                     // $t38 := borrow_local($t0)
                     $t38 := $MakePtr(false, _s)
-                    // $t39 := borrow_field<0x2::M::S>.c($t38)
+                    // $t39 := borrow_field<M::S>.c($t38)
                     $t39 := $t38
                     // $t1 := read_ref($t39)
                     mstore(add($locals, 32), $LoadU256($t39))
@@ -1264,7 +1264,7 @@ object "test_A2_M_test_abi_S" {
                     }
                     // $t40 := borrow_local($t3)
                     $t40 := $MakePtr(false, $locals)
-                    // $t41 := vector::length<0x2::M::S2>($t40)
+                    // $t41 := vector::length<M::S2>($t40)
                     $t41 := A1_vector_length$A2_M_S2$($t40)
                     // $t42 := 1
                     $t42 := 1
@@ -1291,7 +1291,7 @@ object "test_A2_M_test_abi_S" {
                     // label L14
                     // $t45 := borrow_local($t1)
                     $t45 := $MakePtr(false, add($locals, 32))
-                    // $t46 := vector::length<0x2::M::S2>($t45)
+                    // $t46 := vector::length<M::S2>($t45)
                     $t46 := A1_vector_length$A2_M_S2$($t45)
                     // $t47 := 1
                     $t47 := 1
@@ -1320,9 +1320,9 @@ object "test_A2_M_test_abi_S" {
                     $t50 := $MakePtr(false, add($locals, 32))
                     // $t51 := 0
                     $t51 := 0
-                    // $t52 := vector::borrow<0x2::M::S2>($t50, $t51)
+                    // $t52 := vector::borrow<M::S2>($t50, $t51)
                     $t52 := A1_vector_borrow$A2_M_S2$($t50, $t51)
-                    // $t53 := borrow_field<0x2::M::S2>.x($t52)
+                    // $t53 := borrow_field<M::S2>.x($t52)
                     $t53 := $t52
                     // $t54 := 0
                     $t54 := 0
@@ -1404,7 +1404,7 @@ object "test_A2_M_test_abi_S" {
         function A2_M_pack_S(a, b) -> $result {
             let s2, $t4, $t5, $t6, $t7, $t8
             let $locals := $Malloc(32)
-            // $t3 := vector::empty<0x2::M::S2>()
+            // $t3 := vector::empty<M::S2>()
             mstore($locals, A1_vector_empty$A2_M_S2$())
             // $t4 := (u128)($t0)
             $t4 := $CastU128(a)
@@ -1412,11 +1412,11 @@ object "test_A2_M_test_abi_S" {
             $t5 := A2_M_pack_S2($t4)
             // $t6 := borrow_local($t3)
             $t6 := $MakePtr(false, $locals)
-            // vector::push_back<0x2::M::S2>($t6, $t5)
+            // vector::push_back<M::S2>($t6, $t5)
             A1_vector_push_back$A2_M_S2$($t6, $t5)
             // $t7 := move($t3)
             $t7 := mload($locals)
-            // $t8 := pack 0x2::M::S($t0, $t1, $t7)
+            // $t8 := pack M::S($t0, $t1, $t7)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -1474,7 +1474,7 @@ object "test_A2_M_test_abi_S" {
             A1_vector_push_back$u128$($t2, x)
             // $t3 := move($t1)
             $t3 := mload($locals)
-            // $t4 := pack 0x2::M::S2($t3)
+            // $t4 := pack M::S2($t3)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t3)
@@ -2216,7 +2216,7 @@ object "test_A2_M_test_abi_String" {
         }
         function A1_ascii_into_bytes(string) -> $result {
             let $t1
-            // $t1 := unpack 0x1::ascii::String($t0)
+            // $t1 := unpack ascii::String($t0)
             $t1 := $MemoryLoadU256(add(string, 0))
             $Free(string, 32)
             // return $t1
@@ -2249,7 +2249,7 @@ object "test_A2_M_test_abi_String" {
 
         function A1_ascii_as_bytes(string) -> $result {
             let $t1
-            // $t1 := borrow_field<0x1::ascii::String>.bytes($t0)
+            // $t1 := borrow_field<ascii::String>.bytes($t0)
             $t1 := string
             // return $t1
             $result := $t1
@@ -2297,7 +2297,7 @@ object "test_A2_M_test_abi_String" {
                     x := A1_ascii_try_string(bytes)
                     // $t2 := borrow_local($t1)
                     $t2 := $MakePtr(false, x)
-                    // $t3 := option::is_some<0x1::ascii::String>($t2)
+                    // $t3 := option::is_some<ascii::String>($t2)
                     $t3 := A1_option_is_some$A1_ascii_String$($t2)
                     // if ($t3) goto L1 else goto L0
                     switch $t3
@@ -2308,7 +2308,7 @@ object "test_A2_M_test_abi_String" {
                     // label L2
                     // $t5 := move($t1)
                     $t5 := x
-                    // $t6 := option::destroy_some<0x1::ascii::String>($t5)
+                    // $t6 := option::destroy_some<ascii::String>($t5)
                     $t6 := A1_option_destroy_some$A1_ascii_String$($t5)
                     // return $t6
                     $result := $t6
@@ -2349,7 +2349,7 @@ object "test_A2_M_test_abi_String" {
                     // label L2
                     // $t6 := move($t0)
                     $t6 := t
-                    // $t2 := unpack 0x1::option::Option<#0>($t6)
+                    // $t2 := unpack option::Option<#0>($t6)
                     mstore($locals, $MemoryLoadU256(add($t6, 0)))
                     $Free($t6, 32)
                     // $t7 := borrow_local($t2)
@@ -2409,7 +2409,7 @@ object "test_A2_M_test_abi_String" {
         }
         function A1_option_is_some$A1_ascii_String$(t) -> $result {
             let $t1, $t2, $t3
-            // $t1 := borrow_field<0x1::option::Option<#0>>.vec($t0)
+            // $t1 := borrow_field<option::Option<#0>>.vec($t0)
             $t1 := t
             // $t2 := vector::is_empty<#0>($t1)
             $t2 := A1_vector_is_empty$A1_ascii_String$($t1)
@@ -2477,13 +2477,13 @@ object "test_A2_M_test_abi_String" {
                     // assert forall j: num: Range(0, $t4): ascii::is_valid_char(Index($t0, j))
                     // $t14 := move($t0)
                     $t14 := mload($locals)
-                    // $t15 := pack 0x1::ascii::String($t14)
+                    // $t15 := pack ascii::String($t14)
                     {
                         let $mem := $Malloc(32)
                         $MemoryStoreU256(add($mem, 0), $t14)
                         $t15 := $mem
                     }
-                    // $t16 := option::some<0x1::ascii::String>($t15)
+                    // $t16 := option::some<ascii::String>($t15)
                     $t16 := A1_option_some$A1_ascii_String$($t15)
                     // return $t16
                     $result := $t16
@@ -2509,7 +2509,7 @@ object "test_A2_M_test_abi_String" {
                 }
                 case 7 {
                     // label L4
-                    // $t12 := option::none<0x1::ascii::String>()
+                    // $t12 := option::none<ascii::String>()
                     $t12 := A1_option_none$A1_ascii_String$()
                     // return $t12
                     $result := $t12
@@ -2532,7 +2532,7 @@ object "test_A2_M_test_abi_String" {
             let $t0, $t1
             // $t0 := vector::empty<#0>()
             $t0 := A1_vector_empty$A1_ascii_String$()
-            // $t1 := pack 0x1::option::Option<#0>($t0)
+            // $t1 := pack option::Option<#0>($t0)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t0)
@@ -2550,7 +2550,7 @@ object "test_A2_M_test_abi_String" {
             let $t1, $t2
             // $t1 := vector::singleton<#0>($t0)
             $t1 := A1_vector_singleton$A1_ascii_String$(e)
-            // $t2 := pack 0x1::option::Option<#0>($t1)
+            // $t2 := pack option::Option<#0>($t1)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t1)

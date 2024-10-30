@@ -141,54 +141,6 @@ module 0x42::m {
 } // end 0x42::m
 
 
-// -- Model dump after env processor lambda-lifting:
-module 0x42::m {
-    private fun foo(f: |&u64|) {
-        Tuple()
-    }
-    private fun g() {
-        m::foo(closure m::g$lambda$1());
-        Tuple()
-    }
-    private fun g$lambda$1(v: &u64) {
-        Eq<u64>(v, Borrow(Immutable)(1));
-        Tuple()
-    }
-} // end 0x42::m
-
-
-// -- Model dump after env processor specification checker:
-module 0x42::m {
-    private fun foo(f: |&u64|) {
-        Tuple()
-    }
-    private fun g() {
-        m::foo(closure m::g$lambda$1());
-        Tuple()
-    }
-    private fun g$lambda$1(v: &u64) {
-        Eq<u64>(v, Borrow(Immutable)(1));
-        Tuple()
-    }
-} // end 0x42::m
-
-
-// -- Model dump after env processor specification rewriter:
-module 0x42::m {
-    private fun foo(f: |&u64|) {
-        Tuple()
-    }
-    private fun g() {
-        m::foo(closure m::g$lambda$1());
-        Tuple()
-    }
-    private fun g$lambda$1(v: &u64) {
-        Eq<u64>(v, Borrow(Immutable)(1));
-        Tuple()
-    }
-} // end 0x42::m
-
-
 
 Diagnostics:
 warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
@@ -197,9 +149,7 @@ warning: Unused parameter `f`. Consider removing or prefixing with an underscore
 3 │     fun foo(f: |&u64|) {
   │             ^
 
-
-Diagnostics:
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
   ┌─ tests/lambda/inline-parity/eq_inline.move:7:13
   │
 7 │           foo(|v| {

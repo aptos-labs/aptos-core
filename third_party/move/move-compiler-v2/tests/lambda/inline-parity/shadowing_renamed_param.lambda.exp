@@ -561,26 +561,42 @@ module 0x42::Test {
 
 
 Diagnostics:
-error: captured variable `x` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:15:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:14:13
    │
-15 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
-   │             ^
+14 │           foo(|y| {
+   │ ╭─────────────^
+15 │ │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+16 │ │                     // have the value 1.
+17 │ │         }, 3);
+   │ ╰─────────^
 
-error: captured variable `x` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:21:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:20:14
    │
-21 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
-   │             ^
+20 │           foo2(|y| {
+   │ ╭──────────────^
+21 │ │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+22 │ │                     // have the value 1.
+23 │ │         }, 5);
+   │ ╰─────────^
 
-error: captured variable `x` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:30:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:29:13
    │
-30 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
-   │             ^
+29 │           foo(|y| {
+   │ ╭─────────────^
+30 │ │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+31 │ │                     // have the value 1.
+32 │ │         }, 3);
+   │ ╰─────────^
 
-error: captured variable `x` cannot be modified inside of a lambda
-   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:36:13
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+   ┌─ tests/lambda/inline-parity/shadowing_renamed_param.move:35:14
    │
-36 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
-   │             ^
+35 │           foo2(|y| {
+   │ ╭──────────────^
+36 │ │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+37 │ │                     // have the value 1.
+38 │ │         }, 5);
+   │ ╰─────────^

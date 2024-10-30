@@ -39,16 +39,16 @@ module 0x815::m {
 [variant baseline]
 fun m::test_common_access(): u8 {
      var $t0: u8
-     var $t1: 0x815::m::Positional
+     var $t1: m::Positional
      var $t2: u8
      var $t3: u8
      var $t4: &mut u8
-     var $t5: &mut 0x815::m::Positional
+     var $t5: &mut m::Positional
   0: $t2 := 42
-  1: $t1 := pack_variant 0x815::m::Positional::A($t2)
+  1: $t1 := pack_variant m::Positional::A($t2)
   2: $t3 := 19
   3: $t5 := borrow_local($t1)
-  4: $t4 := borrow_variant_field<0x815::m::Positional::A|B>.0($t5)
+  4: $t4 := borrow_variant_field<m::Positional::A|B>.0($t5)
   5: write_ref($t4, $t3)
   6: $t0 := 20
   7: return $t0

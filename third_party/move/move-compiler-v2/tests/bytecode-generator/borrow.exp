@@ -99,10 +99,10 @@ module 0x42::borrow {
 ============ initial bytecode ================
 
 [variant baseline]
-fun borrow::field($t0: &0x42::borrow::S): u64 {
+fun borrow::field($t0: &borrow::S): u64 {
      var $t1: u64
      var $t2: &u64
-  0: $t2 := borrow_field<0x42::borrow::S>.f($t0)
+  0: $t2 := borrow_field<borrow::S>.f($t0)
   1: $t1 := read_ref($t2)
   2: return $t1
 }
@@ -131,11 +131,11 @@ fun borrow::param($t0: u64): u64 {
 
 
 [variant baseline]
-fun borrow::mut_field($t0: &mut 0x42::borrow::S): u64 {
+fun borrow::mut_field($t0: &mut borrow::S): u64 {
      var $t1: u64
      var $t2: &mut u64
      var $t3: u64
-  0: $t2 := borrow_field<0x42::borrow::S>.f($t0)
+  0: $t2 := borrow_field<borrow::S>.f($t0)
   1: $t3 := 22
   2: write_ref($t2, $t3)
   3: $t1 := read_ref($t2)

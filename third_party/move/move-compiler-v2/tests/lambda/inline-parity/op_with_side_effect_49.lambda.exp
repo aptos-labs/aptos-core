@@ -176,14 +176,14 @@ module 0xc0ffee::m {
 
 
 Diagnostics:
-error: captured variable `x` cannot be modified inside of a lambda
-  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:9:22
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:9:18
   │
 9 │         x + call(|| {x = x + 1; x}) + call(|| {x = x + 7; x})
-  │                      ^
+  │                  ^^^^^^^^^^^^^^^^^
 
-error: captured variable `x` cannot be modified inside of a lambda
-  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:9:48
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:9:44
   │
 9 │         x + call(|| {x = x + 1; x}) + call(|| {x = x + 7; x})
-  │                                                ^
+  │                                            ^^^^^^^^^^^^^^^^^

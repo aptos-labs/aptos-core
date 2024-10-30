@@ -16,7 +16,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut m::S, $t1: u64) {
      var $t2: u64
      var $t3: u64
      var $t4: &u64
@@ -28,16 +28,16 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t10: u64
      var $t11: u64
      var $t12: u64
-  0: $t4 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t4 := borrow_field<m::S>.x($t0)
   1: $t3 := read_ref($t4)
   2: $t2 := /($t1, $t3)
-  3: $t6 := borrow_field<0xc0ffee::m::S>.y($t0)
+  3: $t6 := borrow_field<m::S>.y($t0)
   4: $t5 := m::foo($t6)
   5: label L0
   6: $t7 := <($t2, $t5)
   7: if ($t7) goto 8 else goto 17
   8: label L2
-  9: $t8 := borrow_field<0xc0ffee::m::S>.z($t0)
+  9: $t8 := borrow_field<m::S>.z($t0)
  10: $t10 := 1
  11: $t9 := -($t2, $t10)
  12: m::bar($t8, $t9)
@@ -75,7 +75,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut m::S, $t1: u64) {
      var $t2: u64 [unused]
      var $t3: u64
      var $t4: &u64
@@ -88,13 +88,13 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t11: u64 [unused]
      var $t12: u64 [unused]
      # live vars: $t0, $t1
-  0: $t4 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t4 := borrow_field<m::S>.x($t0)
      # live vars: $t0, $t1, $t4
   1: $t3 := read_ref($t4)
      # live vars: $t0, $t1, $t3
   2: $t1 := /($t1, $t3)
      # live vars: $t0, $t1
-  3: $t4 := borrow_field<0xc0ffee::m::S>.y($t0)
+  3: $t4 := borrow_field<m::S>.y($t0)
      # live vars: $t0, $t1, $t4
   4: $t3 := m::foo($t4)
      # live vars: $t0, $t1, $t3
@@ -106,7 +106,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # live vars: $t0, $t1, $t3
   8: label L2
      # live vars: $t0, $t1, $t3
-  9: $t8 := borrow_field<0xc0ffee::m::S>.z($t0)
+  9: $t8 := borrow_field<m::S>.z($t0)
      # live vars: $t0, $t1, $t3, $t8
  10: $t10 := 1
      # live vars: $t0, $t1, $t3, $t8, $t10
