@@ -64,6 +64,7 @@ aptos-block-executor = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
+move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 rand_core = { workspace = true }
 
