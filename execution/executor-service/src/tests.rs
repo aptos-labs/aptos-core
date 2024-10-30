@@ -9,6 +9,7 @@ use aptos_config::utils;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_secure_net::network_controller::NetworkController;
 use aptos_vm::sharded_block_executor::ShardedBlockExecutor;
+use rstest::rstest;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 pub fn create_thread_remote_executor_shards(
@@ -53,8 +54,22 @@ pub fn create_thread_remote_executor_shards(
     (remote_executor_client, remote_executor_services)
 }
 
-#[test]
-fn test_sharded_block_executor_no_conflict() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_sharded_block_executor_no_conflict(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     use std::thread;
 
     let num_shards = 8;
@@ -66,15 +81,34 @@ fn test_sharded_block_executor_no_conflict() {
     // TODO: We need to pass this test without this sleep
     thread::sleep(std::time::Duration::from_millis(10));
 
-    test_utils::test_sharded_block_executor_no_conflict(sharded_block_executor);
+    test_utils::test_sharded_block_executor_no_conflict(
+        sharded_block_executor,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     executor_services.iter_mut().for_each(|executor_service| {
         executor_service.shutdown();
     });
 }
 
-#[test]
-fn test_sharded_block_executor_with_conflict() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_sharded_block_executor_with_conflict(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     use std::thread;
 
     let num_shards = 8;
@@ -86,7 +120,13 @@ fn test_sharded_block_executor_with_conflict() {
     // TODO: We need to pass this test without this sleep
     thread::sleep(std::time::Duration::from_millis(10));
 
-    test_utils::sharded_block_executor_with_conflict(sharded_block_executor, 2);
+    test_utils::sharded_block_executor_with_conflict(
+        sharded_block_executor,
+        2,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     executor_services.iter_mut().for_each(|executor_service| {
         executor_service.shutdown();

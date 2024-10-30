@@ -78,6 +78,7 @@ pub(crate) mod cli {
         let ty_args = vec![];
         let args = vec![];
 
+        // TODO[Orderless]: Change this to transaction payload v2 format
         TransactionPayload::Script(Script::new(code, ty_args, args))
     }
 
@@ -87,6 +88,7 @@ pub(crate) mod cli {
         metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
     ) -> TransactionPayload {
+        // TODO[Orderless]: Change this to transaction payload v2 format
         TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::new([

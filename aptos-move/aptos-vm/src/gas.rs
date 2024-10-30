@@ -130,6 +130,11 @@ pub(crate) fn check_gas(
         .evaluate(gas_feature_version, &gas_params.vm);
     let total_rounded: Gas = (intrinsic_gas + keyless).to_unit_round_up_with_params(txn_gas_params);
 
+    println!(
+        "txn metadata max gas amount: {:?}",
+        txn_metadata.max_gas_amount()
+    );
+    println!("total rounded: {:?}", total_rounded);
     if txn_metadata.max_gas_amount() < total_rounded {
         speculative_warn!(
             log_context,
@@ -185,12 +190,12 @@ pub(crate) fn check_gas(
     // gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(
-        txn_metadata,
-        features,
-        resolver,
-        module_storage,
-    )? {
+
+    // Question[Orderless]: With the introduction of stateless accounts and orderless transactions, APT coin could be
+    // deposited into a stateless account. When the the first sequence number based transaction with sequence number 0 is
+    // sent from the account, "even if this transaction is not sponsored", we create the Account resource in prologue.
+    // So, I'm updating the below if statement condition to run not just for sponsored transactions. Please let me if it is wrong.
+    if crate::aptos_vm::is_account_init_in_transaction(txn_metadata, resolver, module_storage)? {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);
@@ -201,11 +206,19 @@ pub(crate) fn check_gas(
         let expected = gas_unit_price * 10 + 2 * storage_fee_per_account_create;
         let actual = gas_unit_price * max_gas_amount;
 
+        println!("gas_unit_price {:?}", gas_unit_price);
+        println!(
+            "storage fee per account create {:?}",
+            storage_fee_per_account_create
+        );
+        println!("actual {:?}", actual);
+        println!("max gas amount {:?}", max_gas_amount);
+        println!("expected {:?}", expected);
         if actual < expected {
             speculative_warn!(
                 log_context,
                 format!(
-                    "[VM] Insufficient gas for sponsored transaction; min {}, submitted {}",
+                    "[VM] Insufficient gas for transaction that creates an account; min {}, submitted {}",
                     expected, actual,
                 ),
             );

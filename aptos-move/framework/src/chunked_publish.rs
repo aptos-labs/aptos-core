@@ -102,6 +102,7 @@ fn create_chunks(data: Vec<u8>, chunk_size: usize) -> Vec<Vec<u8>> {
 }
 
 // Create a transaction payload for staging chunked data to the staging area.
+// TODO[Orderless]: Change the below functions to use transaction payload v2 format.
 fn large_packages_stage_code_chunk(
     metadata_chunk: Vec<u8>,
     code_indices: Vec<u16>,

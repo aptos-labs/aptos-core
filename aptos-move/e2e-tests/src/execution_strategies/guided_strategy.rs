@@ -56,7 +56,7 @@ impl PartitionStrategy for UnPartitionedGuidedStrategy {
 
 pub struct GuidedExecutor<Strategy: PartitionStrategy> {
     strategy: Strategy,
-    executor: FakeExecutor,
+    pub executor: FakeExecutor,
 }
 
 impl<Strategy: PartitionStrategy> GuidedExecutor<Strategy> {
