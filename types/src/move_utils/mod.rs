@@ -40,3 +40,4 @@ impl FromStr for MemberId {
 }
 
 pub mod as_move_value;
+pub mod move_event_v2;

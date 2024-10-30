@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::aggregator::AggregatorResource;
-use crate::account_address::create_derived_object_address;
+use crate::{
+    account_address::create_derived_object_address, move_utils::move_event_v2::MoveEventV2Type,
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -94,3 +96,31 @@ impl MoveStructType for MigrationFlag {
 }
 
 impl MoveResource for MigrationFlag {}
+
+/// Struct that represents a Withdraw event.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WithdrawFAEvent {
+    pub store: AccountAddress,
+    pub amount: u64,
+}
+
+impl MoveEventV2Type for WithdrawFAEvent {}
+
+impl MoveStructType for WithdrawFAEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungble_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Withdraw");
+}
+
+/// Struct that represents a Deposit event.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DepositFAEvent {
+    pub store: AccountAddress,
+    pub amount: u64,
+}
+
+impl MoveEventV2Type for DepositFAEvent {}
+
+impl MoveStructType for DepositFAEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungble_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Deposit");
+}
