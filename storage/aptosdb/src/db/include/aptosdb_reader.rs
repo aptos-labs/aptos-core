@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::block_info::BlockHeight;
+use aptos_types::{block_info::BlockHeight, indexer::indexer_db_reader::IndexedTransactionSummary, transaction::ReplayProtector};
 
 impl DbReader for AptosDB {
     fn get_epoch_ending_ledger_infos(
@@ -70,7 +70,7 @@ impl DbReader for AptosDB {
     fn get_account_transaction(
         &self,
         address: AccountAddress,
-        seq_num: u64,
+        replay_protector: ReplayProtector,
         include_events: bool,
         ledger_version: Version,
     ) -> Result<Option<TransactionWithProof>> {
@@ -80,7 +80,7 @@ impl DbReader for AptosDB {
                 "This API is not supported with sharded DB"
             );
             self.transaction_store
-                .get_account_transaction_version(address, seq_num, ledger_version)?
+                .get_account_transaction_version(address, replay_protector, ledger_version)?
                 .map(|txn_version| {
                     self.get_transaction_with_proof(txn_version, ledger_version, include_events)
                 })
@@ -88,7 +88,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_account_transactions(
+    fn get_ordered_account_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
@@ -96,7 +96,7 @@ impl DbReader for AptosDB {
         include_events: bool,
         ledger_version: Version,
     ) -> Result<AccountTransactionsWithProof> {
-        gauged_api("get_account_transactions", || {
+        gauged_api("get_ordered_account_transactions", || {
             ensure!(
                 !self.state_kv_db.enabled_sharding(),
                 "This API is not supported with sharded DB"
@@ -105,7 +105,7 @@ impl DbReader for AptosDB {
 
             let txns_with_proofs = self
                 .transaction_store
-                .get_account_transaction_version_iter(
+                .get_account_ordered_transactions_iter(
                     address,
                     start_seq_num,
                     limit,
@@ -118,6 +118,32 @@ impl DbReader for AptosDB {
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+        })
+    }
+
+    fn get_account_all_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<IndexedTransactionSummary>> {
+        gauged_api("get_account_all_transaction_summaries", || {
+            ensure!(
+                !self.state_kv_db.enabled_sharding(),
+                "This API is not supported with sharded DB"
+            );
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+
+            self
+                .transaction_store
+                .get_account_transaction_summaries_iter(address, start_version, end_version, limit, ledger_version)?
+                .map(|result| {
+                    let (_version, txn_summary) = result?;
+                    Ok(txn_summary)
+                })
+                .collect::<Result<Vec<_>>>()
         })
     }
 

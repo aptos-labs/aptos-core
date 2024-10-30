@@ -18,6 +18,7 @@ module aptos_framework::genesis {
     use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
+    use aptos_framework::nonce_validation;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
@@ -93,7 +94,7 @@ module aptos_framework::genesis {
             b"multi_agent_script_prologue",
             b"epilogue",
         );
-
+        nonce_validation::initialize(&aptos_framework_account);
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);
 

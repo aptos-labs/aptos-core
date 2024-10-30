@@ -15,8 +15,8 @@ use aptos_types::{
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
-        Version,
+        SignedTransaction, Transaction, TransactionExecutable, TransactionInfo, TransactionOutput,
+        TransactionPayload, TransactionPayloadV2, Version,
     },
     vm_status::VMStatus,
 };
@@ -148,7 +148,25 @@ impl AptosDebugger {
                         entry_func.ty_args().to_vec(),
                     ),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
+                    TransactionPayload::V2(TransactionPayloadV2::V1 {executable, extra_config: _}) => {
+                        // Question: Is this correct? Should we add new call frame for orderless transactions?
+                        match executable {
+                            TransactionExecutable::EntryFunction(entry_func) => {
+                                GasProfiler::new_function(
+                                    gas_meter,
+                                    entry_func.module().clone(),
+                                    entry_func.function().to_owned(),
+                                    entry_func.ty_args().to_vec(),
+                                )
+                            },
+                            TransactionExecutable::Script(_) => {
+                                GasProfiler::new_script(gas_meter)
+                            },
+                            TransactionExecutable::Empty => {
+                                unimplemented!("not supported yet")
+                            },
+                        }
+                    },
                     // Deprecated.
                     TransactionPayload::ModuleBundle(..) => {
                         unreachable!("Module bundle payload has already been checked because before this function is called")
@@ -390,6 +408,21 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
                     TransactionPayload::Script(_) => "script".to_string(),
                     TransactionPayload::ModuleBundle(_) => panic!("deprecated module bundle"),
                     TransactionPayload::Multisig(_) => "multisig".to_string(),
+                    TransactionPayload::V2(TransactionPayloadV2::V1 {
+                        executable,
+                        extra_config: _,
+                    }) => {
+                        // TODO: Should we separate orderless transactions here?
+                        match executable {
+                            TransactionExecutable::EntryFunction(txn) => format!(
+                                "entry: {:?}::{:?}",
+                                txn.module().name.as_str(),
+                                txn.function().as_str()
+                            ),
+                            TransactionExecutable::Script(_) => "script".to_string(),
+                            TransactionExecutable::Empty => "empty".to_string(),
+                        }
+                    },
                 })
         })
         // Count number of instances for each (irrsepsecitve of order)
