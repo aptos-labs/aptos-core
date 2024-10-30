@@ -37,6 +37,7 @@ itertools = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
+rstest = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

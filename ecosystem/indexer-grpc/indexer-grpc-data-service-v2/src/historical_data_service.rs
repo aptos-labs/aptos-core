@@ -215,6 +215,7 @@ impl HistoricalDataService {
                         .last_mut()
                         .unwrap()
                         .processed_range
+                        .as_mut()
                         .unwrap()
                         .last_version = last_processed_version;
                     responses

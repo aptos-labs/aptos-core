@@ -1,4 +1,4 @@
-module 0xCAFE::test {
+module publisher::test {
     use std::signer;
     use std::string;
     use std::string::String;
