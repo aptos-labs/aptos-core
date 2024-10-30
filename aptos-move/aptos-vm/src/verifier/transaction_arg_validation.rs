@@ -21,6 +21,7 @@ use move_core_types::{
     value::MoveValue,
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     LoadedFunction,
@@ -110,6 +111,8 @@ pub fn validate_combine_signer_and_txn_args(
     func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
+    let _timer = VM_TIMER.timer_with_label("AptosVM::validate_combine_signer_and_txn_args");
+
     // Entry function should not return.
     if !func.return_tys().is_empty() {
         return Err(VMStatus::error(

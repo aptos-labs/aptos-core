@@ -107,6 +107,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::StatusType,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
@@ -1908,6 +1909,8 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
+        let _timer = VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl");
+
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
@@ -1938,6 +1941,8 @@ impl AptosVM {
                 code_storage,
             ));
 
+        let account_init_for_sponsored_transaction_timer =
+            VM_TIMER.timer_with_label("AptosVM::account_init_for_sponsored_transaction");
         let is_account_init_for_sponsored_transaction =
             unwrap_or_discard!(is_account_init_for_sponsored_transaction(
                 &txn_data,
@@ -1956,6 +1961,10 @@ impl AptosVM {
                 ))
             );
         }
+        drop(account_init_for_sponsored_transaction_timer);
+
+        let payload_timer =
+            VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl [payload]");
 
         // We keep track of whether any newly published modules are loaded into the Vm's loader
         // cache as part of executing transactions. This would allow us to decide whether the cache
@@ -1996,6 +2005,7 @@ impl AptosVM {
                 unwrap_or_discard!(Err(deprecated_module_bundle!()))
             },
         };
+        drop(payload_timer);
 
         let gas_usage = txn_data
             .max_gas_amount()

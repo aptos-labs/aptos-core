@@ -233,6 +233,7 @@ members = [
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
+    "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/paranoid-tests",
     "third_party/move/move-vm/runtime",
     "third_party/move/move-vm/test-utils",
@@ -866,6 +867,7 @@ move-transactional-test-runner = { path = "third_party/move/testing-infra/transa
 move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",
 ] }
+move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
 move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
     "table-extension",

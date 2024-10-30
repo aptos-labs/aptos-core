@@ -28,6 +28,7 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::loaded_data::runtime_types::{
     StructIdentifier, StructLayout, StructNameIndex, StructType, Type,
 };
@@ -289,6 +290,8 @@ impl Module {
         module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
     ) -> PartialVMResult<Self> {
+        let _timer = VM_TIMER.timer_with_label("Module::new");
+
         let id = module.self_id();
 
         let mut structs = vec![];
