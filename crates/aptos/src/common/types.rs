@@ -2353,6 +2353,10 @@ pub struct ChunkedPublishOption {
     pub(crate) chunked_publish: bool,
 
     /// Address of the `large_packages` move module for chunked publishing
-    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS)]
-    pub(crate) large_packages_module_address: String,
+    ///
+    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet.  On any other network, you will need to first publish it from the framework
+    /// under move-examples/large_packages.
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: AccountAddress,
 }

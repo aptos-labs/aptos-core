@@ -3,6 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+- Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`
 - [`Fix`] Remove unwraps to make outputs go through regular error handling
 
 ## [4.2.6] - 2024/10/23
