@@ -14,14 +14,29 @@ NAME='aptos-cli'
 CRATE_NAME='aptos'
 CARGO_PATH="crates/$CRATE_NAME/Cargo.toml"
 PLATFORM_NAME="$1"
+EXPECTED_VERSION="$2"
 
 # Grab system information
-ARCH=`uname -m`
-OS=`uname -s`
-VERSION=`cat "$CARGO_PATH" | grep "^\w*version =" | sed 's/^.*=[ ]*"//g' | sed 's/".*$//g'`
+ARCH=$(uname -m)
+OS=$(uname -s)
+VERSION=$(sed -n '/^\w*version = /p' "$CARGO_PATH" | sed 's/^.*=[ ]*"//g' | sed 's/".*$//g')
 
-echo "Building release $VERSION of $NAME for $OS-$PLATFORM_NAME"
-cargo build -p $CRATE_NAME --profile cli
+# Check that the
+if [[ "$EXPECTED_VERSION" != "$VERSION" ]]; then
+  echo "Wanted to release for $EXPECTED_VERSION, but Cargo.toml says the version is $VERSION"
+  exit 1
+fi
+
+# Check that the release doesn't already exist
+curl -f "https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v$EXPECTED_VERSION/aptos-cli-$EXPECTED_VERSION-Ubuntu-22.04-x86_64.zip"
+ALREADY_RELEASED=$?
+if [[ $ALREADY_RELEASED -eq 0 ]]; then
+  echo "$EXPECTED_VERSION already released"
+  exit 2
+fi
+
+echo "Building release $VERSION of $NAME for $OS-$PLATFORM_NAME on $ARCH"
+cargo build -p "$CRATE_NAME" --profile cli
 
 cd target/cli/
 
@@ -29,5 +44,5 @@ cd target/cli/
 ZIP_NAME="$NAME-$VERSION-$PLATFORM_NAME-$ARCH.zip"
 
 echo "Zipping release: $ZIP_NAME"
-zip $ZIP_NAME $CRATE_NAME
-mv $ZIP_NAME ../..
+zip "$ZIP_NAME" "$CRATE_NAME"
+mv "$ZIP_NAME" ../..
