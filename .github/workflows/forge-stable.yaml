@@ -24,6 +24,35 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
+      TEST_NAME:
+        required: true
+        type: choice
+        description: The specific stable test to run. If 'all', all stable tests will be run
+        default: 'all'
+        options:
+          - all
+          - framework-upgrade-test
+          - realistic-env-load-sweep
+          - realistic-env-workload-sweep
+          - realistic-env-graceful-overload
+          - realistic-env-graceful-workload-sweep
+          - realistic-env-fairness-workload-sweep
+          - realistic-network-tuned-for-throughput
+          - consensus-stress-test
+          - workload-mix-test
+          - single-vfn-perf
+          - fullnode-reboot-stress-test
+          - compat
+          - changing-working-quorum-test
+          - changing-working-quorum-test-high-load
+          - pfn-const-tps-realistic-env
+          - realistic-env-max-load-long
+      JOB_PARALLELISM:
+        required: false
+        type: number
+        description: The number of test jobs to run in parallel. If not specified, defaults to 1
+        default: 1
+
   # NOTE: to support testing different branches on different schedules, you need to specify the cron schedule in the 'determine-test-branch' step as well below
   # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
   schedule:
@@ -122,228 +151,69 @@ jobs:
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
           echo "To cancel this job, do `pnpm infra ci cancel-workflow ${{ github.run_id }}` from internal-ops" >> $GITHUB_STEP_SUMMARY
 
-  ### Real-world-network tests.
-  # Run forge framework upgradability test. This is a PR required job.
-  run-forge-framework-upgrade-test:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.result }}
+    steps:
+      - name: Compute matrix
+        id: set-matrix
+        uses: actions/github-script@v7
+        env:
+          TEST_NAME: ${{ inputs.TEST_NAME }}
+        with:
+          result-encoding: string
+          script: |
+            const testName = process.env.TEST_NAME || 'all';
+            console.log(`Running job: ${testName}`);
+            const tests = [
+              { TEST_NAME: 'framework-upgrade-test', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'framework_upgrade' },
+              { TEST_NAME: 'realistic-env-load-sweep', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'realistic_env_load_sweep' },
+              { TEST_NAME: 'realistic-env-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_workload_sweep' },
+              { TEST_NAME: 'realistic-env-graceful-overload', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_env_graceful_overload' },
+              { TEST_NAME: 'realistic-env-graceful-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2100, FORGE_TEST_SUITE: 'realistic_env_graceful_workload_sweep' },
+              { TEST_NAME: 'realistic-env-fairness-workload-sweep', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_env_fairness_workload_sweep' },
+              { TEST_NAME: 'realistic-network-tuned-for-throughput', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_network_tuned_for_throughput', FORGE_ENABLE_PERFORMANCE: true },
+              { TEST_NAME: 'consensus-stress-test', FORGE_RUNNER_DURATION_SECS: 2400, FORGE_TEST_SUITE: 'consensus_stress_test' },
+              { TEST_NAME: 'workload-mix-test', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'workload_mix' },
+              { TEST_NAME: 'single-vfn-perf', FORGE_RUNNER_DURATION_SECS: 480, FORGE_TEST_SUITE: 'single_vfn_perf' },
+              { TEST_NAME: 'fullnode-reboot-stress-test', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'fullnode_reboot_stress_test' },
+              { TEST_NAME: 'compat', FORGE_RUNNER_DURATION_SECS: 300, FORGE_TEST_SUITE: 'compat' },
+              { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
+              { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
+              { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
+              { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' }
+            ];
+
+            const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
+            core.debug(`Matrix: ${JSON.stringify(matrix)}`);
+
+            core.summary.addHeading('Forge Stable Run');
+
+            const testsToRunNames = matrix.map(test => test.TEST_NAME);
+            core.summary.addRaw("The following tests will be run:", true);
+            core.summary.addList(testsToRunNames);
+
+            core.summary.write();
+
+            const matrix_output = { include: matrix };
+            return JSON.stringify(matrix_output);
+
+  run:
+    needs: [determine-test-metadata, generate-matrix]
     if: ${{ github.event_name != 'pull_request' }}
-    needs:
-      - determine-test-metadata
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJson(inputs.JOB_PARALLELISM) || 1 }}
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }}
-      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
-      FORGE_TEST_SUITE: framework_upgrade
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-realistic-env-load-sweep:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-framework-upgrade-test] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-env-load-sweep-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes (6 tests, each for 300 seconds)
-      FORGE_TEST_SUITE: realistic_env_load_sweep
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-realistic-env-workload-sweep:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-load-sweep] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-env-workload-sweep-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 2000 # Run for 33 minutes (5 tests, each for 400 seconds)
-      FORGE_TEST_SUITE: realistic_env_workload_sweep
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-realistic-env-graceful-overload:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-workload-sweep] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-env-graceful-overload-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 1200 # Run for 20 minutes
-      FORGE_TEST_SUITE: realistic_env_graceful_overload
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-realistic-env-graceful-workload-sweep:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-graceful-overload] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-env-graceful-workload-sweep-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 2100 # Run for 5 minutes per test, 7 tests.
-      FORGE_TEST_SUITE: realistic_env_graceful_workload_sweep
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-realistic-env-fairness-workload-sweep:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-graceful-workload-sweep] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-env-fairness-workload-sweep-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 5 minutes per test, 3 tests.
-      FORGE_TEST_SUITE: realistic_env_fairness_workload_sweep
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-realistic-network-tuned-for-throughput:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [ determine-test-metadata, run-forge-realistic-env-fairness-workload-sweep ] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-network-tuned-for-throughput-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: realistic_network_tuned_for_throughput
-      FORGE_ENABLE_PERFORMANCE: true
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  ### Forge Correctness/Componenet/Stress tests
-
-  run-forge-consensus-stress-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-network-tuned-for-throughput] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-consensus-stress-test-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 2400 # Run for 40 minutes
-      FORGE_TEST_SUITE: consensus_stress_test
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-workload-mix-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-consensus-stress-test] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-workload-mix-test-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: workload_mix
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-single-vfn-perf:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-workload-mix-test] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-continuous-e2e-single-vfn-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 480 # Run for 8 minutes
-      FORGE_TEST_SUITE: single_vfn_perf
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  run-forge-fullnode-reboot-stress-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-single-vfn-perf] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-fullnode-reboot-stress-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: fullnode_reboot_stress_test
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  ### Compatibility Forge tests
-
-  run-forge-compat:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-fullnode-reboot-stress-test] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-compat-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 300 # Run for 5 minutes
-      # This will upgrade from testnet branch to the latest main
-      FORGE_TEST_SUITE: compat
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }}
-      GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-  ### Changing working quorum Forge tests
-
-  run-forge-changing-working-quorum-test:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-compat] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-changing-working-quorum-test-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 1200 # Run for 20 minutes
-      FORGE_TEST_SUITE: changing_working_quorum_test
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-      FORGE_ENABLE_FAILPOINTS: true
-
-  run-forge-changing-working-quorum-test-high-load:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-changing-working-quorum-test] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: changing_working_quorum_test_high_load
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-      FORGE_ENABLE_FAILPOINTS: true
-
-  # Measures PFN latencies with a constant TPS (with a realistic environment)
-  run-forge-pfn-const-tps-realistic-env:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-changing-working-quorum-test-high-load] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-with-realistic-env-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
-      FORGE_TEST_SUITE: pfn_const_tps_with_realistic_env
-      POST_TO_SLACK: true
-      SEND_RESULTS_TO_TRUNK: true
-
-
-  # longest test for last, to get useful signal from short tests first
-
-  run-forge-realistic-env-max-load-long:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps-realistic-env] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-realistic-env-max-load-long-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
-      FORGE_TEST_SUITE: realistic_env_max_load_large
+      IMAGE_TAG: ${{ ((matrix.FORGE_TEST_SUITE == 'compat' && needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST) || needs.determine-test-metadata.outputs.IMAGE_TAG) }}
+      FORGE_NAMESPACE: forge-${{ matrix.TEST_NAME }}-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
+      FORGE_TEST_SUITE: ${{ matrix.FORGE_TEST_SUITE }}
+      FORGE_RUNNER_DURATION_SECS: ${{ matrix.FORGE_RUNNER_DURATION_SECS }}
+      FORGE_ENABLE_PERFORMANCE: ${{ matrix.FORGE_ENABLE_PERFORMANCE || false }}
+      FORGE_ENABLE_FAILPOINTS: ${{ matrix.FORGE_ENABLE_FAILPOINTS || false }}
       POST_TO_SLACK: true
       SEND_RESULTS_TO_TRUNK: true
