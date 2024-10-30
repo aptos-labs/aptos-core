@@ -43,7 +43,7 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{
         authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload, Script,
-        SignedTransaction, TransactionArgument, TransactionPayload, TransactionStatus,
+        SignedTransaction, TransactionArgument, TransactionPayloadWrapper, TransactionStatus,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -1775,7 +1775,7 @@ impl TransactionOptions {
     /// Submit a transaction
     pub async fn submit_transaction(
         &self,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
         let (sender_public_key, sender_address) = self.get_public_key_and_address()?;
@@ -1943,7 +1943,7 @@ impl TransactionOptions {
     /// Simulates a transaction locally, using the debugger to fetch required data from remote.
     async fn simulate_using_debugger<F>(
         &self,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
         execute: F,
     ) -> CliTypedResult<TransactionSummary>
     where
@@ -2021,7 +2021,7 @@ impl TransactionOptions {
     /// Simulates a transaction locally.
     pub async fn simulate_locally(
         &self,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Simulating transaction locally...");
@@ -2035,7 +2035,7 @@ impl TransactionOptions {
     /// the accuracy of the measurement results.
     pub async fn benchmark_locally(
         &self,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Benchmarking transaction locally...");
@@ -2050,7 +2050,7 @@ impl TransactionOptions {
     /// Simulates the transaction locally with the gas profiler enabled.
     pub async fn profile_gas(
         &self,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Simulating transaction locally using the gas profiler...");
@@ -2335,9 +2335,12 @@ impl ScriptFunctionArguments {
         }
     }
 
-    pub fn create_script_payload(self, bytecode: Vec<u8>) -> CliTypedResult<TransactionPayload> {
+    pub fn create_script_payload(
+        self,
+        bytecode: Vec<u8>,
+    ) -> CliTypedResult<TransactionPayloadWrapper> {
         let script_function_args = self.check_input_style()?;
-        Ok(TransactionPayload::Script(Script::new(
+        Ok(TransactionPayloadWrapper::Script(Script::new(
             bytecode,
             script_function_args.type_arg_vec.try_into()?,
             script_function_args.arg_vec.try_into()?,

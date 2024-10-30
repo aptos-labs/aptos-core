@@ -20,14 +20,14 @@ use aptos_types::{
     keyless::AnyKeylessPublicKey,
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::{AnyPublicKey, AuthenticationKey},
-        EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
+        authenticator::{AnyPublicKey, AuthenticationKey}, EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayloadInner, TransactionPayloadWrapper
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType,
 };
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use move_core_types::move_resource::MoveStructType;
+use rand::Rng;
 
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
@@ -228,7 +228,7 @@ pub struct TransactionBuilder {
     pub secondary_signers: Vec<Account>,
     pub fee_payer: Option<Account>,
     pub sequence_number: Option<u64>,
-    pub program: Option<TransactionPayload>,
+    pub program: Option<TransactionPayloadWrapper>,
     pub max_gas_amount: Option<u64>,
     pub gas_unit_price: Option<u64>,
     pub chain_id: Option<ChainId>,
@@ -270,18 +270,18 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn payload(mut self, payload: TransactionPayload) -> Self {
+    pub fn payload(mut self, payload: TransactionPayloadWrapper) -> Self {
         self.program = Some(payload);
         self
     }
 
     pub fn script(mut self, s: Script) -> Self {
-        self.program = Some(TransactionPayload::Script(s));
+        self.program = Some(TransactionPayloadWrapper::Script(s));
         self
     }
 
     pub fn entry_function(mut self, f: EntryFunction) -> Self {
-        self.program = Some(TransactionPayload::EntryFunction(f));
+        self.program = Some(TransactionPayloadWrapper::EntryFunction(f));
         self
     }
 
@@ -297,6 +297,40 @@ impl TransactionBuilder {
 
     pub fn ttl(mut self, ttl: u64) -> Self {
         self.ttl = Some(ttl);
+        self
+    }
+
+    // TODO: Primarily used for running the tests with both payload v1 and v2 formats.
+    // After orderless transactions is fully released, clean this up.
+    pub fn upgrade_payload(mut self, use_payload_v2_format: bool, add_nonce: bool) -> Self {
+        use aptos_types::transaction::TransactionExtraConfig;
+
+        if let Some(program) = &self.program {
+            if use_payload_v2_format {
+                let executable = program.executable();
+                let mut extra_config = program.extra_config();
+                if add_nonce {
+                    extra_config = match extra_config {
+                        TransactionExtraConfig::V1 {
+                            multisig_address,
+                            replay_protection_nonce,
+                        } => TransactionExtraConfig::V1 {
+                            multisig_address,
+                            replay_protection_nonce: replay_protection_nonce.or_else(|| {
+                                let mut rng = rand::thread_rng();
+                                Some(rng.gen())
+                            })
+                        }
+                    }
+                }
+                self.program = Some(TransactionPayloadWrapper::Payload(
+                    TransactionPayloadInner::V1 { 
+                        executable,
+                        extra_config,
+                    }
+                ));
+            }
+        }
         self
     }
 

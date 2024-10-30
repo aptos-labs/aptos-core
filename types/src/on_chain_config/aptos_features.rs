@@ -120,6 +120,8 @@ pub enum FeatureFlag {
     ACCOUNT_ABSTRACTION = 85,
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
+    TRANSACTION_PAYLOAD_V2 = 87,
+    ORDERLESS_TRANSACTIONS = 88,
 }
 
 impl FeatureFlag {
@@ -205,6 +207,9 @@ impl FeatureFlag {
             FeatureFlag::PERMISSIONED_SIGNER,
             // FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
+            // TODO: Remove these from deafult features before landing the PR.
+            FeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::ORDERLESS_TRANSACTIONS,
         ]
     }
 }
@@ -363,6 +368,14 @@ impl Features {
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
+    }
+
+    pub fn is_transaction_payload_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_PAYLOAD_V2)
+    }
+
+    pub fn is_orderless_txns_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ORDERLESS_TRANSACTIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

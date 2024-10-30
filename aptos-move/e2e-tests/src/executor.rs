@@ -47,7 +47,7 @@ use aptos_types::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
         BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        TransactionPayloadWrapper, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -835,18 +835,24 @@ impl FakeExecutor {
             &log_context,
             |gas_meter| {
                 let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                    TransactionPayloadWrapper::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayloadWrapper::EntryFunction(entry_func) => {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
+                    },
+                    TransactionPayloadWrapper::Multisig(..) => unimplemented!("not supported yet"),
 
                     // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
+                    TransactionPayloadWrapper::ModuleBundle(..) => {
                         unreachable!("Module bundle payload has been removed")
+                    },
+
+                    TransactionPayloadWrapper::Payload(_) => {
+                        unimplemented!("Nested transaction payload is not yet supported")
                     },
                 };
                 gas_profiler

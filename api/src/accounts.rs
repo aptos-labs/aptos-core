@@ -16,7 +16,7 @@ use crate::{
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
+    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64, HexEncodedBytes,
 };
 use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
 use aptos_types::{
@@ -262,29 +262,148 @@ impl Account {
     /// * JSON: Return a JSON encoded version of [`AccountData`]
     /// * BCS: Return a BCS encoded version of [`AccountData`]
     pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
-        // Retrieve the Account resource and convert it accordingly
-        let state_value = self.get_account_resource()?;
-
-        // Convert the AccountResource into the summary object AccountData
-        let account_resource: AccountResource = bcs::from_bytes(&state_value)
-            .context("Internal error deserializing response from DB")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
+        match accept_type {
+            AcceptType::Json => {
+                // Retrieve the Account resource and convert it accordingly
+                let account_data = if let Ok(state_value) = self.get_account_resource() {
+                    // Convert the AccountResource into the summary object AccountData
+                    let account_resource: AccountResource = bcs::from_bytes(&state_value)
+                        .context("Internal error deserializing response from DB")
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?;
+                    account_resource.into()
+                } else {
+                    AccountData {
+                        sequence_number: aptos_api_types::U64(0),
+                        // Question: What's the right authentication key to return here?
+                        authentication_key: HexEncodedBytes::from(Vec::new()),
+                        state_exists: false,
+                    }
+                };
+                BasicResponse::try_from_json((
+                    account_data,
                     &self.latest_ledger_info,
-                )
-            })?;
-        let account_data: AccountData = account_resource.into();
+                    BasicResponseStatus::Ok,
+                ))
+            },
+            AcceptType::Bcs => {
+                // Retrieve the Account resource and convert it accordingly
+                let state_value = self.get_account_resource()?;
+                BasicResponse::try_from_encoded((
+                    state_value,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            },
+        }
+    }
 
+    pub fn balance(
+        &self,
+        asset_type: AssetType,
+        accept_type: &AcceptType,
+    ) -> BasicResultWith404<u64> {
+        let (fa_metadata_address, mut balance) = match asset_type {
+            AssetType::Coin(move_struct_tag) => {
+                let coin_store_type_tag =
+                    StructTag::from_str(&format!("0x1::coin::CoinStore<{}>", move_struct_tag))
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?;
+                // query coin balance
+                let state_value = self.context.get_state_value_poem(
+                    &StateKey::resource(&self.address.into(), &coin_store_type_tag).map_err(
+                        |err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        },
+                    )?,
+                    self.ledger_version,
+                    &self.latest_ledger_info,
+                )?;
+                let coin_balance = match state_value {
+                    None => 0,
+                    Some(bytes) => bcs::from_bytes::<CoinStoreResourceUntyped>(&bytes)
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?
+                        .coin(),
+                };
+                (
+                    get_paired_fa_metadata_address(&move_struct_tag),
+                    coin_balance,
+                )
+            },
+            AssetType::FungibleAsset(fa_metadata_adddress) => (fa_metadata_adddress.into(), 0),
+        };
+        let primary_fungible_store_address =
+            get_paired_fa_primary_store_address(self.address.into(), fa_metadata_address);
+        if let Some(data_blob) = self.context.get_state_value_poem(
+            &StateKey::resource_group(
+                &primary_fungible_store_address,
+                &ObjectGroupResource::struct_tag(),
+            ),
+            self.ledger_version,
+            &self.latest_ledger_info,
+        )? {
+            if let Ok(object_group) = bcs::from_bytes::<ObjectGroupResource>(&data_blob) {
+                if let Some(fa_store) = object_group.group.get(&FungibleStoreResource::struct_tag())
+                {
+                    let fa_store_resource = bcs::from_bytes::<FungibleStoreResource>(fa_store)
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?;
+                    if fa_store_resource.balance != 0 {
+                        balance += fa_store_resource.balance();
+                    } else if let Some(concurrent_fa_balance) = object_group
+                        .group
+                        .get(&ConcurrentFungibleBalanceResource::struct_tag())
+                    {
+                        // query potential concurrent fa balance
+                        let concurrent_fa_balance_resource =
+                            bcs::from_bytes::<ConcurrentFungibleBalanceResource>(
+                                concurrent_fa_balance,
+                            )
+                            .map_err(|err| {
+                                BasicErrorWith404::internal_with_code(
+                                    err,
+                                    AptosErrorCode::InternalError,
+                                    &self.latest_ledger_info,
+                                )
+                            })?;
+                        balance += concurrent_fa_balance_resource.balance();
+                    }
+                }
+            }
+        }
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
-                account_data,
+                balance,
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
             AcceptType::Bcs => BasicResponse::try_from_encoded((
-                state_value,
+                bcs::to_bytes(&balance).unwrap(),
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
