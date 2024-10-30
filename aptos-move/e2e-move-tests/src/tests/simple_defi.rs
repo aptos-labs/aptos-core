@@ -1,17 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use rstest::rstest;
 
 #[derive(Serialize, Deserialize)]
 struct ModuleData {
@@ -26,12 +28,25 @@ const CHLOE_COIN_STRUCT_STRING: &str =
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";
 
-#[test]
-fn exchange_e2e_test() {
-    let mut h = MoveHarness::new();
+#[rstest(origin_stateless_account, test_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn exchange_e2e_test(origin_stateless_account: bool, test_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // create an origin account and create a resource address from it
-    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if origin_stateless_account { None } else { Some(0) });
     let resource_address = create_resource_address(*origin_account.address(), vec![].as_slice());
 
     let mut build_options = BuildOptions::default();
@@ -74,7 +89,7 @@ fn exchange_e2e_test() {
     );
 
     // verify that exchange_to() and exchange_from() are working properly
-    let test_user_account = h.new_account_with_balance_and_sequence_number(20, 10);
+    let test_user_account = h.new_account_with_balance_and_sequence_number(20, if test_stateless_account { None } else { Some(0) });
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
@@ -83,7 +98,7 @@ fn exchange_e2e_test() {
     );
 
     // swap from 5 aptos coins to 5 chloe's coins
-    run_exchange_function(&mut h, &test_user_account, EXCHANGE_TO_FUNCTION, 5, 10);
+    run_exchange_function(&mut h, &test_user_account, EXCHANGE_TO_FUNCTION, 5, 0);
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
@@ -100,7 +115,7 @@ fn exchange_e2e_test() {
     assert_coin_balance(&mut h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
 
     // swap to 3 aptos coins from 3 chloe's aptos coins
-    run_exchange_function(&mut h, &test_user_account, EXCHANGE_FROM_FUNCTION, 3, 11);
+    run_exchange_function(&mut h, &test_user_account, EXCHANGE_FROM_FUNCTION, 3, 1);
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
@@ -146,7 +161,7 @@ fn run_exchange_function(
     amount: u64,
     sequence_number: u64,
 ) {
-    let exchange_payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let exchange_payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             create_resource_address(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),

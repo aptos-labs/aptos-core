@@ -14,12 +14,13 @@ use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
     test_helpers::transaction_test_helpers,
-    transaction::{Script, TransactionPayload},
+    transaction::{Script, TransactionPayloadWrapper},
     vm_status::StatusCode,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use move_core_types::{account_address::AccountAddress, gas_algebra::GasQuantity};
 use rand::SeedableRng;
+use rstest::rstest;
 
 const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
@@ -77,8 +78,12 @@ impl std::ops::Deref for TestValidator {
 // * Testing for invalid genesis write sets -- this is tested in
 //   move-language/move/language/e2e-testsuite/src/tests/genesis.rs
 
-#[test]
-fn test_validate_transaction() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_transaction(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -89,13 +94,19 @@ fn test_validate_transaction() {
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
 }
 
-#[test]
-fn test_validate_invalid_signature() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_invalid_signature(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let mut rng = ::rand::rngs::StdRng::from_seed([1u8; 32]);
@@ -110,13 +121,19 @@ fn test_validate_invalid_signature() {
         &other_private_key,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         program,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::INVALID_SIGNATURE);
 }
 
-#[test]
-fn test_validate_known_script_too_large_args() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_known_script_too_large_args(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -125,7 +142,7 @@ fn test_validate_known_script_too_large_args() {
         1,
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(Script::new(
+        Some(TransactionPayloadWrapper::Script(Script::new(
             vec![42; MAX_TRANSACTION_SIZE_IN_BYTES as usize],
             vec![],
             vec![],
@@ -137,6 +154,8 @@ fn test_validate_known_script_too_large_args() {
         0,
         0, /* max gas price */
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
@@ -145,8 +164,12 @@ fn test_validate_known_script_too_large_args() {
     );
 }
 
-#[test]
-fn test_validate_max_gas_units_above_max() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_max_gas_units_above_max(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -159,6 +182,8 @@ fn test_validate_max_gas_units_above_max() {
         0,
         0,              /* max gas price */
         Some(u64::MAX), // Max gas units
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
@@ -167,8 +192,12 @@ fn test_validate_max_gas_units_above_max() {
     );
 }
 
-#[test]
-fn test_validate_max_gas_units_below_min() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_max_gas_units_below_min(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -186,7 +215,7 @@ fn test_validate_max_gas_units_below_min() {
         1,
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(Script::new(
+        Some(TransactionPayloadWrapper::Script(Script::new(
             vec![42; u64::from(txn_bytes) as usize],
             vec![],
             vec![],
@@ -194,6 +223,8 @@ fn test_validate_max_gas_units_below_min() {
         0,
         0,       /* max gas price */
         Some(0), // Max gas units
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
@@ -228,8 +259,12 @@ fn test_get_account_sequence_number() {
     );
 }
 
-#[test]
-fn test_validate_max_gas_price_above_bounds() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_max_gas_price_above_bounds(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -242,6 +277,8 @@ fn test_validate_max_gas_price_above_bounds() {
         0,
         u64::MAX, /* max gas price */
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
@@ -253,8 +290,12 @@ fn test_validate_max_gas_price_above_bounds() {
 // NB: This test is designed to fail if/when we bump the minimum gas price to be non-zero. You will
 // then need to update this price here in order to make the test pass -- uncomment the commented
 // out assertion and remove the current failing assertion in this case.
-#[test]
-fn test_validate_max_gas_price_below_bounds() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_max_gas_price_below_bounds(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -269,6 +310,8 @@ fn test_validate_max_gas_price_below_bounds() {
         40000,
         0, /* max gas price */
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
@@ -278,8 +321,12 @@ fn test_validate_max_gas_price_below_bounds() {
     //);
 }
 
-#[test]
-fn test_validate_invalid_auth_key() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_invalid_auth_key(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let mut rng = ::rand::rngs::StdRng::from_seed([1u8; 32]);
@@ -294,13 +341,19 @@ fn test_validate_invalid_auth_key() {
         &other_private_key,
         other_private_key.public_key(),
         Some(program),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::INVALID_AUTH_KEY);
 }
 
-#[test]
-fn test_validate_account_doesnt_exist() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_account_doesnt_exist(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -315,16 +368,23 @@ fn test_validate_account_doesnt_exist() {
         u64::MAX,
         1, /* max gas price */
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
+    // To accommodate stateless account, the prologue will now output SEQUENCE_NUMBER_TOO_NEW status code
+    // instead of SENDING_ACCOUNT_DOES_NOT_EXIST.
+    // When a transaction validation fails with SEQUENCE_NUMBER_TOO_NEW, the validation result is still
+    // set to `success` so that mempool will continue to forward the transaction.
     let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(
-        ret.status().unwrap(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
-    );
+    assert_eq!(ret.status(), None);
 }
 
-#[test]
-fn test_validate_sequence_number_too_new() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_sequence_number_too_new(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -335,13 +395,19 @@ fn test_validate_sequence_number_too_new() {
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
 }
 
-#[test]
-fn test_validate_invalid_arguments() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_invalid_arguments(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -352,14 +418,20 @@ fn test_validate_invalid_arguments() {
         &aptos_vm_genesis::GENESIS_KEYPAIR.0,
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let _ret = vm_validator.validate_transaction(transaction).unwrap();
     // TODO: Script arguement types are now checked at execution time. Is this an idea behavior?
     // assert_eq!(ret.status().unwrap().major_status, StatusCode::TYPE_MISMATCH);
 }
 
-#[test]
-fn test_validate_expiration_time() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_expiration_time(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -372,13 +444,19 @@ fn test_validate_expiration_time() {
         0,    /* expiration_time */
         0,    /* gas_unit_price */
         None, /* max_gas_amount */
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::TRANSACTION_EXPIRED);
 }
 
-#[test]
-fn test_validate_chain_id() {
+#[rstest(use_txn_payload_v2_format, use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_validate_chain_id(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
@@ -389,6 +467,8 @@ fn test_validate_chain_id() {
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         // all tests use ChainId::test() for chain_id, so pick something different
         ChainId::new(ChainId::test().id() + 1),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::BAD_CHAIN_ID);

@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-db-indexer-schemas = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }

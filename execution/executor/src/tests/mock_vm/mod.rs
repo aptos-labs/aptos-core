@@ -24,8 +24,8 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionAuxiliaryData, TransactionOutput, TransactionPayload,
-        TransactionStatus, WriteSetPayload,
+        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable, TransactionOutput,
+        TransactionPayloadInner, TransactionPayloadWrapper, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -384,41 +384,52 @@ pub fn encode_reconfiguration_transaction() -> Transaction {
 
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
     let sender = txn.sender();
+    let script_to_mock_vm_txn = |script: &Script| {
+        assert!(script.code().is_empty(), "Code should be empty.");
+        match script.args().len() {
+            1 => match script.args()[0] {
+                TransactionArgument::U64(amount) => MockVMTransaction::Mint { sender, amount },
+                _ => unimplemented!("Only one integer argument is allowed for mint transactions."),
+            },
+            2 => match (&script.args()[0], &script.args()[1]) {
+                (TransactionArgument::Address(recipient), TransactionArgument::U64(amount)) => {
+                    MockVMTransaction::Payment {
+                        sender,
+                        recipient: *recipient,
+                        amount: *amount,
+                    }
+                },
+                _ => unimplemented!(
+                    "The first argument for payment transaction must be recipient address \
+                        and the second argument must be amount."
+                ),
+            },
+            _ => unimplemented!("Transaction must have one or two arguments."),
+        }
+    };
     match txn.payload() {
-        TransactionPayload::Script(script) => {
-            assert!(script.code().is_empty(), "Code should be empty.");
-            match script.args().len() {
-                1 => match script.args()[0] {
-                    TransactionArgument::U64(amount) => MockVMTransaction::Mint { sender, amount },
-                    _ => unimplemented!(
-                        "Only one integer argument is allowed for mint transactions."
-                    ),
-                },
-                2 => match (&script.args()[0], &script.args()[1]) {
-                    (TransactionArgument::Address(recipient), TransactionArgument::U64(amount)) => {
-                        MockVMTransaction::Payment {
-                            sender,
-                            recipient: *recipient,
-                            amount: *amount,
-                        }
-                    },
-                    _ => unimplemented!(
-                        "The first argument for payment transaction must be recipient address \
-                         and the second argument must be amount."
-                    ),
-                },
-                _ => unimplemented!("Transaction must have one or two arguments."),
-            }
-        },
-        TransactionPayload::EntryFunction(_) => {
+        TransactionPayloadWrapper::Script(script) => script_to_mock_vm_txn(script),
+        TransactionPayloadWrapper::EntryFunction(_) => {
             // TODO: we need to migrate Script to EntryFunction later
             unimplemented!("MockVM does not support entry function transaction payload.")
         },
-        TransactionPayload::Multisig(_) => {
+        TransactionPayloadWrapper::Multisig(_) => {
             unimplemented!("MockVM does not support multisig transaction payload.")
         },
+        TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+            executable,
+            extra_config: _,
+        }) => match executable {
+            TransactionExecutable::Script(script) => script_to_mock_vm_txn(script),
+            TransactionExecutable::EntryFunction(_) => {
+                unimplemented!("MockVM does not support entry function transaction payload.")
+            },
+            TransactionExecutable::Empty => {
+                unimplemented!("MockVM does not support empty transaction payload.")
+            },
+        },
         // Deprecated.
-        TransactionPayload::ModuleBundle(_) => {
+        TransactionPayloadWrapper::ModuleBundle(_) => {
             unreachable!("Module bundle payload has been removed")
         },
     }

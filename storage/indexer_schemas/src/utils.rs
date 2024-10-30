@@ -1,11 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::transaction_by_account::TransactionByAccountSchema;
-use aptos_schemadb::iterator::SchemaIterator;
+use crate::schema::{
+    ordered_transaction_by_account::OrderedTransactionByAccountSchema,
+    transaction_summaries_by_account::TransactionSummariesByAccountSchema,
+};
+use aptos_schemadb::iterator::{ScanDirection, SchemaIterator};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
-    account_address::AccountAddress, indexer::indexer_db_reader::Order, transaction::Version,
+    account_address::AccountAddress,
+    indexer::indexer_db_reader::{IndexedTransactionSummary, Order},
+    transaction::Version,
 };
 
 pub fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
@@ -41,9 +46,9 @@ pub fn get_first_seq_num_and_limit(order: Order, cursor: u64, limit: u64) -> Res
     })
 }
 
-// This is a replicate of the AccountTransactionVersionIter from storage/aptosdb crate.
-pub struct AccountTransactionVersionIter<'a> {
-    inner: SchemaIterator<'a, TransactionByAccountSchema>,
+// This is a replicate of the AccountOrderedTransactionsIter from storage/aptosdb crate.
+pub struct AccountOrderedTransactionsIter<'a> {
+    inner: SchemaIterator<'a, OrderedTransactionByAccountSchema>,
     address: AccountAddress,
     expected_next_seq_num: Option<u64>,
     end_seq_num: u64,
@@ -51,9 +56,9 @@ pub struct AccountTransactionVersionIter<'a> {
     ledger_version: Version,
 }
 
-impl<'a> AccountTransactionVersionIter<'a> {
+impl<'a> AccountOrderedTransactionsIter<'a> {
     pub fn new(
-        inner: SchemaIterator<'a, TransactionByAccountSchema>,
+        inner: SchemaIterator<'a, OrderedTransactionByAccountSchema>,
         address: AccountAddress,
         end_seq_num: u64,
         ledger_version: Version,
@@ -69,7 +74,7 @@ impl<'a> AccountTransactionVersionIter<'a> {
     }
 }
 
-impl<'a> AccountTransactionVersionIter<'a> {
+impl<'a> AccountOrderedTransactionsIter<'a> {
     fn next_impl(&mut self) -> Result<Option<(u64, Version)>> {
         Ok(match self.inner.next().transpose()? {
             Some(((address, seq_num), version)) => {
@@ -117,8 +122,117 @@ impl<'a> AccountTransactionVersionIter<'a> {
     }
 }
 
-impl<'a> Iterator for AccountTransactionVersionIter<'a> {
+impl<'a> Iterator for AccountOrderedTransactionsIter<'a> {
     type Item = Result<(u64, Version)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_impl().transpose()
+    }
+}
+
+pub struct AccountTransactionSummariesIter<'a> {
+    inner: SchemaIterator<'a, TransactionSummariesByAccountSchema>,
+    address: AccountAddress,
+    start_version: Option<Version>,
+    end_version: Option<Version>,
+    limit: u64,
+    direction: ScanDirection,
+    prev_version: Option<Version>,
+    ledger_version: Version,
+    count: u64,
+}
+
+impl<'a> AccountTransactionSummariesIter<'a> {
+    pub fn new(
+        inner: SchemaIterator<'a, TransactionSummariesByAccountSchema>,
+        address: AccountAddress,
+        start_version: Option<Version>,
+        end_version: Option<Version>,
+        limit: u64,
+        direction: ScanDirection,
+        ledger_version: Version,
+    ) -> Self {
+        Self {
+            inner,
+            address,
+            start_version,
+            end_version,
+            limit,
+            direction,
+            ledger_version,
+            prev_version: None,
+            count: 0,
+        }
+    }
+}
+
+impl<'a> AccountTransactionSummariesIter<'a> {
+    fn next_impl(&mut self) -> Result<Option<(Version, IndexedTransactionSummary)>> {
+        Ok(match self.inner.next().transpose()? {
+            Some(((address, version), txn_summary)) => {
+                // No more transactions sent by this account.
+                if address != self.address {
+                    return Ok(None);
+                }
+
+                // If already iterated over `limit` transactions, return None.
+                if self.count > self.limit {
+                    return Ok(None);
+                }
+
+                // This case ideally shouldn't occur if the iterator is initiated properly.
+                if (self.direction == ScanDirection::Backward
+                    && version > self.end_version.unwrap())
+                    || (self.direction == ScanDirection::Forward
+                        && version < self.start_version.unwrap())
+                {
+                    return Ok(None);
+                }
+
+                ensure!(
+                    version == txn_summary.version,
+                    "DB corruption: version mismatch: version in key: {}, version in txn summary: {}",
+                    version,
+                    txn_summary.version,
+                );
+
+                // Ensure version_{i+1} > version_{i}
+                if let Some(prev_version) = self.prev_version {
+                    if self.direction == ScanDirection::Forward {
+                        ensure!(
+                            prev_version < version,
+                            "DB corruption: account transaction versions are not strictly increasing when scanning forward: \
+                             previous version: {}, current version: {}",
+                            prev_version,
+                            version,
+                        );
+                    } else {
+                        ensure!(
+                            prev_version > version,
+                            "DB corruption: account transaction versions are not strictly decreasing when scanning backward: \
+                             previous version: {}, current version: {}",
+                            prev_version,
+                            version,
+                        );
+                    }
+                }
+
+                // No more transactions (in this view of the ledger).
+                if version > self.ledger_version {
+                    return Ok(None);
+                }
+
+                self.prev_version = Some(version);
+                self.count += 1;
+                Some((version, txn_summary))
+            },
+            None => None,
+        })
+    }
+}
+
+impl<'a> Iterator for AccountTransactionSummariesIter<'a> {
+    type Item = Result<(Version, IndexedTransactionSummary)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_impl().transpose()

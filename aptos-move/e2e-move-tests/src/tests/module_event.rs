@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use rstest::rstest;
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct Field {
@@ -20,17 +22,23 @@ struct MyEvent {
     bytes: Vec<u64>,
 }
 
-#[test]
-fn test_module_event_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-
-    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_module_event_enabled(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
-        .insert("event".to_string(), addr);
+        .insert("event".to_string(), *account.address());
 
     let result = h.publish_package_with_options(
         &account,
@@ -65,10 +73,18 @@ fn test_module_event_enabled() {
     assert_eq!(count, 10);
 }
 
-#[test]
-fn verify_module_event_upgrades() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_module_event_upgrades(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Initial code
     let source = r#"

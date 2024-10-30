@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
+use rstest::rstest;
 
 #[derive(Deserialize, Serialize)]
 struct ChainIdStore {
@@ -51,20 +53,28 @@ fn call_get_chain_id_from_native_txn_context(harness: &mut MoveHarness, account:
     chain_id_store.id
 }
 
-fn setup(harness: &mut MoveHarness) -> Account {
+fn setup(harness: &mut MoveHarness, stateless_account: bool) -> Account {
     let path = common::test_dir_path("chain_id.data/pack");
 
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = harness.new_account_at(AccountAddress::ONE, seq_num);
 
     assert_success!(harness.publish_package_cache_building(&account, &path));
 
     account
 }
 
-#[test]
-fn test_chain_id_from_aptos_framework() {
-    let mut harness = MoveHarness::new();
-    let account = setup(&mut harness);
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_chain_id_from_aptos_framework(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = setup(&mut harness, stateless_account);
 
     assert_eq!(
         call_get_chain_id_from_aptos_framework(&mut harness, &account),
@@ -72,10 +82,17 @@ fn test_chain_id_from_aptos_framework() {
     );
 }
 
-#[test]
-fn test_chain_id_from_type_info() {
-    let mut harness = MoveHarness::new();
-    let account = setup(&mut harness);
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_chain_id_from_type_info(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = setup(&mut harness, stateless_account);
 
     assert_eq!(
         call_get_chain_id_from_native_txn_context(&mut harness, &account),

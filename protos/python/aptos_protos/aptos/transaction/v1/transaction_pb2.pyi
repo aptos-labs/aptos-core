@@ -760,12 +760,15 @@ class WriteTableItem(_message.Message):
     ) -> None: ...
 
 class TransactionPayload(_message.Message):
+    # Question: Not yet sure that this is the right way to add the extra config. Check again.
     __slots__ = [
         "type",
         "entry_function_payload",
         "script_payload",
         "write_set_payload",
         "multisig_payload",
+        "multisig_address",
+        "replay_protection_nonce",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):

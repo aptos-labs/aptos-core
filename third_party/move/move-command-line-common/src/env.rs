@@ -51,12 +51,22 @@ pub fn get_move_compiler_v1_from_env() -> bool {
 /// testing process.  This is useful for debugging whether V2 is being invoked properly.
 const MOVE_COMPILER_BLOCK_V1_ENV_VAR: &str = "MOVE_COMPILER_BLOCK_V1";
 const MVC_BLOCK_V1_ENV_VAR: &str = "MVC_BLOCK_V1";
+const TXN_PAYLOAD_V2_FORMAT_ENV_VAR: &str = "TXN_PAYLOAD_V2_FORMAT";
+const USE_ORDERLESS_TXNS_ENV_VAR: &str = "USE_ORDERLESS_TXNS";
 
 // Make this debugging option available as a CLI flag
 pub const MOVE_COMPILER_BLOCK_V1_FLAG: &str = "block-compiler-v1";
 
 pub fn get_move_compiler_block_v1_from_env() -> bool {
     read_bool_env_var(MOVE_COMPILER_BLOCK_V1_ENV_VAR) || read_bool_env_var(MVC_BLOCK_V1_ENV_VAR)
+}
+
+pub fn get_txn_payload_v2_format_from_env() -> bool {
+    read_bool_env_var(TXN_PAYLOAD_V2_FORMAT_ENV_VAR)
+}
+
+pub fn get_use_orderless_transactions_from_env() -> bool {
+    read_bool_env_var(USE_ORDERLESS_TXNS_ENV_VAR)
 }
 
 pub fn read_env_var(v: &str) -> String {

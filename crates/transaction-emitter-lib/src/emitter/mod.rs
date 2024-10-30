@@ -20,7 +20,7 @@ use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_logger::{error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -30,7 +30,10 @@ use aptos_sdk::{
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
 };
-use aptos_types::account_config::aptos_test_root_address;
+use aptos_types::{
+    account_config::aptos_test_root_address, indexer::indexer_db_reader::IndexedTransactionSummary,
+    transaction::Version,
+};
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
 use rand::{
@@ -992,108 +995,17 @@ fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
-/// This function waits for the submitted transactions to be committed, up to
-/// a wait_timeout (counted from the start_time passed in, not from the function call).
-/// It returns number of transactions that expired without being committed,
-/// and sum of completion timestamps for those that have.
-///
-/// This function updates sequence_number for the account to match what
-/// we were able to fetch last.
-async fn wait_for_accounts_sequence(
-    start_time: Instant,
-    client: &RestClient,
-    account_seqs: &HashMap<AccountAddress, (u64, u64)>,
-    txn_expiration_ts_secs: u64,
-    sleep_between_cycles: Duration,
-) -> (HashMap<AccountAddress, u64>, u128) {
-    let mut pending_addresses: HashSet<_> = account_seqs.keys().copied().collect();
-    let mut latest_fetched_counts = HashMap::new();
-
-    let mut sum_of_completion_timestamps_millis = 0u128;
-    loop {
-        match query_sequence_numbers(client, pending_addresses.iter()).await {
-            Ok((sequence_numbers, ledger_timestamp_secs)) => {
-                let millis_elapsed = start_time.elapsed().as_millis();
-                for (address, sequence_number) in sequence_numbers {
-                    let (start_seq_num, end_seq_num) = account_seqs.get(&address).unwrap();
-
-                    let prev_sequence_number = latest_fetched_counts
-                        .insert(address, sequence_number)
-                        .unwrap_or(*start_seq_num);
-                    // fetched sequence number that is older than one we already fetched.
-                    // client connection probably moved to a different server.
-                    if prev_sequence_number <= sequence_number {
-                        sum_of_completion_timestamps_millis +=
-                            millis_elapsed * (sequence_number - prev_sequence_number) as u128;
-
-                        if *end_seq_num == sequence_number {
-                            pending_addresses.remove(&address);
-                        }
-                    }
-                }
-
-                if pending_addresses.is_empty() {
-                    break;
-                }
-
-                if ledger_timestamp_secs > txn_expiration_ts_secs {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(60)),
-                        warn!(
-                            "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}",
-                            client.path_prefix_string(),
-                            ledger_timestamp_secs,
-                            txn_expiration_ts_secs,
-                            pending_addresses,
-                        )
-                    );
-                    break;
-                }
-            },
-            Err(e) => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(60)),
-                    warn!(
-                        "[{}] Failed to query ledger info on accounts {:?}: {:?}",
-                        client.path_prefix_string(),
-                        pending_addresses,
-                        e
-                    )
-                );
-            },
-        }
-
-        if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
-            sample!(
-                SampleRate::Duration(Duration::from_secs(15)),
-                error!(
-                    "[{}] Client cannot catch up to needed timestamp ({}), after additional 240s, aborting",
-                    client.path_prefix_string(),
-                    txn_expiration_ts_secs,
-                )
-            );
-            break;
-        }
-
-        time::sleep(sleep_between_cycles).await;
-    }
-
-    (latest_fetched_counts, sum_of_completion_timestamps_millis)
-}
-
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
-    Ok(query_sequence_numbers(client, [address].iter()).await?.0[0].1)
+    Ok(query_sequence_numbers(client, vec![address]).await?.0[0].1)
 }
 
 // Return a pair of (list of sequence numbers, ledger timestamp)
-pub async fn query_sequence_numbers<'a, I>(
+pub async fn query_sequence_numbers(
     client: &RestClient,
-    addresses: I,
-) -> Result<(Vec<(AccountAddress, u64)>, u64)>
-where
-    I: Iterator<Item = &'a AccountAddress>,
-{
-    let futures = addresses.map(|address| {
+    addresses: Vec<AccountAddress>,
+) -> Result<(Vec<(AccountAddress, u64)>, u64)> {
+    let start = Instant::now();
+    let futures = addresses.iter().map(|address| {
         FETCH_ACCOUNT_RETRY_POLICY.retry(move || get_account_address_and_seq_num(client, *address))
     });
 
@@ -1103,6 +1015,7 @@ where
         .into_iter()
         .unzip();
 
+    info!("query_sequence_numbers took {:?}", start.elapsed());
     // return min for the timestamp, to make sure
     // all sequence numbers were <= to return values at that timestamp
     Ok((seq_nums, timestamps.into_iter().min().unwrap()))
@@ -1140,6 +1053,66 @@ pub async fn get_account_seq_num(
             }
             result?;
             unreachable!()
+        },
+    }
+}
+
+pub async fn query_txn_summaries(
+    client: &RestClient,
+    start_version_by_address: Vec<(AccountAddress, Version)>,
+) -> Result<(HashMap<AccountAddress, Vec<IndexedTransactionSummary>>, u64), RestError>
+// where
+//     I: Iterator<Item = (AccountAddress, Version)>,
+{
+    let start = Instant::now();
+    let futures = start_version_by_address
+        .iter()
+        .map(|(address, start_version)| {
+            FETCH_ACCOUNT_RETRY_POLICY
+                .retry(move || get_account_txn_summmaries(client, *address, *start_version))
+        });
+
+    let (account_txn_summaries, timestamps): (Vec<_>, Vec<_>) = try_join_all(futures)
+        .await
+        .map_err(|e| format_err!("Get account txn summaries failed: {:?}", e))?
+        .into_iter()
+        .unzip();
+    info!("query_txn_summaries took {:?}", start.elapsed());
+    Ok((
+        account_txn_summaries.into_iter().collect(),
+        timestamps.into_iter().min().unwrap(),
+    ))
+}
+
+async fn get_account_txn_summmaries(
+    client: &RestClient,
+    address: AccountAddress,
+    start_version: Version,
+) -> Result<((AccountAddress, Vec<IndexedTransactionSummary>), u64), RestError> {
+    let start = Instant::now();
+    let result = client
+        .get_account_transaction_summaries(
+            address,
+            Some(start_version),
+            None,
+            None,
+            None,
+            // TODO: make this configurable
+            Some(500),
+        )
+        .await;
+    match result {
+        Ok(resp) => {
+            let account_txn_summaries = resp.inner().clone();
+            info!("get_account_txn_summmaries took {:?}", start.elapsed());
+            Ok((
+                (address, account_txn_summaries),
+                Duration::from_micros(resp.state().timestamp_usecs).as_secs(),
+            ))
+        },
+        Err(e) => {
+            error!("Error in get_account_txn_summmaries: {:?}", e);
+            Err(e)
         },
     }
 }

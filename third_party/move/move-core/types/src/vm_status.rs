@@ -595,9 +595,10 @@ pub enum StatusCode {
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
     ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED = 41,
+    NONCE_ALREADY_USED = 42,
+    EMPTY_PAYLOAD_PROVIDED = 43,
+
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_7 = 42,
-    RESERVED_VALIDATION_ERROR_8 = 43,
     RESERVED_VALIDATION_ERROR_9 = 44,
 
     // When a code module/script is published it is verified. These are the

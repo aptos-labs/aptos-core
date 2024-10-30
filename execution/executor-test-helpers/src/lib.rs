@@ -17,7 +17,7 @@ use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     test_helpers::transaction_test_helpers::get_test_signed_txn,
-    transaction::{Transaction, TransactionPayload},
+    transaction::{Transaction, TransactionPayloadWrapper},
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
 };
@@ -72,7 +72,9 @@ pub fn get_test_signed_transaction(
     sequence_number: u64,
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    payload: Option<TransactionPayload>,
+    payload: Option<TransactionPayloadWrapper>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> Transaction {
     Transaction::UserTransaction(get_test_signed_txn(
         sender,
@@ -80,5 +82,7 @@ pub fn get_test_signed_transaction(
         &private_key,
         public_key,
         payload,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ))
 }

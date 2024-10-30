@@ -8,8 +8,8 @@ use crate::{
 use aptos::test::CliTestFramework;
 use aptos_consensus::QUORUM_STORE_DB_NAME;
 use aptos_forge::{
-    args::TransactionTypeArg, reconfig, wait_for_all_nodes_to_catchup, NodeExt, Swarm, SwarmExt,
-    TransactionType,
+    args::TransactionTypeArg, reconfig, wait_for_all_nodes_to_catchup, NodeExt,
+    ReplayProtectionType, Swarm, SwarmExt, TransactionType,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client;
@@ -42,6 +42,7 @@ async fn generate_traffic_and_assert_committed(
                 sender_use_account_pool: false,
                 non_conflicting: false,
                 use_fa_transfer: false,
+                replay_protection: ReplayProtectionType::SequenceNumber,
             },
             70,
         ),
@@ -50,6 +51,7 @@ async fn generate_traffic_and_assert_committed(
                 add_created_accounts_to_pool: true,
                 max_account_working_set: 1_000_000,
                 creation_balance: 1_000_000,
+                replay_protection: ReplayProtectionType::SequenceNumber,
             },
             20,
         ),

@@ -17,7 +17,7 @@ use aptos_rest_client::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{Multisig, MultisigTransactionPayload, TransactionPayload},
+    transaction::{Multisig, MultisigTransactionPayload, TransactionPayloadWrapper},
 };
 use async_trait::async_trait;
 use bcs::to_bytes;
@@ -304,7 +304,7 @@ impl CliCommand<TransactionSummary> for Execute {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(TransactionPayload::Multisig(Multisig {
+            .submit_transaction(TransactionPayloadWrapper::Multisig(Multisig {
                 multisig_address: self.multisig_account.multisig_address,
                 transaction_payload: None,
             }))
@@ -331,7 +331,7 @@ impl CliCommand<TransactionSummary> for ExecuteWithPayload {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         self.execute
             .txn_options
-            .submit_transaction(TransactionPayload::Multisig(Multisig {
+            .submit_transaction(TransactionPayloadWrapper::Multisig(Multisig {
                 multisig_address: self.execute.multisig_account.multisig_address,
                 transaction_payload: Some(self.entry_function_args.try_into()?),
             }))

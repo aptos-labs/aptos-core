@@ -9,7 +9,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayloadWrapper,
         TransactionStatus,
     },
     write_set::WriteSet,
@@ -177,13 +177,15 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // publish all packages
     for group in packages {
         let sender = *group[0].address();
-        let acc = vm.new_account_at(sender);
+        // TODO[Orderless]: Change this to support stateless accounts and orderless transaction
+        let acc = vm.new_account_at(sender, Some(0));
         publish_group(&mut vm, &acc, &group, 0)?;
     }
 
     let sender_acc = if true {
         // create sender pub/priv key. initialize and fund account
-        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), 0)
+        // TODO[Orderless]: Change this to support stateless accounts and orderless transactions
+        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), Some(0))
             .remove(0)
     } else {
         // only create sender pub/priv key. do not initialize
@@ -206,7 +208,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .gas_unit_price(100)
                 .max_gas_amount(1000)
                 .sequence_number(0)
-                .payload(TransactionPayload::Script(Script::new(
+                .payload(TransactionPayloadWrapper::Script(Script::new(
                     script_bytes,
                     type_args,
                     args.into_iter()
@@ -248,12 +250,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .gas_unit_price(100)
                 .max_gas_amount(1000)
                 .sequence_number(0)
-                .payload(TransactionPayload::EntryFunction(EntryFunction::new(
-                    module,
-                    function_name,
-                    type_args,
-                    args,
-                )))
+                .payload(TransactionPayloadWrapper::EntryFunction(
+                    EntryFunction::new(module, function_name, type_args, args),
+                ))
         },
     };
     let raw_tx = tx.raw();

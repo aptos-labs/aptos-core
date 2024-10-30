@@ -17,7 +17,7 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
     let path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_string_resource");
     let payload = TestContext::build_package(path, named_addresses);
-    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
     context.commit_block(&vec![txn]).await;
 
     context

@@ -211,7 +211,7 @@ async fn test_view_tuple() {
 
     let root_account = context.root_account().await;
     let module_txn =
-        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
 
     context.commit_block(&vec![module_txn]).await;
 
@@ -236,7 +236,7 @@ async fn test_view_aggregator() {
     let named_addresses = vec![("addr".to_string(), account.address())];
     let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_counter");
     let payload = TestContext::build_package(path, named_addresses);
-    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
     context.commit_block(&vec![txn]).await;
 
     let function = format!("{}::counter::add_and_get_counter_value", account.address());

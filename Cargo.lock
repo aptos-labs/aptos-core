@@ -531,6 +531,7 @@ dependencies = [
  "bytes",
  "goldenfile",
  "hyper 0.14.28",
+ "move-command-line-common",
  "rand 0.7.3",
  "regex",
  "serde_json",
@@ -1235,6 +1236,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-crypto",
  "aptos-db-indexer-schemas",
  "aptos-logger",
  "aptos-metrics-core",
@@ -2697,6 +2699,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-keygen",
+ "aptos-logger",
  "aptos-proptest-helpers",
  "aptos-temppath",
  "aptos-types",
@@ -4592,6 +4595,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
+ "rstest",
  "serde",
 ]
 
@@ -4748,6 +4752,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
+ "rstest",
 ]
 
 [[package]]
@@ -7682,6 +7687,7 @@ dependencies = [
  "claims",
  "hex",
  "move-binary-format",
+ "move-command-line-common",
  "move-core-types",
  "move-model",
  "move-package",
@@ -10205,6 +10211,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "rstest",
 ]
 
 [[package]]

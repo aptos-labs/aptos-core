@@ -1,22 +1,32 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
+
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::vm_status::StatusCode::DEPENDENCY_LIMIT_REACHED;
+use rstest::rstest;
 
-#[test]
-fn exceeding_max_num_dependencies() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn exceeding_max_num_dependencies(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
 
     h.modify_gas_schedule(|gas_params| {
         gas_params.vm.txn.max_num_dependencies = 2.into();
     });
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(
         h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p1"),)
     );
@@ -63,15 +73,21 @@ fn exceeding_max_num_dependencies() {
     ));
 }
 
-#[test]
-fn exceeding_max_dependency_size() {
-    let mut h = MoveHarness::new();
-
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn exceeding_max_dependency_size(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     h.modify_gas_schedule(|gas_params| {
         gas_params.vm.txn.max_total_dependency_size = 260.into();
     });
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(
         h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p1"),)
     );

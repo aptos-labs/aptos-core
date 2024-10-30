@@ -47,14 +47,15 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
-        TransactionPayload, TransactionStatus, Version,
+        TransactionPayloadWrapper, TransactionStatus, Version,
     },
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
+use move_command_line_common::env::{get_txn_payload_v2_format_from_env, get_use_orderless_transactions_from_env};
 use hyper::{HeaderMap, Response};
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use serde_json::{json, Value};
 use std::{
     boxed::Box,
@@ -239,6 +240,8 @@ pub struct TestContext {
     golden_output: Option<GoldenOutputs>,
     fake_time_usecs: u64,
     pub api_specific_config: ApiSpecificConfig,
+    pub use_txn_payload_v2_format: bool,
+    pub use_orderless_transactions: bool,
 }
 
 impl TestContext {
@@ -266,6 +269,8 @@ impl TestContext {
             golden_output: None,
             fake_time_usecs: 0,
             api_specific_config,
+            use_txn_payload_v2_format: get_txn_payload_v2_format_from_env(),
+            use_orderless_transactions: get_use_orderless_transactions_from_env(),
         }
     }
 
@@ -447,7 +452,8 @@ impl TestContext {
         let txn = root.sign_with_transaction_builder(
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions)
         );
 
         let bcs_txn = bcs::to_bytes(&txn).unwrap();
@@ -509,7 +515,8 @@ impl TestContext {
         tc.sign_with_transaction_builder(
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         )
     }
 
@@ -586,7 +593,8 @@ impl TestContext {
         let create_multisig_txn = account.sign_with_transaction_builder(
             factory
                 .create_multisig_account(additional_owners, signatures_required)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         );
         self.commit_block(&vec![
             create_multisig_txn,
@@ -607,7 +615,8 @@ impl TestContext {
         let txn = account.sign_with_transaction_builder(
             factory
                 .create_multisig_account_with_existing_account(owners, signatures_required)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         );
         self.commit_block(&vec![
             txn,
@@ -626,7 +635,8 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .create_multisig_transaction(multisig_account, payload)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -641,7 +651,8 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .approve_multisig_transaction(multisig_account, transaction_id)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -656,7 +667,8 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .reject_multisig_transaction(multisig_account, transaction_id)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -671,7 +683,8 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .create_multisig_transaction_with_payload_hash(multisig_account, payload)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         );
         self.commit_block(&vec![txn]).await;
     }
@@ -695,7 +708,8 @@ impl TestContext {
         sender.sign_with_transaction_builder(
             factory
                 .account_transfer(receiver, amount)
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         )
     }
 
@@ -708,7 +722,8 @@ impl TestContext {
         creator.sign_with_transaction_builder(
             factory
                 .create_user_account(account.public_key())
-                .expiration_timestamp_secs(u64::MAX),
+                .expiration_timestamp_secs(u64::MAX)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions),
         )
     }
 
@@ -719,6 +734,7 @@ impl TestContext {
             .transfer(root_account.address(), 1)
             .sender(root_account.address())
             .sequence_number(root_account.sequence_number())
+            .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions)
             .build();
         let invalid_key = AccountKey::generate(self.rng());
         txn.sign(invalid_key.private_key(), root_account.public_key().clone())
@@ -755,7 +771,7 @@ impl TestContext {
     pub fn build_package(
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
-    ) -> TransactionPayload {
+    ) -> TransactionPayloadWrapper {
         let mut build_options = aptos_framework::BuildOptions::default();
         named_addresses.into_iter().for_each(|(name, address)| {
             build_options.named_addresses.insert(name, address);
@@ -771,10 +787,13 @@ impl TestContext {
     pub async fn publish_package(
         &mut self,
         publisher: &mut LocalAccount,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
-        let txn =
-            publisher.sign_with_transaction_builder(self.transaction_factory().payload(payload));
+        let txn = publisher.sign_with_transaction_builder(
+                self.transaction_factory()
+                .payload(payload)
+                .upgrade_payload(self.use_txn_payload_v2_format, self.use_orderless_transactions)
+            );
         let bcs_txn = bcs::to_bytes(&txn).unwrap();
         self.expect_status_code(202)
             .post_bcs_txn("/transactions", bcs_txn)
@@ -1019,14 +1038,30 @@ impl TestContext {
         payload: Value,
         status_code: u16,
     ) {
-        let mut request = json!({
-            "sender": account.address(),
-            "sequence_number": account.sequence_number().to_string(),
-            "gas_unit_price": "100",
-            "max_gas_amount": "1000000",
-            "expiration_timestamp_secs": "16373698888888",
-            "payload": payload,
-        });
+       let mut request = if self.use_orderless_transactions { 
+            let mut rng = rand::thread_rng();
+            let replay_protection_nonce: u64 = rng.gen();
+            json!({
+                "sender": account.address(),
+                "sequence_number": (u64::MAX).to_string(),
+                "gas_unit_price": "100",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": "16373698888888",
+                "payload": payload,
+                "replay_protection_nonce": replay_protection_nonce.to_string(),
+            })
+        } else {
+            // TODO[Orderless]: This request is currently converted to transaction payload v1 format.
+            // Check if this request can be converted to v2 format.
+            json!({
+                "sender": account.address(),
+                "sequence_number": account.sequence_number().to_string(),
+                "gas_unit_price": "100",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": "16373698888888",
+                "payload": payload,
+            })
+        };
 
         let resp = self
             .post(
@@ -1053,7 +1088,9 @@ impl TestContext {
             .post("/transactions", request)
             .await;
         self.commit_mempool_txns(1).await;
-        account.increment_sequence_number();
+        if !self.use_orderless_transactions {
+            account.increment_sequence_number();
+        }
     }
 
     pub async fn simulate_multisig_transaction(
@@ -1088,14 +1125,28 @@ impl TestContext {
         payload: Value,
         status_code: u16,
     ) -> Value {
-        let mut request = json!({
-            "sender": sender.address(),
-            "sequence_number": sender.sequence_number().to_string(),
-            "gas_unit_price": "0",
-            "max_gas_amount": "1000000",
-            "expiration_timestamp_secs": "16373698888888",
-            "payload": payload,
-        });
+        let mut request = if self.use_orderless_transactions { 
+            let mut rng = rand::thread_rng();
+            let replay_protection_nonce: u64 = rng.gen();
+            json!({
+                "sender": sender.address(),
+                "sequence_number": (u64::MAX).to_string(),
+                "gas_unit_price": "0",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": "16373698888888",
+                "payload": payload,
+                "replay_protection_nonce": replay_protection_nonce.to_string(),
+            })
+        } else {
+            json!({
+                "sender": sender.address(),
+                "sequence_number": sender.sequence_number().to_string(),
+                "gas_unit_price": "0",
+                "max_gas_amount": "1000000",
+                "expiration_timestamp_secs": "16373698888888",
+                "payload": payload,
+            })
+        };
 
         // We're intentionally using invalid signatures since simulation API rejects valid ones.
         let random_account = self.gen_account();

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
@@ -8,11 +9,11 @@ use aptos_types::{
     account_config::ObjectCoreResource,
     event::EventHandle,
     move_utils::MemberId,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use serde::Deserialize;
-
+use rstest::rstest;
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
     collection: AccountAddress,
@@ -23,12 +24,19 @@ struct Token {
     mutation_events: EventHandle,
 }
 
-#[test]
-fn test_basic_token() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_basic_token(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let account = h.new_account_at(addr, if stateless_account { None } else { Some(0) });
 
     publish_object_token_example(&mut h, addr, &account);
 
@@ -110,35 +118,48 @@ pub fn publish_object_token_example(h: &mut MoveHarness, addr: AccountAddress, a
     assert_success!(result);
 }
 
-pub fn create_mint_hero_payload(addr: &AccountAddress, description: &str) -> TransactionPayload {
+pub fn create_mint_hero_payload(
+    addr: &AccountAddress,
+    description: &str,
+) -> TransactionPayloadWrapper {
     let fun = str::parse(&format!("0x{}::hero::mint_hero", addr.to_hex())).unwrap();
     let MemberId {
         module_id,
         member_id: function_id,
     } = fun;
 
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![
-        bcs::to_bytes(description).unwrap(),
-        bcs::to_bytes("Male").unwrap(),
-        bcs::to_bytes("Wukong").unwrap(),
-        bcs::to_bytes("Monkey God").unwrap(),
-        bcs::to_bytes("404").unwrap(),
-    ]))
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
+        module_id,
+        function_id,
+        vec![],
+        vec![
+            bcs::to_bytes(description).unwrap(),
+            bcs::to_bytes("Male").unwrap(),
+            bcs::to_bytes("Wukong").unwrap(),
+            bcs::to_bytes("Monkey God").unwrap(),
+            bcs::to_bytes("404").unwrap(),
+        ],
+    ))
 }
 
 pub fn create_set_hero_description_payload(
     addr: &AccountAddress,
     description: &str,
-) -> TransactionPayload {
+) -> TransactionPayloadWrapper {
     let fun = str::parse(&format!("0x{}::hero::set_hero_description", addr.to_hex())).unwrap();
     let MemberId {
         module_id,
         member_id: function_id,
     } = fun;
 
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![
-        bcs::to_bytes("Hero Quest!").unwrap(),
-        bcs::to_bytes("Wukong").unwrap(),
-        bcs::to_bytes(description).unwrap(),
-    ]))
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
+        module_id,
+        function_id,
+        vec![],
+        vec![
+            bcs::to_bytes("Hero Quest!").unwrap(),
+            bcs::to_bytes("Wukong").unwrap(),
+            bcs::to_bytes(description).unwrap(),
+        ],
+    ))
 }

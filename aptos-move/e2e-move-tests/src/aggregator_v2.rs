@@ -23,9 +23,12 @@ pub fn initialize(
     aggregator_execution_enabled: bool,
     txns: usize,
     allow_block_executor_fallback: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
     let (mut harness, account) =
-        initialize_harness(mode, aggregator_execution_enabled, path.clone());
+        initialize_harness(mode, aggregator_execution_enabled, path.clone(), stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     if !allow_block_executor_fallback {
         harness.executor.disable_block_executor_fallback();
     }
@@ -47,9 +50,12 @@ pub fn initialize_enabled_disabled_comparison(
     mode: ExecutorMode,
     txns: usize,
     allow_block_executor_fallback: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
-    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone());
-    let (mut harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
+    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone(), stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
+    let (mut harness_comp, _account_comp) = initialize_harness(mode, true, path.clone(), stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     if !allow_block_executor_fallback {
         harness_base.executor.disable_block_executor_fallback();
         harness_comp.executor.disable_block_executor_fallback();
@@ -71,10 +77,13 @@ fn initialize_harness(
     mode: ExecutorMode,
     aggregator_execution_enabled: bool,
     path: PathBuf,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> (MoveHarness, Account) {
     let executor = FakeExecutor::from_head_genesis().set_executor_mode(mode);
 
-    let mut harness = MoveHarness::new_with_executor(executor);
+    let mut harness = MoveHarness::new_with_executor_and_flags(executor, use_txn_payload_v2_format, use_orderless_transactions);
     // Reduce gas scaling, so that smaller differences in gas are caught in comparison testing.
     harness.modify_gas_scaling(1000);
 
@@ -100,7 +109,7 @@ fn initialize_harness(
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let account = harness.new_account_at(AccountAddress::ONE, if stateless_account { None } else { Some(0) });
     assert_success!(harness.publish_package_cache_building(&account, &path));
     (harness, account)
 }
@@ -227,7 +236,12 @@ impl AggV2TestHarness {
 
     pub fn new_account_with_key_pair(&mut self) -> Account {
         let acc = Account::new();
-        let seq_num = 0;
+        // Creating a stateless account if use_orderless_transactions is true
+        let seq_num = if self.harness.use_orderless_transactions {
+            None            
+        } else {
+            Some(0)
+        };
         // Mint the account 10M Aptos coins (with 8 decimals).
         let balance = 1_000_000_000_000_000;
 

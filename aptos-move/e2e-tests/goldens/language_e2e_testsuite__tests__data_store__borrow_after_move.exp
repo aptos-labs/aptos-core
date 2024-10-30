@@ -5,7 +5,7 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10c00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Creation(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10100000000000000020000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
                     },
                 ),
@@ -32,7 +32,7 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10d00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10200000000000000020000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                             StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M::T1)" }: Creation(0300000000000000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
                     },
@@ -56,7 +56,7 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10e00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10300000000000000020000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
                     },
                 ),
@@ -79,7 +79,7 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10f00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10400000000000000020000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                             StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M::T1)" }: Deletion(metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
                     },
@@ -99,7 +99,7 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe11000000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10500000000000000020000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
                     },
                 ),

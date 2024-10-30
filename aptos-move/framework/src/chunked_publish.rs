@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use aptos_types::transaction::{EntryFunction, TransactionPayloadWrapper};
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 /// The default address where the `large_packages.move` module is deployed.
@@ -25,7 +25,7 @@ pub fn chunk_package_and_create_payloads(
     object_address: Option<AccountAddress>,
     large_packages_module_address: AccountAddress,
     chunk_size: usize,
-) -> Vec<TransactionPayload> {
+) -> Vec<TransactionPayloadWrapper> {
     // Chunk the metadata
     let mut metadata_chunks = create_chunks(metadata, chunk_size);
     // Separate last chunk for special handling
@@ -107,8 +107,8 @@ fn large_packages_stage_code_chunk(
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
     large_packages_module_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,
             ident_str!("large_packages").to_owned(),
@@ -129,8 +129,8 @@ fn large_packages_stage_code_chunk_and_publish_to_account(
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
     large_packages_module_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,
             ident_str!("large_packages").to_owned(),
@@ -151,8 +151,8 @@ fn large_packages_stage_code_chunk_and_publish_to_object(
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
     large_packages_module_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,
             ident_str!("large_packages").to_owned(),
@@ -174,8 +174,8 @@ fn large_packages_stage_code_chunk_and_upgrade_object_code(
     code_chunks: Vec<Vec<u8>>,
     code_object: AccountAddress,
     large_packages_module_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,
             ident_str!("large_packages").to_owned(),
@@ -194,8 +194,8 @@ fn large_packages_stage_code_chunk_and_upgrade_object_code(
 // Cleanup account's `StagingArea` resource.
 pub fn large_packages_cleanup_staging_area(
     large_packages_module_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,
             ident_str!("large_packages").to_owned(),

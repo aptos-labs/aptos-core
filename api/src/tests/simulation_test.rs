@@ -8,7 +8,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        EntryFunction, RawTransaction, SignedTransaction, TransactionPayload,
+        EntryFunction, SignedTransaction, TransactionPayloadWrapper, ReplayProtector,
     },
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
@@ -38,10 +38,36 @@ async fn simulate_aptos_transfer(
         let signature = use_valid_signature
             .then(|| signature.to_string())
             .unwrap_or(Ed25519Signature::dummy_signature().to_string());
-        let req = warp::test::request()
-            .method("POST")
-            .path("/v1/transactions/simulate")
-            .json(&json!({
+        
+        // TODO: Is there a more concise way to write this statement?
+        let request = if context.use_orderless_transactions {
+            let replay_protection_nonce = match txn.replay_protector() {
+                ReplayProtector::SequenceNumber(_) => 0,
+                ReplayProtector::Nonce(nonce) => nonce,
+            };
+            json!({
+                "sender": txn.sender().to_string(),
+                "sequence_number": txn.sequence_number().to_string(),
+                "max_gas_amount": txn.max_gas_amount().to_string(),
+                "gas_unit_price": txn.gas_unit_price().to_string(),
+                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+                "payload": {
+                    "type": "entry_function_payload",
+                    "function": "0x1::aptos_account::transfer",
+                    "type_arguments": [],
+                    "arguments": [
+                        bob.address().to_standard_string(), transfer_amount.to_string(),
+                    ]
+                },
+                "replay_protection_nonce": replay_protection_nonce.to_string(),
+                "signature": {
+                    "type": "ed25519_signature",
+                    "public_key": public_key.to_string(),
+                    "signature": signature,
+                },
+            })
+        } else {
+            json!({
                 "sender": txn.sender().to_string(),
                 "sequence_number": txn.sequence_number().to_string(),
                 "max_gas_amount": txn.max_gas_amount().to_string(),
@@ -59,8 +85,14 @@ async fn simulate_aptos_transfer(
                     "type": "ed25519_signature",
                     "public_key": public_key.to_string(),
                     "signature": signature,
-                }
-            }));
+                },
+            })
+        };
+
+        let req = warp::test::request()
+            .method("POST")
+            .path("/v1/transactions/simulate")
+            .json(&request);
         let resp = context.expect_status_code(expected_status).reply(req).await;
         // Assert the gas used header is present if expected.
         if assert_gas_used {
@@ -131,41 +163,68 @@ async fn test_simulate_txn_with_aggregator() {
     let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn]).await;
 
-    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!("counter").to_owned()),
         ident_str!("increment_counter").to_owned(),
         vec![],
         vec![],
     ));
-    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
     if let TransactionAuthenticator::Ed25519 {
         public_key,
         signature: _,
     } = txn.authenticator_ref()
     {
         let function = format!("{}::counter::increment_counter", account.address());
+        let request = if context.use_orderless_transactions {
+            let replay_protection_nonce = match txn.replay_protector() {
+                ReplayProtector::SequenceNumber(_) => 0,
+                ReplayProtector::Nonce(nonce) => nonce,
+            };
+            json!({
+                "sender": txn.sender().to_string(),
+                "sequence_number": txn.sequence_number().to_string(),
+                "max_gas_amount": txn.max_gas_amount().to_string(),
+                "gas_unit_price": txn.gas_unit_price().to_string(),
+                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+                "payload": {
+                    "type": "entry_function_payload",
+                    "function": function,
+                    "type_arguments": [],
+                    "arguments": []
+                },
+                "signature": {
+                    "type": "ed25519_signature",
+                    "public_key": public_key.to_string(),
+                    "signature": Ed25519Signature::dummy_signature().to_string(),
+                },
+                "replay_proection_nonce": replay_protection_nonce.to_string(),
+            })
+        } else {
+            json!({
+                "sender": txn.sender().to_string(),
+                "sequence_number": txn.sequence_number().to_string(),
+                "max_gas_amount": txn.max_gas_amount().to_string(),
+                "gas_unit_price": txn.gas_unit_price().to_string(),
+                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+                "payload": {
+                    "type": "entry_function_payload",
+                    "function": function,
+                    "type_arguments": [],
+                    "arguments": []
+                },
+                "signature": {
+                    "type": "ed25519_signature",
+                    "public_key": public_key.to_string(),
+                    "signature": Ed25519Signature::dummy_signature().to_string(),
+                },
+            })
+        };
         let resp = context
             .expect_status_code(200)
             .post(
                 "/transactions/simulate",
-                json!({
-                    "sender": txn.sender().to_string(),
-                    "sequence_number": txn.sequence_number().to_string(),
-                    "max_gas_amount": txn.max_gas_amount().to_string(),
-                    "gas_unit_price": txn.gas_unit_price().to_string(),
-                    "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-                    "payload": {
-                        "type": "entry_function_payload",
-                        "function": function,
-                        "type_arguments": [],
-                        "arguments": []
-                    },
-                    "signature": {
-                        "type": "ed25519_signature",
-                        "public_key": public_key.to_string(),
-                        "signature": Ed25519Signature::dummy_signature().to_string(),
-                    }
-                }),
+                request,
             )
             .await;
         assert!(resp[0]["success"].as_bool().is_some_and(|v| v));
@@ -258,15 +317,17 @@ async fn bcs_simulate_fee_payer_transaction_without_gas_fee_check(context: &mut 
 
     let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
-    let raw_txn = RawTransaction::new(
-        txn.sender(),
-        txn.sequence_number(),
-        txn.payload().clone(),
-        txn.max_gas_amount(),
-        100,
-        txn.expiration_timestamp_secs(),
-        txn.chain_id(),
-    );
+    let mut raw_txn = txn.clone().into_raw_transaction();
+    raw_txn.set_gas_unit_price(100);
+    // let raw_txn =  RawTransaction::new(
+    //     txn.sender(),
+    //     txn.sequence_number(),
+    //     txn.payload().clone(),
+    //     txn.max_gas_amount(),
+    //     100,
+    //     txn.expiration_timestamp_secs(),
+    //     txn.chain_id(),
+    // );
     let txn = SignedTransaction::new_signed_transaction(
         raw_txn.clone(),
         TransactionAuthenticator::FeePayer {
@@ -318,15 +379,18 @@ async fn test_bcs_simulate_automated_account_creation() {
 
     let transfer_amount: u64 = 0;
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
-    let raw_txn = RawTransaction::new(
-        txn.sender(),
-        txn.sequence_number(),
-        txn.payload().clone(),
-        txn.max_gas_amount(),
-        100,
-        txn.expiration_timestamp_secs(),
-        txn.chain_id(),
-    );
+    let mut raw_txn = txn.clone().into_raw_transaction();
+    raw_txn.set_gas_unit_price(100);
+
+    //  let raw_txn = RawTransaction::new(
+    //     txn.sender(),
+    //     txn.sequence_number(),
+    //     txn.payload().clone(),
+    //     txn.max_gas_amount(),
+    //     100,
+    //     txn.expiration_timestamp_secs(),
+    //     txn.chain_id(),
+    // );
     // Replace the authenticator with a NoAccountAuthenticator in the transaction.
     let txn = SignedTransaction::new_signed_transaction(
         raw_txn.clone(),
@@ -410,15 +474,17 @@ async fn test_bcs_execute_fee_payer_transaction_no_authenticator_fail() {
 
     let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
     let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
-    let raw_txn = RawTransaction::new(
-        txn.sender(),
-        txn.sequence_number(),
-        txn.payload().clone(),
-        txn.max_gas_amount(),
-        100,
-        txn.expiration_timestamp_secs(),
-        txn.chain_id(),
-    );
+    let mut raw_txn = txn.clone().into_raw_transaction();
+    raw_txn.set_gas_unit_price(100);
+    //  let raw_txn = RawTransaction::new(
+    //     txn.sender(),
+    //     txn.sequence_number(),
+    //     txn.payload().clone(),
+    //     txn.max_gas_amount(),
+    //     100,
+    //     txn.expiration_timestamp_secs(),
+    //     txn.chain_id(),
+    // );
 
     let txn = SignedTransaction::new_signed_transaction(
         raw_txn.clone(),

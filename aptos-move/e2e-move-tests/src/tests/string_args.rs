@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
@@ -12,6 +13,7 @@ use move_core_types::{
     parser::parse_struct_tag,
     vm_status::StatusCode,
 };
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -20,15 +22,15 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-fn success(tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>) {
-    success_generic(vec![], tests)
+fn success(tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    success_generic(vec![], tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions)
 }
 
-fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>) {
-    let mut h = MoveHarness::new();
+fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(
         h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
     );
@@ -80,18 +82,21 @@ fn abort_info() -> impl Fn(TransactionStatus) {
     move |txn_status| assert_move_abort!(txn_status, abort_info)
 }
 
-fn fail(tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>) {
-    fail_generic(vec![], tests)
+fn fail(tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    fail_generic(vec![], tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions)
 }
 
 fn fail_generic(
     ty_args: Vec<TypeTag>,
     tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(
         h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
     );
@@ -122,8 +127,15 @@ fn big_string_vec(first_dim: u64, second_dim: u64, base: &str) -> Vec<u8> {
     bcs::to_bytes(&outer).unwrap()
 }
 
-#[test]
-fn string_args_good() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_good(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut tests = vec![];
 
     // just strings
@@ -303,11 +315,18 @@ fn string_args_good() {
 
     tests.push(("0xcafe::test::multi_vec", vec![(args, expected_change)]));
 
-    success(tests);
+    success(tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn string_args_bad_utf8() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_bad_utf8(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut tests = vec![];
 
     // simple strings
@@ -396,11 +415,18 @@ fn string_args_bad_utf8() {
     ];
     tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
 
-    fail(tests);
+    fail(tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn string_args_chopped() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_chopped(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let idx = 0u64;
     let s_vec = vec![
         "hi there!".as_bytes(),
@@ -417,13 +443,20 @@ fn string_args_chopped() {
             "0xcafe::test::str_vec",
             args,
             deserialization_failure(),
-        )]);
+        )], stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
         i /= 2;
     }
 }
 
-#[test]
-fn string_args_bad_length() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_bad_length(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     // chop after bcs so length stays big but payload gets small basically a bogus input
     let mut tests = vec![];
 
@@ -568,21 +601,35 @@ fn string_args_bad_length() {
 
     tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
 
-    fail(tests);
+    fail(tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn string_args_non_generic_call() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_non_generic_call(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let tests = vec![("0xcafe::test::non_generic_call", vec![(
         vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
         "hi",
     )])];
 
-    success_generic(vec![], tests);
+    success_generic(vec![], tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn string_args_generic_call() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_generic_call(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let tests = vec![("0xcafe::test::generic_call", vec![(
         vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
         "hi",
@@ -596,11 +643,18 @@ fn string_args_generic_call() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
-    success_generic(vec![string_type], tests);
+    success_generic(vec![string_type], tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn string_args_generic_instantiation() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn string_args_generic_instantiation(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut tests = vec![];
     let long_addr = AccountAddress::from_hex_literal(
         "0xffabcdeffff555777876542123456789ca843279e3427144cead5e4d59ffffff",
@@ -655,11 +709,18 @@ fn string_args_generic_instantiation() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
-    success_generic(vec![string_type, address_type], tests);
+    success_generic(vec![string_type, address_type], tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }
 
-#[test]
-fn huge_string_args_are_not_allowed() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn huge_string_args_are_not_allowed(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut tests = vec![];
     let mut len: u64 = 1_000_000_000_000;
     let mut big_str_arg = vec![];
@@ -678,5 +739,5 @@ fn huge_string_args_are_not_allowed() {
         vec![big_str_arg],
         deserialization_failure(),
     ));
-    fail(tests);
+    fail(tests, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 }

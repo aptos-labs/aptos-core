@@ -1,4 +1,4 @@
-module 0x1::test {
+module 0xcafe::test {
     struct ModuleData has key, store {
         global_counter: u64,
     }

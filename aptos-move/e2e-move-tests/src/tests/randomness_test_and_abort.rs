@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_abort, assert_success, build_package, tests::common, MoveHarness};
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
@@ -12,13 +13,21 @@ use aptos_types::{
 };
 use claims::assert_ok;
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::AbortLocation};
+use rstest::rstest;
 
 // Error codes from randomness module.
 const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
-#[test]
-fn test_and_abort_defense_is_sound_and_correct() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_and_abort_defense_is_sound_and_correct(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // These scripts call a public entry function and a public function. The randomness API will reject both calls.
     for dir in [
@@ -28,9 +37,9 @@ fn test_and_abort_defense_is_sound_and_correct() {
         println!("Testing {dir}");
         // This will redeploy the package, so backwards compatibility must be maintained in these directories.
         let (_, package) =
-            deploy_code(AccountAddress::ONE, dir, &mut h).expect("building package must succeed");
+            deploy_code(AccountAddress::ONE, dir, &mut h, stateless_account).expect("building package must succeed");
 
-        let status = run_script(&mut h, &package);
+        let status = run_script(&mut h, &package, stateless_account);
         assert_abort!(status, E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
     }
 
@@ -45,6 +54,7 @@ fn test_and_abort_defense_is_sound_and_correct() {
         &mut h,
         "0xa11ce",
         "0x1::some_randapp::safe_private_entry_call",
+        stateless_account
     );
     assert_success!(status);
 
@@ -55,33 +65,50 @@ fn test_and_abort_defense_is_sound_and_correct() {
         &mut h,
         "0xa11ce",
         "0x1::some_randapp::safe_friend_entry_call",
+        stateless_account
     );
     assert_success!(status);
 }
 
-#[test]
-fn test_only_private_entry_function_can_be_annotated() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_only_private_entry_function_can_be_annotated(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     // Make sure building a package fails.
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     assert!(deploy_code(
         AccountAddress::ONE,
         "randomness.data/invalid_pack_non_entry",
-        &mut h
+        &mut h,
+        stateless_account,
     )
     .is_err());
     assert!(deploy_code(
         AccountAddress::ONE,
         "randomness.data/invalid_pack_public_entry",
-        &mut h
+        &mut h,
+        stateless_account,
     )
     .is_err());
 }
 
-#[test]
-fn test_unbiasable_annotation() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_unbiasable_annotation(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    deploy_code(AccountAddress::ONE, "randomness.data/pack", &mut h)
+    deploy_code(AccountAddress::ONE, "randomness.data/pack", &mut h, stateless_account)
         .expect("building package must succeed");
     set_randomness_seed(&mut h);
 
@@ -95,13 +122,13 @@ fn test_unbiasable_annotation() {
     ];
 
     for entry_func in should_succeed {
-        let status = run_entry_func(&mut h, "0xa11ce", entry_func);
+        let status = run_entry_func(&mut h, "0xa11ce", entry_func, stateless_account);
         assert_success!(status);
     }
 
     // Non-annotated functions which use randomness fail at runtime.
     let entry_func = "0x1::test::fail_if_not_annotated_and_using_randomness";
-    let status = run_entry_func(&mut h, "0xa11ce", entry_func);
+    let status = run_entry_func(&mut h, "0xa11ce", entry_func, stateless_account);
     let status = assert_ok!(status.as_kept_status());
 
     if let ExecutionStatus::MoveAbort {
@@ -139,8 +166,9 @@ fn deploy_code(
     addr: AccountAddress,
     code_path: &str,
     harness: &mut MoveHarness,
+    stateless_account: bool,
 ) -> anyhow::Result<(Account, BuiltPackage)> {
-    let account = harness.new_account_at(addr);
+    let account = harness.new_account_at(addr, if stateless_account { None } else { Some(0) });
 
     let package = build_package(
         common::test_dir_path(code_path),
@@ -153,23 +181,30 @@ fn deploy_code(
     Ok((account, package))
 }
 
-fn run_script(h: &mut MoveHarness, package: &BuiltPackage) -> TransactionStatus {
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+fn run_script(h: &mut MoveHarness, package: &BuiltPackage, stateless_account: bool) -> TransactionStatus {
+    let alice = AccountAddress::from_hex_literal("0xa11ce").unwrap();
+    let seq_num = if let Some(seq_num) = h.sequence_number_opt(&alice) {
+        seq_num
+    } else {
+        0
+    };
+    let alice = h.new_account_at(alice, if stateless_account { None } else { Some(seq_num) });
     let scripts = package.extract_script_code();
     let code = scripts[0].clone();
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(Script::new(code, vec![], vec![]))
-        .sequence_number(10)
+        .sequence_number(seq_num)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     h.run(txn)
 }
 
-fn run_entry_func(h: &mut MoveHarness, signer: &str, name: &str) -> TransactionStatus {
-    let alice = h.new_account_at(AccountAddress::from_hex_literal(signer).unwrap());
+fn run_entry_func(h: &mut MoveHarness, signer: &str, name: &str, stateless_account: bool) -> TransactionStatus {
+    let alice = h.new_account_at(AccountAddress::from_hex_literal(signer).unwrap(), if stateless_account { None } else { Some(0) });
 
     println!("Running entry function '{name}'");
     h.run_entry_function(&alice, str::parse(name).unwrap(), vec![], vec![])

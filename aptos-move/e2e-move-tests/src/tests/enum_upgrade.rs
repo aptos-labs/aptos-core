@@ -3,18 +3,26 @@
 
 //! Tests for enum type upgrade compatibility
 
+// Note[Orderless]: Done
 use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionStatus};
 use move_core_types::vm_status::StatusCode;
+use rstest::rstest;
 
-#[test]
-fn enum_upgrade() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
-
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn enum_upgrade(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), if stateless_account { None } else { Some(0) });
     // Initial publish
     let result = publish(
         &mut h,

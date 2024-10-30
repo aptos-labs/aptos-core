@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     assert_success, assert_vm_status,
     resource_groups::{
@@ -15,7 +16,7 @@ use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag}
 use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
 use proptest::prelude::*;
 use serde::Deserialize;
-use test_case::test_case;
+use rstest::rstest;
 
 // This mode describes whether to enable or disable RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET flag
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -37,13 +38,16 @@ fn setup(
     // This mode describes whether to enable or disable RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET flag
     resource_group_mode: ResourceGroupMode,
     txns: usize,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+    seq_num: Option<u64>,
 ) -> ResourceGroupsTestHarness {
     let path = common::test_dir_path("resource_groups.data/pack");
     match resource_group_mode {
-        ResourceGroupMode::EnabledOnly => initialize(path, executor_mode, true, txns),
-        ResourceGroupMode::DisabledOnly => initialize(path, executor_mode, false, txns),
+        ResourceGroupMode::EnabledOnly => initialize(path, executor_mode, true, txns, use_txn_payload_v2_format, use_orderless_transactions, seq_num),
+        ResourceGroupMode::DisabledOnly => initialize(path, executor_mode, false, txns, use_txn_payload_v2_format, use_orderless_transactions, seq_num),
         ResourceGroupMode::BothComparison => {
-            initialize_enabled_disabled_comparison(path, executor_mode, txns)
+            initialize_enabled_disabled_comparison(path, executor_mode, txns, use_txn_payload_v2_format, use_orderless_transactions, seq_num)
         },
     }
 }
@@ -53,15 +57,26 @@ pub struct TestEnvConfig {
     pub executor_mode: ExecutorMode,
     pub resource_group_mode: ResourceGroupMode,
     pub block_split: BlockSplit,
+    pub use_txn_payload_v2_format: bool,
+    pub use_orderless_transactions: bool,
+    pub stateless_account: bool,
 }
 
 #[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
 fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+        (
+            arb_block_split(num_txns),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>(),
+        ).prop_map(|(block_split, use_txn_payload_v2_format, use_orderless_transactions, stateless_account)| TestEnvConfig {
             executor_mode: ExecutorMode::BothComparison,
             resource_group_mode: ResourceGroupMode::BothComparison,
-            block_split
+            block_split,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+            stateless_account,
         }),
     ]
     .boxed()
@@ -70,15 +85,31 @@ fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
 #[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
 fn arb_test_env_non_equivalent(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+        (
+            arb_block_split(num_txns),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>(),
+        ).prop_map(|(block_split, use_txn_payload_v2_format, use_orderless_transactions, stateless_account)| TestEnvConfig {
             executor_mode: ExecutorMode::BothComparison,
             resource_group_mode: ResourceGroupMode::DisabledOnly,
-            block_split
+            block_split,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+            stateless_account,
         }),
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+        (
+            arb_block_split(num_txns),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>(),
+        ).prop_map(|(block_split, use_txn_payload_v2_format, use_orderless_transactions, stateless_account)| TestEnvConfig {
             executor_mode: ExecutorMode::BothComparison,
             resource_group_mode: ResourceGroupMode::EnabledOnly,
-            block_split
+            block_split,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+            stateless_account,
         }),
     ]
     .boxed()
@@ -96,7 +127,7 @@ proptest! {
     #[test]
     fn proptest_resource_groups_1(test_env in arb_test_env(17)) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 17);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 17, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions, if test_env.stateless_account { None } else { Some(0) });
 
         let txns = vec![
             (SUCCESS, h.init_signer(vec![5,2,3])),
@@ -126,7 +157,7 @@ proptest! {
     #[test]
     fn proptest_resource_groups_2(test_env in arb_test_env_non_equivalent(12)) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions, if test_env.stateless_account { None } else { Some(0) });
 
         let txns = vec![
             (SUCCESS, h.init_signer(vec![5,2,3])),
@@ -159,10 +190,42 @@ struct Secondary {
     value: u32,
 }
 
-#[test_case(true)]
-#[test_case(false)]
-fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
-    let mut h = MoveHarness::new();
+// TODO[Orderless]: Revisit this test and remove unnecessary cases
+#[rstest(resource_group_charge_as_sum_enabled, primary_stateless_account, user_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, true, false, false),
+    case(true, true, true, true, false),
+    case(true, true, true, true, true),
+
+    case(true, false, true, false, false),
+    case(true, false, true, true, false),
+    case(true, false, true, true, true),
+
+    case(false, true, true, false, false),
+    case(false, true, true, true, false),
+    case(false, true, true, true, true),
+
+    case(false, false, true, false, false),
+    case(false, false, true, true, false),
+    case(false, false, true, true, true),
+
+    case(true, true, false, false, false),
+    case(true, true, false, true, false),
+    case(true, true, false, true, true),
+
+    case(true, false, false, false, false),
+    case(true, false, false, true, false),
+    case(true, false, false, true, true),
+
+    case(false, true, false, false, false),
+    case(false, true, false, true, false),
+    case(false, true, false, true, true),
+
+    case(false, false, false, false, false),
+    case(false, false, false, true, false),
+    case(false, false, false, true, true),
+)]
+fn test_resource_groups(resource_group_charge_as_sum_enabled: bool, primary_stateless_account: bool, user_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     if resource_group_charge_as_sum_enabled {
         h.enable_features(
             vec![FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET],
@@ -175,11 +238,11 @@ fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
     }
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let primary_account = h.new_account_at(primary_addr);
+    let primary_account = h.new_account_at(primary_addr, if primary_stateless_account { None } else { Some(0)});
     let secondary_addr = AccountAddress::from_hex_literal("0xf00d").unwrap();
-    let secondary_account = h.new_account_at(secondary_addr);
+    let secondary_account = h.new_account_at(secondary_addr, Some(0));
     let user_addr = AccountAddress::from_hex_literal("0x0123").unwrap();
-    let user_account = h.new_account_at(user_addr);
+    let user_account = h.new_account_at(user_addr, if user_stateless_account { None } else { Some(0)});
 
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
@@ -380,12 +443,20 @@ fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
     assert!(h.read_resource_raw(&user_addr, secondary_tag).is_none());
 }
 
-#[test]
-fn test_resource_groups_container_not_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_resource_groups_container_not_enabled(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let primary_account = h.new_account_at(primary_addr);
+    let primary_account = h.new_account_at(primary_addr, if stateless_account { None } else { Some(0) });
 
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
@@ -400,10 +471,17 @@ fn test_resource_groups_container_not_enabled() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn verify_resource_group_member_upgrades() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_resource_group_member_upgrades(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Initial code
     let source = r#"
@@ -470,10 +548,18 @@ fn verify_resource_group_member_upgrades() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn verify_unsafe_resource_group_member_upgrades() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::SAFER_RESOURCE_GROUPS]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_unsafe_resource_group_member_upgrades(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![FeatureFlag::SAFER_RESOURCE_GROUPS]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Initial code
     let source = r#"
@@ -507,10 +593,17 @@ fn verify_unsafe_resource_group_member_upgrades() {
     assert_success!(result);
 }
 
-#[test]
-fn verify_resource_group_upgrades() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_resource_group_upgrades(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Initial code
     let source = r#"
@@ -588,10 +681,18 @@ fn verify_resource_group_upgrades() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn verify_unsafe_resource_group_upgrades() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::SAFER_RESOURCE_GROUPS]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_unsafe_resource_group_upgrades(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![FeatureFlag::SAFER_RESOURCE_GROUPS]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Initial code
     let source = r#"

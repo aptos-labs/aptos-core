@@ -1041,6 +1041,8 @@ mod tests {
                             }),
                             ..Default::default()
                         })),
+                        // TODO: Try out other types of payloads
+                        extra_config: None,
                     }),
                     signature: Some(Signature::default()),
                     ..Default::default()

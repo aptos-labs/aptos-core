@@ -10,7 +10,7 @@ use aptos_transaction_generator_lib::{
     publishing::publish_util::{Package, PackageHandler},
 };
 use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
-use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+use aptos_types::{account_address::AccountAddress, transaction::TransactionPayloadWrapper};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, fs, process::exit};
@@ -23,7 +23,7 @@ pub fn execute_txn(
     executor: &mut FakeExecutor,
     account: &Account,
     sequence_number: u64,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
 ) {
     let sign_tx = account
         .transaction()
@@ -31,6 +31,7 @@ pub fn execute_txn(
         .max_gas_amount(2_000_000)
         .gas_unit_price(200)
         .payload(payload)
+        .upgrade_payload(true, true)
         .sign();
 
     let txn_output = executor.execute_transaction(sign_tx);
@@ -287,7 +288,8 @@ fn main() {
             .get(&entry_point_name)
             .expect(&entry_point_name);
         let expected_time_micros = cur_calibration.expected_time_micros;
-        let publisher = executor.new_account_at(AccountAddress::random());
+        // TODO[Orderless]: Check if this needs to be updated to accommodate stateless accounts.
+        let publisher = executor.new_account_at(AccountAddress::random(), Some(0));
 
         let mut package_handler =
             PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());

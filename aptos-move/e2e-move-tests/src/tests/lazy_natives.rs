@@ -1,15 +1,24 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::vm_status::StatusCode;
+use rstest::rstest;
 
-#[test]
-fn lazy_natives() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn lazy_natives(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account { None } else { Some(0) });
     // Set flag to publish the package.
     h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     let mut builder = PackageBuilder::new("LazyNatives");

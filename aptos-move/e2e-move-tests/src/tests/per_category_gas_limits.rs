@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     assert_out_of_gas, assert_success, assert_vm_status, enable_golden, tests::common, MoveHarness,
 };
@@ -14,6 +15,7 @@ use aptos_types::{
 };
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
 use serde::{Deserialize, Serialize};
+use rstest::rstest;
 
 /// Mimics `0xcafe::test::ModuleData`
 #[derive(Serialize, Deserialize)]
@@ -21,12 +23,18 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-#[test]
-fn execution_limit_reached() {
-    let mut h = MoveHarness::new();
-
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn execution_limit_reached(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     // Publish the infinite loop module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("infinite_loop.data/empty_loop"),
@@ -60,9 +68,16 @@ fn bounded_execution_time() {
     });
 }
 
-#[test]
-fn io_limit_reached_by_load_resource() {
-    let (mut h, acc) = setup();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn io_limit_reached_by_load_resource(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let (mut h, acc) = setup(stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
 
     // Lower the max io gas to lower than a single load_resource
     h.modify_gas_schedule(|gas_params| {
@@ -79,10 +94,13 @@ fn io_limit_reached_by_load_resource() {
     assert_vm_status!(res, StatusCode::IO_LIMIT_REACHED);
 }
 
-#[test]
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn io_limit_reached_by_new_bytes() {
-    let (mut h, acc) = setup();
+fn io_limit_reached_by_new_bytes(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -100,10 +118,13 @@ fn io_limit_reached_by_new_bytes() {
     });
 }
 
-#[test]
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn storage_limit_reached_by_new_bytes() {
-    let (mut h, acc) = setup();
+fn storage_limit_reached_by_new_bytes(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -122,10 +143,13 @@ fn storage_limit_reached_by_new_bytes() {
     });
 }
 
-#[test]
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn out_of_gas_while_charging_write_gas() {
-    let (mut h, acc) = setup();
+fn out_of_gas_while_charging_write_gas(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -145,10 +169,13 @@ fn out_of_gas_while_charging_write_gas() {
     test_create_multiple_items(&mut h, &acc, |status| assert_out_of_gas!(status));
 }
 
-#[test]
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn out_of_gas_while_charging_storage_fee() {
-    let (mut h, acc) = setup();
+fn out_of_gas_while_charging_storage_fee(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -174,10 +201,10 @@ fn state_key_size() -> NumBytes {
     (key_size as u64).into()
 }
 
-fn setup() -> (MoveHarness, Account) {
-    let mut h = MoveHarness::new();
+fn setup(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) -> (MoveHarness, Account) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     // Publish the test module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("per_category_gas_limits.data/test"),

@@ -12,6 +12,7 @@
 //
 // Currently, we are testing both the old and the new compatibility checker
 
+// Note[Orderless]: Done
 use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_package_builder::PackageBuilder;
@@ -21,42 +22,84 @@ use aptos_types::{
 use move_core_types::vm_status::StatusCode;
 use rstest::rstest;
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn private_non_entry(use_new_checker: bool) {
-    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker);
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn private_non_entry(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_success!(result)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn remove_function(use_new_checker: bool) {
-    let result = check_upgrade("fun f(){}", "", use_new_checker);
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn remove_function(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let result = check_upgrade("fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_success!(result);
 
-    let result = check_upgrade("public fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-    let result = check_upgrade("public(friend) fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public(friend) fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_success!(result);
 
-    let result = check_upgrade("entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("entry fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-    let result = check_upgrade("public entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public entry fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
-    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker);
+    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn change_function_signature(use_new_checker: bool) {
-    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker);
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn change_function_signature(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let result = check_upgrade("fun f(){}", "fun f(u: u16){}", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_success!(result);
 
     let result = check_upgrade(
         "public fun f(){}",
         "public fun f(u: u16){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
@@ -64,16 +107,22 @@ fn change_function_signature(use_new_checker: bool) {
         "public(friend) fun f(){}",
         "public(friend) fun f(u: u16){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_success!(result);
 
-    let result = check_upgrade("entry fun f(){}", "entry fun f(u: u16){}", use_new_checker);
+    let result = check_upgrade("entry fun f(){}", "entry fun f(u: u16){}", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
     let result = check_upgrade(
         "public entry fun f(){}",
         "public entry fun f(u: u16){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
@@ -81,55 +130,120 @@ fn change_function_signature(use_new_checker: bool) {
         "public(friend) entry fun f(){}",
         "public(friend) entry fun f(u: u16){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_add_entry(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn friend_add_entry(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let result = check_upgrade(
         "public(friend) fun f(){}",
         "public(friend) entry fun f(){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_success!(result)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_remove_entry_failure(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn friend_remove_entry_failure(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let result = check_upgrade(
         "public(friend) entry fun f(){}",
         "public(friend) fun f(){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_remove_failure(use_new_checker: bool) {
-    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker);
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn friend_remove_failure(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let result = check_upgrade("public(friend) entry fun f(){}", "", use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions);
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[rstest(use_new_checker, case(false), case(true))]
-fn friend_entry_change_sig_failure(use_new_checker: bool) {
+#[rstest(use_new_checker, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn friend_entry_change_sig_failure(use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let result = check_upgrade(
         "public(friend) entry fun f(){}",
         "public(friend) entry fun f(_s: &signer){}",
         use_new_checker,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool) -> TransactionStatus {
+fn check_upgrade(old_decls: &str, new_decls: &str, use_new_checker: bool, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) -> TransactionStatus {
     let (enabled, disabled) = if use_new_checker {
         (vec![FeatureFlag::USE_COMPATIBILITY_CHECKER_V2], vec![])
     } else {
         (vec![], vec![FeatureFlag::USE_COMPATIBILITY_CHECKER_V2])
     };
     let mut builder = PackageBuilder::new("Package");
-    let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(enabled, disabled);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), if stateless_account { None } else { Some(0) });
 
     // Publish for first time
     builder.add_source(

@@ -11,14 +11,14 @@ use crate::{
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
-use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
+use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
     batch::{NativeBatch, SchemaBatch, WriteBatch},
     DB,
 };
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::transaction::{ReplayProtector, Transaction, Version};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -135,10 +135,12 @@ impl TransactionDb {
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
-                batch.put::<TransactionByAccountSchema>(
-                    &(txn.sender(), txn.sequence_number()),
-                    &version,
-                )?;
+                if let  ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                    batch.put::<OrderedTransactionByAccountSchema>(
+                        &(txn.sender(), seq_num),
+                        &version,
+                    )?;
+                }
             }
         }
         batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;

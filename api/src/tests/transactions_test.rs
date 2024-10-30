@@ -107,6 +107,8 @@ async fn test_get_transactions_with_zero_limit() {
     context.check_golden_output(resp);
 }
 
+// TODO: Add tests for /transaction_summaries endpoint.
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn test_get_transactions_param_limit_exceeds_limit() {
@@ -206,7 +208,7 @@ async fn test_multi_agent_signed_transaction() {
     // Create a new account with a multi-agent signer
     let txn = root_account.sign_multi_agent_with_transaction_builder(
         vec![&secondary],
-        factory.create_user_account(account.public_key()),
+        factory.create_user_account(account.public_key()).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -271,7 +273,7 @@ async fn test_fee_payer_signed_transaction() {
     let txn = root_account.sign_fee_payer_with_transaction_builder(
         vec![],
         &fee_payer,
-        factory.create_user_account(account.public_key()),
+        factory.create_user_account(account.public_key()).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -331,7 +333,8 @@ async fn test_fee_payer_signed_transaction() {
             factory
                 .create_user_account(yet_another_account.public_key())
                 .max_gas_amount(200_000)
-                .gas_unit_price(1),
+                .gas_unit_price(1)
+                .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
         )
         .into_raw_transaction();
     let another_txn = another_raw_txn
@@ -418,7 +421,7 @@ async fn test_multi_ed25519_signed_transaction() {
     let root_account = context.root_account().await;
     // TODO: migrate once multi-ed25519 is supported
     let create_account_txn = root_account.sign_with_transaction_builder(
-        factory.create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key()),
+        factory.create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key()).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
     context.commit_block(&vec![create_account_txn]).await;
 
@@ -427,6 +430,7 @@ async fn test_multi_ed25519_signed_transaction() {
         .sender(auth_key.account_address())
         .sequence_number(0)
         .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
+        .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions)
         .build();
 
     let signature = private_key.sign(&raw_txn).unwrap();
@@ -720,14 +724,28 @@ async fn test_signing_message_with_payload(
     payload: serde_json::Value,
 ) {
     let sender = context.root_account().await;
-    let mut body = json!({
-        "sender": sender.address().to_hex_literal(),
-        "sequence_number": sender.sequence_number().to_string(),
-        "gas_unit_price": txn.gas_unit_price().to_string(),
-        "max_gas_amount": txn.max_gas_amount().to_string(),
-        "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-        "payload": payload,
-    });
+    let mut body = if context.use_orderless_transactions {
+        let mut rng = rand::thread_rng();
+        let replay_protection_nonce: u64 = rng.gen();
+        json!({
+            "sender": sender.address().to_hex_literal(),
+            "sequence_number": (u64::MAX).to_string(),
+            "gas_unit_price": txn.gas_unit_price().to_string(),
+            "max_gas_amount": txn.max_gas_amount().to_string(),
+            "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+            "payload": payload,
+            "replay_protection_nonce": replay_protection_nonce.to_string(),
+        })
+    } else {
+        json!({
+            "sender": sender.address().to_hex_literal(),
+            "sequence_number": sender.sequence_number().to_string(),
+            "gas_unit_price": txn.gas_unit_price().to_string(),
+            "max_gas_amount": txn.max_gas_amount().to_string(),
+            "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+            "payload": payload,
+        })
+    };
 
     let resp = context
         .post("/transactions/encode_submission", body.clone())
@@ -893,7 +911,8 @@ async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
         context
             .transaction_factory()
             .script(Script::new(invalid_bytecode, vec![], vec![]))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(u64::MAX)
+            .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
     test_transaction_vm_status(context, txn, false).await
 }
@@ -1106,7 +1125,8 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
-            .script(Script::new(script, vec![], vec![])),
+            .script(Script::new(script, vec![], vec![]))
+            .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
 
     test_transaction_vm_status(context, txn, false).await
@@ -1144,7 +1164,8 @@ async fn test_submit_entry_function_api_validation(
                 ty_args,
                 args,
             ))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(u64::MAX)
+            .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -1177,7 +1198,8 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function(
                 ty_args,
                 args,
             ))
-            .expiration_timestamp_secs(u64::MAX),
+            .expiration_timestamp_secs(u64::MAX)
+            .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions),
     );
 
     test_transaction_vm_status(context, txn, false).await
@@ -1567,6 +1589,7 @@ async fn test_simulation_failure_with_move_abort_error_rendering() {
         .sender(account.address())
         .sequence_number(account.sequence_number())
         .expiration_timestamp_secs(u64::MAX)
+        .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions)
         .build();
     let invalid_key = AccountKey::generate(&mut context.rng());
 
@@ -1603,6 +1626,7 @@ async fn test_simulation_failure_with_detail_error() {
         .sender(account.address())
         .sequence_number(account.sequence_number())
         .expiration_timestamp_secs(u64::MAX)
+        .upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions)
         .build();
     let invalid_key = AccountKey::generate(&mut context.rng());
     let txn = raw_txn
@@ -1626,13 +1650,14 @@ async fn test_runtime_error_message_in_interpreter() {
     let path =
         PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_exceed_limit");
     let payload = TestContext::build_package(path, named_addresses);
-    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
     let body = bcs::to_bytes(&txn).unwrap();
     let resp = context
         .expect_status_code(202)
         .post_bcs_txn("/transactions", body)
         .await;
 
+    // TODO: Check if this needs to be updated for v2 format
     let resp = context
         .expect_status_code(200)
         .post(

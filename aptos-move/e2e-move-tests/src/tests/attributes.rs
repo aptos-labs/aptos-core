@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuildOptions;
@@ -10,11 +11,19 @@ use move_binary_format::CompiledModule;
 use move_core_types::{metadata::Metadata, vm_status::StatusCode};
 use serde::Serialize;
 use std::collections::BTreeMap;
+use rstest::rstest;
 
-#[test]
-fn test_view_attribute() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_view_attribute(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), if stateless_account { None } else { Some(0) });
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -30,11 +39,19 @@ fn test_view_attribute() {
     assert_success!(h.publish_package(&account, path.path()));
 }
 
-#[test]
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
 #[should_panic]
-fn test_view_attribute_with_signer() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+fn test_view_attribute_with_signer(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -50,11 +67,19 @@ fn test_view_attribute_with_signer() {
     h.create_publish_package(&account, path.path(), None, |_| {});
 }
 
-#[test]
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
 #[should_panic]
-fn test_view_attribute_with_ref_signer() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+fn test_view_attribute_with_ref_signer(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -70,11 +95,19 @@ fn test_view_attribute_with_ref_signer() {
     h.create_publish_package(&account, path.path(), None, |_| {});
 }
 
-#[test]
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
 #[should_panic]
-fn test_view_attribute_with_mut_ref_signer() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+fn test_view_attribute_with_mut_ref_signer(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -90,11 +123,19 @@ fn test_view_attribute_with_mut_ref_signer() {
     h.create_publish_package(&account, path.path(), None, |_| {});
 }
 
-#[test]
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
 #[should_panic]
-fn test_view_attribute_on_non_view() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+fn test_view_attribute_on_non_view(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -110,10 +151,18 @@ fn test_view_attribute_on_non_view() {
     assert_success!(h.publish_package(&account, path.path()));
 }
 
-#[test]
-fn test_bad_attribute_in_code() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_bad_attribute_in_code(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -131,10 +180,18 @@ fn test_bad_attribute_in_code() {
     assert_success!(h.publish_package(&account, path.path()));
 }
 
-#[test]
-fn test_bad_fun_attribute_in_compiled_module() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_bad_fun_attribute_in_compiled_module(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -192,10 +249,18 @@ fn test_bad_fun_attribute_in_compiled_module() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn test_bad_view_attribute_in_compiled_module() {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_bad_view_attribute_in_compiled_module(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             fun view(_value: u64) { }
@@ -215,10 +280,19 @@ fn test_bad_view_attribute_in_compiled_module() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn verify_resource_group_member_fails_when_not_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_resource_group_member_fails_when_not_enabled(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             struct ResourceGroupMember has key { }
@@ -241,10 +315,19 @@ fn verify_resource_group_member_fails_when_not_enabled() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn verify_resource_groups_fail_when_not_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_resource_groups_fail_when_not_enabled(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             struct ResourceGroup { }
@@ -264,10 +347,19 @@ fn verify_resource_groups_fail_when_not_enabled() {
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn verify_module_events_fail_when_not_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::MODULE_EVENT]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn verify_module_events_fail_when_not_enabled(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![FeatureFlag::MODULE_EVENT]);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             struct Event { }
