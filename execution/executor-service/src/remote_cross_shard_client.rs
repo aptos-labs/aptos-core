@@ -84,7 +84,7 @@ pub struct RemoteCrossShardClientV3 {
 
 impl RemoteCrossShardClientV3 {
     pub fn new(controller: &mut NetworkController, shard_addresses: &Vec<SocketAddr>) -> Self {
-        let num_sender_threads = 4;
+        let num_sender_threads = 24;
         let mut message_txs = vec![];
         let self_addr = controller.get_self_addr();
         let outbound_rpc_runtime = controller.get_outbound_rpc_runtime();
