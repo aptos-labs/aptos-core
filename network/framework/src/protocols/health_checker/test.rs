@@ -5,7 +5,7 @@
 use super::*;
 use crate::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
-    peer_manager::{self, ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
+    peer_manager::{self, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
         wire::{
@@ -17,31 +17,26 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
-use aptos_time_service::{MockTimeService, TimeService};
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_time_service::TimeService;
 use futures::future;
 use maplit::hashmap;
 use std::sync::Arc;
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);
-const PING_TIMEOUT: Duration = Duration::from_millis(500);
 
 struct TestHarness {
-    mock_time: MockTimeService,
-    peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     connection_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl TestHarness {
-    fn new_permissive(
-        ping_failures_tolerated: u64,
-    ) -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
+    fn new_permissive() -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
         ::aptos_logger::Logger::init_for_testing();
         let mock_time = TimeService::mock();
 
-        let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+        let (peer_mgr_reqs_tx, ..) = aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_reqs_tx, ..) = aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 1, None);
@@ -67,15 +62,11 @@ impl TestHarness {
             mock_time.clone(),
             HealthCheckNetworkInterface::new(network_client, hc_network_rx),
             PING_INTERVAL,
-            PING_TIMEOUT,
-            ping_failures_tolerated,
         );
         health_checker.set_connection_source(connection_notifs_rx);
 
         (
             Self {
-                mock_time: mock_time.into_mock(),
-                peer_mgr_reqs_rx,
                 peer_mgr_notifs_tx,
                 connection_notifs_tx,
                 peers_and_metadata,
@@ -85,36 +76,7 @@ impl TestHarness {
     }
 
     fn new_strict() -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
-        Self::new_permissive(0 /* ping_failures_tolerated */)
-    }
-
-    async fn trigger_ping(&self) {
-        self.mock_time.advance_async(PING_INTERVAL).await;
-    }
-
-    async fn expect_ping(&mut self) -> (Ping, oneshot::Sender<Result<Bytes, RpcError>>) {
-        let req = self.peer_mgr_reqs_rx.next().await.unwrap();
-        let rpc_req = match req {
-            PeerManagerRequest::SendRpc(_peer_id, rpc_req) => rpc_req,
-            _ => panic!("Unexpected PeerManagerRequest: {:?}", req),
-        };
-
-        let protocol_id = rpc_req.protocol_id;
-        let req_data = rpc_req.data;
-        let res_tx = rpc_req.res_tx;
-
-        assert_eq!(protocol_id, ProtocolId::HealthCheckerRpc);
-
-        match bcs::from_bytes(&req_data).unwrap() {
-            HealthCheckerMsg::Ping(ping) => (ping, res_tx),
-            msg => panic!("Unexpected HealthCheckerMsg: {:?}", msg),
-        }
-    }
-
-    async fn expect_ping_send_ok(&mut self) {
-        let (ping, res_tx) = self.expect_ping().await;
-        let res_data = bcs::to_bytes(&HealthCheckerMsg::Pong(Pong(ping.0))).unwrap();
-        res_tx.send(Ok(res_data.into())).unwrap();
+        Self::new_permissive()
     }
 
     async fn send_inbound_ping(
@@ -178,27 +140,6 @@ async fn expect_pong(res_rx: oneshot::Receiver<Result<Bytes, RpcError>>) {
         HealthCheckerMsg::Pong(_) => {},
         msg => panic!("Unexpected HealthCheckerMsg: {:?}", msg),
     };
-}
-
-#[tokio::test]
-async fn outbound() {
-    let (mut harness, health_checker) = TestHarness::new_strict();
-
-    let test = async move {
-        // Trigger ping to a peer. This should do nothing.
-        harness.trigger_ping().await;
-
-        // Notify HealthChecker of new connected node.
-        let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
-        harness.send_new_peer_notification(peer_id).await;
-
-        // Trigger ping to a peer. This should ping the newly added peer.
-        harness.trigger_ping().await;
-
-        // Health Checker should attempt to ping the new peer.
-        harness.expect_ping_send_ok().await;
-    };
-    future::join(health_checker.start(), test).await;
 }
 
 #[tokio::test]

@@ -29,8 +29,6 @@ impl HealthCheckerBuilder {
         network_context: NetworkContext,
         time_service: TimeService,
         ping_interval_ms: u64,
-        ping_timeout_ms: u64,
-        ping_failures_tolerated: u64,
         network_sender: NetworkSender<HealthCheckerMsg>,
         network_rx: HealthCheckerNetworkEvents,
         peers_and_metadata: Arc<PeersAndMetadata>,
@@ -47,8 +45,6 @@ impl HealthCheckerBuilder {
             time_service,
             HealthCheckNetworkInterface::new(network_client, network_rx),
             Duration::from_millis(ping_interval_ms),
-            Duration::from_millis(ping_timeout_ms),
-            ping_failures_tolerated,
         );
         Self {
             service: Some(service),

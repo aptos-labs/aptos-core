@@ -199,8 +199,6 @@ impl NetworkBuilder {
 
         network_builder.add_connection_monitoring(
             config.ping_interval_ms,
-            config.ping_timeout_ms,
-            config.ping_failures_tolerated,
             config.max_parallel_deserialization_tasks,
         );
 
@@ -399,8 +397,6 @@ impl NetworkBuilder {
     fn add_connection_monitoring(
         &mut self,
         ping_interval_ms: u64,
-        ping_timeout_ms: u64,
-        ping_failures_tolerated: u64,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> &mut Self {
         // Initialize and start HealthChecker.
@@ -413,8 +409,6 @@ impl NetworkBuilder {
             self.network_context(),
             self.time_service.clone(),
             ping_interval_ms,
-            ping_timeout_ms,
-            ping_failures_tolerated,
             hc_network_tx,
             hc_network_rx,
             self.peers_and_metadata.clone(),
