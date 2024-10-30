@@ -12,7 +12,7 @@ use crate::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
         RawTransaction, RawTransactionWithData, Script, SignedTransaction, Transaction,
-        TransactionPayload,
+        TransactionPayloadWrapper,
     },
 };
 use aptos_crypto::{ed25519::*, traits::*};
@@ -41,7 +41,7 @@ pub fn get_test_signed_transaction(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    payload: Option<TransactionPayload>,
+    payload: Option<TransactionPayloadWrapper>,
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
@@ -50,7 +50,7 @@ pub fn get_test_signed_transaction(
         sender,
         sequence_number,
         payload.unwrap_or_else(|| {
-            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+            TransactionPayloadWrapper::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
         }),
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price,
@@ -69,7 +69,7 @@ pub fn get_test_unchecked_transaction(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     expiration_time: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
@@ -93,7 +93,7 @@ fn get_test_unchecked_transaction_(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
@@ -121,7 +121,7 @@ pub fn get_test_signed_txn(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    payload: Option<TransactionPayload>,
+    payload: Option<TransactionPayloadWrapper>,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
     get_test_signed_transaction(
@@ -141,7 +141,7 @@ pub fn get_test_unchecked_txn(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
     get_test_unchecked_transaction(
@@ -170,7 +170,7 @@ pub fn get_test_unchecked_multi_agent_txn(
     let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
-        TransactionPayload::Script(
+        TransactionPayloadWrapper::Script(
             script.unwrap_or_else(|| Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new())),
         ),
         MAX_GAS_AMOUNT,
@@ -231,7 +231,7 @@ pub fn block(user_txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
 pub fn get_test_raw_transaction(
     sender: AccountAddress,
     sequence_number: u64,
-    payload: Option<TransactionPayload>,
+    payload: Option<TransactionPayloadWrapper>,
     expiration_timestamp_secs: Option<u64>,
     gas_unit_price: Option<u64>,
     max_gas_amount: Option<u64>,
@@ -240,7 +240,7 @@ pub fn get_test_raw_transaction(
         sender,
         sequence_number,
         payload.unwrap_or_else(|| {
-            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+            TransactionPayloadWrapper::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
         }),
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price.unwrap_or(TEST_GAS_PRICE),

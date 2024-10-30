@@ -14,7 +14,9 @@ use std::collections::BTreeMap;
 #[test]
 fn test_view_attribute() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -34,7 +36,9 @@ fn test_view_attribute() {
 #[should_panic]
 fn test_view_attribute_with_signer() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -54,7 +58,9 @@ fn test_view_attribute_with_signer() {
 #[should_panic]
 fn test_view_attribute_with_ref_signer() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -74,7 +80,9 @@ fn test_view_attribute_with_ref_signer() {
 #[should_panic]
 fn test_view_attribute_with_mut_ref_signer() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -94,7 +102,9 @@ fn test_view_attribute_with_mut_ref_signer() {
 #[should_panic]
 fn test_view_attribute_on_non_view() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -113,7 +123,9 @@ fn test_view_attribute_on_non_view() {
 #[test]
 fn test_bad_attribute_in_code() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -134,7 +146,9 @@ fn test_bad_attribute_in_code() {
 #[test]
 fn test_bad_fun_attribute_in_compiled_module() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
 
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -195,7 +209,9 @@ fn test_bad_fun_attribute_in_compiled_module() {
 #[test]
 fn test_bad_view_attribute_in_compiled_module() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    // Creating stateless account if enable_orderless_transactions is true.
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             fun view(_value: u64) { }
@@ -218,7 +234,8 @@ fn test_bad_view_attribute_in_compiled_module() {
 #[test]
 fn verify_resource_group_member_fails_when_not_enabled() {
     let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             struct ResourceGroupMember has key { }
@@ -244,7 +261,8 @@ fn verify_resource_group_member_fails_when_not_enabled() {
 #[test]
 fn verify_resource_groups_fail_when_not_enabled() {
     let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             struct ResourceGroup { }
@@ -267,7 +285,8 @@ fn verify_resource_groups_fail_when_not_enabled() {
 #[test]
 fn verify_module_events_fail_when_not_enabled() {
     let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::MODULE_EVENT]);
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap(), seq_num);
     let source = r#"
         module 0xf00d::M {
             struct Event { }

@@ -7,7 +7,7 @@ pub(crate) mod cli {
     use aptos_framework::{BuildOptions, BuiltPackage};
     use aptos_types::{
         account_address::AccountAddress,
-        transaction::{EntryFunction, Script, TransactionPayload},
+        transaction::{EntryFunction, Script, TransactionPayloadWrapper},
     };
     use arbitrary::Arbitrary;
     use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -53,7 +53,7 @@ pub(crate) mod cli {
     /// ### Arguments
     ///
     /// * `package` - Built Move package
-    fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
+    fn generate_module_payload(package: &BuiltPackage) -> TransactionPayloadWrapper {
         // extract package data
         let code = package.extract_code();
         let metadata = package
@@ -72,13 +72,13 @@ pub(crate) mod cli {
     /// ### Arguments
     ///
     /// * `package` - Built Move package
-    fn generate_script_payload_jwk(package: &BuiltPackage) -> TransactionPayload {
+    fn generate_script_payload_jwk(package: &BuiltPackage) -> TransactionPayloadWrapper {
         // extract package data
         let code = package.extract_script_code().into_iter().next().unwrap();
         let ty_args = vec![];
         let args = vec![];
 
-        TransactionPayload::Script(Script::new(code, ty_args, args))
+        TransactionPayloadWrapper::Script(Script::new(code, ty_args, args))
     }
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
@@ -86,8 +86,8 @@ pub(crate) mod cli {
     pub fn code_publish_package_txn(
         metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
-    ) -> TransactionPayload {
-        TransactionPayload::EntryFunction(EntryFunction::new(
+    ) -> TransactionPayloadWrapper {
+        TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::new([
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

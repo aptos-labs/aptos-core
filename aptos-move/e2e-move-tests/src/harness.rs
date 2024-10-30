@@ -28,12 +28,11 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        ViewFunctionOutput,
+        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction, TransactionArgument, TransactionExecutable, TransactionExtraConfig, TransactionOutput, TransactionPayloadInner, TransactionPayloadWrapper, TransactionStatus, ViewFunctionOutput
     },
     AptosCoinType,
 };
+use move_command_line_common::env::{get_txn_payload_v2_format_from_env, get_use_orderless_transactions_from_env};
 use claims::assert_ok;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
@@ -46,10 +45,15 @@ use project_root::get_project_root;
 use proptest::strategy::{BoxedStrategy, Just, Strategy};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map, BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+
+pub enum ReplayProtectionType {
+    SequenceNumber,
+    Nonce,
+}
 
 // Code representing successful transaction, used for run_block_in_parts_and_check
 pub const SUCCESS: u64 = 0;
@@ -78,10 +82,14 @@ pub struct MoveHarness {
     /// The executor being used.
     pub executor: FakeExecutor,
     /// The last counted transaction sequence number, by account address.
-    txn_seq_no: BTreeMap<AccountAddress, u64>,
+    /// Sequence numbers are made optional to handle stateless accounts, which don't store 0x1::Account resource.
+    txn_seq_no: BTreeMap<AccountAddress, Option<u64>>,
 
     pub default_gas_unit_price: u64,
     pub max_gas_per_txn: u64,
+    // Uses the new transaction format with TransactionPayloadWrapper
+    pub use_txn_payload_v2_format: bool,
+    pub enable_orderless_transactions: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -97,42 +105,120 @@ impl MoveHarness {
     /// Creates a new harness.
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
+        let mut h = Self {
             executor: FakeExecutor::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            // TODO[Orderless]: After the new TransactionPayload format is fully rolled, set this flag to true by default.
+            use_txn_payload_v2_format: get_txn_payload_v2_format_from_env(),
+            enable_orderless_transactions: get_use_orderless_transactions_from_env(),
+        };
+        // TODO[Orderless]: All the new() functions have this enable_features code. Make it concise.
+        if h.use_txn_payload_v2_format {
+            h.enable_features(
+                vec![
+                    FeatureFlag::TRANSACTION_PAYLOAD_V2,
+                ],
+                vec![],
+            );
         }
+        if h.enable_orderless_transactions {
+            h.enable_features(
+                vec![
+                    FeatureFlag::ORDERLESS_TRANSACTIONS,
+                ],
+                vec![],
+            );
+        }
+        h
     }
 
     pub fn new_with_executor(executor: FakeExecutor) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
+        let mut h = Self {
             executor,
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: get_txn_payload_v2_format_from_env(),
+            enable_orderless_transactions: get_use_orderless_transactions_from_env(),
+        };
+        if h.use_txn_payload_v2_format {
+            h.enable_features(
+                vec![
+                    FeatureFlag::TRANSACTION_PAYLOAD_V2,
+                ],
+                vec![],
+            );
         }
+        if h.enable_orderless_transactions {
+            h.enable_features(
+                vec![
+                    FeatureFlag::ORDERLESS_TRANSACTIONS,
+                ],
+                vec![],
+            );
+        }
+        h
     }
 
     pub fn new_with_validators(count: u64) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
+        let mut h = Self {
             executor: FakeExecutor::from_head_genesis_with_count(count),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: get_txn_payload_v2_format_from_env(),
+            enable_orderless_transactions: get_use_orderless_transactions_from_env(),
+        };
+        if h.use_txn_payload_v2_format {
+            h.enable_features(
+                vec![
+                    FeatureFlag::TRANSACTION_PAYLOAD_V2,
+                ],
+                vec![],
+            );
         }
+        if h.enable_orderless_transactions {
+            h.enable_features(
+                vec![
+                    FeatureFlag::ORDERLESS_TRANSACTIONS,
+                ],
+                vec![],
+            );
+        }
+        h
     }
 
     pub fn new_testnet() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
+        let mut h = Self {
             executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: get_txn_payload_v2_format_from_env(),
+            enable_orderless_transactions: get_use_orderless_transactions_from_env(),
+        };
+        if h.use_txn_payload_v2_format {
+            h.enable_features(
+                vec![
+                    FeatureFlag::TRANSACTION_PAYLOAD_V2,
+                ],
+                vec![],
+            );
         }
+        if h.enable_orderless_transactions {
+            h.enable_features(
+                vec![
+                    FeatureFlag::ORDERLESS_TRANSACTIONS,
+                ],
+                vec![],
+            );
+        }
+        hash_map
     }
 
     pub fn new_with_features(
@@ -151,10 +237,12 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            enable_orderless_transactions: true,
         }
     }
 
-    pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: u64) -> Account {
+    pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: Option<u64>) -> Account {
         let data = self
             .executor
             .store_and_fund_account(acc.clone(), balance, seq_num);
@@ -164,34 +252,34 @@ impl MoveHarness {
 
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
-    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
-        self.new_account_with_balance_at(addr, 1_000_000_000_000_000)
+    pub fn new_account_at(&mut self, addr: AccountAddress, seq_num: Option<u64>) -> Account {
+        self.new_account_with_balance_at(addr, 1_000_000_000_000_000, seq_num)
     }
 
-    pub fn new_account_with_balance_at(&mut self, addr: AccountAddress, balance: u64) -> Account {
+    pub fn new_account_with_balance_at(&mut self, addr: AccountAddress, balance: u64, seq_num: Option<u64>) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&acc, balance, 10)
+        self.store_and_fund_account(&acc, balance, seq_num)
     }
 
     // Creates an account with a randomly generated address and key pair
-    pub fn new_account_with_key_pair(&mut self) -> Account {
+    pub fn new_account_with_key_pair(&mut self, seq_num: Option<u64>) -> Account {
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, 0)
+        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, seq_num)
     }
 
     pub fn new_account_with_balance_and_sequence_number(
         &mut self,
         balance: u64,
-        sequence_number: u64,
+        sequence_number: Option<u64>,
     ) -> Account {
         self.store_and_fund_account(&Account::new(), balance, sequence_number)
     }
 
     /// Gets the account where the Aptos framework is installed (0x1).
     pub fn aptos_framework_account(&mut self) -> Account {
-        self.new_account_at(AccountAddress::ONE)
+        self.new_account_at(AccountAddress::ONE, Some(0))
     }
 
     /// Runs a signed transaction. On success, applies the write set.
@@ -251,18 +339,27 @@ impl MoveHarness {
     pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionBuilder {
-        let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
-        let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
-        let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
-        *seq_no_ref = seq_no + 1;
-        account
-            .transaction()
-            .sequence_number(seq_no)
-            .max_gas_amount(self.max_gas_per_txn)
-            .gas_unit_price(self.default_gas_unit_price)
-            .payload(payload)
+        if payload.has_nonce() {
+            account
+                .transaction()
+                .sequence_number(u64::MAX)
+                .max_gas_amount(self.max_gas_per_txn)
+                .gas_unit_price(self.default_gas_unit_price)
+                .payload(payload)
+        } else {
+            let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
+            let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(Some(0));
+            let seq_no = std::cmp::max(on_chain_seq_no, seq_no_ref.clone().unwrap_or(0));
+            *seq_no_ref = Some(seq_no + 1);
+            account
+                .transaction()
+                .sequence_number(seq_no)
+                .max_gas_amount(self.max_gas_per_txn)
+                .gas_unit_price(self.default_gas_unit_price)
+                .payload(payload)
+        }
     }
 
     /// Creates a transaction, based on provided payload.
@@ -270,9 +367,10 @@ impl MoveHarness {
     pub fn create_transaction_payload(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         self.create_transaction_without_sign(account, payload)
+            .upgrade_payload(self.use_txn_payload_v2_format, self.enable_orderless_transactions)
             .sign()
     }
 
@@ -280,7 +378,7 @@ impl MoveHarness {
     pub fn create_transaction_payload_mainnet(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         self.create_transaction_without_sign(account, payload)
             .chain_id(ChainId::mainnet())
@@ -292,7 +390,7 @@ impl MoveHarness {
     pub fn run_transaction_payload(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
         self.run(txn)
@@ -302,7 +400,7 @@ impl MoveHarness {
     pub fn run_transaction_payload_mainnet(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload_mainnet(account, payload);
         assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
@@ -310,7 +408,7 @@ impl MoveHarness {
     }
 
     /// Runs a transaction and return gas used.
-    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
+    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayloadWrapper) -> u64 {
         let txn = self.create_transaction_payload(account, payload);
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
@@ -321,7 +419,7 @@ impl MoveHarness {
     pub fn evaluate_gas_with_profiler(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
         let (output, gas_log) = self
@@ -347,18 +445,38 @@ impl MoveHarness {
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> SignedTransaction {
+        // TODO[Orderless]: If enable_orderless_transactions flag is true, 
+        // then all created transactions are nonce based transactions. Change this.
         let MemberId {
             module_id,
             member_id: function_id,
         } = fun;
+        let entry_function = EntryFunction::new(
+            module_id,
+            function_id,
+            ty_args,
+            args,
+        );
+        let payload = if self.use_txn_payload_v2_format {
+            TransactionPayloadWrapper::Payload(
+                TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::EntryFunction(entry_function),
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address: None,
+                        replay_protection_nonce: if self.enable_orderless_transactions {
+                            Some(rand::random::<u64>())
+                        } else {
+                            None
+                        },
+                    }
+                }
+            )
+        } else {
+            TransactionPayloadWrapper::EntryFunction(entry_function)
+        };
         self.create_transaction_payload(
             account,
-            TransactionPayload::EntryFunction(EntryFunction::new(
-                module_id,
-                function_id,
-                ty_args,
-                args,
-            )),
+            payload,
         )
     }
 
@@ -369,12 +487,38 @@ impl MoveHarness {
         multisig_address: AccountAddress,
         transaction_payload: Option<MultisigTransactionPayload>,
     ) -> SignedTransaction {
-        self.create_transaction_payload(
-            account,
-            TransactionPayload::Multisig(Multisig {
+        // TODO[Orderless]: If enable_orderless_transactions flag is true, 
+        // then all created transactions are nonce based transactions. Change this.
+        let payload = if self.use_txn_payload_v2_format {
+            let executable = if let Some(payload) = transaction_payload {
+                match payload {
+                    MultisigTransactionPayload::EntryFunction(entry) => TransactionExecutable::EntryFunction(entry),
+                }
+            } else {
+                TransactionExecutable::Empty
+            };
+            TransactionPayloadWrapper::Payload(
+                TransactionPayloadInner::V1 { 
+                    executable, 
+                    extra_config: TransactionExtraConfig::V1 { 
+                        multisig_address: Some(multisig_address),
+                        replay_protection_nonce: if self.enable_orderless_transactions {
+                            Some(rand::random::<u64>())
+                        } else {
+                            None
+                        },
+                    }
+                }
+            )
+        } else {
+            TransactionPayloadWrapper::Multisig(Multisig {
                 multisig_address,
                 transaction_payload,
-            }),
+            })
+        };
+        self.create_transaction_payload(
+            account,
+            payload,
         )
     }
 
@@ -385,9 +529,29 @@ impl MoveHarness {
         ty_args: Vec<TypeTag>,
         args: Vec<TransactionArgument>,
     ) -> SignedTransaction {
+        // TODO[Orderless]: If enable_orderless_transactions flag is true, 
+        // then all created transactions are nonce based transactions. Change this.
+        let script = Script::new(code, ty_args, args);
+        let payload = if self.use_txn_payload_v2_format {
+            TransactionPayloadWrapper::Payload(
+                TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::Script(script),
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address: None,
+                        replay_protection_nonce: if self.enable_orderless_transactions {
+                            Some(rand::random::<u64>())
+                        } else {
+                            None
+                        },
+                    }
+                }
+            )
+        } else {
+           TransactionPayloadWrapper::Script(script)
+        };
         self.create_transaction_payload(
             account,
-            TransactionPayload::Script(Script::new(code, ty_args, args)),
+            payload,
         )
     }
 

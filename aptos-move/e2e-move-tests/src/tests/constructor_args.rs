@@ -30,16 +30,21 @@ fn module_data() -> StructTag {
 }
 
 fn success(h: &mut MoveHarness, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
-    success_generic(h, vec![], tests)
+    success_generic(h, vec![], tests, false);
+    if h.enable_orderless_transactions {
+        success_generic(h, vec![], tests, true);
+    }
 }
 
 fn success_generic(
     h: &mut MoveHarness,
     ty_args: Vec<TypeTag>,
     tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+    stateless_sender: bool,
 ) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if stateless_sender { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     assert_success!(h.publish_package_cache_building(
         &acc,
@@ -72,9 +77,11 @@ fn success_generic_view(
     h: &mut MoveHarness,
     ty_args: Vec<TypeTag>,
     tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+    stateless_sender: bool,
 ) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if stateless_sender { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("constructor_args.data/pack")
@@ -98,15 +105,17 @@ fn success_generic_view(
 
 type Closure = Box<dyn FnOnce(TransactionStatus) -> bool>;
 
-fn fail(tests: Vec<(&str, Vec<Vec<u8>>, Closure)>) {
-    fail_generic(vec![], tests)
+fn fail(h: &mut MoveHarness, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>) {
+    fail_generic(h, vec![], tests, false);
+    if h.enable_orderless_transactions {
+        fail_generic(h, vec![], tests, true);
+    }
 }
 
-fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>) {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
-
+fn fail_generic(h: &mut MoveHarness, ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>, stateless_sender: bool) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if stateless_sender { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("constructor_args.data/pack")
@@ -210,7 +219,10 @@ fn view_constructor_args() {
         "hi",
     )];
     let module_data_type = TypeTag::Struct(Box::new(module_data()));
-    success_generic_view(&mut h, vec![module_data_type], view);
+    success_generic_view(&mut h, vec![module_data_type], view, false);
+    if h.enable_orderless_transactions {
+        success_generic_view(&mut h, vec![module_data_type], view, true);
+    }
 }
 
 #[test]
@@ -265,5 +277,7 @@ fn constructor_args_bad() {
         ),
     ];
 
-    fail(tests);
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+
+    fail(&mut h, tests);
 }

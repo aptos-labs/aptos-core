@@ -12,7 +12,8 @@ use aptos_transaction_generator_lib::{
     workflow_delegator::{
         StageSwitchCondition, StageTracking, WorkflowKind, WorkflowTxnGeneratorCreator,
     },
-    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGeneratorCreator,
+    ReplayProtectionType, ObjectPool, ReliableTransactionSubmitter, 
+    RootAccountHandle, TransactionGeneratorCreator,
 };
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -32,6 +33,7 @@ impl WorkflowKind for TokenWorkflowKind {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> WorkflowTxnGeneratorCreator {
         match self {
             TokenWorkflowKind::CreateMintBurn {
@@ -88,6 +90,7 @@ impl WorkflowKind for TokenWorkflowKind {
                             txn_factory.clone(),
                             packages.clone(),
                             mint_worker,
+                            replay_protection_type,
                         )),
                         created_pool.clone(),
                         Some(minted_pool.clone()),
@@ -97,6 +100,7 @@ impl WorkflowKind for TokenWorkflowKind {
                             txn_factory.clone(),
                             packages.clone(),
                             burn_worker,
+                            replay_protection_type,
                         )),
                         minted_pool.clone(),
                         Some(burnt_pool.clone()),

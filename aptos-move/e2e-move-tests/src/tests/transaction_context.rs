@@ -6,7 +6,7 @@ use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, MultisigTransactionPayload, TransactionPayload},
+    transaction::{EntryFunction, MultisigTransactionPayload, TransactionPayloadWrapper},
 };
 use bcs::to_bytes;
 use move_core_types::{
@@ -310,7 +310,7 @@ fn test_transaction_context_gas_payer_as_separate_account() {
     } = fun;
     let ty_args = vec![];
     let args = vec![];
-    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         module_id,
         function_id,
         ty_args,
@@ -355,7 +355,7 @@ fn test_transaction_context_secondary_signers() {
     } = fun;
     let ty_args = vec![];
     let args = vec![];
-    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         module_id,
         function_id,
         ty_args,

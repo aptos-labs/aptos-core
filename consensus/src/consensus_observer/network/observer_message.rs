@@ -869,7 +869,7 @@ mod test {
         aggregate_signature::AggregateSignature,
         chain_id::ChainId,
         ledger_info::LedgerInfo,
-        transaction::{RawTransaction, Script, TransactionPayload},
+        transaction::{RawTransaction, Script, TransactionPayloadWrapper},
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
         PeerId,
@@ -1800,7 +1800,7 @@ mod test {
         for i in 0..num_transactions {
             // Create the raw transaction
             let transaction_payload =
-                TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+                TransactionPayloadWrapper::Script(Script::new(vec![], vec![], vec![]));
             let raw_transaction = RawTransaction::new(
                 sender,
                 i as u64,

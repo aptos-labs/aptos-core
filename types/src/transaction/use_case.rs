@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::SignedTransaction;
+use crate::transaction::{SignedTransaction, TransactionExecutable, TransactionPayloadInner};
 use move_core_types::account_address::AccountAddress;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -36,10 +36,11 @@ impl UseCaseAwareTransaction for SignedTransaction {
     }
 
     fn parse_use_case(&self) -> UseCaseKey {
-        use crate::transaction::TransactionPayload::*;
+        use crate::transaction::TransactionPayloadWrapper::*;
         use UseCaseKey::*;
 
         match self.payload() {
+            // Question: MultiSig contains an entry function too. Why isn't it handled like the entry function?
             Script(_) | ModuleBundle(_) | Multisig(_) => Others,
             EntryFunction(entry_fun) => {
                 let module_id = entry_fun.module();
@@ -49,6 +50,18 @@ impl UseCaseAwareTransaction for SignedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+            Payload(TransactionPayloadInner::V1 {
+                executable: TransactionExecutable::EntryFunction(entry_fun),
+                extra_config: _,
+            }) => {
+                let module_id = entry_fun.module();
+                if module_id.address().is_special() {
+                    Platform
+                } else {
+                    ContractAddress(*module_id.address())
+                }
+            },
+            _ => Others,
         }
     }
 }

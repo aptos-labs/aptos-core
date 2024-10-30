@@ -24,18 +24,27 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     compiler.into_script_blob(code).expect("Failed to compile")
 });
 
+// TODO[Orderless]: Need to upgrade these functions to use transaction payload v2 format
 pub fn empty_txn(
     sender: &Account,
     seq_num: u64,
     max_gas_amount: u64,
     gas_unit_price: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num
+    };
     sender
         .transaction()
         .script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
         .sequence_number(seq_num)
         .max_gas_amount(max_gas_amount)
         .gas_unit_price(gas_unit_price)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions) 
         .sign()
 }
 
@@ -44,13 +53,21 @@ pub fn create_account_txn(
     sender: &Account,
     new_account: &Account,
     seq_num: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num
+    };
     sender
         .transaction()
         .payload(aptos_stdlib::aptos_account_create_account(
             *new_account.address(),
         ))
         .sequence_number(seq_num)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions) 
         .sign()
 }
 
@@ -64,8 +81,15 @@ pub fn peer_to_peer_txn(
     seq_num: u64,
     transfer_amount: u64,
     gas_unit_price: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     // get a SignedTransaction
+    let seq_num = if use_orderless_transactions {
+        u64::MAX
+    } else {
+        seq_num
+    };
     sender
         .transaction()
         .payload(aptos_stdlib::aptos_coin_transfer(
@@ -74,5 +98,6 @@ pub fn peer_to_peer_txn(
         ))
         .sequence_number(seq_num)
         .gas_unit_price(gas_unit_price)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions) 
         .sign()
 }

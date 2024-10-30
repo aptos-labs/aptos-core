@@ -45,9 +45,7 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
-        },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        }, BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutable, TransactionOutput, TransactionPayloadInner, TransactionPayloadWrapper, TransactionStatus, VMValidatorResult, ViewFunctionOutput
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -390,13 +388,13 @@ impl FakeExecutor {
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
-    pub fn create_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
+    pub fn create_raw_account_data(&mut self, balance: u64, seq_num: Option<u64>) -> AccountData {
         AccountData::new_from_seed(&mut self.rng, balance, seq_num)
     }
 
     /// Creates a number of [`Account`] instances all with the same balance and sequence number,
     /// and publishes them to this executor's data store.
-    pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: u64) -> Vec<Account> {
+    pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: Option<u64>) -> Vec<Account> {
         let mut accounts: Vec<Account> = Vec::with_capacity(size);
         for _i in 0..size {
             let account_data = AccountData::new_from_seed(&mut self.rng, balance, seq_num);
@@ -408,24 +406,24 @@ impl FakeExecutor {
 
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
-    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
-        let data = self.new_account_data_at(addr);
+    pub fn new_account_at(&mut self, addr: AccountAddress, seq_num: Option<u64>) -> Account {
+        let data = self.new_account_data_at(addr, seq_num);
         data.account().clone()
     }
 
-    pub fn new_account_data_at(&mut self, addr: AccountAddress) -> AccountData {
+    pub fn new_account_data_at(&mut self, addr: AccountAddress, seq_num: Option<u64>) -> AccountData {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
 
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(acc, 1_000_000_000_000_000, 0)
+        self.store_and_fund_account(acc, 1_000_000_000_000_000, seq_num)
     }
 
     pub fn store_and_fund_account(
         &mut self,
         account: Account,
         balance: u64,
-        seq_num: u64,
+        seq_num: Option<u64>,
     ) -> AccountData {
         let features = Features::fetch_config(&self.data_store).unwrap_or_default();
         let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
@@ -835,18 +833,42 @@ impl FakeExecutor {
             &log_context,
             |gas_meter| {
                 let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                    TransactionPayloadWrapper::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayloadWrapper::EntryFunction(entry_func) => {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
+                    },
+                    TransactionPayloadWrapper::Multisig(..) => unimplemented!("not supported yet"),
 
                     // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
+                    TransactionPayloadWrapper::ModuleBundle(..) => {
                         unreachable!("Module bundle payload has been removed")
+                    },
+
+                    TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                        executable,
+                        extra_config
+                    }) => {
+                        if extra_config.is_multisig() {
+                            unimplemented!("not supported yet")
+                        } else {
+                            match executable {
+                                TransactionExecutable::EntryFunction(entry_func) => {
+                                    GasProfiler::new_function(
+                                        gas_meter,
+                                        entry_func.module().clone(),
+                                        entry_func.function().to_owned(),
+                                        entry_func.ty_args().to_vec(),
+                                    )
+                                },
+                                TransactionExecutable::Script(_) =>  GasProfiler::new_script(gas_meter),
+                                TransactionExecutable::Empty => unimplemented!("not supported yet"),
+                            }
+                        }
                     },
                 };
                 gas_profiler
@@ -1006,10 +1028,12 @@ impl FakeExecutor {
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
     ) -> Measurement {
+        // TODO[Orderless]: Creating all stateful accounts here.
+        // Check if any tests need to be done with stateless accounts with seq_num = None.
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
-                .map(|_| *self.new_account_at(AccountAddress::random()).address())
+                .map(|_| *self.new_account_at(AccountAddress::random(), Some(0)).address())
                 .collect::<Vec<_>>(),
             _ => vec![],
         };

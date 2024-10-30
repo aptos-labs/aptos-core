@@ -119,7 +119,8 @@ impl AUTransactionGen for Arc<dyn AUTransactionGen> {
 pub struct AccountCurrent {
     initial_data: AccountData,
     balance: u64,
-    sequence_number: u64,
+    // Sequence number is made optional to handle stateless accounts, which don't store 0x1::Account resource.
+    sequence_number: Option<u64>,
     sent_events_count: u64,
     received_events_count: u64,
     // creation of event counter affects gas usage in create account. This tracks it
@@ -155,7 +156,7 @@ impl AccountCurrent {
 
     /// Returns the current sequence number for this account, assuming all transactions seen so far
     /// are applied.
-    pub fn sequence_number(&self) -> u64 {
+    pub fn sequence_number(&self) -> Option<u64> {
         self.sequence_number
     }
 
@@ -251,6 +252,7 @@ pub fn txn_one_account_result(
     match (enough_max_gas, enough_to_transfer, enough_to_succeed) {
         (true, true, true) => {
             // Success!
+            // TODO[Orderless]: Change this sequence number update for orderless transactions
             sender.sequence_number += 1;
             sender.sent_events_count += 1;
             sender.balance -= to_deduct;

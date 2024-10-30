@@ -39,12 +39,26 @@ pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
     name: Identifier::new("ObjectGroup").unwrap(),
     type_args: vec![],
 });
+
 #[test]
-fn test_basic_fungible_token() {
+fn test_basic_fungible_token_with_stateful_sender() {
     let mut h = MoveHarness::new();
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
+    test_basic_fungible_token(&mut h, alice, bob);
+}
+
+#[test]
+fn test_basic_fungible_token_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
+    test_basic_fungible_token(&mut h, alice, bob);
+}
+
+fn test_basic_fungible_token(h: &mut MoveHarness, alice: Account, bob: Account) {
     let root = h.aptos_framework_account();
 
     let mut build_options = aptos_framework::BuildOptions::default();
@@ -178,10 +192,22 @@ fn test_basic_fungible_token() {
 
 // A simple test to verify gas paying still work for prologue and epilogue.
 #[test]
-fn test_coin_to_fungible_asset_migration() {
+fn test_coin_to_fungible_asset_migration_with_stateful_sender() {
     let mut h = MoveHarness::new();
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    test_coin_to_fungible_asset_migration(&mut h, alice);
+}
+
+#[test]
+fn test_coin_to_fungible_asset_migration_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), None);
+    test_coin_to_fungible_asset_migration(&mut h, alice);
+}
+
+fn test_coin_to_fungible_asset_migration(h: &mut MovweHarness, alice: Account) {
     let alice_primary_store_addr =
         account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
     let root = h.aptos_framework_account();

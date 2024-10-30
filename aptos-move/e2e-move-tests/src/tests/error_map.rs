@@ -19,11 +19,21 @@ struct ModuleData {
 }
 
 #[test]
-fn error_map() {
+fn error_map_test_with_stateful_sender() {
     let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), Some(0));
+    error_map(&mut h, acc);
+}
 
-    // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[test]
+fn error_map_test_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), None);
+    error_map(&mut h, acc);
+}
+
+
+fn error_map(h: &mut MoveHarness, acc: Account) {
     assert_success!(h.publish_package_with_options(
         &acc,
         &common::test_dir_path("error_map.data/pack"),

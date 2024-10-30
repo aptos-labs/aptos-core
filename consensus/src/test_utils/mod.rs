@@ -43,7 +43,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
-    transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    transaction::{RawTransaction, Script, SignedTransaction, TransactionPayloadWrapper},
 };
 pub use mock_payload_manager::MockPayloadManager;
 #[cfg(test)]
@@ -247,7 +247,8 @@ pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> SignedTransactio
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
-    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let transaction_payload =
+        TransactionPayloadWrapper::Script(Script::new(vec![], vec![], vec![]));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),
         0,

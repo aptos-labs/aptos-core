@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, harness::MoveHarness};
+use crate::{assert_success, harness::MoveHarness, ReplayProtectionType};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use std::path::PathBuf;
@@ -11,7 +11,13 @@ pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
     let executor = FakeExecutor::from_head_genesis();
 
     let mut harness = MoveHarness::new_with_executor(executor);
-    let account = harness.new_account_at(AccountAddress::ONE);
+    // Creating a statless account if enable_orderless_transactions is true
+    let seq_num = if harness.enable_orderless_transactions {
+        None
+    } else {
+        Some(0)
+    };
+    let account = harness.new_account_at(AccountAddress::ONE, seq_num);
     assert_success!(harness.publish_package_cache_building(&account, &path));
     assert_success!(harness.run_entry_function(
         &account,

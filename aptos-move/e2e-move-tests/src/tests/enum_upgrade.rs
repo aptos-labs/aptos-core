@@ -11,13 +11,23 @@ use aptos_types::{account_address::AccountAddress, transaction::TransactionStatu
 use move_core_types::vm_status::StatusCode;
 
 #[test]
-fn enum_upgrade() {
+fn enum_upgrade_test_with_stateful_sender() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+    let stateful_acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap(), Some(0));
+    enum_upgrade(&mut h, acc);
+}
 
+#[test]
+fn enum_upgrade_test_with_stateless_sender() {
+    let mut h = MoveHarness::new();
+    let stateless_acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap(), None);
+    enum_upgrade(&mut h, acc);
+}
+
+fn enum_upgrade(h: &mut MoveHarness, acc: Account) {
     // Initial publish
     let result = publish(
-        &mut h,
+        h,
         &acc,
         r#"
         module 0x815::m {
@@ -31,7 +41,7 @@ fn enum_upgrade() {
 
     // Add a compatible variant
     let result = publish(
-        &mut h,
+        h,
         &acc,
         r#"
         module 0x815::m {
@@ -46,7 +56,7 @@ fn enum_upgrade() {
 
     // Upgrade identity
     let result = publish(
-        &mut h,
+        h,
         &acc,
         r#"
         module 0x815::m {
@@ -61,7 +71,7 @@ fn enum_upgrade() {
 
     // Incompatible because of modification
     let result = publish(
-        &mut h,
+        h,
         &acc,
         r#"
         module 0x815::m {
@@ -76,7 +86,7 @@ fn enum_upgrade() {
 
     // Incompatible because of removal
     let result = publish(
-        &mut h,
+        h,
         &acc,
         r#"
         module 0x815::m {
@@ -90,7 +100,7 @@ fn enum_upgrade() {
 
     // Incompatible because of renaming
     let result = publish(
-        &mut h,
+        h,
         &acc,
         r#"
         module 0x815::m {

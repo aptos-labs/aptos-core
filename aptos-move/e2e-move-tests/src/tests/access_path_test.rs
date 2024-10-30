@@ -100,7 +100,13 @@ fn access_path_panic() {
     cm.serialize(&mut module_bytes).unwrap();
 
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(addr);
+    // Creating a stateless account if enable_orderless_transactions is set to true
+    let seq_num = if h.enable_orderless_transactions {
+        None
+    } else {
+        Some(0)
+    };
+    let acc = h.new_account_at(addr, seq_num);
     h.executor.add_module(&cm.self_id(), module_bytes);
 
     let res = h.run_entry_function(

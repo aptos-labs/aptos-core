@@ -11,7 +11,7 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, OnChainConfig},
-    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionPayloadWrapper, TransactionStatus},
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -49,7 +49,9 @@ struct StateWithCoins {
 )]
 fn code_publishing_basic(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    // Creating a stateless account if enable_orderless_transactions is true
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial"),
@@ -86,7 +88,8 @@ fn code_publishing_basic(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) 
 #[test]
 fn code_publishing_upgrade_success_compat() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version with compat requirements
     assert_success!(h.publish_package_cache_building(
@@ -104,7 +107,8 @@ fn code_publishing_upgrade_success_compat() {
 #[test]
 fn code_publishing_disallow_native() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     assert_vm_status!(
         h.publish_package_cache_building(
@@ -120,7 +124,8 @@ fn code_publishing_disallow_native_entry_func() {
     let mut h = MoveHarness::new();
     // Disable feature for now to publish the package.
     h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     assert_success!(h.publish_package_cache_building(
         &acc,
@@ -143,7 +148,8 @@ fn code_publishing_disallow_native_entry_func() {
 #[test]
 fn code_publishing_allow_system_native() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap(), seq_num);
 
     assert_success!(h.publish_package_cache_building(
         &acc,
@@ -154,7 +160,8 @@ fn code_publishing_allow_system_native() {
 #[test]
 fn code_publishing_upgrade_fail_compat() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version with compat requirements
     assert_success!(h.publish_package_cache_building(
@@ -173,7 +180,8 @@ fn code_publishing_upgrade_fail_compat() {
 #[test]
 fn code_publishing_upgrade_fail_immutable() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version with immutable requirements
     assert_success!(h.publish_package_cache_building(
@@ -192,7 +200,8 @@ fn code_publishing_upgrade_fail_immutable() {
 #[test]
 fn code_publishing_upgrade_fail_overlapping_module() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version
     assert_success!(h.publish_package_cache_building(
@@ -218,7 +227,8 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 #[test]
 fn code_publishing_upgrade_loader_cache_consistency() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Create a sequence of package upgrades
     let txns = vec![
@@ -278,7 +288,8 @@ fn code_publishing_framework_upgrade_fail() {
 #[test]
 fn code_publishing_using_resource_account() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
     let module_address = create_resource_address(*acc.address(), &[]);
@@ -316,7 +327,8 @@ fn code_publishing_using_resource_account() {
 #[test]
 fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // First module publish attempt failed when executing the init_module.
     // Second attempt should pass.
@@ -355,8 +367,9 @@ fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
 )]
 fn code_publishing_faked_dependency(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(enabled.clone(), disabled);
-    let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
+    let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap(), seq_num);
 
     let mut pack1 = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
     pack1.add_source("m", "module 0xcafe::m { public fun f() {} }");
@@ -390,7 +403,8 @@ fn code_publishing_faked_dependency(enabled: Vec<FeatureFlag>, disabled: Vec<Fea
 )]
 fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(enabled.clone(), disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     let mut pack1 = PackageBuilder::new("Package").with_policy(UpgradePolicy::compat());
     pack1.add_source(
@@ -421,7 +435,8 @@ fn test_module_publishing_does_not_fallback() {
 
     let mut h = MoveHarness::new_with_executor(executor);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
-    let account = h.new_account_at(addr);
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let module_name = "foo";
     let function_name = "bar";
@@ -445,7 +460,8 @@ fn test_module_publishing_does_not_fallback() {
         let mut i = 0;
         while i < abort_code {
             // Transaction that calls an entry that aborts.
-            let caller = h.new_account_at(AccountAddress::random());
+            let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+            let caller = h.new_account_at(AccountAddress::random(), seq_num);
             let txn = h.create_entry_function(&caller, member_id.clone(), vec![], vec![]);
             txns.push(txn);
             expected_abort_codes.push(Some(abort_code));
@@ -493,7 +509,7 @@ fn test_module_publishing_does_not_fallback() {
     }
 }
 
-fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
+fn publish_module_txn(source: String, module_name: &str) -> TransactionPayloadWrapper {
     let mut builder = PackageBuilder::new(module_name).with_policy(UpgradePolicy::compat());
     builder.add_source(module_name, &source);
 
@@ -523,7 +539,8 @@ fn test_module_publishing_does_not_leak_speculative_information() {
 
     let mut h = MoveHarness::new_with_executor(executor);
     let addr = AccountAddress::random();
-    let account = h.new_account_at(addr);
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let tys_with_abort_codes = [
         ("u8", Some(1)),
@@ -600,7 +617,8 @@ fn test_init_module_should_not_publish_modules() {
         vec![],
     );
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let txn = h.create_publish_package_cache_building(
         &account,
@@ -618,7 +636,8 @@ fn test_init_module_can_publish_modules() {
         FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
     ]);
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let seq_num = if h.enable_orderless_transactions { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let txn = h.create_publish_package_cache_building(
         &account,
