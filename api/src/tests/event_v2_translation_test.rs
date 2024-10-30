@@ -8,6 +8,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, ValidCryptoMaterial};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_config::RotationProofChallenge;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
+use rstest::rstest;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 
@@ -15,7 +16,7 @@ static MODULE_EVENT_MIGRATION: u64 = 57;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_feature_enable_disable() {
-    let mut context = new_test_context(current_function_name!());
+    let mut context = new_test_context(current_function_name!()).await;
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
     assert!(context.is_feature_enabled(MODULE_EVENT_MIGRATION).await);
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
@@ -39,9 +40,23 @@ fn matches_event_details(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_event_v2_translation_coin_deposit_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_event_v2_translation_coin_deposit_event(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
@@ -151,9 +166,23 @@ async fn test_event_v2_translation_coin_deposit_event() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_event_v2_translation_coin_withdraw_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_event_v2_translation_coin_withdraw_event(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
@@ -262,9 +291,23 @@ async fn test_event_v2_translation_coin_withdraw_event() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_event_v2_translation_account_coin_register_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_event_v2_translation_account_coin_register_event(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
@@ -396,9 +439,23 @@ fn rotate_authentication_key_payload(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_event_v2_translation_account_key_rotation_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_event_v2_translation_account_key_rotation_event(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
@@ -506,9 +563,23 @@ async fn test_event_v2_translation_account_key_rotation_event() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_event_v2_translation_token_objects() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_event_v2_translation_token_objects(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
@@ -659,9 +730,23 @@ async fn test_event_v2_translation_token_objects() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_event_v2_translation_token_v1() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_event_v2_translation_token_v1(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;

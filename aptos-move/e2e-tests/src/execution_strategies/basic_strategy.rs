@@ -22,7 +22,7 @@ impl PartitionStrategy for BasicStrategy {
 }
 
 pub struct BasicExecutor {
-    executor: FakeExecutor,
+    pub executor: FakeExecutor,
     strategy: BasicStrategy,
 }
 

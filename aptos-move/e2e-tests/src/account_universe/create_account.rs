@@ -37,11 +37,21 @@ impl AUTransactionGen for CreateAccountGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
-        let txn = create_account_txn(sender.account(), &self.new_account, sender.sequence_number);
+        let txn = create_account_txn(
+            sender.account(),
+            &self.new_account,
+            sender.sequence_number,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
 
+        // TODO[Orderless]: create_account_gas_cost() gives the gas cost for a sequence number based transaction.
+        // Need to update this for orderless transaction.
         let mut gas_used = sender.create_account_gas_cost();
         let low_balance_gas_used = sender.create_account_low_balance_gas_cost();
         let gas_price = txn.gas_unit_price();
@@ -52,13 +62,19 @@ impl AUTransactionGen for CreateAccountGen {
             gas_price,
             gas_used,
             low_balance_gas_used,
+            use_orderless_transactions,
         );
         if is_success {
             sender.event_counter_created = true;
             universe.add_account(AccountData::with_account(
                 self.new_account.clone(),
                 self.amount,
-                0,
+                // Creating a stateless account if use_orderless_transactions is set to true.
+                if use_orderless_transactions {
+                    None
+                } else {
+                    Some(0)
+                },
                 false,
                 false,
             ));
@@ -84,6 +100,8 @@ impl AUTransactionGen for CreateExistingAccountGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
@@ -91,7 +109,13 @@ impl AUTransactionGen for CreateExistingAccountGen {
             ..
         } = self.sender_receiver.pick(universe);
 
-        let txn = create_account_txn(sender.account(), receiver.account(), sender.sequence_number);
+        let txn = create_account_txn(
+            sender.account(),
+            receiver.account(),
+            sender.sequence_number,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
 
         // This transaction should never work, but it will fail differently if there's not enough
         // gas to reserve.
@@ -99,7 +123,10 @@ impl AUTransactionGen for CreateExistingAccountGen {
         let gas_price = txn.gas_unit_price();
         let enough_max_gas = sender.balance >= gas_costs::TXN_RESERVED * gas_price;
         let status = if enough_max_gas {
-            sender.sequence_number += 1;
+            if !use_orderless_transactions {
+                sender.sequence_number =
+                    sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
+            }
             gas_used = sender.create_existing_account_gas_cost();
             sender.balance -= gas_used * gas_price;
             // TODO(tmn) provide a real abort location

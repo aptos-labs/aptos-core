@@ -2,8 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
-use aptos_api_test_context::current_function_name;
+// Note[Orderless]: Done
+use super::new_test_context_with_orderless_flags;
+use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, secp256k1_ecdsa, SigningKey};
 use aptos_sdk::types::{
     transaction::{
@@ -18,9 +19,7 @@ use aptos_sdk::types::{
 use rand::{rngs::StdRng, SeedableRng};
 use std::convert::TryInto;
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multi_secp256k1_ecdsa() {
-    let mut context = new_test_context(current_function_name!());
+async fn multi_secp256k1_ecdsa(context: &mut TestContext) {
     let other = context.create_account().await;
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
@@ -67,13 +66,28 @@ async fn test_multi_secp256k1_ecdsa() {
         balance_start + 5,
         context.get_apt_balance(other.address()).await
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_multi_secp256k1_ecdsa() {
+    let mut context =
+        new_test_context_with_orderless_flags(current_function_name!(), false, false).await;
+    multi_secp256k1_ecdsa(&mut context).await;
     let txns = context.get("/transactions?start=14&limit=1").await;
     context.check_golden_output(txns[0]["signature"].clone());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_secp256k1_ecdsa() {
-    let mut context = new_test_context(current_function_name!());
+async fn test_multi_secp256k1_ecdsa_payload_v2_format() {
+    let mut context =
+        new_test_context_with_orderless_flags(current_function_name!(), true, false).await;
+    multi_secp256k1_ecdsa(&mut context).await;
+    let txns = context.get("/transactions?start=14&limit=1").await;
+    context.check_golden_output(txns[0]["signature"].clone());
+}
+// Note testing for orderless transactions because the nonce and thereby the signature changes everytime we run the code.
+
+async fn secp256k1_ecdsa(context: &mut TestContext) {
     let other = context.create_account().await;
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
@@ -111,6 +125,22 @@ async fn test_secp256k1_ecdsa() {
         balance_start + 5,
         context.get_apt_balance(other.address()).await
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_secp256k1_ecdsa() {
+    let mut context =
+        new_test_context_with_orderless_flags(current_function_name!(), false, false).await;
+    secp256k1_ecdsa(&mut context).await;
+    let txns = context.get("/transactions?start=14&limit=1").await;
+    context.check_golden_output(txns[0]["signature"].clone());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_secp256k1_ecdsa_payload_v2_format() {
+    let mut context =
+        new_test_context_with_orderless_flags(current_function_name!(), true, false).await;
+    secp256k1_ecdsa(&mut context).await;
     let txns = context.get("/transactions?start=14&limit=1").await;
     context.check_golden_output(txns[0]["signature"].clone());
 }

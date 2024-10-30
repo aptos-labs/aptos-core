@@ -666,6 +666,16 @@ module std::features {
     const ENABLE_FUNCTION_VALUES: u64 = 89;
 
 
+    /// Whether orderless transactions are enabled.
+    /// Lifetime: transient
+    const ORDERED_TRANSACTIONS: u64 = 91;
+
+    public fun get_orderless_transactions_feture(): u64 { ORDERED_TRANSACTIONS }
+
+    public fun orderless_transactions_enabled(): bool acquires Features {
+        is_enabled(ORDERED_TRANSACTIONS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -72,6 +72,7 @@
     "signature": "0x72e5b26a971d06d000f7e4a805b46623428d610f66d8425baa81e60522da00ab5c8e874377b2619dae1ddbf9141f41f71a97aed927b8eee2e6683e6b19e4ae00",
     "type": "ed25519_signature"
   },
+  "replay_protection_nonce": null,
   "events": [
     {
       "guid": {

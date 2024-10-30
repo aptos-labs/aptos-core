@@ -1215,6 +1215,8 @@ module aptos_framework::vesting {
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     use aptos_std::math64::min;
+    #[test_only]
+    use aptos_framework::aptos_coin;
 
     #[test_only]
     const MIN_STAKE: u64 = 100000000000000; // 1M APT coins with 8 decimals.
@@ -1480,7 +1482,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1491,7 +1493,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -2036,7 +2038,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_set_beneficiary_with_missing_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,

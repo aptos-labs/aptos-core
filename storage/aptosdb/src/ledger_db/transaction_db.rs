@@ -7,18 +7,22 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
         transaction_by_hash::TransactionByHashSchema,
+        transaction_summaries_by_account::TransactionSummariesByAccountSchema,
     },
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
-use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
+use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
     batch::{NativeBatch, SchemaBatch, WriteBatch},
     DB,
 };
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::{
+    indexer::indexer_db_reader::IndexedTransactionSummary,
+    transaction::{ReplayProtector, Transaction, Version},
+};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -135,11 +139,27 @@ impl TransactionDb {
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
-                batch.put::<TransactionByAccountSchema>(
-                    &(txn.sender(), txn.sequence_number()),
-                    &version,
-                )?;
+                if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                    batch.put::<OrderedTransactionByAccountSchema>(
+                        &(txn.sender(), seq_num),
+                        &version,
+                    )?;
+                }
             }
+        }
+
+        if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
+            let txn_summary = IndexedTransactionSummary {
+                sender: signed_txn.sender(),
+                replay_protector: signed_txn.replay_protector(),
+                version,
+                // TODO[Orderless]: Check if there is a way to get the hash without recomputing it.
+                transaction_hash: transaction.hash(),
+            };
+            batch.put::<TransactionSummariesByAccountSchema>(
+                &(signed_txn.sender(), version),
+                &txn_summary,
+            )?;
         }
         batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
         batch.put::<TransactionSchema>(&version, transaction)?;

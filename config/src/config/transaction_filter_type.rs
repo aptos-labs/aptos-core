@@ -4,7 +4,9 @@
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{SignedTransaction, TransactionPayload},
+    transaction::{
+        SignedTransaction, TransactionExecutable, TransactionPayload, TransactionPayloadInner,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,13 +32,19 @@ impl Matcher {
             Matcher::TransactionId(id) => txn.committed_hash() == *id,
             Matcher::Sender(sender) => txn.sender() == *sender,
             Matcher::ModuleAddress(address) => match txn.payload() {
-                TransactionPayload::EntryFunction(entry_function) => {
-                    *entry_function.module().address() == *address
-                },
+                TransactionPayload::EntryFunction(entry_function)
+                | TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::EntryFunction(entry_function),
+                    extra_config: _,
+                }) => *entry_function.module().address() == *address,
                 _ => false,
             },
             Matcher::EntryFunction(address, module_name, function) => match txn.payload() {
-                TransactionPayload::EntryFunction(entry_function) => {
+                TransactionPayload::EntryFunction(entry_function)
+                | TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::EntryFunction(entry_function),
+                    extra_config: _,
+                }) => {
                     *entry_function.module().address() == *address
                         && entry_function.module().name().to_string() == *module_name
                         && entry_function.function().to_string() == *function
