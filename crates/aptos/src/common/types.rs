@@ -25,6 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -73,6 +74,7 @@ const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
+pub const GIT_IGNORE: &str = ".gitignore";
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -374,7 +376,18 @@ impl CliConfig {
         let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
+        let no_dir = !aptos_folder.exists();
         create_dir_if_not_exist(aptos_folder.as_path())?;
+
+        // If the `.aptos/` doesn't exist, we'll add a .gitignore in it to ignore the config file
+        // so people don't save their credentials...
+        if no_dir {
+            write_to_user_only_file(
+                aptos_folder.join(GIT_IGNORE).as_path(),
+                GIT_IGNORE,
+                "*\ntestnet/\nconfig.yaml".as_bytes(),
+            )?;
+        }
 
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
@@ -1164,12 +1177,12 @@ pub struct MovePackageDir {
     /// Currently, defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", "2.0"),
+           default_value_if("move_2", "true", "2.1"),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    /// Same as `--bytecode_version=7 --language_version=2.1 --compiler_version=2.0`
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }
@@ -1899,7 +1912,7 @@ impl TransactionOptions {
         let sequence_number = account.sequence_number;
 
         let balance = client
-            .get_account_balance_at_version(sender_address, version)
+            .view_apt_account_balance_at_version(sender_address, version)
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?
             .into_inner();
@@ -1908,7 +1921,7 @@ impl TransactionOptions {
             if gas_unit_price == 0 {
                 DEFAULT_MAX_GAS
             } else {
-                std::cmp::min(balance.coin.value.0 / gas_unit_price, DEFAULT_MAX_GAS)
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
             }
         });
 
@@ -2218,9 +2231,7 @@ impl TryInto<MemberId> for &EntryFunctionArguments {
     fn try_into(self) -> Result<MemberId, Self::Error> {
         self.function_id
             .clone()
-            .ok_or(CliError::CommandArgumentError(
-                "No function ID provided".to_string(),
-            ))
+            .ok_or_else(|| CliError::CommandArgumentError("No function ID provided".to_string()))
     }
 }
 
@@ -2340,4 +2351,8 @@ pub struct ChunkedPublishOption {
     /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
     #[clap(long)]
     pub(crate) chunked_publish: bool,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS)]
+    pub(crate) large_packages_module_address: String,
 }

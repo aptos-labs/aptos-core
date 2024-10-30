@@ -23,8 +23,8 @@ use crate::{
     round_manager::RoundManager,
     test_utils::{
         consensus_runtime, create_vec_signed_transactions,
-        mock_execution_client::MockExecutionClient, timed_block_on, MockPayloadManager,
-        MockStorage, TreeInserter,
+        mock_execution_client::MockExecutionClient, timed_block_on, MockOptQSPayloadProvider,
+        MockPastProposalStatusTracker, MockPayloadManager, MockStorage, TreeInserter,
     },
     util::time_service::{ClockTimeService, TimeService},
 };
@@ -232,10 +232,7 @@ impl NodeSetup {
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
-        let epoch_state = Arc::new(EpochState {
-            epoch: 1,
-            verifier: storage.get_validator_set().into(),
-        });
+        let epoch_state = Arc::new(EpochState::new(1, storage.get_validator_set().into()));
         let validators = epoch_state.verifier.clone();
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -308,6 +305,7 @@ impl NodeSetup {
             false,
             onchain_consensus_config.effective_validator_txn_config(),
             true,
+            Arc::new(MockOptQSPayloadProvider {}),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -335,6 +333,7 @@ impl NodeSetup {
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
             None,
+            Arc::new(MockPastProposalStatusTracker {}),
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -522,6 +521,14 @@ impl NodeSetup {
             .commit_to_storage(ordered_blocks)
             .await
             .unwrap();
+    }
+}
+
+fn config_with_round_timeout_msg_disabled() -> ConsensusConfig {
+    // Disable RoundTimeoutMsg to unless expliclity enabled.
+    ConsensusConfig {
+        enable_round_timeout_msg: false,
+        ..Default::default()
     }
 }
 
@@ -965,7 +972,7 @@ fn sync_info_carried_on_timeout_vote() {
         1,
         None,
         None,
-        None,
+        Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
     );
@@ -996,13 +1003,14 @@ fn sync_info_carried_on_timeout_vote() {
             .insert_single_quorum_cert(block_0_quorum_cert.clone())
             .unwrap();
 
-        node.round_manager
-            .round_state
-            .process_certificates(SyncInfo::new(
+        node.round_manager.round_state.process_certificates(
+            SyncInfo::new(
                 block_0_quorum_cert.clone(),
                 block_0_quorum_cert.into_wrapped_ledger_info(),
                 None,
-            ));
+            ),
+            &generate_validator_verifier(&[node.signer.clone()]),
+        );
         node.round_manager
             .process_local_timeout(2)
             .await
@@ -1468,7 +1476,7 @@ fn nil_vote_on_timeout() {
         1,
         None,
         None,
-        None,
+        Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
     );
@@ -1551,7 +1559,7 @@ fn vote_resent_on_timeout() {
         1,
         None,
         None,
-        None,
+        Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
     );
@@ -1701,7 +1709,7 @@ fn safety_rules_crash() {
         1,
         None,
         None,
-        None,
+        Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
     );
@@ -1766,7 +1774,7 @@ fn echo_timeout() {
         4,
         None,
         None,
-        None,
+        Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
     );
@@ -1802,9 +1810,69 @@ fn echo_timeout() {
         // it receives 4 timeout messages (1 from each) and doesn't echo since it already timeout
         for _ in 0..4 {
             let timeout_vote = node_1.next_vote().await;
+            // Verifying only some vote messages to check that round manager can accept both
+            // verified and unverified votes
             node_1
                 .round_manager
                 .process_vote_msg(timeout_vote)
+                .await
+                .unwrap();
+        }
+    });
+}
+
+#[test]
+fn echo_round_timeout_msg() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        4,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
+    runtime.spawn(playground.start());
+    timed_block_on(&runtime, async {
+        // clear the message queue
+        for node in &mut nodes {
+            node.next_proposal().await;
+        }
+        // timeout 3 nodes
+        for node in &mut nodes[1..] {
+            node.round_manager
+                .process_local_timeout(1)
+                .await
+                .unwrap_err();
+        }
+        let node_0 = &mut nodes[0];
+        // node 0 doesn't timeout and should echo the timeout after 2 timeout message
+        for i in 0..3 {
+            let timeout_vote = node_0.next_timeout().await;
+            let result = node_0
+                .round_manager
+                .process_round_timeout_msg(timeout_vote)
+                .await;
+            // first and third message should not timeout
+            if i == 0 || i == 2 {
+                assert!(result.is_ok());
+            }
+            if i == 1 {
+                // timeout is an Error
+                assert!(result.is_err());
+            }
+        }
+
+        let node_1 = &mut nodes[1];
+        // it receives 4 timeout messages (1 from each) and doesn't echo since it already timeout
+        for _ in 0..4 {
+            let timeout_vote = node_1.next_timeout().await;
+            node_1
+                .round_manager
+                .process_round_timeout_msg(timeout_vote)
                 .await
                 .unwrap();
         }

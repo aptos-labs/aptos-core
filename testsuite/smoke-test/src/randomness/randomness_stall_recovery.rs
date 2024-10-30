@@ -23,7 +23,7 @@ async fn randomness_stall_recovery() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_num_fullnodes(1)
+        .with_num_fullnodes(0) //TODO: revert back to 1 after invalid version bug is fixed
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;

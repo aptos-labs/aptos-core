@@ -43,7 +43,7 @@ async fn test_node_broadcast_receiver_succeed() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
-        verifier: validator_verifier.clone(),
+        verifier: validator_verifier.into(),
     });
     let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
@@ -101,6 +101,7 @@ async fn test_node_broadcast_receiver_succeed() {
 #[tokio::test]
 async fn test_node_broadcast_receiver_failure() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let validator_verifier = Arc::new(validator_verifier);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: validator_verifier.clone(),
@@ -197,7 +198,7 @@ async fn test_node_broadcast_receiver_storage() {
     let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
-        verifier: validator_verifier,
+        verifier: validator_verifier.into(),
     });
 
     let storage = Arc::new(MockStorage::new());

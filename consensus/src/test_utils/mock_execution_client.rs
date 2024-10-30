@@ -14,7 +14,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
     test_utils::mock_storage::MockStorage,
 };
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::{Payload, Round},
@@ -33,7 +33,7 @@ use aptos_types::{
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 pub struct MockExecutionClient {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
@@ -162,7 +162,16 @@ impl TExecutionClient for MockExecutionClient {
         Ok(())
     }
 
-    async fn sync_to(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the MockExecutionClient!"
+        )))
+    }
+
+    async fn sync_to_target(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         debug!(
             "Fake sync to block id {}",
             commit.ledger_info().consensus_block_id()

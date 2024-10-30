@@ -68,26 +68,19 @@ jobs:
           elif [[ "${{ github.event_name }}" == "push" ]]; then
               echo "Branch: ${{ github.ref_name }}"
               echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "Using GIT_SHA"
-            # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
-            # on pull_request, this will default to null and the following "checkout" step will use the PR's base branch
+          # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
+          elif [[ -n "${{ inputs.GIT_SHA }}" ]]; then
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
+          # if GIT_SHA not provided, use the branch where workflow runs on
+          else
+            echo "BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
           fi
-
       # Use the branch hash instead of the full branch name to stay under kubernetes namespace length limit
       - name: Hash the branch
         id: hash-branch
         run: |
-          # If BRANCH is empty, default to "main"
-          if [ -z "${{ steps.determine-test-branch.outputs.BRANCH }}" ]; then
-            BRANCH="main"
-          else
-            BRANCH="${{ steps.determine-test-branch.outputs.BRANCH }}"
-          fi
-
           # Hashing the branch name
-          echo "BRANCH_HASH=$(echo -n "$BRANCH" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
+          echo "BRANCH_HASH=$(echo -n "${{ steps.determine-test-branch.outputs.BRANCH }}" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
 
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
@@ -111,7 +104,7 @@ jobs:
           branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
           variants: "failpoints performance"
 
-      - uses: ./.github/actions/determine-or-use-target-branch-and-get-last-released-image
+      - uses: aptos-labs/aptos-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
         id: get-last-released-image-tag-for-compat-test
         with:
           base-branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
@@ -127,6 +120,7 @@ jobs:
             echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
           fi
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
+          echo "To cancel this job, do `pnpm infra ci cancel-workflow ${{ github.run_id }}` from internal-ops" >> $GITHUB_STEP_SUMMARY
 
   ### Real-world-network tests.
   # Run forge framework upgradability test. This is a PR required job.
@@ -142,6 +136,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-load-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -154,6 +149,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes (6 tests, each for 300 seconds)
       FORGE_TEST_SUITE: realistic_env_load_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -166,6 +162,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2000 # Run for 33 minutes (5 tests, each for 400 seconds)
       FORGE_TEST_SUITE: realistic_env_workload_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-graceful-overload:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -178,6 +175,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1200 # Run for 20 minutes
       FORGE_TEST_SUITE: realistic_env_graceful_overload
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-graceful-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -190,6 +188,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2100 # Run for 5 minutes per test, 7 tests.
       FORGE_TEST_SUITE: realistic_env_graceful_workload_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-env-fairness-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -202,6 +201,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 5 minutes per test, 3 tests.
       FORGE_TEST_SUITE: realistic_env_fairness_workload_sweep
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-realistic-network-tuned-for-throughput:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -215,6 +215,7 @@ jobs:
       FORGE_TEST_SUITE: realistic_network_tuned_for_throughput
       FORGE_ENABLE_PERFORMANCE: true
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   ### Forge Correctness/Componenet/Stress tests
 
@@ -229,6 +230,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2400 # Run for 40 minutes
       FORGE_TEST_SUITE: consensus_stress_test
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-workload-mix-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -241,6 +243,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: workload_mix
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-single-vfn-perf:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -253,6 +256,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 480 # Run for 8 minutes
       FORGE_TEST_SUITE: single_vfn_perf
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   run-forge-fullnode-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
@@ -265,6 +269,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
       FORGE_TEST_SUITE: fullnode_reboot_stress_test
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   ### Compatibility Forge tests
 
@@ -281,6 +286,7 @@ jobs:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }}
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
   ### Changing working quorum Forge tests
 
@@ -295,6 +301,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1200 # Run for 20 minutes
       FORGE_TEST_SUITE: changing_working_quorum_test
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   run-forge-changing-working-quorum-test-high-load:
@@ -308,6 +315,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   # Measures PFN latencies with a constant TPS (with a realistic environment)
@@ -322,6 +330,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: pfn_const_tps_with_realistic_env
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true
 
 
   # longest test for last, to get useful signal from short tests first
@@ -337,3 +346,4 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: realistic_env_max_load_large
       POST_TO_SLACK: true
+      SEND_RESULTS_TO_TRUNK: true

@@ -344,12 +344,11 @@ spec aptos_framework::transaction_validation {
         use std::option;
         use aptos_std::type_info;
         use aptos_framework::account::{Account};
-        use aptos_framework::aggregator;
         use aptos_framework::aptos_coin::{AptosCoin};
         use aptos_framework::coin;
         use aptos_framework::coin::{CoinStore, CoinInfo};
         use aptos_framework::optional_aggregator;
-        use aptos_framework::transaction_fee::{AptosCoinCapabilities, AptosCoinMintCapability, CollectedFeesPerBlock};
+        use aptos_framework::transaction_fee::{AptosCoinCapabilities, AptosCoinMintCapability};
 
         account: signer;
         gas_payer: address;
@@ -379,25 +378,9 @@ spec aptos_framework::transaction_validation {
         // ensures balance == pre_balance - transaction_fee_amount + storage_fee_refunded;
         ensures account.sequence_number == pre_account.sequence_number + 1;
 
-
-        // Check fee collection.
-        let collect_fee_enabled = features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES);
-        let collected_fees = global<CollectedFeesPerBlock>(@aptos_framework).amount;
-        let aggr = collected_fees.value;
-        let aggr_val = aggregator::spec_aggregator_get_val(aggr);
-        let aggr_lim = aggregator::spec_get_limit(aggr);
-
-        /// [high-level-req-3]
-        aborts_if collect_fee_enabled && !exists<CollectedFeesPerBlock>(@aptos_framework);
-        aborts_if collect_fee_enabled && transaction_fee_amount > 0 && aggr_val + transaction_fee_amount > aggr_lim;
-
         // Check burning.
         //   (Check the total supply aggregator when enabled.)
-        let amount_to_burn = if (collect_fee_enabled) {
-            0
-        } else {
-            transaction_fee_amount - storage_fee_refunded
-        };
+        let amount_to_burn = transaction_fee_amount - storage_fee_refunded;
         let apt_addr = type_info::type_of<AptosCoin>().account_address;
         let maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
         let total_supply_enabled = option::spec_is_some(maybe_apt_supply);
@@ -413,11 +396,7 @@ spec aptos_framework::transaction_validation {
         ensures total_supply_enabled ==> apt_supply_value - amount_to_burn == post_apt_supply_value;
 
         // Check minting.
-        let amount_to_mint = if (collect_fee_enabled) {
-            storage_fee_refunded
-        } else {
-            storage_fee_refunded - transaction_fee_amount
-        };
+        let amount_to_mint = storage_fee_refunded - transaction_fee_amount;
         let total_supply = coin::supply<AptosCoin>;
         let post post_total_supply = coin::supply<AptosCoin>;
 

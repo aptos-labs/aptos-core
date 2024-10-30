@@ -48,7 +48,7 @@ use aptos_types::{
     },
 };
 use aptos_vm::AptosVM;
-use aptos_vm_validator::vm_validator::VMValidator;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
@@ -172,7 +172,7 @@ pub fn new_test_context_inner(
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret.is_some());
 
-    let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
+    let mempool = MockSharedMempool::new_in_runtime(&db_rw, PooledVMValidator::new(db.clone(), 1));
 
     node_config
         .storage
@@ -194,8 +194,9 @@ pub fn new_test_context_inner(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address = attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true)
-        .expect("Failed to attach poem to runtime");
+    let poem_address =
+        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach poem to runtime");
     let api_specific_config = ApiSpecificConfig::V1(poem_address);
 
     TestContext::new(

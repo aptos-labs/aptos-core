@@ -85,14 +85,18 @@ module std::features {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
 
-    /// Whether gas fees are collected and distributed to the block proposers.
+    #[deprecated]
+    /// Deprecated feature
     /// Lifetime: transient
     const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
 
+    #[deprecated]
+    /// Deprecated feature
     public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
 
-    public fun collect_and_distribute_gas_fees(): bool acquires Features {
-        is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
+    #[deprecated]
+    public fun collect_and_distribute_gas_fees(): bool {
+        false
     }
 
     /// Whether the new `aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()` native is enabled.
@@ -601,6 +605,20 @@ module std::features {
 
     public fun is_collection_owner_enabled(): bool acquires Features {
         is_enabled(COLLECTION_OWNER)
+    }
+
+    /// Whether the transaction context hash function update is enabled. This update introduces new APIs (public functions
+    /// and native functions) to the transaction context module: `raw_transaction_hash` and `unique_session_hash`.
+    /// `raw_transaction_hash` retrieves the hash of the raw transaction. Also, `unique_session_hash` will replace
+    /// in a later release the existing `get_transaction_hash` function which has a misleading name.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE: u64 = 80;
+
+    public fun get_transaction_context_hash_function_update_feature(): u64 { TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE }
+
+    public fun transaction_context_hash_function_update_enabled(): bool acquires Features {
+        is_enabled(TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE)
     }
 
     // ============================================================================================

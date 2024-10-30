@@ -22,8 +22,8 @@ error[E04007]: incompatible types
 48 │             action(i); // expected to have wrong argument type
    │             ^^^^^^^^^ Invalid call of 'action'. Invalid argument type
    ·
-96 │     public fun length<T>(v: &vector<T>): u64 { abort(1) }
-   │                                          --- Given: 'u64'
+95 │     public fun length<T>(_v: &vector<T>): u64 { abort(1) }
+   │                                           --- Given: 'u64'
 
 error[E04007]: incompatible types
    ┌─ tests/move_check/typing/lambda.move:56:19
@@ -34,8 +34,8 @@ error[E04007]: incompatible types
 56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
    │                   ^ Incompatible arguments to '+'
    ·
-96 │     public fun length<T>(v: &vector<T>): u64 { abort(1) }
-   │                                          --- Found: 'u64'. It is not compatible with the other type.
+95 │     public fun length<T>(_v: &vector<T>): u64 { abort(1) }
+   │                                           --- Found: 'u64'. It is not compatible with the other type.
 
 error[E04007]: incompatible types
    ┌─ tests/move_check/typing/lambda.move:61:9
@@ -71,29 +71,29 @@ error[E04024]: invalid usage of function type
    ┌─ tests/move_check/typing/lambda.move:77:18
    │
 77 │         let _x = |i| i + 1; // expected lambda not allowed
-   │                  ^^^^^^^^^ function type only allowed for inline function arguments
+   │                  ^^^^^^^^^ function-typed values only allowed for inline function arguments
 
 error[E04024]: invalid usage of function type
    ┌─ tests/move_check/typing/lambda.move:81:12
    │
 81 │         f: |u64|u64, // expected lambda not allowed
-   │            ^^^^^^^^ function type only allowed for inline function arguments
+   │            ^^^^^^^^ function-typed values only allowed for inline function arguments
 
 error[E04024]: invalid usage of function type
    ┌─ tests/move_check/typing/lambda.move:84:46
    │
 84 │     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
-   │                                              ^^^^^ function type only allowed for inline function arguments
+   │                                              ^^^^^ function-typed values only allowed for inline function arguments
 
 error[E04024]: invalid usage of function type
-   ┌─ tests/move_check/typing/lambda.move:86:58
+   ┌─ tests/move_check/typing/lambda.move:86:59
    │
-86 │     public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-   │                                                          ^^^^^ function type only allowed for inline function arguments
+86 │     public inline fun inline_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                                                           ^^^^^ function-typed values only allowed for inline function arguments
 
 error[E04024]: invalid usage of function type
    ┌─ tests/move_check/typing/lambda.move:89:49
    │
 89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-   │                                                 ^^^^^ function type only allowed for inline function arguments
+   │                                                 ^^^^^ function-typed values only allowed for inline function arguments
 

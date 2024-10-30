@@ -4,9 +4,10 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
-        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
+        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
+        WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -204,8 +205,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
             },
-            BlockMetadata(txn) => (&txn, info, events).into(),
-            BlockMetadataExt(txn) => (&txn, info, events).into(),
+            BlockMetadata(txn) => Transaction::BlockMetadataTransaction(
+                BlockMetadataTransaction::from_internal(txn, info, events),
+            ),
+            BlockMetadataExt(txn) => Transaction::BlockMetadataTransaction(
+                BlockMetadataTransaction::from_internal_ext(txn, info, events),
+            ),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,

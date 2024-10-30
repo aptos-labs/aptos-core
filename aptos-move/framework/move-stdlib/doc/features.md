@@ -133,6 +133,8 @@ return true.
 -  [Function `transaction_simulation_enhancement_enabled`](#0x1_features_transaction_simulation_enhancement_enabled)
 -  [Function `get_collection_owner_feature`](#0x1_features_get_collection_owner_feature)
 -  [Function `is_collection_owner_enabled`](#0x1_features_is_collection_owner_enabled)
+-  [Function `get_transaction_context_hash_function_update_feature`](#0x1_features_get_transaction_context_hash_function_update_feature)
+-  [Function `transaction_context_hash_function_update_enabled`](#0x1_features_transaction_context_hash_function_update_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -367,7 +369,7 @@ Lifetime: transient
 
 <a id="0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES"></a>
 
-Whether gas fees are collected and distributed to the block proposers.
+Deprecated feature
 Lifetime: transient
 
 
@@ -880,6 +882,21 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE"></a>
+
+Whether the transaction context hash function update is enabled. This update introduces new APIs (public functions
+and native functions) to the transaction context module: <code>raw_transaction_hash</code> and <code>unique_session_hash</code>.
+<code>raw_transaction_hash</code> retrieves the hash of the raw transaction. Also, <code>unique_session_hash</code> will replace
+in a later release the existing <code>get_transaction_hash</code> function which has a misleading name.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE">TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE</a>: u64 = 80;
+</code></pre>
+
+
+
 <a id="0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT"></a>
 
 Whether the simulation enhancement is enabled. This enables the simulation without an authentication check,
@@ -1116,9 +1133,11 @@ Lifetime: transient
 
 ## Function `get_collect_and_distribute_gas_fees_feature`
 
+Deprecated feature
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64
 </code></pre>
 
 
@@ -1140,7 +1159,8 @@ Lifetime: transient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool
 </code></pre>
 
 
@@ -1149,8 +1169,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool {
+    <b>false</b>
 }
 </code></pre>
 
@@ -3273,6 +3293,52 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_transaction_context_hash_function_update_feature"></a>
+
+## Function `get_transaction_context_hash_function_update_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_context_hash_function_update_feature">get_transaction_context_hash_function_update_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_context_hash_function_update_feature">get_transaction_context_hash_function_update_feature</a>(): u64 { <a href="features.md#0x1_features_TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE">TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_transaction_context_hash_function_update_enabled"></a>
+
+## Function `transaction_context_hash_function_update_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_context_hash_function_update_enabled">transaction_context_hash_function_update_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_context_hash_function_update_enabled">transaction_context_hash_function_update_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE">TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -3877,17 +3943,6 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_fee_payer_enabled">spec_fee_payer_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>)
-}
-</code></pre>
-
-
-
-
-<a id="0x1_features_spec_collect_and_distribute_gas_fees_enabled"></a>
-
-
-<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">spec_collect_and_distribute_gas_fees_enabled</a>(): bool {
-   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
 }
 </code></pre>
 

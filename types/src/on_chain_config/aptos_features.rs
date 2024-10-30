@@ -12,6 +12,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
+
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
@@ -21,7 +22,7 @@ pub enum FeatureFlag {
     SHA_512_AND_RIPEMD_160_NATIVES = 3,
     APTOS_STD_CHAIN_ID_NATIVES = 4,
     VM_BINARY_FORMAT_V6 = 5,
-    COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
+    _DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
     BLAKE2B_256_NATIVE = 8,
     RESOURCE_GROUPS = 9,
@@ -95,6 +96,8 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE = 80,
+    ENABLE_LOADER_V2 = 81,
 }
 
 impl FeatureFlag {
@@ -172,6 +175,9 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE,
+            // TODO(loader_v2): Enable V2 loader.
+            // FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
@@ -192,7 +198,6 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-
         features
     }
 }
@@ -315,6 +320,10 @@ impl Features {
 
     pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn is_loader_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

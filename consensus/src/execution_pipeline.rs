@@ -13,8 +13,7 @@ use crate::{
 use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExecutionResult};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
-    ExecutorResult,
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, warn};
@@ -34,6 +33,9 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{mpsc, oneshot};
+
+pub type PreCommitHook =
+    Box<dyn 'static + FnOnce(&StateComputeResult) -> BoxFuture<'static, ()> + Send>;
 
 #[allow(clippy::unwrap_used)]
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -88,6 +90,7 @@ impl ExecutionPipeline {
         parent_block_id: HashValue,
         txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
+        pre_commit_hook: PreCommitHook,
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
@@ -101,6 +104,7 @@ impl ExecutionPipeline {
                 block_preparer: txn_generator,
                 result_tx,
                 command_creation_time: Instant::now(),
+                pre_commit_hook,
                 lifetime_guard,
             })
             .expect("Failed to send block to execution pipeline.");
@@ -127,6 +131,7 @@ impl ExecutionPipeline {
             block_executor_onchain_config,
             parent_block_id,
             block_preparer,
+            pre_commit_hook,
             result_tx,
             command_creation_time,
             lifetime_guard,
@@ -163,6 +168,7 @@ impl ExecutionPipeline {
                     block: (block.id(), sig_verified_txns).into(),
                     parent_block_id,
                     block_executor_onchain_config,
+                    pre_commit_hook,
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
@@ -196,6 +202,7 @@ impl ExecutionPipeline {
             block,
             parent_block_id,
             block_executor_onchain_config,
+            pre_commit_hook,
             result_tx,
             command_creation_time,
             lifetime_guard,
@@ -205,7 +212,7 @@ impl ExecutionPipeline {
             let block_id = block.block_id;
             debug!("execute_stage received block {}.", block_id);
             let executor = executor.clone();
-            let state_checkpoint_output = monitor!(
+            let execution_time = monitor!(
                 "execute_block",
                 tokio::task::spawn_blocking(move || {
                     fail_point!("consensus::compute", |_| {
@@ -220,7 +227,7 @@ impl ExecutionPipeline {
                             parent_block_id,
                             block_executor_onchain_config,
                         )
-                        .map(|output| (output, start.elapsed()))
+                        .map(|_| start.elapsed())
                 })
                 .await
             )
@@ -231,7 +238,8 @@ impl ExecutionPipeline {
                     input_txns,
                     block_id,
                     parent_block_id,
-                    state_checkpoint_output,
+                    execution_time,
+                    pre_commit_hook,
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
@@ -251,7 +259,8 @@ impl ExecutionPipeline {
             input_txns,
             block_id,
             parent_block_id,
-            state_checkpoint_output: execution_result,
+            execution_time,
+            pre_commit_hook,
             result_tx,
             command_creation_time,
             lifetime_guard,
@@ -260,12 +269,12 @@ impl ExecutionPipeline {
             counters::APPLY_LEDGER_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             debug!("ledger_apply stage received block {}.", block_id);
             let res = async {
-                let (state_checkpoint_output, execution_duration) = execution_result?;
+                let execution_duration = execution_time?;
                 let executor = executor.clone();
                 monitor!(
                     "ledger_apply",
                     tokio::task::spawn_blocking(move || {
-                        executor.ledger_update(block_id, parent_block_id, state_checkpoint_output)
+                        executor.ledger_update(block_id, parent_block_id)
                     })
                     .await
                 )
@@ -274,6 +283,7 @@ impl ExecutionPipeline {
             }
             .await;
             let pipeline_res = res.map(|(output, execution_duration)| {
+                let pre_commit_hook_fut = pre_commit_hook(&output);
                 let pre_commit_fut: BoxFuture<'static, ExecutorResult<()>> =
                     if output.epoch_state().is_some() || !enable_pre_commit {
                         // hack: it causes issue if pre-commit is finished at an epoch ending, and
@@ -282,10 +292,12 @@ impl ExecutionPipeline {
                         let executor = executor.clone();
                         Box::pin(async move {
                             tokio::task::spawn_blocking(move || {
-                                executor.pre_commit_block(block_id, parent_block_id)
+                                executor.pre_commit_block(block_id)
                             })
                             .await
-                            .expect("failed to spawn_blocking")
+                            .expect("failed to spawn_blocking")?;
+                            pre_commit_hook_fut.await;
+                            Ok(())
                         })
                     } else {
                         // kick off pre-commit right away
@@ -294,7 +306,7 @@ impl ExecutionPipeline {
                         pre_commit_tx
                             .send(PreCommitCommand {
                                 block_id,
-                                parent_block_id,
+                                pre_commit_hook_fut,
                                 result_tx: pre_commit_result_tx,
                                 lifetime_guard,
                             })
@@ -321,7 +333,7 @@ impl ExecutionPipeline {
     ) {
         while let Some(PreCommitCommand {
             block_id,
-            parent_block_id,
+            pre_commit_hook_fut,
             result_tx,
             lifetime_guard,
         }) = block_rx.recv().await
@@ -331,12 +343,12 @@ impl ExecutionPipeline {
                 let executor = executor.clone();
                 monitor!(
                     "pre_commit",
-                    tokio::task::spawn_blocking(move || {
-                        executor.pre_commit_block(block_id, parent_block_id)
-                    })
+                    tokio::task::spawn_blocking(move || { executor.pre_commit_block(block_id) })
                 )
                 .await
-                .expect("Failed to spawn_blocking().")
+                .expect("Failed to spawn_blocking().")?;
+                pre_commit_hook_fut.await;
+                Ok(())
             }
             .await;
             result_tx
@@ -355,6 +367,7 @@ struct PrepareBlockCommand {
     // The parent block id.
     parent_block_id: HashValue,
     block_preparer: BlockPreparer,
+    pre_commit_hook: PreCommitHook,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
@@ -365,6 +378,7 @@ struct ExecuteBlockCommand {
     block: ExecutableBlock,
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
+    pre_commit_hook: PreCommitHook,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
@@ -374,7 +388,8 @@ struct LedgerApplyCommand {
     input_txns: Vec<SignedTransaction>,
     block_id: HashValue,
     parent_block_id: HashValue,
-    state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
+    execution_time: ExecutorResult<Duration>,
+    pre_commit_hook: PreCommitHook,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
@@ -382,7 +397,7 @@ struct LedgerApplyCommand {
 
 struct PreCommitCommand {
     block_id: HashValue,
-    parent_block_id: HashValue,
+    pre_commit_hook_fut: BoxFuture<'static, ()>,
     result_tx: oneshot::Sender<ExecutorResult<()>>,
     lifetime_guard: CountedRequest<()>,
 }

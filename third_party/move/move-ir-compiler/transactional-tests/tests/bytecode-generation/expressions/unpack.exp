@@ -1,7 +1,7 @@
 processed 3 tasks
 
 task 0 'print-bytecode'. lines 1-18:
-// Move bytecode v6
+// Move bytecode v7
 module 1d12.M {
 struct T {
 	b: bool

@@ -17,7 +17,6 @@ pub mod traits;
 
 use self::{
     faucet::FaucetArgs,
-    health_checker::HealthChecker,
     indexer_api::IndexerApiArgs,
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
@@ -41,6 +40,7 @@ use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
+pub use health_checker::HealthChecker;
 use std::{
     collections::HashSet,
     fs::{create_dir_all, remove_dir_all},
@@ -135,14 +135,14 @@ impl RunLocalnet {
                 HealthChecker::IndexerApiMetadata(_) => continue,
             };
             if !silent {
-                eprintln!("{} is starting, please wait...", health_checker);
+                println!("{} is starting, please wait...", health_checker);
             } else {
                 info!("[silent] {} is starting, please wait...", health_checker);
             }
             let fut = async move {
                 health_checker.wait(None).await?;
                 if !silent {
-                    eprintln!(
+                    println!(
                         "{} is ready. Endpoint: {}",
                         health_checker,
                         health_checker.address_str()
@@ -337,7 +337,7 @@ impl CliCommand<()> for RunLocalnet {
             })?;
         }
 
-        eprintln!(
+        println!(
             "\nReadiness endpoint: http://{}:{}/\n",
             bind_to, self.ready_server_args.ready_server_listen_port,
         );

@@ -52,7 +52,7 @@ fn test_token_creation_with_token_events_store() {
     let _event = events.pop().unwrap();
     let event = events.pop().unwrap();
     assert_eq!(
-        "0x3::token_event_store::OptInTransferEvent".to_string(),
+        "0x3::token_event_store::OptInTransfer".to_string(),
         event.type_tag().to_string()
     );
 }

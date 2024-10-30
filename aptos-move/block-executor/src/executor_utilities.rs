@@ -13,6 +13,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, prelude::*};
+use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
@@ -86,14 +87,22 @@ pub(crate) use resource_writes_to_materialize;
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
-    finalized_group: anyhow::Result<Vec<(T::Tag, ValueWithLayout<T::Value>)>>,
+    finalized_group: anyhow::Result<(Vec<(T::Tag, ValueWithLayout<T::Value>)>, ResourceGroupSize)>,
     metadata_op: T::Value,
     is_read_needing_exchange: bool,
-) -> Result<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>), PanicError> {
+) -> Result<
+    (
+        T::Key,
+        T::Value,
+        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        ResourceGroupSize,
+    ),
+    PanicError,
+> {
     let metadata_is_deletion = metadata_op.is_deletion();
 
     match finalized_group {
-        Ok(finalized_group) => {
+        Ok((finalized_group, group_size)) => {
             if is_read_needing_exchange && metadata_is_deletion {
                 // Value needed exchange but was not written / modified during the txn
                 // execution: may not be empty.
@@ -108,7 +117,7 @@ pub(crate) fn map_finalized_group<T: Transaction>(
                     metadata_is_deletion
                 )))
             } else {
-                Ok((group_key, metadata_op, finalized_group))
+                Ok((group_key, metadata_op, finalized_group, group_size))
             }
         },
         Err(e) => Err(code_invariant_error(format!(
@@ -119,7 +128,12 @@ pub(crate) fn map_finalized_group<T: Transaction>(
 }
 
 pub(crate) fn serialize_groups<T: Transaction>(
-    finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
+    finalized_groups: Vec<(
+        T::Key,
+        T::Value,
+        Vec<(T::Tag, Arc<T::Value>)>,
+        ResourceGroupSize,
+    )>,
 ) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
     fail_point!(
         "fail-point-resource-group-serialization",
@@ -129,27 +143,45 @@ pub(crate) fn serialize_groups<T: Transaction>(
 
     finalized_groups
         .into_iter()
-        .map(|(group_key, mut metadata_op, finalized_group)| {
-            let btree: BTreeMap<T::Tag, Bytes> = finalized_group
-                .into_iter()
-                .map(|(resource_tag, arc_v)| {
-                    let bytes = arc_v
-                        .extract_raw_bytes()
-                        .expect("Deletions should already be applied");
-                    (resource_tag, bytes)
-                })
-                .collect();
+        .map(
+            |(group_key, mut metadata_op, finalized_group, group_size)| {
+                let btree: BTreeMap<T::Tag, Bytes> = finalized_group
+                    .into_iter()
+                    .map(|(resource_tag, arc_v)| {
+                        let bytes = arc_v
+                            .extract_raw_bytes()
+                            .expect("Deletions should already be applied");
+                        (resource_tag, bytes)
+                    })
+                    .collect();
 
-            bcs::to_bytes(&btree)
-                .map_err(|e| {
-                    alert!("Unexpected resource group error {:?}", e);
-                    ResourceGroupSerializationError
-                })
-                .map(|group_bytes| {
-                    metadata_op.set_bytes(group_bytes.into());
-                    (group_key, metadata_op)
-                })
-        })
+                match bcs::to_bytes(&btree) {
+                    Ok(group_bytes) => {
+                        if (!btree.is_empty() || group_size.get() != 0)
+                            && group_bytes.len() as u64 != group_size.get()
+                        {
+                            alert!(
+                                "Serialized resource group size mismatch key = {:?} num items {}, \
+				 len {} recorded size {}, op {:?}",
+                                group_key,
+                                btree.len(),
+                                group_bytes.len(),
+                                group_size.get(),
+                                metadata_op,
+                            );
+                            Err(ResourceGroupSerializationError)
+                        } else {
+                            metadata_op.set_bytes(group_bytes.into());
+                            Ok((group_key, metadata_op))
+                        }
+                    },
+                    Err(e) => {
+                        alert!("Unexpected resource group error {:?}", e);
+                        Err(ResourceGroupSerializationError)
+                    },
+                }
+            },
+        )
         .collect()
 }
 
@@ -169,11 +201,24 @@ pub(crate) fn map_id_to_values_in_group_writes<
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
 >(
-    finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
+    finalized_groups: Vec<(
+        T::Key,
+        T::Value,
+        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        ResourceGroupSize,
+    )>,
     latest_view: &LatestView<T, S, X>,
-) -> Result<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>, PanicError> {
+) -> Result<
+    Vec<(
+        T::Key,
+        T::Value,
+        Vec<(T::Tag, Arc<T::Value>)>,
+        ResourceGroupSize,
+    )>,
+    PanicError,
+> {
     let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
-    for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
+    for (group_key, group_metadata_op, resource_vec, group_size) in finalized_groups.into_iter() {
         let mut patched_resource_vec = Vec::with_capacity(resource_vec.len());
         for (tag, value_with_layout) in resource_vec.into_iter() {
             let value = match value_with_layout {
@@ -185,7 +230,12 @@ pub(crate) fn map_id_to_values_in_group_writes<
             };
             patched_resource_vec.push((tag, value));
         }
-        patched_finalized_groups.push((group_key, group_metadata_op, patched_resource_vec));
+        patched_finalized_groups.push((
+            group_key,
+            group_metadata_op,
+            patched_resource_vec,
+            group_size,
+        ));
     }
     Ok(patched_finalized_groups)
 }

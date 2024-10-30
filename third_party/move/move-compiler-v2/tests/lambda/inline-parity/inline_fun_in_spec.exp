@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::exec` has a function parameter:
+  ┌─ tests/lambda/inline-parity/inline_fun_in_spec.move:3:9
+  │
+3 │     fun exec<T, R>(f: |T|R, x: T): R {
+  │         ^^^^       - Parameter `f` has function-valued type `|T|R`.

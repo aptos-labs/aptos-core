@@ -498,15 +498,16 @@ module aptos_framework::object {
                     to,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut object.transfer_events,
+                TransferEvent {
+                    object: ref.self,
+                    from: object.owner,
+                    to,
+                },
+            );
         };
-        event::emit_event(
-            &mut object.transfer_events,
-            TransferEvent {
-                object: ref.self,
-                from: object.owner,
-                to,
-            },
-        );
         object.owner = to;
     }
 
@@ -554,15 +555,16 @@ module aptos_framework::object {
                         to,
                     },
                 );
+            } else {
+                event::emit_event(
+                    &mut object_core.transfer_events,
+                    TransferEvent {
+                        object,
+                        from: object_core.owner,
+                        to,
+                    },
+                );
             };
-            event::emit_event(
-                &mut object_core.transfer_events,
-                TransferEvent {
-                    object,
-                    from: object_core.owner,
-                    to,
-                },
-            );
             object_core.owner = to;
         };
     }
@@ -842,7 +844,7 @@ module aptos_framework::object {
     #[test(fx = @std)]
     fun test_correct_auid() {
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
-        let bytes = aptos_framework::transaction_context::get_transaction_hash();
+        let bytes = aptos_framework::transaction_context::unique_session_hash();
         std::vector::push_back(&mut bytes, 1);
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, 0);

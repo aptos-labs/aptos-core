@@ -39,5 +39,22 @@ module 0xcafe::vectors {
     }
 } // end 0xcafe::vectors
 
+// -- Sourcified model before bytecode pipeline
+module 0xcafe::vectors {
+    public entry fun guess_flips_break2(flips: vector<u8>): u64 {
+        let i = 0;
+        let flipsref5 = &flips;
+        while (i < 0x1::vector::length<u8>(flipsref5)) {
+            if (*0x1::vector::borrow<u8>(flipsref5, i) != 0u8) break;
+            i = i + 1;
+            if (*0x1::vector::borrow<u8>(flipsref5, i) == 5u8) break;
+        };
+        let _v = copy flips;
+        let _v2 = flips;
+        let x = flipsref5;
+        0x1::vector::length<u8>(x)
+    }
+}
+
 
 ============ bytecode verification succeeded ========

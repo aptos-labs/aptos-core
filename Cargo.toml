@@ -26,9 +26,11 @@ members = [
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-benchmarks",
+    "aptos-move/aptos-vm-environment",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
+    "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
@@ -116,6 +118,7 @@ members = [
     "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
+    "ecosystem/indexer-grpc/indexer-grpc-file-checker",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
@@ -126,7 +129,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-test-transactions",
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
-    "ecosystem/nft-metadata-crawler-parser",
+    "ecosystem/nft-metadata-crawler",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -193,7 +196,6 @@ members = [
     "third_party/move/evm/exec-utils",
     "third_party/move/evm/extract-ethereum-abi",
     # third_party/move
-    "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
@@ -221,6 +223,7 @@ members = [
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
     "third_party/move/move-model/bytecode-test-utils",
+    "third_party/move/move-model/bytecode/ast-generator-tests",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
@@ -231,6 +234,7 @@ members = [
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
+    "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/paranoid-tests",
     "third_party/move/move-vm/runtime",
     "third_party/move/move-vm/test-utils",
@@ -243,6 +247,7 @@ members = [
     "third_party/move/tools/move-bytecode-viewer",
     "third_party/move/tools/move-cli",
     "third_party/move/tools/move-coverage",
+    "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-explain",
     "third_party/move/tools/move-package",
@@ -359,6 +364,7 @@ aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
+aptos-indexer-grpc-file-checker = { path = "ecosystem/indexer-grpc/indexer-grpc-file-checker" }
 aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
@@ -393,7 +399,7 @@ aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
+aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
@@ -455,6 +461,7 @@ aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-vm-environment = { path = "aptos-move/aptos-vm-environment" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
@@ -465,11 +472,12 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
 aes-gcm = "0.10.3"
-ahash = "0.8.11"
+ahash = { version = "0.8.11", features = ["serde"] }
 atty = "0.2.14"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
+ambassador = "0.4.1"
 anyhow = "1.0.71"
 anstyle = "1.0.1"
 arbitrary = { version = "1.3.2", features = ["derive"] }
@@ -519,7 +527,12 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
+clap = { version = "4.3.9", features = [
+    "derive",
+    "env",
+    "unstable-styles",
+    "wrap_help",
+] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [
@@ -550,7 +563,7 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = "2.1"
+diesel = { version = "2.1", features = ["uuid"] }
 # Use the crate version once this feature gets released on crates.io:
 # https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
 diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [
@@ -675,8 +688,14 @@ petgraph = "0.6.5"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 # We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
-poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["anyhow", "rustls"] }
-poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["swagger-ui", "url"] }
+poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "anyhow",
+    "rustls",
+] }
+poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "swagger-ui",
+    "url",
+] }
 poem-openapi-derive = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b" }
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
@@ -694,6 +713,7 @@ prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
 quick_cache = "0.5.1"
+quick-junit = "0.5.0"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
@@ -756,6 +776,7 @@ stats_alloc = "0.1.8"
 status-line = "0.2.0"
 strum = "0.24.1"
 strum_macros = "0.24.2"
+sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
@@ -792,6 +813,7 @@ tonic = { version = "0.11.0", features = [
     "zstd",
 ] }
 tonic-reflection = "0.11.0"
+topological-sort = "0.2.2"
 triomphe = "0.1.9"
 tsify-next = "0.5.4"
 tui = "0.19.0"
@@ -827,6 +849,7 @@ move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-compiler = { path = "third_party/move/move-compiler" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
+move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
@@ -849,6 +872,7 @@ move-transactional-test-runner = { path = "third_party/move/testing-infra/transa
 move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",
 ] }
+move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
 move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
     "table-extension",

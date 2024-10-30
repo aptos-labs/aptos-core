@@ -62,6 +62,7 @@ pub struct K8sSwarm {
     era: Option<String>,
     use_port_forward: bool,
     chaos_experiment_ops: Box<dyn ChaosExperimentOps + Send + Sync>,
+    has_indexer: bool,
 }
 
 impl K8sSwarm {
@@ -75,6 +76,7 @@ impl K8sSwarm {
         keep: bool,
         era: Option<String>,
         use_port_forward: bool,
+        has_indexer: bool,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await?;
 
@@ -123,6 +125,7 @@ impl K8sSwarm {
                 kube_client: kube_client.clone(),
                 kube_namespace: kube_namespace.to_string(),
             }),
+            has_indexer,
         };
 
         // test hitting the configured prometheus endpoint
@@ -446,6 +449,10 @@ impl Swarm for K8sSwarm {
     fn get_default_pfn_node_config(&self) -> NodeConfig {
         get_default_pfn_node_config()
     }
+
+    fn has_indexer(&self) -> bool {
+        self.has_indexer
+    }
 }
 
 /// Amount of time to wait for genesis to complete
@@ -456,11 +463,6 @@ pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
 
 /// Amount of time to wait for nodes to spin up, from provisioning to API ready
 pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
-    // retry every 10 seconds for 20 minutes
-    fixed_retry_strategy(10 * 1000, 120)
-}
-
-pub fn k8s_wait_indexer_strategy() -> impl Iterator<Item = Duration> {
     // retry every 10 seconds for 20 minutes
     fixed_retry_strategy(10 * 1000, 120)
 }
@@ -733,8 +735,8 @@ trait ChaosExperimentOps {
     async fn list_stress_chaos(&self) -> Result<Vec<StressChaos>>;
 
     async fn ensure_chaos_experiments_active(&self) -> Result<()> {
-        let timeout_duration = Duration::from_secs(300); // 5 minutes
-        let polling_interval = Duration::from_secs(5);
+        let timeout_duration = Duration::from_secs(600); // 10 minutes
+        let polling_interval = Duration::from_secs(10);
 
         tokio::time::timeout(timeout_duration, async {
             loop {
@@ -791,6 +793,8 @@ fn check_all_injected(status: &Option<ChaosStatus>) -> bool {
         .map_or(false, |conditions| {
             conditions.iter().any(|c| {
                 c.r#type == ChaosConditionType::AllInjected && c.status == ConditionStatus::True
+            }) && conditions.iter().any(|c| {
+                c.r#type == ChaosConditionType::Selected && c.status == ConditionStatus::True
             })
         })
 }
@@ -868,19 +872,31 @@ mod tests {
     ) -> (Vec<NetworkChaos>, Vec<StressChaos>) {
         let network_chaos = NetworkChaos {
             status: Some(ChaosStatus {
-                conditions: Some(vec![ChaosCondition {
-                    r#type: ChaosConditionType::AllInjected,
-                    status: network_status,
-                }]),
+                conditions: Some(vec![
+                    ChaosCondition {
+                        r#type: ChaosConditionType::AllInjected,
+                        status: network_status.clone(),
+                    },
+                    ChaosCondition {
+                        r#type: ChaosConditionType::Selected,
+                        status: network_status,
+                    },
+                ]),
             }),
             ..NetworkChaos::new("test", Default::default())
         };
         let stress_chaos = StressChaos {
             status: Some(ChaosStatus {
-                conditions: Some(vec![ChaosCondition {
-                    r#type: ChaosConditionType::AllInjected,
-                    status: stress_status,
-                }]),
+                conditions: Some(vec![
+                    ChaosCondition {
+                        r#type: ChaosConditionType::AllInjected,
+                        status: stress_status.clone(),
+                    },
+                    ChaosCondition {
+                        r#type: ChaosConditionType::Selected,
+                        status: stress_status,
+                    },
+                ]),
             }),
             ..StressChaos::new("test", Default::default())
         };

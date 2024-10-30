@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, MultisigTransactionPayload, TransactionPayload},
+    transaction::{
+        EntryFunction, MultisigTransactionPayload, RawTransactionWithData, TransactionPayload,
+    },
 };
 use bcs::to_bytes;
 use move_core_types::{
@@ -31,6 +34,7 @@ struct TransactionContextStore {
     type_arg_names: Vec<String>,
     args: Vec<Vec<u8>>,
     multisig_address: AccountAddress,
+    raw_transaction_hash: Vec<u8>,
 }
 
 fn setup(harness: &mut MoveHarness) -> Account {
@@ -467,4 +471,137 @@ fn test_transaction_context_multisig_payload() {
     );
     assert!(txn_ctx_store.type_arg_names.is_empty());
     assert!(txn_ctx_store.args.is_empty());
+}
+
+#[test]
+fn test_transaction_context_raw_transaction_hash_simple() {
+    let mut harness = new_move_harness();
+    let account = setup(&mut harness);
+    let signed_txn = harness.create_entry_function(
+        &account,
+        str::parse(
+            "0x1::transaction_context_test::store_raw_transaction_hash_from_native_txn_context",
+        )
+        .unwrap(),
+        vec![],
+        vec![],
+    );
+    let expected_hash = signed_txn.clone().into_raw_transaction().hash();
+    let status = harness.run(signed_txn);
+    assert!(status.status().unwrap().is_success());
+    let txn_ctx_store = harness
+        .read_resource::<crate::tests::transaction_context::TransactionContextStore>(
+            account.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+    let hash = txn_ctx_store.raw_transaction_hash;
+    assert_eq!(hash, expected_hash.to_vec());
+}
+
+#[test]
+fn test_transaction_context_raw_transaction_hash_multiagent() {
+    let mut harness = new_move_harness();
+
+    let alice = setup(&mut harness);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+
+    let fun: MemberId = str::parse(
+        "0x1::transaction_context_test::store_raw_transaction_hash_from_native_txn_context_multi",
+    )
+    .unwrap();
+    let MemberId {
+        module_id,
+        member_id: function_id,
+    } = fun;
+    let ty_args = vec![];
+    let args = vec![];
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        function_id,
+        ty_args,
+        args,
+    ));
+    let signed_txn = TransactionBuilder::new(alice.clone())
+        .secondary_signers(vec![bob.clone()])
+        .payload(payload)
+        .sequence_number(harness.sequence_number(alice.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign_multi_agent();
+
+    let raw_txn_with_data =
+        RawTransactionWithData::new_multi_agent(signed_txn.clone().into_raw_transaction(), vec![
+            *bob.address(),
+        ]);
+    let expected_hash = raw_txn_with_data.hash();
+
+    let output = harness.run_raw(signed_txn);
+    assert_success!(*output.status());
+
+    let txn_ctx_store = harness
+        .read_resource::<crate::tests::transaction_context::TransactionContextStore>(
+            alice.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+
+    let hash = txn_ctx_store.raw_transaction_hash;
+    assert_eq!(hash, expected_hash.to_vec());
+}
+
+#[test]
+fn test_transaction_context_raw_transaction_hash_multiagent_with_fee_payer() {
+    let mut harness = new_move_harness();
+
+    let alice = setup(&mut harness);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+    let fee_payer = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+
+    let fun: MemberId = str::parse(
+        "0x1::transaction_context_test::store_raw_transaction_hash_from_native_txn_context_multi",
+    )
+    .unwrap();
+    let MemberId {
+        module_id,
+        member_id: function_id,
+    } = fun;
+    let ty_args = vec![];
+    let args = vec![];
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        function_id,
+        ty_args,
+        args,
+    ));
+    let signed_txn = TransactionBuilder::new(alice.clone())
+        .fee_payer(fee_payer.clone())
+        .secondary_signers(vec![bob.clone()])
+        .payload(payload)
+        .sequence_number(harness.sequence_number(alice.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign_fee_payer();
+
+    // In the case of a fee payer transaction, the hash value is generated using
+    // AccountAddress::ZERO as the fee payer address.
+    let raw_txn_with_data = RawTransactionWithData::new_fee_payer(
+        signed_txn.clone().into_raw_transaction(),
+        vec![*bob.address()],
+        AccountAddress::ZERO,
+    );
+    let expected_hash = raw_txn_with_data.hash();
+
+    let output = harness.run_raw(signed_txn);
+    assert_success!(*output.status());
+
+    let txn_ctx_store = harness
+        .read_resource::<crate::tests::transaction_context::TransactionContextStore>(
+            alice.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+
+    let hash = txn_ctx_store.raw_transaction_hash;
+    assert_eq!(hash, expected_hash.to_vec());
 }

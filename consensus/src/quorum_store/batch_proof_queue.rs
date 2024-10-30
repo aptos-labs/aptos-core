@@ -7,17 +7,20 @@ use super::{
 };
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
-    common::TxnSummaryWithExpiration,
+    common::{Author, TxnSummaryWithExpiration},
     payload::TDataInfo,
     proof_of_store::{BatchInfo, ProofOfStore},
     utils::PayloadTxnsSize,
 };
 use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_metrics_core::TimerHelper;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{prelude::SliceRandom, thread_rng};
 use std::{
     cmp::Reverse,
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    ops::Bound,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -69,10 +72,16 @@ pub struct BatchProofQueue {
     remaining_proofs: u64,
     remaining_local_txns: u64,
     remaining_local_proofs: u64,
+
+    batch_expiry_gap_when_init_usecs: u64,
 }
 
 impl BatchProofQueue {
-    pub(crate) fn new(my_peer_id: PeerId, batch_store: Arc<BatchStore>) -> Self {
+    pub(crate) fn new(
+        my_peer_id: PeerId,
+        batch_store: Arc<BatchStore>,
+        batch_expiry_gap_when_init_usecs: u64,
+    ) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
@@ -85,6 +94,7 @@ impl BatchProofQueue {
             remaining_proofs: 0,
             remaining_local_txns: 0,
             remaining_local_proofs: 0,
+            batch_expiry_gap_when_init_usecs,
         }
     }
 
@@ -184,10 +194,21 @@ impl BatchProofQueue {
         let expiration = proof.expiration();
 
         let batch_sort_key = BatchSortKey::from_info(proof.info());
-        self.author_to_batches
-            .entry(author)
-            .or_default()
-            .insert(batch_sort_key.clone(), proof.info().clone());
+        let batches_for_author = self.author_to_batches.entry(author).or_default();
+        batches_for_author.insert(batch_sort_key.clone(), proof.info().clone());
+
+        // Check if a batch with a higher batch Id (reverse sorted) exists
+        if let Some((prev_batch_key, _)) = batches_for_author
+            .range((Bound::Unbounded, Bound::Excluded(batch_sort_key.clone())))
+            .next_back()
+        {
+            if prev_batch_key.gas_bucket_start() == batch_sort_key.gas_bucket_start() {
+                counters::PROOF_MANAGER_OUT_OF_ORDER_PROOF_INSERTION
+                    .with_label_values(&[author.short_str().as_str()])
+                    .inc();
+            }
+        }
+
         self.expirations.add_item(batch_sort_key, expiration);
 
         // If we are here, then proof is added for the first time. Otherwise, we will
@@ -389,11 +410,13 @@ impl BatchProofQueue {
         let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             false,
             excluded_batches,
+            &HashSet::new(),
             max_txns,
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
             return_non_full,
             block_timestamp,
+            None,
         );
         let proof_of_stores: Vec<_> = result
             .into_iter()
@@ -412,6 +435,11 @@ impl BatchProofQueue {
             .collect();
 
         if is_full || return_non_full {
+            counters::CONSENSUS_PULL_NUM_UNIQUE_TXNS.observe_with(&["proof"], unique_txns as f64);
+            counters::CONSENSUS_PULL_NUM_TXNS.observe_with(&["proof"], all_txns.count() as f64);
+            counters::CONSENSUS_PULL_SIZE_IN_BYTES
+                .observe_with(&["proof"], all_txns.size_in_bytes() as f64);
+
             counters::BLOCK_SIZE_WHEN_PULL.observe(unique_txns as f64);
             counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(all_txns.count() as f64);
             counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
@@ -429,23 +457,60 @@ impl BatchProofQueue {
     pub fn pull_batches(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
+        exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
+        minimum_batch_age_usecs: Option<u64>,
     ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64) {
-        let (result, all_txns, unique_txns, _) = self.pull_internal(
-            true,
+        let (result, pulled_txns, unique_txns, is_full) = self.pull_batches_internal(
             excluded_batches,
+            exclude_authors,
             max_txns,
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
             return_non_full,
             block_timestamp,
+            minimum_batch_age_usecs,
+        );
+
+        if is_full || return_non_full {
+            counters::CONSENSUS_PULL_NUM_UNIQUE_TXNS
+                .observe_with(&["optbatch"], unique_txns as f64);
+            counters::CONSENSUS_PULL_NUM_TXNS
+                .observe_with(&["optbatch"], pulled_txns.count() as f64);
+            counters::CONSENSUS_PULL_SIZE_IN_BYTES
+                .observe_with(&["optbatch"], pulled_txns.size_in_bytes() as f64);
+        }
+        (result, pulled_txns, unique_txns)
+    }
+
+    pub fn pull_batches_internal(
+        &mut self,
+        excluded_batches: &HashSet<BatchInfo>,
+        exclude_authors: &HashSet<Author>,
+        max_txns: PayloadTxnsSize,
+        max_txns_after_filtering: u64,
+        soft_max_txns_after_filtering: u64,
+        return_non_full: bool,
+        block_timestamp: Duration,
+        minimum_batch_age_usecs: Option<u64>,
+    ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64, bool) {
+        let (result, all_txns, unique_txns, is_full) = self.pull_internal(
+            true,
+            excluded_batches,
+            exclude_authors,
+            max_txns,
+            max_txns_after_filtering,
+            soft_max_txns_after_filtering,
+            return_non_full,
+            block_timestamp,
+            minimum_batch_age_usecs,
         );
         let batches = result.into_iter().map(|item| item.info.clone()).collect();
-        (batches, all_txns, unique_txns)
+        (batches, all_txns, unique_txns, is_full)
     }
 
     pub fn pull_batches_with_transactions(
@@ -461,13 +526,15 @@ impl BatchProofQueue {
         PayloadTxnsSize,
         u64,
     ) {
-        let (batches, all_txns, unique_txns) = self.pull_batches(
+        let (batches, pulled_txns, unique_txns, is_full) = self.pull_batches_internal(
             excluded_batches,
+            &HashSet::new(),
             max_txns,
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
             return_non_full,
             block_timestamp,
+            None,
         );
         let mut result = Vec::new();
         for batch in batches.into_iter() {
@@ -482,18 +549,27 @@ impl BatchProofQueue {
                 );
             }
         }
-        (result, all_txns, unique_txns)
+
+        if is_full || return_non_full {
+            counters::CONSENSUS_PULL_NUM_UNIQUE_TXNS.observe_with(&["inline"], unique_txns as f64);
+            counters::CONSENSUS_PULL_NUM_TXNS.observe_with(&["inline"], pulled_txns.count() as f64);
+            counters::CONSENSUS_PULL_SIZE_IN_BYTES
+                .observe_with(&["inline"], pulled_txns.size_in_bytes() as f64);
+        }
+        (result, pulled_txns, unique_txns)
     }
 
     fn pull_internal(
         &mut self,
         batches_without_proofs: bool,
         excluded_batches: &HashSet<BatchInfo>,
+        exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
+        min_batch_age_usecs: Option<u64>,
     ) -> (Vec<&QueueItem>, PayloadTxnsSize, u64, bool) {
         let mut result = Vec::new();
         let mut cur_unique_txns = 0;
@@ -515,10 +591,27 @@ impl BatchProofQueue {
             }
         }
 
+        let max_batch_creation_ts_usecs = min_batch_age_usecs
+            .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
         let mut iters = vec![];
-        for (_, batches) in self.author_to_batches.iter() {
+        for (_, batches) in self
+            .author_to_batches
+            .iter()
+            .filter(|(author, _)| !exclude_authors.contains(author))
+        {
             let batch_iter = batches.iter().rev().filter_map(|(sort_key, info)| {
                 if let Some(item) = self.items.get(&sort_key.batch_key) {
+                    let batch_create_ts_usecs =
+                        item.info.expiration() - self.batch_expiry_gap_when_init_usecs;
+
+                    // Ensure that the batch was created at least `min_batch_age_usecs` ago to
+                    // reduce the chance of inline fetches.
+                    if max_batch_creation_ts_usecs
+                        .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
+                    {
+                        return None;
+                    }
+
                     if item.is_committed() {
                         return None;
                     }

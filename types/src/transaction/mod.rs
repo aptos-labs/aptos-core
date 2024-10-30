@@ -1202,6 +1202,16 @@ impl TransactionOutput {
         }
     }
 
+    pub fn new_empty_success() -> Self {
+        Self {
+            write_set: WriteSet::default(),
+            events: vec![],
+            gas_used: 0,
+            status: TransactionStatus::Keep(ExecutionStatus::Success),
+            auxiliary_data: TransactionAuxiliaryData::None,
+        }
+    }
+
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
         (self.write_set, self.events)
     }
@@ -1334,15 +1344,9 @@ impl TransactionOutput {
         }
         Ok(None)
     }
-}
 
-pub trait TransactionOutputProvider {
-    fn get_transaction_output(&self) -> &TransactionOutput;
-}
-
-impl TransactionOutputProvider for TransactionOutput {
-    fn get_transaction_output(&self) -> &TransactionOutput {
-        self
+    pub fn has_new_epoch_event(&self) -> bool {
+        self.events.iter().any(ContractEvent::is_new_epoch_event)
     }
 }
 
@@ -1563,6 +1567,15 @@ impl TransactionToCommit {
     pub fn dummy_with_transaction_info(transaction_info: TransactionInfo) -> Self {
         Self {
             transaction_info,
+            ..Self::dummy()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction(transaction: Transaction) -> Self {
+        Self {
+            transaction,
+            transaction_info: TransactionInfo::dummy(),
             ..Self::dummy()
         }
     }
@@ -1991,6 +2004,13 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
+    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V0 {
+            block_id,
+            block_end_info,
+        })
+    }
+
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
@@ -2027,7 +2047,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(vt) => vt.type_name(),
-            Transaction::BlockMetadataExt(_) => "block_metadata_ext",
+            Transaction::BlockMetadataExt(bmet) => bmet.type_name(),
         }
     }
 
