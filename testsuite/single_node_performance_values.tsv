@@ -13,8 +13,8 @@ batch100-transfer	1	VM	60	0.794	1.041	634.6
 batch100-transfer	1	NativeVM	60	0.776	1.157	1387.1
 vector-picture30k	1	VM	60	0.960	1.051	102.5
 vector-picture30k	100	VM	60	0.754	1.051	1855.3
-smart-table-picture30-k-with200-change	1	VM	60	0.922	1.047	16.1
-smart-table-picture30-k-with200-change	100	VM	60	0.924	1.089	209.5
+smart-table-picture30-k-with200-change	1	VM	5	0.922	1.1	15.4
+smart-table-picture30-k-with200-change	100	VM	5	0.924	1.14	198.5
 modify-global-resource-agg-v2	1	VM	60	0.829	1.033	34327.5
 modify-global-flag-agg-v2	1	VM	60	0.954	1.021	4224.0
 modify-global-bounded-agg-v2	1	VM	60	0.869	1.076	7793.9

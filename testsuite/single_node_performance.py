@@ -116,6 +116,10 @@ else:
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
 SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
 
+if os.environ.get("DISABLE_MOVE2"):
+    ADDITIONAL_BUILD_ENV = ""
+else: 
+    ADDITIONAL_BUILD_ENV = "MOVE_COMPILER_V2=1 MOVE_LANGUAGE_V2=1 MVC_BLOCK_V1=1"
 
 @dataclass(frozen=True)
 class RunGroupKey:
@@ -622,7 +626,7 @@ warnings = []
 with tempfile.TemporaryDirectory() as tmpdirname:
     move_e2e_benchmark_failed = False
     if not SKIP_MOVE_E2E:
-        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        execute_command(f"{ADDITIONAL_BUILD_ENV} cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
         try:
             execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
         except:
@@ -654,7 +658,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     }
     print(calibrated_expected_tps)
 
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
+    execute_command(f"{ADDITIONAL_BUILD_ENV} cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
