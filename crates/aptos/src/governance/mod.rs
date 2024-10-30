@@ -441,7 +441,7 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
 }
 
 /// Extract the proposal id from the events of a proposal creation transaction.
-fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
+pub fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
     if let Transaction::UserTransaction(inner) = txn {
         // Find event with proposal id
         let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
@@ -473,9 +473,9 @@ struct CreateProposalEvent {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProposalSubmissionSummary {
-    proposal_id: Option<u64>,
+    pub proposal_id: Option<u64>,
     #[serde(flatten)]
-    transaction: TransactionSummary,
+    pub transaction: TransactionSummary,
 }
 
 /// Submit a vote on a proposal

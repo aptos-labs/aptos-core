@@ -5,18 +5,16 @@ use crate::{aptos_framework_path, components::ProposalMetadata, ExecutionMode, R
 use anyhow::Result;
 use aptos::{
     common::types::CliCommand,
-    governance::{ExecuteProposal, SubmitProposal, SubmitVote},
+    governance::{self, ExecuteProposal, SubmitProposal, SubmitVote},
     move_tool::{RunFunction, RunScript},
     stake::IncreaseLockup,
 };
-use aptos_api_types::U64;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_genesis::keys::PrivateIdentity;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
-use serde::Deserialize;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -35,11 +33,6 @@ pub struct NetworkConfig {
     pub validator_account: AccountAddress,
     pub validator_key: Ed25519PrivateKey,
     pub framework_git_rev: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct CreateProposalEvent {
-    proposal_id: U64,
 }
 
 impl NetworkConfig {
@@ -218,33 +211,16 @@ impl NetworkConfig {
 
         let rev_string = self.framework_git_rev.clone();
         let framework_path = aptos_framework_path();
-        if let Some(rev) = &rev_string {
+        let result = if let Some(rev) = &rev_string {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
-            SubmitProposal::try_parse_from(args)?.execute().await?;
+            SubmitProposal::try_parse_from(args)?.execute().await?
         } else {
             args.push("--framework-local-dir");
             args.push(framework_path.as_os_str().to_str().unwrap());
-            SubmitProposal::try_parse_from(args)?.execute().await?;
+            SubmitProposal::try_parse_from(args)?.execute().await?
         };
-
-        // Get proposal id.
-        let event = Client::new(self.endpoint.clone())
-            .get_account_events(
-                AccountAddress::ONE,
-                "0x1::aptos_governance::GovernanceEvents",
-                "create_proposal_events",
-                None,
-                Some(1),
-            )
-            .await?
-            .into_inner()
-            .pop()
-            .unwrap();
-
-        Ok(*serde_json::from_value::<CreateProposalEvent>(event.data)?
-            .proposal_id
-            .inner())
+        result.proposal_id.ok_or(anyhow::anyhow!("Failed to find proposal id"))
     }
 
     pub async fn vote_proposal(&self, proposal_id: u64) -> Result<()> {

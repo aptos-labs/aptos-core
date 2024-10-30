@@ -3507,7 +3507,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
- "aptos-api-types",
  "aptos-build-info",
  "aptos-crypto",
  "aptos-framework",
