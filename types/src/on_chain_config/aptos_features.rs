@@ -96,7 +96,6 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
-    TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE = 80,
     ENABLE_LOADER_V2 = 81,
 }
 
@@ -175,7 +174,6 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
-            FeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE,
             // TODO(loader_v2): Enable V2 loader.
             // FeatureFlag::ENABLE_LOADER_V2,
         ]
