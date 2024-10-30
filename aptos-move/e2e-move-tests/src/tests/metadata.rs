@@ -18,16 +18,30 @@ use aptos_types::{
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress,
     language_storage::CORE_CODE_ADDRESS,
     metadata::Metadata,
     vm_status::{StatusCode, StatusCode::CONSTRAINT_NOT_SATISFIED},
 };
 use move_model::metadata::{CompilationMetadata, CompilerVersion, COMPILATION_METADATA_KEY};
+use rstest::rstest;
 use std::collections::BTreeMap;
 
-#[test]
-fn test_unknown_metadata_key() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_unknown_metadata_key(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let unknown_key = || {
         let metadata = Metadata {
             key: vec![1, 2, 3, 4, 5],
@@ -35,12 +49,31 @@ fn test_unknown_metadata_key() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(unknown_key);
+    let result = test_metadata_with_changes(
+        unknown_key,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn test_duplicate_entries() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_duplicate_entries(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let duplicate_same_version = || {
         let metadata = Metadata {
             key: APTOS_METADATA_KEY_V1.to_vec(),
@@ -48,7 +81,12 @@ fn test_duplicate_entries() {
         };
         vec![metadata.clone(), metadata]
     };
-    let result = test_metadata_with_changes(duplicate_same_version);
+    let result = test_metadata_with_changes(
+        duplicate_same_version,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
     let duplicate_different_version = || {
@@ -66,12 +104,31 @@ fn test_duplicate_entries() {
         vec![metadata_v1, metadata_v0]
     };
 
-    let result = test_metadata_with_changes(duplicate_different_version);
+    let result = test_metadata_with_changes(
+        duplicate_different_version,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-#[test]
-fn test_malformed_metadata_value() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_malformed_metadata_value(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let invalid_value = || {
         let metadata = Metadata {
             key: APTOS_METADATA_KEY.to_vec(),
@@ -79,7 +136,12 @@ fn test_malformed_metadata_value() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(invalid_value);
+    let result = test_metadata_with_changes(
+        invalid_value,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
     let v0_to_v1 = || {
@@ -89,7 +151,12 @@ fn test_malformed_metadata_value() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(v0_to_v1);
+    let result = test_metadata_with_changes(
+        v0_to_v1,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 
     let v1_to_v0 = || {
@@ -102,23 +169,36 @@ fn test_malformed_metadata_value() {
         };
         vec![metadata]
     };
-    let result = test_metadata_with_changes(v1_to_v0);
+    let result = test_metadata_with_changes(
+        v1_to_v0,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
-fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatus {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
-
+fn test_metadata_with_changes(
+    f: impl Fn() -> Vec<Metadata>,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> TransactionStatus {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
         "m.move",
-        r#"
-        module 0xf00d::M {
+        format!(
+            r#"
+        module {}::M {{
             #[view]
-            fun foo(value: u64): u64 { value }
-        }
+            fun foo(value: u64): u64 {{ value }}
+        }}
         "#,
+            account.address()
+        )
+        .as_str(),
     );
     let path = builder.write_to_temp().unwrap();
 
@@ -143,8 +223,22 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
     )
 }
 
-#[test]
-fn test_duplicate_compilation_metadata_entries() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_duplicate_compilation_metadata_entries(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let duplicate_compilation_metatdata = || Metadata {
         key: COMPILATION_METADATA_KEY.to_vec(),
         value: bcs::to_bytes(&CompilationMetadata::default()).unwrap(),
@@ -152,11 +246,17 @@ fn test_duplicate_compilation_metadata_entries() {
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
         CompilerVersion::V2_1,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
         CompilerVersion::V1,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_success!(result);
 }
@@ -164,19 +264,25 @@ fn test_duplicate_compilation_metadata_entries() {
 fn test_compilation_metadata_with_changes(
     f: impl Fn() -> Metadata,
     compiler_version: CompilerVersion,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> TransactionStatus {
-    let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
-
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
         "m.move",
-        r#"
-        module 0xf00d::M {
+        format!(
+            r#"
+        module {}::M {{
             #[view]
-            fun foo(value: u64): u64 { value }
-        }
+            fun foo(value: u64): u64 {{ value }}
+        }}
         "#,
+            account.address()
+        )
+        .as_str(),
     );
     let path = builder.write_to_temp().unwrap();
 
@@ -209,23 +315,30 @@ fn test_compilation_metadata_internal(
     mainnet_flag: bool,
     v2_flag: bool,
     feature_enabled: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> TransactionStatus {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     if feature_enabled {
         h.enable_features(vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE], vec![]);
     } else {
         h.enable_features(vec![], vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE]);
     }
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
         "m.move",
-        r#"
-        module 0xf00d::M {
+        format!(
+            r#"
+        module {}::M {{
             #[view]
-            fun foo(value: u64): u64 { value }
-        }
+            fun foo(value: u64): u64 {{ value }}
+        }}
         "#,
+            account.address()
+        )
+        .as_str(),
     );
     let path = builder.write_to_temp().unwrap();
 
@@ -273,8 +386,11 @@ fn test_compilation_metadata_script_internal(
     mainnet_flag: bool,
     v2_flag: bool,
     feature_enabled: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> TransactionStatus {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     if feature_enabled {
         h.enable_features(
             vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT],
@@ -285,7 +401,7 @@ fn test_compilation_metadata_script_internal(
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
         ]);
     }
-    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
         "m.move",
@@ -325,31 +441,61 @@ fn test_compilation_metadata_script_internal(
     }
 }
 
-#[test]
-fn test_compilation_metadata_for_script() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_compilation_metadata_for_script(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut enable_check = true;
     // run compiler v2 code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_script_internal(true, true, enable_check),
+        test_compilation_metadata_script_internal(
+            true,
+            true,
+            enable_check,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions
+        ),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // run compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_script_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
     // run compiler v2 code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
     // run compiler v1 code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
 
     enable_check = false;
@@ -358,79 +504,141 @@ fn test_compilation_metadata_for_script() {
     assert_success!(test_compilation_metadata_script_internal(
         true,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ),);
     // run compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_script_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
     // run compiler v2 code to test
     // success because the feature flag is turned off
     assert_success!(test_compilation_metadata_script_internal(
         false,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ),);
     // run compiler v1 code to test
     assert_success!(test_compilation_metadata_script_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
 }
 
-#[test]
-fn test_compilation_metadata() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_compilation_metadata(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut enable_check = true;
     // publish compiler v2 code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_internal(true, true, enable_check),
+        test_compilation_metadata_internal(
+            true,
+            true,
+            enable_check,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions
+        ),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
     // publish compiler v2 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         true,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
     // publish compiler v1 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
 
     enable_check = false;
     // publish compiler v2 code to mainnet
     // failed because the metadata cannot be recognized
     assert_vm_status!(
-        test_compilation_metadata_internal(true, true, enable_check),
+        test_compilation_metadata_internal(
+            true,
+            true,
+            enable_check,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions
+        ),
         CONSTRAINT_NOT_SATISFIED
     );
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
         true,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
     // publish compiler v2 code to test
     // failed because the metadata cannot be recognized
     assert_vm_status!(
-        test_compilation_metadata_internal(false, true, enable_check),
+        test_compilation_metadata_internal(
+            false,
+            true,
+            enable_check,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions
+        ),
         CONSTRAINT_NOT_SATISFIED
     );
     // publish compiler v1 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         false,
-        enable_check
+        enable_check,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ));
 }

@@ -15,8 +15,8 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
+    AccountData, Address, AptosErrorCode, AsConverter, AssetType, HexEncodedBytes, LedgerInfo,
+    MoveModuleBytecode, MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
 use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
 use aptos_types::{
@@ -263,32 +263,44 @@ impl Account {
     /// * JSON: Return a JSON encoded version of [`AccountData`]
     /// * BCS: Return a BCS encoded version of [`AccountData`]
     pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
-        // Retrieve the Account resource and convert it accordingly
-        let state_value = self.get_account_resource()?;
-
-        // Convert the AccountResource into the summary object AccountData
-        let account_resource: AccountResource = bcs::from_bytes(&state_value)
-            .context("Internal error deserializing response from DB")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
-                )
-            })?;
-        let account_data: AccountData = account_resource.into();
-
         match accept_type {
-            AcceptType::Json => BasicResponse::try_from_json((
-                account_data,
-                &self.latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
-            AcceptType::Bcs => BasicResponse::try_from_encoded((
-                state_value,
-                &self.latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            AcceptType::Json => {
+                // Retrieve the Account resource and convert it accordingly
+                let account_data = if let Ok(state_value) = self.get_account_resource() {
+                    // Convert the AccountResource into the summary object AccountData
+                    let account_resource: AccountResource = bcs::from_bytes(&state_value)
+                        .context("Internal error deserializing response from DB")
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?;
+                    account_resource.into()
+                } else {
+                    AccountData {
+                        sequence_number: aptos_api_types::U64(0),
+                        // Question: What's the right authentication key to return here?
+                        authentication_key: HexEncodedBytes::from(Vec::new()),
+                        state_exists: false,
+                    }
+                };
+                BasicResponse::try_from_json((
+                    account_data,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            },
+            AcceptType::Bcs => {
+                // Retrieve the Account resource and convert it accordingly
+                let state_value = self.get_account_resource()?;
+                BasicResponse::try_from_encoded((
+                    state_value,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            },
         }
     }
 
