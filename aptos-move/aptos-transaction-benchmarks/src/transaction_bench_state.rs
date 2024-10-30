@@ -129,7 +129,11 @@ where
         }
     }
 
-    pub fn gen_transaction(&mut self) -> Vec<SignatureVerifiedTransaction> {
+    pub fn gen_transaction(
+        &mut self,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) -> Vec<SignatureVerifiedTransaction> {
         let mut runner = TestRunner::default();
         let transaction_gens = vec(&self.strategy, self.num_transactions)
             .new_tree(&mut runner)
@@ -138,7 +142,15 @@ where
         let mut transactions: Vec<Transaction> = transaction_gens
             .into_iter()
             .map(|txn_gen| {
-                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
+                Transaction::UserTransaction(
+                    txn_gen
+                        .apply(
+                            &mut self.account_universe,
+                            use_txn_payload_v2_format,
+                            use_orderless_transactions,
+                        )
+                        .0,
+                )
             })
             .collect();
 
@@ -182,18 +194,30 @@ where
     }
 
     /// Executes this state in a single block.
-    pub(crate) fn execute_sequential(mut self) {
+    pub(crate) fn execute_sequential(
+        mut self,
+        use_txn_payload_v2_format: bool,
+        use_orderless_txns: bool,
+    ) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let txn_provider = DefaultTxnProvider::new(self.gen_transaction());
+        let txn_provider = DefaultTxnProvider::new(
+            self.gen_transaction(use_txn_payload_v2_format, use_orderless_txns),
+        );
         self.execute_benchmark_sequential(&txn_provider, None);
     }
 
     /// Executes this state in a single block.
-    pub(crate) fn execute_parallel(mut self) {
+    pub(crate) fn execute_parallel(
+        mut self,
+        use_txn_payload_v2_format: bool,
+        use_orderless_txns: bool,
+    ) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let txn_provider = DefaultTxnProvider::new(self.gen_transaction());
+        let txn_provider = DefaultTxnProvider::new(
+            self.gen_transaction(use_txn_payload_v2_format, use_orderless_txns),
+        );
         self.execute_benchmark_parallel(&txn_provider, num_cpus::get(), None);
     }
 

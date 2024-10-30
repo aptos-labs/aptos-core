@@ -20,6 +20,9 @@ use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use rstest::rstest;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+// TODO[Orderless]: Once Aaron updates `create_object_code_deployment_address` function to not take sequence number as input,
+// revisit these tests and adapt them to orderless accounts
+
 /// This tests the `object_code_deployment.move` module under the `aptos-framework` package.
 /// The feature `OBJECT_CODE_DEPLOYMENT` is on by default for tests.
 
@@ -52,8 +55,9 @@ impl TestContext {
             MoveHarness::new()
         };
 
-        let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-        let sequence_number = harness.sequence_number(account.address());
+        let account =
+            harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+        let sequence_number = harness.sequence_number_opt(account.address()).unwrap();
         let object_address =
             create_object_code_deployment_address(*account.address(), sequence_number + 1);
         TestContext {
@@ -242,7 +246,7 @@ fn object_code_deployment_upgrade_fail_when_not_owner() {
     // We should not be able to upgrade with a different account.
     let different_account = context
         .harness
-        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
     let status = context.execute_object_code_action(
         &different_account,
         "object_code_deployment.data/pack_upgrade_compat",
@@ -367,7 +371,7 @@ fn freeze_code_object_fail_when_not_owner() {
 
     let different_account = context
         .harness
-        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+        .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), Some(0));
     let status =
         context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze);
 
@@ -388,7 +392,7 @@ fn freeze_code_object_fail_when_having_mutable_dependency() {
     options
         .named_addresses
         .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
-    let sequence_number = context.harness.sequence_number(acc.address());
+    let sequence_number = context.harness.sequence_number_opt(acc.address()).unwrap();
     context.object_address =
         create_object_code_deployment_address(*acc.address(), sequence_number + 1);
     options.named_addresses.insert(
@@ -422,7 +426,7 @@ fn freeze_code_object_succeeds_when_all_dependencies_immutable() {
     options
         .named_addresses
         .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
-    let sequence_number = context.harness.sequence_number(acc.address());
+    let sequence_number = context.harness.sequence_number_opt(acc.address()).unwrap();
     context.object_address =
         create_object_code_deployment_address(*acc.address(), sequence_number + 1);
     options.named_addresses.insert(

@@ -75,6 +75,7 @@ pub trait AptosValidatorInterface: Sync {
 
     async fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
+    // TODO[Orderless]: Should a similar function be added which takes a replay protector as input?
     async fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,

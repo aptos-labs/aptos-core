@@ -138,7 +138,7 @@ impl BatchGenerator {
                 (
                     TransactionSummary::new(
                         txn.sender(),
-                        txn.sequence_number(),
+                        txn.replay_protector(),
                         txn.committed_hash(),
                     ),
                     TransactionInProgress::new(txn.gas_unit_price()),
@@ -463,6 +463,18 @@ impl BatchGenerator {
                             self.config.sender_max_total_txns as u64,
                         );
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
+                        for batch in &batches {
+                            for txn in batch.txns() {
+                                info!(
+                                    "handle_scheduled_pull author: {:?}, batch_id: {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})",
+                                    batch.author(),
+                                    batch.batch_id(),
+                                    txn.sender(),
+                                    txn.replay_protector(),
+                                    txn.expiration_timestamp_secs()
+                                );
+                            }
+                        }
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
 

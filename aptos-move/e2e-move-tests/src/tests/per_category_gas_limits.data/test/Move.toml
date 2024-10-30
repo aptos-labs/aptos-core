@@ -6,3 +6,5 @@ version = "0.0.0"
 MoveStdlib = { local = "../../../../../framework/move-stdlib" }
 AptosStdlib = { local = "../../../../../framework/aptos-stdlib" }
 
+[addresses]
+publisher = "_"

@@ -1,4 +1,4 @@
-module 0xcafe::test {
+module publisher::test {
     use aptos_framework::code;
 
     fun init_module(s: &signer) {

@@ -1,4 +1,4 @@
-module 0xbeef::test {
+module publisher::test {
 
     struct A0 has drop { a: u64 }
     struct A1 has drop { a: A0, b: A0 }

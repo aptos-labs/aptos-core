@@ -29,7 +29,7 @@ runs:
       shell: bash
 
     # Run the rust unit tests
-    - name: Run all unit tests
+    - name: Run all unit tests with txn payload v1 format
       run: |
         cargo nextest run \
           --profile ci \
@@ -46,14 +46,74 @@ runs:
         rm nextest_output.json
       shell: bash
       env:
+        TXN_PAYLOAD_V2_FORMAT: "false"
         NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: "4297152"
         MVP_TEST_ON_CI: "true"
+        SOLC_EXE: /home/runner/bin/solc
         Z3_EXE: /home/runner/bin/z3
         CVC5_EXE: /home/runner/bin/cvc5
         DOTNET_ROOT: /home/runner/.dotnet
         BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+    # TODO[Orderless]: May need to remove this as we are now using rstest
+    # - name: Run all unit tests with txn payload v2 format
+    #   run: |
+    #     cargo nextest run \
+    #       --profile ci \
+    #       --cargo-profile ci \
+    #       --locked \
+    #       --workspace \
+    #       --exclude smoke-test \
+    #       --exclude aptos-testcases \
+    #       --exclude aptos-keyless-circuit \
+    #       --retries 3 \
+    #       --no-fail-fast \
+    #       --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
+    #     python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" || echo "summary generation had an error"
+    #     rm nextest_output.json
+    #   shell: bash
+    #   env:
+    #     TXN_PAYLOAD_V2_FORMAT: true
+    #     NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
+    #     INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+    #     RUST_MIN_STACK: "4297152"
+    #     MVP_TEST_ON_CI: "true"
+    #     SOLC_EXE: /home/runner/bin/solc
+    #     Z3_EXE: /home/runner/bin/z3
+    #     CVC5_EXE: /home/runner/bin/cvc5
+    #     DOTNET_ROOT: /home/runner/.dotnet
+    #     BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+    # TODO[Orderless]: May need to remove this as we are now using rstest
+    # - name: Run all unit tests with orderless transactions enabled
+    #   run: |
+    #     cargo nextest run \
+    #       --profile ci \
+    #       --cargo-profile ci \
+    #       --locked \
+    #       --workspace \
+    #       --exclude smoke-test \
+    #       --exclude aptos-testcases \
+    #       --exclude aptos-keyless-circuit \
+    #       --retries 3 \
+    #       --no-fail-fast \
+    #       --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
+    #     python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" || echo "summary generation had an error"
+    #     rm nextest_output.json
+    #   shell: bash
+    #   env:
+    #     TXN_PAYLOAD_V2_FORMAT: true
+    #     USE_ORDERLESS_TXNS: true
+    #     NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
+    #     INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+    #     RUST_MIN_STACK: "4297152"
+    #     MVP_TEST_ON_CI: "true"
+    #     Z3_EXE: /home/runner/bin/z3
+    #     CVC5_EXE: /home/runner/bin/cvc5
+    #     DOTNET_ROOT: /home/runner/.dotnet
+    #     BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
 
     - name: Upload results
       # Run this step even if the test step ahead fails

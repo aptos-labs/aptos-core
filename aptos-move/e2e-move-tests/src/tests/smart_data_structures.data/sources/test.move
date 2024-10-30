@@ -1,4 +1,4 @@
-module 0xcafe::test {
+module publisher::test {
     use aptos_std::smart_vector::{Self, SmartVector};
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::table::{Self, Table};

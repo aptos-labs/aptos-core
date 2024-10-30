@@ -497,6 +497,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "reqwest 0.11.23",
+ "rstest",
  "serde",
  "serde_json",
  "tokio",
@@ -1576,6 +1577,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rayon",
+ "rstest",
  "serde",
  "thiserror",
 ]
@@ -2720,6 +2722,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-keygen",
+ "aptos-logger",
  "aptos-proptest-helpers",
  "aptos-rest-client",
  "aptos-temppath",
@@ -4521,6 +4524,7 @@ dependencies = [
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
+ "rstest",
  "serde",
  "serde-big-array",
  "serde_bytes",
@@ -4638,6 +4642,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
+ "rstest",
  "serde",
 ]
 
@@ -4794,6 +4799,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
+ "rstest",
 ]
 
 [[package]]
@@ -10275,6 +10281,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "rstest",
 ]
 
 [[package]]

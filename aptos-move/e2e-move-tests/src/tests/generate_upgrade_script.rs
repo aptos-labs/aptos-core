@@ -7,10 +7,11 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
 
+// TODO[Orderless]: Check if this test needs a modification for testing stateless accounts as well.
 #[test]
 fn generate_upgrade_script() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_with_key_pair(Some(0));
 
     // Construct two packages: one for which a proposal is created, the other for
     // holding the proposal script.

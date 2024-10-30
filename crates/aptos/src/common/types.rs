@@ -2424,6 +2424,7 @@ impl ScriptFunctionArguments {
 
     pub fn create_script_payload(self, bytecode: Vec<u8>) -> CliTypedResult<TransactionPayload> {
         let script_function_args = self.check_input_style()?;
+        // TODO[Orderless]: Change this to transaction payload v2 format.
         Ok(TransactionPayload::Script(Script::new(
             bytecode,
             script_function_args.type_arg_vec.try_into()?,

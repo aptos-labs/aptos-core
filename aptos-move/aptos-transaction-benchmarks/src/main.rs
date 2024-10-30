@@ -54,6 +54,12 @@ struct ParamSweepOpt {
 
     #[clap(long)]
     pub maybe_block_gas_limit: Option<u64>,
+
+    #[clap(long, default_value_t = true)]
+    pub use_txn_payload_v2_format: bool,
+
+    #[clap(long, default_value_t = false)]
+    pub use_orderless_transactions: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -87,6 +93,12 @@ struct ExecuteOpt {
 
     #[clap(long, default_value_t = false)]
     pub generate_then_execute: bool,
+
+    #[clap(long, default_value_t = true)]
+    pub use_txn_payload_v2_format: bool,
+
+    #[clap(long, default_value_t = false)]
+    pub use_orderless_transactions: bool,
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -125,6 +137,8 @@ fn param_sweep(opt: ParamSweepOpt) {
                 false,
                 maybe_block_gas_limit,
                 false,
+                opt.use_txn_payload_v2_format,
+                opt.use_orderless_transactions,
             );
             par_tps.sort();
             seq_tps.sort();
@@ -189,6 +203,8 @@ fn execute(opt: ExecuteOpt) {
         opt.no_conflict_txns,
         opt.maybe_block_gas_limit,
         opt.generate_then_execute,
+        opt.use_txn_payload_v2_format,
+        opt.use_orderless_transactions,
     );
 
     let sum: usize = par_tps.iter().sum();

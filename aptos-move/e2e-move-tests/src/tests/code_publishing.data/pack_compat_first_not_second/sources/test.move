@@ -1,5 +1,5 @@
 // This package is compatible with `pack_initial` but not with `pack_upgrade_compat`.
-module 0xcafe::test {
+module publisher::test {
 
     struct State has key {
         value: u64

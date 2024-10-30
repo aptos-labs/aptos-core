@@ -1,4 +1,4 @@
-module 0xcafe::mod1 {
+module publisher::mod1 {
     fun large0() {
         let _blob: vector<u64> = vector[
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

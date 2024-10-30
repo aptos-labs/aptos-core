@@ -185,7 +185,8 @@ pub(crate) fn check_gas(
     // gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(
+
+    if crate::aptos_vm::is_account_init_in_transaction(
         txn_metadata,
         features,
         resolver,
@@ -205,7 +206,7 @@ pub(crate) fn check_gas(
             speculative_warn!(
                 log_context,
                 format!(
-                    "[VM] Insufficient gas for sponsored transaction; min {}, submitted {}",
+                    "[VM] Insufficient gas for transaction that creates an account; min {}, submitted {}",
                     expected, actual,
                 ),
             );

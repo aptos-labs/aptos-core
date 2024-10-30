@@ -1,4 +1,4 @@
-module 0xbeef::very_nested_structure {
+module publisher::very_nested_structure {
     use aptos_std::table;
     use aptos_std::table::Table;
     use std::vector;

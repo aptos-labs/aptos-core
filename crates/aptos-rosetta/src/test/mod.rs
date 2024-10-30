@@ -60,6 +60,7 @@ fn test_transaction(
     // generate random key
     let private_key = Ed25519PrivateKey::generate_for_testing();
 
+    // TODO[Orderless]: Also test with orderless transactions.
     TransactionOnChainData {
         version,
         transaction: aptos_types::transaction::Transaction::UserTransaction(
@@ -71,6 +72,8 @@ fn test_transaction(
                     None,      // Expiration timestamp
                     Some(101), // Gas unit price, specifically make it different than 100 to check calculations
                     None,      // Max gas amount
+                    false,     // Use txn payload v2 format
+                    false,     // Use orderless transactions
                 ),
                 // Dummy keys and signatures
                 private_key.public_key(),

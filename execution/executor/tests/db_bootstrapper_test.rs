@@ -129,6 +129,8 @@ fn get_aptos_coin_mint_transaction(
     aptos_root_seq_num: u64,
     account: &AccountAddress,
     amount: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> Transaction {
     get_test_signed_transaction(
         aptos_test_root_address(),
@@ -136,6 +138,8 @@ fn get_aptos_coin_mint_transaction(
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
         Some(aptos_stdlib::aptos_coin_mint(*account, amount)),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -144,6 +148,8 @@ fn get_account_transaction(
     aptos_root_seq_num: u64,
     account: &AccountAddress,
     _account_key: &Ed25519PrivateKey,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> Transaction {
     get_test_signed_transaction(
         aptos_test_root_address(),
@@ -151,6 +157,8 @@ fn get_account_transaction(
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
         Some(aptos_stdlib::aptos_account_create_account(*account)),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -160,6 +168,8 @@ fn get_aptos_coin_transfer_transaction(
     sender_key: &Ed25519PrivateKey,
     recipient: AccountAddress,
     amount: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> Transaction {
     get_test_signed_transaction(
         sender,
@@ -167,6 +177,8 @@ fn get_aptos_coin_transfer_transaction(
         sender_key.clone(),
         sender_key.public_key(),
         Some(aptos_stdlib::aptos_coin_transfer(recipient, amount)),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -204,10 +216,12 @@ fn test_new_genesis() {
 
     // Mint for 2 demo accounts.
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
-    let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
-    let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000);
-    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000);
+    // TODO[Orderless]: Try other possibilties for testing orderless transactions
+    let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key, false, false);
+    let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key, true, true);
+    let txn3 =
+        get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000, false, false);
+    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000, true, true);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);
     assert_eq!(get_balance(&account1, &db), 200_000_000);
     assert_eq!(get_balance(&account2, &db), 200_000_000);
@@ -290,7 +304,15 @@ fn test_new_genesis() {
 
     println!("FINAL TRANSFER");
     // Transfer some money.
-    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 50_000_000);
+    let txn = get_aptos_coin_transfer_transaction(
+        account1,
+        0,
+        &account1_key,
+        account2,
+        50_000_000,
+        true,
+        true,
+    );
     execute_and_commit(vec![txn], &db, &signer);
 
     // And verify.

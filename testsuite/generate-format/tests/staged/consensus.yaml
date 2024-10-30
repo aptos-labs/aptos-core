@@ -1148,6 +1148,37 @@ TransactionAuthenticator:
         STRUCT:
           - sender:
               TYPENAME: AccountAuthenticator
+TransactionExecutable:
+  ENUM:
+    0:
+      Script:
+        NEWTYPE:
+          TYPENAME: Script
+    1:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
+    2:
+      Empty: UNIT
+TransactionExtraConfig:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - multisig_address:
+              OPTION:
+                TYPENAME: AccountAddress
+          - replay_protection_nonce:
+              OPTION: U64
+TransactionPayloadInner:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - executable:
+              TYPENAME: TransactionExecutable
+          - extra_config:
+              TYPENAME: TransactionExtraConfig
 TransactionPayload:
   ENUM:
     0:
@@ -1166,6 +1197,10 @@ TransactionPayload:
       Multisig:
         NEWTYPE:
           TYPENAME: Multisig
+    4:
+      Payload:
+        NEWTYPE:
+          TYPENAME: TransactionPayloadInner
 TwoChainTimeout:
   STRUCT:
     - epoch: U64

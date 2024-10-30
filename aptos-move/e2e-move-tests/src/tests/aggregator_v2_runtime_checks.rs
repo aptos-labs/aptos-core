@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
@@ -14,28 +15,26 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{sub_status::NFE_BCS_SERIALIZATION_FAILURE, AbortLocation},
 };
+use rstest::rstest;
 
 fn publish_test_package(h: &mut MoveHarness, aptos_framework_account: &Account) {
     let path_buf = common::test_dir_path("aggregator_v2.data/pack");
     assert_success!(h.publish_package_cache_building(aptos_framework_account, path_buf.as_path()));
 }
 
-fn create_test_txn(
-    h: &mut MoveHarness,
-    aptos_framework_account: &Account,
-    name: &str,
-) -> SignedTransaction {
-    h.create_entry_function(
-        aptos_framework_account,
-        str::parse(name).unwrap(),
-        vec![],
-        vec![],
-    )
+fn create_test_txn(h: &mut MoveHarness, acc: &Account, name: &str) -> SignedTransaction {
+    h.create_entry_function(acc, str::parse(name).unwrap(), vec![], vec![])
 }
 
-fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_status: F) {
-    let mut h = MoveHarness::new();
-    let aptos_framework_account = h.aptos_framework_account();
+fn run_entry_functions<F: Fn(ExecutionStatus)>(
+    func_names: Vec<&str>,
+    check_status: F,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let aptos_framework_account =
+        h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap(), Some(0));
     publish_test_package(&mut h, &aptos_framework_account);
 
     // Make sure aggregators are enabled, so that we can test
@@ -60,8 +59,14 @@ fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_stat
     }
 }
 
-#[test]
-fn test_equality() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_equality(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         // Aggregators.
         "0x1::runtime_checks::test_equality_with_aggregators_I",
@@ -76,13 +81,24 @@ fn test_equality() {
         "0x1::runtime_checks::test_equality_with_derived_string_snapshots_II",
         "0x1::runtime_checks::test_equality_with_derived_string_snapshots_III",
     ];
-    run_entry_functions(func_names, |status: ExecutionStatus| {
-        assert_matches!(status, ExecutionStatus::ExecutionFailure { .. });
-    });
+    run_entry_functions(
+        func_names,
+        |status: ExecutionStatus| {
+            assert_matches!(status, ExecutionStatus::ExecutionFailure { .. });
+        },
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 }
 
-#[test]
-fn test_serialization() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_serialization(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         "0x1::runtime_checks::test_serialization_with_aggregators",
         "0x1::runtime_checks::test_serialization_with_snapshots",
@@ -92,17 +108,28 @@ fn test_serialization() {
         AccountAddress::ONE,
         ident_str!("bcs").to_owned(),
     ));
-    run_entry_functions(func_names, |status: ExecutionStatus| {
-        assert_eq!(status, ExecutionStatus::MoveAbort {
-            location: bcs_location.clone(),
-            code: NFE_BCS_SERIALIZATION_FAILURE,
-            info: None,
-        });
-    });
+    run_entry_functions(
+        func_names,
+        |status: ExecutionStatus| {
+            assert_eq!(status, ExecutionStatus::MoveAbort {
+                location: bcs_location.clone(),
+                code: NFE_BCS_SERIALIZATION_FAILURE,
+                info: None,
+            });
+        },
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 }
 
-#[test]
-fn test_serialized_size() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_serialized_size(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         "0x1::runtime_checks::test_serialized_size_with_aggregators",
         "0x1::runtime_checks::test_serialized_size_with_snapshots",
@@ -111,13 +138,24 @@ fn test_serialized_size() {
 
     // Serialized size of delayed values is deterministic and fixed, so running
     // these functions should succeed, unlike regular serialization.
-    run_entry_functions(func_names, |status: ExecutionStatus| {
-        assert_eq!(status, ExecutionStatus::Success);
-    });
+    run_entry_functions(
+        func_names,
+        |status: ExecutionStatus| {
+            assert_eq!(status, ExecutionStatus::Success);
+        },
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 }
 
-#[test]
-fn test_string_utils() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_string_utils(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let func_names = vec![
         // Aggregators.
         "0x1::runtime_checks::test_to_string_with_aggregators",
@@ -137,16 +175,21 @@ fn test_string_utils() {
     ];
 
     let string_utils_id = ModuleId::new(AccountAddress::ONE, ident_str!("string_utils").to_owned());
-    run_entry_functions(func_names, |status: ExecutionStatus| {
-        if let ExecutionStatus::MoveAbort {
-            location: AbortLocation::Module(id),
-            code: 3, // EUNABLE_TO_FORMAT_DELAYED_FIELD
-            info: Some(_),
-        } = status
-        {
-            assert_eq!(id, string_utils_id.clone())
-        } else {
-            unreachable!("Expected Move abort, got {:?}", status)
-        }
-    });
+    run_entry_functions(
+        func_names,
+        |status: ExecutionStatus| {
+            if let ExecutionStatus::MoveAbort {
+                location: AbortLocation::Module(id),
+                code: 3, // EUNABLE_TO_FORMAT_DELAYED_FIELD
+                info: Some(_),
+            } = status
+            {
+                assert_eq!(id, string_utils_id.clone())
+            } else {
+                unreachable!("Expected Move abort, got {:?}", status)
+            }
+        },
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 }

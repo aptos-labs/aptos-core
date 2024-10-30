@@ -1,5 +1,5 @@
-module 0xcafe::m2 {
-    use 0xcafe::m1;
+module publisher::m2 {
+    use publisher::m1;
 
     public entry fun run() {
         m1::run();

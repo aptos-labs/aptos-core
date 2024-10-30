@@ -26,6 +26,7 @@ pub(crate) mod transaction_accumulator_root_hash;
 pub(crate) mod transaction_auxiliary_data;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
+pub(crate) mod transaction_summaries_by_account;
 pub(crate) mod version_data;
 pub(crate) mod write_set;
 
@@ -55,7 +56,9 @@ pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accum
 pub const TRANSACTION_ACCUMULATOR_HASH_CF_NAME: ColumnFamilyName =
     "transaction_accumulator_root_hash";
 pub const TRANSACTION_AUXILIARY_DATA_CF_NAME: ColumnFamilyName = "transaction_auxiliary_data";
-pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
+pub const ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
+pub const TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME: ColumnFamilyName =
+    "transaction_summaries_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
 pub const VERSION_DATA_CF_NAME: ColumnFamilyName = "version_data";

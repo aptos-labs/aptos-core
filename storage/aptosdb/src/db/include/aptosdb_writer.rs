@@ -266,6 +266,12 @@ impl AptosDB {
                     .unwrap()
             });
             s.spawn(|_| {
+                self.ledger_db
+                    .transaction_db()
+                    .commit_transaction_summaries(chunk.first_version, chunk.transactions)
+                    .unwrap()
+            });
+            s.spawn(|_| {
                 self.commit_state_kv_and_ledger_metadata(
                     chunk,
                     skip_index_and_usage,

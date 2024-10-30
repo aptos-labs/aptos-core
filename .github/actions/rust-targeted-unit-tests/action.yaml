@@ -38,3 +38,36 @@ runs:
         CVC5_EXE: /home/runner/bin/cvc5
         DOTNET_ROOT: /home/runner/.dotnet
         BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+    # TODO[Orderless]: May need to remove this as we are now using rstest
+    # - name: Run only the targeted unit tests for compiler v1 with txn payload v2 format
+    #   run: |
+    #     cargo x targeted-compiler-unit-tests -vvv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+    #   shell: bash
+    #   env:
+    #     TXN_PAYLOAD_V2_FORMAT: "true"
+    #     INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+    #     RUST_MIN_STACK: "4297152"
+    #     MVP_TEST_ON_CI: "true"
+    #     SOLC_EXE: /home/runner/bin/solc
+    #     Z3_EXE: /home/runner/bin/z3
+    #     CVC5_EXE: /home/runner/bin/cvc5
+    #     DOTNET_ROOT: /home/runner/.dotnet
+    #     BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+    # TODO[Orderless]: May need to remove this as we are now using rstest
+    # - name: Run only the targeted unit tests for compiler v1 with orderless transactions enabled
+    #   run: |
+    #     cargo x targeted-compiler-unit-tests -vvv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+    #   shell: bash
+    #   env:        
+    #     TXN_PAYLOAD_V2_FORMAT: "true"
+    #     USE_ORDERLESS_TXNS: "true"
+    #     INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+    #     RUST_MIN_STACK: "4297152"
+    #     MVP_TEST_ON_CI: "true"
+    #     SOLC_EXE: /home/runner/bin/solc
+    #     Z3_EXE: /home/runner/bin/z3
+    #     CVC5_EXE: /home/runner/bin/cvc5
+    #     DOTNET_ROOT: /home/runner/.dotnet
+    #     BOOGIE_EXE: /home/runner/.dotnet/tools/boogie

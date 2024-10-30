@@ -24,8 +24,8 @@ fn load_module(builder: &mut TransactionComposer, harness: &MoveHarness, module_
 #[test]
 fn simple_builder() {
     let mut h = MoveHarness::new();
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
 
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::aptos_account");
@@ -50,7 +50,7 @@ fn simple_builder() {
     let txn = alice
         .transaction()
         .script(bcs::from_bytes(&script).unwrap())
-        .sequence_number(10)
+        .sequence_number(0)
         .sign();
     assert_eq!(
         h.run(txn),
@@ -67,8 +67,8 @@ fn simple_builder() {
 #[test]
 fn chained_deposit() {
     let mut h = MoveHarness::new();
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
 
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::coin");
@@ -114,7 +114,7 @@ fn chained_deposit() {
     let txn = alice
         .transaction()
         .script(bcs::from_bytes(&script).unwrap())
-        .sequence_number(10)
+        .sequence_number(0)
         .sign();
 
     assert_eq!(
@@ -131,7 +131,7 @@ fn chained_deposit() {
 #[test]
 fn chained_deposit_mismatch() {
     let mut h = MoveHarness::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
 
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::coin");
@@ -169,7 +169,7 @@ fn chained_deposit_mismatch() {
 #[test]
 fn chained_deposit_invalid_copy() {
     let mut h = MoveHarness::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
 
     let mut builder = TransactionComposer::single_signer();
     load_module(&mut builder, &h, "0x1::coin");
@@ -233,9 +233,9 @@ fn chained_deposit_invalid_copy() {
 #[test]
 fn test_module() {
     let mut h = MoveHarness::new();
-    let account = h.new_account_at(AccountAddress::ONE);
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let mut seq_num = 10;
+    let account = h.new_account_at(AccountAddress::ONE, Some(0));
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
+    let mut seq_num = 0;
 
     let module_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")

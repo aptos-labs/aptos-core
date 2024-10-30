@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     assert_out_of_gas, assert_success, assert_vm_status, enable_golden, tests::common, MoveHarness,
 };
+use aptos_framework::BuildOptions;
 use aptos_gas_algebra::{Gas, GasQuantity};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
@@ -13,6 +15,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -21,15 +24,33 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-#[test]
-fn execution_limit_reached() {
-    let mut h = MoveHarness::new();
-
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn execution_limit_reached(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     // Publish the infinite loop module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package_cache_building(
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let mut build_options = BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("publisher".to_string(), *acc.address());
+    assert_success!(h.publish_package_with_options(
         &acc,
         &common::test_dir_path("infinite_loop.data/empty_loop"),
+        build_options,
     ));
 
     // Lower the max execution gas to 1000 units.
@@ -41,7 +62,7 @@ fn execution_limit_reached() {
     // Execute the loop. It should hit the execution limit before running out of gas.
     let res = h.run_entry_function(
         &acc,
-        str::parse("0xbeef::test::run").unwrap(),
+        str::parse(format!("{}::test::run", acc.address()).as_str()).unwrap(),
         vec![],
         vec![],
     );
@@ -60,9 +81,27 @@ fn bounded_execution_time() {
     });
 }
 
-#[test]
-fn io_limit_reached_by_load_resource() {
-    let (mut h, acc) = setup();
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn io_limit_reached_by_load_resource(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let (mut h, acc) = setup(
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     // Lower the max io gas to lower than a single load_resource
     h.modify_gas_schedule(|gas_params| {
@@ -72,17 +111,17 @@ fn io_limit_reached_by_load_resource() {
     // Execute the test function. The function will attempt to check if a resource exists and shall immediately hit the IO gas limit.
     let res = h.run_entry_function(
         &acc,
-        str::parse("0xbeef::test::run_exists").unwrap(),
+        str::parse(format!("{}::test::run_exists", acc.address()).as_str()).unwrap(),
         vec![],
         vec![],
     );
     assert_vm_status!(res, StatusCode::IO_LIMIT_REACHED);
 }
 
-#[test]
+#[rstest(stateless_account, case(true), case(false))]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn io_limit_reached_by_new_bytes() {
-    let (mut h, acc) = setup();
+fn io_limit_reached_by_new_bytes(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -100,10 +139,10 @@ fn io_limit_reached_by_new_bytes() {
     });
 }
 
-#[test]
+#[rstest(stateless_account, case(true), case(false))]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn storage_limit_reached_by_new_bytes() {
-    let (mut h, acc) = setup();
+fn storage_limit_reached_by_new_bytes(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -122,10 +161,10 @@ fn storage_limit_reached_by_new_bytes() {
     });
 }
 
-#[test]
+#[rstest(stateless_account, case(true), case(false))]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn out_of_gas_while_charging_write_gas() {
-    let (mut h, acc) = setup();
+fn out_of_gas_while_charging_write_gas(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -145,10 +184,10 @@ fn out_of_gas_while_charging_write_gas() {
     test_create_multiple_items(&mut h, &acc, |status| assert_out_of_gas!(status));
 }
 
-#[test]
+#[rstest(stateless_account, case(true), case(false))]
 #[ignore = "test needs redesign after 1.9 charging scheme change."]
-fn out_of_gas_while_charging_storage_fee() {
-    let (mut h, acc) = setup();
+fn out_of_gas_while_charging_storage_fee(stateless_account: bool) {
+    let (mut h, acc) = setup(stateless_account, true, true);
     enable_golden!(h);
 
     // Modify the gas schedule.
@@ -174,19 +213,28 @@ fn state_key_size() -> NumBytes {
     (key_size as u64).into()
 }
 
-fn setup() -> (MoveHarness, Account) {
-    let mut h = MoveHarness::new();
+fn setup(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> (MoveHarness, Account) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     // Publish the test module.
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(h.publish_package_cache_building(
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let mut build_options = BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("publisher".to_string(), *acc.address());
+    assert_success!(h.publish_package_with_options(
         &acc,
         &common::test_dir_path("per_category_gas_limits.data/test"),
+        build_options
     ));
 
     // Initialize.
     assert_success!(h.run_entry_function(
         &acc,
-        str::parse("0xbeef::test::init_table_of_bytes").unwrap(),
+        str::parse(format!("{}::test::init_table_of_bytes", acc.address()).as_str()).unwrap(),
         vec![],
         vec![],
     ));
@@ -206,7 +254,7 @@ fn create_multiple_items(
 ) -> TransactionStatus {
     h.run_entry_function(
         acc,
-        str::parse("0xbeef::test::create_multiple").unwrap(),
+        str::parse(format!("{}::test::create_multiple", acc.address()).as_str()).unwrap(),
         vec![],
         vec![ser(&begin), ser(&end), ser(&base_size)],
     )

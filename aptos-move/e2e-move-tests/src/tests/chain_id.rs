@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
@@ -54,7 +55,7 @@ fn call_get_chain_id_from_native_txn_context(harness: &mut MoveHarness, account:
 fn setup(harness: &mut MoveHarness) -> Account {
     let path = common::test_dir_path("chain_id.data/pack");
 
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let account = harness.new_account_at(AccountAddress::ONE, Some(0));
 
     assert_success!(harness.publish_package_cache_building(&account, &path));
 

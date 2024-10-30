@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
+
 use crate::{assert_success, tests::common, BlockSplit, MoveHarness, SUCCESS};
 use aptos_cached_packages::aptos_stdlib::{aptos_account_batch_transfer, aptos_account_transfer};
 use aptos_language_e2e_tests::{
@@ -16,6 +18,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use once_cell::sync::Lazy;
+use rstest::rstest;
 use serde::Deserialize;
 use std::str::FromStr;
 
@@ -39,12 +42,27 @@ pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
     name: Identifier::new("ObjectGroup").unwrap(),
     type_args: vec![],
 });
-#[test]
-fn test_basic_fungible_token() {
-    let mut h = MoveHarness::new();
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_basic_fungible_token(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+
+    let alice = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap(), Some(0));
     let root = h.aptos_framework_account();
 
     let mut build_options = aptos_framework::BuildOptions::default();
@@ -177,11 +195,24 @@ fn test_basic_fungible_token() {
 }
 
 // A simple test to verify gas paying still work for prologue and epilogue.
-#[test]
-fn test_coin_to_fungible_asset_migration() {
-    let mut h = MoveHarness::new();
-
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_coin_to_fungible_asset_migration(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let alice = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let alice_primary_store_addr =
         account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
     let root = h.aptos_framework_account();
@@ -238,11 +269,29 @@ fn test_coin_to_fungible_asset_migration() {
 /// We do that by having an expensive transaction first (to make sure committed index isn't moved),
 /// and then create some new aggregators (concurrent balances for new accounts), and then have them issue
 /// transactions - so their balance is checked in prologue.
-#[test]
-fn test_prologue_speculation() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_prologue_speculation(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let executor = FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::ParallelOnly);
 
-    let mut harness = MoveHarness::new_with_executor(executor);
+    let mut harness = MoveHarness::new_with_executor_and_flags(
+        executor,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     harness.enable_features(
         vec![
             FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
@@ -251,14 +300,17 @@ fn test_prologue_speculation() {
         ],
         vec![],
     );
-    let independent_account = harness.new_account_at(AccountAddress::random());
-
+    let independent_account =
+        harness.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let sink_txn = harness.create_transaction_payload(
         &independent_account,
         aptos_account_batch_transfer(vec![AccountAddress::random(); 50], vec![10_000_000_000; 50]),
     );
 
-    let account = harness.new_account_at(AccountAddress::ONE);
+    // 0x1 can't be a stateless account. The account address (0x1) isn't equaly to Hash(public key||scheme).
+    // A transaction signed by 0x1 succeeds prologue only if an Account resource containing an authentication key
+    // exists for 0x1.
+    let account = harness.new_account_at(AccountAddress::ONE, Some(0));
     let dst_1 = Account::new();
     let dst_2 = Account::new();
     let dst_3 = Account::new();

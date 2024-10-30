@@ -531,7 +531,9 @@ mod tests {
     fn generate_random_challenge_data(
         sender_addr: AccountAddress,
     ) -> (RawTransaction, RawTxnSigningMessage, Challenge) {
-        let raw_txn = get_test_raw_transaction(sender_addr, 0, None, None, None, None);
+        // TODO[Orderless]: Test with orderless transactions as well.
+        let raw_txn =
+            get_test_raw_transaction(sender_addr, 0, None, None, None, None, false, false);
 
         // Generate signing message (returns the concatenation of hash prefix || BCS serialization of transaction)
         let raw_txn_signing_message =
@@ -908,7 +910,9 @@ mod tests {
 
         // Incorrect raw transaction
         let (.., sender_address) = generate_sender();
-        let bad_raw_txn = get_test_raw_transaction(sender_address, 0, None, None, None, None);
+        // TODO[Orderless]: Test with orderless transactions as well.
+        let bad_raw_txn =
+            get_test_raw_transaction(sender_address, 0, None, None, None, None, false, false);
         let bad_paar = PartialAuthenticatorAssertionResponse::new(
             AssertionSignature::Secp256r1Ecdsa {
                 signature: secp256r1_signature.clone(),

@@ -16,9 +16,17 @@ pub fn initialize(
     mode: ExecutorMode,
     resource_group_charge_as_sum_enabled: bool,
     txns: usize,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+    seq_num: Option<u64>,
 ) -> ResourceGroupsTestHarness {
-    let (mut harness, account) =
-        initialize_harness(mode, resource_group_charge_as_sum_enabled, path);
+    let (mut harness, account) = initialize_harness(
+        mode,
+        resource_group_charge_as_sum_enabled,
+        path,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     harness.executor.disable_block_executor_fallback();
 
     let mut rg_harness = ResourceGroupsTestHarness {
@@ -29,7 +37,7 @@ pub fn initialize(
         txn_index: 0,
     };
 
-    rg_harness.initialize_issuer_accounts(txns);
+    rg_harness.initialize_issuer_accounts(txns, seq_num);
     rg_harness
 }
 
@@ -37,9 +45,24 @@ pub fn initialize_enabled_disabled_comparison(
     path: PathBuf,
     mode: ExecutorMode,
     txns: usize,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+    seq_num: Option<u64>,
 ) -> ResourceGroupsTestHarness {
-    let (harness_base, account_base) = initialize_harness(mode, false, path.clone());
-    let (harness_comp, _account_comp) = initialize_harness(mode, true, path);
+    let (harness_base, account_base) = initialize_harness(
+        mode,
+        false,
+        path.clone(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let (harness_comp, _account_comp) = initialize_harness(
+        mode,
+        true,
+        path,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let mut rg_harness = ResourceGroupsTestHarness {
         harness: harness_base,
@@ -49,7 +72,7 @@ pub fn initialize_enabled_disabled_comparison(
         txn_index: 0,
     };
 
-    rg_harness.initialize_issuer_accounts(txns);
+    rg_harness.initialize_issuer_accounts(txns, seq_num);
     rg_harness
 }
 
@@ -57,10 +80,16 @@ fn initialize_harness(
     mode: ExecutorMode,
     resource_group_charge_as_sum_enabled: bool,
     path: PathBuf,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> (MoveHarness, Account) {
     let executor = FakeExecutor::from_head_genesis().set_executor_mode(mode);
 
-    let mut harness = MoveHarness::new_with_executor(executor);
+    let mut harness = MoveHarness::new_with_executor_and_flags(
+        executor,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     // Reduce gas scaling, so that smaller differences in gas are caught in comparison testing.
     harness.modify_gas_scaling(1000);
     if resource_group_charge_as_sum_enabled {
@@ -73,7 +102,7 @@ fn initialize_harness(
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
-    let account = harness.new_account_at(AccountAddress::ONE);
+    let account = harness.new_account_at(AccountAddress::ONE, Some(0));
     assert_success!(harness.publish_package_cache_building(&account, &path));
     (harness, account)
 }
@@ -110,15 +139,14 @@ impl ResourceGroupsTestHarness {
         }
     }
 
-    pub fn initialize_issuer_accounts(&mut self, num_accounts: usize) {
+    pub fn initialize_issuer_accounts(&mut self, num_accounts: usize, seq_num: Option<u64>) {
         self.txn_accounts = (0..num_accounts)
-            .map(|_i| self.new_account_with_key_pair())
+            .map(|_i| self.new_account_with_key_pair(seq_num))
             .collect();
     }
 
-    pub fn new_account_with_key_pair(&mut self) -> Account {
+    pub fn new_account_with_key_pair(&mut self, seq_num: Option<u64>) -> Account {
         let acc = Account::new();
-        let seq_num = 0;
         // Mint the account 10M Aptos coins (with 8 decimals).
         let balance = 1_000_000_000_000_000;
 

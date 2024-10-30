@@ -191,6 +191,7 @@ fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
     mempool_config.capacity_per_user = 100_000;
+    mempool_config.orderless_txn_capacity_per_user = 100_000;
     mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
     mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
 }

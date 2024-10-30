@@ -1,4 +1,4 @@
-module 0xbeef::VersionModule {
+module publisher::VersionModule {
     use std::signer;
     use std::debug;
 

@@ -595,10 +595,10 @@ pub enum StatusCode {
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
     ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED = 41,
-    // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_7 = 42,
-    RESERVED_VALIDATION_ERROR_8 = 43,
-    RESERVED_VALIDATION_ERROR_9 = 44,
+    NONCE_ALREADY_USED = 42,
+    EMPTY_PAYLOAD_PROVIDED = 43,
+    TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
+    // TODO[Orderless]: Used all the reserved slots for validation errors. Is it okay?
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.

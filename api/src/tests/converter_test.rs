@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use aptos_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
@@ -15,7 +16,7 @@ use std::convert::TryInto;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_value_conversion() {
-    let context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!()).await;
     let address = AccountAddress::from_hex_literal("0x1").unwrap();
 
     let state_view = context.latest_state_view();

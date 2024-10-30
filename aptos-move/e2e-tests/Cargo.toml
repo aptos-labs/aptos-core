@@ -25,6 +25,7 @@ aptos-gas-meter = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_framework::BuildOptions;
+use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{AbortInfo, TransactionStatus},
@@ -12,6 +15,7 @@ use move_core_types::{
     parser::parse_struct_tag,
     vm_status::StatusCode,
 };
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -20,20 +24,29 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-fn success(tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>) {
-    success_generic(vec![], tests)
+fn success(h: MoveHarness, acc: Account, tests: Vec<(String, Vec<(Vec<Vec<u8>>, &str)>)>) {
+    success_generic(h, acc, vec![], tests)
 }
 
-fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &str)>)>) {
-    let mut h = MoveHarness::new();
-
+fn success_generic(
+    mut h: MoveHarness,
+    acc: Account,
+    ty_args: Vec<TypeTag>,
+    tests: Vec<(String, Vec<(Vec<Vec<u8>>, &str)>)>,
+) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
-    );
+    let mut build_options = BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("publisher".to_string(), *acc.address());
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("string_args.data/pack"),
+        build_options
+    ));
 
-    let mut module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let mut module_data =
+        parse_struct_tag(format!("{}::test::ModuleData", acc.address()).as_str()).unwrap();
     let string_struct = StructTag {
         address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
         module: Identifier::new("string").expect("valid identifier"),
@@ -50,7 +63,7 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
         for (args, expected_change) in in_out {
             assert_success!(h.run_entry_function(
                 &acc,
-                str::parse(entry).unwrap(),
+                str::parse(entry.as_str()).unwrap(),
                 ty_args.clone(),
                 args,
             ));
@@ -80,30 +93,45 @@ fn abort_info() -> impl Fn(TransactionStatus) {
     move |txn_status| assert_move_abort!(txn_status, abort_info)
 }
 
-fn fail(tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>) {
-    fail_generic(vec![], tests)
+fn fail(
+    h: &mut MoveHarness,
+    acc: Account,
+    tests: Vec<(String, Vec<Vec<u8>>, impl Fn(TransactionStatus))>,
+) {
+    fail_generic(h, acc, vec![], tests)
 }
 
 fn fail_generic(
+    h: &mut MoveHarness,
+    acc: Account,
     ty_args: Vec<TypeTag>,
-    tests: Vec<(&str, Vec<Vec<u8>>, impl Fn(TransactionStatus))>,
+    tests: Vec<(String, Vec<Vec<u8>>, impl Fn(TransactionStatus))>,
 ) {
-    let mut h = MoveHarness::new();
-
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
-    );
+    let mut build_options = BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("publisher".to_string(), *acc.address());
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("string_args.data/pack"),
+        build_options
+    ));
 
-    let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
+    let module_data =
+        parse_struct_tag(format!("{}::test::ModuleData", acc.address()).as_str()).unwrap();
 
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data));
 
     for (entry, args, err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
-        let status = h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args);
+        let status = h.run_entry_function(
+            &acc,
+            str::parse(entry.as_str()).unwrap(),
+            ty_args.clone(),
+            args,
+        );
         err(status);
     }
 }
@@ -122,18 +150,38 @@ fn big_string_vec(first_dim: u64, second_dim: u64, base: &str) -> Vec<u8> {
     bcs::to_bytes(&outer).unwrap()
 }
 
-#[test]
-fn string_args_good() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_good(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+
     let mut tests = vec![];
 
     // just strings
     let args = vec![bcs::to_bytes("hi there!".as_bytes()).unwrap()];
     let expected_change = "hi there!";
 
-    tests.push(("0xcafe::test::hi", vec![(args, expected_change)]));
+    tests.push((format!("{}::test::hi", acc.address()), vec![(
+        args,
+        expected_change,
+    )]));
 
     let str128 = std::str::from_utf8(&[97u8; 128] as &[u8]).unwrap();
-    tests.push(("0xcafe::test::hi", vec![(
+    tests.push((format!("{}::test::hi", acc.address()), vec![(
         vec![bcs::to_bytes(str128.as_bytes()).unwrap()],
         str128,
     )]));
@@ -161,7 +209,7 @@ fn string_args_good() {
     let expected_change = "world, hello world";
     in_out.push((args, expected_change));
 
-    tests.push(("0xcafe::test::str_vec", in_out));
+    tests.push((format!("{}::test::str_vec", acc.address()), in_out));
 
     // vector of vector of strings
     let mut in_out = vec![];
@@ -262,7 +310,7 @@ fn string_args_good() {
     let expected_change = format!("{}{}{}", hello, i, j);
     in_out.push((args, expected_change.as_str()));
 
-    tests.push(("0xcafe::test::str_vec_vec", in_out));
+    tests.push((format!("{}::test::str_vec_vec", acc.address()), in_out));
 
     // multi vector
     let long_addr = AccountAddress::from_hex_literal(
@@ -301,33 +349,61 @@ fn string_args_good() {
     ];
     let expected_change = "hi there! hello";
 
-    tests.push(("0xcafe::test::multi_vec", vec![(args, expected_change)]));
+    tests.push((format!("{}::test::multi_vec", acc.address()), vec![(
+        args,
+        expected_change,
+    )]));
 
-    success(tests);
+    success(h, acc, tests);
 }
 
-#[test]
-fn string_args_bad_utf8() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_bad_utf8(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+
     let mut tests = vec![];
 
     // simple strings
     let args = vec![bcs::to_bytes(&vec![0xF0u8, 0x28u8, 0x8Cu8, 0xBCu8]).unwrap()];
-    tests.push(("0xcafe::test::hi", args, abort_info()));
+    tests.push((format!("{}::test::hi", acc.address()), args, abort_info()));
 
     let args = vec![bcs::to_bytes(&vec![0xC3u8, 0x28u8]).unwrap()];
-    tests.push(("0xcafe::test::hi", args, abort_info()));
+    tests.push((format!("{}::test::hi", acc.address()), args, abort_info()));
 
     // vector of strings
     let bad = [0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let i = 0u64;
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
-    tests.push(("0xcafe::test::str_vec", args, abort_info()));
+    tests.push((
+        format!("{}::test::str_vec", acc.address()),
+        args,
+        abort_info(),
+    ));
 
     let bad = [0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
-    tests.push(("0xcafe::test::str_vec", args, abort_info()));
+    tests.push((
+        format!("{}::test::str_vec", acc.address()),
+        args,
+        abort_info(),
+    ));
 
     // vector of vector of strings
     let i = 0u64;
@@ -352,7 +428,11 @@ fn string_args_bad_utf8() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        abort_info(),
+    ));
 
     let bad = [0xF0u8, 0x28u8, 0x8Cu8, 0x28u8];
     let s_vec = vec![
@@ -373,7 +453,11 @@ fn string_args_bad_utf8() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        abort_info(),
+    ));
 
     let bad = [0x60u8, 0xFFu8];
     let s_vec = vec![
@@ -394,13 +478,34 @@ fn string_args_bad_utf8() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        abort_info(),
+    ));
 
-    fail(tests);
+    fail(&mut h, acc, tests);
 }
 
-#[test]
-fn string_args_chopped() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_chopped(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+
     let idx = 0u64;
     let s_vec = vec![
         "hi there!".as_bytes(),
@@ -413,8 +518,8 @@ fn string_args_chopped() {
         let mut arg = string_arg.clone();
         arg.remove(i);
         let args = vec![arg, bcs::to_bytes(&idx).unwrap()];
-        fail(vec![(
-            "0xcafe::test::str_vec",
+        fail(&mut h, acc.clone(), vec![(
+            format!("{}::test::str_vec", acc.address()),
             args,
             deserialization_failure(),
         )]);
@@ -422,8 +527,24 @@ fn string_args_chopped() {
     }
 }
 
-#[test]
-fn string_args_bad_length() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_bad_length(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     // chop after bcs so length stays big but payload gets small basically a bogus input
     let mut tests = vec![];
 
@@ -432,12 +553,20 @@ fn string_args_bad_length() {
     // length over max size
     let mut args = bcs::to_bytes(&vec![0x30u8; 100000]).unwrap();
     args.truncate(20);
-    tests.push(("0xcafe::test::hi", vec![args], deserialization_failure()));
+    tests.push((
+        format!("{}::test::hi", acc.address()),
+        vec![args],
+        deserialization_failure(),
+    ));
 
     // length in size but input chopped
     let mut args = bcs::to_bytes(&vec![0x30u8; 30000]).unwrap();
     args.truncate(300);
-    tests.push(("0xcafe::test::hi", vec![args], deserialization_failure()));
+    tests.push((
+        format!("{}::test::hi", acc.address()),
+        vec![args],
+        deserialization_failure(),
+    ));
 
     // vector of strings
 
@@ -448,7 +577,11 @@ fn string_args_bad_length() {
     bcs_vec.truncate(200);
     let i = 0u64;
     let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push(("0xcafe::test::str_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
     // length over max size after 2 big-ish strings
     let bad = vec![0x30u8; 100000];
@@ -457,7 +590,11 @@ fn string_args_bad_length() {
     let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
     bcs_vec.truncate(30000);
     let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push(("0xcafe::test::str_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
     // length in size but input chopped
     let big = vec![0x30u8; 10000];
@@ -465,7 +602,11 @@ fn string_args_bad_length() {
     let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
     bcs_vec.truncate(20000);
     let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push(("0xcafe::test::str_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
     // vector of vector of strings
 
@@ -493,7 +634,11 @@ fn string_args_bad_length() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
     let bad = vec![0x30u8; 10000];
     let s_vec = vec![
@@ -516,7 +661,11 @@ fn string_args_bad_length() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
     let bad = vec![0x30u8; 100000];
     let s_vec = vec![
@@ -539,7 +688,11 @@ fn string_args_bad_length() {
         bcs::to_bytes(&i).unwrap(),
         bcs::to_bytes(&j).unwrap(),
     ];
-    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
     // length over max size with 0 length strings
     let s_vec = vec![vec!["".as_bytes(); 3]; 100000];
@@ -566,24 +719,61 @@ fn string_args_bad_length() {
         bcs::to_bytes(&j).unwrap(),
     ];
 
-    tests.push(("0xcafe::test::str_vec_vec", args, deserialization_failure()));
+    tests.push((
+        format!("{}::test::str_vec_vec", acc.address()),
+        args,
+        deserialization_failure(),
+    ));
 
-    fail(tests);
+    fail(&mut h, acc, tests);
 }
 
-#[test]
-fn string_args_non_generic_call() {
-    let tests = vec![("0xcafe::test::non_generic_call", vec![(
-        vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
-        "hi",
-    )])];
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_non_generic_call(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
-    success_generic(vec![], tests);
+    let tests = vec![(format!("{}::test::non_generic_call", acc.address()), vec![
+        (vec![bcs::to_bytes("hi".as_bytes()).unwrap()], "hi"),
+    ])];
+
+    success_generic(h, acc, vec![], tests);
 }
 
-#[test]
-fn string_args_generic_call() {
-    let tests = vec![("0xcafe::test::generic_call", vec![(
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_generic_call(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+
+    let tests = vec![(format!("{}::test::generic_call", acc.address()), vec![(
         vec![bcs::to_bytes("hi".as_bytes()).unwrap()],
         "hi",
     )])];
@@ -596,11 +786,27 @@ fn string_args_generic_call() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
-    success_generic(vec![string_type], tests);
+    success_generic(h, acc, vec![string_type], tests);
 }
 
-#[test]
-fn string_args_generic_instantiation() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn string_args_generic_instantiation(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let mut tests = vec![];
     let long_addr = AccountAddress::from_hex_literal(
         "0xffabcdeffff555777876542123456789ca843279e3427144cead5e4d59ffffff",
@@ -641,10 +847,11 @@ fn string_args_generic_instantiation() {
         bcs::to_bytes(&j).unwrap(),
     ];
 
-    tests.push(("0xcafe::test::generic_multi_vec", vec![(
-        args,
-        "hi there! hello",
-    )]));
+    tests.push(
+        (format!("{}::test::generic_multi_vec", acc.address()), vec![
+            (args, "hi there! hello"),
+        ]),
+    );
 
     let address_type = TypeTag::Address;
     let string_struct = StructTag {
@@ -655,11 +862,28 @@ fn string_args_generic_instantiation() {
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
-    success_generic(vec![string_type, address_type], tests);
+    success_generic(h, acc, vec![string_type, address_type], tests);
 }
 
-#[test]
-fn huge_string_args_are_not_allowed() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn huge_string_args_are_not_allowed(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+
     let mut tests = vec![];
     let mut len: u64 = 1_000_000_000_000;
     let mut big_str_arg = vec![];
@@ -674,9 +898,9 @@ fn huge_string_args_are_not_allowed() {
         }
     }
     tests.push((
-        "0xcafe::test::hi",
+        format!("{}::test::hi", acc.address()),
         vec![big_str_arg],
         deserialization_failure(),
     ));
-    fail(tests);
+    fail(&mut h, acc, tests);
 }

@@ -49,6 +49,7 @@ impl Command {
 
         let endpoint = format!("https://{}.aptoslabs.com/v1", network);
         let debugger = AptosDebugger::rest_client(Client::new(Url::parse(&endpoint)?))?;
+        // TODO[Orderless]: Check if this needs to be updated for orderless transactions
         let version = debugger
             .get_version_by_account_sequence(txn.sender(), txn.sequence_number())
             .await?

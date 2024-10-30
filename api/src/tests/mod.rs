@@ -27,20 +27,61 @@ mod webauthn_secp256r1_ecdsa;
 use aptos_api_test_context::{new_test_context_inner as super_new_test_context, TestContext};
 use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
 
-fn new_test_context(test_name: String) -> TestContext {
-    new_test_context_with_config(test_name, NodeConfig::default())
+async fn new_test_context(test_name: String) -> TestContext {
+    new_test_context_with_config(test_name, NodeConfig::default(), false, false).await
 }
 
-fn new_test_context_with_config(test_name: String, node_config: NodeConfig) -> TestContext {
-    super_new_test_context(test_name, node_config, false, None)
+async fn new_test_context_with_config(
+    test_name: String,
+    node_config: NodeConfig,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> TestContext {
+    super_new_test_context(
+        test_name,
+        node_config,
+        false,
+        None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await
+}
+
+async fn new_test_context_with_orderless_flags(
+    test_name: String,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> TestContext {
+    super_new_test_context(
+        test_name,
+        NodeConfig::default(),
+        false,
+        None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await
 }
 
 #[cfg(test)]
-fn new_test_context_with_db_sharding_and_internal_indexer(test_name: String) -> TestContext {
+async fn new_test_context_with_db_sharding_and_internal_indexer(
+    test_name: String,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> TestContext {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = true;
     node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 0, true, 10);
-    let test_context = super_new_test_context(test_name, node_config, false, None);
+    let test_context = super_new_test_context(
+        test_name,
+        node_config,
+        false,
+        None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let _ = test_context
         .get_indexer_reader()
         .unwrap()
@@ -48,12 +89,22 @@ fn new_test_context_with_db_sharding_and_internal_indexer(test_name: String) -> 
     test_context
 }
 
-fn new_test_context_with_sharding_and_delayed_internal_indexer(
+async fn new_test_context_with_sharding_and_delayed_internal_indexer(
     test_name: String,
     end_version: Option<u64>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> TestContext {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = true;
     node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 0, true, 1);
-    super_new_test_context(test_name, node_config, false, end_version)
+    super_new_test_context(
+        test_name,
+        node_config,
+        false,
+        end_version,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await
 }

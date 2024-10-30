@@ -1,4 +1,4 @@
-module 0xCAFE::test {
+module publisher::test {
     use std::signer;
     use std::signer::address_of;
     use aptos_std::smart_table;
@@ -28,7 +28,7 @@ module 0xCAFE::test {
     }
 
     public entry fun init_stack(account: &signer) {
-        assert!(signer::address_of(account) == @0xcafe, 123);
+        assert!(signer::address_of(account) == @publisher, 123);
 
         let stack = table_with_length::new<u64, Item>();
         let table_of_items = Stack { stack };
@@ -36,8 +36,8 @@ module 0xCAFE::test {
     }
 
     public entry fun stack_push(to_push: u64) acquires Stack {
-        assert!(exists<Stack>(@0xcafe), 123);
-        let stack = borrow_global_mut<Stack>(@0xcafe);
+        assert!(exists<Stack>(@publisher), 123);
+        let stack = borrow_global_mut<Stack>(@publisher);
 
         let len = table_with_length::length(&mut stack.stack);
         let pushed = 0;
@@ -48,8 +48,8 @@ module 0xCAFE::test {
     }
 
     public entry fun stack_pop(to_pop: u64) acquires Stack {
-        assert!(exists<Stack>(@0xcafe), 123);
-        let stack = &mut borrow_global_mut<Stack>(@0xcafe).stack;
+        assert!(exists<Stack>(@publisher), 123);
+        let stack = &mut borrow_global_mut<Stack>(@publisher).stack;
 
         let len = table_with_length::length(stack);
         assert!(len >= to_pop, 456);
