@@ -4,13 +4,22 @@
 //! Smoke tests for function values (closures) introduced in Move 2.2. (Functional
 //! tests are written as transactional tests elsewhere.)
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
+use rstest::rstest;
 
-#[test]
-fn function_value_registry() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn function_value_registry(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut builder = PackageBuilder::new("Package");
     let source = r#"
         module 0x66::registry {
@@ -60,8 +69,8 @@ fn function_value_registry() {
     );
     let path = builder.write_to_temp().unwrap();
 
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x66").unwrap());
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x66").unwrap(), if stateless_account { None } else { Some(0) });
     assert_success!(h.publish_package_with_options(
         &acc,
         path.path(),

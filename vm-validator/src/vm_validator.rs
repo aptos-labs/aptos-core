@@ -321,6 +321,7 @@ impl TransactionValidation for PooledVMValidator {
     type ValidationInstance = AptosVM;
 
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
+        info!("pooled_validate_transaction (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", txn.sender(), txn.replay_protector(), txn.expiration_timestamp_secs());
         let vm_validator = self.get_next_vm();
 
         fail_point!("vm_validator::validate_transaction", |_| {
