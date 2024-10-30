@@ -12,6 +12,7 @@ use aptos_types::{
 };
 use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
+use rstest::rstest;
 
 #[derive(Serialize, Deserialize)]
 struct RotationCapabilityOfferProofChallengeV2 {
@@ -24,11 +25,20 @@ struct RotationCapabilityOfferProofChallengeV2 {
     recipient_address: AccountAddress,
 }
 
-#[test]
-fn offer_rotation_capability_test() {
+// TODO[Orderless]: Revisit this test for stateless accounts. 
+// Should the sequence number in the above test be made optional?
+// Will the rotation capability fail for stateless accounts?
+
+#[rstest(offerer_stateless_account, delegate_stateless_account,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn offer_rotation_capability_test(offerer_stateless_account: bool, delegate_stateless_account: bool) {
     let mut harness = MoveHarness::new();
-    let offerer_account = harness.new_account_with_key_pair();
-    let delegate_account = harness.new_account_with_key_pair();
+    let offerer_account = harness.new_account_with_key_pair(if offerer_stateless_account { None } else { Some(0) });
+    let delegate_account = harness.new_account_with_key_pair(if delegate_stateless_account { None } else { Some(0) });
 
     offer_rotation_capability_v2(&mut harness, &offerer_account, &delegate_account);
     revoke_rotation_capability(&mut harness, &offerer_account, *delegate_account.address());

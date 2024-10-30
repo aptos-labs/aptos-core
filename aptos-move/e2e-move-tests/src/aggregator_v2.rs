@@ -100,7 +100,9 @@ fn initialize_harness(
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
-    let account = harness.new_account_at(AccountAddress::ONE);
+    // Initializing a stateless account if use_orderless_transactions is set to true.
+    let seq_num = if harness.use_orderless_transactions { None } else { Some(0) };
+    let account = harness.new_account_at(AccountAddress::ONE, seq_num);
     assert_success!(harness.publish_package_cache_building(&account, &path));
     (harness, account)
 }
@@ -227,7 +229,12 @@ impl AggV2TestHarness {
 
     pub fn new_account_with_key_pair(&mut self) -> Account {
         let acc = Account::new();
-        let seq_num = 0;
+        // Creating a stateless account if use_orderless_transactions is true
+        let seq_num = if self.harness.use_orderless_transactions {
+            None            
+        } else {
+            Some(0)
+        };
         // Mint the account 10M Aptos coins (with 8 decimals).
         let balance = 1_000_000_000_000_000;
 

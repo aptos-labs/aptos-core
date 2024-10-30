@@ -7,11 +7,12 @@ use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use rstest::rstest;
 
 #[derive(Serialize, Deserialize)]
 struct ModuleData {
@@ -26,12 +27,17 @@ const CHLOE_COIN_STRUCT_STRING: &str =
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";
 
-#[test]
-fn exchange_e2e_test() {
+#[rstest(origin_stateless_account, test_stateless_account,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn exchange_e2e_test(origin_stateless_account: bool, test_stateless_account: bool) {
     let mut h = MoveHarness::new();
 
     // create an origin account and create a resource address from it
-    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let origin_account = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if origin_stateless_account { None } else { Some(0) });
     let resource_address = create_resource_address(*origin_account.address(), vec![].as_slice());
 
     let mut build_options = BuildOptions::default();
@@ -74,7 +80,7 @@ fn exchange_e2e_test() {
     );
 
     // verify that exchange_to() and exchange_from() are working properly
-    let test_user_account = h.new_account_with_balance_and_sequence_number(20, 10);
+    let test_user_account = h.new_account_with_balance_and_sequence_number(20, if test_stateless_account { None } else { Some(10) });
     assert_coin_balance(
         &mut h,
         test_user_account.address(),
@@ -146,7 +152,7 @@ fn run_exchange_function(
     amount: u64,
     sequence_number: u64,
 ) {
-    let exchange_payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let exchange_payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             create_resource_address(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),

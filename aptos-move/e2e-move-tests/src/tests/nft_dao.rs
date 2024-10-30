@@ -4,13 +4,27 @@
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_types::account_address::create_resource_address;
 use move_core_types::account_address::AccountAddress;
+use rstest::rstest;
 
-#[test]
+#[rstest(stateless_account1, stateless_account2, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
 // Test the txn argument works as expected
-fn test_nft_dao_txn_arguments() {
-    let mut h = MoveHarness::new();
+fn test_nft_dao_txn_arguments(stateless_account1: bool, stateless_account2: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), if stateless_account1 { None } else { Some(0) });
 
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
@@ -44,7 +58,7 @@ fn test_nft_dao_txn_arguments() {
         .map(|e| e.to_owned().into_bytes())
         .collect();
     let desc = "desc".to_owned().into_bytes();
-    let voter = h.new_account_at(AccountAddress::from_hex_literal("0xaf").unwrap());
+    let voter = h.new_account_at(AccountAddress::from_hex_literal("0xaf").unwrap(), if stateless_account2 { None } else { Some(0) });
     h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_create_collection_script(

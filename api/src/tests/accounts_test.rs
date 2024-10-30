@@ -247,7 +247,7 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
 
     let root_account = context.root_account().await;
     let txn =
-        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload).upgrade_payload(context.use_txn_payload_v2_format, context.use_orderless_transactions));
     context.commit_block(&vec![txn.clone()]).await;
 
     if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {

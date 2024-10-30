@@ -4,6 +4,7 @@
 
 //! Mempool is used to track transactions which have been submitted but not yet
 //! agreed upon.
+use super::AccountSequenceNumberInfo;
 use crate::{
     core_mempool::{
         index::TxnPointer,
@@ -24,7 +25,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::{use_case::UseCaseKey, SignedTransaction},
+    transaction::{use_case::UseCaseKey, ReplayProtector, SignedTransaction},
     vm_status::DiscardedVMStatus,
 };
 use std::{
@@ -51,24 +52,31 @@ impl Mempool {
     }
 
     /// This function will be called once the transaction has been stored.
-    pub(crate) fn commit_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
+    pub(crate) fn commit_transaction(
+        &mut self,
+        sender: &AccountAddress,
+        replay_protector: ReplayProtector,
+    ) {
         self.transactions
-            .commit_transaction(sender, sequence_number);
+            .commit_transaction(sender, replay_protector);
     }
 
     pub(crate) fn log_commit_transaction(
         &self,
         sender: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         tracked_use_case: Option<(UseCaseKey, &String)>,
         block_timestamp: Duration,
     ) {
         trace!(
-            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
+            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, replay_protector)),
             is_rejected = false
         );
-        self.log_commit_latency(*sender, sequence_number, tracked_use_case, block_timestamp);
-        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+        self.log_commit_latency(*sender, replay_protector, tracked_use_case, block_timestamp);
+        if let Some(ranking_score) = self
+            .transactions
+            .get_ranking_score(sender, replay_protector)
+        {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
@@ -81,16 +89,19 @@ impl Mempool {
     fn log_reject_transaction(
         &self,
         sender: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         reason_label: &'static str,
     ) {
         trace!(
-            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
+            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, replay_protector)),
             is_rejected = true,
             label = reason_label,
         );
-        self.log_commit_rejected_latency(*sender, sequence_number, reason_label);
-        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+        self.log_commit_rejected_latency(*sender, replay_protector, reason_label);
+        if let Some(ranking_score) = self
+            .transactions
+            .get_ranking_score(sender, replay_protector)
+        {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
                 reason_label,
@@ -103,12 +114,12 @@ impl Mempool {
     pub(crate) fn reject_transaction(
         &mut self,
         sender: &AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         hash: &HashValue,
         reason: &DiscardedVMStatus,
     ) {
         if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-            self.log_reject_transaction(sender, sequence_number, counters::COMMIT_IGNORED_LABEL);
+            self.log_reject_transaction(sender, replay_protector, counters::COMMIT_IGNORED_LABEL);
             // Do not remove the transaction from mempool
             return;
         }
@@ -118,9 +129,9 @@ impl Mempool {
         } else {
             counters::COMMIT_REJECTED_LABEL
         };
-        self.log_reject_transaction(sender, sequence_number, label);
+        self.log_reject_transaction(sender, replay_protector, label);
         self.transactions
-            .reject_transaction(sender, sequence_number, hash);
+            .reject_transaction(sender, replay_protector, hash);
     }
 
     pub(crate) fn log_txn_latency(
@@ -140,10 +151,14 @@ impl Mempool {
         }
     }
 
-    fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
+    fn log_consensus_pulled_latency(
+        &self,
+        account: AccountAddress,
+        replay_protector: ReplayProtector,
+    ) {
         if let Some((insertion_info, bucket, priority)) = self
             .transactions
-            .get_insertion_info_and_bucket(&account, sequence_number)
+            .get_insertion_info_and_bucket(&account, replay_protector)
         {
             let prev_count = insertion_info
                 .consensus_pulled_counter
@@ -163,12 +178,12 @@ impl Mempool {
     fn log_commit_rejected_latency(
         &self,
         account: AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         stage: &'static str,
     ) {
         if let Some((insertion_info, bucket, priority)) = self
             .transactions
-            .get_insertion_info_and_bucket(&account, sequence_number)
+            .get_insertion_info_and_bucket(&account, replay_protector)
         {
             Self::log_txn_latency(insertion_info, bucket.as_str(), stage, priority.as_str());
         }
@@ -231,13 +246,13 @@ impl Mempool {
     fn log_commit_latency(
         &self,
         account: AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         tracked_use_case: Option<(UseCaseKey, &String)>,
         block_timestamp: Duration,
     ) {
         if let Some((insertion_info, bucket, priority)) = self
             .transactions
-            .get_insertion_info_and_bucket(&account, sequence_number)
+            .get_insertion_info_and_bucket(&account, replay_protector)
         {
             Self::log_txn_latency(
                 insertion_info,
@@ -276,7 +291,7 @@ impl Mempool {
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,
-        db_sequence_number: u64,
+        account_sequence_number: AccountSequenceNumberInfo,
         timeline_state: TimelineState,
         client_submitted: bool,
         // The time at which the transaction was inserted into the mempool of the
@@ -287,18 +302,32 @@ impl Mempool {
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
-                .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
-            committed_seq_number = db_sequence_number
+                .txns(TxnsLog::new_txn(txn.sender(), txn.replay_protector())),
+            committed_seq_number = account_sequence_number
         );
 
-        // don't accept old transactions (e.g. seq is less than account's current seq_number)
-        if txn.sequence_number() < db_sequence_number {
-            return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
-                "transaction sequence number is {}, current sequence number is  {}",
-                txn.sequence_number(),
-                db_sequence_number,
-            ));
-        }
+        if let ReplayProtector::SequenceNumber(txn_seq_num) = txn.replay_protector() {
+            // don't accept old transactions (e.g. seq is less than account's current seq_number)
+            match &account_sequence_number {
+                AccountSequenceNumberInfo::Required(account_sequence_number) => {
+                    if txn_seq_num < *account_sequence_number {
+                        return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber)
+                            .with_message(format!(
+                                "transaction sequence number is {}, current sequence number is  {}",
+                                txn_seq_num, account_sequence_number,
+                            ));
+                    }
+                },
+                AccountSequenceNumberInfo::NotRequired => {
+                    return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(
+                        format!(
+                            "transaction has sequence number {}, but not sequence number provided for sender's account",
+                            txn_seq_num,
+                        ),
+                    );
+                },
+            }
+        };
 
         let now = SystemTime::now();
         let expiration_time =
@@ -310,7 +339,7 @@ impl Mempool {
             expiration_time,
             ranking_score,
             timeline_state,
-            db_sequence_number,
+            account_sequence_number,
             now,
             client_submitted,
             priority.clone(),
@@ -358,17 +387,25 @@ impl Mempool {
     fn txn_was_chosen(
         account_address: AccountAddress,
         sequence_number: u64,
-        inserted: &HashSet<(AccountAddress, u64)>,
+        inserted: &HashSet<(AccountAddress, ReplayProtector)>,
         exclude_transactions: &BTreeMap<TransactionSummary, TransactionInProgress>,
     ) -> bool {
-        if inserted.contains(&(account_address, sequence_number)) {
+        if inserted.contains(&(
+            account_address,
+            ReplayProtector::SequenceNumber(sequence_number),
+        )) {
             return true;
         }
 
-        let min_inclusive = TxnPointer::new(account_address, sequence_number, HashValue::zero());
+        // TODO: Make sure this range search works as expected
+        let min_inclusive = TxnPointer::new(
+            account_address,
+            ReplayProtector::SequenceNumber(sequence_number),
+            HashValue::zero(),
+        );
         let max_exclusive = TxnPointer::new(
             account_address,
-            sequence_number.saturating_add(1),
+            ReplayProtector::SequenceNumber(sequence_number.saturating_add(1)),
             HashValue::zero(),
         );
 
@@ -397,6 +434,12 @@ impl Mempool {
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
 
+        for txn_summary in exclude_transactions.keys() {
+            info!(
+                "get_batch_excluded_transactions (address: {:?}, replay_protector: {:?})",
+                txn_summary.sender, txn_summary.replay_protector
+            );
+        }
         let gas_end_time = start_time.elapsed();
 
         let mut result = vec![];
@@ -418,33 +461,56 @@ impl Mempool {
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
             }
-            let tx_seq = txn.sequence_number.transaction_sequence_number;
-            let txn_in_sequence = tx_seq > 0
-                && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
-            let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
-            // include transaction if it's "next" for given account or
-            // we've already sent its ancestor to Consensus.
-            if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
-                inserted.insert((txn.address, tx_seq));
-                result.push((txn.address, tx_seq));
-                if (result.len() as u64) == max_txns {
-                    break;
-                }
-
-                // check if we can now include some transactions
-                // that were skipped before for given account
-                let mut skipped_txn = (txn.address, tx_seq + 1);
-                while skipped.remove(&skipped_txn) {
-                    inserted.insert(skipped_txn);
-                    result.push(skipped_txn);
+            let txn_replay_protector = txn.replay_protector;
+            match txn_replay_protector {
+                ReplayProtector::Nonce(_) => {
+                    inserted.insert((txn.address, txn_replay_protector));
+                    result.push((txn.address, txn_replay_protector));
                     if (result.len() as u64) == max_txns {
-                        break 'main;
+                        break;
                     }
-                    skipped_txn = (skipped_txn.0, skipped_txn.1 + 1);
-                }
-            } else {
-                skipped.insert((txn.address, tx_seq));
-            }
+                },
+                ReplayProtector::SequenceNumber(txn_seq) => {
+                    let txn_in_sequence = txn_seq > 0
+                        && Self::txn_was_chosen(
+                            txn.address,
+                            txn_seq - 1,
+                            &inserted,
+                            &exclude_transactions,
+                        );
+                    let account_sequence_number =
+                        self.transactions.get_account_sequence_number(&txn.address);
+                    // include transaction if it's "next" for given account or
+                    // we've already sent its ancestor to Consensus.
+                    if txn_in_sequence || account_sequence_number == Some(&txn_seq) {
+                        inserted.insert((txn.address, txn_replay_protector));
+                        result.push((txn.address, txn_replay_protector));
+                        if (result.len() as u64) == max_txns {
+                            break;
+                        }
+                        // check if we can now include some transactions
+                        // that were skipped before for given account
+                        let (skipped_txn_sender, mut skipped_txn_seq_num) =
+                            (txn.address, txn_seq + 1);
+                        while skipped.remove(&(skipped_txn_sender, skipped_txn_seq_num)) {
+                            inserted.insert((
+                                skipped_txn_sender,
+                                ReplayProtector::SequenceNumber(skipped_txn_seq_num),
+                            ));
+                            result.push((
+                                skipped_txn_sender,
+                                ReplayProtector::SequenceNumber(skipped_txn_seq_num),
+                            ));
+                            if (result.len() as u64) == max_txns {
+                                break 'main;
+                            }
+                            skipped_txn_seq_num += 1;
+                        }
+                    } else {
+                        skipped.insert((txn.address, txn_seq));
+                    }
+                },
+            };
         }
         let result_size = result.len();
         let result_end_time = start_time.elapsed();
@@ -452,10 +518,10 @@ impl Mempool {
 
         let mut block = Vec::with_capacity(result_size);
         let mut full_bytes = false;
-        for (sender, sequence_number) in result {
+        for (sender, replay_protector) in result {
             if let Some((txn, ranking_score)) = self
                 .transactions
-                .get_with_ranking_score(&sender, sequence_number)
+                .get_with_ranking_score(&sender, replay_protector)
             {
                 let txn_size = txn.txn_bytes_len() as u64;
                 if total_bytes + txn_size > max_bytes {
@@ -480,6 +546,14 @@ impl Mempool {
         let block_end_time = start_time.elapsed();
         let block_time = block_end_time.saturating_sub(result_end_time);
 
+        for txn in &block {
+            info!(
+                "get_batch (address: {:?}, replay_protector: {:?}, expiration_time_secs: {:?})",
+                txn.sender(),
+                txn.replay_protector(),
+                txn.expiration_timestamp_secs()
+            );
+        }
         if result_size > 0 {
             debug!(
                 LogSchema::new(LogEntry::GetBlock),
@@ -520,7 +594,7 @@ impl Mempool {
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
         for transaction in &block {
-            self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
+            self.log_consensus_pulled_latency(transaction.sender(), transaction.replay_protector());
         }
         block
     }

@@ -7,10 +7,18 @@ use aptos_types::{
     state_store::state_value::StateValueMetadata,
 };
 use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
+use rstest::rstest;
 
-#[test]
-fn test_metadata_tracking() {
-    let mut harness = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_metadata_tracking(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut harness = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     harness.new_epoch(); // so that timestamp is not 0 (rather, 7200000001)
     let timestamp = CurrentTimeMicroseconds {
         microseconds: 7200000001,
@@ -23,7 +31,7 @@ fn test_metadata_tracking() {
     let address3 = AccountAddress::from_hex_literal("0x300").unwrap();
 
     // create and fund account1
-    let account1 = harness.new_account_at(address1);
+    let account1 = harness.new_account_at(address1, if stateless_account { None } else { Some(0) });
 
     // Disable storage slot metadata tracking
     harness.enable_features(vec![], vec![

@@ -9,6 +9,7 @@ use aptos_types::account_address::AccountAddress;
 use move_core_types::transaction_argument::TransactionArgument;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
+use rstest::rstest;
 
 pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
 
@@ -18,12 +19,22 @@ fn build_scripts() -> BTreeMap<String, Vec<u8>> {
     common::build_scripts(package_folder, package_names)
 }
 
-#[test]
-fn test_vote() {
+// TODO[Orderless]: Remove some cases if unneccessary
+#[rstest(stateless_account1, stateless_account2, stateless_account3,
+    case(true, true, true),
+    case(true, false, true),
+    case(false, true, true),
+    case(false, false, true),
+    case(true, true, false),
+    case(true, false, false),
+    case(false, true, false),
+    case(false, false, false),
+)]
+fn test_vote(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool) {
     // Genesis starts with one validator with index 0
     let mut harness = MoveHarness::new();
-    let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
+    let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), if stateless_account1 { None } else { Some(0)});
+    let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), if stateless_account2 { None } else { Some(0)});
     let validator_1_address = *validator_1.address();
     let validator_2_address = *validator_2.address();
 
@@ -36,7 +47,7 @@ fn test_vote() {
 
     // Disable partial governance voting.
     let core_resources =
-        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap(), if stateless_account3 { None } else { Some(0)});
     let script_code = PROPOSAL_SCRIPTS
         .get("enable_partial_governance_voting")
         .expect("proposal script should be built");

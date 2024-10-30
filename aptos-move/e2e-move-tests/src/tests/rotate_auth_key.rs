@@ -20,12 +20,19 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, TransactionStatus},
 };
 use move_core_types::parser::parse_struct_tag;
+use rstest::rstest;
 
-#[test]
-fn rotate_auth_key_ed25519_to_ed25519() {
+// TODO[Orderless]: Revisit this test and remove unnecessary cases
+#[rstest(stateless_account1, stateless_account2,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn rotate_auth_key_ed25519_to_ed25519(stateless_account1: bool, stateless_account2: bool) {
     let mut harness = MoveHarness::new();
-    let account1 = harness.new_account_with_key_pair();
-    let account2 = harness.new_account_with_key_pair();
+    let account1 = harness.new_account_with_key_pair(if stateless_account1 { None } else { Some(10) });
+    let account2 = harness.new_account_with_key_pair(if stateless_account2 { None } else { Some(10) });
 
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_key_rotation_transaction(
@@ -43,10 +50,13 @@ fn rotate_auth_key_ed25519_to_ed25519() {
     verify_originating_address(&mut harness, account2.auth_key(), *account1.address());
 }
 
-#[test]
-fn rotate_auth_key_ed25519_to_multi_ed25519() {
+#[rstest(stateless_account,
+    case(true),
+    case(false),
+)]
+fn rotate_auth_key_ed25519_to_multi_ed25519(stateless_account: bool) {
     let mut harness = MoveHarness::new();
-    let account1 = harness.new_account_with_key_pair();
+    let account1 = harness.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let private_key = MultiEd25519PrivateKey::generate_for_testing();
     let public_key = MultiEd25519PublicKey::from(&private_key);
     let auth_key = AuthenticationKey::multi_ed25519(&public_key);
@@ -67,11 +77,22 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
     verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address());
 }
 
-#[test]
-fn rotate_auth_key_twice() {
+// TODO[Orderless]: Revisit this test and remove unnecessary cases
+#[rstest(stateless_account1, stateless_account2, stateless_account3,
+    case(true, true, true),
+    case(true, false, true),
+    case(false, true, true),
+    case(false, false, true),
+    case(true, true, false),
+    case(true, false, false),
+    case(false, true, false),
+    case(false, false, false),
+
+)]
+fn rotate_auth_key_twice(stateless_account1: bool, stateless_account2: bool, stateless_account3: bool) {
     let mut harness = MoveHarness::new();
-    let mut account1 = harness.new_account_with_key_pair();
-    let account2 = harness.new_account_with_key_pair();
+    let mut account1 = harness.new_account_with_key_pair(if stateless_account1 { None } else { Some(10) });
+    let account2 = harness.new_account_with_key_pair(if stateless_account2 { None } else { Some(10) });
 
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_key_rotation_transaction(
@@ -89,7 +110,7 @@ fn rotate_auth_key_twice() {
     // verify that we can still get to account1's originating address
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 
-    let account3 = harness.new_account_with_key_pair();
+    let account3 = harness.new_account_with_key_pair(if stateless_account3 { None } else { Some(10) });
     assert_successful_key_rotation_transaction(
         0,
         0,
@@ -104,11 +125,16 @@ fn rotate_auth_key_twice() {
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 }
 
-#[test]
-fn rotate_auth_key_with_rotation_capability_e2e() {
+#[rstest(delegator_stateless_account, offerer_stateless_account,
+    case(true, true),
+    case(true, false),
+    case(false, true),
+    case(false, false),
+)]
+fn rotate_auth_key_with_rotation_capability_e2e(delegator_stateless_account: bool, offerer_stateless_account: bool) {
     let mut harness = MoveHarness::new();
-    let delegate_account = harness.new_account_with_key_pair();
-    let mut offerer_account = harness.new_account_with_key_pair();
+    let delegate_account = harness.new_account_with_key_pair(if delegator_stateless_account { None } else { Some(0) });
+    let mut offerer_account = harness.new_account_with_key_pair(if offerer_stateless_account { None } else { Some(0) });
 
     offer_rotation_capability_v2(&mut harness, &offerer_account, &delegate_account);
     let new_private_key = Ed25519PrivateKey::generate_for_testing();

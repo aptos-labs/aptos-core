@@ -7,7 +7,7 @@ use crate::{
     chain_id::ChainId,
     transaction::{
         AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionWithProof,
+        TransactionInfo, TransactionListWithProof, TransactionPayloadWrapper, TransactionWithProof,
     },
 };
 use aptos_crypto::{
@@ -48,7 +48,7 @@ proptest! {
     }
 
     #[test]
-    fn transaction_payload_bcs_roundtrip(txn_payload in any::<TransactionPayload>()) {
+    fn transaction_payload_bcs_roundtrip(txn_payload in any::<TransactionPayloadWrapper>()) {
         assert_canonical_encode_decode(txn_payload);
     }
 

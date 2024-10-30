@@ -11,10 +11,26 @@ use aptos_types::{
 use aptos_vm::testing::{testing_only::inject_error_once, InjectedError};
 use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
+use rstest::rstest;
 
-#[test]
-fn test_refunds() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(mod_stateless_account, user_stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true),
+)]
+fn test_refunds(mod_stateless_account: bool, user_stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    
+    h.enable_features(
         vec![
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::MODULE_EVENT,
@@ -31,8 +47,8 @@ fn test_refunds() {
     });
     let mod_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let user_addr = AccountAddress::from_hex_literal("0x100").unwrap();
-    let mod_acc = h.new_account_at(mod_addr);
-    let user_acc = h.new_account_at(user_addr);
+    let mod_acc = h.new_account_at(mod_addr, if mod_stateless_account { None } else { Some(0) });
+    let user_acc = h.new_account_at(user_addr, if user_stateless_account { None } else { Some(0) });
 
     assert_success!(h.publish_package(&mod_acc, &test_dir_path("storage_refund.data/pack")));
 

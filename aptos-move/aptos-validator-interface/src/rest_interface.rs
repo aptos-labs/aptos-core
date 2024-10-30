@@ -16,8 +16,8 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionInfo,
-        TransactionPayload, Version,
+        EntryFunction, ExecutionStatus::MiscellaneousError, ReplayProtector, Transaction,
+        TransactionInfo, TransactionPayloadWrapper, Version,
     },
 };
 use async_recursion::async_recursion;
@@ -279,16 +279,16 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 let version = start + idx as u64;
                 (version, txn, txn_info)
             });
-        let extract_entry_fun = |payload: &TransactionPayload| -> Option<EntryFunction> {
+        let extract_entry_fun = |payload: &TransactionPayloadWrapper| -> Option<EntryFunction> {
             match payload {
-                TransactionPayload::Multisig(multi_sig)
+                TransactionPayloadWrapper::Multisig(multi_sig)
                     if multi_sig.transaction_payload.is_some() =>
                 {
                     let aptos_types::transaction::MultisigTransactionPayload::EntryFunction(e) =
                         multi_sig.transaction_payload.clone().unwrap();
                     Some(e.clone())
                 },
-                TransactionPayload::EntryFunction(e) => Some(e.clone()),
+                TransactionPayloadWrapper::EntryFunction(e) => Some(e.clone()),
                 _ => None,
             }
         };
@@ -354,10 +354,19 @@ impl AptosValidatorInterface for RestDebuggerInterface {
     ) -> Result<Option<Version>> {
         Ok(Some(
             self.0
-                .get_account_transactions_bcs(account, Some(seq), None)
+                .get_account_ordered_transactions_bcs(account, Some(seq), None)
                 .await?
                 .into_inner()[0]
                 .version,
         ))
+    }
+
+    // TODO: Implement this function
+    async fn get_version_by_replay_protector(
+        &self,
+        _account: AccountAddress,
+        _replay_protector: ReplayProtector,
+    ) -> Result<Option<Version>> {
+        unimplemented!("get_version_by_replay_protector is not implemented yet");
     }
 }

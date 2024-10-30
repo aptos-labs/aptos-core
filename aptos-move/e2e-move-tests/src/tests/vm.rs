@@ -12,13 +12,15 @@ use claims::{assert_ok_eq, assert_some};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use test_case::test_case;
 
+// TODO[Orderless]: Adapt this test for orderless transactions.
+
 // Make sure verification and invariant violation errors are kept.
 #[test_case(StatusCode::TYPE_MISMATCH)]
 #[test_case(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)]
 fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
     let mut h = MoveHarness::new();
-    let sender = h.new_account_with_balance_and_sequence_number(1_000_000, 10);
-    let receiver = h.new_account_with_balance_and_sequence_number(1_000_000, 10);
+    let sender = h.new_account_with_balance_and_sequence_number(1_000_000, Some(10));
+    let receiver = h.new_account_with_balance_and_sequence_number(1_000_000, Some(10));
 
     let max_gas_amount = 100_000;
     let txn = sender
