@@ -1,6 +1,6 @@
 [package]
 name = 'add-numbers'
 version = '1.0.0'
-[dependencies.AptosFramework]
-local = '../../../..'
-subdir = 'aptos-move/framework/aptos-framework'
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }

@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
-    assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
+    assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness
 };
 use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
 use aptos_language_e2e_tests::executor::FakeExecutor;
@@ -11,7 +12,7 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, OnChainConfig},
-    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionPayloadWrapper, TransactionStatus},
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -43,13 +44,25 @@ struct StateWithCoins {
 
 /// Runs the basic publishing test for all legacy flag combinations. Otherwise we will only
 /// run tests which are expected to make a difference for legacy flag combinations.
-#[rstest(enabled, disabled,
-    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK]),
-    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![]),
+#[rstest(enabled, disabled, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], true, false, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], true, true, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], true, true, true),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], false, false, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], false, true, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], false, true, true),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], true, false, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], true, true, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], true, true, true),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], false, false, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], false, true, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], false, true, true),
 )]
-fn code_publishing_basic(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
-    let mut h = MoveHarness::new_with_features(enabled, disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+fn code_publishing_basic(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(enabled, disabled);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial"),
@@ -83,10 +96,18 @@ fn code_publishing_basic(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) 
     assert_eq!(state.value, 42)
 }
 
-#[test]
-fn code_publishing_upgrade_success_compat() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_upgrade_success_compat(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version with compat requirements
     assert_success!(h.publish_package_cache_building(
@@ -101,10 +122,18 @@ fn code_publishing_upgrade_success_compat() {
     ));
 }
 
-#[test]
-fn code_publishing_disallow_native() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_disallow_native(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     assert_vm_status!(
         h.publish_package_cache_building(
@@ -115,12 +144,20 @@ fn code_publishing_disallow_native() {
     );
 }
 
-#[test]
-fn code_publishing_disallow_native_entry_func() {
-    let mut h = MoveHarness::new();
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_disallow_native_entry_func(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
     // Disable feature for now to publish the package.
     h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     assert_success!(h.publish_package_cache_building(
         &acc,
@@ -140,10 +177,18 @@ fn code_publishing_disallow_native_entry_func() {
     );
 }
 
-#[test]
-fn code_publishing_allow_system_native() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_allow_system_native(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap(), seq_num);
 
     assert_success!(h.publish_package_cache_building(
         &acc,
@@ -151,10 +196,18 @@ fn code_publishing_allow_system_native() {
     ));
 }
 
-#[test]
-fn code_publishing_upgrade_fail_compat() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_upgrade_fail_compat(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version with compat requirements
     assert_success!(h.publish_package_cache_building(
@@ -170,10 +223,18 @@ fn code_publishing_upgrade_fail_compat() {
     assert_vm_status!(status, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[test]
-fn code_publishing_upgrade_fail_immutable() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_upgrade_fail_immutable(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version with immutable requirements
     assert_success!(h.publish_package_cache_building(
@@ -189,10 +250,18 @@ fn code_publishing_upgrade_fail_immutable() {
     assert_abort!(status, _);
 }
 
-#[test]
-fn code_publishing_upgrade_fail_overlapping_module() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_upgrade_fail_overlapping_module(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Install the initial version
     assert_success!(h.publish_package_cache_building(
@@ -215,10 +284,18 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 /// the flush operation out, then this test fails.
 ///
 /// TODO: for some reason this test did not capture a serious bug in `code::check_coexistence`.
-#[test]
-fn code_publishing_upgrade_loader_cache_consistency() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_upgrade_loader_cache_consistency(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // Create a sequence of package upgrades
     let txns = vec![
@@ -275,10 +352,18 @@ fn code_publishing_framework_upgrade_fail() {
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[test]
-fn code_publishing_using_resource_account() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_using_resource_account(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
     let module_address = create_resource_address(*acc.address(), &[]);
@@ -313,10 +398,18 @@ fn code_publishing_using_resource_account() {
     assert_success!(result);
 }
 
-#[test]
-fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     // First module publish attempt failed when executing the init_module.
     // Second attempt should pass.
@@ -349,14 +442,26 @@ fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
     assert_eq!(2, value_resource.important_value);
 }
 
-#[rstest(enabled, disabled,
-         case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK]),
-         case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![]),
+#[rstest(enabled, disabled, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], true, false, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], true, true, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], true, true, true),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], false, false, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], false, true, false),
+    case(vec![], vec![FeatureFlag::CODE_DEPENDENCY_CHECK], false, true, true),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], true, false, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], true, true, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], true, true, true),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], false, false, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], false, true, false),
+    case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK], vec![], false, true, true),
 )]
-fn code_publishing_faked_dependency(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
-    let mut h = MoveHarness::new_with_features(enabled.clone(), disabled);
-    let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap());
+fn code_publishing_faked_dependency(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(enabled.clone(), disabled);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
+    let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap(), seq_num);
 
     let mut pack1 = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
     pack1.add_source("m", "module 0xcafe::m { public fun f() {} }");
@@ -384,13 +489,25 @@ fn code_publishing_faked_dependency(enabled: Vec<FeatureFlag>, disabled: Vec<Fea
     }
 }
 
-#[rstest(enabled, disabled,
-         case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE]),
-         case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![]),
+#[rstest(enabled, disabled, stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], true, false, false),
+    case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], true, true, false),
+    case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], true, true, true),
+    case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], false, false, false),
+    case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], false, true, false),
+    case(vec![], vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], false, true, true),
+    case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![], true, false, false),
+    case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![], true, true, false),
+    case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![], true, true, true),
+    case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![], false, false, false),
+    case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![], false, true, false),
+    case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE], vec![], false, true, true),
 )]
-fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
-    let mut h = MoveHarness::new_with_features(enabled.clone(), disabled);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>, stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(enabled.clone(), disabled);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
 
     let mut pack1 = PackageBuilder::new("Package").with_policy(UpgradePolicy::compat());
     pack1.add_source(
@@ -414,14 +531,22 @@ fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<Fe
     }
 }
 
-#[test]
-fn test_module_publishing_does_not_fallback() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_module_publishing_does_not_fallback(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool)  {
     let mut executor = FakeExecutor::from_head_genesis().set_parallel();
     executor.disable_block_executor_fallback();
 
-    let mut h = MoveHarness::new_with_executor(executor);
+    let mut h = MoveHarness::new_with_executor_and_flags(executor, use_txn_payload_v2_format, use_orderless_transactions);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
-    let account = h.new_account_at(addr);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let module_name = "foo";
     let function_name = "bar";
@@ -445,7 +570,8 @@ fn test_module_publishing_does_not_fallback() {
         let mut i = 0;
         while i < abort_code {
             // Transaction that calls an entry that aborts.
-            let caller = h.new_account_at(AccountAddress::random());
+            let seq_num = if stateless_account { None } else { Some(0) };
+            let caller = h.new_account_at(AccountAddress::random(), seq_num);
             let txn = h.create_entry_function(&caller, member_id.clone(), vec![], vec![]);
             txns.push(txn);
             expected_abort_codes.push(Some(abort_code));
@@ -493,7 +619,7 @@ fn test_module_publishing_does_not_fallback() {
     }
 }
 
-fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
+fn publish_module_txn(source: String, module_name: &str) -> TransactionPayloadWrapper {
     let mut builder = PackageBuilder::new(module_name).with_policy(UpgradePolicy::compat());
     builder.add_source(module_name, &source);
 
@@ -516,14 +642,22 @@ struct Foo {
     data: u64,
 }
 
-#[test]
-fn test_module_publishing_does_not_leak_speculative_information() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_module_publishing_does_not_leak_speculative_information(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis().set_parallel();
     executor.disable_block_executor_fallback();
 
-    let mut h = MoveHarness::new_with_executor(executor);
+    let mut h = MoveHarness::new_with_executor_and_flags(executor, use_txn_payload_v2_format, use_orderless_transactions);
     let addr = AccountAddress::random();
-    let account = h.new_account_at(addr);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let tys_with_abort_codes = [
         ("u8", Some(1)),
@@ -593,14 +727,23 @@ fn assert_move_abort(status: TransactionStatus, expected_abort_code: u64) {
     }
 }
 
-#[test]
-fn test_init_module_should_not_publish_modules() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_init_module_should_not_publish_modules(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES],
         vec![],
     );
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let txn = h.create_publish_package_cache_building(
         &account,
@@ -612,13 +755,22 @@ fn test_init_module_should_not_publish_modules() {
     assert_move_abort(output.status().clone(), 0x03_0000);
 }
 
-#[test]
-fn test_init_module_can_publish_modules() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions, 
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true),
+)]
+fn test_init_module_can_publish_modules(stateless_account: bool, use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![], vec![
         FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
     ]);
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let account = h.new_account_at(addr, seq_num);
 
     let txn = h.create_publish_package_cache_building(
         &account,
