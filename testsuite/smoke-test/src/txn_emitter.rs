@@ -9,7 +9,8 @@ use crate::{
 use anyhow::ensure;
 use aptos_forge::{
     args::TransactionTypeArg, emitter::NumAccountsMode, AccountType, EmitJobMode, EmitJobRequest,
-    EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
+    EntryPoints, NodeExt, ReplayProtectionType, Result, Swarm, TransactionType, TxnEmitter,
+    TxnStats, WorkflowProgress,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use aptos_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_sample_jwt_token};
@@ -22,7 +23,7 @@ pub async fn generate_traffic(
     nodes: &[PeerId],
     duration: Duration,
     gas_price: u64,
-    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
     let rng = SeedableRng::from_rng(OsRng)?;
@@ -54,7 +55,7 @@ pub async fn generate_keyless_traffic(
     nodes: &[PeerId],
     duration: Duration,
     gas_price: u64,
-    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
     let rng = SeedableRng::from_rng(OsRng)?;
@@ -85,7 +86,7 @@ pub async fn create_emit_job_request(
     swarm: &mut dyn Swarm,
     nodes: &[PeerId],
     gas_price: u64,
-    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>,
     account_type: AccountType,
 ) -> Result<EmitJobRequest> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
@@ -115,50 +116,74 @@ pub async fn create_emit_job_request(
     Ok(emit_job_request)
 }
 
-static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Lazy::new(|| {
-    vec![
-        // vec![(
-        //     TransactionType::AccountGeneration {
-        //         add_created_accounts_to_pool: true,
-        //         max_account_working_set: 1_000_000,
-        //         creation_balance: 1_000_000,
-        //     },
-        //     20,
-        // )],
-        // vec![
-        //     (TransactionTypeArg::CoinTransfer.materialize_default(), 20),
-        //     // // commenting this out given it consistently fails smoke test
-        //     // // and it seems to be called only from `test_txn_emmitter`
-        //     (
-        //         TransactionType::PublishPackage {
-        //             use_account_pool: false,
-        //         },
-        //         20,
-        //     ),
-        // ],
+static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>> =
+    Lazy::new(|| {
         vec![
-            (
-                TransactionTypeArg::NoOp.materialize(
-                    100,
-                    false,
-                    WorkflowProgress::when_done_default(),
+            // vec![(
+            //     TransactionType::AccountGeneration {
+            //         add_created_accounts_to_pool: true,
+            //         max_account_working_set: 1_000_000,
+            //         creation_balance: 1_000_000,
+            //     },
+            //     20,
+            // )],
+            // vec![
+            //     (TransactionTypeArg::CoinTransfer.materialize_default(), 20),
+            //     // // commenting this out given it consistently fails smoke test
+            //     // // and it seems to be called only from `test_txn_emmitter`
+            //     (
+            //         TransactionType::PublishPackage {
+            //             use_account_pool: false,
+            //         },
+            //         20,
+            //     ),
+            // ],
+            vec![
+                (
+                    TransactionTypeArg::NoOp.materialize(
+                        100,
+                        false,
+                        WorkflowProgress::when_done_default(),
+                    ),
+                    ReplayProtectionType::SequenceNumber,
+                    20,
                 ),
-                20,
-            ),
-            (
-                TransactionType::CallCustomModules {
-                    entry_point: Box::new(EntryPoints::MakeOrChangeTable {
-                        offset: 0,
-                        count: 60,
-                    }),
-                    num_modules: 1,
-                    use_account_pool: false,
-                },
-                20,
-            ),
-        ],
-    ]
-});
+                (
+                    TransactionType::CallCustomModules {
+                        entry_point: Box::new(EntryPoints::MakeOrChangeTable {
+                            offset: 0,
+                            count: 60,
+                        }),
+                        num_modules: 1,
+                        use_account_pool: false,
+                    },
+                    ReplayProtectionType::SequenceNumber,
+                    20,
+                ),
+                (
+                    TransactionTypeArg::NoOp.materialize(
+                        100,
+                        false,
+                        WorkflowProgress::when_done_default(),
+                    ),
+                    ReplayProtectionType::Nonce,
+                    20,
+                ),
+                (
+                    TransactionType::CallCustomModules {
+                        entry_point: Box::new(EntryPoints::MakeOrChangeTable {
+                            offset: 0,
+                            count: 60,
+                        }),
+                        num_modules: 1,
+                        use_account_pool: false,
+                    },
+                    ReplayProtectionType::Nonce,
+                    20,
+                ),
+            ],
+        ]
+    });
 
 #[ignore]
 #[tokio::test]
@@ -242,6 +267,7 @@ async fn test_txn_emmitter_with_high_pending_latency() {
                 num_modules: 1,
                 use_account_pool: false,
             },
+            ReplayProtectionType::SequenceNumber,
             1,
         )]],
     )
@@ -279,7 +305,7 @@ async fn test_txn_emmitter_low_funds() {
         .init_max_gas_per_txn(20000)
         .max_gas_per_txn(3)
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(5))
-        .transaction_type(transaction_type)
+        .transaction_type(transaction_type, ReplayProtectionType::SequenceNumber)
         .mode(EmitJobMode::MaxLoad {
             mempool_backlog: 10,
         });

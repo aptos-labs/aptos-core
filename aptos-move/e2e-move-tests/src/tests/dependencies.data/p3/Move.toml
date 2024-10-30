@@ -4,3 +4,6 @@ version = "0.0.0"
 
 [dependencies]
 p2 = { local = "../p2" }
+
+[addresses]
+publisher = "_"

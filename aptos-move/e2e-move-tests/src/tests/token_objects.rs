@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
@@ -11,8 +12,8 @@ use aptos_types::{
     transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{identifier::Identifier, language_storage::StructTag};
+use rstest::rstest;
 use serde::Deserialize;
-
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
     collection: AccountAddress,
@@ -23,22 +24,36 @@ struct Token {
     mutation_events: EventHandle,
 }
 
-#[test]
-fn test_basic_token() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_basic_token(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let account = h.new_account_at(addr);
+    let account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
 
-    publish_object_token_example(&mut h, addr, &account);
+    publish_object_token_example(&mut h, *account.address(), &account);
 
     let result = h.run_transaction_payload(
         &account,
-        create_mint_hero_payload(&addr, "The best hero ever!"),
+        create_mint_hero_payload(account.address(), "The best hero ever!"),
     );
     assert_success!(result);
 
-    let token_addr = account_address::create_token_address(addr, "Hero Quest!", "Wukong");
+    let token_addr =
+        account_address::create_token_address(*account.address(), "Hero Quest!", "Wukong");
     let obj_tag = StructTag {
         address: AccountAddress::from_hex_literal("0x1").unwrap(),
         module: Identifier::new("object").unwrap(),
@@ -77,7 +92,7 @@ fn test_basic_token() {
 
     let result = h.run_transaction_payload(
         &account,
-        create_set_hero_description_payload(&addr, "Oh no!"),
+        create_set_hero_description_payload(account.address(), "Oh no!"),
     );
     assert_success!(result);
 

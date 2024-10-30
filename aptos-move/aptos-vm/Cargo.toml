@@ -57,6 +57,7 @@ once_cell = { workspace = true }
 ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+rstest = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
