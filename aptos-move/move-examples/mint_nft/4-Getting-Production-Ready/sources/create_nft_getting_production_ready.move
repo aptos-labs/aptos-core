@@ -288,7 +288,12 @@ module mint_nft::create_nft_getting_production_ready {
         token_data_id: TokenDataId,
         public_key: ValidatedPublicKey
     ) {
-        let sequence_number = account::get_sequence_number(receiver_addr);
+        // TODO[Orderless]: Is this the right way to deal with stateless accounts?
+        let sequence_number = if (account::exists_at(receiver_addr)) {
+            account::get_sequence_number(receiver_addr)
+        } else {
+            0
+        };
 
         let proof_challenge = MintProofChallenge {
             receiver_account_sequence_number: sequence_number,

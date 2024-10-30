@@ -294,14 +294,27 @@ module aptos_framework::account {
         exists<Account>(addr)
     }
 
+    inline fun resource_exists_at(addr: address): bool {
+        exists<Account>(addr)
+    }
+
     #[view]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
-        borrow_global<Account>(addr).guid_creation_num
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).guid_creation_num
+        } else {
+            // TODO[Orderless]: Is this okay to return a default value here?
+            0
+        }
     }
 
     #[view]
     public fun get_sequence_number(addr: address): u64 acquires Account {
-        borrow_global<Account>(addr).sequence_number
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).sequence_number
+        } else {
+            0
+        }
     }
 
     #[view]
@@ -314,7 +327,14 @@ module aptos_framework::account {
         }
     }
 
+    inline fun ensure_resource_exists(addr: address) {
+        if (!resource_exists_at(addr)) {
+            create_account_unchecked(addr);
+        }
+    }
+
     public(friend) fun increment_sequence_number(addr: address) acquires Account {
+        ensure_resource_exists(addr);
         let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
 
         assert!(
@@ -327,7 +347,11 @@ module aptos_framework::account {
 
     #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
-        borrow_global<Account>(addr).authentication_key
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).authentication_key
+        } else {
+            bcs::to_bytes(&addr)
+        }
     }
 
     /// This function is used to rotate a resource account's authentication key to `new_auth_key`. This is done in
@@ -337,7 +361,7 @@ module aptos_framework::account {
     /// 3. During multisig_v2 account creation
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        ensure_resource_exists(addr);
         assert!(
             vector::length(&new_auth_key) == 32,
             error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
@@ -397,8 +421,8 @@ module aptos_framework::account {
         cap_update_table: vector<u8>,
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         check_rotation_permission(account);
+        ensure_resource_exists(addr);
         let account_resource = borrow_global_mut<Account>(addr);
 
         // Verify the given `from_public_key_bytes` matches this account's current authentication key.
@@ -577,9 +601,8 @@ module aptos_framework::account {
     /// authority of the new authentication key.
     entry fun set_originating_address(account: &signer) acquires Account, OriginatingAddress {
         let account_addr = signer::address_of(account);
-        assert!(exists<Account>(account_addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let auth_key_as_address =
-            from_bcs::to_address(borrow_global<Account>(account_addr).authentication_key);
+            from_bcs::to_address(get_authentication_key(account_addr));
         let address_map_ref_mut =
             &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         if (table::contains(address_map_ref_mut, auth_key_as_address)) {
@@ -612,9 +635,9 @@ module aptos_framework::account {
 
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
-        assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         check_rotation_permission(account);
         let addr = signer::address_of(account);
+        ensure_resource_exists(addr);
         let account_resource = borrow_global<Account>(addr);
         assert!(
             option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address),
@@ -648,7 +671,8 @@ module aptos_framework::account {
     ) acquires Account {
         check_offering_permission(account);
         let source_address = signer::address_of(account);
-        assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        // Question[Orderless]: Is it okay to comment this statement to accommodate stateless accounts?
+        // assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
         // Proof that this account intends to delegate its signer capability to another account.
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
@@ -887,6 +911,7 @@ module aptos_framework::account {
 
     public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
         let addr = signer::address_of(account_signer);
+        ensure_resource_exists(addr);
         let account = borrow_global_mut<Account>(addr);
         let guid = guid::create(addr, &mut account.guid_creation_num);
         assert!(

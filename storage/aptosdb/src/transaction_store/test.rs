@@ -33,16 +33,18 @@ proptest! {
             let user_txn = txn
                 .try_as_signed_user_txn()
                 .expect("All should be user transactions here.");
-            prop_assert_eq!(
-                store
-                    .get_account_transaction_version(
-                        user_txn.sender(),
-                        user_txn.sequence_number(),
-                        ledger_version
-                    )
-                    .unwrap(),
-                Some(ver as Version)
-            );
+            if let ReplayProtector::SequenceNumber(seq_num) = user_txn.replay_protector() {
+                prop_assert_eq!(
+                    store
+                        .get_account_ordered_transaction_version(
+                            user_txn.sender(),
+                            seq_num,
+                            ledger_version
+                        )
+                        .unwrap(),
+                    Some(ver as Version)
+                );
+            }
         }
     }
 
@@ -71,7 +73,7 @@ proptest! {
         // can we just get all the account transaction versions individually
 
         for (version, txn) in &txns {
-            let mut iter = store.get_account_transaction_version_iter(
+            let mut iter = store.get_account_ordered_transactions_iter(
                 txn.sender(),
                 txn.sequence_number(),
                 1, /* num_versions */
@@ -113,7 +115,7 @@ proptest! {
             .keys()
             .map(|address| {
                 let txn_metadatas = store
-                    .get_account_transaction_version_iter(
+                    .get_account_ordered_transactions_iter(
                         *address,
                         seq_num_offset,
                         num_versions,

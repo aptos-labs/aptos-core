@@ -12,7 +12,7 @@ use aptos_sdk::{
     types::LocalAccount,
 };
 use aptos_types::{
-    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,
+    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayloadWrapper,
 };
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +32,7 @@ async fn get_chain_id(client: &ApiClient) -> Result<ChainId> {
 pub async fn build_and_submit_transaction(
     client: &ApiClient,
     account: &mut LocalAccount,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     options: TransactionOptions,
 ) -> Result<PendingTransaction> {
     // create factory

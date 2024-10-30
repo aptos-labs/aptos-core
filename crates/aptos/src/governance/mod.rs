@@ -35,7 +35,7 @@ use aptos_types::{
     governance::VotingRecords,
     stake_pool::StakePool,
     state_store::table::TableHandle,
-    transaction::{Script, TransactionPayload},
+    transaction::{Script, TransactionPayloadWrapper},
 };
 use async_trait::async_trait;
 use clap::Parser;
@@ -889,7 +889,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
-        let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
+        let txn = TransactionPayloadWrapper::Script(Script::new(bytecode, vec![], args));
 
         self.txn_options
             .submit_transaction(txn)
