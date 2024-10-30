@@ -87,6 +87,8 @@ pub struct RocksdbOpt {
     index_db_max_total_wal_size: u64,
     #[clap(long, hide(true), default_value_t = 16)]
     max_background_jobs: i32,
+    #[clap(long, hide(true), default_value_t = 1024)]
+    block_cache_size: u64,
 }
 
 impl From<RocksdbOpt> for RocksdbConfigs {
@@ -96,12 +98,14 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_open_files: opt.ledger_db_max_open_files,
                 max_total_wal_size: opt.ledger_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                block_cache_size: opt.block_cache_size,
                 ..Default::default()
             },
             state_merkle_db_config: RocksdbConfig {
                 max_open_files: opt.state_merkle_db_max_open_files,
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                block_cache_size: opt.block_cache_size,
                 ..Default::default()
             },
             enable_storage_sharding: opt.enable_storage_sharding,
@@ -109,12 +113,14 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_open_files: opt.state_kv_db_max_open_files,
                 max_total_wal_size: opt.state_kv_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                block_cache_size: opt.block_cache_size,
                 ..Default::default()
             },
             index_db_config: RocksdbConfig {
                 max_open_files: opt.index_db_max_open_files,
                 max_total_wal_size: opt.index_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                block_cache_size: opt.block_cache_size,
                 ..Default::default()
             },
         }
