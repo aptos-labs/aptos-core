@@ -10,9 +10,6 @@ module aptos_framework::transaction_context {
     /// The transaction context extension feature is not enabled.
     const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 = 2;
 
-    /// The transaction context hash function update feature is not enabled.
-    const ETRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE_NOT_ENABLED: u64 = 3;
-
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
     struct AUID has drop, store {
@@ -34,19 +31,15 @@ module aptos_framework::transaction_context {
         entry_function_payload: Option<EntryFunctionPayload>,
     }
 
-    /// Returns a unique session hash, ensuring a distinct value for each transaction
-    /// session: prologue, execution, epilogue.
-    public fun unique_session_hash(): vector<u8> {
-        get_txn_hash()
-    }
-    #[deprecated]
-    // This function is deprecated. Use `unique_session_hash` instead.
+    /// Returns the transaction hash of the current transaction.
+    native fun get_txn_hash(): vector<u8>;
+
+    /// Returns the transaction hash of the current transaction.
+    /// Internally calls the private function `get_txn_hash`.
+    /// This function is created for to feature gate the `get_txn_hash` function.
     public fun get_transaction_hash(): vector<u8> {
         get_txn_hash()
     }
-    // This function will be removed when `get_transaction_hash` is deprecated.
-    native fun get_txn_hash(): vector<u8>;
-
 
     /// Returns a universally unique identifier (of type address) generated
     /// by hashing the transaction hash of this transaction and a sequence number
@@ -189,15 +182,6 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
-    /// Returns the hash of the current raw transaction, which is used for transaction authentication.
-    /// This function calls an internal native function to retrieve the raw transaction hash.
-    /// In the case of a fee payer transaction, the hash value is generated using 0x0 as the fee payer address.
-    public fun raw_transaction_hash(): vector<u8> {
-        assert!(features::transaction_context_hash_function_update_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE_NOT_ENABLED));
-        raw_transaction_hash_internal()
-    }
-    native fun raw_transaction_hash_internal(): vector<u8>;
-
     #[test()]
     fun test_auid_uniquess() {
         use std::vector;
@@ -272,13 +256,6 @@ module aptos_framework::transaction_context {
     #[test]
     #[expected_failure(abort_code=196609, location = Self)]
     fun test_call_multisig_payload() {
-        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
-        let _multisig = multisig_payload();
-    }
-
-    #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
-    fun test_call_raw_txn_hash() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _multisig = multisig_payload();
     }
