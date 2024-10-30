@@ -42,6 +42,7 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
+    "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
     "aptos-utils",
@@ -233,6 +234,7 @@ members = [
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
+    "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/paranoid-tests",
     "third_party/move/move-vm/runtime",
     "third_party/move/move-vm/test-utils",
@@ -428,6 +430,7 @@ aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
+aptos-script-composer = { path = "aptos-move/script-composer" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
@@ -524,7 +527,12 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
+clap = { version = "4.3.9", features = [
+    "derive",
+    "env",
+    "unstable-styles",
+    "wrap_help",
+] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [
@@ -680,8 +688,14 @@ petgraph = "0.6.5"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 # We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
-poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["anyhow", "rustls"] }
-poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["swagger-ui", "url"] }
+poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "anyhow",
+    "rustls",
+] }
+poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "swagger-ui",
+    "url",
+] }
 poem-openapi-derive = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b" }
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
@@ -699,6 +713,7 @@ prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
 quick_cache = "0.5.1"
+quick-junit = "0.5.0"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
@@ -761,6 +776,7 @@ stats_alloc = "0.1.8"
 status-line = "0.2.0"
 strum = "0.24.1"
 strum_macros = "0.24.2"
+sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
@@ -799,6 +815,7 @@ tonic = { version = "0.11.0", features = [
 tonic-reflection = "0.11.0"
 topological-sort = "0.2.2"
 triomphe = "0.1.9"
+tsify-next = "0.5.4"
 tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
@@ -813,6 +830,8 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.42"
 which = "4.2.5"
 whoami = "1.5.0"
 x25519-dalek = "1.2.0"
@@ -853,6 +872,7 @@ move-transactional-test-runner = { path = "third_party/move/testing-infra/transa
 move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",
 ] }
+move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
 move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
     "table-extension",
