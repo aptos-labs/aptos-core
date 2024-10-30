@@ -303,6 +303,7 @@ impl CliCommand<TransactionSummary> for Execute {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        // TODO[Orderless]: Change this to transaction payload v2 format.
         self.txn_options
             .submit_transaction(TransactionPayload::Multisig(Multisig {
                 multisig_address: self.multisig_account.multisig_address,
@@ -329,6 +330,7 @@ impl CliCommand<TransactionSummary> for ExecuteWithPayload {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        // TODO[Orderless]: Change this to transaction payload v2 format.
         self.execute
             .txn_options
             .submit_transaction(TransactionPayload::Multisig(Multisig {

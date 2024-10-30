@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator,
-    accounts_pool_wrapper::AccountsPoolWrapperCreator,
+    account_generator::AccountGeneratorCreator, //accounts_pool_wrapper::AccountsPoolWrapperCreator,
     call_custom_modules::{
         CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator,
     },
     publishing::publish_util::Package,
-    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowProgress,
+    ObjectPool,
+    ReliableTransactionSubmitter,
+    ReplayProtectionType,
+    RootAccountHandle,
+    TransactionGenerator,
+    TransactionGeneratorCreator,
+    WorkflowProgress,
 };
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_sdk::{
@@ -36,6 +40,7 @@ pub trait WorkflowKind: std::fmt::Debug + Sync + Send + CloneWorkflowKind {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> WorkflowTxnGeneratorCreator;
 }
 
@@ -320,7 +325,7 @@ impl WorkflowTxnGeneratorCreator {
             };
             pool_per_stage.push(next_pool.clone());
 
-            let delegation_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+            let _delegation_worker = CustomModulesDelegationGeneratorCreator::create_worker(
                 init_txn_factory.clone(),
                 root_account,
                 txn_executor,
@@ -329,15 +334,15 @@ impl WorkflowTxnGeneratorCreator {
             )
             .await;
 
-            creators.push(Box::new(AccountsPoolWrapperCreator::new(
-                Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                    txn_factory.clone(),
-                    packages.clone(),
-                    delegation_worker,
-                )),
-                prev_pool.clone(),
-                Some(next_pool.clone()),
-            )));
+            // creators.push(Box::new(AccountsPoolWrapperCreator::new(
+            //     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+            //         txn_factory.clone(),
+            //         packages.clone(),
+            //         delegation_worker,
+            //     )),
+            //     prev_pool.clone(),
+            //     Some(next_pool.clone()),
+            // )));
 
             stage_switch_conditions.push(
                 if special_last {
@@ -362,6 +367,7 @@ impl WorkflowTxnGeneratorCreator {
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         assert_eq!(num_modules, 1, "Only one module is supported for now");
 
@@ -390,6 +396,7 @@ impl WorkflowTxnGeneratorCreator {
                 txn_executor,
                 num_modules,
                 stage_tracking,
+                replay_protection_type,
             )
             .await
     }

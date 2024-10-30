@@ -135,6 +135,8 @@ pub enum FeatureFlag {
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
     DEFAULT_ACCOUNT_RESOURCE = 91,
+    TRANSACTION_PAYLOAD_V2 = 92,
+    ORDERLESS_TRANSACTIONS = 93,
 }
 
 impl FeatureFlag {
@@ -225,6 +227,9 @@ impl FeatureFlag {
             FeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            // TODO[Orderless]: Remove these from deafult features before landing the PR.
+            FeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::ORDERLESS_TRANSACTIONS,
         ]
     }
 }
@@ -383,6 +388,14 @@ impl Features {
 
     pub fn is_default_account_resource_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
+    }
+
+    pub fn is_transaction_payload_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_PAYLOAD_V2)
+    }
+
+    pub fn is_orderless_txns_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ORDERLESS_TRANSACTIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

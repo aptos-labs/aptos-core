@@ -6,7 +6,7 @@ use crate::{
     token_workflow::TokenWorkflowKind,
     EntryPoints,
 };
-use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
+use aptos_transaction_generator_lib::{ReplayProtectionType, TransactionType, WorkflowProgress};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -364,12 +364,13 @@ impl TransactionTypeArg {
 
     pub fn args_to_transaction_mix_per_phase(
         transaction_types: &[TransactionTypeArg],
+        replay_protection_types: &[ReplayProtectionType],
         transaction_weights: &[usize],
         transaction_phases: &[usize],
         module_working_set_size: usize,
         sender_use_account_pool: bool,
         workflow_progress_type: WorkflowProgress,
-    ) -> Vec<Vec<(TransactionType, usize)>> {
+    ) -> Vec<Vec<(TransactionType, ReplayProtectionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
             .map(|t| {
@@ -381,6 +382,16 @@ impl TransactionTypeArg {
             })
             .collect::<Vec<_>>();
 
+        let arg_replay_protection_types = if replay_protection_types.is_empty() {
+            vec![ReplayProtectionType::SequenceNumber; arg_transaction_types.len()]
+        } else {
+            assert_eq!(
+                replay_protection_types.len(),
+                arg_transaction_types.len(),
+                "Transaction types and replay protection types need to be the same length"
+            );
+            replay_protection_types.to_vec()
+        };
         let arg_transaction_weights = if transaction_weights.is_empty() {
             vec![1; arg_transaction_types.len()]
         } else {
@@ -402,12 +413,18 @@ impl TransactionTypeArg {
             transaction_phases.to_vec()
         };
 
-        let mut transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>> = Vec::new();
-        for (transaction_type, (weight, phase)) in arg_transaction_types.into_iter().zip(
-            arg_transaction_weights
-                .into_iter()
-                .zip(arg_transaction_phases.into_iter()),
-        ) {
+        let mut transaction_mix_per_phase: Vec<
+            Vec<(TransactionType, ReplayProtectionType, usize)>,
+        > = Vec::new();
+        for (transaction_type, (replay_protection_type, (weight, phase))) in
+            arg_transaction_types.into_iter().zip(
+                arg_replay_protection_types.into_iter().zip(
+                    arg_transaction_weights
+                        .into_iter()
+                        .zip(arg_transaction_phases.into_iter()),
+                ),
+            )
+        {
             assert!(
                 phase <= transaction_mix_per_phase.len(),
                 "cannot skip phases ({})",
@@ -416,10 +433,11 @@ impl TransactionTypeArg {
             if phase == transaction_mix_per_phase.len() {
                 transaction_mix_per_phase.push(Vec::new());
             }
-            transaction_mix_per_phase
-                .get_mut(phase)
-                .unwrap()
-                .push((transaction_type, weight));
+            transaction_mix_per_phase.get_mut(phase).unwrap().push((
+                transaction_type,
+                replay_protection_type,
+                weight,
+            ));
         }
 
         transaction_mix_per_phase
@@ -457,12 +475,18 @@ pub struct EmitWorkloadArgs {
 
     #[clap(long, num_args = 0..)]
     pub transaction_phases: Vec<usize>,
+
+    #[clap(long, value_enum, default_value = "sequence-number", num_args = 1.., ignore_case = true)]
+    pub replay_protection_types: Vec<ReplayProtectionType>,
 }
 
 impl EmitWorkloadArgs {
-    pub fn args_to_transaction_mix_per_phase(&self) -> Vec<Vec<(TransactionType, usize)>> {
+    pub fn args_to_transaction_mix_per_phase(
+        &self,
+    ) -> Vec<Vec<(TransactionType, ReplayProtectionType, usize)>> {
         TransactionTypeArg::args_to_transaction_mix_per_phase(
             &self.transaction_type,
+            &self.replay_protection_types,
             &self.transaction_weights,
             &self.transaction_phases,
             self.module_working_set_size.unwrap_or(1),

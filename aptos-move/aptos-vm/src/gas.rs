@@ -205,7 +205,7 @@ pub(crate) fn check_gas(
             speculative_warn!(
                 log_context,
                 format!(
-                    "[VM] Insufficient gas for sponsored transaction; min {}, submitted {}",
+                    "[VM] Insufficient gas for transaction that creates an account; min {}, submitted {}",
                     expected, actual,
                 ),
             );

@@ -73,6 +73,8 @@ pub fn get_test_signed_transaction(
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     payload: Option<TransactionPayload>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> Transaction {
     Transaction::UserTransaction(get_test_signed_txn(
         sender,
@@ -80,5 +82,7 @@ pub fn get_test_signed_transaction(
         &private_key,
         public_key,
         payload,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     ))
 }

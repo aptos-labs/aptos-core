@@ -1,2 +1,2 @@
-module 0x1::unrelated {
+module publisher::unrelated {
 }
