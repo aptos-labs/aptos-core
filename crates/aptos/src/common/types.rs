@@ -2353,14 +2353,6 @@ pub struct ChunkedPublishOption {
     pub(crate) chunked_publish: bool,
 
     /// Address of the `large_packages` move module for chunked publishing
-    #[clap(long)]
-    pub(crate) large_packages_module_address: Option<String>,
-}
-
-impl ChunkedPublishOption {
-    pub fn large_packages_module_address(&self) -> &str {
-        self.large_packages_module_address
-            .as_deref()
-            .unwrap_or(LARGE_PACKAGES_MODULE_ADDRESS)
-    }
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS)]
+    pub(crate) large_packages_module_address: String,
 }

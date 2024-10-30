@@ -896,7 +896,7 @@ impl CliTestFramework {
             },
             chunked_publish_option: ChunkedPublishOption {
                 chunked_publish: false,
-                large_packages_module_address: Some(LARGE_PACKAGES_MODULE_ADDRESS.to_string()),
+                large_packages_module_address: LARGE_PACKAGES_MODULE_ADDRESS.to_string(),
             },
         }
         .execute()

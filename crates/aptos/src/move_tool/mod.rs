@@ -820,7 +820,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             package,
             PublishType::AccountDeploy,
             None,
-            self.chunked_publish_option.large_packages_module_address(),
+            &self.chunked_publish_option.large_packages_module_address,
         )?;
 
         let size = &chunked_publish_payloads
@@ -1050,7 +1050,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             submit_chunked_publish_transactions(
                 chunked_package_payloads.payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )
             .await
         } else {
@@ -1156,7 +1156,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1182,7 +1182,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
 
@@ -1197,7 +1197,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )
             .await
         } else {
@@ -1294,7 +1294,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
 
@@ -1308,7 +1308,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )
             .await
         } else {
@@ -1385,7 +1385,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1411,7 +1411,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
 
@@ -1426,7 +1426,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )
             .await
         } else {
@@ -1529,7 +1529,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
 
@@ -1543,7 +1543,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address(),
+                &self.chunked_publish_option.large_packages_module_address,
             )
             .await
         } else {
@@ -1702,8 +1702,8 @@ pub struct ClearStagingArea {
     pub(crate) txn_options: TransactionOptions,
 
     /// Address of the `large_packages` move module for chunked publishing
-    #[clap(long)]
-    pub(crate) large_packages_module_address: Option<String>,
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS)]
+    pub(crate) large_packages_module_address: String,
 }
 
 #[async_trait]
@@ -1713,16 +1713,12 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let large_packages_module_address = self
-            .large_packages_module_address
-            .as_deref()
-            .unwrap_or(LARGE_PACKAGES_MODULE_ADDRESS);
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
-            large_packages_module_address,
+            &self.large_packages_module_address,
             self.txn_options.profile_options.account_address()?
         );
-        let payload = large_packages_cleanup_staging_area(large_packages_module_address);
+        let payload = large_packages_cleanup_staging_area(&self.large_packages_module_address);
         self.txn_options
             .submit_transaction(payload)
             .await
