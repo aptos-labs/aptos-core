@@ -312,6 +312,15 @@ message TransactionPayload {
     MultisigPayload multisig_payload = 6;
   }
   reserved 4;
+
+  oneof extra_config {
+    ExtraConfigV1 extra_config_v1 = 7;
+  }
+}
+
+message ExtraConfigV1 {
+  optional string multisig_address = 1;
+  optional uint64 replay_protection_nonce = 2;
 }
 
 message EntryFunctionPayload {

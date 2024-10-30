@@ -1,4 +1,4 @@
-module 0xbeef::test {
+module publisher::test {
     use std::signer::address_of;
     use std::vector;
     use aptos_std::table::{Self, Table};

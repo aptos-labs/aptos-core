@@ -143,6 +143,8 @@ pub enum FeatureFlag {
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
     DefaultAccountResource,
+    TransactionPayloadV2,
+    OrderlessTransactions,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -381,6 +383,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
             },
             FeatureFlag::DefaultAccountResource => AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
         }
     }
 }
@@ -546,6 +550,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::NewAccountsDefaultToFaStore
             },
             AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE => FeatureFlag::DefaultAccountResource,
+            AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
+            AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
         }
     }
 }

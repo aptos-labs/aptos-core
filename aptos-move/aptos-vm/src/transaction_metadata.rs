@@ -9,7 +9,9 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{
         authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
-        EntryFunction, Multisig, SignedTransaction, TransactionPayload,
+        EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction,
+        TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
+        TransactionPayload, TransactionPayloadInner,
     },
 };
 
@@ -18,7 +20,7 @@ pub struct TransactionMetadata {
     pub authentication_proof: AuthenticationProof,
     pub secondary_signers: Vec<AccountAddress>,
     pub secondary_authentication_proofs: Vec<AuthenticationProof>,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub fee_payer: Option<AccountAddress>,
     /// `None` if the [TransactionAuthenticator] lacks an authenticator for the fee payer.
     /// `Some([])` if the authenticator for the fee payer is a [NoAccountAuthenticator].
@@ -31,6 +33,7 @@ pub struct TransactionMetadata {
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
     pub is_keyless: bool,
+    // Question[Orderless]: Why are we storing entry function payload here, but not script payload?
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
 }
@@ -47,7 +50,7 @@ impl TransactionMetadata {
                 .iter()
                 .map(|account_auth| account_auth.authentication_proof())
                 .collect(),
-            sequence_number: txn.sequence_number(),
+            replay_protector: txn.replay_protector(),
             fee_payer: txn.authenticator_ref().fee_payer_address(),
             fee_payer_authentication_proof: txn
                 .authenticator()
@@ -58,28 +61,51 @@ impl TransactionMetadata {
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id(),
-            script_hash: match txn.payload() {
-                TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
-                TransactionPayload::EntryFunction(_) => vec![],
-                TransactionPayload::Multisig(_) => vec![],
-
-                // Deprecated. Return an empty vec because we cannot do anything
-                // else here, only `unreachable!` otherwise.
-                TransactionPayload::ModuleBundle(_) => vec![],
+            script_hash: if let Ok(TransactionExecutableRef::Script(s)) =
+                txn.payload().executable_ref()
+            {
+                HashValue::sha3_256_of(s.code()).to_vec()
+            } else {
+                vec![]
             },
-            script_size: match txn.payload() {
-                TransactionPayload::Script(s) => (s.code().len() as u64).into(),
-                _ => NumBytes::zero(),
+            script_size: if let Ok(TransactionExecutableRef::Script(s)) =
+                txn.payload().executable_ref()
+            {
+                (s.code().len() as u64).into()
+            } else {
+                NumBytes::zero()
             },
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|res| !res.is_empty())
                 .unwrap_or(false),
-            entry_function_payload: match txn.payload() {
-                TransactionPayload::EntryFunction(e) => Some(e.clone()),
-                _ => None,
+            entry_function_payload: if txn.payload().is_multisig() {
+                None
+            } else if let Ok(TransactionExecutableRef::EntryFunction(e)) =
+                txn.payload().executable_ref()
+            {
+                Some(e.clone())
+            } else {
+                None
             },
             multisig_payload: match txn.payload() {
                 TransactionPayload::Multisig(m) => Some(m.clone()),
+                TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                    executable,
+                    extra_config:
+                        TransactionExtraConfig::V1 {
+                            multisig_address: Some(multisig_address),
+                            ..
+                        },
+                }) => Some(Multisig {
+                    multisig_address: *multisig_address,
+                    transaction_payload: match executable {
+                        TransactionExecutable::EntryFunction(e) => {
+                            // TODO[Orderless]: How to avoid the clone operation here.
+                            Some(MultisigTransactionPayload::EntryFunction(e.clone()))
+                        },
+                        _ => None,
+                    },
+                }),
                 _ => None,
             },
         }
@@ -125,8 +151,15 @@ impl TransactionMetadata {
         &self.authentication_proof
     }
 
-    pub fn sequence_number(&self) -> u64 {
-        self.sequence_number
+    pub fn replay_protector(&self) -> ReplayProtector {
+        self.replay_protector
+    }
+
+    pub fn is_orderless(&self) -> bool {
+        match self.replay_protector {
+            ReplayProtector::SequenceNumber(_) => false,
+            ReplayProtector::Nonce(_) => true,
+        }
     }
 
     pub fn transaction_size(&self) -> NumBytes {

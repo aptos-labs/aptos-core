@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
@@ -9,6 +10,7 @@ use aptos_types::{
     account_config::{AccountResource, CORE_CODE_ADDRESS},
 };
 use move_core_types::parser::parse_struct_tag;
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -21,13 +23,39 @@ struct SignerCapabilityOfferProofChallengeV2 {
     recipient_address: AccountAddress,
 }
 
-#[test]
 /// Tests Alice offering Bob a signer for her account.
-fn offer_signer_capability_v2() {
-    let mut harness = MoveHarness::new();
+#[rstest(
+    alice_stateless_account,
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn offer_signer_capability_v2(
+    alice_stateless_account: bool,
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut harness =
+        MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let account_alice = harness.new_account_with_key_pair();
-    let account_bob = harness.new_account_at(AccountAddress::from_hex_literal("0x345").unwrap());
+    let account_alice = harness.new_account_with_key_pair(
+        if alice_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let account_bob = harness.new_account_at(
+        AccountAddress::from_hex_literal("0x345").unwrap(),
+        if bob_stateless_account { None } else { Some(0) },
+    );
 
     // This struct fixes sequence number 0, which is what Alice's account is at in this e2e test
     let proof_struct = SignerCapabilityOfferProofChallengeV2 {
@@ -65,13 +93,39 @@ fn offer_signer_capability_v2() {
     );
 }
 
-#[test]
 /// Samples a test case for the Move tests for `offer_signer_capability`
-fn sample_offer_signer_capability_v2_test_case_for_move() {
-    let mut harness = MoveHarness::new();
+#[rstest(
+    alice_stateless_account,
+    bob_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn sample_offer_signer_capability_v2_test_case_for_move(
+    alice_stateless_account: bool,
+    bob_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut harness =
+        MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let account_alice = harness.new_account_with_key_pair();
-    let account_bob = harness.new_account_at(AccountAddress::from_hex_literal("0x345").unwrap());
+    let account_alice = harness.new_account_with_key_pair(
+        if alice_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let account_bob = harness.new_account_at(
+        AccountAddress::from_hex_literal("0x345").unwrap(),
+        if bob_stateless_account { None } else { Some(0) },
+    );
 
     // This struct fixes sequence number 0, which is what Alice's account is at in the Move test
     let proof_struct = SignerCapabilityOfferProofChallengeV2 {

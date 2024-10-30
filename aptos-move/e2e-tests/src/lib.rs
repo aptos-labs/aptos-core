@@ -8,7 +8,9 @@
 //!
 //! This crate contains helpers for executing tests against the Aptos VM.
 
-use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
+use aptos_types::{
+    on_chain_config::FeatureFlag, transaction::TransactionStatus, vm_status::KeptVMStatus,
+};
 
 pub mod account;
 pub mod account_universe;
@@ -67,4 +69,20 @@ macro_rules! current_function_name {
         let name = type_name_of(f);
         &name[..name.len() - 3]
     }};
+}
+
+pub fn feature_flags_for_orderless(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> Vec<FeatureFlag> {
+    let mut flags = vec![];
+    if use_txn_payload_v2_format {
+        flags.push(FeatureFlag::TRANSACTION_PAYLOAD_V2);
+    }
+    if use_orderless_transactions {
+        flags.push(FeatureFlag::ORDERLESS_TRANSACTIONS);
+        flags.push(FeatureFlag::ACCOUNT_ABSTRACTION);
+        flags.push(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE);
+    }
+    flags
 }

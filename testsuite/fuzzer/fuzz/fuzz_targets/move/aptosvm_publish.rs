@@ -113,7 +113,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // publish all packages
     for group in packages {
         let sender = *group[0].address();
-        let acc = vm.new_account_at(sender);
+        // TODO[Orderless]: Change this to support stateless accounts and orderless transactions
+        let acc = vm.new_account_at(sender, Some(0));
 
         // First publish attempt
         publish_group(&mut vm, &acc, &group, 0)?;

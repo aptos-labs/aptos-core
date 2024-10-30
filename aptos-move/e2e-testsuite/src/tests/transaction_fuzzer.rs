@@ -2,17 +2,26 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_language_e2e_tests::{
+    account::Account, executor::FakeExecutor, feature_flags_for_orderless,
+};
 use proptest::{collection::vec, prelude::*};
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
+    #![proptest_config(ProptestConfig::with_cases(40))]
     #[test]
     fn fuzz_scripts_genesis_state(
         txns in vec(any::<EntryFunctionCall>(), 0..10),
+        use_txn_payload_v2_format in any::<bool>(),
+        use_orderless_transactions in any::<bool>(),
     ) {
-        let executor = FakeExecutor::from_head_genesis();
+        if use_orderless_transactions && !use_txn_payload_v2_format {
+            return Ok(()); // Orderless transactions require V2 transaction format
+        }
+        let mut executor = FakeExecutor::from_head_genesis();
+        executor.enable_features(feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions), vec![]);
         let accounts = vec![
             (Account::new_aptos_root(), 0),
         ];
@@ -25,6 +34,7 @@ proptest! {
                 account.transaction()
                 .payload(payload.clone())
                 .sequence_number(*account_sequence_number)
+                .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
                 .sign());
                 prop_assert!(!output.status().is_discarded());
         }

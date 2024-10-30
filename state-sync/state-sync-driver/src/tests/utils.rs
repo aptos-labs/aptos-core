@@ -32,8 +32,8 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, ReplayProtector,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus, Version,
     },
@@ -212,6 +212,7 @@ pub fn create_transaction() -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
+    // TODO[Orderless]: Change this to transaction payload v2 format.
     let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),
@@ -291,7 +292,7 @@ pub async fn verify_commit_notification(
             let signed = txn.try_as_signed_user_txn().unwrap();
             CommittedTransaction {
                 sender: signed.sender(),
-                sequence_number: 0,
+                replay_protector: ReplayProtector::SequenceNumber(0),
                 use_case: signed.parse_use_case(),
             }
         })

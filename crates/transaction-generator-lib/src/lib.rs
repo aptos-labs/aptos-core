@@ -58,6 +58,13 @@ pub use publishing::{entry_point_trait, prebuild_packages::create_prebuilt_packa
 
 pub const SEND_AMOUNT: u64 = 1;
 
+#[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
+pub enum ReplayProtectionType {
+    #[default]
+    SequenceNumber,
+    Nonce,
+}
+
 #[derive(Debug, Clone)]
 pub enum TransactionType {
     CoinTransfer {
@@ -244,7 +251,7 @@ impl RootAccountHandle for AlwaysApproveRootAccountHandle {
 }
 
 pub async fn create_txn_generator_creator(
-    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>,
     root_account: impl RootAccountHandle,
     source_accounts: &mut [LocalAccount],
     initial_burner_accounts: Vec<LocalAccount>,
@@ -289,7 +296,7 @@ pub async fn create_txn_generator_creator(
     for transaction_mix in transaction_mix_per_phase {
         let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
             Vec::new();
-        for (transaction_type, weight) in transaction_mix {
+        for (transaction_type, replay_protection_type, weight) in transaction_mix {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
                 TransactionType::CoinTransfer {
@@ -309,6 +316,7 @@ pub async fn create_txn_generator_creator(
                         } else {
                             SamplingMode::Basic
                         },
+                        replay_protection_type,
                     )),
                     sender_use_account_pool,
                     &accounts_pool,
@@ -357,6 +365,7 @@ pub async fn create_txn_generator_creator(
                             entry_point.pre_built_packages(),
                             entry_point.package_name(),
                             &mut EntryPointTransactionGenerator::new_singleton(entry_point),
+                            replay_protection_type,
                         )
                         .await,
                     ),
@@ -378,6 +387,7 @@ pub async fn create_txn_generator_creator(
                             entry_points[0].0.pre_built_packages(),
                             entry_points[0].0.package_name(),
                             &mut EntryPointTransactionGenerator::new(entry_points),
+                            replay_protection_type,
                         )
                         .await,
                     ),
@@ -408,6 +418,7 @@ pub async fn create_txn_generator_creator(
                         use_account_pool.then(|| accounts_pool.clone()),
                         cur_phase.clone(),
                         progress_type,
+                        replay_protection_type,
                     )
                     .await,
                 ),

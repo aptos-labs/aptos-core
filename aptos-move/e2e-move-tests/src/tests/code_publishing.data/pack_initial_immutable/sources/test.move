@@ -1,4 +1,4 @@
-module 0xcafe::test {
+module publisher::test {
 
     struct State has key {
         value: u64

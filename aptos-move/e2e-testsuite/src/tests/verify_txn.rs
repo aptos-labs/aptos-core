@@ -8,7 +8,8 @@ use aptos_gas_algebra::Gas;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
-    current_function_name, executor::FakeExecutor, transaction_status_eq,
+    current_function_name, executor::FakeExecutor, feature_flags_for_orderless,
+    transaction_status_eq,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -25,13 +26,32 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use move_ir_compiler::Compiler;
-
+use rstest::rstest;
 pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
-#[test]
-fn verify_signature() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn verify_signature(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 10);
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
     // Generate a new key pair to try and sign things with.
     let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -42,6 +62,8 @@ fn verify_signature() {
         &private_key,
         sender.account().pubkey.as_ed25519().unwrap(),
         program,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
     assert_prologue_parity!(
@@ -51,13 +73,53 @@ fn verify_signature() {
     );
 }
 
-#[test]
-fn verify_multi_agent_invalid_sender_signature() {
+#[rstest(
+    sender_stateless_account,
+    secondary_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn verify_multi_agent_invalid_sender_signature(
+    sender_stateless_account: bool,
+    secondary_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
 
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
+    let sender = executor.create_raw_account_data(
+        1_000_010,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let secondary_signer = executor.create_raw_account_data(
+        100_100,
+        if secondary_stateless_account {
+            None
+        } else {
+            Some(100)
+        },
+    );
 
     executor.add_account_data(&sender);
     executor.add_account_data(&secondary_signer);
@@ -68,12 +130,14 @@ fn verify_multi_agent_invalid_sender_signature() {
     let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
         *sender.address(),
         vec![*secondary_signer.address()],
-        10,
+        0,
         &private_key,
         sender.account().pubkey.as_ed25519().unwrap(),
         vec![&secondary_signer.account().privkey],
         vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_prologue_parity!(
         executor.validate_transaction(signed_txn.clone()).status(),
@@ -82,12 +146,52 @@ fn verify_multi_agent_invalid_sender_signature() {
     );
 }
 
-#[test]
-fn verify_multi_agent_invalid_secondary_signature() {
+#[rstest(
+    sender_stateless_account,
+    secondary_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn verify_multi_agent_invalid_secondary_signature(
+    sender_stateless_account: bool,
+    secondary_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
+    let sender = executor.create_raw_account_data(
+        1_000_010,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
+    let secondary_signer = executor.create_raw_account_data(
+        100_100,
+        if secondary_stateless_account {
+            None
+        } else {
+            Some(100)
+        },
+    );
 
     executor.add_account_data(&sender);
     executor.add_account_data(&secondary_signer);
@@ -104,6 +208,8 @@ fn verify_multi_agent_invalid_secondary_signature() {
         vec![&private_key],
         vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_prologue_parity!(
         executor.validate_transaction(signed_txn.clone()).status(),
@@ -112,13 +218,53 @@ fn verify_multi_agent_invalid_secondary_signature() {
     );
 }
 
-#[test]
-fn verify_multi_agent_duplicate_secondary_signer() {
+#[rstest(
+    sender_stateless_account,
+    secondary_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn verify_multi_agent_duplicate_secondary_signer(
+    sender_stateless_account: bool,
+    secondary_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-    let third_signer = executor.create_raw_account_data(100_100, 100);
+    let sender = executor.create_raw_account_data(
+        1_000_010,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
+    let secondary_signer = executor.create_raw_account_data(
+        100_100,
+        if secondary_stateless_account {
+            None
+        } else {
+            Some(100)
+        },
+    );
+    let third_signer = executor.create_raw_account_data(100_100, Some(100));
 
     executor.add_account_data(&sender);
     executor.add_account_data(&secondary_signer);
@@ -146,6 +292,8 @@ fn verify_multi_agent_duplicate_secondary_signer() {
             secondary_signer.account().pubkey.as_ed25519().unwrap(),
         ],
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_prologue_parity!(
         executor.validate_transaction(signed_txn.clone()).status(),
@@ -154,10 +302,30 @@ fn verify_multi_agent_duplicate_secondary_signer() {
     );
 }
 
-#[test]
-fn verify_reserved_sender() {
+// This test is testing with sender = VM reserved address.
+// Making it a stateless account and sending txn with sequence number 0 would trigger creating an Account
+// resource for a reserved address which fails. So, not testing for these cases.
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn verify_reserved_sender(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 10);
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(10) });
     executor.add_account_data(&sender);
     // Generate a new key pair to try and sign things with.
     let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -168,28 +336,54 @@ fn verify_reserved_sender() {
         &private_key,
         private_key.public_key(),
         Some(program),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
-    assert_prologue_parity!(
-        executor.validate_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::INVALID_AUTH_KEY
-    );
+    if use_orderless_transactions {
+        // Orderless transactions don't check if the Account resource exists.
+        // The authentication fails for these transactions.
+        assert_prologue_parity!(
+            executor.validate_transaction(signed_txn.clone()).status(),
+            executor.execute_transaction(signed_txn).status(),
+            StatusCode::INVALID_AUTH_KEY
+        );
+    } else {
+        assert_prologue_parity!(
+            executor.validate_transaction(signed_txn.clone()).status(),
+            executor.execute_transaction(signed_txn).status(),
+            StatusCode::INVALID_AUTH_KEY
+        );
+    }
 }
 
-#[test]
-fn verify_simple_payment() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn verify_simple_payment_1(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
-    let sender = executor.create_raw_account_data(900_000, 10);
-    let receiver = executor.create_raw_account_data(100_000, 10);
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(0) });
+    let receiver = executor.create_raw_account_data(100_000, Some(10));
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
-
-    // define the arguments to the peer to peer transaction
-    let transfer_amount = 1_000;
-
-    let empty_script = &*EMPTY_SCRIPT;
 
     // Create a new transaction that has the exact right sequence number.
     let txn = sender
@@ -197,20 +391,75 @@ fn verify_simple_payment() {
         .transaction()
         .payload(aptos_stdlib::aptos_coin_transfer(
             *receiver.address(),
-            transfer_amount,
+            1_000,
         ))
-        .sequence_number(10)
+        .sequence_number(0)
+        .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_eq!(executor.validate_transaction(txn).status(), None);
+}
+
+#[rstest(
+    sender_stateless_account,
+    receiver_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn verify_simple_payment_2(
+    sender_stateless_account: bool,
+    receiver_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
+    let sender = executor.create_raw_account_data(
+        900_000,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let receiver = executor.create_raw_account_data(
+        100_000,
+        if receiver_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
 
     // Create a new transaction that has the bad auth key.
+    println!("txn2");
+    let empty_script = &*EMPTY_SCRIPT;
     let txn = receiver
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .raw()
         .sign(
             &sender.account().privkey,
@@ -224,41 +473,141 @@ fn verify_simple_payment() {
         executor.execute_transaction(txn).status(),
         StatusCode::INVALID_AUTH_KEY
     );
+}
 
-    // Create a new transaction that has a old sequence number.
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn verify_simple_payment_3(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(10) });
+    let receiver = executor.create_raw_account_data(100_000, Some(10));
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
+
+    // Create a new transaction that has a too new sequence number.
+    let empty_script = &*EMPTY_SCRIPT;
     let txn = sender
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(1)
+        .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::SEQUENCE_NUMBER_TOO_OLD
+    if stateless_account && !use_orderless_transactions {
+        assert_prologue_disparity!(
+            executor.validate_transaction(txn.clone()).status() => None,
+            executor.execute_transaction(txn).status() =>
+            TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
+        );
+    } else if !use_orderless_transactions {
+        assert_prologue_parity!(
+            executor.validate_transaction(txn.clone()).status(),
+            executor.execute_transaction(txn).status(),
+            StatusCode::SEQUENCE_NUMBER_TOO_OLD
+        );
+    } else {
+        assert_eq!(executor.validate_transaction(txn).status(), None);
+    }
+}
+
+#[rstest(
+    sender_stateless_account,
+    receiver_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn verify_simple_payment_4(
+    sender_stateless_account: bool,
+    receiver_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
     );
+    // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
+    let sender = executor.create_raw_account_data(
+        900_000,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let receiver = executor.create_raw_account_data(
+        100_000,
+        if receiver_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
 
     // Create a new transaction that has a too new sequence number.
+    let empty_script = &*EMPTY_SCRIPT;
     let txn = sender
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(11)
+        .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
-    assert_prologue_disparity!(
-        executor.validate_transaction(txn.clone()).status() => None,
-        executor.execute_transaction(txn).status() =>
-        TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
-    );
+    if !use_orderless_transactions {
+        assert_prologue_disparity!(
+            executor.validate_transaction(txn.clone()).status() => None,
+            executor.execute_transaction(txn).status() =>
+            TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
+        );
+    } else {
+        assert_eq!(executor.validate_transaction(txn).status(), None);
+    }
 
     // Create a new transaction that doesn't have enough balance to pay for gas.
     let txn = sender
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -266,17 +615,20 @@ fn verify_simple_payment() {
         StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
     );
 
-    // Create a new transaction from a bogus account that doesn't exist
-    let bogus_account = executor.create_raw_account_data(100_000, 10);
-    let txn = bogus_account
+    // Create a new transaction from a bogus stateful account that doesn't exist
+    let bogus_stateful_account = executor.create_raw_account_data(100_000, Some(0));
+    let txn = bogus_stateful_account
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(0)
+        .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
-    assert_prologue_disparity!(
-        executor.validate_transaction(txn.clone()).status() => None,
-        executor.execute_transaction(txn).status() => TransactionStatus::Keep(ExecutionStatus::Success)
+    // The sender doesn't have account balance to pay for Account resource creation.
+    assert_eq!(
+        executor.validate_transaction(txn).status(),
+        Some(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)
     );
 
     // The next couple tests test transaction size, and bounds on gas price and the number of
@@ -291,9 +643,10 @@ fn verify_simple_payment() {
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
+        .sequence_number(0)
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit + GasQuantity::one()).into())
         .max_gas_amount(1_000_000)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -331,9 +684,10 @@ fn verify_simple_payment() {
             vec![],
             vec![TransactionArgument::U8(42); u64::from(extra_txn_bytes) as usize],
         ))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount(gas_limit.into())
         .gas_unit_price(txn_gas_params.max_price_per_gas_unit.into())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -345,9 +699,10 @@ fn verify_simple_payment() {
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + GasQuantity::one()).into())
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -363,9 +718,10 @@ fn verify_simple_payment() {
             vec![],
             vec![TransactionArgument::U8(42); MAX_TRANSACTION_SIZE_IN_BYTES as usize],
         ))
-        .sequence_number(10)
+        .sequence_number(0)
         .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + GasQuantity::one()).into())
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -381,9 +737,10 @@ fn verify_simple_payment() {
         .script(Script::new(empty_script.clone(), vec![], vec![
             TransactionArgument::U8(42),
         ]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     let output = executor.execute_transaction(txn);
     assert_eq!(
@@ -394,14 +751,75 @@ fn verify_simple_payment() {
     );
 }
 
-#[test]
-pub fn test_arbitrary_script_execution() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(false, false, false),
+    case(false, true, false)
+)]
+fn verify_simple_payment_5(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(0) });
+    let receiver = executor.create_raw_account_data(100_000, Some(0));
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
+
+    let empty_script = &*EMPTY_SCRIPT;
+
+    // Create a new transaction that has a old sequence number.
+    let txn = sender
+        .account()
+        .transaction()
+        .script(Script::new(empty_script.clone(), vec![], vec![]))
+        .sequence_number(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
+        .sign();
+    assert_prologue_disparity!(
+        executor.validate_transaction(txn.clone()).status() => None,
+        executor.execute_transaction(txn).status() => TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
+    );
+}
+
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+pub fn test_arbitrary_script_execution(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     // create a FakeExecutor with a genesis from file
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
 
     // create an empty transaction
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender =
+        executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
 
     // If CustomScripts is on, result should be Keep(DeserializationError). If it's off, the
@@ -411,9 +829,10 @@ pub fn test_arbitrary_script_execution() {
         .account()
         .transaction()
         .script(Script::new(random_script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     let status = executor.execute_transaction(txn).status().clone();
@@ -427,10 +846,29 @@ pub fn test_arbitrary_script_execution() {
     );
 }
 
-#[test]
-fn verify_expiration_time() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn verify_expiration_time(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 0);
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
     let private_key = &sender.account().privkey;
     let txn = transaction_test_helpers::get_test_signed_transaction(
@@ -440,8 +878,10 @@ fn verify_expiration_time() {
         private_key.public_key(),
         None, /* script */
         0,    /* expiration_time */
-        0,    /* gas_unit_price */
+        1,    /* gas_unit_price */
         None, /* max_gas_amount */
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -458,8 +898,10 @@ fn verify_expiration_time() {
         private_key.public_key(),
         None, /* script */
         0,    /* expiration_time */
-        0,    /* gas_unit_price */
+        1,    /* gas_unit_price */
         None, /* max_gas_amount */
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -468,10 +910,29 @@ fn verify_expiration_time() {
     );
 }
 
-#[test]
-fn verify_chain_id() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn verify_chain_id(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 0);
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    let sender =
+        executor.create_raw_account_data(900_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let txn = transaction_test_helpers::get_test_txn_with_chain_id(
@@ -481,6 +942,8 @@ fn verify_chain_id() {
         private_key.public_key(),
         // all tests use ChainId::test() for chain_id,so pick something different
         ChainId::new(ChainId::test().id() + 1),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -492,7 +955,7 @@ fn verify_chain_id() {
 #[test]
 fn verify_max_sequence_number() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, std::u64::MAX);
+    let sender = executor.create_raw_account_data(900_000, Some(std::u64::MAX));
     executor.add_account_data(&sender);
     let private_key = &sender.account().privkey;
     let txn = transaction_test_helpers::get_test_signed_transaction(
@@ -502,8 +965,10 @@ fn verify_max_sequence_number() {
         private_key.public_key(),
         None,     /* script */
         u64::MAX, /* expiration_time */
-        0,        /* gas_unit_price */
+        1,        /* gas_unit_price */
         None,     /* max_gas_amount */
+        false,
+        false,
     );
     assert_prologue_parity!(
         executor.validate_transaction(txn.clone()).status(),
@@ -575,9 +1040,27 @@ fn good_module_uses_bad(
     (module, bytes)
 }
 
-#[test]
-fn test_script_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_script_dependency_fails_verification(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -585,7 +1068,8 @@ fn test_script_dependency_fails_verification() {
     executor.add_module(&module.self_id(), bytes);
 
     // Create a module that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender =
+        executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
 
     let code = "
@@ -607,9 +1091,10 @@ fn test_script_dependency_fails_verification() {
         .account()
         .transaction()
         .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
@@ -622,9 +1107,27 @@ fn test_script_dependency_fails_verification() {
     }
 }
 
-#[test]
-fn test_type_tag_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_type_tag_dependency_fails_verification(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -632,7 +1135,8 @@ fn test_type_tag_dependency_fails_verification() {
     executor.add_module(&module.self_id(), bytes);
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender =
+        executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
 
     let code = "
@@ -659,9 +1163,10 @@ fn test_type_tag_dependency_fails_verification() {
             }))],
             vec![],
         ))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
@@ -674,9 +1179,27 @@ fn test_type_tag_dependency_fails_verification() {
     }
 }
 
-#[test]
-fn test_script_transitive_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_script_transitive_dependency_fails_verification(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -689,7 +1212,8 @@ fn test_script_transitive_dependency_fails_verification() {
     executor.add_module(&good_module.self_id(), good_module_bytes);
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender =
+        executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
 
     let code = "
@@ -710,9 +1234,10 @@ fn test_script_transitive_dependency_fails_verification() {
         .account()
         .transaction()
         .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
@@ -725,9 +1250,27 @@ fn test_script_transitive_dependency_fails_verification() {
     }
 }
 
-#[test]
-fn test_type_tag_transitive_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_type_tag_transitive_dependency_fails_verification(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
+    executor.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -740,7 +1283,8 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     executor.add_module(&good_module.self_id(), good_module_bytes);
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender =
+        executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&sender);
 
     let code = "
@@ -767,9 +1311,10 @@ fn test_type_tag_transitive_dependency_fails_verification() {
             }))],
             vec![],
         ))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
+        .sequence_number(0)
+        .max_gas_amount(105_000)
         .gas_unit_price(1)
+        .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions)
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`

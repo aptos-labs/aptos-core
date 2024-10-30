@@ -689,6 +689,16 @@ module std::features {
         is_enabled(DEFAULT_ACCOUNT_RESOURCE)
     }
 
+    /// Whether orderless transactions are enabled.
+    /// Lifetime: transient
+    const ORDERLESS_TRANSACTIONS: u64 = 91;
+
+    public fun get_orderless_transactions_feture(): u64 { ORDERLESS_TRANSACTIONS }
+
+    public fun orderless_transactions_enabled(): bool acquires Features {
+        is_enabled(ORDERLESS_TRANSACTIONS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

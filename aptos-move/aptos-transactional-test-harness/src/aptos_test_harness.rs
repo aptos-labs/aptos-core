@@ -439,6 +439,8 @@ impl<'a> AptosTestAdapter<'a> {
         bail!("Failed to fetch balance under address {}.", signer_addr)
     }
 
+    // TODO: Check if we need to modify this for orderless transactions. We don't need sequence number in
+    // transaction parameters for orderless transactions.
     /// Derive the default transaction parameters from the account and balance resources fetched
     /// from storage. In the future, we are planning to allow the user to override these using
     /// command arguments.

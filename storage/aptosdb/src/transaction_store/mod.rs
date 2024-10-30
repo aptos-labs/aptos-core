@@ -4,22 +4,25 @@
 
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
-use crate::ledger_db::LedgerDb;
-use aptos_db_indexer_schemas::{
-    schema::transaction_by_account::TransactionByAccountSchema,
-    utils::AccountTransactionVersionIter,
+use crate::{
+    ledger_db::LedgerDb,
+    schema::transaction_summaries_by_account::TransactionSummariesByAccountSchema,
+    utils::iterators::AccountTransactionSummariesIter,
 };
-use aptos_schemadb::batch::SchemaBatch;
+use aptos_db_indexer_schemas::{
+    schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema,
+    utils::AccountOrderedTransactionsIter,
+};
+use aptos_schemadb::{batch::SchemaBatch, iterator::ScanDirection};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{Transaction, Version},
+    transaction::{ReplayProtector, Transaction, Version},
 };
 use std::sync::Arc;
 
 #[cfg(test)]
 mod test;
-
 #[derive(Clone, Debug)]
 pub struct TransactionStore {
     ledger_db: Arc<LedgerDb>,
@@ -34,19 +37,18 @@ impl TransactionStore {
     pub fn get_account_ordered_transaction_version(
         &self,
         address: AccountAddress,
-        sequence_number: u64,
+        seq_num: u64,
         ledger_version: Version,
     ) -> Result<Option<Version>> {
         if let Some(version) = self
             .ledger_db
             .transaction_db_raw()
-            .get::<TransactionByAccountSchema>(&(address, sequence_number))?
+            .get::<OrderedTransactionByAccountSchema>(&(address, seq_num))?
         {
             if version <= ledger_version {
                 return Ok(Some(version));
             }
         }
-
         Ok(None)
     }
 
@@ -62,13 +64,13 @@ impl TransactionStore {
         min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
-    ) -> Result<AccountTransactionVersionIter> {
+    ) -> Result<AccountOrderedTransactionsIter> {
         let mut iter = self
             .ledger_db
             .transaction_db_raw()
-            .iter::<TransactionByAccountSchema>()?;
+            .iter::<OrderedTransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
-        Ok(AccountTransactionVersionIter::new(
+        Ok(AccountOrderedTransactionsIter::new(
             iter,
             address,
             min_seq_num
@@ -78,16 +80,81 @@ impl TransactionStore {
         ))
     }
 
+    // TODO[Orderless]: Update this so that the user can specify even the range of chain timestamps
+    pub fn get_account_transaction_summaries_iter(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<AccountTransactionSummariesIter> {
+        // Question[Orderless]: When start version is specified, we are current scanning forward from start version.
+        // When start version is not specified we are scanning backward, so as to return the most recent transactions.
+        // This doesn't seem to be a good design. Should we instead let the API take scan direction as input?
+        if start_version.is_some() {
+            let mut iter = self
+                .ledger_db
+                .transaction_db_raw()
+                .iter::<TransactionSummariesByAccountSchema>()?;
+            iter.seek(&(address, start_version.unwrap()))?;
+            Ok(AccountTransactionSummariesIter::new(
+                iter,
+                address,
+                start_version,
+                end_version,
+                limit,
+                ScanDirection::Forward,
+                ledger_version,
+            ))
+        } else if end_version.is_some() {
+            let mut iter = self
+                .ledger_db
+                .transaction_db_raw()
+                .rev_iter::<TransactionSummariesByAccountSchema>()?;
+            iter.seek_for_prev(&(address, end_version.unwrap()))?;
+            Ok(AccountTransactionSummariesIter::new(
+                iter,
+                address,
+                start_version,
+                end_version,
+                limit,
+                ScanDirection::Backward,
+                ledger_version,
+            ))
+        } else {
+            let mut iter = self
+                .ledger_db
+                .transaction_db_raw()
+                .rev_iter::<TransactionSummariesByAccountSchema>()?;
+            iter.seek_for_prev(&(address, u64::MAX))?;
+            Ok(AccountTransactionSummariesIter::new(
+                iter,
+                address,
+                start_version,
+                Some(u64::MAX),
+                limit,
+                ScanDirection::Backward,
+                ledger_version,
+            ))
+        }
+    }
+
     /// Prune the transaction by account store given a list of transaction
     pub fn prune_transaction_by_account(
         &self,
-        transactions: &[Transaction],
+        transactions: &[(Version, Transaction)],
         db_batch: &mut SchemaBatch,
     ) -> Result<()> {
-        for transaction in transactions {
+        for (version, transaction) in transactions {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
+                if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                    db_batch
+                        .delete::<OrderedTransactionByAccountSchema>(&(txn.sender(), seq_num))?;
+                }
+                // TODO[Orderless]: Check where else transactions summaries need to be pruned
                 db_batch
-                    .delete::<TransactionByAccountSchema>(&(txn.sender(), txn.sequence_number()))?;
+                    .delete::<TransactionSummariesByAccountSchema>(&(txn.sender(), *version))?;
             }
         }
         Ok(())

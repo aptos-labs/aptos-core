@@ -1,4 +1,4 @@
-module 0xbeef::test {
+module publisher::test {
     public fun foo() {
         let i = 0;
         while (i < 2) {

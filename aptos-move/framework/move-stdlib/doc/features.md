@@ -147,6 +147,8 @@ return true.
 -  [Function `new_accounts_default_to_fa_store_enabled`](#0x1_features_new_accounts_default_to_fa_store_enabled)
 -  [Function `get_default_account_resource_feature`](#0x1_features_get_default_account_resource_feature)
 -  [Function `is_default_account_resource_enabled`](#0x1_features_is_default_account_resource_enabled)
+-  [Function `get_orderless_transactions_feture`](#0x1_features_get_orderless_transactions_feture)
+-  [Function `orderless_transactions_enabled`](#0x1_features_orderless_transactions_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -810,6 +812,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>: u64 = 39;
+</code></pre>
+
+
+
+<a id="0x1_features_ORDERLESS_TRANSACTIONS"></a>
+
+Whether orderless transactions are enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a>: u64 = 91;
 </code></pre>
 
 
@@ -3708,6 +3721,52 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_default_account_resource_enabled">is_default_account_resource_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_orderless_transactions_feture"></a>
+
+## Function `get_orderless_transactions_feture`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_orderless_transactions_feture">get_orderless_transactions_feture</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_orderless_transactions_feture">get_orderless_transactions_feture</a>(): u64 { <a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_orderless_transactions_enabled"></a>
+
+## Function `orderless_transactions_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_orderless_transactions_enabled">orderless_transactions_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_orderless_transactions_enabled">orderless_transactions_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a>)
 }
 </code></pre>
 

@@ -60,7 +60,8 @@ impl UserAccount {
 
     pub fn convert_account(&self, vm: &mut FakeExecutor) -> Account {
         if self.is_inited_and_funded {
-            vm.create_accounts(1, self.fund_amount(), 0).remove(0)
+            // TODO[Orderless]: Change this to support stateless accounts and orderless transactions.
+            vm.create_accounts(1, self.fund_amount(), Some(0)).remove(0)
         } else {
             Account::new()
         }

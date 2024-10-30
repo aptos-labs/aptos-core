@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::harness::MoveHarness;
+// Note[Orderless]: Done
+use crate::{assert_success, harness::MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_language_e2e_tests::account::Account;
@@ -18,8 +19,14 @@ pub fn setup_staking(
     initial_stake_amount: u64,
 ) -> TransactionStatus {
     let address = *account.address();
-    initialize_staking(harness, account, initial_stake_amount, address, address);
-    rotate_consensus_key(harness, account, address);
+    assert_success!(initialize_staking(
+        harness,
+        account,
+        initial_stake_amount,
+        address,
+        address
+    ));
+    assert_success!(rotate_consensus_key(harness, account, address));
     join_validator_set(harness, account, address)
 }
 

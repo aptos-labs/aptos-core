@@ -1,4 +1,4 @@
-module 0xbeef::test {
+module publisher::test {
     use std::vector;
 
     public entry fun just_under_quota() {

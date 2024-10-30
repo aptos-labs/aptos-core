@@ -1,4 +1,4 @@
-module 0xcafe::test {
+module publisher::test {
 
     /// This error is raised because it wants to.
     const ESOME_ERROR: u64 = 0x1;

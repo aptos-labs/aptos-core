@@ -1,3 +1,3 @@
-module 0xcafe::m1 {
+module publisher::m1 {
     public entry fun run() {}
 }

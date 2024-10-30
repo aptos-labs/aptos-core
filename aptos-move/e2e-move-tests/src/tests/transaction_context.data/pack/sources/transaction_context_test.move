@@ -26,7 +26,7 @@ module admin::transaction_context_test {
         multisig_address: address,
     }
 
-    /// Called when the module is first deployed at address `signer`, which is supposed to be @admin (= 0x1).
+    /// Called when the module is first deployed at address `signer`, which is supposed to be @admin.
     fun init_module(sender: &signer) {
         assert!(signer::address_of(sender) == @admin, 1);
         // Initialize the global resource with the default values.

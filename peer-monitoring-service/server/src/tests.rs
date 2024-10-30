@@ -617,6 +617,7 @@ pub fn create_mock_db_reader() -> MockDatabaseReader {
 mod database_mock {
     use super::*;
     use aptos_storage_interface::Result;
+    use aptos_types::transaction::IndexedTransactionSummary;
 
     mock! {
         pub DatabaseReader {}
@@ -703,6 +704,15 @@ mod database_mock {
                 include_events: bool,
                 ledger_version: Version,
             ) -> Result<AccountOrderedTransactionsWithProof>;
+
+            fn get_account_transaction_summaries(
+                &self,
+                address: AccountAddress,
+                start_version: Option<u64>,
+                end_version: Option<u64>,
+                limit: u64,
+                ledger_version: Version,
+            ) -> Result<Vec<IndexedTransactionSummary>>;
 
             fn get_state_proof_with_ledger_info(
                 &self,

@@ -6,6 +6,7 @@ use move_core_types::account_address::AccountAddress;
 
 const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::object_code_deployment";
 
+// TODO[Orderless]: What if creator is a stateless account and doesn't have a sequence number?
 pub fn create_object_code_deployment_address(
     creator: AccountAddress,
     creator_sequence_number: u64,

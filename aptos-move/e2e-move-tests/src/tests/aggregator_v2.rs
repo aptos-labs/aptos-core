@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     aggregator_v2::{
         initialize, initialize_enabled_disabled_comparison, AggV2TestHarness, AggregatorLocation,
@@ -13,7 +14,7 @@ use aptos_language_e2e_tests::executor::ExecutorMode;
 use aptos_types::{transaction::ExecutionStatus, vm_status::StatusCode};
 use claims::assert_ok_eq;
 use proptest::prelude::*;
-use test_case::test_case;
+use rstest::rstest;
 
 const STRESSTEST_MODE: bool = false;
 
@@ -27,6 +28,9 @@ fn _setup(
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
     allow_block_executor_fallback: bool,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
     let path = common::test_dir_path("aggregator_v2.data/pack");
     match aggregator_execution_mode {
@@ -36,6 +40,9 @@ fn _setup(
             true,
             txns,
             allow_block_executor_fallback,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         ),
         AggregatorMode::DisabledOnly => initialize(
             path,
@@ -43,12 +50,18 @@ fn _setup(
             false,
             txns,
             allow_block_executor_fallback,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         ),
         AggregatorMode::BothComparison => initialize_enabled_disabled_comparison(
             path,
             executor_mode,
             txns,
             allow_block_executor_fallback,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         ),
     }
 }
@@ -57,36 +70,100 @@ pub(crate) fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
-    _setup(executor_mode, aggregator_execution_mode, txns, false)
+    _setup(
+        executor_mode,
+        aggregator_execution_mode,
+        txns,
+        false,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
 }
 
 pub(crate) fn setup_allow_fallback(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> AggV2TestHarness {
-    _setup(executor_mode, aggregator_execution_mode, txns, true)
+    _setup(
+        executor_mode,
+        aggregator_execution_mode,
+        txns,
+        true,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
 }
 
 #[cfg(test)]
 mod test_cases {
     use super::*;
 
-    #[test]
-    fn test_snapshot_concat() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
+    #[rstest(
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(true, false, false),
+        case(true, true, false),
+        case(true, true, true),
+        case(false, false, false),
+        case(false, true, false),
+        case(false, true, true)
+    )]
+    fn test_snapshot_concat(
+        stateless_account: bool,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
+        let mut h = setup(
+            DEFAULT_EXECUTOR_MODE,
+            AggregatorMode::BothComparison,
+            1,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
         let txn = h.verify_string_concat();
         h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, txn)]);
     }
 
-    #[test]
-    fn test_aggregators_e2e() {
+    #[rstest(
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(true, false, false),
+        case(true, true, false),
+        case(true, true, true),
+        case(false, false, false),
+        case(false, true, false),
+        case(false, true, true)
+    )]
+    fn test_aggregators_e2e(
+        stateless_account: bool,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         println!("Testing test_aggregators_e2e");
         let element_type = ElementType::U64;
         let use_type = UseType::UseTableType;
 
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 100);
+        let mut h = setup(
+            DEFAULT_EXECUTOR_MODE,
+            AggregatorMode::BothComparison,
+            100,
+            stateless_account,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
 
         let init_txn = h.init(None, use_type, element_type, StructType::Aggregator);
         h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, init_txn)]);
@@ -188,33 +265,103 @@ pub struct TestEnvConfig {
     pub executor_mode: ExecutorMode,
     pub aggregator_execution_mode: AggregatorMode,
     pub block_split: BlockSplit,
+    pub stateless_account: bool,
+    pub use_txn_payload_v2_format: bool,
+    pub use_orderless_transactions: bool,
 }
 
 #[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
 fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
-    prop_oneof![
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
-            executor_mode: ExecutorMode::BothComparison,
-            aggregator_execution_mode: AggregatorMode::BothComparison,
-            block_split
-        }),
-    ]
+    prop_oneof![(
+        arb_block_split(num_txns),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+    )
+        .prop_filter(
+            "Invalid combination",
+            |(_, use_txn_payload_v2_format, use_orderless_transactions, _)| {
+                // Filter out the invalid combination (use_txn_payload_v2_format = false, use_orderless_transactions = true)
+                *use_txn_payload_v2_format || !*use_orderless_transactions
+            }
+        )
+        .prop_map(
+            |(
+                block_split,
+                stateless_account,
+                use_txn_payload_v2_format,
+                use_orderless_transactions,
+            )| TestEnvConfig {
+                executor_mode: ExecutorMode::BothComparison,
+                aggregator_execution_mode: AggregatorMode::BothComparison,
+                block_split,
+                stateless_account,
+                use_txn_payload_v2_format,
+                use_orderless_transactions,
+            }
+        ),]
     .boxed()
 }
 
 #[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
 fn arb_test_env_non_equivalent(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
-            executor_mode: ExecutorMode::BothComparison,
-            aggregator_execution_mode: AggregatorMode::DisabledOnly,
-            block_split
-        }),
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
-            executor_mode: ExecutorMode::BothComparison,
-            aggregator_execution_mode: AggregatorMode::EnabledOnly,
-            block_split
-        }),
+        (
+            arb_block_split(num_txns),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>(),
+        )
+            .prop_filter(
+                "Invalid combination",
+                |(_, use_txn_payload_v2_format, use_orderless_transactions, _)| {
+                    // Filter out the invalid combination (use_txn_payload_v2_format = false, use_orderless_transactions = true)
+                    *use_txn_payload_v2_format || !*use_orderless_transactions
+                }
+            )
+            .prop_map(
+                |(
+                    block_split,
+                    stateless_account,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
+                )| TestEnvConfig {
+                    executor_mode: ExecutorMode::BothComparison,
+                    aggregator_execution_mode: AggregatorMode::DisabledOnly,
+                    block_split,
+                    stateless_account,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
+                }
+            ),
+        (
+            arb_block_split(num_txns),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>(),
+        )
+            .prop_filter(
+                "Invalid combination",
+                |(_, use_txn_payload_v2_format, use_orderless_transactions, _)| {
+                    // Filter out the invalid combination (use_txn_payload_v2_format = false, use_orderless_transactions = true)
+                    *use_txn_payload_v2_format || !*use_orderless_transactions
+                }
+            )
+            .prop_map(
+                |(
+                    block_split,
+                    stateless_account,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
+                )| TestEnvConfig {
+                    executor_mode: ExecutorMode::BothComparison,
+                    aggregator_execution_mode: AggregatorMode::EnabledOnly,
+                    block_split,
+                    stateless_account,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
+                }
+            ),
     ]
     .boxed()
 }
@@ -261,7 +408,7 @@ proptest! {
     #[test]
     fn test_aggregator_lifetime(test_env in arb_test_env(14), element_type in arb_agg_type(), use_type in arb_use_type()) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 14);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 14, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -297,9 +444,9 @@ proptest! {
         is_3_collocated in any::<bool>(),
     ) {
         println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 24);
-        let acc_2 = h.new_account_with_key_pair();
-        let acc_3 = h.new_account_with_key_pair();
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 24, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
+        let acc_2 = h.new_account_with_key_pair(test_env.stateless_account);
+        let acc_3 = h.new_account_with_key_pair(test_env.stateless_account);
 
         let mut idx_1 = 0;
         let agg_1_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
@@ -363,7 +510,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 4);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 4, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -386,7 +533,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -409,7 +556,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -432,7 +579,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -452,7 +599,7 @@ proptest! {
     #[test]
     fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
         println!("Testing test_aggregator_with_republish {:?}", test_env);
-        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -474,7 +621,7 @@ proptest! {
     #[test]
     fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_droppable_use_type()) {
         println!("Testing test_aggregator_recreate {:?}", test_env);
-        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -506,7 +653,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
         let snap_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
@@ -537,7 +684,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10, test_env.stateless_account, test_env.use_txn_payload_v2_format, test_env.use_orderless_transactions);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -561,12 +708,29 @@ proptest! {
     }
 }
 
-#[test]
-fn test_aggregator_snapshot_equivalent_gas() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_aggregator_snapshot_equivalent_gas(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let test_env = TestEnvConfig {
         executor_mode: ExecutorMode::BothComparison,
         aggregator_execution_mode: AggregatorMode::BothComparison,
         block_split: BlockSplit::Whole,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     };
 
     println!("Testing test_aggregator_snapshot {:?}", test_env);
@@ -577,6 +741,9 @@ fn test_aggregator_snapshot_equivalent_gas() {
         test_env.executor_mode,
         test_env.aggregator_execution_mode,
         6,
+        test_env.stateless_account,
+        test_env.use_txn_payload_v2_format,
+        test_env.use_orderless_transactions,
     );
 
     let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
@@ -619,14 +786,39 @@ fn test_aggregator_snapshot_equivalent_gas() {
     h.run_block_in_parts_and_check(test_env.block_split, txns);
 }
 
+#[rstest(
+    use_type,
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(UseType::UseResourceGroupType, true, false, false),
+    case(UseType::UseResourceGroupType, true, true, false),
+    case(UseType::UseResourceGroupType, true, true, true),
+    case(UseType::UseResourceGroupType, false, false, false),
+    case(UseType::UseResourceGroupType, false, true, false),
+    case(UseType::UseResourceGroupType, false, true, true),
+    case(UseType::UseResourceType, true, false, false),
+    case(UseType::UseResourceType, true, true, false),
+    case(UseType::UseResourceType, true, true, true),
+    case(UseType::UseResourceType, false, false, false),
+    case(UseType::UseResourceType, false, true, false),
+    case(UseType::UseResourceType, false, true, true)
+)]
+
 // Table splits into multiple resources, so test is not as straightforward
-#[test_case(UseType::UseResourceGroupType)]
-#[test_case(UseType::UseResourceType)]
-fn test_too_many_aggregators_in_a_resource(use_type: UseType) {
+fn test_too_many_aggregators_in_a_resource(
+    use_type: UseType,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let test_env = TestEnvConfig {
         executor_mode: ExecutorMode::BothComparison,
         aggregator_execution_mode: AggregatorMode::EnabledOnly,
         block_split: BlockSplit::Whole,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     };
     println!(
         "Testing test_too_many_aggregators_in_a_resource {:?}",
@@ -639,6 +831,9 @@ fn test_too_many_aggregators_in_a_resource(use_type: UseType) {
         test_env.executor_mode,
         test_env.aggregator_execution_mode,
         12,
+        test_env.stateless_account,
+        test_env.use_txn_payload_v2_format,
+        test_env.use_orderless_transactions,
     );
 
     let agg_locs = (0..15)

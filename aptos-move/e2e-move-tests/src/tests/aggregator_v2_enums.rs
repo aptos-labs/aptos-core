@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{
     aggregator_v2::AggV2TestHarness,
     tests::{aggregator_v2::AggregatorMode, common},
@@ -11,8 +12,8 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::transaction::SignedTransaction;
 use claims::{assert_ok, assert_some};
 use move_core_types::parser::parse_struct_tag;
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
-
 #[derive(Deserialize, Serialize)]
 struct Integer {
     value: u128,
@@ -31,9 +32,28 @@ enum Counter {
     Integer(Integer),
 }
 
-#[test]
-fn test_aggregators_in_enums() {
-    let mut h = make_harness(155);
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_aggregators_in_enums(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = make_harness(
+        155,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     // Create a large block, where a counter is incremented 150 times. During the
     // test, we switch between parallel (aggregator) and non-parallel (integer)
@@ -77,7 +97,12 @@ fn test_aggregators_in_enums() {
     assert_eq!(value, 150);
 }
 
-fn make_harness(num_txns: usize) -> AggV2TestHarness {
+fn make_harness(
+    num_txns: usize,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> AggV2TestHarness {
     let source = r"
     module 0x1::enums_with_aggregators {
       use aptos_framework::aggregator_v2::{Self, Aggregator};
@@ -150,6 +175,9 @@ fn make_harness(num_txns: usize) -> AggV2TestHarness {
         ExecutorMode::BothComparison,
         AggregatorMode::BothComparison,
         num_txns + 1,
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
     // Publish the package to ensure subsequent tests can use that code.

@@ -1,13 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use move_core_types::vm_status::StatusCode;
+use rstest::rstest;
 
-#[test]
-fn lazy_natives() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn lazy_natives(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    // Users cannot publish native functions. So, only testing with framework account.
     let acc = h.aptos_framework_account();
     let mut builder = PackageBuilder::new("LazyNatives");
     builder.add_source(
@@ -29,7 +38,7 @@ fn lazy_natives() {
     // Should be able to call nothing entry
     assert_success!(h.run_entry_function(
         &acc,
-        str::parse("0x1::test::nothing").unwrap(),
+        str::parse(format!("{}::test::nothing", acc.address()).as_str()).unwrap(),
         vec![],
         vec![]
     ));
@@ -37,7 +46,7 @@ fn lazy_natives() {
     // Should not be able to call something entry
     let status = h.run_entry_function(
         &acc,
-        str::parse("0x1::test::something").unwrap(),
+        str::parse(format!("{}::test::something", acc.address()).as_str()).unwrap(),
         vec![],
         vec![],
     );

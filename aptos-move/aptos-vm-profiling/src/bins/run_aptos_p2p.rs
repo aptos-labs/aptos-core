@@ -11,6 +11,7 @@ use aptos_types::{
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::io::{self, Read};
 
+// TODO[Orderless]: Add another test to test nonce based transactions
 fn main() -> Result<()> {
     let mut blob = vec![];
     io::stdin().read_to_end(&mut blob)?;
@@ -21,8 +22,8 @@ fn main() -> Result<()> {
     let state_store = InMemoryStateStore::new();
     state_store.apply_write_set(&genesis_write_set)?;
 
-    let alice = AccountData::new(100_000_000, 0);
-    let bob = AccountData::new(100_000_000, 0);
+    let alice = AccountData::new(100_000_000, Some(0));
+    let bob = AccountData::new(100_000_000, Some(0));
     state_store.add_account_data(&alice)?;
     state_store.add_account_data(&bob)?;
 

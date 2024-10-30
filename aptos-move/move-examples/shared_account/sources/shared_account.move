@@ -39,6 +39,7 @@ module shared_account::SharedAccount {
 
             // make sure that the account exists, so when we call disperse() it wouldn't fail
             // because one of the accounts does not exist
+            // Question[Orderless]: Will it be possible to remove this check to accommodate stateless accounts?
             assert!(account::exists_at(addr), error::invalid_argument(EACCOUNT_NOT_FOUND));
 
             vector::push_back(&mut share_record, Share { share_holder: addr, num_shares });

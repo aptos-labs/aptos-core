@@ -181,13 +181,15 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // publish all packages
     for group in packages {
         let sender = *group[0].address();
-        let acc = vm.new_account_at(sender);
+        // TODO[Orderless]: Change this to support stateless accounts and orderless transaction
+        let acc = vm.new_account_at(sender, Some(0));
         publish_group(&mut vm, &acc, &group, 0)?;
     }
 
     let sender_acc = if true {
         // create sender pub/priv key. initialize and fund account
-        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), 0)
+        // TODO[Orderless]: Change this to support stateless accounts and orderless transactions
+        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), Some(0))
             .remove(0)
     } else {
         // only create sender pub/priv key. do not initialize

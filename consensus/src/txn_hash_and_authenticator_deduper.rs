@@ -42,9 +42,9 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
         let mut is_possible_duplicate = false;
         let mut possible_duplicates = vec![false; transactions.len()];
         for (i, txn) in transactions.iter().enumerate() {
-            match seen.get(&(txn.sender(), txn.sequence_number())) {
+            match seen.get(&(txn.sender(), txn.replay_protector())) {
                 None => {
-                    seen.insert((txn.sender(), txn.sequence_number()), i);
+                    seen.insert((txn.sender(), txn.replay_protector()), i);
                 },
                 Some(first_index) => {
                     is_possible_duplicate = true;
@@ -100,20 +100,25 @@ impl TxnHashAndAuthenticatorDeduper {
     }
 }
 
+// TODO[Orderless]: Update these tests also when generating transactions with nonce.
 #[cfg(test)]
 mod tests {
     use crate::{
         transaction_deduper::TransactionDeduper,
         txn_hash_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper,
     };
-    use aptos_cached_packages::aptos_stdlib;
     use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
     use aptos_keygen::KeyGen;
     use aptos_types::{
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            EntryFunction, RawTransaction, ReplayProtector, Script, SignedTransaction,
+            TransactionExecutable,
+        },
+        utility_coin::AptosCoinType,
+        CoinType,
     };
-    use move_core_types::account_address::AccountAddress;
+    use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
     use std::time::Instant;
 
     struct Account {
@@ -141,15 +146,16 @@ mod tests {
     }
 
     fn raw_txn(
-        payload: TransactionPayload,
+        executable: TransactionExecutable,
         sender: AccountAddress,
-        seq_num: u64,
+        replay_protector: ReplayProtector,
         gas_unit_price: u64,
     ) -> RawTransaction {
-        RawTransaction::new(
+        RawTransaction::new_txn(
             sender,
-            seq_num,
-            payload,
+            replay_protector,
+            executable,
+            None,
             500_000,
             gas_unit_price,
             0,
@@ -158,8 +164,13 @@ mod tests {
     }
 
     fn empty_txn(sender: AccountAddress, seq_num: u64, gas_unit_price: u64) -> RawTransaction {
-        let payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
-        raw_txn(payload, sender, seq_num, gas_unit_price)
+        let executable = TransactionExecutable::Script(Script::new(vec![], vec![], vec![]));
+        raw_txn(
+            executable,
+            sender,
+            ReplayProtector::SequenceNumber(seq_num),
+            gas_unit_price,
+        )
     }
 
     fn peer_to_peer_txn(
@@ -168,8 +179,22 @@ mod tests {
         seq_num: u64,
         gas_unit_price: u64,
     ) -> RawTransaction {
-        let payload = aptos_stdlib::aptos_coin_transfer(receiver, 1);
-        raw_txn(payload, sender, seq_num, gas_unit_price)
+        let entry_func = EntryFunction::new(
+            ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
+            ident_str!("transfer").to_owned(),
+            vec![AptosCoinType::type_tag()],
+            vec![
+                bcs::to_bytes(&receiver).unwrap(),
+                bcs::to_bytes(&1).unwrap(),
+            ],
+        );
+        let executable = TransactionExecutable::EntryFunction(entry_func);
+        raw_txn(
+            executable,
+            sender,
+            ReplayProtector::SequenceNumber(seq_num),
+            gas_unit_price,
+        )
     }
 
     fn block(refs: Vec<&SignedTransaction>) -> Vec<SignedTransaction> {

@@ -12,6 +12,7 @@ use move_core_types::{
     parser::parse_struct_tag,
     vm_status::StatusCode,
 };
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -20,26 +21,31 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-const OBJECT_ADDRESS: AccountAddress = AccountAddress::new([
-    0x66, 0x2E, 0x50, 0x41, 0x8C, 0xE5, 0xF3, 0x5A, 0x6C, 0xA8, 0xB7, 0x9E, 0x28, 0x7C, 0x94, 0x12,
-    0x90, 0x71, 0xAA, 0x3F, 0xBD, 0x2A, 0xB9, 0x51, 0x37, 0xF7, 0xCB, 0xAD, 0x13, 0x6F, 0x09, 0x2B,
-]);
-
 fn module_data() -> StructTag {
     parse_struct_tag("0xCAFE::test::ModuleData").unwrap()
 }
 
-fn success(h: &mut MoveHarness, tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
-    success_generic(h, vec![], tests)
+fn success(
+    h: &mut MoveHarness,
+    tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+    stateless_account: bool,
+    object_address: AccountAddress,
+) {
+    success_generic(h, vec![], tests.clone(), stateless_account, object_address);
 }
 
 fn success_generic(
     h: &mut MoveHarness,
     ty_args: Vec<TypeTag>,
     tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+    stateless_account: bool,
+    object_address: AccountAddress,
 ) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        if stateless_account { None } else { Some(0) },
+    );
 
     assert_success!(h.publish_package_cache_building(
         &acc,
@@ -58,7 +64,7 @@ fn success_generic(
         ));
         assert_eq!(
             String::from_utf8(
-                h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data())
+                h.read_resource::<ModuleData>(&object_address, module_data())
                     .unwrap()
                     .state
             )
@@ -72,9 +78,11 @@ fn success_generic_view(
     h: &mut MoveHarness,
     ty_args: Vec<TypeTag>,
     tests: Vec<(&str, Vec<Vec<u8>>, &str)>,
+    stateless_account: bool,
 ) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if stateless_account { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("constructor_args.data/pack")
@@ -98,15 +106,19 @@ fn success_generic_view(
 
 type Closure = Box<dyn FnOnce(TransactionStatus) -> bool>;
 
-fn fail(tests: Vec<(&str, Vec<Vec<u8>>, Closure)>) {
-    fail_generic(vec![], tests)
+fn fail(h: &mut MoveHarness, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>, stateless_sender: bool) {
+    fail_generic(h, vec![], tests, stateless_sender);
 }
 
-fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>) {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
-
+fn fail_generic(
+    h: &mut MoveHarness,
+    ty_args: Vec<TypeTag>,
+    tests: Vec<(&str, Vec<Vec<u8>>, Closure)>,
+    stateless_sender: bool,
+) {
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let seq_num = if stateless_sender { None } else { Some(0) };
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), seq_num);
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("constructor_args.data/pack")
@@ -121,8 +133,25 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>
     }
 }
 
-#[test]
-fn constructor_args_good() {
+// TODO[Orderless]: The object address created by an orderless transaction varies based on the nonce used.
+// Support orderless transactions here, by computing the object address that could have been created by the orderless transaction.
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    // case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    // case(false, true, true),
+)]
+fn constructor_args_good(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let object_address = AccountAddress::from_hex_literal(
+        "0x2b8c0bdf1e6d3886f2fbf7e9cee0fb1fadd9bad887fb93175af7cc6b5bb8ca02",
+    )
+    .expect("can't compute object address");
     let tests = vec![
         // ensure object exist
         ("0xcafe::test::initialize", vec![], ""),
@@ -130,14 +159,14 @@ fn constructor_args_good() {
             "0xcafe::test::object_arg",
             vec![
                 bcs::to_bytes("hi").unwrap(),
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),
+                bcs::to_bytes(&object_address).unwrap(),
             ],
             "hi",
         ),
         (
             "0xcafe::test::pass_optional_fixedpoint32",
             vec![
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),     // Object<T>
+                bcs::to_bytes(&object_address).unwrap(),     // Object<T>
                 bcs::to_bytes(&vec![(1u64 << 32)]).unwrap(), // Option<FixedPoint32>
             ],
             "4294967296",
@@ -145,7 +174,7 @@ fn constructor_args_good() {
         (
             "0xcafe::test::pass_optional_vector_fixedpoint64",
             vec![
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&object_address).unwrap(), // Object<T>
                 bcs::to_bytes(&vec![vec![(1u128 << 64), (2u128 << 64)]]).unwrap(), // Option<vector<FixedPoint64>>
                 bcs::to_bytes(&1u64).unwrap(),
             ],
@@ -154,7 +183,7 @@ fn constructor_args_good() {
         (
             "0xcafe::test::pass_optional_vector_optional_string",
             vec![
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&object_address).unwrap(), // Object<T>
                 bcs::to_bytes(&vec![vec![vec!["a"], vec!["b"]]]).unwrap(), // Option<vector<Option<String>>>
                 bcs::to_bytes(&1u64).unwrap(),
             ],
@@ -163,7 +192,7 @@ fn constructor_args_good() {
         (
             "0xcafe::test::pass_vector_optional_object",
             vec![
-                bcs::to_bytes(&vec![vec![OBJECT_ADDRESS], vec![]]).unwrap(), // vector<Option<Object<T>>>
+                bcs::to_bytes(&vec![vec![object_address], vec![]]).unwrap(), // vector<Option<Object<T>>>
                 bcs::to_bytes(&"pff vectors of optionals").unwrap(),
                 bcs::to_bytes(&0u64).unwrap(),
             ],
@@ -172,20 +201,36 @@ fn constructor_args_good() {
         (
             "0xcafe::test::ensure_vector_vector_u8",
             vec![
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&object_address).unwrap(), // Object<T>
                 bcs::to_bytes(&vec![vec![1u8], vec![2u8]]).unwrap(), // vector<vector<u8>>
             ],
             "vector<vector<u8>>",
         ),
     ];
 
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
 
-    success(&mut h, tests);
+    success(&mut h, tests, stateless_account, object_address);
 }
 
-#[test]
-fn view_constructor_args() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    // case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    // case(false, true, true),
+)]
+fn view_constructor_args(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let object_address = AccountAddress::from_hex_literal(
+        "0x2b8c0bdf1e6d3886f2fbf7e9cee0fb1fadd9bad887fb93175af7cc6b5bb8ca02",
+    )
+    .expect("can't compute object address");
     let tests = vec![
         // ensure object exist
         ("0xcafe::test::initialize", vec![], ""),
@@ -194,27 +239,48 @@ fn view_constructor_args() {
             "0xcafe::test::object_arg",
             vec![
                 bcs::to_bytes("hi").unwrap(),
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),
+                bcs::to_bytes(&object_address).unwrap(),
             ],
             "hi",
         ),
     ];
 
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
 
-    success(&mut h, tests);
+    success(&mut h, tests, stateless_account, object_address);
 
     let view = vec![(
         "0xcafe::test::get_state",
-        vec![bcs::to_bytes(&OBJECT_ADDRESS).unwrap()],
+        vec![bcs::to_bytes(&object_address).unwrap()],
         "hi",
     )];
     let module_data_type = TypeTag::Struct(Box::new(module_data()));
-    success_generic_view(&mut h, vec![module_data_type], view);
+    success_generic_view(
+        &mut h,
+        vec![module_data_type.clone()],
+        view,
+        stateless_account,
+    );
 }
 
-#[test]
-fn constructor_args_bad() {
+#[rstest(stateless_account, use_txn_payload_v2_format, use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    // case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    // case(false, true, true),
+)]
+fn constructor_args_bad(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let object_address = AccountAddress::from_hex_literal(
+        "0x2b8c0bdf1e6d3886f2fbf7e9cee0fb1fadd9bad887fb93175af7cc6b5bb8ca02",
+    )
+    .expect("can't compute object address");
     let good: &[u8] = "a".as_bytes();
     let bad: &[u8] = &[0x80u8; 1];
 
@@ -224,7 +290,7 @@ fn constructor_args_bad() {
             "0xcafe::test::object_arg",
             vec![
                 bcs::to_bytes("hi").unwrap(),
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(),
+                bcs::to_bytes(&object_address).unwrap(),
             ],
             Box::new(|e| {
                 matches!(
@@ -236,7 +302,7 @@ fn constructor_args_bad() {
         (
             "0xcafe::test::pass_optional_vector_optional_string",
             vec![
-                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&object_address).unwrap(), // Object<T>
                 bcs::to_bytes(&vec![vec![vec![good], vec![bad]]]).unwrap(), // Option<vector<Option<String>>>
                 bcs::to_bytes(&1u64).unwrap(),
             ],
@@ -265,5 +331,8 @@ fn constructor_args_bad() {
         ),
     ];
 
-    fail(tests);
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
+
+    fail(&mut h, tests, stateless_account);
 }

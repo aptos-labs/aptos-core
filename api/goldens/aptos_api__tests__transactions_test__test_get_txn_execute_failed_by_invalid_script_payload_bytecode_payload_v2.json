@@ -1,0 +1,93 @@
+{
+  "version": "5",
+  "hash": "",
+  "state_change_hash": "",
+  "event_root_hash": "",
+  "state_checkpoint_hash": null,
+  "gas_used": "3",
+  "success": false,
+  "vm_status": "CODE_DESERIALIZATION_ERROR",
+  "accumulator_root_hash": "",
+  "changes": [
+    {
+      "address": "0xa550c18",
+      "state_key_hash": "",
+      "data": {
+        "type": "0x1::account::Account",
+        "data": {
+          "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
+          "coin_register_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "0"
+              }
+            }
+          },
+          "guid_creation_num": "4",
+          "key_rotation_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "1"
+              }
+            }
+          },
+          "rotation_capability_offer": {
+            "for": {
+              "vec": []
+            }
+          },
+          "sequence_number": "2",
+          "signer_capability_offer": {
+            "for": {
+              "vec": []
+            }
+          }
+        }
+      },
+      "type": "write_resource"
+    }
+  ],
+  "sender": "0xa550c18",
+  "sequence_number": "1",
+  "max_gas_amount": "100000000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "59",
+  "payload": {
+    "code": {
+      "bytecode": "0xa11ceb0b030000",
+      "abi": null
+    },
+    "type_arguments": [],
+    "arguments": [],
+    "type": "script_payload"
+  },
+  "signature": {
+    "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+    "signature": "0xe32a04d373d70e2baa71940b3b426675e0c8ec59f1c4da2245147f00a3679514a9c0be781380f5686cbcc44b61d6d3469b9b5ce51ca6e857a1f0872b0a9e1b09",
+    "type": "ed25519_signature"
+  },
+  "replay_protection_nonce": null,
+  "events": [
+    {
+      "guid": {
+        "creation_number": "0",
+        "account_address": "0x0"
+      },
+      "sequence_number": "0",
+      "type": "0x1::transaction_fee::FeeStatement",
+      "data": {
+        "execution_gas_units": "3",
+        "io_gas_units": "0",
+        "storage_fee_octas": "0",
+        "storage_fee_refund_octas": "0",
+        "total_charge_gas_units": "3"
+      }
+    }
+  ],
+  "timestamp": "1000000",
+  "type": "user_transaction"
+}

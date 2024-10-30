@@ -1,29 +1,44 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{tests::common, MoveHarness};
 use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas_algebra::Gas;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
-    account_address::AccountAddress,
     on_chain_config::{ApprovedExecutionHashes, OnChainConfig},
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
 };
+use rstest::rstest;
 
-#[test]
-fn large_transactions() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn large_transactions(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     // This test validates that only small txns (less than the maximum txn size) can be kept. It
     // then evaluates the limits of the ApprovedExecutionHashes. Specifically, the hash is the code
     // is the only portion that can exceed the size limits. There's a further restriction on the
     // maximum transaction size of 1 MB even for governance, because the governance transaction can
     // be submitted by any one and that can result in a large amount of large transactions making their
     // way into consensus.
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let alice = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let root = h.aptos_framework_account();
     let entries = ApprovedExecutionHashes { entries: vec![] };
     h.set_resource(
@@ -38,15 +53,19 @@ fn large_transactions() {
     let very_large = vec![0; 1024 * 1024];
 
     let status = run(&mut h, &alice, small.clone(), small.clone());
-    assert!(!status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), small.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, small.clone(), large.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), large.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, very_large.clone(), small.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
 
     let entries = ApprovedExecutionHashes {
         entries: vec![
@@ -61,28 +80,46 @@ fn large_transactions() {
     );
 
     let status = run(&mut h, &alice, small.clone(), small.clone());
-    assert!(!status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), small.clone());
-    assert!(!status.is_discarded());
+    assert!(!status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, small.clone(), large.clone());
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, large.clone(), large);
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
+
     let status = run(&mut h, &alice, very_large, small);
-    assert!(status.is_discarded());
+    assert!(status.is_discarded(), "status: {:?}", status);
 }
 
-#[test]
-fn alt_execution_limit_for_gov_proposals() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn alt_execution_limit_for_gov_proposals(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     // This test validates that approved governance scripts automatically get the
     // alternate (usually increased) execution limit.
     let max_gas_regular = 10;
     let max_gas_gov = 100;
 
     // Set up the testing environment
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let alice = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let root = h.aptos_framework_account();
 
     h.modify_gas_schedule(|gas_params| {
@@ -151,6 +188,10 @@ fn alt_execution_limit_for_gov_proposals() {
         .flatten()
         .expect("should be able to get fee statement")
         .execution_gas_used();
+    println!(
+        "max_gas_gov: {}, exec_gas_used: {}, overshoot: {}",
+        max_gas_gov, exec_gas_used, overshoot
+    );
     assert!(max_gas_gov <= exec_gas_used && exec_gas_used <= max_gas_gov + overshoot);
 
     // TODO: Consider adding a successful transaction that costs x amount of gas where
@@ -167,12 +208,22 @@ fn run(
 ) -> TransactionStatus {
     let script = Script::new(code, vec![], vec![TransactionArgument::U8Vector(txn_arg)]);
 
-    let txn = TransactionBuilder::new(account.clone())
+    let mut txn_builder = TransactionBuilder::new(account.clone())
         .script(script)
-        .sequence_number(h.sequence_number(account.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign();
+        .sequence_number(0)
+        .current_time(h.executor.get_block_time())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions);
+
+    let seq_num = if h.use_orderless_transactions {
+        u64::MAX
+    } else {
+        h.sequence_number_opt(account.address()).unwrap_or(0)
+    };
+    txn_builder = txn_builder.sequence_number(seq_num);
+
+    let txn = txn_builder.sign();
 
     h.run(txn)
 }

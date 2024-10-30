@@ -20,6 +20,7 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
+use aptos_logger::prelude::*;
 use aptos_rest_client::AptosBaseUrl;
 use aptos_transaction_simulation::{
     DeltaStateStore, EitherStateView, EmptyStateView, SimulationStateStore,
@@ -49,8 +50,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
+        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -429,13 +430,18 @@ impl FakeExecutor {
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
-    pub fn create_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
+    pub fn create_raw_account_data(&mut self, balance: u64, seq_num: Option<u64>) -> AccountData {
         AccountData::new_from_seed(&mut self.rng, balance, seq_num)
     }
 
     /// Creates a number of [`Account`] instances all with the same balance and sequence number,
     /// and publishes them to this executor's data store.
-    pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: u64) -> Vec<Account> {
+    pub fn create_accounts(
+        &mut self,
+        size: usize,
+        balance: u64,
+        seq_num: Option<u64>,
+    ) -> Vec<Account> {
         let mut accounts: Vec<Account> = Vec::with_capacity(size);
         for _i in 0..size {
             let account_data = AccountData::new_from_seed(&mut self.rng, balance, seq_num);
@@ -447,24 +453,28 @@ impl FakeExecutor {
 
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
-    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
-        let data = self.new_account_data_at(addr);
+    pub fn new_account_at(&mut self, addr: AccountAddress, seq_num: Option<u64>) -> Account {
+        let data = self.new_account_data_at(addr, seq_num);
         data.account().clone()
     }
 
-    pub fn new_account_data_at(&mut self, addr: AccountAddress) -> AccountData {
+    pub fn new_account_data_at(
+        &mut self,
+        addr: AccountAddress,
+        seq_num: Option<u64>,
+    ) -> AccountData {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
 
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(acc, 1_000_000_000_000_000, 0)
+        self.store_and_fund_account(acc, 1_000_000_000_000_000, seq_num)
     }
 
     pub fn store_and_fund_account(
         &mut self,
         account: Account,
         balance: u64,
-        seq_num: u64,
+        seq_num: Option<u64>,
     ) -> AccountData {
         let features = Features::fetch_config(&self.state_store).unwrap_or_default();
         let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
@@ -575,9 +585,14 @@ impl FakeExecutor {
             &self.state_store,
             &StateKey::resource_typed::<T>(addr).expect("failed to create StateKey"),
         )
-        .expect("account must exist in data store")
-        .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
-        bcs::from_bytes(&data_blob).ok()
+        .expect("account must exist in data store");
+        match data_blob {
+            Some(blob) => bcs::from_bytes(&blob).ok(),
+            None => {
+                info!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr);
+                None
+            },
+        }
     }
 
     pub fn read_resource_group<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
@@ -876,20 +891,20 @@ impl FakeExecutor {
             &txn,
             &log_context,
             |gas_meter| {
-                let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
-                    // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has been removed")
+                let gas_profiler = match txn.payload().executable_ref() {
+                    Ok(TransactionExecutableRef::Script(_)) => GasProfiler::new_script(gas_meter),
+                    Ok(TransactionExecutableRef::EntryFunction(entry_func))
+                        if !txn.payload().is_multisig() =>
+                    {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
                     },
+                    Ok(_) => unimplemented!("multisig or empty payload not supported yet"),
+                    Err(_) => unimplemented!("payload type is deprecated"),
                 };
                 gas_profiler
             },
@@ -1053,10 +1068,16 @@ impl FakeExecutor {
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
     ) -> Measurement {
+        // TODO[Orderless]: Creating all stateful accounts here.
+        // Check if any tests need to be done with stateless accounts with seq_num = None.
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
-                .map(|_| *self.new_account_at(AccountAddress::random()).address())
+                .map(|_| {
+                    *self
+                        .new_account_at(AccountAddress::random(), Some(0))
+                        .address()
+                })
                 .collect::<Vec<_>>(),
             _ => vec![],
         };
@@ -1256,6 +1277,18 @@ impl FakeExecutor {
             .lock()
             .unwrap()
             .to_vec()
+    }
+
+    pub fn enable_features(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        self.exec("features", "change_feature_flags_internal", vec![], vec![
+            MoveValue::Signer(AccountAddress::ONE)
+                .simple_serialize()
+                .unwrap(),
+            bcs::to_bytes(&enabled).unwrap(),
+            bcs::to_bytes(&disabled).unwrap(),
+        ]);
     }
 
     pub fn exec(

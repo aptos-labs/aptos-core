@@ -2,14 +2,28 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
+// Note[Orderless]: Done
+use super::new_test_context_with_orderless_flags;
 use aptos_api_test_context::{current_function_name, TestContext};
+use rstest::rstest;
 use serde_json::json;
 use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_function_values() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_function_values(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let mut account = context.create_account().await;
     let account_addr = account.address();
 

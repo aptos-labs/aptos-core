@@ -857,6 +857,26 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
+    NonceValidationAddNonceBucket {},
+
+    NonceValidationInitializeNonceTable {},
+
+    NonceValidationBiBigOrderedMapAddNonceBucket {},
+
+    NonceValidationBiBigOrderedMapInitializeNonceTable {},
+
+    NonceValidationBigOrderedMapAddNonceBucket {},
+
+    NonceValidationBigOrderedMapInitializeNonceTable {},
+
+    NonceValidationOrderedMapAddNonceBucket {},
+
+    NonceValidationOrderedMapInitializeNonceTable {},
+
+    NonceValidationVectorAddNonceBucket {},
+
+    NonceValidationVectorInitializeNonceTable {},
+
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     ObjectTransferCall {
         object: AccountAddress,
@@ -1713,6 +1733,30 @@ impl EntryFunctionCall {
                 sequence_number,
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
+            NonceValidationAddNonceBucket {} => nonce_validation_add_nonce_bucket(),
+            NonceValidationInitializeNonceTable {} => nonce_validation_initialize_nonce_table(),
+            NonceValidationBiBigOrderedMapAddNonceBucket {} => {
+                nonce_validation_bi_big_ordered_map_add_nonce_bucket()
+            },
+            NonceValidationBiBigOrderedMapInitializeNonceTable {} => {
+                nonce_validation_bi_big_ordered_map_initialize_nonce_table()
+            },
+            NonceValidationBigOrderedMapAddNonceBucket {} => {
+                nonce_validation_big_ordered_map_add_nonce_bucket()
+            },
+            NonceValidationBigOrderedMapInitializeNonceTable {} => {
+                nonce_validation_big_ordered_map_initialize_nonce_table()
+            },
+            NonceValidationOrderedMapAddNonceBucket {} => {
+                nonce_validation_ordered_map_add_nonce_bucket()
+            },
+            NonceValidationOrderedMapInitializeNonceTable {} => {
+                nonce_validation_ordered_map_initialize_nonce_table()
+            },
+            NonceValidationVectorAddNonceBucket {} => nonce_validation_vector_add_nonce_bucket(),
+            NonceValidationVectorInitializeNonceTable {} => {
+                nonce_validation_vector_initialize_nonce_table()
+            },
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ObjectCodeDeploymentPublish {
                 metadata_serialized,
@@ -4181,6 +4225,156 @@ pub fn multisig_account_vote_transanction(
     ))
 }
 
+pub fn nonce_validation_add_nonce_bucket() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation").to_owned(),
+        ),
+        ident_str!("add_nonce_bucket").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_bi_big_ordered_map_add_nonce_bucket() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_bi_big_ordered_map").to_owned(),
+        ),
+        ident_str!("add_nonce_bucket").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_bi_big_ordered_map_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_bi_big_ordered_map").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_big_ordered_map_add_nonce_bucket() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_big_ordered_map").to_owned(),
+        ),
+        ident_str!("add_nonce_bucket").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_big_ordered_map_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_big_ordered_map").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_ordered_map_add_nonce_bucket() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_ordered_map").to_owned(),
+        ),
+        ident_str!("add_nonce_bucket").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_ordered_map_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_ordered_map").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_vector_add_nonce_bucket() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_vector").to_owned(),
+        ),
+        ident_str!("add_nonce_bucket").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn nonce_validation_vector_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation_vector").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
 pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -6641,6 +6835,106 @@ mod decoder {
         }
     }
 
+    pub fn nonce_validation_add_nonce_bucket(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationAddNonceBucket {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationInitializeNonceTable {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_bi_big_ordered_map_add_nonce_bucket(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationBiBigOrderedMapAddNonceBucket {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_bi_big_ordered_map_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationBiBigOrderedMapInitializeNonceTable {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_big_ordered_map_add_nonce_bucket(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationBigOrderedMapAddNonceBucket {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_big_ordered_map_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationBigOrderedMapInitializeNonceTable {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_ordered_map_add_nonce_bucket(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationOrderedMapAddNonceBucket {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_ordered_map_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationOrderedMapInitializeNonceTable {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_vector_add_nonce_bucket(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationVectorAddNonceBucket {})
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_vector_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationVectorInitializeNonceTable {})
+        } else {
+            None
+        }
+    }
+
     pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectTransferCall {
@@ -7761,6 +8055,46 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
+        );
+        map.insert(
+            "nonce_validation_add_nonce_bucket".to_string(),
+            Box::new(decoder::nonce_validation_add_nonce_bucket),
+        );
+        map.insert(
+            "nonce_validation_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_initialize_nonce_table),
+        );
+        map.insert(
+            "nonce_validation_bi_big_ordered_map_add_nonce_bucket".to_string(),
+            Box::new(decoder::nonce_validation_bi_big_ordered_map_add_nonce_bucket),
+        );
+        map.insert(
+            "nonce_validation_bi_big_ordered_map_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_bi_big_ordered_map_initialize_nonce_table),
+        );
+        map.insert(
+            "nonce_validation_big_ordered_map_add_nonce_bucket".to_string(),
+            Box::new(decoder::nonce_validation_big_ordered_map_add_nonce_bucket),
+        );
+        map.insert(
+            "nonce_validation_big_ordered_map_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_big_ordered_map_initialize_nonce_table),
+        );
+        map.insert(
+            "nonce_validation_ordered_map_add_nonce_bucket".to_string(),
+            Box::new(decoder::nonce_validation_ordered_map_add_nonce_bucket),
+        );
+        map.insert(
+            "nonce_validation_ordered_map_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_ordered_map_initialize_nonce_table),
+        );
+        map.insert(
+            "nonce_validation_vector_add_nonce_bucket".to_string(),
+            Box::new(decoder::nonce_validation_vector_add_nonce_bucket),
+        );
+        map.insert(
+            "nonce_validation_vector_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_vector_initialize_nonce_table),
         );
         map.insert(
             "object_transfer_call".to_string(),

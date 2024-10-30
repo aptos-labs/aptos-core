@@ -45,13 +45,17 @@ pub fn get_test_signed_transaction(
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
+    let payload = payload.unwrap_or_else(|| {
+        TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+    });
+    let payload = payload.upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
     let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
-        payload.unwrap_or_else(|| {
-            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
-        }),
+        payload,
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price,
         expiration_timestamp_secs,
@@ -73,6 +77,8 @@ pub fn get_test_unchecked_transaction(
     expiration_time: u64,
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     get_test_unchecked_transaction_(
         sender,
@@ -84,6 +90,8 @@ pub fn get_test_unchecked_transaction(
         gas_unit_price,
         max_gas_amount,
         ChainId::test(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -98,7 +106,10 @@ fn get_test_unchecked_transaction_(
     gas_unit_price: u64,
     max_gas_amount: Option<u64>,
     chain_id: ChainId,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
+    let payload = payload.upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
     let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
@@ -122,6 +133,8 @@ pub fn get_test_signed_txn(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     payload: Option<TransactionPayload>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
     get_test_signed_transaction(
@@ -133,6 +146,8 @@ pub fn get_test_signed_txn(
         expiration_time,
         TEST_GAS_PRICE,
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -142,6 +157,8 @@ pub fn get_test_unchecked_txn(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     payload: TransactionPayload,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
     get_test_unchecked_transaction(
@@ -153,6 +170,8 @@ pub fn get_test_unchecked_txn(
         expiration_time,
         TEST_GAS_PRICE,
         None,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     )
 }
 
@@ -165,14 +184,18 @@ pub fn get_test_unchecked_multi_agent_txn(
     secondary_private_keys: Vec<&Ed25519PrivateKey>,
     secondary_public_keys: Vec<Ed25519PublicKey>,
     script: Option<Script>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
+    let payload = TransactionPayload::Script(
+        script.unwrap_or_else(|| Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new())),
+    );
+    let payload = payload.upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
     let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
-        TransactionPayload::Script(
-            script.unwrap_or_else(|| Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new())),
-        ),
+        payload,
         MAX_GAS_AMOUNT,
         TEST_GAS_PRICE,
         expiration_time,
@@ -207,18 +230,21 @@ pub fn get_test_txn_with_chain_id(
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     chain_id: ChainId,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
-    let raw_txn = RawTransaction::new_script(
+    let payload = TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]));
+    let payload = payload.upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
+    let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
-        Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new()),
+        payload,
         MAX_GAS_AMOUNT,
         TEST_GAS_PRICE,
         expiration_time,
         chain_id,
     );
-
     let signature = private_key.sign(&raw_txn).unwrap();
 
     SignedTransaction::new(raw_txn, public_key, signature)
@@ -235,13 +261,17 @@ pub fn get_test_raw_transaction(
     expiration_timestamp_secs: Option<u64>,
     gas_unit_price: Option<u64>,
     max_gas_amount: Option<u64>,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> RawTransaction {
+    let payload = payload.unwrap_or_else(|| {
+        TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+    });
+    let payload = payload.upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
     RawTransaction::new(
         sender,
         sequence_number,
-        payload.unwrap_or_else(|| {
-            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
-        }),
+        payload,
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price.unwrap_or(TEST_GAS_PRICE),
         expiration_timestamp_secs.unwrap_or(expiration_time(10)),

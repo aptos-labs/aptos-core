@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::MoveHarness;
-use aptos_types::{
-    account_address::AccountAddress, move_utils::MemberId, transaction::ExecutionStatus,
-};
+use aptos_types::{move_utils::MemberId, transaction::ExecutionStatus};
 use move_binary_format::{
     file_format::{
         AddressIdentifierIndex, Bytecode::*, CodeUnit, Constant, ConstantPoolIndex,
@@ -17,16 +16,33 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{ability::AbilitySet, identifier::Identifier, vm_status::StatusCode};
+use rstest::rstest;
 
-#[test]
-fn access_path_panic() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn access_path_panic(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     // github.com/aptos-labs/aptos-core/security/advisories/GHSA-rpw2-84hq-48jj
     let mut ty = SignatureToken::Bool;
     for _ in 0..18 {
         ty = SignatureToken::StructInstantiation(StructHandleIndex(0), vec![ty]);
     }
 
-    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    let acc = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let addr = *acc.address();
 
     let cm = CompiledModule {
         version: 6,
@@ -100,8 +116,6 @@ fn access_path_panic() {
     let mut module_bytes = vec![];
     cm.serialize(&mut module_bytes).unwrap();
 
-    let mut h = MoveHarness::new();
-    let acc = h.new_account_at(addr);
     h.executor.add_module(&cm.self_id(), module_bytes);
 
     let res = h.run_entry_function(

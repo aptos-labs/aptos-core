@@ -366,11 +366,16 @@ module aptos_framework::account {
     /// - Aborts if no Account resource exists at `addr`
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
         if (resource_exists_at(addr)) {
+            if (resource_exists_at(addr)) {
             Account[addr].guid_creation_num
         } else if (features::is_default_account_resource_enabled()) {
             0
         } else {
             abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
+        } else {
+            // TODO[Orderless]: Is this okay to return a default value here?
+            0
         }
     }
 
@@ -749,7 +754,7 @@ module aptos_framework::account {
         let account_addr = signer::address_of(account);
         assert!(exists<Account>(account_addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let auth_key_as_address =
-            from_bcs::to_address(Account[account_addr].authentication_key);
+            from_bcs::to_address(get_authentication_key(account_addr));
         let address_map_ref_mut =
             &mut OriginatingAddress[@aptos_framework].address_map;
         if (address_map_ref_mut.contains(auth_key_as_address)) {
@@ -790,7 +795,6 @@ module aptos_framework::account {
 
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
-        assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         check_rotation_permission(account);
         let addr = signer::address_of(account);
         assert_account_resource_with_error(addr, ENO_SUCH_ROTATION_CAPABILITY_OFFER);

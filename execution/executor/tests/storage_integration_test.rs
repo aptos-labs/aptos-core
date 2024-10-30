@@ -105,6 +105,7 @@ fn test_reconfiguration() {
             .consensus_public_key
     );
 
+    // TODO[Orderless]: Try other possibilities for testing orderless transactions
     // txn1 = give the validator some money so they can send a tx
     let txn1 = get_test_signed_transaction(
         aptos_test_root_address(),
@@ -112,6 +113,8 @@ fn test_reconfiguration() {
         genesis_key.clone(),
         genesis_key.public_key(),
         Some(aptos_stdlib::aptos_coin_mint(validator_account, 1_000_000)),
+        false,
+        false,
     );
     // txn2 = a dummy block prologue to bump the timer.
     let txn2 = Transaction::BlockMetadata(BlockMetadata::new(
@@ -131,6 +134,8 @@ fn test_reconfiguration() {
         genesis_key.clone(),
         genesis_key.public_key(),
         Some(aptos_stdlib::version_set_for_next_epoch(42)),
+        true,
+        true,
     );
 
     let txn4 = get_test_signed_transaction(
@@ -139,6 +144,8 @@ fn test_reconfiguration() {
         genesis_key.clone(),
         genesis_key.public_key(),
         Some(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        true,
+        true,
     );
 
     let txn_block = into_signature_verified_block(vec![txn1, txn2, txn3, txn4]);

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, SigningKey};
@@ -35,16 +36,20 @@ use move_core_types::{
         StatusCode::{FEATURE_UNDER_GATING, INVALID_SIGNATURE},
     },
 };
+use rstest::rstest;
 
 /// Initializes an Aptos VM and sets the keyless configuration via script.
 fn init_feature_gating(
     enabled_features: Vec<FeatureFlag>,
     disabled_features: Vec<FeatureFlag>,
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 ) -> (MoveHarness, Account, Account) {
-    let mut h = MoveHarness::new_with_features(enabled_features, disabled_features);
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(enabled_features, disabled_features);
 
-    let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
+    let recipient = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     // initialize JWKs
     let core_resources = run_jwk_and_config_script(&mut h);
     // initialize default VK
@@ -62,10 +67,12 @@ fn test_feature_gating(
     recipient: &Account,
     get_sig_and_pk: fn() -> (KeylessSignature, KeylessPublicKey),
     should_succeed: bool,
+    stateless_account: bool,
 ) {
     let (sig, pk) = get_sig_and_pk();
 
-    let transaction = create_and_spend_keyless_account(h, sig, pk, *recipient.address());
+    let transaction =
+        create_and_spend_keyless_account(h, sig, pk, *recipient.address(), stateless_account);
     let output = h.run_raw(transaction);
 
     if !should_succeed {
@@ -93,8 +100,22 @@ fn test_feature_gating(
     }
 }
 
-#[test]
-fn test_rotate_vk() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_rotate_vk(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let (mut h, recipient, core_resources) = init_feature_gating(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
@@ -102,11 +123,14 @@ fn test_rotate_vk() {
             FeatureFlag::KEYLESS_ACCOUNTS,
         ],
         vec![],
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
     // Old proof for old VK
     let (old_sig, pk) = get_sample_groth16_sig_and_pk();
-    let account = create_keyless_account(&mut h, pk);
+    let account = create_keyless_account(&mut h, pk, stateless_account);
     let transaction =
         spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
     let output = h.run_raw(transaction);
@@ -151,8 +175,22 @@ fn test_rotate_vk() {
     }
 }
 
-#[test]
-fn test_proof_simulation() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_proof_simulation(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let (mut h, recipient, core_resources) = init_feature_gating(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
@@ -161,13 +199,17 @@ fn test_proof_simulation() {
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
         ],
         vec![],
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
     let (sig, pk, pvk) = get_random_simulated_groth16_sig_and_pk();
     run_upgrade_vk_script(&mut h, core_resources, Groth16VerificationKey::from(pvk));
     run_jwk_and_config_script(&mut h);
 
-    let transaction = create_and_spend_keyless_account(&mut h, sig, pk, *recipient.address());
+    let transaction =
+        create_and_spend_keyless_account(&mut h, sig, pk, *recipient.address(), stateless_account);
     let output = h.run_raw(transaction);
 
     assert_success!(
@@ -177,8 +219,22 @@ fn test_proof_simulation() {
     );
 }
 
-#[test]
-fn test_feature_gating_with_zk_on() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_feature_gating_with_zk_on(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     //
     // ZK & ZKless
     let (mut h, recipient, _) = init_feature_gating(
@@ -189,11 +245,26 @@ fn test_feature_gating_with_zk_on() {
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
         ],
         vec![],
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     // Groth16-based sig => success
-    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, true);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_groth16_sig_and_pk,
+        true,
+        stateless_account,
+    );
     // OIDC-based sig => success
-    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, true);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_openid_sig_and_pk,
+        true,
+        stateless_account,
+    );
 
     //
     // ZK & !ZKless
@@ -204,15 +275,44 @@ fn test_feature_gating_with_zk_on() {
             FeatureFlag::KEYLESS_ACCOUNTS,
         ],
         vec![FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS],
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     // Groth16-based sig => success
-    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, true);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_groth16_sig_and_pk,
+        true,
+        stateless_account,
+    );
     // OIDC-based sig => discard
-    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, false);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_openid_sig_and_pk,
+        false,
+        stateless_account,
+    );
 }
 
-#[test]
-fn test_feature_gating_with_zk_off() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_feature_gating_with_zk_off(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     //
     // !ZK & ZKless
     let (mut h, recipient, _) = init_feature_gating(
@@ -222,11 +322,26 @@ fn test_feature_gating_with_zk_off() {
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
         ],
         vec![FeatureFlag::KEYLESS_ACCOUNTS],
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     // Groth16-based sig => discard
-    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, false);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_groth16_sig_and_pk,
+        false,
+        stateless_account,
+    );
     // OIDC-based sig => success
-    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, true);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_openid_sig_and_pk,
+        true,
+        stateless_account,
+    );
 
     //
     // !ZK & !ZKless
@@ -239,19 +354,49 @@ fn test_feature_gating_with_zk_off() {
             FeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
         ],
+        stateless_account,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
     // Groth16-based sig => discard
-    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, false);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_groth16_sig_and_pk,
+        false,
+        stateless_account,
+    );
     // OIDC-based sig => discard
-    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, false);
+    test_feature_gating(
+        &mut h,
+        &recipient,
+        get_sample_openid_sig_and_pk,
+        false,
+        stateless_account,
+    );
 }
 
 /// Creates a federated keyless account associated with a JWK addr. First, ensures TXN validation
 /// for this account fails because the JWKs are not installed at that JWK addr. Second, installs the
 /// JWK at this address and ensures TXN validation now succeeds.
-#[test]
-fn test_federated_keyless_at_jwk_addr() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_federated_keyless_at_jwk_addr(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
             FeatureFlag::BN254_STRUCTURES,
@@ -261,10 +406,14 @@ fn test_federated_keyless_at_jwk_addr() {
         vec![],
     );
 
-    let jwk_addr = AccountAddress::from_hex_literal("0xadd").unwrap();
+    let jwk_account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let jwk_addr = *jwk_account.address();
 
     // Step 0: Make sure the default VK is installed
-    let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let core_resources = h.new_account_at(
+        AccountAddress::from_hex_literal("0xA550C18").unwrap(),
+        Some(0),
+    );
     run_upgrade_vk_script(
         &mut h,
         core_resources.clone(),
@@ -273,8 +422,8 @@ fn test_federated_keyless_at_jwk_addr() {
 
     // Step 1: Make sure TXN validation fails if JWKs are not installed at jwk_addr.
     let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let sender = create_federated_keyless_account(&mut h, jwk_addr, pk);
-    let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let sender = create_federated_keyless_account(&mut h, jwk_addr, pk, stateless_account);
+    let recipient = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let txn = spend_keyless_account(&mut h, sig.clone(), &sender, *recipient.address());
     let output = h.run_raw(txn);
 
@@ -295,7 +444,7 @@ fn test_federated_keyless_at_jwk_addr() {
     // Step 1: Make sure TXN validation succeeds once JWKs are installed at jwk_addr.
     let iss = get_sample_iss();
     let jwk = get_sample_jwk();
-    let _ = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
+    let _ = install_federated_jwks_and_set_keyless_config(&mut h, jwk_account, iss, jwk);
 
     let txn = spend_keyless_account(&mut h, sig, &sender, *recipient.address());
     let output = h.run_raw(txn);
@@ -308,9 +457,24 @@ fn test_federated_keyless_at_jwk_addr() {
 }
 
 /// Tests that the default JWKs at 0x1 work as an override when the JWKs at jwk_addr don't work.
-#[test]
-fn test_federated_keyless_override_at_0x1() {
-    let mut h = MoveHarness::new_with_features(
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn test_federated_keyless_override_at_0x1(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
+    h.enable_features(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
             FeatureFlag::BN254_STRUCTURES,
@@ -320,10 +484,12 @@ fn test_federated_keyless_override_at_0x1() {
         vec![],
     );
 
-    let jwk_addr = AccountAddress::from_hex_literal("0xadd").unwrap();
+    let jwk_account = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
+    let jwk_addr = *jwk_account.address();
     let iss = get_sample_iss();
     let jwk = secure_test_rsa_jwk(); // this will be the wrong JWK
-    let core_resources = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
+    let core_resources =
+        install_federated_jwks_and_set_keyless_config(&mut h, jwk_account, iss, jwk);
 
     // Step 0: Make sure the default VK is installed
     run_upgrade_vk_script(
@@ -334,8 +500,8 @@ fn test_federated_keyless_override_at_0x1() {
 
     // Step 1: Make sure the TXN does not validate, since the wrong JWK is installed at JWK addr
     let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let sender = create_federated_keyless_account(&mut h, jwk_addr, pk);
-    let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let sender = create_federated_keyless_account(&mut h, jwk_addr, pk, stateless_account);
+    let recipient = h.new_account_with_key_pair(if stateless_account { None } else { Some(0) });
     let txn = spend_keyless_account(&mut h, sig.clone(), &sender, *recipient.address());
     let output = h.run_raw(txn);
 
@@ -365,7 +531,11 @@ fn test_federated_keyless_override_at_0x1() {
     );
 }
 
-fn create_keyless_account(h: &mut MoveHarness, pk: KeylessPublicKey) -> Account {
+fn create_keyless_account(
+    h: &mut MoveHarness,
+    pk: KeylessPublicKey,
+    stateless_account: bool,
+) -> Account {
     let addr = AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
     let account = h.store_and_fund_account(
         &Account::new_from_addr(
@@ -373,7 +543,7 @@ fn create_keyless_account(h: &mut MoveHarness, pk: KeylessPublicKey) -> Account 
             AccountPublicKey::AnyPublicKey(AnyPublicKey::Keyless { public_key: pk }),
         ),
         100000000,
-        0,
+        if stateless_account { None } else { Some(0) },
     );
 
     println!("Actual address: {}", addr.to_hex());
@@ -389,12 +559,18 @@ fn spend_keyless_account(
     recipient: AccountAddress,
 ) -> SignedTransaction {
     let payload = aptos_stdlib::aptos_coin_transfer(recipient, 1);
-    //println!("Payload: {:?}", payload);
+    let seq_num = if h.use_orderless_transactions {
+        u64::MAX
+    } else {
+        h.sequence_number_opt(account.address()).unwrap_or(0)
+    };
     let raw_txn = TransactionBuilder::new(account.clone())
         .payload(payload)
-        .sequence_number(h.sequence_number(account.address()))
+        .sequence_number(seq_num)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .raw();
 
     println!("RawTxn sender: {:?}", raw_txn.sender());
@@ -432,6 +608,7 @@ fn create_federated_keyless_account(
     h: &mut MoveHarness,
     jwk_addr: AccountAddress,
     pk: KeylessPublicKey,
+    stateless_account: bool,
 ) -> Account {
     let fed_pk = FederatedKeylessPublicKey { jwk_addr, pk };
     let addr = AuthenticationKey::any_key(AnyPublicKey::federated_keyless(fed_pk.clone()))
@@ -442,7 +619,7 @@ fn create_federated_keyless_account(
             AccountPublicKey::AnyPublicKey(AnyPublicKey::FederatedKeyless { public_key: fed_pk }),
         ),
         100000000,
-        0,
+        if stateless_account { None } else { Some(0) },
     );
 
     println!("Actual address: {}", addr.to_hex());
@@ -457,15 +634,19 @@ fn create_and_spend_keyless_account(
     sig: KeylessSignature,
     pk: KeylessPublicKey,
     recipient: AccountAddress,
+    stateless_account: bool,
 ) -> SignedTransaction {
-    let account = create_keyless_account(h, pk);
+    let account = create_keyless_account(h, pk, stateless_account);
 
     spend_keyless_account(h, sig, &account, recipient)
 }
 
 /// Sets the keyless configuration
 fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
-    let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let core_resources = h.new_account_at(
+        AccountAddress::from_hex_literal("0xA550C18").unwrap(),
+        Some(0),
+    );
 
     let package = build_package(
         common::test_dir_path("keyless_setup.data/pack"),
@@ -482,6 +663,11 @@ fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
     let jwk = get_sample_jwk();
     let config = Configuration::new_for_testing();
 
+    let seq_num = if h.use_orderless_transactions {
+        u64::MAX
+    } else {
+        h.sequence_number_opt(core_resources.address()).unwrap_or(0)
+    };
     let txn = TransactionBuilder::new(core_resources.clone())
         .script(Script::new(script, vec![], vec![
             TransactionArgument::U8Vector(iss.into_bytes()),
@@ -491,9 +677,11 @@ fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
             TransactionArgument::U8Vector(jwk.n.into_bytes()),
             TransactionArgument::U64(config.max_exp_horizon_secs),
         ]))
-        .sequence_number(h.sequence_number(core_resources.address()))
+        .sequence_number(seq_num)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
@@ -507,11 +695,14 @@ fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
 /// Sets the keyless configuration and installs the sample RSA JWK as a federated JWK.
 fn install_federated_jwks_and_set_keyless_config(
     h: &mut MoveHarness,
-    jwk_owner: AccountAddress,
+    jwk_owner: Account,
     iss: String,
     jwk: RSA_JWK,
 ) -> Account {
-    let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let core_resources = h.new_account_at(
+        AccountAddress::from_hex_literal("0xA550C18").unwrap(),
+        Some(0),
+    );
 
     federated_keyless_init_config(h, core_resources.clone());
 
@@ -534,13 +725,20 @@ fn federated_keyless_init_config(h: &mut MoveHarness, core_resources: Account) {
 
     let config = Configuration::new_for_testing();
 
+    let seq_num = if h.use_orderless_transactions {
+        u64::MAX
+    } else {
+        h.sequence_number_opt(core_resources.address()).unwrap_or(0)
+    };
     let txn = TransactionBuilder::new(core_resources.clone())
         .script(Script::new(script, vec![], vec![TransactionArgument::U64(
             config.max_exp_horizon_secs,
         )]))
-        .sequence_number(h.sequence_number(core_resources.address()))
+        .sequence_number(seq_num)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
@@ -551,13 +749,11 @@ fn federated_keyless_init_config(h: &mut MoveHarness, core_resources: Account) {
 
 fn federated_keyless_install_jwk(
     h: &mut MoveHarness,
-    jwk_owner: AccountAddress,
+    jwk_owner: Account,
     iss: String,
     jwk: RSA_JWK,
 ) {
-    let jwk_owner_account = h.new_account_at(jwk_owner);
-
-    let txn = TransactionBuilder::new(jwk_owner_account.clone())
+    let txn = TransactionBuilder::new(jwk_owner.clone())
         .entry_function(EntryFunction::new(
             ModuleId::new(CORE_CODE_ADDRESS, ident_str!("jwks").to_owned()),
             ident_str!("update_federated_jwk_set").to_owned(),
@@ -570,9 +766,17 @@ fn federated_keyless_install_jwk(
                 MoveValue::Vector(vec![MoveValue::vector_u8(jwk.n.into_bytes())]),
             ]),
         ))
-        .sequence_number(h.sequence_number(jwk_owner_account.address()))
+        .sequence_number(
+            if h.use_orderless_transactions {
+                u64::MAX
+            } else {
+                0
+            },
+        )
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
@@ -593,6 +797,11 @@ fn run_upgrade_vk_script(h: &mut MoveHarness, core_resources: Account, vk: Groth
 
     let script = package.extract_script_code()[0].clone();
 
+    let seq_num = if h.use_orderless_transactions {
+        u64::MAX
+    } else {
+        h.sequence_number_opt(core_resources.address()).unwrap_or(0)
+    };
     let txn = TransactionBuilder::new(core_resources.clone())
         .script(Script::new(script, vec![], vec![
             TransactionArgument::U8Vector(vk.alpha_g1),
@@ -602,9 +811,11 @@ fn run_upgrade_vk_script(h: &mut MoveHarness, core_resources: Account, vk: Groth
             TransactionArgument::U8Vector(vk.gamma_abc_g1[0].clone()),
             TransactionArgument::U8Vector(vk.gamma_abc_g1[1].clone()),
         ]))
-        .sequence_number(h.sequence_number(core_resources.address()))
+        .sequence_number(seq_num)
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
+        .current_time(h.executor.get_block_time())
+        .upgrade_payload(h.use_txn_payload_v2_format, h.use_orderless_transactions)
         .sign();
 
     // NOTE: We cannot write the Groth16Verification key via MoveHarness::set_resource

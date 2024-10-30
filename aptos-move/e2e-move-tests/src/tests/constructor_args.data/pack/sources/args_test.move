@@ -5,8 +5,9 @@ module 0xCAFE::test {
     use std::fixed_point32::FixedPoint32;
     use aptos_std::fixed_point64::FixedPoint64;
     use aptos_std::object::Object;
-    use aptos_framework::object::{create_object_from_account, generate_signer};
+    use aptos_framework::object::{create_object, generate_signer};
     use aptos_framework::object;
+    use std::signer;
 
     struct ModuleData has key, store {
         state: String,
@@ -17,7 +18,7 @@ module 0xCAFE::test {
     }
 
     public entry fun initialize(sender: &signer) {
-        let cref = create_object_from_account(sender);
+        let cref = create_object(signer::address_of(sender));
         let s = generate_signer(&cref);
         move_to(&s, ModuleData { state: std::string::utf8(b"") });
     }

@@ -36,7 +36,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, TransactionListWithProof,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionWithProof, Version,
     },
 };
@@ -261,6 +261,15 @@ mock! {
             include_events: bool,
             ledger_version: Version,
         ) -> Result<AccountOrderedTransactionsWithProof>;
+
+        fn get_account_transaction_summaries(
+            &self,
+            address: AccountAddress,
+            start_version: Option<u64>,
+            end_version: Option<u64>,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<IndexedTransactionSummary>>;
 
         fn get_state_proof_with_ledger_info(
             &self,

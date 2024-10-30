@@ -61,6 +61,7 @@ rayon = { workspace = true }
 ref-cast = { workspace = true }
 ring = { workspace = true }
 rsa = { workspace = true }
+rstest = { workspace = true }
 serde = { workspace = true }
 serde-big-array = { workspace = true }
 serde_bytes = { workspace = true }

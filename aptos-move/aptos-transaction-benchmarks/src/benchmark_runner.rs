@@ -17,6 +17,8 @@ pub(crate) trait BenchmarkRunner {
         run_seq: bool,
         conurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (usize, usize);
 }
 
@@ -63,6 +65,8 @@ where
         run_seq: bool,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (usize, usize) {
         let mut state = TransactionBenchState::with_size(
             &self.strategy,
@@ -72,7 +76,8 @@ where
             self.remote_executor_addresses.clone(),
             self.account_pick_style.clone(),
         );
-        let transactions = state.gen_transaction();
+        let transactions =
+            state.gen_transaction(use_txn_payload_v2_format, use_orderless_transactions);
         let partitioned_txns = state.partition_txns_if_needed(&transactions);
         state.execute_blockstm_benchmark(
             transactions,
@@ -105,6 +110,8 @@ where
         remote_executor_addresses: Option<Vec<SocketAddr>>,
         account_pick_style: AccountPickStyle,
         num_runs: usize,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> Self {
         println!("Generating transactions for {} runs", num_runs);
         let mut states: Vec<_> = (0..num_runs)
@@ -122,7 +129,8 @@ where
         let (transactions, partitioned_txns) = states
             .iter_mut()
             .map(|state| {
-                let txns = state.gen_transaction();
+                let txns =
+                    state.gen_transaction(use_txn_payload_v2_format, use_orderless_transactions);
                 let partitioned_txns = state.partition_txns_if_needed(&txns);
                 (txns, partitioned_txns)
             })
@@ -147,6 +155,8 @@ where
         run_seq: bool,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
+        _use_txn_payload_v2_format: bool,
+        _use_orderless_transactions: bool,
     ) -> (usize, usize) {
         let mut state = self.states.pop().unwrap();
         let transactions = self.transactions.pop().unwrap();

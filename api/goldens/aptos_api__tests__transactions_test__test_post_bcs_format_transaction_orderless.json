@@ -1,0 +1,22 @@
+{
+  "hash": "",
+  "sender": "0xa550c18",
+  "sequence_number": "18446744073709551615",
+  "max_gas_amount": "100000000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "60",
+  "payload": {
+    "function": "0x1::aptos_account::create_account",
+    "type_arguments": [],
+    "arguments": [
+      "0x7f907266eb89259623f37611ff40880bf8ff54b0f72366879296df154f9523c3"
+    ],
+    "type": "entry_function_payload"
+  },
+  "signature": {
+    "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+    "signature": "",
+    "type": "ed25519_signature"
+  },
+  "replay_protection_nonce": ""
+}

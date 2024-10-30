@@ -32,6 +32,7 @@ pub fn execute_txn(
         .max_gas_amount(2_000_000)
         .gas_unit_price(200)
         .payload(payload)
+        .upgrade_payload(true, true)
         .sign();
 
     let txn_output = executor.execute_transaction(sign_tx);
@@ -362,7 +363,7 @@ fn main() {
             .get(&entry_point_name)
             .expect(&entry_point_name);
         let expected_time_micros = cur_calibration.expected_time_micros;
-        let publisher = executor.new_account_at(AccountAddress::random());
+        let publisher = executor.new_account_at(AccountAddress::random(), Some(0));
 
         let mut package_handler =
             PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());

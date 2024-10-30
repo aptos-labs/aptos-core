@@ -91,6 +91,11 @@ on:
         required: false
         type: boolean
         description: Send forge results to trunk.io
+      FORGE_REPLAY_PROTECTION_TYPE:
+        required: false
+        type: string
+        default: sequence_number
+        description: The type of replay protection to use for the forge test. Either "sequence_number" or "nonce".
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -122,6 +127,7 @@ env:
   VERBOSE: true
   FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}
   FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
+  FORGE_REPLAY_PROTECTION_TYPE: ${{ inputs.FORGE_REPLAY_PROTECTION_TYPE }}
   # FORGE_JUNIT_XML_PATH: ${{ inputs.SEND_RESULTS_TO_TRUNK && '/tmp/test.xml' || '' }}
 
 # TODO: should we migrate this to a composite action, so that we can skip it

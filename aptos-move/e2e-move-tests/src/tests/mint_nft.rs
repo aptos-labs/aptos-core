@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
+// Note[Orderless]: Done
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
@@ -12,6 +12,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
 };
 use move_core_types::parser::parse_struct_tag;
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
@@ -32,6 +33,7 @@ struct MintProofChallenge {
     account_address: AccountAddress,
     module_name: String,
     struct_name: String,
+    // TODO[Orderless]: Should we make this field optional to accomodate stateless accounts?
     receiver_account_sequence_number: u64,
     receiver_account_address: AccountAddress,
     token_data_id: TokenDataId,
@@ -47,11 +49,54 @@ struct TokenStore {
     mutate_token_property_events: EventHandle,
 }
 
-#[test]
-fn mint_nft_e2e() {
-    let mut h = MoveHarness::new();
+// TODO[Orderless]: Revisit the test and remove unnecessary cases
+#[rstest(
+    creator_stateless_account,
+    receiver_stateless_account,
+    resource_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false, false),
+    case(true, true, false, true, false),
+    case(true, true, false, true, true),
+    case(true, false, false, false, false),
+    case(true, false, false, true, false),
+    case(true, false, false, true, true),
+    case(false, true, false, false, false),
+    case(false, true, false, true, false),
+    case(false, true, false, true, true),
+    case(false, false, false, false, false),
+    case(false, false, false, true, false),
+    case(false, false, false, true, true),
+    case(true, true, true, false, false),
+    case(true, true, true, true, false),
+    case(true, true, true, true, true),
+    case(true, false, true, false, false),
+    case(true, false, true, true, false),
+    case(true, false, true, true, true),
+    case(false, true, true, false, false),
+    case(false, true, true, true, false),
+    case(false, true, true, true, true),
+    case(false, false, true, false, false),
+    case(false, false, true, true, false),
+    case(false, false, true, true, true)
+)]
+fn mint_nft_e2e(
+    creator_stateless_account: bool,
+    receiver_stateless_account: bool,
+    resource_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_with_key_pair(
+        if creator_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
     let resource_address = create_resource_address(*acc.address(), &[]);
 
     // give a named address to the `mint_nft` module publisher
@@ -94,11 +139,18 @@ fn mint_nft_e2e() {
         name: String::from("Token name").into_bytes(),
     };
 
-    let nft_receiver = h.new_account_with_key_pair();
+    let nft_receiver = h.new_account_with_key_pair(
+        if receiver_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
     let mint_proof = MintProofChallenge {
         account_address: resource_address,
         module_name: String::from("create_nft_getting_production_ready"),
         struct_name: String::from("MintProofChallenge"),
+        // TODO[Orderless]: Should we make this field None if receiver is a stateless account?
         receiver_account_sequence_number: 0,
         receiver_account_address: *nft_receiver.address(),
         token_data_id,
@@ -106,7 +158,14 @@ fn mint_nft_e2e() {
 
     // sign the MintProofChallenge using the resource account's private key
     let mint_proof_msg = bcs::to_bytes(&mint_proof);
-    let resource_account = h.new_account_at(resource_address);
+    let resource_account = h.new_account_at(
+        resource_address,
+        if resource_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
     let mint_proof_signature = resource_account
         .privkey
         .sign_arbitrary_message(&mint_proof_msg.unwrap());
@@ -151,16 +210,35 @@ fn mint_nft_e2e() {
 
 /// samples two signatures for unit tests in move-examples/
 /// 4-Getting-Production-Ready/sources/create_nft_getting_production_ready.move
-#[test]
-fn sample_mint_nft_part4_unit_test_signature() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn sample_mint_nft_part4_unit_test_signature(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap(), Some(0));
     let resource_address = create_resource_address(*acc.address(), &[]);
 
-    let resource_account = h.new_account_at(resource_address);
-    let nft_receiver1 = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    let nft_receiver2 = h.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
+    let resource_account = h.new_account_at(
+        resource_address,
+        if stateless_account { None } else { Some(0) },
+    );
+    let nft_receiver1 =
+        h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap(), Some(10));
+    let nft_receiver2 =
+        h.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap(), Some(10));
 
     // construct the token_data_id and mint_proof, which are required to mint the nft
     let token_data_id1 = TokenDataId {
@@ -217,19 +295,55 @@ fn sample_mint_nft_part4_unit_test_signature() {
 /// Run `cargo test generate_nft_tutorial_part4_signature -- --nocapture`
 /// to generate a valid signature for `[resource_account_address]::create_nft_getting_production_ready::mint_event_pass()` function
 /// in `aptos-move/move-examples/mint_nft/4-Getting-Production-Ready/sources/create_nft_getting_production_ready.move`. åååååååå
-#[test]
-fn generate_nft_tutorial_part4_signature() {
-    let mut h = MoveHarness::new();
+#[rstest(
+    resource_stateless_account,
+    receiver_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn generate_nft_tutorial_part4_signature(
+    resource_stateless_account: bool,
+    receiver_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut h = MoveHarness::new_with_flags(use_txn_payload_v2_format, use_orderless_transactions);
 
     // When running this test to generate a valid signature, supply the actual resource_address to line 217.
     // Uncomment line 223 and comment out line 224 (it's just a placeholder).
     // let resource_address = h.new_account_at(AccountAddress::from_hex_literal("0x[resource account's address]").unwrap());
-    let resource_address = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let resource_address = h.new_account_at(
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        if resource_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
 
     // When running this test to generate a valid signature, supply the actual nft_receiver's address to line 222.
     // Uncomment line 228 and comment out line 229.
     // let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0x[nft-receiver's address]").unwrap());
-    let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let nft_receiver = h.new_account_at(
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        if receiver_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
 
     // When running this test to generate a valid signature, supply the actual private key to replace the (0000...) in line 232.
     let admin_private_key = Ed25519PrivateKey::from_encoded_string(
@@ -250,6 +364,7 @@ fn generate_nft_tutorial_part4_signature() {
         struct_name: String::from("MintProofChallenge"),
         // change the `receiver_account_sequence_number` to the right sequence number
         // you can find an account's sequence number by searching for the account's address on explorer.aptoslabs.com and going to the `Info` tab
+        // TODO[Orderless]: Should we make this field None if receiver is a stateless account?
         receiver_account_sequence_number: 0,
         receiver_account_address: *nft_receiver.address(),
         token_data_id,

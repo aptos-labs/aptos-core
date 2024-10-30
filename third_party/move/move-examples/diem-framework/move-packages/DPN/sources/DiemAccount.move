@@ -2,6 +2,8 @@
 /// numerous auxiliary data structures. It also defines the prolog and epilog that run
 /// before and after every transaction.
 
+// Question[Orderless]: Is this module used anymore?
+// Do I need to change the transaction validation here too?
 module DiemFramework::DiemAccount {
     use DiemFramework::AccountFreezing;
     use DiemFramework::CoreAddresses;
