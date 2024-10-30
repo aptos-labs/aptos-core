@@ -25,6 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -2350,4 +2351,16 @@ pub struct ChunkedPublishOption {
     /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
     #[clap(long)]
     pub(crate) chunked_publish: bool,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    #[clap(long)]
+    pub(crate) large_packages_module_address: Option<String>,
+}
+
+impl ChunkedPublishOption {
+    pub fn large_packages_module_address(&self) -> &str {
+        self.large_packages_module_address
+            .as_deref()
+            .unwrap_or(LARGE_PACKAGES_MODULE_ADDRESS)
+    }
 }

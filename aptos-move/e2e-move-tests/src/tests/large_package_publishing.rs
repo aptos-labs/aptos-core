@@ -143,6 +143,7 @@ impl LargePackageTestContext {
             package_code,
             publish_type,
             Some(self.object_address),
+            LARGE_PACKAGES_MODULE_ADDRESS,
         )
     }
 }
