@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [4.3.0] - 2024/10/30
 - Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`
 - [`Fix`] Remove unwraps to make outputs go through regular error handling
 
