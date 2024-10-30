@@ -51,6 +51,7 @@ impl InternalIndexerDBService {
                 .expect("Failed to open internal indexer db"),
         );
 
+        // TODO: Enable transaction summaries here after the feature is complete
         let internal_indexer_db_config =
             InternalIndexerDBConfig::new(true, true, true, 0, true, 10_000);
         Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))
@@ -208,7 +209,7 @@ impl InternalIndexerDBService {
         let end_version = end_version.unwrap_or(std::u64::MAX);
         let mut next_version = start_version;
         while next_version < end_version {
-            next_version = self.db_indexer.process(start_version, end_version)?;
+            next_version = self.db_indexer.process(next_version, end_version)?;
             // We shouldn't stop the internal indexer so that internal indexer can catch up with the main DB
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }

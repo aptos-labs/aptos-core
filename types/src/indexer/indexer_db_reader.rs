@@ -10,14 +10,26 @@ use crate::{
         state_value::StateValue,
         table::{TableHandle, TableInfo},
     },
-    transaction::{AccountTransactionsWithProof, Version},
+    transaction::{AccountOrderedTransactionsWithProof, ReplayProtector, Version},
 };
 use anyhow::Result;
+use aptos_crypto::HashValue;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Order {
     Ascending,
     Descending,
+}
+
+// Question: Do we need any more information here? How about gas_used and block timestamp?
+// Question: As this struct is stored in the DB, do changes to this struct break the DB?
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndexedTransactionSummary {
+    pub sender: AccountAddress,
+    pub version: Version,
+    pub transaction_hash: HashValue,
+    pub replay_protector: ReplayProtector,
 }
 
 pub trait IndexerReader: Send + Sync {
@@ -43,14 +55,14 @@ pub trait IndexerReader: Send + Sync {
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>>;
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof>;
+    ) -> Result<AccountOrderedTransactionsWithProof>;
 
     fn get_prefixed_state_value_iterator(
         &self,

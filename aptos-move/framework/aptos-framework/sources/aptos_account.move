@@ -173,7 +173,8 @@ module aptos_framework::aptos_account {
     }
 
     public fun assert_account_is_registered_for_apt(addr: address) {
-        assert_account_exists(addr);
+        // TODO[Orderless]: This check is removed to accommodate stateless accounts. Make sure it's okay.
+        // assert_account_exists(addr);
         assert!(coin::is_account_registered<AptosCoin>(addr), error::not_found(EACCOUNT_NOT_REGISTERED_FOR_APT));
     }
 

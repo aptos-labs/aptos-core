@@ -13,7 +13,7 @@ use aptos_types::{
         state_value::StateValue,
         table::{TableHandle, TableInfo},
     },
-    transaction::{AccountTransactionsWithProof, Version},
+    transaction::{AccountOrderedTransactionsWithProof, Version},
 };
 use std::sync::Arc;
 
@@ -113,17 +113,17 @@ impl IndexerReader for IndexerReaders {
         anyhow::bail!("DB indexer reader is not available")
     }
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> anyhow::Result<AccountTransactionsWithProof> {
+    ) -> anyhow::Result<AccountOrderedTransactionsWithProof> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
             if db_indexer_reader.indexer_db.transaction_enabled() {
-                return Ok(db_indexer_reader.get_account_transactions(
+                return Ok(db_indexer_reader.get_account_ordered_transactions(
                     address,
                     start_seq_num,
                     limit,
@@ -136,6 +136,32 @@ impl IndexerReader for IndexerReaders {
         }
         anyhow::bail!("DB indexer reader is not available")
     }
+
+    // // TODO: Give more elaborate range marker: start_version, end_version, start_timestamp, end_timestamp
+    // fn get_account_all_transaction_summaries(
+    //     &self,
+    //     address: AccountAddress,
+    //     start_version: Option<u64>,
+    //     end_version: Option<u64>,
+    //     limit: u64,
+    //     ledger_version: Version,
+    // ) -> anyhow::Result<Vec<IndexedTransactionSummary>> {
+    //     if let Some(db_indexer_reader) = &self.db_indexer_reader {
+    //         // TODO: May be we need a new config flag to enable this?
+    //         if db_indexer_reader.indexer_db.transaction_summaries_enabled() {
+    //             return Ok(db_indexer_reader.get_account_all_transaction_summaries(
+    //                 address,
+    //                 start_version,
+    //                 end_version,
+    //                 limit,
+    //                 ledger_version,
+    //             )?);
+    //         } else {
+    //             anyhow::bail!("Interal transaction summaries by account index is not enabled")
+    //         }
+    //     }
+    //     anyhow::bail!("DB indexer reader is not available")
+    // }
 
     fn get_prefixed_state_value_iterator(
         &self,

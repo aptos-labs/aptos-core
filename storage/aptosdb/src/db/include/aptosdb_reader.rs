@@ -4,7 +4,7 @@
 use aptos_storage_interface::state_store::state::State;
 use aptos_storage_interface::state_store::state_summary::StateSummary;
 use aptos_storage_interface::state_store::state_view::hot_state_view::HotStateView;
-use aptos_types::block_info::BlockHeight;
+use aptos_types::{block_info::BlockHeight, indexer::indexer_db_reader::IndexedTransactionSummary};
 
 impl DbReader for AptosDB {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
@@ -82,10 +82,10 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_account_transaction(
+    fn get_account_ordered_transaction(
         &self,
         address: AccountAddress,
-        seq_num: u64,
+        sequence_number: u64,
         include_events: bool,
         ledger_version: Version,
     ) -> Result<Option<TransactionWithProof>> {
@@ -95,7 +95,7 @@ impl DbReader for AptosDB {
                 "This API is not supported with sharded DB"
             );
             self.transaction_store
-                .get_account_transaction_version(address, seq_num, ledger_version)?
+                .get_account_ordered_transaction_version(address, sequence_number, ledger_version)?
                 .map(|txn_version| {
                     self.get_transaction_with_proof(txn_version, ledger_version, include_events)
                 })
@@ -103,15 +103,15 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof> {
-        gauged_api("get_account_transactions", || {
+    ) -> Result<AccountOrderedTransactionsWithProof> {
+        gauged_api("get_account_ordered_transactions", || {
             ensure!(
                 !self.state_kv_db.enabled_sharding(),
                 "This API is not supported with sharded DB"
@@ -120,7 +120,7 @@ impl DbReader for AptosDB {
 
             let txns_with_proofs = self
                 .transaction_store
-                .get_account_transaction_version_iter(
+                .get_account_ordered_transactions_iter(
                     address,
                     start_seq_num,
                     limit,
@@ -132,7 +132,50 @@ impl DbReader for AptosDB {
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+            Ok(AccountOrderedTransactionsWithProof::new(txns_with_proofs))
+        })
+    }
+
+    // TODO[Orderless]: Give more elaborate range marker: start_version, end_version, start_timestamp, end_timestamp
+    fn get_account_all_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<IndexedTransactionSummary>> {
+        gauged_api("get_account_all_transaction_summaries", || {
+            // Question[Orderless]: Is it okay to comment this and support the transaction_summaries API even for sharded DB?
+            // ensure!(
+            //     !self.state_kv_db.enabled_sharding(),
+            //     "This API is not supported with sharded DB"
+            // );
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+
+            let txn_summaries_iter = self
+                .transaction_store
+                .get_account_transaction_summaries_iter(address, start_version, end_version, limit, ledger_version)?
+                .map(|result| {
+                    let (_version, txn_summary) = result?;
+                    Ok(txn_summary)
+                });
+            
+            // TODO[Orderless]: If start_version is not specified, then we are currently scanning the database in reverse direction
+            // to return the latest transactions. This is a bad design. Discuss and update this. 
+            if start_version.is_some() {
+                txn_summaries_iter 
+                    .collect::<Result<Vec<_>>>()
+            } else {
+                let txn_summaries = txn_summaries_iter
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(
+                    txn_summaries
+                        .into_iter()
+                        .rev()
+                        .collect::<Vec<_>>()
+                )
+            }
         })
     }
 

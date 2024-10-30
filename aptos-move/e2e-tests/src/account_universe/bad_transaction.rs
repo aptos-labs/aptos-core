@@ -36,21 +36,31 @@ impl AUTransactionGen for SequenceNumberMismatchGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        // Ignoring this flag because "Sequence number mismatch" doesn't apply for orderless transactions
+        _use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
-        let seq = if sender.sequence_number == self.seq {
+        let seq = if sender.sequence_number.unwrap_or(0) == self.seq {
             self.seq + 1
         } else {
             self.seq
         };
 
-        let txn = empty_txn(sender.account(), seq, gas_costs::TXN_RESERVED, 0);
+        let txn = empty_txn(
+            sender.account(),
+            Some(seq),
+            gas_costs::TXN_RESERVED,
+            0,
+            use_txn_payload_v2_format,
+            false, // "Sequence number mismatch" doesn't apply for orderless transactions
+        );
 
         (
             txn,
             (
-                if seq >= sender.sequence_number {
+                if seq >= sender.sequence_number.unwrap_or(0) {
                     TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
                 } else {
                     TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_OLD)
@@ -75,6 +85,8 @@ impl AUTransactionGen for InsufficientBalanceGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
@@ -85,6 +97,8 @@ impl AUTransactionGen for InsufficientBalanceGen {
             sender.sequence_number,
             max_gas_unit,
             self.gas_unit_price,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         );
 
         // TODO: Move such config to AccountUniverse
@@ -140,14 +154,21 @@ impl AUTransactionGen for InvalidAuthkeyGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
-        let txn = sender
+        let mut txn_builder = sender
             .account()
             .transaction()
             .script(Script::new(EMPTY_SCRIPT.clone(), vec![], vec![]))
-            .sequence_number(sender.sequence_number)
+            .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
+        if !use_orderless_transactions {
+            txn_builder = txn_builder.sequence_number(sender.sequence_number.unwrap_or(0));
+        }
+
+        let txn = txn_builder
             .raw()
             .sign(
                 &self.new_keypair.private_key,
