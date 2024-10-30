@@ -31,13 +31,25 @@ impl AccountData {
             sequence_strategy,
             event_count_strategy.clone(),
             event_count_strategy,
+            any::<bool>(),
         )
             .prop_map(
-                |(account, balance, sequence_number, sent_events_count, received_events_count)| {
+                |(
+                    account,
+                    balance,
+                    sequence_number,
+                    sent_events_count,
+                    received_events_count,
+                    stateless_account,
+                )| {
                     AccountData::with_account_and_event_counts(
                         account,
                         balance,
-                        sequence_number,
+                        if stateless_account {
+                            None
+                        } else {
+                            Some(sequence_number)
+                        },
                         sent_events_count,
                         received_events_count,
                     )
