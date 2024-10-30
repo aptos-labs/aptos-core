@@ -7,8 +7,8 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
-        COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
-        TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
+        BLOCK_EXECUTOR_EXECUTE_BLOCK, COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK,
+        OTHER_TIMERS, SAVE_TRANSACTIONS, TRANSACTIONS_SAVED, UPDATE_LEDGER,
     },
     types::partial_state_compute_result::PartialStateComputeResult,
     workflow::{
@@ -40,12 +40,15 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use block_tree::BlockTree;
 use fail::fail_point;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 pub mod block_tree;
 
 pub trait TransactionBlockExecutor: Send + Sync {
+    fn new() -> Self;
+
     fn execute_transaction_block(
+        &self,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -53,8 +56,15 @@ pub trait TransactionBlockExecutor: Send + Sync {
     ) -> Result<ExecutionOutput>;
 }
 
-impl TransactionBlockExecutor for AptosVM {
+pub struct AptosVMBlockExecutor;
+
+impl TransactionBlockExecutor for AptosVMBlockExecutor {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_transaction_block(
+        &self,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -176,7 +186,7 @@ where
 struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<V>,
+    block_executor: V,
 }
 
 impl<V> BlockExecutorInner<V>
@@ -188,7 +198,7 @@ where
         Ok(Self {
             db,
             block_tree,
-            phantom: PhantomData,
+            block_executor: V::new(),
         })
     }
 }
@@ -253,13 +263,13 @@ where
                 };
 
                 let execution_output = {
-                    let _timer = VM_EXECUTE_BLOCK.start_timer();
-                    fail_point!("executor::vm_execute_block", |_| {
+                    let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK.start_timer();
+                    fail_point!("executor::block_executor_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
-                            "Injected error in vm_execute_block"
+                            "Injected error in block_executor_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(
+                    self.block_executor.execute_transaction_block(
                         transactions,
                         state_view,
                         onchain_config.clone(),
