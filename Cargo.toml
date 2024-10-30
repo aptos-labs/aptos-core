@@ -42,6 +42,7 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
+    "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
     "aptos-utils",
@@ -429,6 +430,7 @@ aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
+aptos-script-composer = { path = "aptos-move/script-composer" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
@@ -813,6 +815,7 @@ tonic = { version = "0.11.0", features = [
 tonic-reflection = "0.11.0"
 topological-sort = "0.2.2"
 triomphe = "0.1.9"
+tsify-next = "0.5.4"
 tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
@@ -827,6 +830,8 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.42"
 which = "4.2.5"
 whoami = "1.5.0"
 x25519-dalek = "1.2.0"
