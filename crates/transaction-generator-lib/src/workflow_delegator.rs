@@ -36,6 +36,7 @@ pub trait WorkflowKind: std::fmt::Debug + Sync + Send + CloneWorkflowKind {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> WorkflowTxnGeneratorCreator;
 }
 
@@ -362,6 +363,7 @@ impl WorkflowTxnGeneratorCreator {
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         assert_eq!(num_modules, 1, "Only one module is supported for now");
 
@@ -390,6 +392,7 @@ impl WorkflowTxnGeneratorCreator {
                 txn_executor,
                 num_modules,
                 stage_tracking,
+                replay_protection_type,
             )
             .await
     }

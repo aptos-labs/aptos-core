@@ -1027,7 +1027,7 @@ mod tests {
     use aptos_executor_types::BlockExecutorTrait;
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::WorkflowProgress;
+    use aptos_transaction_generator_lib::{ReplayProtectionType, WorkflowProgress};
     use aptos_transaction_workloads_lib::args::TransactionTypeArg;
     use aptos_types::{
         access_path::Path,
@@ -1253,7 +1253,8 @@ mod tests {
     }
 
     fn test_generic_benchmark<E>(
-        transaction_type: Option<TransactionTypeArg>,
+        transaction_type: Option<(TransactionTypeArg, ReplayProtectionType)>,
+        // TODO[Orderless]: Check how this flag works for orderless transactions
         verify_sequence_numbers: bool,
     ) where
         E: VMBlockExecutor + 'static,
@@ -1294,9 +1295,14 @@ mod tests {
                     shuffle_connected_txns: false,
                     hotspot_probability: None,
                 },
-                |t| {
+                |(t, replay_protection_type)| {
                     BenchmarkWorkload::TransactionMix(vec![(
-                        t.materialize(1, true, WorkflowProgress::MoveByPhases),
+                        t.materialize(
+                            1,
+                            true,
+                            WorkflowProgress::MoveByPhases,
+                            replay_protection_type,
+                        ),
                         1,
                     )])
                 },
@@ -1326,7 +1332,10 @@ mod tests {
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
         test_generic_benchmark::<AptosVMBlockExecutor>(
-            Some(TransactionTypeArg::RepublishAndCall),
+            Some((
+                TransactionTypeArg::RepublishAndCall,
+                ReplayProtectionType::SequenceNumber,
+            )),
             true,
         );
     }
@@ -1338,7 +1347,10 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVMBlockExecutor>(
-            Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
+            Some((
+                TransactionTypeArg::ModifyGlobalMilestoneAggV2,
+                ReplayProtectionType::SequenceNumber,
+            )),
             true,
         );
     }
@@ -1346,7 +1358,10 @@ mod tests {
     #[test]
     fn test_native_vm_benchmark_transaction() {
         test_generic_benchmark::<NativeVMBlockExecutor>(
-            Some(TransactionTypeArg::AptFaTransfer),
+            Some((
+                TransactionTypeArg::AptFaTransfer,
+                ReplayProtectionType::SequenceNumber,
+            )),
             true,
         );
     }
@@ -1356,7 +1371,13 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<
             NativeParallelUncoordinatedBlockExecutor<NativeRawTransactionExecutor>,
-        >(Some(TransactionTypeArg::NoOp), false);
+        >(
+            Some((
+                TransactionTypeArg::NoOp,
+                ReplayProtectionType::SequenceNumber,
+            )),
+            false,
+        );
     }
 
     #[test]
@@ -1364,7 +1385,13 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<
             NativeParallelUncoordinatedBlockExecutor<NativeValueCacheRawTransactionExecutor>,
-        >(Some(TransactionTypeArg::NoOp), false);
+        >(
+            Some((
+                TransactionTypeArg::NoOp,
+                ReplayProtectionType::SequenceNumber,
+            )),
+            false,
+        );
     }
 
     #[test]
@@ -1372,6 +1399,12 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<
             NativeParallelUncoordinatedBlockExecutor<NativeNoStorageRawTransactionExecutor>,
-        >(Some(TransactionTypeArg::NoOp), false);
+        >(
+            Some((
+                TransactionTypeArg::NoOp,
+                ReplayProtectionType::SequenceNumber,
+            )),
+            false,
+        );
     }
 }

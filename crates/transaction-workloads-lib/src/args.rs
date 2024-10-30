@@ -6,7 +6,7 @@ use crate::{
     token_workflow::TokenWorkflowKind,
     EntryPoints,
 };
-use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
+use aptos_transaction_generator_lib::{ReplayProtectionType, TransactionType, WorkflowProgress};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -84,7 +84,12 @@ pub enum TransactionTypeArg {
 
 impl TransactionTypeArg {
     pub fn materialize_default(&self) -> TransactionType {
-        self.materialize(1, false, WorkflowProgress::when_done_default())
+        self.materialize(
+            1,
+            false,
+            WorkflowProgress::when_done_default(),
+            ReplayProtectionType::SequenceNumber,
+        )
     }
 
     pub fn materialize(
@@ -92,12 +97,16 @@ impl TransactionTypeArg {
         module_working_set_size: usize,
         sender_use_account_pool: bool,
         workflow_progress_type: WorkflowProgress,
+        replay_protection: ReplayProtectionType,
     ) -> TransactionType {
-        let call_custom_module = |entry_point: EntryPoints| -> TransactionType {
+        let call_custom_module = |entry_point: EntryPoints,
+                                  replay_protection: ReplayProtectionType|
+         -> TransactionType {
             TransactionType::CallCustomModules {
                 entry_point: Box::new(entry_point),
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
+                replay_protection,
             }
         };
 
@@ -107,74 +116,90 @@ impl TransactionTypeArg {
                 sender_use_account_pool,
                 non_conflicting: false,
                 use_fa_transfer: false,
+                replay_protection,
             },
             TransactionTypeArg::AptFaTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
                 non_conflicting: false,
                 use_fa_transfer: true,
+                replay_protection,
             },
             TransactionTypeArg::NonConflictingCoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
                 non_conflicting: true,
                 use_fa_transfer: false,
+                replay_protection,
             },
             TransactionTypeArg::CoinTransferWithInvalid => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 10,
                 sender_use_account_pool,
                 non_conflicting: false,
                 use_fa_transfer: false,
+                replay_protection,
             },
             TransactionTypeArg::AccountGeneration => TransactionType::AccountGeneration {
                 add_created_accounts_to_pool: true,
                 max_account_working_set: 1_000_000,
                 creation_balance: 0,
+                replay_protection,
             },
             TransactionTypeArg::AccountGenerationLargePool => TransactionType::AccountGeneration {
                 add_created_accounts_to_pool: true,
                 max_account_working_set: 50_000_000,
                 creation_balance: 200_000_000,
+                replay_protection,
             },
             TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
                 use_account_pool: sender_use_account_pool,
                 pre_built: &PreBuiltPackagesImpl,
                 package_name: "simple".to_string(),
+                replay_protection,
             },
-            TransactionTypeArg::Batch100Transfer => {
-                TransactionType::BatchTransfer { batch_size: 100 }
+            TransactionTypeArg::Batch100Transfer => TransactionType::BatchTransfer {
+                batch_size: 100,
+                replay_protection,
             },
-            TransactionTypeArg::AccountResource32B => {
-                call_custom_module(EntryPoints::BytesMakeOrChange {
+            TransactionTypeArg::AccountResource32B => call_custom_module(
+                EntryPoints::BytesMakeOrChange {
                     data_length: Some(32),
-                })
-            },
-            TransactionTypeArg::AccountResource1KB => {
-                call_custom_module(EntryPoints::BytesMakeOrChange {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::AccountResource1KB => call_custom_module(
+                EntryPoints::BytesMakeOrChange {
                     data_length: Some(1024),
-                })
-            },
-            TransactionTypeArg::AccountResource10KB => {
-                call_custom_module(EntryPoints::BytesMakeOrChange {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::AccountResource10KB => call_custom_module(
+                EntryPoints::BytesMakeOrChange {
                     data_length: Some(10 * 1024),
-                })
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::ModifyGlobalResource => {
+                call_custom_module(EntryPoints::IncGlobal, replay_protection)
             },
-            TransactionTypeArg::ModifyGlobalResource => call_custom_module(EntryPoints::IncGlobal),
             TransactionTypeArg::ModifyGlobalResourceAggV2 => {
-                call_custom_module(EntryPoints::IncGlobalAggV2)
+                call_custom_module(EntryPoints::IncGlobalAggV2, replay_protection)
             },
             TransactionTypeArg::ModifyGlobalFlagAggV2 => call_custom_module(
                 // 100 is max, so equivalent to flag
                 EntryPoints::ModifyGlobalBoundedAggV2 { step: 100 },
+                replay_protection,
             ),
-            TransactionTypeArg::ModifyGlobalBoundedAggV2 => {
-                call_custom_module(EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 })
-            },
-            TransactionTypeArg::ModifyGlobalMilestoneAggV2 => {
-                call_custom_module(EntryPoints::IncGlobalMilestoneAggV2 {
+            TransactionTypeArg::ModifyGlobalBoundedAggV2 => call_custom_module(
+                EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 },
+                replay_protection,
+            ),
+            TransactionTypeArg::ModifyGlobalMilestoneAggV2 => call_custom_module(
+                EntryPoints::IncGlobalMilestoneAggV2 {
                     milestone_every: 1000,
-                })
-            },
+                },
+                replay_protection,
+            ),
             TransactionTypeArg::RepublishAndCall => TransactionType::CallCustomModulesMix {
                 entry_points: vec![
                     (Box::new(EntryPoints::Nop), 1),
@@ -182,118 +207,155 @@ impl TransactionTypeArg {
                 ],
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
+                replay_protection,
             },
-            TransactionTypeArg::NoOp => call_custom_module(EntryPoints::Nop),
-            TransactionTypeArg::NoOpFeePayer => call_custom_module(EntryPoints::NopFeePayer),
-            TransactionTypeArg::NoOp2Signers => call_custom_module(EntryPoints::Nop),
-            TransactionTypeArg::NoOp5Signers => call_custom_module(EntryPoints::Nop),
-            TransactionTypeArg::Loop100k => call_custom_module(EntryPoints::Loop {
-                loop_count: Some(100000),
-                loop_type: LoopType::NoOp,
-            }),
-            TransactionTypeArg::Loop10kArithmetic => call_custom_module(EntryPoints::Loop {
-                loop_count: Some(10000),
-                loop_type: LoopType::Arithmetic,
-            }),
-            TransactionTypeArg::Loop1kBcs1k => call_custom_module(EntryPoints::Loop {
-                loop_count: Some(1000),
-                loop_type: LoopType::BcsToBytes { len: 1024 },
-            }),
-            TransactionTypeArg::CreateObjects10 => call_custom_module(EntryPoints::CreateObjects {
-                num_objects: 10,
-                object_payload_size: 0,
-            }),
-            TransactionTypeArg::CreateObjects10WithPayload10k => {
-                call_custom_module(EntryPoints::CreateObjects {
+            TransactionTypeArg::NoOp => call_custom_module(EntryPoints::Nop, replay_protection),
+            TransactionTypeArg::NoOpFeePayer => {
+                call_custom_module(EntryPoints::NopFeePayer, replay_protection)
+            },
+            TransactionTypeArg::NoOp2Signers => {
+                call_custom_module(EntryPoints::Nop, replay_protection)
+            },
+            TransactionTypeArg::NoOp5Signers => {
+                call_custom_module(EntryPoints::Nop, replay_protection)
+            },
+            TransactionTypeArg::Loop100k => call_custom_module(
+                EntryPoints::Loop {
+                    loop_count: Some(100000),
+                    loop_type: LoopType::NoOp,
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::Loop10kArithmetic => call_custom_module(
+                EntryPoints::Loop {
+                    loop_count: Some(10000),
+                    loop_type: LoopType::Arithmetic,
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::Loop1kBcs1k => call_custom_module(
+                EntryPoints::Loop {
+                    loop_count: Some(1000),
+                    loop_type: LoopType::BcsToBytes { len: 1024 },
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::CreateObjects10 => call_custom_module(
+                EntryPoints::CreateObjects {
+                    num_objects: 10,
+                    object_payload_size: 0,
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::CreateObjects10WithPayload10k => call_custom_module(
+                EntryPoints::CreateObjects {
                     num_objects: 10,
                     object_payload_size: 10 * 1024,
-                })
-            },
-            TransactionTypeArg::CreateObjectsConflict10WithPayload10k => {
-                call_custom_module(EntryPoints::CreateObjectsConflict {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::CreateObjectsConflict10WithPayload10k => call_custom_module(
+                EntryPoints::CreateObjectsConflict {
                     num_objects: 10,
                     object_payload_size: 10 * 1024,
-                })
-            },
-            TransactionTypeArg::CreateObjects100 => {
-                call_custom_module(EntryPoints::CreateObjects {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::CreateObjects100 => call_custom_module(
+                EntryPoints::CreateObjects {
                     num_objects: 100,
                     object_payload_size: 0,
-                })
-            },
-            TransactionTypeArg::CreateObjects100WithPayload10k => {
-                call_custom_module(EntryPoints::CreateObjects {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::CreateObjects100WithPayload10k => call_custom_module(
+                EntryPoints::CreateObjects {
                     num_objects: 100,
                     object_payload_size: 10 * 1024,
-                })
-            },
-            TransactionTypeArg::CreateObjectsConflict100WithPayload10k => {
-                call_custom_module(EntryPoints::CreateObjectsConflict {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::CreateObjectsConflict100WithPayload10k => call_custom_module(
+                EntryPoints::CreateObjectsConflict {
                     num_objects: 100,
                     object_payload_size: 10 * 1024,
-                })
-            },
-            TransactionTypeArg::VectorTrimAppendLen3000Size1 => {
-                call_custom_module(EntryPoints::VectorTrimAppend {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::VectorTrimAppendLen3000Size1 => call_custom_module(
+                EntryPoints::VectorTrimAppend {
                     vec_len: 3000,
                     element_len: 1,
                     index: 100,
                     repeats: 1000,
-                })
-            },
-            TransactionTypeArg::VectorRemoveInsertLen3000Size1 => {
-                call_custom_module(EntryPoints::VectorRemoveInsert {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::VectorRemoveInsertLen3000Size1 => call_custom_module(
+                EntryPoints::VectorRemoveInsert {
                     vec_len: 3000,
                     element_len: 1,
                     index: 100,
                     repeats: 1000,
-                })
-            },
-            TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB => {
-                call_custom_module(EntryPoints::ResourceGroupsGlobalWriteTag {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB => call_custom_module(
+                EntryPoints::ResourceGroupsGlobalWriteTag {
                     string_length: 1024,
-                })
-            },
-            TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB => {
-                call_custom_module(EntryPoints::ResourceGroupsGlobalWriteAndReadTag {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB => call_custom_module(
+                EntryPoints::ResourceGroupsGlobalWriteAndReadTag {
                     string_length: 1024,
-                })
-            },
-            TransactionTypeArg::ResourceGroupsSenderWriteTag1KB => {
-                call_custom_module(EntryPoints::ResourceGroupsSenderWriteTag {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::ResourceGroupsSenderWriteTag1KB => call_custom_module(
+                EntryPoints::ResourceGroupsSenderWriteTag {
                     string_length: 1024,
-                })
-            },
-            TransactionTypeArg::ResourceGroupsSenderMultiChange1KB => {
-                call_custom_module(EntryPoints::ResourceGroupsSenderMultiChange {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::ResourceGroupsSenderMultiChange1KB => call_custom_module(
+                EntryPoints::ResourceGroupsSenderMultiChange {
                     string_length: 1024,
-                })
-            },
-            TransactionTypeArg::TokenV1NFTMintAndStoreSequential => {
-                call_custom_module(EntryPoints::TokenV1MintAndStoreNFTSequential)
-            },
-            TransactionTypeArg::TokenV1NFTMintAndTransferSequential => {
-                call_custom_module(EntryPoints::TokenV1MintAndTransferNFTSequential)
-            },
-            TransactionTypeArg::TokenV1NFTMintAndStoreParallel => {
-                call_custom_module(EntryPoints::TokenV1MintAndStoreNFTParallel)
-            },
-            TransactionTypeArg::TokenV1NFTMintAndTransferParallel => {
-                call_custom_module(EntryPoints::TokenV1MintAndTransferNFTParallel)
-            },
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::TokenV1NFTMintAndStoreSequential => call_custom_module(
+                EntryPoints::TokenV1MintAndStoreNFTSequential,
+                replay_protection,
+            ),
+            TransactionTypeArg::TokenV1NFTMintAndTransferSequential => call_custom_module(
+                EntryPoints::TokenV1MintAndTransferNFTSequential,
+                replay_protection,
+            ),
+            TransactionTypeArg::TokenV1NFTMintAndStoreParallel => call_custom_module(
+                EntryPoints::TokenV1MintAndStoreNFTParallel,
+                replay_protection,
+            ),
+            TransactionTypeArg::TokenV1NFTMintAndTransferParallel => call_custom_module(
+                EntryPoints::TokenV1MintAndTransferNFTParallel,
+                replay_protection,
+            ),
             TransactionTypeArg::TokenV1FTMintAndStore => {
-                call_custom_module(EntryPoints::TokenV1MintAndStoreFT)
+                call_custom_module(EntryPoints::TokenV1MintAndStoreFT, replay_protection)
             },
             TransactionTypeArg::TokenV1FTMintAndTransfer => {
-                call_custom_module(EntryPoints::TokenV1MintAndTransferFT)
+                call_custom_module(EntryPoints::TokenV1MintAndTransferFT, replay_protection)
             },
-            TransactionTypeArg::CoinInitAndMint => call_custom_module(EntryPoints::CoinInitAndMint),
+            TransactionTypeArg::CoinInitAndMint => {
+                call_custom_module(EntryPoints::CoinInitAndMint, replay_protection)
+            },
             TransactionTypeArg::FungibleAssetMint => {
-                call_custom_module(EntryPoints::FungibleAssetMint)
+                call_custom_module(EntryPoints::FungibleAssetMint, replay_protection)
             },
-            TransactionTypeArg::TokenV2AmbassadorMint => {
-                call_custom_module(EntryPoints::TokenV2AmbassadorMint { numbered: true })
-            },
+            TransactionTypeArg::TokenV2AmbassadorMint => call_custom_module(
+                EntryPoints::TokenV2AmbassadorMint { numbered: true },
+                replay_protection,
+            ),
             TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
                 workflow_kind: Box::new(TokenWorkflowKind::CreateMintBurn {
                     count: 10000,
@@ -302,68 +364,85 @@ impl TransactionTypeArg {
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
+                replay_protection,
             },
-            TransactionTypeArg::LiquidityPoolSwap => {
-                call_custom_module(EntryPoints::LiquidityPoolSwap { is_stable: false })
-            },
-            TransactionTypeArg::LiquidityPoolSwapStable => {
-                call_custom_module(EntryPoints::LiquidityPoolSwap { is_stable: true })
-            },
-            TransactionTypeArg::VectorPictureCreate30k => {
-                call_custom_module(EntryPoints::InitializeVectorPicture { length: 30 * 1024 })
-            },
-            TransactionTypeArg::VectorPicture30k => {
-                call_custom_module(EntryPoints::VectorPicture { length: 30 * 1024 })
-            },
-            TransactionTypeArg::VectorPictureRead30k => {
-                call_custom_module(EntryPoints::VectorPictureRead { length: 30 * 1024 })
-            },
-            TransactionTypeArg::VectorPictureCreate40 => {
-                call_custom_module(EntryPoints::InitializeVectorPicture { length: 40 })
-            },
+            TransactionTypeArg::LiquidityPoolSwap => call_custom_module(
+                EntryPoints::LiquidityPoolSwap { is_stable: false },
+                replay_protection,
+            ),
+            TransactionTypeArg::LiquidityPoolSwapStable => call_custom_module(
+                EntryPoints::LiquidityPoolSwap { is_stable: true },
+                replay_protection,
+            ),
+            TransactionTypeArg::VectorPictureCreate30k => call_custom_module(
+                EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
+                replay_protection,
+            ),
+            TransactionTypeArg::VectorPicture30k => call_custom_module(
+                EntryPoints::VectorPicture { length: 30 * 1024 },
+                replay_protection,
+            ),
+            TransactionTypeArg::VectorPictureRead30k => call_custom_module(
+                EntryPoints::VectorPictureRead { length: 30 * 1024 },
+                replay_protection,
+            ),
+            TransactionTypeArg::VectorPictureCreate40 => call_custom_module(
+                EntryPoints::InitializeVectorPicture { length: 40 },
+                replay_protection,
+            ),
             TransactionTypeArg::VectorPicture40 => {
-                call_custom_module(EntryPoints::VectorPicture { length: 40 })
+                call_custom_module(EntryPoints::VectorPicture { length: 40 }, replay_protection)
             },
-            TransactionTypeArg::VectorPictureRead40 => {
-                call_custom_module(EntryPoints::VectorPictureRead { length: 40 })
-            },
-            TransactionTypeArg::SmartTablePicture30KWith200Change => {
-                call_custom_module(EntryPoints::SmartTablePicture {
+            TransactionTypeArg::VectorPictureRead40 => call_custom_module(
+                EntryPoints::VectorPictureRead { length: 40 },
+                replay_protection,
+            ),
+            TransactionTypeArg::SmartTablePicture30KWith200Change => call_custom_module(
+                EntryPoints::SmartTablePicture {
                     length: 30 * 1024,
                     num_points_per_txn: 200,
-                })
-            },
-            TransactionTypeArg::SmartTablePicture1MWith256Change => {
-                call_custom_module(EntryPoints::SmartTablePicture {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::SmartTablePicture1MWith256Change => call_custom_module(
+                EntryPoints::SmartTablePicture {
                     length: 1024 * 1024,
                     num_points_per_txn: 256,
-                })
-            },
-            TransactionTypeArg::SmartTablePicture1BWith256Change => {
-                call_custom_module(EntryPoints::SmartTablePicture {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::SmartTablePicture1BWith256Change => call_custom_module(
+                EntryPoints::SmartTablePicture {
                     length: 1024 * 1024 * 1024,
                     num_points_per_txn: 256,
-                })
-            },
-            TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit => {
-                call_custom_module(EntryPoints::SmartTablePicture {
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit => call_custom_module(
+                EntryPoints::SmartTablePicture {
                     length: 1024 * 1024,
                     num_points_per_txn: 1024,
-                })
+                },
+                replay_protection,
+            ),
+            TransactionTypeArg::DeserializeU256 => {
+                call_custom_module(EntryPoints::DeserializeU256, replay_protection)
             },
-            TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
-            TransactionTypeArg::SimpleScript => call_custom_module(EntryPoints::SimpleScript),
-            TransactionTypeArg::APTTransferWithPermissionedSigner => {
-                call_custom_module(EntryPoints::APTTransferWithPermissionedSigner)
+            TransactionTypeArg::SimpleScript => {
+                call_custom_module(EntryPoints::SimpleScript, replay_protection)
             },
+            TransactionTypeArg::APTTransferWithPermissionedSigner => call_custom_module(
+                EntryPoints::APTTransferWithPermissionedSigner,
+                replay_protection,
+            ),
             TransactionTypeArg::APTTransferWithMasterSigner => {
-                call_custom_module(EntryPoints::APTTransferWithMasterSigner)
+                call_custom_module(EntryPoints::APTTransferWithMasterSigner, replay_protection)
             },
         }
     }
 
     pub fn args_to_transaction_mix_per_phase(
-        transaction_types: &[TransactionTypeArg],
+        transaction_types: &[(TransactionTypeArg, ReplayProtectionType)],
         transaction_weights: &[usize],
         transaction_phases: &[usize],
         module_working_set_size: usize,
@@ -372,11 +451,12 @@ impl TransactionTypeArg {
     ) -> Vec<Vec<(TransactionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
-            .map(|t| {
+            .map(|(t, replay_protection)| {
                 t.materialize(
                     module_working_set_size,
                     sender_use_account_pool,
                     workflow_progress_type,
+                    *replay_protection,
                 )
             })
             .collect::<Vec<_>>();
@@ -457,12 +537,26 @@ pub struct EmitWorkloadArgs {
 
     #[clap(long, num_args = 0..)]
     pub transaction_phases: Vec<usize>,
+
+    #[clap(long, value_enum, default_value = "sequence-number", num_args = 1.., ignore_case = true)]
+    pub replay_protection_type: Vec<ReplayProtectionType>,
 }
 
 impl EmitWorkloadArgs {
     pub fn args_to_transaction_mix_per_phase(&self) -> Vec<Vec<(TransactionType, usize)>> {
+        assert_eq!(
+            self.transaction_type.len(),
+            self.replay_protection_type.len(),
+            "Transaction types and replay protection types need to be the same length"
+        );
+        let transaction_types = self
+            .transaction_type
+            .iter()
+            .zip(self.replay_protection_type.iter())
+            .map(|(t, r)| (*t, *r))
+            .collect::<Vec<_>>();
         TransactionTypeArg::args_to_transaction_mix_per_phase(
-            &self.transaction_type,
+            &transaction_types,
             &self.transaction_weights,
             &self.transaction_phases,
             self.module_working_set_size.unwrap_or(1),

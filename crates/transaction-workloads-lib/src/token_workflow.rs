@@ -30,6 +30,7 @@ impl WorkflowKind for TokenWorkflowKind {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> WorkflowTxnGeneratorCreator {
         match self {
             TokenWorkflowKind::CreateMintBurn {
