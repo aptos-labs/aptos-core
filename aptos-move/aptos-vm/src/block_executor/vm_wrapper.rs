@@ -21,7 +21,7 @@ use aptos_vm_types::{
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
-pub(crate) struct AptosExecutorTask {
+pub struct AptosExecutorTask {
     vm: AptosVM,
     id: StateViewId,
 }
