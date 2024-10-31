@@ -3304,12 +3304,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     args,
                     matches!(kind, ModelCallKind::Regular | ModelCallKind::Receiver),
                 );
-                let fun_t = Type::Fun(
-                    Box::new(Type::tuple(arg_types.clone())),
-                    Box::new(expected_type.clone()),
-                    AbilitySet::FUNCTIONS,
-                );
-                let sym_ty = self.check_type(loc, &sym_ty, &fun_t, context);
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var_exp = ExpData::LocalVar(local_id, sym);
                 return Some(self.translate_curry_or_call(
