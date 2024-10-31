@@ -87,21 +87,38 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
     (vec![genesis_block, a1, a2, a3, b1, b2, c1], block_store)
 }
 
-pub fn build_empty_tree() -> Arc<BlockStore> {
+fn build_empty_tree_inner(window_size: usize, max_pruned_blocks_in_mem: usize) -> BlockStore {
     let (initial_data, storage) = EmptyStorage::start_for_testing();
-    Arc::new(BlockStore::new(
+    BlockStore::new(
         storage,
         initial_data,
         Arc::new(DummyExecutionClient),
-        10, // max pruned blocks in mem
+        max_pruned_blocks_in_mem, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
-        1,
+        window_size,
         Arc::new(Mutex::new(PendingBlocks::new())),
         None,
+    )
+}
+
+pub fn build_default_empty_tree() -> Arc<BlockStore> {
+    let window_size: usize = 1;
+    let max_pruned_blocks_in_mem: usize = 10;
+    Arc::new(build_empty_tree_inner(
+        window_size,
+        max_pruned_blocks_in_mem,
     ))
+}
+
+pub fn build_custom_empty_tree(
+    window_size: usize,
+    max_pruned_blocks_in_mem: usize,
+) -> Arc<BlockStore> {
+    let block_store = build_empty_tree_inner(window_size, max_pruned_blocks_in_mem);
+    Arc::new(block_store)
 }
 
 pub struct TreeInserter {
@@ -115,7 +132,19 @@ impl TreeInserter {
     }
 
     pub fn new(signer: ValidatorSigner) -> Self {
-        let block_store = build_empty_tree();
+        let block_store = build_default_empty_tree();
+        Self {
+            signer,
+            block_store,
+        }
+    }
+
+    pub fn new_with_params(
+        signer: ValidatorSigner,
+        window_size: usize,
+        max_pruned_blocks_in_mem: usize,
+    ) -> Self {
+        let block_store = build_custom_empty_tree(window_size, max_pruned_blocks_in_mem);
         Self {
             signer,
             block_store,
