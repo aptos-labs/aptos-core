@@ -55,7 +55,7 @@ module std::bit_vector {
 
     /// Set the bit at `bit_index` in the `self` regardless of its previous state.
     public fun set(self: &mut BitVector, bit_index: u64) {
-        assert!(bit_index < self.length(), EINDEX);
+        assert!(bit_index < vector::length(&self.bit_field), EINDEX);
         let x = vector::borrow_mut(&mut self.bit_field, bit_index);
         *x = true;
     }
