@@ -444,6 +444,7 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
 fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
     if let Transaction::UserTransaction(inner) = txn {
         // Find event with proposal id
+        println!("bowu Events: {:?}", inner.events);
         let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
             event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
         }) {
