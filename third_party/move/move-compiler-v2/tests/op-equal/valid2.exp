@@ -51,13 +51,13 @@ module 0xc0ffee::m {
 ============ initial bytecode ================
 
 [variant baseline]
-fun m::foo($t0: &mut m::S): u64 {
+fun m::foo($t0: &mut 0xc0ffee::m::S): u64 {
      var $t1: u64
      var $t2: &mut u64
      var $t3: u64
      var $t4: u64
      var $t5: u64
-  0: $t2 := borrow_field<m::S>.x($t0)
+  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
   1: $t4 := read_ref($t2)
   2: $t5 := 1
   3: $t3 := +($t4, $t5)
@@ -70,27 +70,27 @@ fun m::foo($t0: &mut m::S): u64 {
 [variant baseline]
 public fun m::test(): u64 {
      var $t0: u64
-     var $t1: m::S
+     var $t1: 0xc0ffee::m::S
      var $t2: u64
      var $t3: u64
-     var $t4: &mut m::S
+     var $t4: &mut 0xc0ffee::m::S
      var $t5: &mut u64
-     var $t6: &mut m::S
+     var $t6: &mut 0xc0ffee::m::S
      var $t7: u64
      var $t8: u64
-     var $t9: &m::S
+     var $t9: &0xc0ffee::m::S
      var $t10: &u64
   0: $t2 := 0
-  1: $t1 := pack m::S($t2)
+  1: $t1 := pack 0xc0ffee::m::S($t2)
   2: $t4 := borrow_local($t1)
   3: $t3 := m::foo($t4)
   4: $t6 := borrow_local($t1)
-  5: $t5 := borrow_field<m::S>.x($t6)
+  5: $t5 := borrow_field<0xc0ffee::m::S>.x($t6)
   6: $t8 := read_ref($t5)
   7: $t7 := +($t8, $t3)
   8: write_ref($t5, $t7)
   9: $t9 := borrow_local($t1)
- 10: $t10 := borrow_field<m::S>.x($t9)
+ 10: $t10 := borrow_field<0xc0ffee::m::S>.x($t9)
  11: $t0 := read_ref($t10)
  12: return $t0
 }
@@ -98,14 +98,14 @@ public fun m::test(): u64 {
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun m::foo($t0: &mut m::S): u64 {
+fun m::foo($t0: &mut 0xc0ffee::m::S): u64 {
      var $t1: u64 [unused]
      var $t2: &mut u64
      var $t3: u64 [unused]
      var $t4: u64
      var $t5: u64
      # live vars: $t0
-  0: $t2 := borrow_field<m::S>.x($t0)
+  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
      # live vars: $t2
   1: $t4 := read_ref($t2)
      # live vars: $t2, $t4
@@ -124,20 +124,20 @@ fun m::foo($t0: &mut m::S): u64 {
 [variant baseline]
 public fun m::test(): u64 {
      var $t0: u64 [unused]
-     var $t1: m::S
+     var $t1: 0xc0ffee::m::S
      var $t2: u64
      var $t3: u64 [unused]
-     var $t4: &mut m::S
+     var $t4: &mut 0xc0ffee::m::S
      var $t5: &mut u64
-     var $t6: &mut m::S [unused]
+     var $t6: &mut 0xc0ffee::m::S [unused]
      var $t7: u64 [unused]
      var $t8: u64
-     var $t9: &m::S
+     var $t9: &0xc0ffee::m::S
      var $t10: &u64
      # live vars:
   0: $t2 := 0
      # live vars: $t2
-  1: $t1 := pack m::S($t2)
+  1: $t1 := pack 0xc0ffee::m::S($t2)
      # live vars: $t1
   2: $t4 := borrow_local($t1)
      # live vars: $t1, $t4
@@ -145,7 +145,7 @@ public fun m::test(): u64 {
      # live vars: $t1, $t2
   4: $t4 := borrow_local($t1)
      # live vars: $t1, $t2, $t4
-  5: $t5 := borrow_field<m::S>.x($t4)
+  5: $t5 := borrow_field<0xc0ffee::m::S>.x($t4)
      # live vars: $t1, $t2, $t5
   6: $t8 := read_ref($t5)
      # live vars: $t1, $t2, $t5, $t8
@@ -155,7 +155,7 @@ public fun m::test(): u64 {
      # live vars: $t1
   9: $t9 := borrow_local($t1)
      # live vars: $t9
- 10: $t10 := borrow_field<m::S>.x($t9)
+ 10: $t10 := borrow_field<0xc0ffee::m::S>.x($t9)
      # live vars: $t10
  11: $t2 := read_ref($t10)
      # live vars: $t2

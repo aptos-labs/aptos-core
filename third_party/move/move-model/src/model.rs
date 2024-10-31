@@ -200,13 +200,21 @@ impl Loc {
             && self.inlined_from_loc == other.inlined_from_loc
             && GlobalEnv::enclosing_span(self.span, other.span)
     }
+
+    /// Returns true if this location is the default one.
+    pub fn is_default(&self) -> bool {
+        *self == Loc::default()
+    }
 }
 
 impl Default for Loc {
     fn default() -> Self {
-        let mut files = Files::new();
-        let dummy_id = files.add(String::new(), String::new());
-        Loc::new(dummy_id, Span::default())
+        static DEFAULT: Lazy<Loc> = Lazy::new(|| {
+            let mut files = Files::new();
+            let dummy_id = files.add(String::new(), String::new());
+            Loc::new(dummy_id, Span::default())
+        });
+        DEFAULT.clone()
     }
 }
 

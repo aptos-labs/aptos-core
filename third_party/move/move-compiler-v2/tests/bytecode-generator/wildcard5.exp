@@ -31,15 +31,15 @@ module 0xc0ffee::m {
 
 [variant baseline]
 public fun m::test() {
-     var $t0: m::S
+     var $t0: 0xc0ffee::m::S
      var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
   0: $t1 := 3
   1: $t2 := 4
-  2: $t0 := pack m::S($t1, $t2)
-  3: ($t3, $t4) := unpack m::S($t0)
+  2: $t0 := pack 0xc0ffee::m::S($t1, $t2)
+  3: ($t3, $t4) := unpack 0xc0ffee::m::S($t0)
   4: return ()
 }
 

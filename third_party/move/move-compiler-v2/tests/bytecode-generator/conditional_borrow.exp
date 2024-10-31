@@ -259,49 +259,49 @@ fun M::test1($t0: u64): u64 {
 
 
 [variant baseline]
-fun M::test1b($t0: M::S): u64 {
+fun M::test1b($t0: 0x8675::M::S): u64 {
      var $t1: u64
-     var $t2: M::S
+     var $t2: 0x8675::M::S
      var $t3: u64
-     var $t4: &mut M::S
-     var $t5: M::S
+     var $t4: &mut 0x8675::M::S
+     var $t5: 0x8675::M::S
      var $t6: bool
      var $t7: u64
-     var $t8: &M::S
+     var $t8: &0x8675::M::S
      var $t9: &u64
      var $t10: u64
      var $t11: u64
      var $t12: &mut u64
-     var $t13: M::S
-     var $t14: &mut M::S
-     var $t15: M::S
-     var $t16: &mut M::S
+     var $t13: 0x8675::M::S
+     var $t14: &mut 0x8675::M::S
+     var $t15: 0x8675::M::S
+     var $t16: &mut 0x8675::M::S
      var $t17: u64
      var $t18: u64
-     var $t19: M::S
-     var $t20: &M::S
+     var $t19: 0x8675::M::S
+     var $t20: &0x8675::M::S
      var $t21: &u64
      var $t22: u64
      var $t23: &mut u64
-     var $t24: M::S
-     var $t25: &mut M::S
-     var $t26: M::S
+     var $t24: 0x8675::M::S
+     var $t25: &mut 0x8675::M::S
+     var $t26: 0x8675::M::S
      var $t27: &mut u64
-     var $t28: &mut M::S
+     var $t28: &mut 0x8675::M::S
      var $t29: u64
      var $t30: u64
      var $t31: u64
-     var $t32: M::S
+     var $t32: 0x8675::M::S
      var $t33: &mut u64
      var $t34: u64
-     var $t35: &M::S
+     var $t35: &0x8675::M::S
      var $t36: &u64
      var $t37: u64
      var $t38: u64
      var $t39: u64
      var $t40: &mut u64
      var $t41: u64
-     var $t42: &M::S
+     var $t42: &0x8675::M::S
      var $t43: &u64
      var $t44: u64
      var $t45: u64
@@ -309,17 +309,17 @@ fun M::test1b($t0: M::S): u64 {
      var $t47: &mut u64
      var $t48: u64
      var $t49: u64
-     var $t50: &M::S
+     var $t50: &0x8675::M::S
      var $t51: &u64
      var $t52: u64
      var $t53: u64
      var $t54: u64
-     var $t55: &M::S
+     var $t55: &0x8675::M::S
      var $t56: &u64
   0: $t3 := 3
-  1: $t2 := pack M::S($t3)
+  1: $t2 := pack 0x8675::M::S($t3)
   2: $t8 := borrow_local($t0)
-  3: $t9 := borrow_field<M::S>.f($t8)
+  3: $t9 := borrow_field<0x8675::M::S>.f($t8)
   4: $t7 := read_ref($t9)
   5: $t10 := 4
   6: $t6 := <($t7, $t10)
@@ -334,30 +334,30 @@ fun M::test1b($t0: M::S): u64 {
  15: $t11 := 10
  16: $t13 := read_ref($t4)
  17: $t14 := borrow_local($t13)
- 18: $t12 := borrow_field<M::S>.f($t14)
+ 18: $t12 := borrow_field<0x8675::M::S>.f($t14)
  19: write_ref($t12, $t11)
  20: $t15 := infer($t0)
  21: $t16 := borrow_local($t15)
  22: $t19 := read_ref($t16)
  23: $t20 := borrow_local($t19)
- 24: $t21 := borrow_field<M::S>.f($t20)
+ 24: $t21 := borrow_field<0x8675::M::S>.f($t20)
  25: $t18 := read_ref($t21)
  26: $t22 := 1
  27: $t17 := +($t18, $t22)
  28: $t24 := read_ref($t16)
  29: $t25 := borrow_local($t24)
- 30: $t23 := borrow_field<M::S>.f($t25)
+ 30: $t23 := borrow_field<0x8675::M::S>.f($t25)
  31: write_ref($t23, $t17)
  32: $t26 := infer($t15)
  33: $t28 := borrow_local($t26)
- 34: $t27 := borrow_field<M::S>.f($t28)
+ 34: $t27 := borrow_field<0x8675::M::S>.f($t28)
  35: $t30 := read_ref($t27)
  36: $t31 := 1
  37: $t29 := +($t30, $t31)
  38: write_ref($t27, $t29)
  39: $t32 := infer($t26)
  40: $t35 := borrow_local($t32)
- 41: $t36 := borrow_field<M::S>.f($t35)
+ 41: $t36 := borrow_field<0x8675::M::S>.f($t35)
  42: $t34 := read_ref($t36)
  43: $t33 := borrow_local($t34)
  44: $t38 := read_ref($t33)
@@ -365,7 +365,7 @@ fun M::test1b($t0: M::S): u64 {
  46: $t37 := +($t38, $t39)
  47: write_ref($t33, $t37)
  48: $t42 := borrow_local($t32)
- 49: $t43 := borrow_field<M::S>.f($t42)
+ 49: $t43 := borrow_field<0x8675::M::S>.f($t42)
  50: $t41 := read_ref($t43)
  51: $t40 := borrow_local($t41)
  52: $t45 := read_ref($t40)
@@ -374,7 +374,7 @@ fun M::test1b($t0: M::S): u64 {
  55: write_ref($t40, $t44)
  56: $t49 := 3
  57: $t50 := borrow_local($t32)
- 58: $t51 := borrow_field<M::S>.f($t50)
+ 58: $t51 := borrow_field<0x8675::M::S>.f($t50)
  59: $t48 := read_ref($t51)
  60: $t47 := borrow_local($t48)
  61: $t53 := read_ref($t47)
@@ -382,7 +382,7 @@ fun M::test1b($t0: M::S): u64 {
  63: $t52 := +($t53, $t54)
  64: write_ref($t47, $t52)
  65: $t55 := borrow_local($t32)
- 66: $t56 := borrow_field<M::S>.f($t55)
+ 66: $t56 := borrow_field<0x8675::M::S>.f($t55)
  67: $t1 := read_ref($t56)
  68: return $t1
 }
@@ -392,16 +392,16 @@ fun M::test1b($t0: M::S): u64 {
 public fun M::testb(): u64 {
      var $t0: u64
      var $t1: u64
-     var $t2: M::S
+     var $t2: 0x8675::M::S
      var $t3: u64
      var $t4: u64
-     var $t5: M::S
+     var $t5: 0x8675::M::S
      var $t6: u64
   0: $t3 := 7
-  1: $t2 := pack M::S($t3)
+  1: $t2 := pack 0x8675::M::S($t3)
   2: $t1 := M::test1b($t2)
   3: $t6 := 2
-  4: $t5 := pack M::S($t6)
+  4: $t5 := pack 0x8675::M::S($t6)
   5: $t4 := M::test1b($t5)
   6: $t0 := +($t1, $t4)
   7: return $t0

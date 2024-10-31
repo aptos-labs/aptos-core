@@ -1,153 +1,117 @@
 
 Diagnostics:
 error: type `|u64|u64` is missing required ability `store`
-  ┌─ <unknown>:1:1
-  │
-1 │ <unknown>
-  │ ^
-
-error: cannot return `&_` from a function with result type `|u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:24:13
+   ┌─ tests/lambda/storable/return_func.move:21:9
    │
-24 │             &double
-   │             ^^^^^^^
+21 │         multiply(x, _)
+   │         ^^^^^^^^^^^^^^
 
-error: cannot return `&_` from a function with result type `|u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:26:13
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:36:13
    │
-26 │             &triple
-   │             ^^^^^^^
+36 │             move |x| double(x)
+   │             ^^^^^^^^^^^^^^^^^^
 
-error: cannot return nothing from a function with result type `|u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:34:31
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:38:13
    │
-34 │             move |x| double(x);
-   │                               ^
+38 │             move |x| triple(x)
+   │             ^^^^^^^^^^^^^^^^^^
 
-error: cannot return nothing from a function with result type `|u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:36:31
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:41:13
    │
-36 │             move |x| triple(x);
-   │                               ^
+41 │             move |x| f(x)
+   │             ^^^^^^^^^^^^^
 
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:75:9
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:44:13
    │
-75 │         sum.push_back(choose_function(0)(x));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 │             move |x| f(x)
+   │             ^^^^^^^^^^^^^
 
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:76:9
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:47:13
    │
-76 │         sum.push_back(choose_function(1)(x));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+47 │             f
+   │             ^
 
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:77:9
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:49:13
    │
-77 │         sum.push_back(choose_function(2)(x));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+49 │             multiply(_, 7)
+   │             ^^^^^^^^^^^^^^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:52:13
+   │
+52 │             move |x| f(x)
+   │             ^^^^^^^^^^^^^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:55:13
+   │
+55 │             move |x| f(x)
+   │             ^^^^^^^^^^^^^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:57:13
+   │
+57 │             multiply3(_, 3, 4)
+   │             ^^^^^^^^^^^^^^^^^^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:64:13
+   │
+64 │             f
+   │             ^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:67:13
+   │
+67 │             g
+   │             ^
 
 error: expected `|integer|_` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:83:23
+   ┌─ tests/lambda/storable/return_func.move:85:37
    │
-83 │         sum.push_back(f(5));
-   │                       ^^^^
-
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:83:9
-   │
-83 │         sum.push_back(f(5));
-   │         ^^^^^^^^^^^^^^^^^^^
+85 │         vector::push_back(&mut sum, f(5));
+   │                                     ^^^^
 
 error: expected `|integer|_` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:84:23
+   ┌─ tests/lambda/storable/return_func.move:86:37
    │
-84 │         sum.push_back(g(7));
-   │                       ^^^^
-
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:84:9
-   │
-84 │         sum.push_back(g(7));
-   │         ^^^^^^^^^^^^^^^^^^^
+86 │         vector::push_back(&mut sum, g(7));
+   │                                     ^^^^
 
 error: expected `|integer|_` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:85:23
+   ┌─ tests/lambda/storable/return_func.move:87:37
    │
-85 │         sum.push_back(h(6));
-   │                       ^^^^
-
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:85:9
-   │
-85 │         sum.push_back(h(6));
-   │         ^^^^^^^^^^^^^^^^^^^
+87 │         vector::push_back(&mut sum, h(6));
+   │                                     ^^^^
 
 error: function type `|u64|u64:store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/return_func.move:87:21
+   ┌─ tests/lambda/storable/return_func.move:89:21
    │
-87 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
+89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
    │                     ^^^^^^
    │
    = required by instantiating vector type parameter
 
 error: expected `vector<_>` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:88:23
+   ┌─ tests/lambda/storable/return_func.move:90:37
    │
-88 │         sum.push_back(f[0](9));
-   │                       ^
-
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:88:9
-   │
-88 │         sum.push_back(f[0](9));
-   │         ^^^^^^^^^^^^^^^^^^^^^^
+90 │         vector::push_back(&mut sum, f[0](9));
+   │                                     ^
 
 error: expected `vector<_>` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:89:23
+   ┌─ tests/lambda/storable/return_func.move:91:37
    │
-89 │         sum.push_back(f[1](11));
-   │                       ^
-
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:89:9
-   │
-89 │         sum.push_back(f[1](11));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^
+91 │         vector::push_back(&mut sum, f[1](11));
+   │                                     ^
 
 error: expected `vector<_>` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:90:23
+   ┌─ tests/lambda/storable/return_func.move:92:37
    │
-90 │         sum.push_back(f[2](13));
-   │                       ^
-
-error: undeclared receiver function `push_back` for type `vector<_>`
-   ┌─ tests/lambda/storable/return_func.move:90:9
-   │
-90 │         sum.push_back(f[2](13));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^
-
-error: expected `bool` but found a value of type `vector<u64>`
-   ┌─ tests/lambda/storable/return_func.move:92:17
-   │
-92 │         assert!(vector<u64>[6, 9, 12, 10, 21, 24, 18, 33, 52])
-   │                 ^^^^^^
-
-error: cannot pass `&|u64||u64|u64:store:copy+drop+store` to a function which expects argument of type `|u64||u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:96:24
-   │
-96 │         test_functions(&choose_function);
-   │                        ^^^^^^^^^^^^^^^^
-
-error: cannot pass `&|u64||u64|u64:store:copy+drop+store` to a function which expects argument of type `|u64||u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:97:24
-   │
-97 │         test_functions(&choose_function2);
-   │                        ^^^^^^^^^^^^^^^^^
-
-error: cannot pass `&|u64||u64|u64:store:copy+drop+store` to a function which expects argument of type `|u64||u64|u64:store`
-   ┌─ tests/lambda/storable/return_func.move:98:24
-   │
-98 │         test_functions(&choose_function3);
-   │                        ^^^^^^^^^^^^^^^^^
+92 │         vector::push_back(&mut sum, f[2](13));
+   │                                     ^

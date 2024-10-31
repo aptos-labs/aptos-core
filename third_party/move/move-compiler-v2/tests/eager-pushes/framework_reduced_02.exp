@@ -1,29 +1,29 @@
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: &m::S, $t4: u64): m::Wrap {
-     var $t5: m::Wrap
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: &0xc0ffee::m::S, $t4: u64): 0xc0ffee::m::Wrap {
+     var $t5: 0xc0ffee::m::Wrap
      var $t6: u64
      var $t7: &u64
-  0: $t7 := borrow_field<m::S>.x($t3)
+  0: $t7 := borrow_field<0xc0ffee::m::S>.x($t3)
   1: $t6 := read_ref($t7)
-  2: $t5 := pack m::Wrap($t0, $t1, $t2, $t6, $t4)
+  2: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t6, $t4)
   3: return $t5
 }
 
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: &m::S, $t4: u64): m::Wrap {
-     var $t5: m::Wrap
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: &0xc0ffee::m::S, $t4: u64): 0xc0ffee::m::Wrap {
+     var $t5: 0xc0ffee::m::Wrap
      var $t6: u64
      var $t7: &u64
      # live vars: $t0, $t1, $t2, $t3, $t4
-  0: $t7 := borrow_field<m::S>.x($t3)
+  0: $t7 := borrow_field<0xc0ffee::m::S>.x($t3)
      # live vars: $t0, $t1, $t2, $t4, $t7
   1: $t6 := read_ref($t7)
      # live vars: $t0, $t1, $t2, $t4, $t6
-  2: $t5 := pack m::Wrap($t0, $t1, $t2, $t6, $t4)
+  2: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t6, $t4)
      # live vars: $t5
   3: return $t5
 }

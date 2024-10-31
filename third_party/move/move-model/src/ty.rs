@@ -3020,6 +3020,7 @@ impl TypeUnificationError {
             | TypeUnificationError::MissingAbilities(loc, ..) => Some(loc.clone()),
             _ => None,
         }
+        .and_then(|loc| if loc.is_default() { None } else { Some(loc) })
     }
 
     /// Return the message for this error.
@@ -3720,19 +3721,20 @@ impl<'a> TypeDisplay<'a> {
             let qsym = builder_table.get(&(mid, sid)).expect("type known");
             qsym.display(self.context.env).to_string()
         } else {
-            let struct_env_opt = env
-                .get_module_opt(mid)
-                .map(|mod_env| mod_env.into_struct(sid));
-            let module_name_str = struct_env_opt
-                .clone()
-                .map(|struct_env| struct_env.module_env.get_name().display(env).to_string())
-                .unwrap_or_else(|| "None".to_string());
+            let struct_env = env.get_module(mid).into_struct(sid);
+            let module_name = struct_env.module_env.get_name();
+            let module_str = if self.context.use_module_qualification
+                || self.context.used_modules.contains(&mid)
+                || Some(module_name) == self.context.module_name.as_ref()
+            {
+                module_name.display(env).to_string()
+            } else {
+                module_name.display_full(env).to_string()
+            };
             format!(
                 "{}::{}",
-                module_name_str,
-                struct_env_opt
-                    .map(|struct_env| struct_env.get_name().display(env.symbol_pool()).to_string())
-                    .unwrap_or_else(|| "None".to_string())
+                module_str,
+                struct_env.get_name().display(env.symbol_pool())
             )
         };
         if !self.context.use_module_qualification {

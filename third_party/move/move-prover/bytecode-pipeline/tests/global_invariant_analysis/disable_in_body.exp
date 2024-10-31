@@ -4,11 +4,11 @@
 fun DisableInv::foo($t0|s: &signer) {
      var $t1: &signer
      var $t2: bool
-     var $t3: DisableInv::R2
+     var $t3: 0x1::DisableInv::R2
   0: $t1 := move($t0)
   1: $t2 := false
-  2: $t3 := pack DisableInv::R2($t2)
-  3: move_to<DisableInv::R2>($t3, $t1)
+  2: $t3 := pack 0x1::DisableInv::R2($t2)
+  3: move_to<0x1::DisableInv::R2>($t3, $t1)
   4: return ()
 }
 
@@ -17,11 +17,11 @@ fun DisableInv::foo($t0|s: &signer) {
 [variant verification]
 fun DisableInv::foo($t0|s: signer) {
      var $t1: bool
-     var $t2: DisableInv::R2
+     var $t2: 0x1::DisableInv::R2
      var $t3: num
   0: $t1 := false
-  1: $t2 := pack DisableInv::R2($t1)
-  2: move_to<DisableInv::R2>($t2, $t0) on_abort goto 5 with $t3
+  1: $t2 := pack 0x1::DisableInv::R2($t1)
+  2: move_to<0x1::DisableInv::R2>($t2, $t0) on_abort goto 5 with $t3
   3: label L1
   4: return ()
   5: label L2
@@ -39,7 +39,7 @@ DisableInv::foo: [
       ]
     ]
   }
-  2: move_to<DisableInv::R2>($t2, $t0) on_abort goto L2 with $t3 {}
+  2: move_to<0x1::DisableInv::R2>($t2, $t0) on_abort goto L2 with $t3 {}
   exitpoint {
     assert @0 = [
       <> -> [
