@@ -450,7 +450,8 @@ impl FatLoopBuilder {
         cfg: &StacklessControlFlowGraph,
         sub_loops: &[NaturalLoop<BlockId>],
     ) -> Vec<Vec<Bytecode>> {
-        sub_loops
+        let mut id_label_map = BTreeMap::new();
+        let blocks: Vec<(BlockId, Vec<Bytecode>)> = sub_loops
             .iter()
             .flat_map(|l| l.loop_body.iter())
             .map(|block_id| match cfg.content(*block_id) {
@@ -458,12 +459,48 @@ impl FatLoopBuilder {
                     panic!("A loop body should never contain a dummy block")
                 },
                 BlockContent::Basic { lower, upper } => {
+                    if let Some(lbl) = code[*lower as usize].get_label_inner_opt() {
+                        id_label_map.insert(*block_id, lbl);
+                    }
                     let block: Vec<_> = (*lower..=*upper)
                         .map(|i| code.get(i as usize).unwrap().clone())
                         .collect();
-                    block
+                    (*block_id, block)
                 },
             })
-            .collect()
+            .collect();
+        let mut results = vec![];
+        for (i, (block_id, block)) in blocks.iter().enumerate() {
+            // if this block has one successor and the last bc of this block is not a branch
+            // we need to check whether the next block is the successor,
+            // if not, insert a jump to the correct block
+            if cfg.successors(*block_id).len() == 1 && !block[block.len() - 1].is_branching() {
+                let successor_id = cfg.successors(*block_id).first().unwrap();
+                let successor_label_opt = id_label_map.get(successor_id);
+                if successor_label_opt.is_some()
+                    && i != blocks.len() - 1
+                    && !blocks.get(i + 1).unwrap().1.is_empty()
+                {
+                    if let Some(lbl) = blocks.get(i + 1).unwrap().1[0].get_label_inner_opt() {
+                        let successor_label = *successor_label_opt.unwrap();
+                        if lbl != successor_label {
+                            let mut new_block = block.clone();
+                            // Inserted bc is used for jumping to its successor so
+                            // we just use the attr_id of its previous bc
+                            new_block.push(Bytecode::Jump(
+                                block[block.len() - 1].get_attr_id(),
+                                Label::new(successor_label as usize),
+                            ));
+                            results.push(new_block);
+                            continue;
+                        }
+                    }
+                }
+                results.push(block.clone());
+            } else {
+                results.push(block.clone());
+            }
+        }
+        results
     }
 }

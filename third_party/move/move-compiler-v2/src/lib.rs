@@ -162,7 +162,6 @@ pub fn run_move_compiler_for_analysis(
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-    options = options.set_experiment(Experiment::CFG_SIMPLIFICATION, false);
     let (env, _units) = run_move_compiler(error_writer, options)?;
     // Reset for subsequent analysis
     env.treat_everything_as_target(false);
