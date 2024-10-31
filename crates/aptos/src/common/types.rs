@@ -1154,7 +1154,7 @@ pub struct MovePackageDir {
     /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
     /// Defaults to `6`, or `7` if language version 2 is selected
-    /// (through `--move-2` or `--language_version=2`), .
+    /// (through `--move-2` or `--language-version=2`), .
     #[clap(
         long,
         default_value_if("move_2", "true", "7"),
@@ -1182,7 +1182,7 @@ pub struct MovePackageDir {
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.1 --compiler_version=2.0`
+    /// Same as `--bytecode-version=7 --language-version=2.1 --compiler-version=2.0`
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }
