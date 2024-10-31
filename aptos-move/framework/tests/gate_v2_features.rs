@@ -22,7 +22,9 @@ fn compile_pkg_with_v1(path_to_pkg: impl Into<String>) {
         compiler_config: compiler_config.clone(),
         ..Default::default()
     };
-    build_config.compile_package(pkg_path.as_path(), &mut std::io::stdout()).unwrap();
+    build_config
+        .compile_package(pkg_path.as_path(), &mut std::io::stdout())
+        .unwrap();
 }
 
 #[test]
