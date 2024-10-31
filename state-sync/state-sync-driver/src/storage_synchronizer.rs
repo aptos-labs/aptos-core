@@ -259,6 +259,7 @@ impl<
             commit_post_processor_notifier,
             pending_data_chunks.clone(),
             runtime.clone(),
+            storage.reader.clone(),
         );
 
         // Spawn the commit post-processor that handles commit notifications
@@ -694,6 +695,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut commit_post_processor_notifier: mpsc::Sender<ChunkCommitNotification>,
     pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
+    storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
@@ -720,15 +722,15 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         ))
                     );
 
-                    // Update the metrics for the newly committed data
-                    metrics::increment_gauge(
-                        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                        metrics::StorageSynchronizerOperations::Synced.get_label(),
-                        notification.committed_transactions.len() as u64,
+                    // Update the synced version metrics
+                    utils::update_new_synced_metrics(
+                        storage.clone(),
+                        notification.committed_transactions.len(),
                     );
-                    if notification.reconfiguration_occurred {
-                        utils::update_new_epoch_metrics();
-                    }
+
+                    // Update the synced epoch metrics
+                    let reconfiguration_occurred = notification.reconfiguration_occurred;
+                    utils::update_new_epoch_metrics(storage.clone(), reconfiguration_occurred);
 
                     // Update the metrics for the data notification commit post-process latency
                     metrics::observe_duration(

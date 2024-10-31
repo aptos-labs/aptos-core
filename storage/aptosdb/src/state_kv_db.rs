@@ -103,8 +103,10 @@ impl StateKvDb {
             enabled_sharding: true,
         };
 
-        if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
-            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
+        if !readonly {
+            if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
+                truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
+            }
         }
 
         Ok(state_kv_db)

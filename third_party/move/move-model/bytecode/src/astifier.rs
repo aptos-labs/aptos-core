@@ -1001,7 +1001,7 @@ impl Generator {
                     None,
                     dests,
                     Operation::Select(*mid, *sid, field_id),
-                    dests,
+                    srcs,
                 )
             },
             BorrowVariantField(mid, sid, variants, _inst, field_offset) => {
@@ -1029,8 +1029,8 @@ impl Generator {
             WriteRef => {
                 let stm = ExpData::Mutate(
                     self.new_stm_node_id(ctx),
-                    self.make_temp(ctx, dests[0]),
                     self.make_temp(ctx, srcs[0]),
+                    self.make_temp(ctx, srcs[1]),
                 );
                 self.add_stm(stm)
             },
@@ -1106,7 +1106,11 @@ impl Generator {
             ctx.env().set_node_instantiation(call_id, inst.to_vec())
         }
         let call = ExpData::Call(call_id, oper, self.make_temps(ctx, srcs.iter().copied()));
-        self.gen_assign(ctx, dests, call)
+        if !dests.is_empty() {
+            self.gen_assign(ctx, dests, call)
+        } else {
+            self.add_stm(call)
+        }
     }
 
     fn gen_match(
@@ -1498,12 +1502,17 @@ impl<'a> IfElseTransformer<'a> {
 
 // ===================================================================================
 
-/// A rewriter which eliminates useless assignments and introduces lets
+/// A rewriter which eliminates single and unused assignments
+/// and introduces lets
 /// for all free variables.
 pub fn transform_assigns(target: &FunctionTarget, exp: Exp) -> Exp {
     let usage = analyze_usage(target, exp.as_ref());
     let builder = ExpBuilder::new(target.global_env());
-    let exp = AssignTransformer { usage, builder }.rewrite_exp(exp);
+    AssignTransformer { usage, builder }.rewrite_exp(exp)
+}
+
+/// A rewriter which binds free variables.
+pub fn bind_free_vars(target: &FunctionTarget, exp: Exp) -> Exp {
     let usage = analyze_usage(target, exp.as_ref());
     let builder = ExpBuilder::new(target.global_env());
     FreeVariableBinder {

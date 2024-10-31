@@ -26,7 +26,10 @@ use crate::{
     utils::{
         iterators::PrefixedStateValueIterator,
         new_sharded_kv_schema_batch,
-        truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
+        truncation_helper::{
+            find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
+            truncate_state_kv_db, truncate_state_merkle_db,
+        },
         ShardedStateKvSchemaBatch,
     },
 };
@@ -297,6 +300,7 @@ impl StateStore {
             Self::sync_commit_progress(
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
+                Arc::clone(&state_merkle_db),
                 /*crash_if_difference_is_too_large=*/ true,
             );
         }
@@ -339,6 +343,7 @@ impl StateStore {
     pub fn sync_commit_progress(
         ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
+        state_merkle_db: Arc<StateMerkleDb>,
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
@@ -393,6 +398,35 @@ impl StateStore {
                 std::cmp::max(difference as usize, 1), /* batch_size */
             )
             .expect("Failed to truncate state K/V db.");
+
+            let state_merkle_max_version = get_max_version_in_state_merkle_db(&state_merkle_db)
+                .expect("Failed to get state merkle max version.")
+                .expect("State merkle max version cannot be None.");
+            if state_merkle_max_version > overall_commit_progress {
+                let difference = state_merkle_max_version - overall_commit_progress;
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
+            }
+            let db = state_merkle_db.metadata_db();
+            let state_merkle_target_version =
+                find_tree_root_at_or_before(db, &state_merkle_db, overall_commit_progress)
+                    .expect("DB read failed.")
+                    .unwrap_or_else(|| {
+                        panic!(
+                    "Could not find a valid root before or at version {}, maybe it was pruned?",
+                    overall_commit_progress
+                )
+                    });
+            if state_merkle_target_version < state_merkle_max_version {
+                info!(
+                    state_merkle_max_version = state_merkle_max_version,
+                    target_version = state_merkle_target_version,
+                    "Start state merkle truncation..."
+                );
+                truncate_state_merkle_db(&state_merkle_db, state_merkle_target_version)
+                    .expect("Failed to truncate state merkle db.");
+            }
         } else {
             info!("No overall commit progress was found!");
         }
@@ -509,6 +543,7 @@ impl StateStore {
                 .freeze(&buffered_state.current_state().base);
             let latest_snapshot_state_view = CachedStateView::new_impl(
                 StateViewId::Miscellaneous,
+                num_transactions,
                 snapshot,
                 speculative_state,
                 Arc::new(AsyncProofFetcher::new(state_db.clone())),
@@ -531,18 +566,21 @@ impl StateStore {
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
 
-            let (updates_until_last_checkpoint, state_after_last_checkpoint) =
+            let state_checkpoint_output =
                 InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
-                    buffered_state.current_state(),
-                    latest_snapshot_state_view.into_state_cache(),
+                    // TODO(aldenhu): avoid cloning the HashMap inside.
+                    &Arc::new(buffered_state.current_state().clone()),
+                    &latest_snapshot_state_view.into_state_cache(),
                     last_checkpoint_index,
                     &write_sets,
                 )?;
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(
-                updates_until_last_checkpoint.as_ref(),
-                &state_after_last_checkpoint,
+                state_checkpoint_output
+                    .state_updates_before_last_checkpoint
+                    .as_ref(),
+                &state_checkpoint_output.result_state,
                 true, /* sync_commit */
             )?;
         }

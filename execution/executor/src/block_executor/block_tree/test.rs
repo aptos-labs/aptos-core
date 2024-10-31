@@ -40,10 +40,9 @@ fn id(index: u64) -> HashValue {
 
 fn empty_block() -> PartialStateComputeResult {
     let result_view = ExecutedTrees::new_empty();
-    PartialStateComputeResult::new_empty_completed(
+    PartialStateComputeResult::new_empty(
         result_view.state().clone(),
         result_view.transaction_accumulator.clone(),
-        None,
     )
 }
 

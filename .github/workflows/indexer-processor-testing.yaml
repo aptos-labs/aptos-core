@@ -39,10 +39,31 @@ jobs:
       - name: Update Rust toolchain
         run: rustup update
 
+      - id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Prepare and Replace API Keys in Yaml
+        id: api_key_tokens
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            testnet_api_key:aptos-ci/TESTNET_INDEXER_API_KEY
+            mainnet_api_key:aptos-ci/MAINNET_INDEXER_API_KEY
+
       - name: Run CLI to Generate JSON Files
+        id: api_key_update
         run: |
           cd ecosystem/indexer-grpc/indexer-transaction-generator
-          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/new_json_transactions
+          ls -al ./imported_transactions
+          echo "Updating API keys in YAML files..."
+          sed -i "s/TESTNET_API_KEY/${{ steps.api_key_tokens.outputs.testnet_api_key }}/g" ./imported_transactions/imported_transactions.yaml
+          sed -i "s/MAINNET_API_KEY/${{ steps.api_key_tokens.outputs.mainnet_api_key }}/g" ./imported_transactions/imported_transactions.yaml
+          
+          cat ./imported_transactions/imported_transactions.yaml  # Print the updated file for verification
+          cargo run -- --testing-folder ./imported_transactions --output-folder ../indexer-test-transactions/new_json_transactions
 
       - name: Install jq
         run: sudo apt-get install jq  # Ensure jq is installed for JSON processing
@@ -52,7 +73,8 @@ jobs:
       - name: Prepare and Clean JSON Files
         run: |
           cd ecosystem/indexer-grpc/indexer-test-transactions
-
+          ls -al ./new_json_transactions/scripted_transactions
+          
           for folder in json_transactions/scripted_transactions new_json_transactions/scripted_transactions; do
             for file in $folder/*.json; do
               echo "Processing $file..."
@@ -75,6 +97,7 @@ jobs:
                       .user.request.sender,
                       .user.request.expirationTimestampSecs.seconds,
                       .user.request.signature.ed25519.publicKey,
+                      .user.request.payload.scriptPayload.code.bytecode,
                       .user.request.signature.ed25519.signature)
                   | (.info.changes[].writeResource.data |=
                   if type == "string" then
@@ -109,13 +132,6 @@ jobs:
             echo "No differences or new files detected."
             exit 0  # Proceed successfully only if no new files or differences are found
           fi
-
-      - id: auth
-        if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
-        uses: "google-github-actions/auth@v2"
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Log active service account email
         if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
