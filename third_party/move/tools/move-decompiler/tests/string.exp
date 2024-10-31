@@ -19,15 +19,15 @@ module 0x1::string {
         vector::append<u8>(&mut self.bytes, *&(&r).bytes);
     }
     public fun insert(self: &mut String, at: u64, o: String) {
+        let _t7;
         let _t6;
-        let _t3 = &self.bytes;
-        let _t4 = at;
+        let _t4;
+        let _t3;
+        _t3 = &self.bytes;
+        _t4 = at;
         if (_t4 <= vector::length<u8>(_t3)) _t6 = internal_is_char_boundary(_t3, at) else _t6 = false;
-        loop {
-            if (_t6) break;
-            abort 2
-        };
-        let _t7 = sub_string(/*freeze*/self, 0, at);
+        if (!_t6) abort 2;
+        _t7 = sub_string(/*freeze*/self, 0, at);
         append(&mut _t7, o);
         append(&mut _t7, sub_string(/*freeze*/self, at, length(/*freeze*/self)));
         *self = _t7;
@@ -35,14 +35,12 @@ module 0x1::string {
     native fun internal_is_char_boundary(v: &vector<u8>, i: u64): bool;
     public fun sub_string(self: &String, i: u64, j: u64): String {
         let _t5;
-        let _t3 = &self.bytes;
+        let _t3;
+        _t3 = &self.bytes;
         if (j <= vector::length<u8>(_t3)) _t5 = i <= j else _t5 = false;
         if (_t5) _t5 = internal_is_char_boundary(_t3, i) else _t5 = false;
         if (_t5) _t5 = internal_is_char_boundary(_t3, j) else _t5 = false;
-        loop {
-            if (_t5) break;
-            abort 2
-        };
+        if (!_t5) abort 2;
         String{bytes: internal_sub_string(_t3, i, j)}
     }
     public fun is_empty(self: &String): bool {
@@ -52,10 +50,7 @@ module 0x1::string {
         append(self, utf8(bytes));
     }
     public fun utf8(bytes: vector<u8>): String {
-        loop {
-            if (internal_check_utf8(&bytes)) break;
-            abort 1
-        };
+        if (!internal_check_utf8(&bytes)) abort 1;
         String{bytes: bytes}
     }
     public native fun internal_check_utf8(v: &vector<u8>): bool;

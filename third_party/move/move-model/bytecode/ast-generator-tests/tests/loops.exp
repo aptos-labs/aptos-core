@@ -91,33 +91,6 @@ loop {
 _t18: u64 = c;
 return _t18
 
---- If-Transformed Generated AST
-loop {
-  _t2: u64 = c;
-  _t3: u64 = 1;
-  _t4: u64 = Add(_t2, _t3);
-  c: u64 = _t4;
-  _t5: u64 = c;
-  _t6: u64 = 2;
-  _t7: u64 = Mod(_t5, _t6);
-  _t8: u64 = 0;
-  _t9: bool = Eq(_t7, _t8);
-  if (_t9) continue;
-  _t10: u64 = c;
-  _t11: u64 = 3;
-  _t12: u64 = Add(_t10, _t11);
-  c: u64 = _t12;
-  _t13: u64 = c;
-  _t14: u64 = 2;
-  _t15: u64 = Mod(_t13, _t14);
-  _t16: u64 = 1;
-  _t17: bool = Eq(_t15, _t16);
-  if (Not(_t17)) continue;
-  break
-};
-_t18: u64 = c;
-return _t18
-
 --- Assign-Transformed Generated AST
 loop {
   c: u64 = Add(c, 1);
@@ -128,11 +101,150 @@ loop {
 };
 return c
 
+--- If-Transformed Generated AST
+loop {
+  c: u64 = Add(c, 1);
+  if (Eq(Mod(c, 2), 0)) continue;
+  c: u64 = Add(c, 3);
+  if (Not(Eq(Mod(c, 2), 1))) continue;
+  break
+};
+return c
+
+--- Var-Bound Generated AST
+loop {
+  c: u64 = Add(c, 1);
+  if (Eq(Mod(c, 2), 0)) continue;
+  c: u64 = Add(c, 3);
+  if (Not(Eq(Mod(c, 2), 1))) continue;
+  break
+};
+return c
+
+
+=== Processing m::nested_loop =====================================================
+--- Source
+fun nested_loop(x: u64): u64 {
+        while (x > 0) {
+            while (x > 10) {
+                x = x - 1;
+                break;
+            };
+            x = x - 1;
+            continue;
+        };
+        x
+    }
+
+--- Stackless Bytecode
+fun m::nested_loop($t0|x: u64): u64 {
+     var $t1|$t3: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: label L5
+  1: $t2 := copy($t0)
+  2: $t3 := 0
+  3: $t4 := >($t2, $t3)
+  4: if ($t4) goto 5 else goto 24
+  5: label L1
+  6: $t5 := copy($t0)
+  7: $t6 := 10
+  8: $t7 := >($t5, $t6)
+  9: if ($t7) goto 10 else goto 16
+ 10: label L3
+ 11: $t8 := move($t0)
+ 12: $t9 := 1
+ 13: $t10 := -($t8, $t9)
+ 14: $t0 := $t10
+ 15: goto 18
+ 16: label L2
+ 17: goto 18
+ 18: label L4
+ 19: $t11 := move($t0)
+ 20: $t12 := 1
+ 21: $t13 := -($t11, $t12)
+ 22: $t0 := $t13
+ 23: goto 0
+ 24: label L0
+ 25: goto 26
+ 26: label L6
+ 27: $t14 := move($t0)
+ 28: return $t14
+}
+
+--- Raw Generated AST
+loop {
+  _t2: u64 = x;
+  _t3: u64 = 0;
+  _t4: bool = Gt(_t2, _t3);
+  if (Not(_t4)) break;
+  _t5: u64 = x;
+  _t6: u64 = 10;
+  _t7: bool = Gt(_t5, _t6);
+  loop {
+    if (Not(_t7)) break;
+    _t8: u64 = x;
+    _t9: u64 = 1;
+    _t10: u64 = Sub(_t8, _t9);
+    x: u64 = _t10;
+    break
+  };
+  _t11: u64 = x;
+  _t12: u64 = 1;
+  _t13: u64 = Sub(_t11, _t12);
+  x: u64 = _t13;
+  continue
+};
+_t14: u64 = x;
+return _t14
+
+--- Assign-Transformed Generated AST
+loop {
+  if (Not(Gt(x, 0))) break;
+  loop {
+    if (Not(Gt(x, 10))) break;
+    x: u64 = Sub(x, 1);
+    break
+  };
+  x: u64 = Sub(x, 1);
+  continue
+};
+return x
+
+--- If-Transformed Generated AST
+loop {
+  if (Not(Gt(x, 0))) break;
+  if (Gt(x, 10)) x: u64 = Sub(x, 1);
+  x: u64 = Sub(x, 1);
+  continue
+};
+return x
+
+--- Var-Bound Generated AST
+loop {
+  if (Not(Gt(x, 0))) break;
+  if (Gt(x, 10)) x: u64 = Sub(x, 1);
+  x: u64 = Sub(x, 1);
+  continue
+};
+return x
+
 
 === Processing m::while_1 =====================================================
 --- Source
 fun while_1(c: u64) {
-        while (c > 0) c = c - 1
+        while (c > 0) c = c - 1;
     }
 
 --- Stackless Bytecode
@@ -168,43 +280,36 @@ loop {
   _t2: u64 = c;
   _t3: u64 = 0;
   _t4: bool = Gt(_t2, _t3);
-  loop {
-    if (Not(_t4)) break;
-    _t5: u64 = c;
-    _t6: u64 = 1;
-    _t7: u64 = Sub(_t5, _t6);
-    c: u64 = _t7;
-    continue[1]
-  };
-  break
-};
-return Tuple()
-
---- If-Transformed Generated AST
-loop {
-  _t2: u64 = c;
-  _t3: u64 = 0;
-  _t4: bool = Gt(_t2, _t3);
-  if _t4 {
-    _t5: u64 = c;
-    _t6: u64 = 1;
-    _t7: u64 = Sub(_t5, _t6);
-    c: u64 = _t7;
-    continue
-  };
-  break
+  if (Not(_t4)) break;
+  _t5: u64 = c;
+  _t6: u64 = 1;
+  _t7: u64 = Sub(_t5, _t6);
+  c: u64 = _t7;
+  continue
 };
 return Tuple()
 
 --- Assign-Transformed Generated AST
 loop {
-  if Gt(c, 0) {
-    {
-      let c: u64 = Sub(c, 1);
-      continue
-    }
-  };
-  break
+  if (Not(Gt(c, 0))) break;
+  c: u64 = Sub(c, 1);
+  continue
+};
+return Tuple()
+
+--- If-Transformed Generated AST
+loop {
+  if (Not(Gt(c, 0))) break;
+  c: u64 = Sub(c, 1);
+  continue
+};
+return Tuple()
+
+--- Var-Bound Generated AST
+loop {
+  if (Not(Gt(c, 0))) break;
+  c: u64 = Sub(c, 1);
+  continue
 };
 return Tuple()
 
@@ -270,42 +375,16 @@ loop {
   _t2: u64 = c;
   _t3: u64 = 0;
   _t4: bool = Gt(_t2, _t3);
-  loop {
-    if (Not(_t4)) break;
-    _t5: u64 = c;
-    _t6: u64 = 10;
-    _t7: bool = Ge(_t5, _t6);
-    if (Not(_t7)) continue[1];
-    _t8: u64 = c;
-    _t9: u64 = 10;
-    _t10: u64 = Sub(_t8, _t9);
-    c: u64 = _t10;
-    continue[1]
-  };
-  break
-};
-_t11: u64 = c;
-_t12: u64 = 1;
-_t13: u64 = Add(_t11, _t12);
-return _t13
-
---- If-Transformed Generated AST
-loop {
-  _t2: u64 = c;
-  _t3: u64 = 0;
-  _t4: bool = Gt(_t2, _t3);
-  if _t4 {
-    _t5: u64 = c;
-    _t6: u64 = 10;
-    _t7: bool = Ge(_t5, _t6);
-    if (Not(_t7)) continue;
-    _t8: u64 = c;
-    _t9: u64 = 10;
-    _t10: u64 = Sub(_t8, _t9);
-    c: u64 = _t10;
-    continue
-  };
-  break
+  if (Not(_t4)) break;
+  _t5: u64 = c;
+  _t6: u64 = 10;
+  _t7: bool = Ge(_t5, _t6);
+  if (Not(_t7)) continue;
+  _t8: u64 = c;
+  _t9: u64 = 10;
+  _t10: u64 = Sub(_t8, _t9);
+  c: u64 = _t10;
+  continue
 };
 _t11: u64 = c;
 _t12: u64 = 1;
@@ -314,12 +393,28 @@ return _t13
 
 --- Assign-Transformed Generated AST
 loop {
-  if Gt(c, 0) {
-    if (Not(Ge(c, 10))) continue;
-    c: u64 = Sub(c, 10);
-    continue
-  };
-  break
+  if (Not(Gt(c, 0))) break;
+  if (Not(Ge(c, 10))) continue;
+  c: u64 = Sub(c, 10);
+  continue
+};
+return Add(c, 1)
+
+--- If-Transformed Generated AST
+loop {
+  if (Not(Gt(c, 0))) break;
+  if (Not(Ge(c, 10))) continue;
+  c: u64 = Sub(c, 10);
+  continue
+};
+return Add(c, 1)
+
+--- Var-Bound Generated AST
+loop {
+  if (Not(Gt(c, 0))) break;
+  if (Not(Ge(c, 10))) continue;
+  c: u64 = Sub(c, 10);
+  continue
 };
 return Add(c, 1)
 
@@ -390,77 +485,63 @@ loop {
   _t2: u64 = c;
   _t3: u64 = 0;
   _t4: bool = Gt(_t2, _t3);
+  if (Not(_t4)) break;
   loop {
-    if (Not(_t4)) break;
-    loop {
-      _t5: u64 = c;
-      _t6: u64 = 10;
-      _t7: bool = Gt(_t5, _t6);
-      loop {
-        if (Not(_t7)) break;
-        _t8: u64 = c;
-        _t9: u64 = 10;
-        _t10: u64 = Sub(_t8, _t9);
-        c: u64 = _t10;
-        continue[1]
-      };
-      break
-    };
-    _t11: u64 = c;
-    _t12: u64 = 1;
-    _t13: u64 = Sub(_t11, _t12);
-    c: u64 = _t13;
-    continue[1]
-  };
-  break
-};
-_t14: u64 = c;
-return _t14
-
---- If-Transformed Generated AST
-loop {
-  _t2: u64 = c;
-  _t3: u64 = 0;
-  _t4: bool = Gt(_t2, _t3);
-  if _t4 {
-    loop {
-      _t5: u64 = c;
-      _t6: u64 = 10;
-      _t7: bool = Gt(_t5, _t6);
-      if _t7 {
-        _t8: u64 = c;
-        _t9: u64 = 10;
-        _t10: u64 = Sub(_t8, _t9);
-        c: u64 = _t10;
-        continue
-      };
-      break
-    };
-    _t11: u64 = c;
-    _t12: u64 = 1;
-    _t13: u64 = Sub(_t11, _t12);
-    c: u64 = _t13;
+    _t5: u64 = c;
+    _t6: u64 = 10;
+    _t7: bool = Gt(_t5, _t6);
+    if (Not(_t7)) break;
+    _t8: u64 = c;
+    _t9: u64 = 10;
+    _t10: u64 = Sub(_t8, _t9);
+    c: u64 = _t10;
     continue
   };
-  break
+  _t11: u64 = c;
+  _t12: u64 = 1;
+  _t13: u64 = Sub(_t11, _t12);
+  c: u64 = _t13;
+  continue
 };
 _t14: u64 = c;
 return _t14
 
 --- Assign-Transformed Generated AST
 loop {
-  if Gt(c, 0) {
-    loop {
-      if Gt(c, 10) {
-        c: u64 = Sub(c, 10);
-        continue
-      };
-      break
-    };
-    c: u64 = Sub(c, 1);
+  if (Not(Gt(c, 0))) break;
+  loop {
+    if (Not(Gt(c, 10))) break;
+    c: u64 = Sub(c, 10);
     continue
   };
-  break
+  c: u64 = Sub(c, 1);
+  continue
+};
+return c
+
+--- If-Transformed Generated AST
+loop {
+  if (Not(Gt(c, 0))) break;
+  loop {
+    if (Not(Gt(c, 10))) break;
+    c: u64 = Sub(c, 10);
+    continue
+  };
+  c: u64 = Sub(c, 1);
+  continue
+};
+return c
+
+--- Var-Bound Generated AST
+loop {
+  if (Not(Gt(c, 0))) break;
+  loop {
+    if (Not(Gt(c, 10))) break;
+    c: u64 = Sub(c, 10);
+    continue
+  };
+  c: u64 = Sub(c, 1);
+  continue
 };
 return c
 
@@ -476,11 +557,15 @@ module 0x815::m {
         };
         c
     }
-    fun while_1(c: u64) {
-        while (c > 0) {
-            let c = c - 1;
-            continue
+    fun nested_loop(x: u64): u64 {
+        while (x > 0) {
+            if (x > 10) x = x - 1;
+            x = x - 1
         };
+        x
+    }
+    fun while_1(c: u64) {
+        while (c > 0) c = c - 1;
     }
     fun while_2(c: u64): u64 {
         while (c > 0) {

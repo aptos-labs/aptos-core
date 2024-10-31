@@ -795,6 +795,7 @@ toml_edit = "0.14.3"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
+try_match = "0.4.2"
 tokio = { version = "1.35.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.3.1"
