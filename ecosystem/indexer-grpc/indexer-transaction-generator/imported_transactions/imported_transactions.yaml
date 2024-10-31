@@ -15,9 +15,10 @@ testnet:
     5992795934: 5992795934_fa_activities
     5523474016: 5523474016_validator_txn
 
+
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  api_key: MAINNET_API_KEY
+  api_key: aptoslabs_hxr2RZXYUSR_GH15n92wXVvCh4rxZYMKuWJ35wgMhHkMS
   versions_to_import:
     308783012: 308783012_fa_transfer
     999930475: 999930475_token_v2_concurrent_mint
@@ -28,3 +29,6 @@ mainnet:
     967255533: 967255533_token_v2_mutation_event
     578366445: 578366445_token_v2_burn_event_v2
     1080786089: 1080786089_token_v2_burn_event_v1
+    1845035942: 1845035942_default_current_table_items
+    513424821: 513424821_default_block_metadata_transactions
+    155112189: 155112189_default_table_items
