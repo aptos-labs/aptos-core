@@ -31,10 +31,10 @@ module 0x815::m {
 ============ initial bytecode ================
 
 [variant baseline]
-fun m::t($t0: m::E): u64 {
+fun m::t($t0: 0x815::m::E): u64 {
      var $t1: u64
      var $t2: u64
-  0: $t2 := unpack_variant m::E::Some($t0)
+  0: $t2 := unpack_variant 0x815::m::E::Some($t0)
   1: $t1 := infer($t2)
   2: return $t1
 }

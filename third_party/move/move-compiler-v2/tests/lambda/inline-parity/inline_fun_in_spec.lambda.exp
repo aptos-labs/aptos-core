@@ -1,7 +1,7 @@
 // -- Model dump before env processor pipeline:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -44,7 +44,7 @@ module 0x42::m {
 // -- Model dump after env processor unused checks:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -87,7 +87,7 @@ module 0x42::m {
 // -- Model dump after env processor type parameter check:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -130,7 +130,7 @@ module 0x42::m {
 // -- Model dump after env processor check recursive struct definition:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -173,7 +173,7 @@ module 0x42::m {
 // -- Model dump after env processor check cyclic type instantiation:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -216,7 +216,7 @@ module 0x42::m {
 // -- Model dump after env processor unused struct params check:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -259,7 +259,7 @@ module 0x42::m {
 // -- Model dump after env processor access and use check before inlining:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>(m::get<0x42::m::S>(a)), 10), a));
     }
 
     struct S {
@@ -302,9 +302,9 @@ module 0x42::m {
 // -- Model dump after env processor inlining:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>({
       let (a: address): (address) = Tuple(a);
-      BorrowGlobal(Immutable)<m::S>(a)
+      BorrowGlobal(Immutable)<0x42::m::S>(a)
     }), 10), a));
     }
 
@@ -348,9 +348,9 @@ module 0x42::m {
 // -- Model dump after env processor access and use check after inlining:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>({
       let (a: address): (address) = Tuple(a);
-      BorrowGlobal(Immutable)<m::S>(a)
+      BorrowGlobal(Immutable)<0x42::m::S>(a)
     }), 10), a));
     }
 
@@ -394,9 +394,9 @@ module 0x42::m {
 // -- Model dump after env processor acquires check:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>({
       let (a: address): (address) = Tuple(a);
-      BorrowGlobal(Immutable)<m::S>(a)
+      BorrowGlobal(Immutable)<0x42::m::S>(a)
     }), 10), a));
     }
 
@@ -440,9 +440,9 @@ module 0x42::m {
 // -- Model dump after env processor simplifier:
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>({
       let (a: address): (address) = Tuple(a);
-      BorrowGlobal(Immutable)<m::S>(a)
+      BorrowGlobal(Immutable)<0x42::m::S>(a)
     }), 10), a));
     }
 

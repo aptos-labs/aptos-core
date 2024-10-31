@@ -112,71 +112,71 @@ module 0x42::fields {
 ============ initial bytecode ================
 
 [variant baseline]
-fun fields::read_generic_val($t0: fields::G<u64>): u64 {
+fun fields::read_generic_val($t0: 0x42::fields::G<u64>): u64 {
      var $t1: u64
-     var $t2: &fields::G<u64>
+     var $t2: &0x42::fields::G<u64>
      var $t3: &u64
   0: $t2 := borrow_local($t0)
-  1: $t3 := borrow_field<fields::G<u64>>.f($t2)
+  1: $t3 := borrow_field<0x42::fields::G<u64>>.f($t2)
   2: $t1 := read_ref($t3)
   3: return $t1
 }
 
 
 [variant baseline]
-fun fields::read_ref($t0: &fields::S): u64 {
+fun fields::read_ref($t0: &0x42::fields::S): u64 {
      var $t1: u64
-     var $t2: &fields::T
+     var $t2: &0x42::fields::T
      var $t3: &u64
-  0: $t2 := borrow_field<fields::S>.g($t0)
-  1: $t3 := borrow_field<fields::T>.h($t2)
+  0: $t2 := borrow_field<0x42::fields::S>.g($t0)
+  1: $t3 := borrow_field<0x42::fields::T>.h($t2)
   2: $t1 := read_ref($t3)
   3: return $t1
 }
 
 
 [variant baseline]
-fun fields::read_val($t0: fields::S): u64 {
+fun fields::read_val($t0: 0x42::fields::S): u64 {
      var $t1: u64
-     var $t2: &fields::T
-     var $t3: &fields::S
+     var $t2: &0x42::fields::T
+     var $t3: &0x42::fields::S
      var $t4: &u64
   0: $t3 := borrow_local($t0)
-  1: $t2 := borrow_field<fields::S>.g($t3)
-  2: $t4 := borrow_field<fields::T>.h($t2)
+  1: $t2 := borrow_field<0x42::fields::S>.g($t3)
+  2: $t4 := borrow_field<0x42::fields::T>.h($t2)
   3: $t1 := read_ref($t4)
   4: return $t1
 }
 
 
 [variant baseline]
-fun fields::write_generic_val($t0: &mut fields::G<u64>, $t1: u64) {
+fun fields::write_generic_val($t0: &mut 0x42::fields::G<u64>, $t1: u64) {
      var $t2: &mut u64
-  0: $t2 := borrow_field<fields::G<u64>>.f($t0)
+  0: $t2 := borrow_field<0x42::fields::G<u64>>.f($t0)
   1: write_ref($t2, $t1)
   2: return ()
 }
 
 
 [variant baseline]
-fun fields::write_local_direct(): fields::S {
-     var $t0: fields::S
-     var $t1: fields::S
+fun fields::write_local_direct(): 0x42::fields::S {
+     var $t0: 0x42::fields::S
+     var $t1: 0x42::fields::S
      var $t2: u64
-     var $t3: fields::T
+     var $t3: 0x42::fields::T
      var $t4: u64
      var $t5: u64
      var $t6: &mut u64
-     var $t7: &mut fields::T
-     var $t8: &mut fields::S
+     var $t7: &mut 0x42::fields::T
+     var $t8: &mut 0x42::fields::S
   0: $t2 := 0
   1: $t4 := 0
-  2: $t3 := pack fields::T($t4)
-  3: $t1 := pack fields::S($t2, $t3)
+  2: $t3 := pack 0x42::fields::T($t4)
+  3: $t1 := pack 0x42::fields::S($t2, $t3)
   4: $t5 := 42
   5: $t8 := borrow_local($t1)
-  6: $t7 := borrow_field<fields::S>.g($t8)
-  7: $t6 := borrow_field<fields::T>.h($t7)
+  6: $t7 := borrow_field<0x42::fields::S>.g($t8)
+  7: $t6 := borrow_field<0x42::fields::T>.h($t7)
   8: write_ref($t6, $t5)
   9: $t0 := infer($t1)
  10: return $t0
@@ -184,24 +184,24 @@ fun fields::write_local_direct(): fields::S {
 
 
 [variant baseline]
-fun fields::write_local_via_ref(): fields::S {
-     var $t0: fields::S
-     var $t1: fields::S
+fun fields::write_local_via_ref(): 0x42::fields::S {
+     var $t0: 0x42::fields::S
+     var $t1: 0x42::fields::S
      var $t2: u64
-     var $t3: fields::T
+     var $t3: 0x42::fields::T
      var $t4: u64
-     var $t5: &mut fields::S
+     var $t5: &mut 0x42::fields::S
      var $t6: u64
      var $t7: &mut u64
-     var $t8: &mut fields::T
+     var $t8: &mut 0x42::fields::T
   0: $t2 := 0
   1: $t4 := 0
-  2: $t3 := pack fields::T($t4)
-  3: $t1 := pack fields::S($t2, $t3)
+  2: $t3 := pack 0x42::fields::T($t4)
+  3: $t1 := pack 0x42::fields::S($t2, $t3)
   4: $t5 := borrow_local($t1)
   5: $t6 := 42
-  6: $t8 := borrow_field<fields::S>.g($t5)
-  7: $t7 := borrow_field<fields::T>.h($t8)
+  6: $t8 := borrow_field<0x42::fields::S>.g($t5)
+  7: $t7 := borrow_field<0x42::fields::T>.h($t8)
   8: write_ref($t7, $t6)
   9: $t0 := infer($t1)
  10: return $t0
@@ -209,23 +209,23 @@ fun fields::write_local_via_ref(): fields::S {
 
 
 [variant baseline]
-fun fields::write_local_via_ref_2(): fields::S {
-     var $t0: fields::S
-     var $t1: fields::S
+fun fields::write_local_via_ref_2(): 0x42::fields::S {
+     var $t0: 0x42::fields::S
+     var $t1: 0x42::fields::S
      var $t2: u64
-     var $t3: fields::T
+     var $t3: 0x42::fields::T
      var $t4: u64
      var $t5: &mut u64
-     var $t6: &mut fields::T
-     var $t7: &mut fields::S
+     var $t6: &mut 0x42::fields::T
+     var $t7: &mut 0x42::fields::S
      var $t8: u64
   0: $t2 := 0
   1: $t4 := 0
-  2: $t3 := pack fields::T($t4)
-  3: $t1 := pack fields::S($t2, $t3)
+  2: $t3 := pack 0x42::fields::T($t4)
+  3: $t1 := pack 0x42::fields::S($t2, $t3)
   4: $t7 := borrow_local($t1)
-  5: $t6 := borrow_field<fields::S>.g($t7)
-  6: $t5 := borrow_field<fields::T>.h($t6)
+  5: $t6 := borrow_field<0x42::fields::S>.g($t7)
+  6: $t5 := borrow_field<0x42::fields::T>.h($t6)
   7: $t8 := 42
   8: write_ref($t5, $t8)
   9: $t0 := infer($t1)
@@ -234,29 +234,29 @@ fun fields::write_local_via_ref_2(): fields::S {
 
 
 [variant baseline]
-fun fields::write_param($t0: &mut fields::S) {
+fun fields::write_param($t0: &mut 0x42::fields::S) {
      var $t1: u64
      var $t2: &mut u64
-     var $t3: &mut fields::T
+     var $t3: &mut 0x42::fields::T
   0: $t1 := 42
-  1: $t3 := borrow_field<fields::S>.g($t0)
-  2: $t2 := borrow_field<fields::T>.h($t3)
+  1: $t3 := borrow_field<0x42::fields::S>.g($t0)
+  2: $t2 := borrow_field<0x42::fields::T>.h($t3)
   3: write_ref($t2, $t1)
   4: return ()
 }
 
 
 [variant baseline]
-fun fields::write_val($t0: fields::S): fields::S {
-     var $t1: fields::S
+fun fields::write_val($t0: 0x42::fields::S): 0x42::fields::S {
+     var $t1: 0x42::fields::S
      var $t2: u64
      var $t3: &mut u64
-     var $t4: &mut fields::T
-     var $t5: &mut fields::S
+     var $t4: &mut 0x42::fields::T
+     var $t5: &mut 0x42::fields::S
   0: $t2 := 42
   1: $t5 := borrow_local($t0)
-  2: $t4 := borrow_field<fields::S>.g($t5)
-  3: $t3 := borrow_field<fields::T>.h($t4)
+  2: $t4 := borrow_field<0x42::fields::S>.g($t5)
+  3: $t3 := borrow_field<0x42::fields::T>.h($t4)
   4: write_ref($t3, $t2)
   5: $t1 := infer($t0)
   6: return $t1

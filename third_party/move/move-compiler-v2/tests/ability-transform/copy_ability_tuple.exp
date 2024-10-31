@@ -1,8 +1,8 @@
 ============ initial bytecode ================
 
 [variant baseline]
-public fun M::f($t0: M::R): (M::R, u64) {
-     var $t1: M::R
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
      var $t2: u64
   0: $t1 := infer($t0)
   1: $t2 := 0
@@ -12,22 +12,22 @@ public fun M::f($t0: M::R): (M::R, u64) {
 
 [variant baseline]
 public fun M::g($t0: &signer) {
-     var $t1: M::R
+     var $t1: 0x42::M::R
      var $t2: u64
      var $t3: u64
   0: $t2 := 1
-  1: $t1 := pack M::R($t2)
+  1: $t1 := pack 0x42::M::R($t2)
   2: $t3 := 3
   3: ($t1, $t3) := M::f($t1)
-  4: move_to<M::R>($t0, $t1)
+  4: move_to<0x42::M::R>($t0, $t1)
   5: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-public fun M::f($t0: M::R): (M::R, u64) {
-     var $t1: M::R
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
      var $t2: u64
      # live vars: $t0
   0: $t1 := infer($t0)
@@ -40,19 +40,19 @@ public fun M::f($t0: M::R): (M::R, u64) {
 
 [variant baseline]
 public fun M::g($t0: &signer) {
-     var $t1: M::R
+     var $t1: 0x42::M::R
      var $t2: u64
      var $t3: u64
      # live vars: $t0
   0: $t2 := 1
      # live vars: $t0, $t2
-  1: $t1 := pack M::R($t2)
+  1: $t1 := pack 0x42::M::R($t2)
      # live vars: $t0, $t1
   2: $t3 := 3
      # live vars: $t0, $t1
   3: ($t1, $t3) := M::f($t1)
      # live vars: $t0, $t1
-  4: move_to<M::R>($t0, $t1)
+  4: move_to<0x42::M::R>($t0, $t1)
      # live vars:
   5: return ()
 }
@@ -60,8 +60,8 @@ public fun M::g($t0: &signer) {
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-public fun M::f($t0: M::R): (M::R, u64) {
-     var $t1: M::R
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
      var $t2: u64
      # live vars: $t0
   0: $t1 := infer($t0)
@@ -74,19 +74,19 @@ public fun M::f($t0: M::R): (M::R, u64) {
 
 [variant baseline]
 public fun M::g($t0: &signer) {
-     var $t1: M::R
+     var $t1: 0x42::M::R
      var $t2: u64
      var $t3: u64
      # live vars: $t0
   0: $t2 := 1
      # live vars: $t0, $t2
-  1: $t1 := pack M::R($t2)
+  1: $t1 := pack 0x42::M::R($t2)
      # live vars: $t0, $t1
   2: $t3 := 3
      # live vars: $t0, $t1
   3: ($t1, $t3) := M::f($t1)
      # live vars: $t0, $t1
-  4: move_to<M::R>($t0, $t1)
+  4: move_to<0x42::M::R>($t0, $t1)
      # live vars:
   5: return ()
 }
@@ -94,8 +94,8 @@ public fun M::g($t0: &signer) {
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
-public fun M::f($t0: M::R): (M::R, u64) {
-     var $t1: M::R
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
      var $t2: u64
      # live vars: $t0
      # refs: []
@@ -114,7 +114,7 @@ public fun M::f($t0: M::R): (M::R, u64) {
 
 [variant baseline]
 public fun M::g($t0: &signer) {
-     var $t1: M::R
+     var $t1: 0x42::M::R
      var $t2: u64
      var $t3: u64
      # live vars: $t0
@@ -132,7 +132,7 @@ public fun M::g($t0: &signer) {
      # #root
      #   <no edges>
      #
-  1: $t1 := pack M::R($t2)
+  1: $t1 := pack 0x42::M::R($t2)
      # live vars: $t0, $t1
      # refs: [$t0 => #0]
      # #0
@@ -156,7 +156,7 @@ public fun M::g($t0: &signer) {
      # #root
      #   <no edges>
      #
-  4: move_to<M::R>($t0, $t1)
+  4: move_to<0x42::M::R>($t0, $t1)
      # live vars:
      # refs: []
      #
@@ -166,8 +166,8 @@ public fun M::g($t0: &signer) {
 ============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
-public fun M::f($t0: M::R): (M::R, u64) {
-     var $t1: M::R
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
      var $t2: u64
      # abort state: {returns}
      # live vars: $t0
@@ -189,7 +189,7 @@ public fun M::f($t0: M::R): (M::R, u64) {
 
 [variant baseline]
 public fun M::g($t0: &signer) {
-     var $t1: M::R
+     var $t1: 0x42::M::R
      var $t2: u64
      var $t3: u64
      # abort state: {returns,aborts}
@@ -209,7 +209,7 @@ public fun M::g($t0: &signer) {
      # #root
      #   <no edges>
      #
-  1: $t1 := pack M::R($t2)
+  1: $t1 := pack 0x42::M::R($t2)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
      # refs: [$t0 => #0]
@@ -236,7 +236,7 @@ public fun M::g($t0: &signer) {
      # #root
      #   <no edges>
      #
-  4: move_to<M::R>($t0, $t1)
+  4: move_to<0x42::M::R>($t0, $t1)
      # abort state: {returns}
      # live vars:
      # refs: []
@@ -247,8 +247,8 @@ public fun M::g($t0: &signer) {
 ============ after AbilityProcessor: ================
 
 [variant baseline]
-public fun M::f($t0: M::R): (M::R, u64) {
-     var $t1: M::R
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
      var $t2: u64
   0: $t1 := move($t0)
   1: $t2 := 0
@@ -258,13 +258,13 @@ public fun M::f($t0: M::R): (M::R, u64) {
 
 [variant baseline]
 public fun M::g($t0: &signer) {
-     var $t1: M::R
+     var $t1: 0x42::M::R
      var $t2: u64
      var $t3: u64
   0: $t2 := 1
-  1: $t1 := pack M::R($t2)
+  1: $t1 := pack 0x42::M::R($t2)
   2: $t3 := 3
   3: ($t1, $t3) := M::f($t1)
-  4: move_to<M::R>($t0, $t1)
+  4: move_to<0x42::M::R>($t0, $t1)
   5: return ()
 }

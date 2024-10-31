@@ -1,10 +1,10 @@
 ============ initial bytecode ================
 
 [variant baseline]
-fun m::bar($t0: &mut m::S, $t1: u64): u64 {
+fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
      var $t2: u64
      var $t3: &mut u64
-  0: $t3 := borrow_field<m::S>.x($t0)
+  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
   1: write_ref($t3, $t1)
   2: $t2 := infer($t1)
   3: return $t2
@@ -12,30 +12,30 @@ fun m::bar($t0: &mut m::S, $t1: u64): u64 {
 
 
 [variant baseline]
-fun m::destroy($t0: m::S) {
+fun m::destroy($t0: 0xc0ffee::m::S) {
      var $t1: u64
-  0: $t1 := unpack m::S($t0)
+  0: $t1 := unpack 0xc0ffee::m::S($t0)
   1: return ()
 }
 
 
 [variant baseline]
-fun m::foo($t0: &mut m::S, $t1: u64) {
+fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t2: &mut u64
-  0: $t2 := borrow_field<m::S>.x($t0)
+  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
   1: write_ref($t2, $t1)
   2: return ()
 }
 
 
 [variant baseline]
-public fun m::test($t0: &mut m::S, $t1: m::S) {
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
      var $t2: u64
      var $t3: bool
      var $t4: u64
-     var $t5: &mut m::S
+     var $t5: &mut 0xc0ffee::m::S
      var $t6: u64
-     var $t7: &mut m::S
+     var $t7: &mut 0xc0ffee::m::S
      var $t8: u64
      var $t9: u64
   0: $t2 := 0
@@ -64,11 +64,11 @@ public fun m::test($t0: &mut m::S, $t1: m::S) {
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun m::bar($t0: &mut m::S, $t1: u64): u64 {
+fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
      var $t2: u64 [unused]
      var $t3: &mut u64
      # live vars: $t0, $t1
-  0: $t3 := borrow_field<m::S>.x($t0)
+  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
      # live vars: $t1, $t3
   1: write_ref($t3, $t1)
      # live vars: $t1
@@ -77,20 +77,20 @@ fun m::bar($t0: &mut m::S, $t1: u64): u64 {
 
 
 [variant baseline]
-fun m::destroy($t0: m::S) {
+fun m::destroy($t0: 0xc0ffee::m::S) {
      var $t1: u64
      # live vars: $t0
-  0: $t1 := unpack m::S($t0)
+  0: $t1 := unpack 0xc0ffee::m::S($t0)
      # live vars:
   1: return ()
 }
 
 
 [variant baseline]
-fun m::foo($t0: &mut m::S, $t1: u64) {
+fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t2: &mut u64
      # live vars: $t0, $t1
-  0: $t2 := borrow_field<m::S>.x($t0)
+  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
      # live vars: $t1, $t2
   1: write_ref($t2, $t1)
      # live vars:
@@ -99,13 +99,13 @@ fun m::foo($t0: &mut m::S, $t1: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &mut m::S, $t1: m::S) {
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
      var $t2: u64
      var $t3: bool
      var $t4: u64
-     var $t5: &mut m::S
+     var $t5: &mut 0xc0ffee::m::S
      var $t6: u64 [unused]
-     var $t7: &mut m::S
+     var $t7: &mut 0xc0ffee::m::S
      var $t8: u64 [unused]
      var $t9: u64 [unused]
      # live vars: $t0, $t1

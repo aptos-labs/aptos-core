@@ -4,10 +4,10 @@ module 0x42::M {
         x: u64,
     }
     spec fun exists_in_vector(v: vector<S>): bool {
-        exists s: M::S: v: Gt(select M::S.x<M::S>(s), 0)
+        exists s: 0x42::M::S: v: Gt(select M::S.x<0x42::M::S>(s), 0)
     }
     spec fun some_in_vector(v: vector<S>): S {
-        choose s: M::S: v: Eq<u64>(select M::S.x<M::S>(s), 0)
+        choose s: 0x42::M::S: v: Eq<u64>(select M::S.x<0x42::M::S>(s), 0)
     }
 } // end 0x42::M
 

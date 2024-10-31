@@ -19,10 +19,10 @@ module 0x42::M {
         pack M::T(select M::S.x<S>(select M::R.s<R>(r)))
     }
     spec fun struct_access(s: S): u64 {
-        select M::S.x<M::S>(s)
+        select M::S.x<0x42::M::S>(s)
     }
     spec fun nested_struct_access(r: R): bool {
-        select M::S.y<M::S>(select M::R.s<M::R>(r))
+        select M::S.y<0x42::M::S>(select M::R.s<0x42::M::R>(r))
     }
     spec fun struct_pack(x: u64,y: bool,z: vector<u64>): S {
         pack M::S(x, y, z)
@@ -43,10 +43,10 @@ module 0x42::M {
         pack M::G<u64>(x, y)
     }
     spec fun resource_global(addr: address): T {
-        global<M::T>(addr)
+        global<0x42::M::T>(addr)
     }
     spec fun resource_global_exists(addr: address): bool {
-        exists<M::T>(addr)
+        exists<0x42::M::T>(addr)
     }
 } // end 0x42::M
 

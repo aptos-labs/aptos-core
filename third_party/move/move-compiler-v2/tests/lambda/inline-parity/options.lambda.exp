@@ -1,7 +1,7 @@
 // -- Model dump before env processor pipeline:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -14,9 +14,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -27,7 +27,7 @@ module 0x42::Test {
 // -- Model dump after env processor unused checks:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -40,9 +40,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -53,7 +53,7 @@ module 0x42::Test {
 // -- Model dump after env processor type parameter check:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -66,9 +66,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -79,7 +79,7 @@ module 0x42::Test {
 // -- Model dump after env processor check recursive struct definition:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -92,9 +92,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -105,7 +105,7 @@ module 0x42::Test {
 // -- Model dump after env processor check cyclic type instantiation:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -118,9 +118,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -131,7 +131,7 @@ module 0x42::Test {
 // -- Model dump after env processor unused struct params check:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -144,9 +144,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -157,7 +157,7 @@ module 0x42::Test {
 // -- Model dump after env processor access and use check before inlining:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -170,9 +170,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -183,7 +183,7 @@ module 0x42::Test {
 // -- Model dump after env processor inlining:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -196,9 +196,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -209,7 +209,7 @@ module 0x42::Test {
 // -- Model dump after env processor access and use check after inlining:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -222,9 +222,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -235,7 +235,7 @@ module 0x42::Test {
 // -- Model dump after env processor acquires check:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -248,9 +248,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }
@@ -261,7 +261,7 @@ module 0x42::Test {
 // -- Model dump after env processor simplifier:
 module 0x42::map_opt {
     use std::option;
-    public fun map<Element,OtherElement>(t: option::Option<Element>,f: |Element|OtherElement): option::Option<OtherElement> {
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement): 0x1::option::Option<OtherElement> {
         if option::is_some<Element>(Borrow(Immutable)(t)) {
           option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
         } else {
@@ -274,9 +274,9 @@ module 0x42::Test {
     use 0x42::map_opt; // resolved as: 0x42::map_opt
     public fun test(): u64 {
         {
-          let t: option::Option<u64> = option::some<u64>(1);
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
           {
-            let x: option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, |e: u64| Add<u64>(e, 1));
             option::extract<u64>(Borrow(Mutable)(x))
           }
         }

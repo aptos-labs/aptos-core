@@ -1,14 +1,14 @@
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), {
       let (x: address): (address) = Tuple(a);
       {
         let r: bool = {
           let (a: address): (address) = Tuple(x);
-          Lt(select m::S.f<m::S>({
+          Lt(select m::S.f<0x42::m::S>({
             let (a: address): (address) = Tuple(a);
-            global<m::S>(a)
+            global<0x42::m::S>(a)
           }), 10)
         };
         r
