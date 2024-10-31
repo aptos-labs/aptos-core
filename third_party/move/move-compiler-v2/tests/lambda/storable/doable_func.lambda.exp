@@ -1,20 +1,2253 @@
+// -- Model dump before env processor pipeline:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  {
+                    let x: u64 = 5;
+                    curry(mod4::alt_multiply, 10, x)
+                  }
+                } else {
+                  if Eq<u64>(key, 4) {
+                    {
+                      let x: u64 = 6;
+                      curry(mod3::multiply, 1, x)
+                    }
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              {
+                                let x: u64 = 2;
+                                {
+                                  let y: u64 = 5;
+                                   move|z: u64| test::multiply3(x, y, z)
+                                }
+                              }
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                {
+                                  let z: u64 = 11;
+                                   move|x: u64| mod4::alt_multiply(x, z)
+                                }
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let x: u64 = 3;
+          {
+            let i: u64 = 0;
+            {
+              let __update_iter_flag: bool = false;
+              {
+                let __upper_bound_value: u64 = 14;
+                loop {
+                  if true {
+                    if __update_iter_flag {
+                      i: u64 = Add<u64>(i, 1)
+                    } else {
+                      __update_iter_flag: bool = true
+                    };
+                    if Lt<u64>(i, __upper_bound_value) {
+                      {
+                        let y: u64 = test::choose_function1(i, 3);
+                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
+                          Tuple()
+                        } else {
+                          Abort(i)
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    };
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  curry(mod4::alt_multiply, 10, 5)
+                } else {
+                  if Eq<u64>(key, 4) {
+                    curry(mod3::multiply, 1, 6)
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                         move|x: u64| mod3::multiply(x, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                               move|z: u64| test::multiply3(2, 5, z)
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                 move|x: u64| mod4::alt_multiply(x, 11)
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y);
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                       move|x: u64| (h)(x)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                       move|z: u64| (i)(z)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let i: u64 = 0;
+          {
+            let __update_iter_flag: bool = false;
+            loop {
+              if true {
+                if __update_iter_flag {
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  __update_iter_flag: bool = true
+                };
+                if Lt<u64>(i, 14) {
+                  {
+                    let y: u64 = test::choose_function1(i, 3);
+                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
+                      Tuple()
+                    } else {
+                      Abort(i)
+                    };
+                    Tuple()
+                  }
+                } else {
+                  break
+                };
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  curry(mod4::alt_multiply, 10, 5)
+                } else {
+                  if Eq<u64>(key, 4) {
+                    curry(mod3::multiply, 1, 6)
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                        curry(mod3::multiply, 1, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              curry(test::multiply3, 100, 2, 5)
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                curry(mod4::alt_multiply, 1, 11)
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 = curry(mod3::multiply, 11, );
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                      curry(test::choose_function1$lambda$1, 1, h)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                      curry(test::choose_function1$lambda$2, 1, i)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let i: u64 = 0;
+          {
+            let __update_iter_flag: bool = false;
+            loop {
+              if true {
+                if __update_iter_flag {
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  __update_iter_flag: bool = true
+                };
+                if Lt<u64>(i, 14) {
+                  {
+                    let y: u64 = test::choose_function1(i, 3);
+                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
+                      Tuple()
+                    } else {
+                      Abort(i)
+                    };
+                    Tuple()
+                  }
+                } else {
+                  break
+                };
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+    private fun choose_function1$lambda$1(h: |u64|u64): u64 {
+        (h)(x)
+    }
+    private fun choose_function1$lambda$2(i: |u64|u64): u64 {
+        (i)(z)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  curry(mod4::alt_multiply, 10, 5)
+                } else {
+                  if Eq<u64>(key, 4) {
+                    curry(mod3::multiply, 1, 6)
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                        curry(mod3::multiply, 1, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              curry(test::multiply3, 100, 2, 5)
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                curry(mod4::alt_multiply, 1, 11)
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 = curry(mod3::multiply, 11, );
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                      curry(test::choose_function1$lambda$1, 1, h)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                      curry(test::choose_function1$lambda$2, 1, i)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let i: u64 = 0;
+          {
+            let __update_iter_flag: bool = false;
+            loop {
+              if true {
+                if __update_iter_flag {
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  __update_iter_flag: bool = true
+                };
+                if Lt<u64>(i, 14) {
+                  {
+                    let y: u64 = test::choose_function1(i, 3);
+                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
+                      Tuple()
+                    } else {
+                      Abort(i)
+                    };
+                    Tuple()
+                  }
+                } else {
+                  break
+                };
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+    private fun choose_function1$lambda$1(h: |u64|u64): u64 {
+        (h)(x)
+    }
+    private fun choose_function1$lambda$2(i: |u64|u64): u64 {
+        (i)(z)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::mod4 {
+    public fun alt_multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod4
+module 0x42::mod3 {
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::mod3
+module 0x42::mod2 {
+    friend fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+} // end 0x42::mod2
+module 0x42::mod1 {
+    friend fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::mod1
+module 0x42::test {
+    use 0x42::mod1; // resolved as: 0x42::mod1
+    use 0x42::mod2; // resolved as: 0x42::mod2
+    use 0x42::mod3; // resolved as: 0x42::mod3
+    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
+    private fun add_mul(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(z, Add<u64>(x, y))
+    }
+    private fun choose_function1(key: u64,x: u64): u64 {
+        {
+          let f: |u64|u64 = if Eq<u64>(key, 0) {
+            mod2::double
+          } else {
+            if Eq<u64>(key, 1) {
+              mod1::triple
+            } else {
+              if Eq<u64>(key, 2) {
+                curry(mod3::multiply, 10, 4)
+              } else {
+                if Eq<u64>(key, 3) {
+                  curry(mod4::alt_multiply, 10, 5)
+                } else {
+                  if Eq<u64>(key, 4) {
+                    curry(mod3::multiply, 1, 6)
+                  } else {
+                    if Eq<u64>(key, 5) {
+                      curry(test::multiply3, 1, 3, 2)
+                    } else {
+                      if Eq<u64>(key, 6) {
+                        curry(mod3::multiply, 1, 7)
+                      } else {
+                        if Eq<u64>(key, 7) {
+                          curry(test::multiply3, 10, 4, 2)
+                        } else {
+                          if Eq<u64>(key, 8) {
+                            curry(test::multiply3, 100, 3, 3)
+                          } else {
+                            if Eq<u64>(key, 9) {
+                              curry(test::multiply3, 100, 2, 5)
+                            } else {
+                              if Eq<u64>(key, 10) {
+                                curry(mod4::alt_multiply, 1, 11)
+                              } else {
+                                if Eq<u64>(key, 11) {
+                                  {
+                                    let g: |(u64, u64)|u64 = curry(mod3::multiply, 11, );
+                                    curry(g, 1, 11)
+                                  }
+                                } else {
+                                  if Eq<u64>(key, 12) {
+                                    {
+                                      let h: |u64|u64 = curry(mod3::multiply, 1, 12);
+                                      curry(test::choose_function1$lambda$1, 1, h)
+                                    }
+                                  } else {
+                                    {
+                                      let i: |u64|u64 = curry(test::multiply3, 10, 2, 2);
+                                      curry(test::choose_function1$lambda$2, 1, i)
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          };
+          (f)(x)
+        }
+    }
+    private fun multiply3(x: u64,y: u64,z: u64): u64 {
+        Mul<u64>(Mul<u64>(x, y), z)
+    }
+    public fun test_functions() {
+        {
+          let i: u64 = 0;
+          {
+            let __update_iter_flag: bool = false;
+            loop {
+              if true {
+                if __update_iter_flag {
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  __update_iter_flag: bool = true
+                };
+                if Lt<u64>(i, 14) {
+                  {
+                    let y: u64 = test::choose_function1(i, 3);
+                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
+                      Tuple()
+                    } else {
+                      Abort(i)
+                    };
+                    Tuple()
+                  }
+                } else {
+                  break
+                };
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+    private fun choose_function1$lambda$1(h: |u64|u64): u64 {
+        (h)(x)
+    }
+    private fun choose_function1$lambda$2(i: |u64|u64): u64 {
+        (i)(z)
+    }
+} // end 0x42::test
+
+
 
 Diagnostics:
-error: expected `u64` but found a value of type `|u64|u64`
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:39:17
+   │
+39 │                 mod2::double
+   │                 ^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:41:17
+   │
+41 │                 mod1::triple
+   │                 ^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:43:17
+   │
+43 │                 mod3::multiply(4, _)
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:46:17
+   │
+46 │                 alt_multiply(x, _)
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:49:17
+   │
+49 │                 mod3::multiply(_, x)
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:51:17
+   │
+51 │                 multiply3(_, 3, 2)
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:53:17
+   │
+53 │                 move |x| mod3::multiply(x, 7)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:55:17
+   │
+55 │                 multiply3(4, _, 2)
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:57:17
+   │
+57 │                 multiply3(3, 3, _)
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:61:17
+   │
+61 │                 move |z| multiply3(x, y, z)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:64:17
+   │
+64 │                 move |x| alt_multiply(x, z)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:66:25
+   │
+66 │                 let g = move |x, y| mod3::multiply(x, y);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:67:17
    │
 67 │                 g(_, 11)
    │                 ^^^^^^^^
 
-error: expected `|u64|u64` but found a value of type `u64`
-   ┌─ tests/lambda/storable/doable_func.move:65:20
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:69:25
    │
-65 │               } else if (key == 11) {
-   │ ╭────────────────────^
-66 │ │                 let g = move |x, y| mod3::multiply(x, y);
-67 │ │                 g(_, 11)
-68 │ │             } else if (key == 12) {
-   · │
-73 │ │                 move |z| i(z)
-74 │ │             };
-   │ ╰─────────────^
+69 │                 let h = mod3::multiply(_, 12);
+   │                         ^^^^^^^^^^^^^^^^^^^^^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:70:26
+   │
+70 │                 move |x| h(x)
+   │                          ^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:70:17
+   │
+70 │                 move |x| h(x)
+   │                 ^^^^^^^^^^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:72:25
+   │
+72 │                 let i = multiply3(2, _, 2);
+   │                         ^^^^^^^^^^^^^^^^^^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:73:26
+   │
+73 │                 move |z| i(z)
+   │                          ^^^^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/doable_func.move:73:17
+   │
+73 │                 move |z| i(z)
+   │                 ^^^^^^^^^^^^^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:75:9
+   │
+75 │         f(x)
+   │         ^^^^
