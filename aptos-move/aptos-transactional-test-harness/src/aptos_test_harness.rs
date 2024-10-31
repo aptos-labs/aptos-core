@@ -27,7 +27,7 @@ use aptos_types::{
     },
     AptosCoinType,
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
@@ -522,9 +522,9 @@ impl<'a> AptosTestAdapter<'a> {
             // Or should we just use execute_block_no_limit ?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
-        let (mut outputs, _) =
-            AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
-                .into_inner();
+        let (mut outputs, _) = AptosVMBlockExecutor
+            .execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
+            .into_inner();
 
         assert_eq!(outputs.len(), 1);
 

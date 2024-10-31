@@ -8,7 +8,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_consensus_types::block::Block;
 use aptos_db::AptosDB;
-use aptos_executor::block_executor::{AptosVMBlockExecutor, BlockExecutor};
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -37,7 +37,7 @@ use aptos_types::{
     waypoint::Waypoint,
     AptosCoinType,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use rand::SeedableRng;
 use std::{path::Path, sync::Arc};
 
@@ -393,7 +393,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
             ))
         })
         .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
-    let waypoint = bootstrap_genesis::<AptosVM>(&dbrw, genesis).unwrap();
+    let waypoint = bootstrap_genesis::<AptosVMBlockExecutor>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 
     (db, dbrw, executor, waypoint)

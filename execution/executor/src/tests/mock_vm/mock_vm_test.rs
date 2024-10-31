@@ -13,7 +13,7 @@ use aptos_types::{
     transaction::signature_verified_transaction::into_signature_verified_block,
     write_set::WriteOp,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use std::collections::BTreeMap;
 
 fn gen_address(index: u8) -> AccountAddress {
@@ -42,11 +42,9 @@ fn test_mock_vm_different_senders() {
         txns.push(encode_mint_transaction(gen_address(i), amount));
     }
 
-    let outputs = MockVM::execute_block_no_limit(
-        &into_signature_verified_block(txns.clone()),
-        &MockStateView,
-    )
-    .expect("MockVM should not fail to start");
+    let outputs = MockVM
+        .execute_block_no_limit(&into_signature_verified_block(txns.clone()), &MockStateView)
+        .expect("MockVM should not fail to start");
 
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
         let sender = txn.try_as_signed_user_txn().unwrap().sender();
@@ -81,9 +79,9 @@ fn test_mock_vm_same_sender() {
         txns.push(encode_mint_transaction(sender, amount));
     }
 
-    let outputs =
-        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
-            .expect("MockVM should not fail to start");
+    let outputs = MockVM
+        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+        .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(
@@ -116,9 +114,9 @@ fn test_mock_vm_payment() {
         encode_transfer_transaction(gen_address(0), gen_address(1), 50),
     ];
 
-    let output =
-        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
-            .expect("MockVM should not fail to start");
+    let output = MockVM
+        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+        .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();
     output_iter.next();

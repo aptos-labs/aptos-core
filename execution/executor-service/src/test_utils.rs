@@ -19,8 +19,9 @@ use aptos_types::{
     },
 };
 use aptos_vm::{
+    aptos_vm::AptosVMBlockExecutor,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    AptosVM, VMExecutor,
+    VMBlockExecutor,
 };
 use std::{
     collections::HashMap,
@@ -136,8 +137,9 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             .into_iter()
             .map(|t| t.into_txn())
             .collect();
-    let unsharded_txn_output =
-        AptosVM::execute_block_no_limit(&txns, executor.data_store()).unwrap();
+    let unsharded_txn_output = AptosVMBlockExecutor
+        .execute_block_no_limit(&txns, executor.data_store())
+        .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();
 }
@@ -190,8 +192,9 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         )
         .unwrap();
 
-    let unsharded_txn_output =
-        AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store()).unwrap();
+    let unsharded_txn_output = AptosVMBlockExecutor
+        .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+        .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();
 }

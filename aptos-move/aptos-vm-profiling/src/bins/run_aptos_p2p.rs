@@ -7,7 +7,7 @@ use aptos_types::{
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
     write_set::WriteSet,
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::{
     collections::HashMap,
     io::{self, Read},
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let res = AptosVM::execute_block_no_limit(&txns, &state_store)?;
+    let res = AptosVMBlockExecutor.execute_block_no_limit(&txns, &state_store)?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

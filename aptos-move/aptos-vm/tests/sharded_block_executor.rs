@@ -202,8 +202,9 @@ mod test_utils {
         },
     };
     use aptos_vm::{
+        aptos_vm::AptosVMBlockExecutor,
         sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-        AptosVM, VMExecutor,
+        VMBlockExecutor,
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
@@ -307,8 +308,9 @@ mod test_utils {
                 .into_iter()
                 .map(|t| t.into_txn())
                 .collect();
-        let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&ordered_txns, executor.data_store()).unwrap();
+        let unsharded_txn_output = AptosVMBlockExecutor
+            .execute_block_no_limit(&ordered_txns, executor.data_store())
+            .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -356,9 +358,9 @@ mod test_utils {
             )
             .unwrap();
 
-        let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
-                .unwrap();
+        let unsharded_txn_output = AptosVMBlockExecutor
+            .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+            .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -410,9 +412,9 @@ mod test_utils {
             )
             .unwrap();
 
-        let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
-                .unwrap();
+        let unsharded_txn_output = AptosVMBlockExecutor
+            .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+            .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 }

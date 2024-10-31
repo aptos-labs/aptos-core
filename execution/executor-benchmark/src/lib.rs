@@ -26,7 +26,7 @@ use aptos_block_executor::counters::{
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
-    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    block_executor::BlockExecutor,
     metrics::{
         COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
         PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
@@ -44,6 +44,7 @@ use aptos_transaction_generator_lib::{
     TransactionType::{self, CoinTransfer},
 };
 use aptos_types::on_chain_config::Features;
+use aptos_vm::VMBlockExecutor;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use metrics::TIMER;
 use pipeline::PipelineConfig;
@@ -58,7 +59,7 @@ use tokio::runtime::Runtime;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     let db = DbReaderWriter::new(
         AptosDB::open(
@@ -120,7 +121,7 @@ pub fn run_benchmark<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
 ) where
-    V: TransactionBlockExecutor + 'static,
+    V: VMBlockExecutor + 'static,
 {
     create_checkpoint(
         source_dir.as_ref(),
@@ -286,7 +287,7 @@ fn init_workload<V>(
     pipeline_config: &PipelineConfig,
 ) -> (Box<dyn TransactionGeneratorCreator>, Arc<AtomicUsize>)
 where
-    V: TransactionBlockExecutor + 'static,
+    V: VMBlockExecutor + 'static,
 {
     let start_version = db.reader.expect_synced_version();
     let (pipeline, block_sender) = Pipeline::<V>::new(
@@ -341,7 +342,7 @@ pub fn add_accounts<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
 ) where
-    V: TransactionBlockExecutor + 'static,
+    V: VMBlockExecutor + 'static,
 {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
     create_checkpoint(
@@ -375,7 +376,7 @@ fn add_accounts_impl<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
 ) where
-    V: TransactionBlockExecutor + 'static,
+    V: VMBlockExecutor + 'static,
 {
     let (mut config, genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
@@ -776,7 +777,6 @@ mod tests {
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
-    use aptos_executor::block_executor::{AptosVMBlockExecutor, TransactionBlockExecutor};
     use aptos_executor_types::BlockExecutorTrait;
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
     use aptos_temppath::TempPath;
@@ -785,7 +785,7 @@ mod tests {
         on_chain_config::{FeatureFlag, Features},
         transaction::Transaction,
     };
-    use aptos_vm::AptosVM;
+    use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
     use rand::thread_rng;
     use std::fs;
 
@@ -881,7 +881,7 @@ mod tests {
         transaction_type: Option<TransactionTypeArg>,
         verify_sequence_numbers: bool,
     ) where
-        E: TransactionBlockExecutor + 'static,
+        E: VMBlockExecutor + 'static,
     {
         aptos_logger::Logger::new().init();
 

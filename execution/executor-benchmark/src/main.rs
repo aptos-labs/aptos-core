@@ -13,7 +13,6 @@ use aptos_block_partitioner::{
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
-use aptos_executor::block_executor::{AptosVMBlockExecutor, TransactionBlockExecutor};
 use aptos_executor_benchmark::{
     native::native_config::NativeConfig, native_executor::NativeExecutor, pipeline::PipelineConfig,
     BenchmarkWorkload,
@@ -27,7 +26,7 @@ use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::AptosVM;
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
@@ -423,7 +422,7 @@ fn get_init_features(
 
 fn run<E>(opt: Opt)
 where
-    E: TransactionBlockExecutor + 'static,
+    E: VMBlockExecutor + 'static,
 {
     match opt.cmd {
         Command::CreateDb {
