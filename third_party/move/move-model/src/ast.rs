@@ -541,15 +541,15 @@ pub enum LambdaCaptureKind {
 
 impl fmt::Display for LambdaCaptureKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &LambdaCaptureKind::Default => {
+        match *self {
+            LambdaCaptureKind::Default => {
                 write!(f, "")
             },
-            &LambdaCaptureKind::Copy => {
+            LambdaCaptureKind::Copy => {
                 write!(f, "copy")
             },
-            &LambdaCaptureKind::Move => write!(f, "move"),
-            &LambdaCaptureKind::Borrow => write!(f, "&"),
+            LambdaCaptureKind::Move => write!(f, "move"),
+            LambdaCaptureKind::Borrow => write!(f, "&"),
         }
     }
 }
@@ -3212,7 +3212,7 @@ impl<'a> ExpDisplay<'a> {
     fn get_tctx(&'a self) -> &'a TypeDisplayContext<'a> {
         match &self.tctx {
             Either::Left(tctx) => tctx,
-            Either::Right(tctx_ref) => *tctx_ref,
+            Either::Right(tctx_ref) => tctx_ref,
         }
     }
 }
@@ -3578,7 +3578,7 @@ impl<'a> OperationDisplay<'a> {
     fn get_tctx(&'a self) -> &'a TypeDisplayContext<'a> {
         match &self.tctx {
             Either::Left(tctx) => tctx,
-            Either::Right(tctx_ref) => *tctx_ref,
+            Either::Right(tctx_ref) => tctx_ref,
         }
     }
 }

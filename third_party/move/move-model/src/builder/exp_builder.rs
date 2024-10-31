@@ -1210,14 +1210,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             ) {
                 return None;
             }
-        } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
-            if !self.check_language_version(
+        } else if type_args.is_some()
+            && !type_args.as_ref().unwrap().is_empty()
+            && !self.check_language_version(
                 &loc,
                 "access specifier type instantiation. Try removing the type instantiation.",
                 LanguageVersion::V2_0,
-            ) {
-                return None;
-            }
+            )
+        {
+            return None;
         }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
@@ -1251,13 +1252,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    let mident = sp(
-                        specifier.loc,
-                        EA::ModuleIdent_ {
-                            address: *address,
-                            module: *module,
-                        },
-                    );
+                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
+                        address: *address,
+                        module: *module,
+                    });
                     let maccess = sp(
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource, None),
@@ -1308,14 +1306,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ResourceSpecifier::Any
             },
         };
-        if !matches!(resource, ResourceSpecifier::Resource(..)) {
-            if !self.check_language_version(
+        if !matches!(resource, ResourceSpecifier::Resource(..))
+            && !self.check_language_version(
                 &loc,
                 "address and wildcard access specifiers. Only resource type names can be provided.",
                 LanguageVersion::V2_0,
-            ) {
-                return None;
-            }
+            )
+        {
+            return None;
         }
         let address = self.translate_address_specifier(address)?;
         Some(AccessSpecifier {
@@ -1993,13 +1991,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
                     // Remember information about this spec block for deferred checking.
-                    self.placeholder_map.insert(
-                        id,
-                        ExpPlaceholder::SpecBlockInfo {
+                    self.placeholder_map
+                        .insert(id, ExpPlaceholder::SpecBlockInfo {
                             spec_id: *spec_id,
                             locals: self.get_locals(),
-                        },
-                    );
+                        });
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
@@ -3680,11 +3676,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(
-                global_id,
-                Operation::Global(None),
-                vec![zero_addr.into_exp()],
-            );
+            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
+                zero_addr.into_exp()
+            ]);
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -3910,11 +3904,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ),
             );
             self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
-            let call = ExpData::Call(
-                node_id,
-                Operation::MoveFunction(mid, fid),
-                vec![vec_exp_e.into_exp(), idx_exp_e.clone().into_exp()],
-            );
+            let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
+                vec_exp_e.into_exp(),
+                idx_exp_e.clone().into_exp(),
+            ]);
             return call;
         }
         ExpData::Invalid(self.env().new_node_id())
@@ -4092,13 +4085,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.create_select_oper(&loc, &mid.qualified_inst(sid, inst), field_name)
                 } else {
                     // Create a placeholder for later resolution.
-                    self.placeholder_map.insert(
-                        id,
-                        ExpPlaceholder::FieldSelectInfo {
+                    self.placeholder_map
+                        .insert(id, ExpPlaceholder::FieldSelectInfo {
                             struct_ty: ty,
                             field_name,
-                        },
-                    );
+                        });
                     Operation::NoOp
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])
@@ -4573,29 +4564,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // Commit the candidate substitution to this expression translator.
                 self.subs = subs;
 
-                if mask != 0u128 {
-                    if !matches!(cand, AnyFunEntry::UserFun(_)) {
-                        let labels = args
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(i, exp)| {
-                                if (1u128 << i) != 0 {
-                                    Some((
-                                        self.to_loc(&exp.loc),
-                                        "`_` not permitted here".to_string(),
-                                    ))
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect_vec();
-                        self.error_with_labels(
+                if mask != 0u128 && !matches!(cand, AnyFunEntry::UserFun(_)) {
+                    let labels = args
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, exp)| {
+                            if (1u128 << i) != 0 {
+                                Some((self.to_loc(&exp.loc), "`_` not permitted here".to_string()))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect_vec();
+                    self.error_with_labels(
                             loc,
                             "Closure construction with `_` placeholders is only allowed in function call expressions",
                             labels
                         );
-                        return self.new_error_exp();
-                    }
+                    return self.new_error_exp();
                 }
 
                 // Map implementation operations to specification ops if compiling function as spec
@@ -4864,8 +4850,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         if let Some(instantiation) = instantiation {
                             self.set_node_instantiation(fun_id, instantiation.clone());
                         };
-                        let fun_exp = ExpData::MoveFunctionExp(fun_id, mid, fid);
-                        fun_exp
+                        ExpData::MoveFunctionExp(fun_id, mid, fid)
                     } else {
                         panic!("Only MoveFunction operations should be possible here")
                     }
@@ -4922,15 +4907,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             None,
         );
         let id = self.new_node_id_with_type_loc(expected_type, loc);
-        self.placeholder_map.insert(
-            id,
-            ExpPlaceholder::ReceiverCallInfo {
+        self.placeholder_map
+            .insert(id, ExpPlaceholder::ReceiverCallInfo {
                 name,
                 generics: generics.map(|g| g.1.clone()),
                 arg_types,
                 result_type: expected_type.clone(),
-            },
-        );
+            });
         ExpData::Call(id, Operation::NoOp, args)
     }
 
@@ -5424,11 +5407,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> Option<usize> {
         let struct_entry = self.parent.parent.lookup_struct_entry(struct_id);
         match (&struct_entry.layout, variant) {
-            (StructLayout::Singleton(fields, _), None) => Some(if struct_entry.is_empty_struct {
-                0
-            } else {
-                fields.len()
-            }),
+            (StructLayout::Singleton(fields, _), None) => Some(
+                if struct_entry.is_empty_struct {
+                    0
+                } else {
+                    fields.len()
+                },
+            ),
             (StructLayout::Variants(variants), Some(name)) => variants
                 .iter()
                 .find(|v| v.name == name)

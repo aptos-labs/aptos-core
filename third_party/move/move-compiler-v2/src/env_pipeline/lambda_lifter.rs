@@ -267,7 +267,7 @@ impl<'a> LambdaLifter<'a> {
             Value(..) | LocalVar(..) | Temporary(..) | MoveFunctionExp(..) => Some(arg),
             Sequence(_, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
-                    Self::get_arg_if_simple(&exp)
+                    Self::get_arg_if_simple(exp)
                 } else {
                     None
                 }
@@ -295,14 +295,14 @@ impl<'a> LambdaLifter<'a> {
         match fn_exp.as_ref() {
             MoveFunctionExp(..) => Some(fn_exp.clone()),
             Curry(id, mask, fn_exp, args) => Self::get_fun_if_simple(fn_exp).and_then(|fn_exp| {
-                Self::get_args_if_simple(args).and_then(|args| {
+                Self::get_args_if_simple(args).map(|args| {
                     let args = args.iter().map(|expref| (*expref).clone()).collect();
-                    Some(ExpData::Curry(*id, *mask, fn_exp, args).into_exp())
+                    ExpData::Curry(*id, *mask, fn_exp, args).into_exp()
                 })
             }),
             Sequence(_, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
-                    Self::get_fun_if_simple(&exp)
+                    Self::get_fun_if_simple(exp)
                 } else {
                     None
                 }
@@ -655,7 +655,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         let params_types = params.iter().map(|param| param.get_type()).collect();
         self.lifted.push(ClosureFunction {
             loc: lambda_loc.clone(),
-            fun_id: fun_id.clone(),
+            fun_id,
             type_params: self.fun_env.get_type_parameters(),
             params,
             result_type: result_type.clone(),
