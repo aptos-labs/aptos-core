@@ -58,7 +58,7 @@ module 0x8675309::M {
     }
 
     public fun wrong_local_call_no_fun(x: u64) {
-        x(1)
+        x(1) // expected to be not a function
     }
 
     public fun wrong_lambda_inferred_type() {
@@ -83,18 +83,17 @@ module 0x8675309::M {
 
     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
 
-    public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+    public inline fun inline_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
         abort (1)
     }
     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
         abort (1)
     }
-
 }
 
 module 0x1::XVector {
-    public fun length<T>(v: &vector<T>): u64 { abort(1) }
-    public fun is_empty<T>(v: &vector<T>): bool { abort(1) }
-    public fun borrow<T>(v: &vector<T>, i: u64): &T { abort(1) }
-    public fun pop_back<T>(v: &mut vector<T>): T { abort(1) }
+    public fun length<T>(_v: &vector<T>): u64 { abort(1) }
+    public fun is_empty<T>(_v: &vector<T>): bool { abort(1) }
+    public fun borrow<T>(_v: &vector<T>, _i: u64): &T { abort(1) }
+    public fun pop_back<T>(_v: &mut vector<T>): T { abort(1) }
 }

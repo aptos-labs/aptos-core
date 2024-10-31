@@ -364,7 +364,7 @@ impl LedgerDb {
                 &gen_rocksdb_options(db_config, true),
                 path.clone(),
                 name,
-                Self::get_column_families_by_name(name),
+                Self::gen_cfds_by_name(db_config, name),
             )?
         } else {
             DB::open_cf(

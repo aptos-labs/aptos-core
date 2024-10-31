@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/expansion/weird_apply_assign.move:7:11
+  │
+7 │         S f = S { f: 0 };
+  │           ^
+  │           │
+  │           Unexpected 'f'
+  │           Expected ';'

@@ -67,6 +67,7 @@ pub const SUCCESS_LABEL: &str = "success";
 // Bounded executor task labels
 pub const CLIENT_EVENT_LABEL: &str = "client_event";
 pub const CLIENT_EVENT_GET_TXN_LABEL: &str = "client_event_get_txn";
+pub const CLIENT_EVENT_GET_PARKING_LOT_ADDRESSES: &str = "client_event_get_parking_lot_addresses";
 pub const RECONFIG_EVENT_LABEL: &str = "reconfig";
 pub const PEER_BROADCAST_EVENT_LABEL: &str = "peer_broadcast";
 
@@ -118,7 +119,7 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
 
 const TXN_CONSENSUS_PULLED_BUCKETS: &[f64] = &[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25.0, 50.0, 100.0];
 
-static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+static TXN_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
     )
@@ -284,7 +285,7 @@ pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_core_mempool_gc_event_count",
         "Number of times the periodic garbage-collection event occurs, regardless of how many txns were actually removed",
         &["type"])
-       .unwrap()
+        .unwrap()
 });
 
 /// Counter for number of periodic client garbage-collection (=GC) events that happen with eager
@@ -316,6 +317,33 @@ pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET: Lazy<HistogramVec> = Laz
     .unwrap()
 });
 
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_count",
+        "Number of txns evicted from parking lot",
+        TXN_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_bytes",
+        "Bytes of txns evicted from parking lot",
+        exponential_buckets(/*start=*/ 500.0, /*factor=*/ 1.4, /*count=*/ 32).unwrap()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_LATENCY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_latency",
+        "Latency of evicting for each transaction from parking lot",
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 /// Counter of pending network events to Mempool
 pub static PENDING_MEMPOOL_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -333,9 +361,9 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.clone()
+        TXN_COUNT_BUCKETS.clone()
     )
-    .unwrap()
+        .unwrap()
 });
 
 pub fn mempool_service_transactions(label: &'static str, num: usize) {

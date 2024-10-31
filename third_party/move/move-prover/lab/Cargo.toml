@@ -7,8 +7,9 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-# diem dependencies
+# Move dependencies
 move-compiler = { path = "../../move-compiler" }
+move-compiler-v2 = { path = "../../move-compiler-v2" }
 move-model = { path = "../../move-model" }
 move-prover = { path = ".." }
 move-prover-boogie-backend = { path = "../boogie-backend" }

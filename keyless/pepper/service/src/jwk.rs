@@ -17,6 +17,10 @@ use tokio::time::Instant;
 static AUTH_0_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$").unwrap());
 
+static COGNITO_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^https://cognito-idp\.[a-zA-Z0-9-_]+\.amazonaws\.com/[a-zA-Z0-9-_]+$").unwrap()
+});
+
 /// The JWK in-mem cache.
 pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<RSA_JWK>>>> =
     Lazy::new(DashMap::new);
@@ -24,17 +28,25 @@ pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<RSA_JWK>>
 pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
     let payload = parse(jwt)?;
 
-    if !AUTH_0_REGEX.is_match(&payload.claims.iss) {
-        return Err(anyhow!("not a federated iss"));
-    }
-
     let jwt_kid: String = match payload.header.kid {
         Some(kid) => kid,
         None => return Err(anyhow!("no kid found on jwt header")),
     };
 
-    let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
-    let keys = fetch_jwks(&jwk_url).await?;
+    // Check if it is a test iss
+    let keys = if payload.claims.iss.eq("test.federated.oidc.provider") {
+        let test_jwk = include_str!("../../../../types/src/jwks/rsa/secure_test_jwk.json");
+        parse_jwks(test_jwk).expect("test jwk should parse")
+    } else if AUTH_0_REGEX.is_match(&payload.claims.iss) {
+        let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
+        fetch_jwks(&jwk_url).await?
+    } else if COGNITO_REGEX.is_match(&payload.claims.iss) {
+        let jwk_url = format!("{}/.well-known/jwks.json", &payload.claims.iss);
+        fetch_jwks(&jwk_url).await?
+    } else {
+        return Err(anyhow!("not a federated iss"));
+    };
+
     let key = keys
         .get(&jwt_kid)
         .ok_or_else(|| anyhow!("unknown kid: {}", jwt_kid))?;

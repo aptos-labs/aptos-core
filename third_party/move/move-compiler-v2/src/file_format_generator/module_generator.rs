@@ -365,7 +365,18 @@ impl ModuleGenerator {
                     ReferenceKind::Mutable => FF::SignatureToken::MutableReference(target_ty),
                 }
             },
-            Fun(_, _) | TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
+            Fun(_param_ty, _result_ty) => {
+                // TODO(LAMBDA)
+                ctx.error(
+                    loc,
+                    format!(
+                        "Unexpected type: {}",
+                        ty.display(&ctx.env.get_type_display_ctx())
+                    ),
+                );
+                FF::SignatureToken::Bool
+            },
+            TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
                 ctx.internal_error(
                     loc,
                     format!(

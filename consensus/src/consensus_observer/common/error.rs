@@ -12,6 +12,9 @@ pub enum Error {
     #[error("Network error: {0}")]
     NetworkError(String),
 
+    #[error("Consensus observer progress stopped: {0}")]
+    ObserverProgressStopped(String),
+
     #[error("Aptos network rpc error: {0}")]
     RpcError(#[from] RpcError),
 
@@ -20,6 +23,9 @@ pub enum Error {
 
     #[error("Subscription progress stopped: {0}")]
     SubscriptionProgressStopped(String),
+
+    #[error("Subscriptions reset: {0}")]
+    SubscriptionsReset(String),
 
     #[error("Subscription suboptimal: {0}")]
     SubscriptionSuboptimal(String),
@@ -37,9 +43,11 @@ impl Error {
         match self {
             Self::InvalidMessageError(_) => "invalid_message_error",
             Self::NetworkError(_) => "network_error",
+            Self::ObserverProgressStopped(_) => "observer_progress_stopped",
             Self::RpcError(_) => "rpc_error",
             Self::SubscriptionDisconnected(_) => "subscription_disconnected",
             Self::SubscriptionProgressStopped(_) => "subscription_progress_stopped",
+            Self::SubscriptionsReset(_) => "subscriptions_reset",
             Self::SubscriptionSuboptimal(_) => "subscription_suboptimal",
             Self::SubscriptionTimeout(_) => "subscription_timeout",
             Self::UnexpectedError(_) => "unexpected_error",

@@ -3,39 +3,29 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
-use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
-use aptos_crypto::{
-    hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::HashValue;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
-    account_config::NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
+    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
-    epoch_state::EpochState,
     jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
+    proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        block_epilogue::{BlockEndInfo, BlockEpiloguePayload},
-        ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionStatus, Version,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
+        Version,
     },
     write_set::WriteSet,
 };
 pub use error::{ExecutorError, ExecutorResult};
-pub use executed_chunk::ExecutedChunk;
 pub use ledger_update_output::LedgerUpdateOutput;
-pub use parsed_transaction_output::ParsedTransactionOutput;
-use serde::{Deserialize, Serialize};
+use state_compute_result::StateComputeResult;
 use std::{
-    cmp::max,
     collections::{BTreeSet, HashMap},
-    fmt::Debug,
     ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -44,11 +34,12 @@ use std::{
 };
 
 mod error;
-mod executed_chunk;
 pub mod execution_output;
 mod ledger_update_output;
-pub mod parsed_transaction_output;
+pub mod planned;
 pub mod state_checkpoint_output;
+pub mod state_compute_result;
+pub mod transactions_with_output;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -143,9 +134,8 @@ pub trait BlockExecutorTrait: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
-        let state_checkpoint_output =
-            self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
-        self.ledger_update(block_id, parent_block_id, state_checkpoint_output)
+        self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
+        self.ledger_update(block_id, parent_block_id)
     }
 
     /// Executes a block and returns the state checkpoint output.
@@ -154,13 +144,12 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput>;
+    ) -> ExecutorResult<()>;
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -169,19 +158,13 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> ExecutorResult<()> {
-        let mut parent_block_id = self.committed_block_id();
         for block_id in block_ids {
-            self.pre_commit_block(block_id, parent_block_id)?;
-            parent_block_id = block_id;
+            self.pre_commit_block(block_id)?;
         }
         self.commit_ledger(ledger_info_with_sigs)
     }
 
-    fn pre_commit_block(
-        &self,
-        block_id: HashValue,
-        parent_block_id: HashValue,
-    ) -> ExecutorResult<()>;
+    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()>;
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 
@@ -262,16 +245,16 @@ impl VerifyExecutionMode {
 }
 
 pub trait TransactionReplayer: Send {
-    fn replay(
+    fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
-    ) -> Result<()>;
+    ) -> Result<usize>;
 
-    fn commit(&self) -> Result<ExecutedChunk>;
+    fn commit(&self) -> Result<Version>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
@@ -282,261 +265,25 @@ pub struct ChunkCommitNotification {
     pub reconfiguration_occurred: bool,
 }
 
-/// A structure that summarizes the result of the execution needed for consensus to agree on.
-/// The execution is responsible for generating the ID of the new state, which is returned in the
-/// result.
-///
-/// Not every transaction in the payload succeeds: the returned vector keeps the boolean status
-/// of success / failure of the transactions.
-/// Note that the specific details of compute_status are opaque to StateMachineReplication,
-/// which is going to simply pass the results between StateComputer and PayloadClient.
-#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct StateComputeResult {
-    /// transaction accumulator root hash is identified as `state_id` in Consensus.
-    root_hash: HashValue,
-    /// Represents the roots of all the full subtrees from left to right in this accumulator
-    /// after the execution. For details, please see [`InMemoryAccumulator`](aptos_types::proof::accumulator::InMemoryAccumulator).
-    frozen_subtree_roots: Vec<HashValue>,
-
-    /// The frozen subtrees roots of the parent block,
-    parent_frozen_subtree_roots: Vec<HashValue>,
-
-    /// The number of leaves of the transaction accumulator after executing a proposed block.
-    /// This state must be persisted to ensure that on restart that the version is calculated correctly.
-    num_leaves: u64,
-
-    /// The number of leaves after executing the parent block,
-    parent_num_leaves: u64,
-
-    /// If set, this is the new epoch info that should be changed to if this block is committed.
-    epoch_state: Option<EpochState>,
-    /// The compute status (success/failure) of the given payload. The specific details are opaque
-    /// for StateMachineReplication, which is merely passing it between StateComputer and
-    /// PayloadClient.
-    ///
-    /// Here, only input transactions statuses are kept, and in their order.
-    /// Input includes BlockMetadata, but doesn't include StateCheckpoint/BlockEpilogue
-    compute_status_for_input_txns: Vec<TransactionStatus>,
-
-    /// The transaction info hashes of all success txns.
-    transaction_info_hashes: Vec<HashValue>,
-
-    subscribable_events: Vec<ContractEvent>,
-
-    block_end_info: Option<BlockEndInfo>,
+pub struct ProofReader<'a> {
+    proofs: Option<&'a HashMap<HashValue, SparseMerkleProofExt>>,
 }
 
-impl StateComputeResult {
-    pub fn new(
-        root_hash: HashValue,
-        frozen_subtree_roots: Vec<HashValue>,
-        num_leaves: u64,
-        parent_frozen_subtree_roots: Vec<HashValue>,
-        parent_num_leaves: u64,
-        epoch_state: Option<EpochState>,
-        compute_status_for_input_txns: Vec<TransactionStatus>,
-        transaction_info_hashes: Vec<HashValue>,
-        subscribable_events: Vec<ContractEvent>,
-        block_end_info: Option<BlockEndInfo>,
-    ) -> Self {
+impl<'a> ProofReader<'a> {
+    pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
         Self {
-            root_hash,
-            frozen_subtree_roots,
-            num_leaves,
-            parent_frozen_subtree_roots,
-            parent_num_leaves,
-            epoch_state,
-            compute_status_for_input_txns,
-            transaction_info_hashes,
-            subscribable_events,
-            block_end_info,
+            proofs: Some(proofs),
         }
-    }
-
-    /// generate a new dummy state compute result with a given root hash.
-    /// this function is used in RandomComputeResultStateComputer to assert that the compute
-    /// function is really called.
-    pub fn new_dummy_with_root_hash(root_hash: HashValue) -> Self {
-        Self {
-            root_hash,
-            frozen_subtree_roots: vec![],
-            num_leaves: 0,
-            parent_frozen_subtree_roots: vec![],
-            parent_num_leaves: 0,
-            epoch_state: None,
-            compute_status_for_input_txns: vec![],
-            transaction_info_hashes: vec![],
-            subscribable_events: vec![],
-            block_end_info: None,
-        }
-    }
-
-    pub fn new_dummy_with_num_txns(num_txns: usize) -> Self {
-        Self {
-            root_hash: HashValue::zero(),
-            frozen_subtree_roots: vec![],
-            num_leaves: 0,
-            parent_frozen_subtree_roots: vec![],
-            parent_num_leaves: 0,
-            epoch_state: None,
-            compute_status_for_input_txns: vec![
-                TransactionStatus::Keep(ExecutionStatus::Success);
-                num_txns
-            ],
-            transaction_info_hashes: vec![],
-            subscribable_events: vec![],
-            block_end_info: None,
-        }
-    }
-
-    /// generate a new dummy state compute result with ACCUMULATOR_PLACEHOLDER_HASH as the root hash.
-    /// this function is used in ordering_state_computer as a dummy state compute result,
-    /// where the real compute result is generated after ordering_state_computer.commit pushes
-    /// the blocks and the finality proof to the execution phase.
-    pub fn new_dummy() -> Self {
-        StateComputeResult::new_dummy_with_root_hash(*ACCUMULATOR_PLACEHOLDER_HASH)
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_dummy_with_compute_status(compute_status: Vec<TransactionStatus>) -> Self {
-        let mut ret = Self::new_dummy();
-        ret.compute_status_for_input_txns = compute_status;
-        ret
-    }
-
-    pub fn version(&self) -> Version {
-        max(self.num_leaves, 1)
-            .checked_sub(1)
-            .expect("Integer overflow occurred")
-    }
-
-    pub fn root_hash(&self) -> HashValue {
-        self.root_hash
-    }
-
-    pub fn compute_status_for_input_txns(&self) -> &Vec<TransactionStatus> {
-        &self.compute_status_for_input_txns
-    }
-
-    pub fn transactions_to_commit_len(&self) -> usize {
-        self.compute_status_for_input_txns()
-            .iter()
-            .filter(|status| matches!(status, TransactionStatus::Keep(_)))
-            .count()
-            // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
-            + (if self.has_reconfiguration() { 0 } else { 1 })
-    }
-
-    /// On top of input transactions (which contain BlockMetadata and Validator txns),
-    /// filter out those that should be committed, and add StateCheckpoint/BlockEpilogue if needed.
-    pub fn transactions_to_commit(
-        &self,
-        input_txns: Vec<Transaction>,
-        block_id: HashValue,
-    ) -> Vec<Transaction> {
-        assert_eq!(
-            input_txns.len(),
-            self.compute_status_for_input_txns().len(),
-            "{:?} != {:?}",
-            input_txns.iter().map(|t| t.type_name()).collect::<Vec<_>>(),
-            self.compute_status_for_input_txns()
-        );
-        let output = itertools::zip_eq(input_txns, self.compute_status_for_input_txns())
-            .filter_map(|(txn, status)| {
-                assert!(
-                    !txn.is_non_reconfig_block_ending(),
-                    "{:?}: {:?}",
-                    txn,
-                    status
-                );
-                match status {
-                    TransactionStatus::Keep(_) => Some(txn),
-                    _ => None,
-                }
-            })
-            .chain(
-                (!self.has_reconfiguration()).then_some(self.block_end_info.clone().map_or(
-                    Transaction::StateCheckpoint(block_id),
-                    |block_end_info| {
-                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
-                            block_id,
-                            block_end_info,
-                        })
-                    },
-                )),
-            )
-            .collect::<Vec<_>>();
-
-        assert!(
-            self.has_reconfiguration()
-                || output
-                    .last()
-                    .map_or(false, Transaction::is_non_reconfig_block_ending),
-            "{:?}",
-            output.last()
-        );
-
-        output
-    }
-
-    pub fn epoch_state(&self) -> &Option<EpochState> {
-        &self.epoch_state
-    }
-
-    pub fn extension_proof(&self) -> AccumulatorExtensionProof<TransactionAccumulatorHasher> {
-        AccumulatorExtensionProof::<TransactionAccumulatorHasher>::new(
-            self.parent_frozen_subtree_roots.clone(),
-            self.parent_num_leaves(),
-            self.transaction_info_hashes().clone(),
-        )
-    }
-
-    pub fn transaction_info_hashes(&self) -> &Vec<HashValue> {
-        &self.transaction_info_hashes
-    }
-
-    pub fn num_leaves(&self) -> u64 {
-        self.num_leaves
-    }
-
-    pub fn frozen_subtree_roots(&self) -> &Vec<HashValue> {
-        &self.frozen_subtree_roots
-    }
-
-    pub fn parent_num_leaves(&self) -> u64 {
-        self.parent_num_leaves
-    }
-
-    pub fn parent_frozen_subtree_roots(&self) -> &Vec<HashValue> {
-        &self.parent_frozen_subtree_roots
-    }
-
-    pub fn has_reconfiguration(&self) -> bool {
-        self.epoch_state.is_some()
-    }
-
-    pub fn subscribable_events(&self) -> &[ContractEvent] {
-        &self.subscribable_events
-    }
-}
-
-pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProofExt>,
-}
-
-impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
-        ProofReader { proofs }
     }
 
     pub fn new_empty() -> Self {
-        Self::new(HashMap::new())
+        Self { proofs: None }
     }
 }
 
-impl ProofRead for ProofReader {
+impl<'a> ProofRead for ProofReader<'a> {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
-        self.proofs.get(&key)
+        self.proofs.and_then(|proofs| proofs.get(&key))
     }
 }
 
@@ -546,6 +293,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
     type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref()
         || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
+        || type_tag == NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.deref()
 }
 
 #[cfg(feature = "bench")]

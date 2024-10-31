@@ -44,6 +44,7 @@ pub fn prepare_phases_and_buffer_manager(
     highest_committed_round: u64,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    max_pending_rounds_in_commit_vote_cache: u64,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -134,6 +135,7 @@ pub fn prepare_phases_and_buffer_manager(
             highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
+            max_pending_rounds_in_commit_vote_cache,
         ),
     )
 }

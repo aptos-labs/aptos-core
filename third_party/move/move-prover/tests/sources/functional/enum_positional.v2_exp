@@ -13,6 +13,5 @@ error: data invariant does not hold
   =     at tests/sources/functional/enum_positional.move:17: test_positional_incorrect
   =         <redacted> = <redacted>
   =     at tests/sources/functional/enum_positional.move:18: test_positional_incorrect
-  =         <redacted> = <redacted>
   =         y = <redacted>
   =     at tests/sources/functional/enum_positional.move:9

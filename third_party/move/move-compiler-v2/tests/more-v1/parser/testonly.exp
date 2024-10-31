@@ -1,0 +1,16 @@
+
+Diagnostics:
+warning: unknown attribute
+  ┌─ tests/more-v1/parser/testonly.move:5:7
+  │
+5 │     #[testonly]
+  │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
+
+warning: unknown attribute
+   ┌─ tests/more-v1/parser/testonly.move:15:7
+   │
+15 │     #[view]
+   │       ^^^^ Attribute name 'view' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
+
+
+============ bytecode verification succeeded ========

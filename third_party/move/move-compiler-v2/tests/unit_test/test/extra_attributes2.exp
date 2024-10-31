@@ -23,6 +23,3 @@ error: invalid attribute
    │
 21 │     #[expected_failure(verify_only)]
    │                        ^^^^^^^^^^^ Attribute 'verify_only' is not expected in a nested attribute position
-
-
-============ bytecode verification succeeded ========

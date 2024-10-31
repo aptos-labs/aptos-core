@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+  ┌─ tests/more-v1/typing/borrow_divergent.move:4:13
+  │
+4 │            &break;
+  │             ^^^^^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/more-v1/typing/borrow_divergent.move:11:12
+   │
+11 │         &{ return };
+   │            ^^^^^^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/more-v1/typing/borrow_divergent.move:18:21
+   │
+18 │         &(if (cond) return else return);
+   │                     ^^^^^^

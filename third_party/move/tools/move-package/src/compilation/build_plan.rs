@@ -12,7 +12,7 @@ use crate::{
     source_package::parsed_manifest::PackageName,
     CompilerConfig,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::{report_diagnostics_to_color_buffer, report_warnings, FilesSourceText},
@@ -453,9 +453,18 @@ impl BuildPlan {
     // compilation flags
     fn clean(build_root: &Path, keep_paths: BTreeSet<PackageName>) -> Result<()> {
         for dir in std::fs::read_dir(build_root)? {
-            let path = dir?.path();
-            if !keep_paths.iter().any(|name| path.ends_with(name.as_str())) {
-                std::fs::remove_dir_all(&path)?;
+            let path = dir
+                .with_context(|| {
+                    format!(
+                        "Cleaning subdirectories of build root {}",
+                        build_root.to_string_lossy()
+                    )
+                })?
+                .path();
+            if path.is_dir() && !keep_paths.iter().any(|name| path.ends_with(name.as_str())) {
+                std::fs::remove_dir_all(&path).with_context(|| {
+                    format!("When deleting directory {}", path.to_string_lossy())
+                })?;
             }
         }
         Ok(())

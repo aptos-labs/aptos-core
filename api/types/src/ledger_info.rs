@@ -40,6 +40,26 @@ impl LedgerInfo {
         }
     }
 
+    pub fn new_ledger_info(
+        chain_id: &ChainId,
+        epoch: u64,
+        ledger_version: u64,
+        oldest_ledger_version: u64,
+        oldest_block_height: u64,
+        block_height: u64,
+        ledger_timestamp: u64,
+    ) -> Self {
+        Self {
+            chain_id: chain_id.id(),
+            epoch: epoch.into(),
+            ledger_version: ledger_version.into(),
+            oldest_ledger_version: oldest_ledger_version.into(),
+            block_height: block_height.into(),
+            oldest_block_height: oldest_block_height.into(),
+            ledger_timestamp: ledger_timestamp.into(),
+        }
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch.into()
     }

@@ -27,15 +27,23 @@ use std::{
     str::FromStr,
 };
 
+/// Source-level coverage information for a function.
 #[derive(Clone, Debug, Serialize)]
 pub struct FunctionSourceCoverage {
+    /// Is this a native function?
+    /// If so, then `uncovered_locations` is empty.
     pub fn_is_native: bool,
+
+    /// List of source locations in the function that were not covered.
     pub uncovered_locations: Vec<Loc>,
 }
 
+/// Builder for the source code coverage.
 #[derive(Debug, Serialize)]
 pub struct SourceCoverageBuilder<'a> {
-    uncovered_locations: BTreeMap<Identifier, FunctionSourceCoverage>,
+    /// Mapping from function name to the source-level uncovered locations for that function.
+    pub uncovered_locations: BTreeMap<Identifier, FunctionSourceCoverage>,
+
     source_map: &'a SourceMap,
 }
 

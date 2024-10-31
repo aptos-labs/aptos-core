@@ -6,11 +6,11 @@ use crate::{
     common::{
         local_simulation,
         types::{
-            load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
-            ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
+            load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
+            CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
             MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
             ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -27,15 +27,24 @@ use crate::{
     },
     CliCommand, CliResult,
 };
+use aptos_api_types::AptosErrorCode;
 use aptos_crypto::HashValue;
 use aptos_framework::{
-    docgen::DocgenOptions, extended_checks, natives::code::UpgradePolicy, prover::ProverOptions,
+    chunked_publish::{
+        chunk_package_and_create_payloads, large_packages_cleanup_staging_area, PublishType,
+        LARGE_PACKAGES_MODULE_ADDRESS,
+    },
+    docgen::DocgenOptions,
+    extended_checks,
+    natives::code::UpgradePolicy,
+    prover::ProverOptions,
     BuildOptions, BuiltPackage,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId},
+    error::RestError,
     Client,
 };
 use aptos_types::{
@@ -47,6 +56,7 @@ use aptos_types::{
 use aptos_vm::data_cache::AsMoveResolver;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
+use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
@@ -68,7 +78,7 @@ pub use stored_package::*;
 use tokio::task;
 use url::Url;
 
-mod aptos_debug_natives;
+pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
 mod fmt;
@@ -91,6 +101,7 @@ const HELLO_BLOCKCHAIN_EXAMPLE: &str = include_str!(
 pub enum MoveTool {
     BuildPublishPayload(BuildPublishPayload),
     Clean(CleanPackage),
+    ClearStagingArea(ClearStagingArea),
     #[clap(alias = "build")]
     Compile(CompilePackage),
     #[clap(alias = "build-script")]
@@ -129,6 +140,7 @@ impl MoveTool {
         match self {
             MoveTool::BuildPublishPayload(tool) => tool.execute_serialized().await,
             MoveTool::Clean(tool) => tool.execute_serialized().await,
+            MoveTool::ClearStagingArea(tool) => tool.execute_serialized().await,
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::CompileScript(tool) => tool.execute_serialized().await,
             MoveTool::Coverage(tool) => tool.execute().await,
@@ -162,7 +174,7 @@ impl MoveTool {
     }
 }
 
-#[derive(Parser, Default)]
+#[derive(Default, Parser)]
 pub struct FrameworkPackageArgs {
     /// Git revision or branch for the Aptos framework
     ///
@@ -258,6 +270,15 @@ impl FrameworkPackageArgs {
             toml::to_string_pretty(&manifest)
                 .map_err(|err| CliError::UnexpectedError(err.to_string()))?
                 .as_bytes(),
+        )?;
+
+        // Write a .gitignore
+        let gitignore = package_dir.join(GIT_IGNORE);
+        check_if_file_exists(gitignore.as_path(), prompt_options)?;
+        write_to_file(
+            gitignore.as_path(),
+            GIT_IGNORE,
+            ".aptos/\nbuild/".as_bytes(),
         )
     }
 }
@@ -367,12 +388,12 @@ pub struct CompilePackage {
     /// If set, package metadata should be generated and stored in the package's build directory.
     /// This metadata can be used to construct a transaction to publish a package.
     #[clap(long)]
-    pub(crate) save_metadata: bool,
+    pub save_metadata: bool,
 
     #[clap(flatten)]
-    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -570,7 +591,7 @@ impl CliCommand<&'static str> for TestPackage {
                         )
                     })
                     .collect(),
-                ..UnitTestingConfig::default_with_bound(None)
+                ..UnitTestingConfig::default()
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(
@@ -578,6 +599,7 @@ impl CliCommand<&'static str> for TestPackage {
                 MiscGasParameters::zeros(),
             ),
             aptos_test_feature_flags_genesis(),
+            None,
             None,
             self.compute_coverage,
             &mut std::io::stdout(),
@@ -631,14 +653,21 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
+
         let result = task::spawn_blocking(move || {
             prover_options.prove(
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
-                move_options.compiler_version,
-                move_options.language_version,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],
@@ -713,7 +742,7 @@ pub struct IncludedArtifactsArgs {
     /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
     /// as much.
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
-    pub(crate) included_artifacts: IncludedArtifacts,
+    pub included_artifacts: IncludedArtifacts,
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain
@@ -721,7 +750,8 @@ pub struct IncludedArtifactsArgs {
 pub struct PublishPackage {
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
-
+    #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -730,10 +760,14 @@ pub struct PublishPackage {
     pub(crate) txn_options: TransactionOptions,
 }
 
-struct PackagePublicationData {
+pub(crate) struct PackagePublicationData {
     metadata_serialized: Vec<u8>,
     compiled_units: Vec<Vec<u8>>,
     payload: TransactionPayload,
+}
+
+pub(crate) struct ChunkedPublishPayloads {
+    payloads: Vec<TransactionPayload>,
 }
 
 /// Build a publication transaction payload and store it in a JSON output file.
@@ -750,35 +784,53 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
     type Error = CliError;
 
     fn try_into(self) -> Result<PackagePublicationData, Self::Error> {
-        let package_path = self.move_options.get_package_path()?;
-        let options = self
-            .included_artifacts_args
-            .included_artifacts
-            .build_options(&self.move_options)?;
-        let package = BuiltPackage::build(package_path, options)
-            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
-        let compiled_units = package.extract_code();
-        let metadata_serialized =
-            bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS");
-        let payload = aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
-            metadata_serialized.clone(),
-            compiled_units.clone(),
-        );
-        let size = bcs::serialized_size(&payload)?;
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+
+        let package_publication_data =
+            create_package_publication_data(package, PublishType::AccountDeploy, None)?;
+
+        let size = bcs::serialized_size(&package_publication_data.payload)?;
         println!("package size {} bytes", size);
         if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-            return Err(CliError::UnexpectedError(format!(
-                "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include fewer artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check",
-                MAX_PUBLISH_PACKAGE_SIZE, size
-            )));
+            return Err(CliError::PackageSizeExceeded(
+                size,
+                MAX_PUBLISH_PACKAGE_SIZE,
+            ));
         }
-        Ok(PackagePublicationData {
-            metadata_serialized,
-            compiled_units,
-            payload,
-        })
+
+        Ok(package_publication_data)
+    }
+}
+
+#[async_trait]
+pub trait AsyncTryInto<T> {
+    type Error;
+
+    async fn async_try_into(self) -> Result<T, Self::Error>;
+}
+
+#[async_trait]
+impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
+    type Error = CliError;
+
+    async fn async_try_into(self) -> Result<ChunkedPublishPayloads, Self::Error> {
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+
+        let chunked_publish_payloads = create_chunked_publish_payloads(
+            package,
+            PublishType::AccountDeploy,
+            None,
+            self.chunked_publish_option.large_packages_module_address,
+        )?;
+
+        let size = &chunked_publish_payloads
+            .payloads
+            .iter()
+            .map(bcs::serialized_size)
+            .sum::<Result<usize, _>>()?;
+        println!("package size {} bytes", size);
+
+        Ok(chunked_publish_payloads)
     }
 }
 
@@ -814,7 +866,7 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-pub(crate) fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
+pub fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
         None | Some(OptimizationLevel::Default) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
@@ -916,6 +968,73 @@ impl IncludedArtifacts {
 
 pub const MAX_PUBLISH_PACKAGE_SIZE: usize = 60_000;
 
+// Get publication data for standard publish mode, which submits a single transaction for publishing.
+fn create_package_publication_data(
+    package: BuiltPackage,
+    publish_type: PublishType,
+    object_address: Option<AccountAddress>,
+) -> CliTypedResult<PackagePublicationData> {
+    let compiled_units = package.extract_code();
+    let metadata = package.extract_metadata()?;
+    let metadata_serialized = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
+
+    let payload = match publish_type {
+        PublishType::AccountDeploy => {
+            aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
+                metadata_serialized.clone(),
+                compiled_units.clone(),
+            )
+        },
+        PublishType::ObjectDeploy => {
+            aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
+                metadata_serialized.clone(),
+                compiled_units.clone(),
+            )
+        },
+        PublishType::ObjectUpgrade => {
+            aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
+                metadata_serialized.clone(),
+                compiled_units.clone(),
+                object_address.expect("Object address must be provided for upgrading object code."),
+            )
+        },
+    };
+
+    Ok(PackagePublicationData {
+        metadata_serialized,
+        compiled_units,
+        payload,
+    })
+}
+
+// Get publication data for chunked publish mode, which submits multiple transactions for publishing.
+fn create_chunked_publish_payloads(
+    package: BuiltPackage,
+    publish_type: PublishType,
+    object_address: Option<AccountAddress>,
+    large_packages_module_address: AccountAddress,
+) -> CliTypedResult<ChunkedPublishPayloads> {
+    let compiled_units = package.extract_code();
+    let metadata = package.extract_metadata()?;
+    let metadata_serialized = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
+
+    let maybe_object_address = if let PublishType::ObjectUpgrade = publish_type {
+        object_address
+    } else {
+        None
+    };
+
+    let payloads = chunk_package_and_create_payloads(
+        metadata_serialized,
+        compiled_units,
+        publish_type,
+        maybe_object_address,
+        large_packages_module_address,
+    );
+
+    Ok(ChunkedPublishPayloads { payloads })
+}
+
 #[async_trait]
 impl CliCommand<TransactionSummary> for PublishPackage {
     fn command_name(&self) -> &'static str {
@@ -923,8 +1042,21 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let package_publication_data: PackagePublicationData = (&self).try_into()?;
-        profile_or_submit(package_publication_data.payload, &self.txn_options).await
+        if self.chunked_publish_option.chunked_publish {
+            let chunked_package_payloads: ChunkedPublishPayloads = (&self).async_try_into().await?;
+
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &chunked_package_payloads.payloads.len());
+            println!("{}", message.bold());
+            submit_chunked_publish_transactions(
+                chunked_package_payloads.payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
+        } else {
+            let package_publication_data: PackagePublicationData = (&self).try_into()?;
+            profile_or_submit(package_publication_data.payload, &self.txn_options).await
+        }
     }
 }
 
@@ -984,7 +1116,7 @@ impl CliCommand<String> for BuildPublishPayload {
     }
 }
 
-/// Publishes the modules in a Move package to the Aptos blockchain, under an object.
+/// Publishes the modules in a Move package to the Aptos blockchain, under an object (legacy version of `deploy-object`)
 #[derive(Parser)]
 pub struct CreateObjectAndPublishPackage {
     /// The named address for compiling and using in the contract
@@ -994,6 +1126,8 @@ pub struct CreateObjectAndPublishPackage {
     pub(crate) address_name: String,
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -1010,48 +1144,89 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
-        let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
+
+        let sequence_number = if self.chunked_publish_option.chunked_publish {
+            // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
+            // This involves building the package with mock account address `0xcafe` to calculate the transaction count.
+            let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
+            self.move_options
+                .add_named_address(self.address_name.clone(), mock_object_address.to_string());
+            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            let mock_payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::AccountDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
+            let staging_tx_count = (mock_payloads.len() - 1) as u64;
+            self.txn_options.sequence_number(sender_address).await? + staging_tx_count + 1
+        } else {
+            self.txn_options.sequence_number(sender_address).await? + 1
+        };
+
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
 
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let options = self
-            .included_artifacts_args
-            .included_artifacts
-            .build_options(&self.move_options)?;
-        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let message = format!(
             "Do you want to publish this package at object address {}",
             object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
-            bcs::to_bytes(&package.extract_metadata()?)
-                .expect("Failed to serialize PackageMetadata"),
-            package.extract_code(),
-        );
-        let size = bcs::serialized_size(&payload)?;
-        println!("package size {} bytes", size);
+        let result = if self.chunked_publish_option.chunked_publish {
+            let payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::ObjectDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
 
-        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-            return Err(CliError::UnexpectedError(format!(
-                "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check",
-                MAX_PUBLISH_PACKAGE_SIZE, size
-            )));
-        }
-        let result = self
-            .txn_options
-            .submit_transaction(payload)
+            let size = &payloads
+                .iter()
+                .map(bcs::serialized_size)
+                .sum::<Result<usize, _>>()?;
+            println!("package size {} bytes", size);
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
+            println!("{}", message.bold());
+
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
             .await
-            .map(TransactionSummary::from);
+        } else {
+            let payload = create_package_publication_data(
+                package,
+                PublishType::ObjectDeploy,
+                Some(object_address),
+            )?
+            .payload;
+            let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
+
+            if !self.override_size_check_option.override_size_check
+                && size > MAX_PUBLISH_PACKAGE_SIZE
+            {
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
+            }
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        };
 
         if result.is_ok() {
             println!(
-                "Code was successfully deployed to object address {}.",
+                "Code was successfully deployed to object address {}",
                 object_address
             );
         }
@@ -1059,6 +1234,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
     }
 }
 
+/// Upgrades the modules in a Move package deployed under an object (legacy version of `upgrade-object`)
 #[derive(Parser)]
 pub struct UpgradeObjectPackage {
     /// Address of the object the package was deployed to
@@ -1069,6 +1245,8 @@ pub struct UpgradeObjectPackage {
     pub(crate) object_address: AccountAddress,
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -1084,11 +1262,8 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let options = self
-            .included_artifacts_args
-            .included_artifacts
-            .build_options(&self.move_options)?;
-        let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let built_package =
+            build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let url = self
             .txn_options
             .rest_options
@@ -1114,32 +1289,56 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
-            bcs::to_bytes(&built_package.extract_metadata()?)
-                .expect("Failed to serialize PackageMetadata"),
-            built_package.extract_code(),
-            self.object_address,
-        );
-        let size = bcs::serialized_size(&payload)?;
-        println!("package size {} bytes", size);
+        let result = if self.chunked_publish_option.chunked_publish {
+            let payloads = create_chunked_publish_payloads(
+                built_package,
+                PublishType::ObjectUpgrade,
+                Some(self.object_address),
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
 
-        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-            return Err(CliError::UnexpectedError(format!(
-                "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check",
-                MAX_PUBLISH_PACKAGE_SIZE, size
-            )));
-        }
-        let result = self
-            .txn_options
-            .submit_transaction(payload)
+            let size = &payloads
+                .iter()
+                .map(bcs::serialized_size)
+                .sum::<Result<usize, _>>()?;
+            println!("package size {} bytes", size);
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
+            println!("{}", message.bold());
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
             .await
-            .map(TransactionSummary::from);
+        } else {
+            let payload = create_package_publication_data(
+                built_package,
+                PublishType::ObjectUpgrade,
+                Some(self.object_address),
+            )?
+            .payload;
+
+            let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
+
+            if !self.override_size_check_option.override_size_check
+                && size > MAX_PUBLISH_PACKAGE_SIZE
+            {
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
+            }
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        };
 
         if result.is_ok() {
             println!(
-                "Code was successfully upgraded at object address {}.",
+                "Code was successfully upgraded at object address {}",
                 self.object_address
             );
         }
@@ -1158,6 +1357,8 @@ pub struct DeployObjectCode {
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
     #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
+    #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
@@ -1173,37 +1374,97 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
-        let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
+        let sequence_number = if self.chunked_publish_option.chunked_publish {
+            // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
+            // This involves building the package with mock account address `0xcafe` to calculate the transaction count.
+            let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
+            self.move_options
+                .add_named_address(self.address_name.clone(), mock_object_address.to_string());
+            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            let mock_payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::AccountDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
+            let staging_tx_count = (mock_payloads.len() - 1) as u64;
+            self.txn_options.sequence_number(sender_address).await? + staging_tx_count + 1
+        } else {
+            self.txn_options.sequence_number(sender_address).await? + 1
+        };
+
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
 
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let message = format!(
             "Do you want to deploy this package at object address {}",
             object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
-            bcs::to_bytes(&package.extract_metadata()?)
-                .expect("Failed to serialize PackageMetadata"),
-            package.extract_code(),
-        );
+        let result = if self.chunked_publish_option.chunked_publish {
+            let payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::ObjectDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
 
-        submit_tx_and_check(
-            &self.txn_options,
-            payload,
-            &object_address.to_string(),
-            self.override_size_check_option.override_size_check,
-            "Code was successfully deployed to object address {}.",
-        )
-        .await
+            let size = &payloads
+                .iter()
+                .map(bcs::serialized_size)
+                .sum::<Result<usize, _>>()?;
+            println!("package size {} bytes", size);
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
+            println!("{}", message.bold());
+
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
+        } else {
+            let payload = create_package_publication_data(
+                package,
+                PublishType::ObjectDeploy,
+                Some(object_address),
+            )?
+            .payload;
+
+            let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
+
+            if !self.override_size_check_option.override_size_check
+                && size > MAX_PUBLISH_PACKAGE_SIZE
+            {
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
+            }
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        };
+
+        if result.is_ok() {
+            println!(
+                "Code was successfully deployed to object address {}",
+                object_address
+            );
+        }
+        result
     }
 }
 
+/// Upgrades the modules in a Move package deployed under an object.
 #[derive(Parser)]
 pub struct UpgradeCodeObject {
     /// The named address for compiling and using in the contract
@@ -1217,6 +1478,8 @@ pub struct UpgradeCodeObject {
     pub(crate) object_address: AccountAddress,
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -1235,8 +1498,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         self.move_options
             .add_named_address(self.address_name, self.object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let url = self
             .txn_options
             .rest_options
@@ -1262,21 +1524,60 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
-            bcs::to_bytes(&package.extract_metadata()?)
-                .expect("Failed to serialize PackageMetadata"),
-            package.extract_code(),
-            self.object_address,
-        );
+        let result = if self.chunked_publish_option.chunked_publish {
+            let payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::ObjectUpgrade,
+                Some(self.object_address),
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
 
-        submit_tx_and_check(
-            &self.txn_options,
-            payload,
-            &self.object_address.to_string(),
-            self.override_size_check_option.override_size_check,
-            "Code was successfully upgraded at object address {}.",
-        )
-        .await
+            let size = &payloads
+                .iter()
+                .map(bcs::serialized_size)
+                .sum::<Result<usize, _>>()?;
+            println!("package size {} bytes", size);
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
+            println!("{}", message.bold());
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
+        } else {
+            let payload = create_package_publication_data(
+                package,
+                PublishType::ObjectUpgrade,
+                Some(self.object_address),
+            )?
+            .payload;
+
+            let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
+
+            if !self.override_size_check_option.override_size_check
+                && size > MAX_PUBLISH_PACKAGE_SIZE
+            {
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
+            }
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        };
+
+        if result.is_ok() {
+            println!(
+                "Code was successfully upgraded at object address {}",
+                self.object_address
+            );
+        }
+        result
     }
 }
 
@@ -1290,34 +1591,139 @@ fn build_package_options(
     BuiltPackage::build(move_options.get_package_path()?, options)
 }
 
-async fn submit_tx_and_check(
+async fn submit_chunked_publish_transactions(
+    payloads: Vec<TransactionPayload>,
     txn_options: &TransactionOptions,
-    payload: TransactionPayload,
-    object_address: &str,
-    override_size_check: bool,
-    success_message: &str,
+    large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<TransactionSummary> {
-    let size = bcs::serialized_size(&payload)?;
-    println!("package size {} bytes", size);
+    let mut publishing_result = Err(CliError::UnexpectedError(
+        "No payload provided for batch transaction run".to_string(),
+    ));
+    let payloads_length = payloads.len() as u64;
+    let mut tx_hashes = vec![];
 
-    if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-        return Err(CliError::UnexpectedError(format!(
-            "The package is larger than {} bytes ({} bytes)! To lower the size \
-            you may want to include fewer artifacts via `--included-artifacts`. \
-            You can also override this check with `--override-size-check",
-            MAX_PUBLISH_PACKAGE_SIZE, size
-        )));
+    let account_address = txn_options.profile_options.account_address()?;
+
+    if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
+        let message = format!(
+            "The resource {}::large_packages::StagingArea under account {} is not empty.\
+        \nThis may cause package publishing to fail if the data is unexpected. \
+        \nUse the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under the account.",
+            large_packages_module_address, account_address,
+        )
+            .bold();
+        println!("{}", message);
+        prompt_yes_with_override("Do you want to proceed?", txn_options.prompt_options)?;
     }
 
-    let result = txn_options
-        .submit_transaction(payload)
-        .await
-        .map(TransactionSummary::from);
+    for (idx, payload) in payloads.into_iter().enumerate() {
+        println!("Transaction {} of {}", idx + 1, payloads_length);
+        let result = txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from);
 
-    if result.is_ok() {
-        println!("{} {}", success_message, object_address);
+        match result {
+            Ok(tx_summary) => {
+                let tx_hash = tx_summary.transaction_hash.to_string();
+                let status = tx_summary.success.map_or_else(String::new, |success| {
+                    if success {
+                        "Success".to_string()
+                    } else {
+                        "Failed".to_string()
+                    }
+                });
+                println!("Transaction executed: {} ({})\n", status, &tx_hash);
+                tx_hashes.push(tx_hash);
+                publishing_result = Ok(tx_summary);
+            },
+
+            Err(e) => {
+                println!("{}", "Caution: An error occurred while submitting chunked publish transactions. \
+                \nDue to this error, there may be incomplete data left in the `StagingArea` resource. \
+                \nThis could cause further errors if you attempt to run the chunked publish command again. \
+                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.".bold());
+                return Err(e);
+            },
+        }
     }
-    result
+
+    println!(
+        "{}",
+        "All Transactions Submitted Successfully.".bold().green()
+    );
+    let tx_hash_formatted = format!(
+        "Submitted Transactions:\n[\n    {}\n]",
+        tx_hashes
+            .iter()
+            .map(|tx| format!("\"{}\"", tx))
+            .collect::<Vec<_>>()
+            .join(",\n    ")
+    );
+    println!("\n{}\n", tx_hash_formatted);
+    publishing_result
+}
+
+async fn is_staging_area_empty(
+    txn_options: &TransactionOptions,
+    large_packages_module_address: AccountAddress,
+) -> CliTypedResult<bool> {
+    let url = txn_options.rest_options.url(&txn_options.profile_options)?;
+    let client = Client::new(url);
+
+    let staging_area_response = client
+        .get_account_resource(
+            txn_options.profile_options.account_address()?,
+            &format!(
+                "{}::large_packages::StagingArea",
+                large_packages_module_address
+            ),
+        )
+        .await;
+
+    match staging_area_response {
+        Ok(response) => match response.into_inner() {
+            Some(_) => Ok(false), // StagingArea is not empty
+            None => Ok(true),     // TODO: determine which case this is
+        },
+        Err(RestError::Api(aptos_error_response))
+            if aptos_error_response.error.error_code == AptosErrorCode::ResourceNotFound =>
+        {
+            Ok(true) // The resource doesn't exist
+        },
+        Err(rest_err) => Err(CliError::from(rest_err)),
+    }
+}
+
+/// Cleans up the `StagingArea` resource under an account, which is used for chunked publish operations
+#[derive(Parser)]
+pub struct ClearStagingArea {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: AccountAddress,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for ClearStagingArea {
+    fn command_name(&self) -> &'static str {
+        "ClearStagingArea"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        println!(
+            "Cleaning up resource {}::large_packages::StagingArea under account {}.",
+            &self.large_packages_module_address,
+            self.txn_options.profile_options.account_address()?
+        );
+        let payload = large_packages_cleanup_staging_area(self.large_packages_module_address);
+        self.txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
+    }
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain under a resource account
@@ -1714,11 +2120,11 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 #[derive(Parser)]
 pub struct RunScript {
     #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+    pub txn_options: TransactionOptions,
     #[clap(flatten)]
-    pub(crate) compile_proposal_args: CompileScriptFunction,
+    pub compile_proposal_args: CompileScriptFunction,
     #[clap(flatten)]
-    pub(crate) script_function_args: ScriptFunctionArguments,
+    pub script_function_args: ScriptFunctionArguments,
 }
 
 #[async_trait]

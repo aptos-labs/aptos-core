@@ -4,6 +4,38 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [4.3.0] - 2024/10/30
+- Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`
+- [`Fix`] Remove unwraps to make outputs go through regular error handling
+
+## [4.2.6] - 2024/10/23
+- Fixing issue with `--move-2` flag which was still selecting language version 2.0 instead of 2.1.
+
+## [4.2.5] - 2024/10/23
+- Bump to resolve issue with release version inconsistency.
+
+## [4.2.4] - 2024/10/21
+- Releasing Move 2.1, which adds compound assignments (`x += 1`) and loop labels to the language. See [Move 2 Release Notes](https://aptos.dev/en/build/smart-contracts/book/move-2).
+- multiple bug fixes in the Move 2 compilation chain.
+- `aptos move fmt` formats move files inside the `tests` and `examples` directory of a package.
+- Added `aptos update prover-dependencies`, which installs the dependency of Move prover, boogie, z3 and cvc5.
+- Update the default version of `movefmt` to be installed from 1.0.4 to 1.0.5
+- Update the local-testnet logs to use `println` for regular output and reserve `eprintln` for errors.
+- Set compiler V2 as default when using `aptos move prove`.
+
+## [4.2.3] - 2024/09/20
+- Fix the broken indexer in localnet in 4.2.2, which migrates table info from sycn to async ways.
+
+## [4.2.2] - 2024/09/20
+- Fix localnet indexer processors that were emitting spamming logs in 4.2.1.
+
+## [4.2.1] - 2024/09/19
+- Fix localnet indexer processors that were failing to startup in 4.2.0
+
+## [4.2.0] - 2024/09/16
+- Update latest VM and associated changes
+- Update to latest compiler
+
 ## [4.1.0] - 2024/08/30
 - Marks Move 2 and compiler v2 as stable.
 - Adds new `--move-2` flag to work with Move 2 without need for multiple other flags. 

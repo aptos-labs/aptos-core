@@ -30,6 +30,7 @@ use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
+    account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig},
     transaction::SignedTransaction,
@@ -148,6 +149,25 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
             ));
             counters::CLIENT_CALLBACK_FAIL.inc();
         }
+    }
+}
+
+/// Processes request for all addresses in parking lot
+pub(crate) async fn process_parking_lot_addresses<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
+    callback: oneshot::Sender<Vec<(AccountAddress, u64)>>,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation + 'static,
+{
+    let addresses = smp.mempool.lock().get_parking_lot_addresses();
+
+    if callback.send(addresses).is_err() {
+        warn!(LogSchema::event_log(
+            LogEntry::JsonRpc,
+            LogEvent::CallbackFail
+        ));
+        counters::CLIENT_CALLBACK_FAIL.inc();
     }
 }
 
@@ -375,7 +395,15 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
         .start_timer();
     let validation_results = transactions
         .par_iter()
-        .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
+        .map(|t| {
+            let result = smp.validator.read().validate_transaction(t.0.clone());
+            // Pre-compute the hash and length if the transaction is valid, before locking mempool
+            if result.is_ok() {
+                t.0.committed_hash();
+                t.0.txn_bytes_len();
+            }
+            result
+        })
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
     {

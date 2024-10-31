@@ -90,7 +90,7 @@ pub struct BuildOptions {
            default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", "2.1"))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -139,8 +139,8 @@ impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
             bytecode_version: Some(VERSION_7),
-            language_version: Some(LanguageVersion::V2_0),
-            compiler_version: Some(CompilerVersion::V2_0),
+            language_version: Some(LanguageVersion::latest_stable()),
+            compiler_version: Some(CompilerVersion::latest_stable()),
             ..Self::default()
         }
     }
@@ -472,17 +472,27 @@ impl BuiltPackage {
             .package
             .deps_compiled_units
             .iter()
-            .map(|(name, unit)| {
-                let package_name = name.as_str().to_string();
-                let account = match &unit.unit {
-                    CompiledUnit::Module(m) => AccountAddress::new(m.address.into_bytes()),
-                    _ => panic!("script not a dependency"),
-                };
-                PackageDep {
-                    account,
-                    package_name,
-                }
+            .flat_map(|(name, unit)| match &unit.unit {
+                CompiledUnit::Module(m) => {
+                    let package_name = name.as_str().to_string();
+                    let account = AccountAddress::new(m.address.into_bytes());
+
+                    Some(PackageDep {
+                        account,
+                        package_name,
+                    })
+                },
+                CompiledUnit::Script(_) => None,
             })
+            .chain(
+                self.package
+                    .bytecode_deps
+                    .iter()
+                    .map(|(name, address)| PackageDep {
+                        account: address.into_inner(),
+                        package_name: name.as_str().to_string(),
+                    }),
+            )
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();

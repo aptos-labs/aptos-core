@@ -25,6 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -73,6 +74,7 @@ const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
+pub const GIT_IGNORE: &str = ".gitignore";
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -106,6 +108,14 @@ pub enum CliError {
     MoveTestError,
     #[error("Move Prover failed: {0}")]
     MoveProverError(String),
+    #[error(
+        "The package is larger than {1} bytes ({0} bytes)! \
+        To lower the size you may want to include less artifacts via `--included-artifacts`. \
+        You can also override this check with `--override-size-check`. \
+        Alternatively, you can use the `--chunked-publish` to enable chunked publish mode, \
+        which chunks down the package and deploys it in several stages."
+    )]
+    PackageSizeExceeded(usize, usize),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -131,6 +141,7 @@ impl CliError {
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
             CliError::MoveProverError(_) => "MoveProverError",
+            CliError::PackageSizeExceeded(_, _) => "PackageSizeExceeded",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
@@ -365,7 +376,18 @@ impl CliConfig {
         let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
+        let no_dir = !aptos_folder.exists();
         create_dir_if_not_exist(aptos_folder.as_path())?;
+
+        // If the `.aptos/` doesn't exist, we'll add a .gitignore in it to ignore the config file
+        // so people don't save their credentials...
+        if no_dir {
+            write_to_user_only_file(
+                aptos_folder.join(GIT_IGNORE).as_path(),
+                GIT_IGNORE,
+                "*\ntestnet/\nconfig.yaml".as_bytes(),
+            )?;
+        }
 
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
@@ -966,7 +988,7 @@ impl SaveFile {
 }
 
 /// Options specific to using the Rest endpoint
-#[derive(Debug, Default, Parser)]
+#[derive(Debug, Parser)]
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
@@ -983,6 +1005,16 @@ pub struct RestOptions {
     /// environment variable.
     #[clap(long, env)]
     pub node_api_key: Option<String>,
+}
+
+impl Default for RestOptions {
+    fn default() -> Self {
+        Self {
+            url: None,
+            connection_timeout_secs: DEFAULT_EXPIRATION_SECS,
+            node_api_key: None,
+        }
+    }
 }
 
 impl RestOptions {
@@ -1145,12 +1177,12 @@ pub struct MovePackageDir {
     /// Currently, defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", "2.0"),
+           default_value_if("move_2", "true", "2.1"),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    /// Same as `--bytecode_version=7 --language_version=2.1 --compiler_version=2.0`
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }
@@ -1604,7 +1636,7 @@ pub struct TransactionOptions {
     #[clap(flatten)]
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
+    pub prompt_options: PromptOptions,
 
     /// If this option is set, simulate the transaction locally.
     #[clap(long)]
@@ -1880,7 +1912,7 @@ impl TransactionOptions {
         let sequence_number = account.sequence_number;
 
         let balance = client
-            .get_account_balance_at_version(sender_address, version)
+            .view_apt_account_balance_at_version(sender_address, version)
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?
             .into_inner();
@@ -1889,7 +1921,7 @@ impl TransactionOptions {
             if gas_unit_price == 0 {
                 DEFAULT_MAX_GAS
             } else {
-                std::cmp::min(balance.coin.value.0 / gas_unit_price, DEFAULT_MAX_GAS)
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
             }
         });
 
@@ -2018,7 +2050,7 @@ pub struct MultisigAccountWithSequenceNumber {
     pub(crate) sequence_number: u64,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct TypeArgVec {
     /// TypeTag arguments separated by spaces.
     ///
@@ -2057,7 +2089,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
     }
 }
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Default, Parser)]
 pub struct ArgWithTypeVec {
     /// Arguments combined with their type separated by spaces.
     ///
@@ -2199,9 +2231,7 @@ impl TryInto<MemberId> for &EntryFunctionArguments {
     fn try_into(self) -> Result<MemberId, Self::Error> {
         self.function_id
             .clone()
-            .ok_or(CliError::CommandArgumentError(
-                "No function ID provided".to_string(),
-            ))
+            .ok_or_else(|| CliError::CommandArgumentError("No function ID provided".to_string()))
     }
 }
 
@@ -2223,7 +2253,7 @@ impl TryInto<ViewRequest> for EntryFunctionArguments {
 }
 
 /// Common options for constructing a script payload
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct ScriptFunctionArguments {
     #[clap(flatten)]
     pub(crate) type_arg_vec: TypeArgVec,
@@ -2311,4 +2341,22 @@ pub struct OverrideSizeCheckOption {
     /// will still be blocked from publishing.
     #[clap(long)]
     pub(crate) override_size_check: bool,
+}
+
+#[derive(Parser)]
+pub struct ChunkedPublishOption {
+    /// Whether to publish a package in a chunked mode. This may require more than one transaction
+    /// for publishing the Move package.
+    ///
+    /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
+    #[clap(long)]
+    pub(crate) chunked_publish: bool,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    ///
+    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet.  On any other network, you will need to first publish it from the framework
+    /// under move-examples/large_packages.
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: AccountAddress,
 }

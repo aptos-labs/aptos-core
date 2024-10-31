@@ -7,6 +7,7 @@
 use crate::account::AccountData;
 use aptos_types::{
     account_config::CoinInfoResource,
+    chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig},
     state_store::{
         errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
@@ -14,6 +15,7 @@ use aptos_types::{
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},
+    AptosCoinType,
 };
 use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
@@ -105,7 +107,7 @@ impl FakeDataStore {
 
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
-        let coin_info = CoinInfoResource::random(u128::MAX);
+        let coin_info = CoinInfoResource::<AptosCoinType>::random(u128::MAX);
         let write_set = coin_info.to_writeset(0).expect("access path in test");
         self.add_write_set(&write_set)
     }
@@ -117,6 +119,14 @@ impl FakeDataStore {
         self.set(
             StateKey::module_id(module_id),
             StateValue::new_legacy(blob.into()),
+        );
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: ChainId) {
+        let bytes = bcs::to_bytes(&chain_id).expect("Chain id should always be serializable");
+        self.set(
+            StateKey::resource(ChainId::address(), &ChainId::struct_tag()).unwrap(),
+            StateValue::new_legacy(bytes.into()),
         );
     }
 

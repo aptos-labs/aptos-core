@@ -3151,6 +3151,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 <b>pragma</b> aborts_if_is_strict = <b>false</b>;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="account.md#0x1_account_spec_create_resource_address">spec_create_resource_address</a>(source, seed);
+<b>ensures</b> [abstract] source != result;
 </code></pre>
 
 

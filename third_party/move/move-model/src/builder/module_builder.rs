@@ -20,9 +20,9 @@ use crate::{
     intrinsics::process_intrinsic_declaration,
     model,
     model::{
-        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId,
-        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId, SpecFunId,
-        SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc, Loc,
+        ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -48,7 +48,10 @@ use move_compiler::{
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
-use move_ir_types::{ast::ConstantName, location::Spanned};
+use move_ir_types::{
+    ast::ConstantName,
+    location::{sp, Spanned},
+};
 use regex::Regex;
 use std::{
     cell::RefCell,
@@ -250,8 +253,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Converts a ModuleAccess into a qualified symbol which can be used for lookup of
     /// types or functions. If the access has a struct variant, an error is produced.
     pub fn module_access_to_qualified(&self, access: &EA::ModuleAccess) -> QualifiedSymbol {
-        self.check_no_variant(access);
-        let (qsym, _) = self.module_access_to_qualified_with_variant(access);
+        let (_, access) = self.check_no_variant_and_convert_maccess(access);
+        let (qsym, _) = self.module_access_to_qualified_with_variant(&access);
         qsym
     }
 
@@ -262,15 +265,46 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         )
     }
 
-    pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
-        if Self::is_variant(maccess) {
-            self.parent.env.error(
-                &self.parent.to_loc(&maccess.loc),
-                "variants not allowed in this context",
-            );
-            false
+    /// If `maccess` takes the form `ModuleAccess(M, _, Some(V))`,
+    /// check `M::V` is a struct/enum, constant or schema,
+    /// if so, return the form `ModuleAccess(M, V, None)`,
+    /// see how `maccess` is created by
+    /// function `name_access_chain` in `expansion/translate.rs`
+    pub fn check_no_variant_and_convert_maccess(
+        &self,
+        maccess: &EA::ModuleAccess,
+    ) -> (bool, EA::ModuleAccess) {
+        if let EA::ModuleAccess_::ModuleAccess(mident, _, Some(var_name)) = &maccess.value {
+            let addr = self
+                .parent
+                .resolve_address(&self.parent.to_loc(&mident.loc), &mident.value.address);
+            let name = self
+                .symbol_pool()
+                .make(mident.value.module.0.value.as_str());
+            let module_name = ModuleName::from_address_bytes_and_name(addr, name);
+            let var_name_sym = self.symbol_pool().make(var_name.value.as_str());
+            let qualitifed_name = QualifiedSymbol {
+                module_name,
+                symbol: var_name_sym,
+            };
+            if self.parent.struct_table.contains_key(&qualitifed_name)
+                || self.parent.spec_schema_table.contains_key(&qualitifed_name)
+                || self.parent.const_table.contains_key(&qualitifed_name)
+            {
+                let new_maccess = sp(
+                    maccess.loc,
+                    EA::ModuleAccess_::ModuleAccess(*mident, *var_name, None),
+                );
+                (true, new_maccess)
+            } else {
+                self.parent.env.error(
+                    &self.parent.to_loc(&maccess.loc),
+                    "variants not allowed in this context",
+                );
+                (false, maccess.clone())
+            }
         } else {
-            true
+            (true, maccess.clone())
         }
     }
 
@@ -410,7 +444,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             self.symbol_pool().make(n.value.as_str()),
                         ),
                         EA::ModuleAccess_::ModuleAccess(mident, n, _) => {
-                            self.check_no_variant(macc);
+                            let (_, macc) = self.check_no_variant_and_convert_maccess(macc);
                             let addr_bytes = self.parent.resolve_address(
                                 &self.parent.to_loc(&macc.loc),
                                 &mident.value.address,
@@ -568,9 +602,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let def_loc = et.to_loc(&def.loc);
         let name_loc = et.to_loc(&name.loc());
+        let result_type_loc = et.to_loc(&def.signature.return_type.loc);
         et.parent.parent.define_fun(qsym.clone(), FunEntry {
             loc: def_loc.clone(),
             name_loc,
+            result_type_loc,
             module_id: et.parent.module_id,
             fun_id,
             visibility,
@@ -875,6 +911,141 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+        if !self.parent.env.language_version().is_at_least(version_min) {
+            self.parent.env.error(
+                loc,
+                &format!(
+                    "not supported before language version `{}`: {}",
+                    version_min, feature
+                ),
+            )
+        }
+    }
+
+    /// Evaluation of constant `key`
+    /// Performed in depth-first way to detect cyclic dependency
+    /// and constants are evaluated according to dependency relation
+    fn eval_constant(
+        &mut self,
+        key: &PA::ConstantName,
+        constant_map: &UniqueMap<PA::ConstantName, EA::Constant>,
+        visiting: &mut Vec<(PA::ConstantName, Loc)>, // constants that are being traversed during dfs
+        visited: &mut BTreeSet<PA::ConstantName>, // constants that are already visited during dfs
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        // Get all names from an expression
+        // only recursively check on expression types supported in constant definition.
+        fn get_names_from_const_exp(exp: &EA::Exp_) -> BTreeSet<Name> {
+            let mut names = BTreeSet::new();
+            let mut add_names = |v: &EA::Exp| {
+                let set = get_names_from_const_exp(&v.value);
+                for n in set.iter() {
+                    names.insert(*n);
+                }
+            };
+            match exp {
+                EA::Exp_::Name(access, _) => {
+                    names.insert(*access.value.get_name());
+                },
+                EA::Exp_::Call(_, _, _, exp_vec) | EA::Exp_::Vector(_, _, exp_vec) => {
+                    exp_vec.value.iter().for_each(&mut add_names);
+                },
+                EA::Exp_::UnaryExp(_, exp) => {
+                    add_names(exp);
+                },
+                EA::Exp_::BinopExp(exp1, _, exp2) => {
+                    add_names(exp1);
+                    add_names(exp2);
+                },
+                EA::Exp_::Block(seq) => {
+                    for s in seq.iter() {
+                        match &s.value {
+                            EA::SequenceItem_::Seq(exp) | EA::SequenceItem_::Bind(_, exp) => {
+                                add_names(exp);
+                            },
+                            _ => {},
+                        }
+                    }
+                },
+                _ => {},
+            }
+            names
+        }
+        if visited.contains(key) {
+            return;
+        }
+        let qsym = self.qualified_by_module_from_name(&key.0);
+        let loc = self
+            .parent
+            .const_table
+            .get(&qsym)
+            .expect("constant declared")
+            .loc
+            .clone();
+        if let Some(index) = visiting.iter().position(|r| r.0 == *key) {
+            self.parent.env.diag_with_labels(
+                Severity::Error,
+                &loc,
+                &format!("Found recursive definition of a constant `{}`; cycle formed by definitions below", key),
+                visiting[index..]
+                    .to_vec()
+                    .iter()
+                    .map(|(name, loc)| (loc.clone(), format!("`{}` is defined here", name)))
+                    .collect_vec(),
+            );
+            return;
+        }
+        visiting.push((*key, loc.clone()));
+        if let Some(exp) = constant_map.get(key) {
+            let names = get_names_from_const_exp(&exp.value.value);
+            for name in names {
+                let const_name = PA::ConstantName(name);
+                let qsym = self.qualified_by_module_from_name(&name);
+                if !self.parent.const_table.contains_key(&qsym) {
+                    continue;
+                }
+                self.check_language_version(
+                    &loc,
+                    "constant definitions referring to other constants",
+                    LanguageVersion::V2_0,
+                );
+                if visited.contains(&const_name) {
+                    continue;
+                }
+                self.eval_constant(
+                    &const_name,
+                    constant_map,
+                    visiting,
+                    visited,
+                    compiled_module,
+                );
+            }
+            self.def_ana_constant(key, exp, compiled_module);
+        }
+        visited.insert(*key);
+        visiting.pop();
+    }
+
+    /// Evaluation of constants in the module
+    fn analyze_constants(
+        &mut self,
+        module_def: &EA::ModuleDefinition,
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        let mut visited = BTreeSet::new();
+        let mut visiting = vec![];
+        for (name, _) in module_def.constants.key_cloned_iter() {
+            self.eval_constant(
+                &name,
+                &module_def.constants,
+                &mut visiting,
+                &mut visited,
+                compiled_module,
+            );
+        }
+    }
+
     fn def_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
@@ -886,9 +1057,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
 
         // Analyze all constants.
-        for (name, def) in module_def.constants.key_cloned_iter() {
-            self.def_ana_constant(&name, def, compiled_module);
-        }
+        self.analyze_constants(module_def, compiled_module);
 
         // Analyze all schemas. This must be done before other things because schemas need to be
         // ready for inclusion. We also must do this recursively, so use a visited set to detect
@@ -1257,6 +1426,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                     })
                     .collect_vec();
+                if variant_maps.is_empty() {
+                    self.parent.error(
+                        &self.parent.to_loc(&def.loc),
+                        &format!(
+                            "enum type `{}` must have at least one variant.",
+                            qsym.symbol.display(self.parent.env.symbol_pool())
+                        ),
+                    )
+                }
                 (StructLayout::Variants(variant_maps), false)
             },
             EA::StructLayout::Native(_) => (StructLayout::None, false),
@@ -1354,8 +1532,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
+            let is_lang_version_2 = et.env().language_version.is_at_least(LanguageVersion::V2_0);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
-                et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                let symbol_pool = et.parent.parent.env.symbol_pool();
+                if !is_lang_version_2 || symbol_pool.string(*n).as_ref() != "_" {
+                    et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                }
             }
             let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
@@ -3480,9 +3662,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();
             let mut variants: BTreeMap<Symbol, model::StructVariant> = BTreeMap::new();
-            match &entry.layout {
+            let is_enum = match &entry.layout {
                 StructLayout::Singleton(fields, _) => {
                     field_data.extend(fields.values().map(|f| (FieldId::new(f.name), f.clone())));
+                    false
                 },
                 StructLayout::Variants(entry_variants) => {
                     for (order, variant) in entry_variants.iter().enumerate() {
@@ -3501,9 +3684,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             field_data.insert(field_id, field);
                         }
                     }
+                    true
                 },
-                StructLayout::None => {},
-            }
+                StructLayout::None => false,
+            };
             let data = StructData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
@@ -3513,11 +3697,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 abilities: entry.abilities,
                 spec_var_opt: None,
                 field_data,
-                variants: if variants.is_empty() {
-                    None
-                } else {
-                    Some(variants)
-                },
+                variants: if is_enum { Some(variants) } else { None },
                 spec: RefCell::new(spec),
                 is_native: entry.is_native,
             };
@@ -3543,8 +3723,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
-                loc: entry.loc.clone(),
-                id_loc: entry.name_loc.clone(),
+                loc: FunctionLoc {
+                    full: entry.loc.clone(),
+                    id_loc: entry.name_loc.clone(),
+                    result_type_loc: entry.result_type_loc.clone(),
+                },
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,

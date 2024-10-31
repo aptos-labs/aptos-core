@@ -25,7 +25,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info};
 use aptos_storage_interface::DbReader;
@@ -297,11 +297,13 @@ impl StorageAdapter {
                 usize::try_from(*index)
                     .map_err(|_err| anyhow!("index {} out of bounds", index))
                     .and_then(|index| {
-                        validators.get(index).cloned().ok_or(anyhow!(
-                            "index {} is larger than number of validators {}",
-                            index,
-                            validators.len()
-                        ))
+                        validators.get(index).cloned().ok_or_else(|| {
+                            anyhow!(
+                                "index {} is larger than number of validators {}",
+                                index,
+                                validators.len()
+                            )
+                        })
                     })
             })
             .collect()

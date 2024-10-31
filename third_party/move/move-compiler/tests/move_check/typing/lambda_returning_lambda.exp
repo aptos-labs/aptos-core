@@ -1,0 +1,6 @@
+error[E14003]: feature not supported in inlined functions
+   ┌─ tests/move_check/typing/lambda_returning_lambda.move:13:23
+   │
+13 │         foreach<T>(v, action())
+   │                       ^^^^^^^^ Inlined function-typed parameter currently must be a literal lambda expression
+

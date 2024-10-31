@@ -8,19 +8,24 @@
 
 use crate::{
     common::{
-        check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
-        with_context,
+        check_network, get_block_index_from_request, handle_request, native_coin, with_context,
     },
     error::{ApiError, ApiResult},
     types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, *},
     RosettaContext,
 };
 use aptos_logger::{debug, trace, warn};
-use aptos_types::{
-    account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource},
+use aptos_rest_client::{
+    aptos_api_types::{AptosError, AptosErrorCode, ViewFunction},
+    error::{AptosErrorResponse, RestError},
 };
-use std::{collections::HashSet, str::FromStr};
+use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    parser::parse_type_tag,
+};
+use std::str::FromStr;
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -53,7 +58,6 @@ async fn account_balance(
     let network_identifier = request.network_identifier;
 
     check_network(network_identifier, &server_context)?;
-    let rest_client = server_context.rest_client()?;
 
     // Retrieve the block index to read
     let block_height =
@@ -69,7 +73,7 @@ async fn account_balance(
 
     // Retrieve all metadata we want to provide as an on-demand lookup
     let (sequence_number, operators, balances, lockup_expiration) = get_balances(
-        &rest_client,
+        &server_context,
         request.account_identifier,
         balance_version,
         request.currencies,
@@ -90,11 +94,12 @@ async fn account_balance(
 /// Retrieve the balances for an account
 #[allow(clippy::manual_retain)]
 async fn get_balances(
-    rest_client: &aptos_rest_client::Client,
+    server_context: &RosettaContext,
     account: AccountIdentifier,
     version: u64,
     maybe_filter_currencies: Option<Vec<Currency>>,
 ) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>, u64)> {
+    let rest_client = server_context.rest_client()?;
     let owner_address = account.account_address()?;
     let pool_address = account.pool_address()?;
 
@@ -105,7 +110,7 @@ async fn get_balances(
     // Lookup the delegation pool, if it's provided in the account information
     if pool_address.is_some() {
         match get_delegation_stake_balances(
-            rest_client,
+            rest_client.as_ref(),
             &account,
             owner_address,
             pool_address.unwrap(),
@@ -137,156 +142,198 @@ async fn get_balances(
         }
     }
 
-    // Retrieve all account resources
-    // TODO: This will need to change for FungibleAssets, will need to lookup on a list of known FAs
-    if let Ok(response) = rest_client
-        .get_account_resources_at_version_bcs(owner_address, version)
+    // Retrieve sequence number
+    let sequence_number = match rest_client
+        .get_account_resource_at_version_bcs(owner_address, "0x1::account::Account", version)
         .await
     {
-        let resources = response.into_inner();
-        let mut maybe_sequence_number = None;
-        let mut maybe_operators = None;
-
-        // Iterate through resources, converting balances
-        for (struct_tag, bytes) in resources {
-            match (
-                struct_tag.address,
-                struct_tag.module.as_str(),
-                struct_tag.name.as_str(),
-            ) {
-                // Retrieve the sequence number from the account resource
-                // TODO: Make a separate call for this
-                (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE) => {
-                    let account: AccountResource = bcs::from_bytes(&bytes)?;
-                    maybe_sequence_number = Some(account.sequence_number())
+        Ok(response) => {
+            let account: AccountResource = response.into_inner();
+            account.sequence_number()
+        },
+        Err(RestError::Api(AptosErrorResponse {
+            error:
+                AptosError {
+                    error_code: AptosErrorCode::AccountNotFound,
+                    ..
                 },
-                // Parse all associated coin stores
-                // TODO: This would need to be expanded to support other coin stores
-                (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
-                    // Only show coins on the base account
-                    if account.is_base_account() {
-                        let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
-                        if let Some(coin_type) = struct_tag.type_args.first() {
-                            // Only display supported coins
-                            if coin_type == &native_coin_tag() {
-                                balances.push(Amount {
-                                    value: coin_store.coin().to_string(),
-                                    currency: native_coin(),
-                                });
-                            }
-                        }
-                    }
+            ..
+        }))
+        | Err(RestError::Api(AptosErrorResponse {
+            error:
+                AptosError {
+                    error_code: AptosErrorCode::ResourceNotFound,
+                    ..
                 },
-                // Parse all staking contract data to know the underlying balances of the pools
-                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE) => {
-                    if account.is_base_account() || pool_address.is_some() {
-                        continue;
-                    }
-
-                    let store: Store = bcs::from_bytes(&bytes)?;
-                    maybe_operators = Some(vec![]);
-                    for (operator, contract) in store.staking_contracts {
-                        // Keep track of operators
-                        maybe_operators.as_mut().unwrap().push(operator);
-                        match get_stake_balances(
-                            rest_client,
-                            &account,
-                            contract.pool_address,
-                            version,
-                        )
-                        .await
-                        {
-                            Ok(Some(balance_result)) => {
-                                if let Some(balance) = balance_result.balance {
-                                    total_requested_balance = Some(
-                                        total_requested_balance.unwrap_or_default()
-                                            + u64::from_str(&balance.value).unwrap_or_default(),
-                                    );
-                                }
-                                lockup_expiration = balance_result.lockup_expiration;
-                            },
-                            result => {
-                                warn!(
-                                    "Failed to retrieve requested balance for account: {}, address: {}: {:?}",
-                                    owner_address, contract.pool_address, result
-                                )
-                            },
-                        }
-                    }
-                    if let Some(balance) = total_requested_balance {
-                        balances.push(Amount {
-                            value: balance.to_string(),
-                            currency: native_coin(),
-                        })
-                    }
-
-                    /* TODO: Right now operator stake is not supported
-                    else if account.is_operator_stake() {
-                        // For operator stake, filter on operator address
-                        let operator_address = account.operator_address()?;
-                        if let Some(contract) = store.staking_contracts.get(&operator_address) {
-                            balances.push(get_total_stake(
-                                rest_client,
-                                &account,
-                                contract.pool_address,
-                                version,
-                            ).await?);
-                        }
-                    }*/
-                },
-                _ => {},
-            }
-        }
-
-        // Retrieves the sequence number accordingly
-        // TODO: Sequence number should be 0 if it isn't retrieved probably
-        let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
-            sequence_number
-        } else {
+            ..
+        })) => {
+            // If the account or resource doesn't exist, set the sequence number to 0
+            0
+        },
+        _ => {
+            // Any other error we can't retrieve the sequence number
             return Err(ApiError::InternalError(Some(
                 "Failed to retrieve account sequence number".to_string(),
             )));
-        };
+        },
+    };
 
-        // Filter based on requested currencies
-        if let Some(currencies) = maybe_filter_currencies {
-            let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
-            // Remove extra currencies not requested
-            balances = balances
-                .into_iter()
-                .filter(|balance| currencies.contains(&balance.currency))
-                .collect();
-
-            for balance in balances.iter() {
-                currencies.remove(&balance.currency);
+    // Retrieve staking information (if it applies)
+    // Only non-pool addresses, and non base accounts
+    let mut maybe_operators = None;
+    if !account.is_base_account() && pool_address.is_none() {
+        if let Ok(response) = rest_client
+            .get_account_resource_at_version_bcs(
+                owner_address,
+                "0x1::staking_contract::Store",
+                version,
+            )
+            .await
+        {
+            let store: Store = response.into_inner();
+            maybe_operators = Some(vec![]);
+            for (operator, contract) in store.staking_contracts {
+                // Keep track of operators
+                maybe_operators.as_mut().unwrap().push(operator);
+                match get_stake_balances(
+                    rest_client.as_ref(),
+                    &account,
+                    contract.pool_address,
+                    version,
+                )
+                .await
+                {
+                    Ok(Some(balance_result)) => {
+                        if let Some(balance) = balance_result.balance {
+                            total_requested_balance = Some(
+                                total_requested_balance.unwrap_or_default()
+                                    + u64::from_str(&balance.value).unwrap_or_default(),
+                            );
+                        }
+                        lockup_expiration = balance_result.lockup_expiration;
+                    },
+                    result => {
+                        warn!(
+                                        "Failed to retrieve requested balance for account: {}, address: {}: {:?}",
+                                        owner_address, contract.pool_address, result
+                                    )
+                    },
+                }
             }
-
-            for currency in currencies {
+            if let Some(balance) = total_requested_balance {
                 balances.push(Amount {
-                    value: 0.to_string(),
-                    currency,
-                });
+                    value: balance.to_string(),
+                    currency: native_coin(),
+                })
             }
-        }
 
-        // Retrieve balances
-        Ok((
-            sequence_number,
-            maybe_operators,
-            balances,
-            lockup_expiration,
-        ))
-    } else {
-        // If it fails, we return 0
-        // TODO: This should probably be fixed to check if the account exists.  Then if the account doesn't exist, return empty balance, otherwise error
-        Ok((
-            0,
-            None,
-            vec![Amount {
-                value: 0.to_string(),
-                currency: native_coin(),
-            }],
-            0,
-        ))
+            /* TODO: Right now operator stake is not supported
+            else if account.is_operator_stake() {
+                // For operator stake, filter on operator address
+                let operator_address = account.operator_address()?;
+                if let Some(contract) = store.staking_contracts.get(&operator_address) {
+                    balances.push(get_total_stake(
+                        rest_client,
+                        &account,
+                        contract.pool_address,
+                        version,
+                    ).await?);
+                }
+            }*/
+        }
     }
+
+    // Filter currencies to lookup
+    let currencies_to_lookup = if let Some(currencies) = maybe_filter_currencies {
+        currencies.into_iter().collect()
+    } else {
+        server_context.currencies.clone()
+    };
+
+    // Retrieve the fungible asset balances and the coin balances
+    for currency in currencies_to_lookup.iter() {
+        match *currency {
+            // FA only
+            Currency {
+                metadata:
+                    Some(CurrencyMetadata {
+                        move_type: None,
+                        fa_address: Some(ref fa_address),
+                    }),
+                ..
+            } => {
+                let response = rest_client
+                    .view_bcs::<Vec<u64>>(
+                        &ViewFunction {
+                            module: ModuleId {
+                                address: AccountAddress::ONE,
+                                name: ident_str!(PRIMARY_FUNGIBLE_STORE_MODULE).into(),
+                            },
+                            function: ident_str!(BALANCE_FUNCTION).into(),
+                            ty_args: vec![TypeTag::Struct(Box::new(StructTag {
+                                address: AccountAddress::ONE,
+                                module: ident_str!(OBJECT_MODULE).into(),
+                                name: ident_str!(OBJECT_CORE_RESOURCE).into(),
+                                type_args: vec![],
+                            }))],
+                            args: vec![
+                                bcs::to_bytes(&owner_address).unwrap(),
+                                bcs::to_bytes(&AccountAddress::from_str(fa_address).unwrap())
+                                    .unwrap(),
+                            ],
+                        },
+                        Some(version),
+                    )
+                    .await?
+                    .into_inner();
+                let fa_balance = response.first().copied().unwrap_or(0);
+                balances.push(Amount {
+                    value: fa_balance.to_string(),
+                    currency: currency.clone(),
+                })
+            },
+            // Coin or Coin and FA combined
+            Currency {
+                metadata:
+                    Some(CurrencyMetadata {
+                        move_type: Some(ref coin_type),
+                        fa_address: _,
+                    }),
+                ..
+            } => {
+                if let Ok(type_tag) = parse_type_tag(coin_type) {
+                    let response = rest_client
+                        .view_bcs::<Vec<u64>>(
+                            &ViewFunction {
+                                module: ModuleId {
+                                    address: AccountAddress::ONE,
+                                    name: ident_str!(COIN_MODULE).into(),
+                                },
+                                function: ident_str!(BALANCE_FUNCTION).into(),
+                                ty_args: vec![type_tag],
+                                args: vec![bcs::to_bytes(&owner_address).unwrap()],
+                            },
+                            Some(version),
+                        )
+                        .await?
+                        .into_inner();
+                    let coin_balance = response.first().copied().unwrap_or(0);
+                    balances.push(Amount {
+                        value: coin_balance.to_string(),
+                        currency: currency.clone(),
+                    })
+                }
+            },
+            _ => {
+                // None for both, means we can't look it up anyways / it's invalid
+            },
+        }
+    }
+
+    Ok((
+        sequence_number,
+        maybe_operators,
+        balances,
+        lockup_expiration,
+    ))
 }

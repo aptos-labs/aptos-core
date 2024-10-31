@@ -3,9 +3,9 @@
 
 use crate::{
     dropper::DROPPER,
+    flatten_perfect_tree::{FlattenPerfectTree, FptRef},
     map::{DefaultHashBuilder, LayeredMap},
     metrics::LAYER,
-    node::NodeRef,
 };
 use aptos_crypto::HashValue;
 use aptos_drop_helper::ArcAsyncDrop;
@@ -15,7 +15,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Debug)]
 struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
-    root: NodeRef<K, V>,
+    peak: FlattenPerfectTree<K, V>,
     children: Mutex<Vec<Arc<LayerInner<K, V>>>>,
     use_case: &'static str,
     family: HashValue,
@@ -28,7 +28,7 @@ struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
 impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Drop for LayerInner<K, V> {
     fn drop(&mut self) {
         // Drop the tree nodes in a different thread, because that's the slowest part.
-        DROPPER.schedule_drop(self.root.take_for_drop());
+        DROPPER.schedule_drop(self.peak.take_for_drop());
 
         let mut stack = self.drain_children_for_drop();
         while let Some(descendant) = stack.pop() {
@@ -49,7 +49,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
     fn new_family(use_case: &'static str) -> Arc<Self> {
         let family = HashValue::random();
         Arc::new(Self {
-            root: NodeRef::Empty,
+            peak: FlattenPerfectTree::new_with_empty_nodes(1),
             children: Mutex::new(Vec::new()),
             use_case,
             family,
@@ -58,9 +58,9 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
         })
     }
 
-    fn spawn(self: &Arc<Self>, child_root: NodeRef<K, V>, base_layer: u64) -> Arc<Self> {
+    fn spawn(self: &Arc<Self>, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Arc<Self> {
         let child = Arc::new(Self {
-            root: child_root,
+            peak: child_peak,
             children: Mutex::new(Vec::new()),
             use_case: self.use_case,
             family: self.family,
@@ -139,15 +139,15 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.layer
     }
 
-    pub(crate) fn root(&self) -> &NodeRef<K, V> {
-        &self.inner.root
-    }
-
     pub(crate) fn use_case(&self) -> &'static str {
         self.inner.use_case
     }
 
-    pub(crate) fn spawn(&self, child_root: NodeRef<K, V>, base_layer: u64) -> Self {
-        Self::new(self.inner.spawn(child_root, base_layer))
+    pub(crate) fn spawn(&self, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Self {
+        Self::new(self.inner.spawn(child_peak, base_layer))
+    }
+
+    pub(crate) fn peak(&self) -> FptRef<K, V> {
+        self.inner.peak.get_ref()
     }
 }

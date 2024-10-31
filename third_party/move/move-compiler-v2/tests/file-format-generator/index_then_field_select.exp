@@ -1,0 +1,58 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.test {
+struct Coin has copy, drop {
+	_0: u256
+}
+
+inc_vec_new(Arg0: &mut vector<u256>, Arg1: u64) /* def_idx: 0 */ {
+B0:
+	0: CopyLoc[0](Arg0: &mut vector<u256>)
+	1: FreezeRef
+	2: CopyLoc[1](Arg1: u64)
+	3: VecImmBorrow(2)
+	4: ReadRef
+	5: LdU256(1)
+	6: Add
+	7: MoveLoc[0](Arg0: &mut vector<u256>)
+	8: MoveLoc[1](Arg1: u64)
+	9: VecMutBorrow(2)
+	10: WriteRef
+	11: Ret
+}
+test0(Arg0: &mut vector<Coin>, Arg1: u64) /* def_idx: 1 */ {
+L2:	loc0: &mut u256
+B0:
+	0: MoveLoc[0](Arg0: &mut vector<Coin>)
+	1: MoveLoc[1](Arg1: u64)
+	2: VecMutBorrow(4)
+	3: MutBorrowField[0](Coin._0: u256)
+	4: StLoc[2](loc0: &mut u256)
+	5: MoveLoc[2](loc0: &mut u256)
+	6: Pop
+	7: Ret
+}
+test1(Arg0: vector<Coin>, Arg1: u64) /* def_idx: 2 */ {
+L2:	loc0: &mut u256
+B0:
+	0: MutBorrowLoc[0](Arg0: vector<Coin>)
+	1: MoveLoc[1](Arg1: u64)
+	2: VecMutBorrow(4)
+	3: MutBorrowField[0](Coin._0: u256)
+	4: StLoc[2](loc0: &mut u256)
+	5: MoveLoc[2](loc0: &mut u256)
+	6: Pop
+	7: Ret
+}
+test3(Arg0: &vector<Coin>, Arg1: u64) /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](Arg0: &vector<Coin>)
+	1: MoveLoc[1](Arg1: u64)
+	2: VecImmBorrow(4)
+	3: ReadRef
+	4: Pop
+	5: Ret
+}
+}
+============ bytecode verification succeeded ========

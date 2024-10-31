@@ -230,7 +230,7 @@ impl OnChainConfig for ObservedJWKs {
 }
 
 /// Reflection of Move type `0x1::jwks::PatchedJWKs`.
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
 }

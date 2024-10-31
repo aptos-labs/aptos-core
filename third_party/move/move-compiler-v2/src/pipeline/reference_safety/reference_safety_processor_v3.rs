@@ -16,6 +16,8 @@
 //! in the stack machine they are put on the stack in independent instructions.
 //! Another difference is the need for generating good error messages which
 //! the bytecode verifier has not.
+//!
+//! Prerequisites: there are no uninitialized locals.
 
 use crate::pipeline::{
     livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},

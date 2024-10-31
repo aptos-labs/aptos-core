@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::PrefixedStateValueIterator;
+use crate::{metrics::TIMER, utils::PrefixedStateValueIterator};
 use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
@@ -361,8 +361,10 @@ impl DBIndexer {
     }
 
     pub fn process_a_batch(&self, start_version: Version) -> Result<Version> {
+        let _timer = TIMER.with_label_values(&["process_a_batch"]).start_timer();
         let mut version = start_version;
         let num_transactions = self.get_num_of_transactions(version)?;
+        // This promises num_transactions should be readable from main db
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let batch = SchemaBatch::new();
         db_iter.try_for_each(|res| {
@@ -397,7 +399,7 @@ impl DBIndexer {
 
             if self.indexer_db.statekeys_enabled() {
                 writeset.iter().for_each(|(state_key, write_op)| {
-                    if write_op.is_creation() {
+                    if write_op.is_creation() || write_op.is_modification() {
                         batch
                             .put::<StateKeysSchema>(state_key, &())
                             .expect("Failed to put state keys to a batch");
@@ -407,7 +409,10 @@ impl DBIndexer {
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;
+        assert!(version > 0, "batch number should be greater than 0");
+
         assert_eq!(num_transactions, version - start_version);
+
         if self.indexer_db.transaction_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(
                 &MetadataKey::TransactionVersion,

@@ -1177,7 +1177,7 @@ impl<
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     utils::apply_transaction_outputs(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -1198,7 +1198,7 @@ impl<
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -1219,7 +1219,7 @@ impl<
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -1229,7 +1229,7 @@ impl<
                 } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
                 {
                     utils::apply_transaction_outputs(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,

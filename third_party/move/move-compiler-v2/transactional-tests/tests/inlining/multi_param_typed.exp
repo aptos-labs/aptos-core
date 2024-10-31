@@ -1,0 +1,44 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-29:
+- Error: error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:17:30
++ Error: compilation errors:
++  error: a reference is expected but `_` was provided
++    ┌─ TEMPFILE:24:82
+=    │
+- 17 │         for_each_ref_mut(v, |elem: &mut Elem<K, V>| {
+-    │                              ^^^^^^^^^^^^^^^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++ 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
++    │                                                                                  ^
+= 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:24:65
++ error: a reference is expected but `_` was provided
++    ┌─ TEMPFILE:24:87
+=    │
+= 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
+-    │                                                                 ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++    │                                                                                       ^
+= 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:24:73
++ error: cannot pass `|(u64, u64)|integer` to a function which expects argument of type `|(&integer, &mut integer)|u64`
++    ┌─ TEMPFILE:24:64
+=    │
+= 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
+-    │                                                                         ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
+= 
+= 
+= 
+= task 1 'run'. lines 31-31:
+= Error: Function execution failed with VMError: {
+=     major_status: LINKER_ERROR,
+=     sub_status: None,
+=     location: undefined,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 

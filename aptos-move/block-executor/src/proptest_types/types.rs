@@ -12,7 +12,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
-    delayed_fields::PanicError,
+    error::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -25,10 +25,20 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
-use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use aptos_vm_types::{
+    module_and_script_storage::code_storage::AptosCodeStorage,
+    module_write_set::ModuleWrite,
+    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resource_group_adapter::{
+        decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
+    },
+};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_core_types::{
+    ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
+};
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -835,12 +845,34 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 // Mock transaction executor implementation.
 ///////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-pub(crate) struct MockTask<K, E>(PhantomData<(K, E)>);
+pub(crate) struct MockTask<K, E> {
+    phantom_data: PhantomData<(K, E)>,
+}
 
 impl<K, E> MockTask<K, E> {
     pub fn new() -> Self {
-        Self(PhantomData)
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct MockEnvironment {
+    runtime_environment: RuntimeEnvironment,
+}
+
+impl MockEnvironment {
+    pub(crate) fn new() -> Self {
+        Self {
+            runtime_environment: RuntimeEnvironment::new(vec![]),
+        }
+    }
+}
+
+impl WithRuntimeEnvironment for MockEnvironment {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.runtime_environment
     }
 }
 
@@ -849,7 +881,7 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Environment = ();
+    type Environment = MockEnvironment;
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
@@ -861,7 +893,8 @@ where
     fn execute_transaction(
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
-              + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
+              + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
+              + AptosCodeStorage),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
@@ -928,6 +961,8 @@ where
                 let mut group_writes = vec![];
                 for (key, metadata, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
+                    let group_size = view.resource_group_size(key).unwrap();
+                    let mut new_group_size = view.resource_group_size(key).unwrap();
                     for (tag, inner_op) in inner_ops.iter() {
                         let exists = view
                             .get_resource_from_group(key, tag, None)
@@ -940,46 +975,92 @@ where
 
                         // inner op is either deletion or creation.
                         assert!(!inner_op.is_modification());
-                        if exists == inner_op.is_deletion() {
-                            // insert the provided inner op.
-                            new_inner_ops.insert(*tag, inner_op.clone());
-                        }
 
-                        if exists && inner_op.is_creation() {
-                            // Adjust the type, otherwise executor will assert.
-                            if inner_op.bytes().unwrap()[0] % 4 < 3 || *tag == RESERVED_TAG {
-                                new_inner_ops.insert(
-                                    *tag,
+                        let maybe_op = if exists {
+                            Some(
+                                if inner_op.is_creation()
+                                    && (inner_op.bytes().unwrap()[0] % 4 < 3
+                                        || *tag == RESERVED_TAG)
+                                {
                                     ValueType::new(
                                         inner_op.bytes.clone(),
                                         StateValueMetadata::none(),
                                         WriteOpKind::Modification,
-                                    ),
-                                );
-                            } else {
-                                new_inner_ops.insert(
-                                    *tag,
+                                    )
+                                } else {
                                     ValueType::new(
                                         None,
                                         StateValueMetadata::none(),
                                         WriteOpKind::Deletion,
-                                    ),
-                                );
+                                    )
+                                },
+                            )
+                        } else {
+                            inner_op.is_creation().then(|| inner_op.clone())
+                        };
+
+                        if let Some(new_inner_op) = maybe_op {
+                            if exists {
+                                let old_tagged_value_size =
+                                    view.resource_size_in_group(key, tag).unwrap();
+                                let old_size =
+                                    group_tagged_resource_size(tag, old_tagged_value_size).unwrap();
+                                // let _ =
+                                // decrement_size_for_remove_tag(&mut new_group_size, old_size);
+                                if decrement_size_for_remove_tag(&mut new_group_size, old_size)
+                                    .is_err()
+                                {
+                                    // Check it only happens for speculative executions that may not
+                                    // commit by returning incorrect (empty) output.
+                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                }
                             }
+                            if !new_inner_op.is_deletion() {
+                                let new_size = group_tagged_resource_size(
+                                    tag,
+                                    inner_op.bytes.as_ref().unwrap().len(),
+                                )
+                                .unwrap();
+                                if increment_size_for_add_tag(&mut new_group_size, new_size)
+                                    .is_err()
+                                {
+                                    // Check it only happens for speculative executions that may not
+                                    // commit by returning incorrect (empty) output.
+                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                }
+                            }
+
+                            new_inner_ops.insert(*tag, new_inner_op);
                         }
                     }
 
-                    if !inner_ops.is_empty() {
-                        // Not testing metadata_op here, always modification.
-                        group_writes.push((
-                            key.clone(),
-                            ValueType::new(
-                                Some(Bytes::new()),
-                                metadata.clone(),
-                                WriteOpKind::Modification,
-                            ),
-                            new_inner_ops,
-                        ));
+                    if !new_inner_ops.is_empty() {
+                        if group_size.get() > 0
+                            && new_group_size == ResourceGroupSize::zero_combined()
+                        {
+                            // TODO: reserved tag currently prevents this code from being run.
+                            // Group got deleted.
+                            group_writes.push((
+                                key.clone(),
+                                ValueType::new(None, metadata.clone(), WriteOpKind::Deletion),
+                                new_group_size,
+                                new_inner_ops,
+                            ));
+                        } else {
+                            let op_kind = if group_size.get() == 0 {
+                                WriteOpKind::Creation
+                            } else {
+                                WriteOpKind::Modification
+                            };
+
+                            // Not testing metadata_op here, always modification.
+                            group_writes.push((
+                                key.clone(),
+                                ValueType::new(Some(Bytes::new()), metadata.clone(), op_kind),
+                                new_group_size,
+                                new_inner_ops,
+                            ));
+                        }
                     }
                 }
 
@@ -1024,7 +1105,7 @@ pub(crate) enum GroupSizeOrMetadata {
 pub(crate) struct MockOutput<K, E> {
     pub(crate) writes: Vec<(K, ValueType)>,
     // Key, metadata_op, inner_ops
-    pub(crate) group_writes: Vec<(K, ValueType, HashMap<u32, ValueType>)>,
+    pub(crate) group_writes: Vec<(K, ValueType, ResourceGroupSize, HashMap<u32, ValueType>)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
@@ -1053,11 +1134,15 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> BTreeMap<K, ValueType> {
+    fn module_write_set(&self) -> BTreeMap<K, ModuleWrite<ValueType>> {
         self.writes
             .iter()
             .filter(|(k, _)| k.is_module_path())
-            .cloned()
+            .map(|(k, v)| {
+                let dummy_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
+                let write = ModuleWrite::new(dummy_id, v.clone());
+                (k.clone(), write)
+            })
             .collect()
     }
 
@@ -1111,15 +1196,17 @@ where
     ) -> Vec<(
         K,
         ValueType,
+        ResourceGroupSize,
         BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
     )> {
         self.group_writes
             .iter()
             .cloned()
-            .map(|(group_key, metadata_v, inner_ops)| {
+            .map(|(group_key, metadata_v, group_size, inner_ops)| {
                 (
                     group_key,
                     metadata_v,
+                    group_size,
                     inner_ops.into_iter().map(|(k, v)| (k, (v, None))).collect(),
                 )
             })
@@ -1165,12 +1252,26 @@ where
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: Vec<(
+        patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) -> Result<(), PanicError> {
+        let resources: HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value> =
+            patched_resource_write_set.clone().into_iter().collect();
+        for (key, _, size, _) in &self.group_writes {
+            let v = resources.get(key).unwrap();
+            if v.is_deletion() {
+                assert_eq!(*size, ResourceGroupSize::zero_combined());
+            } else {
+                assert_eq!(
+                    size.get(),
+                    resources.get(key).unwrap().bytes().map_or(0, |b| b.len()) as u64
+                );
+            }
+        }
+
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input

@@ -2550,8 +2550,19 @@ impl<'env> FunctionTranslator<'env> {
                     writer.indent();
                     *last_tracked_loc = None;
                     self.track_loc(last_tracked_loc, &loc);
+                    let num_oper_code = global_state
+                        .get_temp_index_oper(mid, fid, *code, baseline_flag)
+                        .unwrap();
+                    let bv2int_str = if *num_oper_code == Bitwise {
+                        format!(
+                            "$int2bv.{}($abort_code)",
+                            boogie_num_type_base(&self.get_local_type(*code))
+                        )
+                    } else {
+                        "$abort_code".to_string()
+                    };
                     let code_str = str_local(*code);
-                    emitln!(writer, "{} := $abort_code;", code_str);
+                    emitln!(writer, "{} := {};", code_str, bv2int_str);
                     self.track_abort(&code_str);
                     emitln!(writer, "goto L{};", target.as_usize());
                     writer.unindent();
@@ -2559,7 +2570,19 @@ impl<'env> FunctionTranslator<'env> {
                 }
             },
             Abort(_, src) => {
-                emitln!(writer, "$abort_code := {};", str_local(*src));
+                let num_oper_code = global_state
+                    .get_temp_index_oper(mid, fid, *src, baseline_flag)
+                    .unwrap();
+                let int2bv_str = if *num_oper_code == Bitwise {
+                    format!(
+                        "$bv2int.{}({})",
+                        boogie_num_type_base(&self.get_local_type(*src)),
+                        str_local(*src)
+                    )
+                } else {
+                    str_local(*src)
+                };
+                emitln!(writer, "$abort_code := {};", int2bv_str);
                 emitln!(writer, "$abort_flag := true;");
                 emitln!(writer, "return;")
             },
@@ -2929,8 +2952,6 @@ impl<'env> FunctionTranslator<'env> {
                     _ => {},
                 },
                 Prop(_, PropKind::Modifies, exp) => {
-                    // global_state.exp_operation_map.get(exp.node_id()) == Bitwise;
-                    //let bv_flag = env.get_node_num_oper(exp.node_id()) == Bitwise;
                     let bv_flag = global_state.get_node_num_oper(exp.node_id()) == Bitwise;
                     need(&BOOL_TYPE, false, 1);
                     need(&self.inst(&env.get_node_type(exp.node_id())), bv_flag, 1)

@@ -87,6 +87,11 @@ impl<I: Ord + Hash> TimeExpirations<I> {
         }
         ret
     }
+
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.expiries.is_empty()
+    }
 }
 
 pub struct MempoolProxy {
@@ -173,6 +178,10 @@ impl BatchSortKey {
 
     pub fn author(&self) -> PeerId {
         self.batch_key.author
+    }
+
+    pub fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
     }
 }
 

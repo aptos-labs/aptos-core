@@ -5,9 +5,7 @@
 
 use crate::{
     common::NUM_STATE_SHARDS,
-    db_options::{
-        gen_state_kv_cfds, state_kv_db_column_families, state_kv_db_new_key_column_families,
-    },
+    db_options::gen_state_kv_cfds,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -105,8 +103,10 @@ impl StateKvDb {
             enabled_sharding: true,
         };
 
-        if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
-            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
+        if !readonly {
+            if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
+                truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
+            }
         }
 
         Ok(state_kv_db)
@@ -268,11 +268,7 @@ impl StateKvDb {
                 &gen_rocksdb_options(state_kv_db_config, true),
                 path,
                 name,
-                if enable_sharding {
-                    state_kv_db_new_key_column_families()
-                } else {
-                    state_kv_db_column_families()
-                },
+                gen_state_kv_cfds(state_kv_db_config, enable_sharding),
             )?
         } else {
             DB::open_cf(

@@ -6,6 +6,7 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
     transaction::AbortInfo,
 };
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
@@ -227,16 +228,37 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    vm.with_module_metadata(module_id, get_metadata)
+pub fn get_vm_metadata(
+    vm: &MoveVM,
+    module_storage: &impl AptosModuleStorage,
+    module_id: &ModuleId,
+) -> Option<Arc<RuntimeModuleMetadataV1>> {
+    if module_storage.is_enabled() {
+        let metadata = module_storage
+            .fetch_module_metadata(module_id.address(), module_id.name())
+            .ok()??;
+        get_metadata(&metadata)
+    } else {
+        #[allow(deprecated)]
+        vm.with_module_metadata(module_id, get_metadata)
+    }
 }
 
 /// Extract metadata from the VM, legacy V0 format upgraded to V1
 pub fn get_vm_metadata_v0(
     vm: &MoveVM,
+    module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    vm.with_module_metadata(module_id, get_metadata_v0)
+    if module_storage.is_enabled() {
+        let metadata = module_storage
+            .fetch_module_metadata(module_id.address(), module_id.name())
+            .ok()??;
+        get_metadata_v0(&metadata)
+    } else {
+        #[allow(deprecated)]
+        vm.with_module_metadata(module_id, get_metadata_v0)
+    }
 }
 
 /// Check if the metadata has unknown key/data types
@@ -624,11 +646,23 @@ fn check_module_complexity(module: &CompiledModule) -> Result<(), MetaDataValida
         check_ident_complexity(module, &mut meter, handle.name)?;
     }
     for def in module.struct_defs() {
-        if let StructFieldInformation::Declared(fields) = &def.field_information {
-            for field in fields {
-                check_ident_complexity(module, &mut meter, field.name)?;
-                check_sigtok_complexity(module, &mut meter, &field.signature.0)?
-            }
+        match &def.field_information {
+            StructFieldInformation::Native => {},
+            StructFieldInformation::Declared(fields) => {
+                for field in fields {
+                    check_ident_complexity(module, &mut meter, field.name)?;
+                    check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+                }
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                for variant in variants {
+                    check_ident_complexity(module, &mut meter, variant.name)?;
+                    for field in &variant.fields {
+                        check_ident_complexity(module, &mut meter, field.name)?;
+                        check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+                    }
+                }
+            },
         }
     }
     for def in module.function_defs() {

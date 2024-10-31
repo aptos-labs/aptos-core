@@ -92,6 +92,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub placeholder_map: BTreeMap<NodeId, ExpPlaceholder>,
     /// A flag to indicate whether to insert freeze operation
     pub insert_freeze: bool,
+    /// A stack of open loops and their optional label
+    pub loop_stack: Vec<Option<PA::Label>>,
 }
 
 #[derive(Debug)]
@@ -159,6 +161,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             spec_block_map: BTreeMap::new(),
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
+            loop_stack: vec![],
         }
     }
 
@@ -176,15 +179,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
-        if !self.env().language_version().is_at_least(version_min) {
-            self.env().error(
-                loc,
-                &format!(
-                    "not supported before language version `{}`: {}",
-                    version_min, feature
-                ),
-            )
-        }
+        self.parent
+            .check_language_version(loc, feature, version_min);
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
@@ -424,13 +420,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         };
         ty.visit(&mut visitor);
         if incomplete {
-            self.error(
-                &loc,
-                &format!(
-                    "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
-                    ty.display(&self.type_display_context())
-                ),
-            );
+            let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
+            // Skip displaying the error message if there is already an error in the type; we must have another message about it already.
+            if !displayed_ty.contains("*error*") {
+                self.error(
+                    &loc,
+                    &format!(
+                        "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
+                        displayed_ty
+                    ),
+                );
+            }
         }
         ty
     }
@@ -677,23 +677,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
+        let is_lang_version_2 = self
+            .env()
+            .language_version
+            .is_at_least(LanguageVersion::V2_0);
         params
             .iter()
             .enumerate()
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
-                let sym = self.symbol_pool().make(v.0.value.as_str());
+                let var_str = v.0.value.as_str();
+                let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
-                self.define_local(
-                    &loc,
-                    sym,
-                    ty.clone(),
-                    None,
-                    // If this is for a proper Move function (not spec function), add the
-                    // index so we can resolve this to a `Temporary` expression instead of
-                    // a `LocalVar`.
-                    if for_move_fun { Some(idx) } else { None },
-                );
+
+                if !is_lang_version_2 || var_str != "_" {
+                    self.define_local(
+                        &loc,
+                        sym,
+                        ty.clone(),
+                        None,
+                        // If this is for a proper Move function (not spec function), add the
+                        // index so we can resolve this to a `Temporary` expression instead of
+                        // a `LocalVar`.
+                        if for_move_fun { Some(idx) } else { None },
+                    );
+                }
                 Parameter(sym, ty, loc)
             })
             .collect_vec()
@@ -777,7 +785,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             .lookup_receiver_function(ty, name)
             .cloned()
         {
-            let type_inst = self.fresh_type_vars(entry.type_params.len());
+            let type_params = entry.type_params.clone();
+            let type_inst = self.fresh_type_vars(type_params.len());
             let arg_types = entry
                 .params
                 .iter()
@@ -786,6 +795,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             let result_type = entry.result_type.instantiate(&type_inst);
             Some(ReceiverFunctionInstance {
                 id: entry.module_id.qualified(entry.fun_id),
+                fun_name: name,
+                type_params,
                 type_inst,
                 arg_types,
                 result_type,
@@ -1552,10 +1563,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Match(discriminator, arms) => {
                 self.translate_match(loc, context, expected_type, discriminator, arms)
             },
-            EA::Exp_::While(cond, body) => {
+            EA::Exp_::While(label, cond, body) => {
                 let cond = self.translate_exp(cond, &Type::new_prim(PrimitiveType::Bool));
                 let body_type = self.check_type(&loc, &Type::unit(), expected_type, context);
+                self.push_loop_label(label);
                 let body = self.translate_exp(body, &body_type);
+                self.pop_loop_label();
                 let id = self.new_node_id_with_type_loc(&body_type, &loc);
                 ExpData::Loop(
                     id,
@@ -1563,13 +1576,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         id,
                         cond.into_exp(),
                         body.into_exp(),
-                        ExpData::LoopCont(id, false).into_exp(),
+                        ExpData::LoopCont(id, 0, false).into_exp(),
                     )
                     .into_exp(),
                 )
             },
-            EA::Exp_::Loop(body) => {
+            EA::Exp_::Loop(label, body) => {
+                self.push_loop_label(label);
                 let body = self.translate_exp(body, &Type::unit());
+                self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
                 let loop_type = if body.has_loop_exit() {
@@ -1580,15 +1595,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&loop_type, &loc);
                 ExpData::Loop(id, body.into_exp())
             },
-            EA::Exp_::Break => {
+            EA::Exp_::Break(label) => {
+                let nest = self.find_loop_nest(label);
                 // Type of `break` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, false)
+                ExpData::LoopCont(id, nest, false)
             },
-            EA::Exp_::Continue => {
+            EA::Exp_::Continue(label) => {
+                let nest = self.find_loop_nest(label);
                 // Type of `continue` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, true)
+                ExpData::LoopCont(id, nest, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
             EA::Exp_::Lambda(bindings, exp) => {
@@ -1799,7 +1816,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         return call;
                     }
                 }
-                let target_exp = self.translate_exp(exp, &target_ty);
+                let target_exp = if let EA::Exp_::ExpDotted(exp) = &exp.value {
+                    self.translate_dotted(exp, &target_ty, *mutable, context)
+                } else {
+                    self.translate_exp(exp, &target_ty)
+                };
                 if self.subs.specialize(&target_ty).is_reference() {
                     self.error(&loc, "cannot borrow from a reference")
                 }
@@ -1876,6 +1897,55 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.new_error_exp()
             },
         }
+    }
+
+    fn find_loop_nest(&self, label: &Option<PA::Label>) -> usize {
+        if let Some(label) = label {
+            let label_sym = label.value();
+            self.loop_stack
+                .iter()
+                .rev()
+                .position(|s| s.map(|s| s.value()) == Some(label_sym))
+                .unwrap_or_else(|| {
+                    self.error(
+                        &self.to_loc(&label.loc()),
+                        &format!("label `{}` undefined", label.value().as_str()),
+                    );
+                    0
+                })
+        } else {
+            0
+        }
+    }
+
+    fn push_loop_label(&mut self, label: &Option<PA::Label>) {
+        if let Some(label) = label {
+            let label_sym = label.value();
+            if let Some(Some(outer)) = self
+                .loop_stack
+                .iter()
+                .find(|s| s.map(|s| s.value()) == Some(label_sym))
+            {
+                self.error_with_labels(
+                    &self.to_loc(&label.loc()),
+                    &format!(
+                        "label `{}` already used by outer loop",
+                        label.value().as_str()
+                    ),
+                    vec![(
+                        self.to_loc(&outer.loc()),
+                        "outer definition of label".to_string(),
+                    )],
+                );
+            }
+        }
+        self.loop_stack.push(*label)
+    }
+
+    fn pop_loop_label(&mut self) {
+        self.loop_stack
+            .pop()
+            .expect("expected loop stack to be balanced");
     }
 
     /// Returns a map representing the current locals in scope and their associated declaration
@@ -2092,8 +2162,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &inst.result_type,
                 )
                 .map_err(|_| ok = false);
-            // `type.inst` is now unified with the actual types,
-            // annotate the instance. Since this post processor
+            // `type_inst` is now unified with the actual types,
+            // annotate the instance.  Since this post processor
             // is run after type finalization, we need to finalize
             // it to report any un-inferred type errors. However,
             // to avoid follow-up errors, only do if unification
@@ -2106,6 +2176,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
                     .collect();
+                // Also need to evaluate type constraints on type parameters
+
                 self.env().set_node_instantiation(id, inst)
             }
         }
@@ -2258,6 +2330,61 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ExpData::Match(id, discr_exp.into_exp(), translate_arms)
     }
 
+    fn translate_typed_lvalue_list(
+        &mut self,
+        list: &EA::TypedLValueList,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        match_locals: bool,
+        context: &ErrorMessageContext,
+    ) -> Pattern {
+        // Shortcut for single element case
+        if list.value.len() == 1 {
+            return self.translate_typed_lvalue(
+                list.value.first().unwrap(),
+                expected_type,
+                expected_order,
+                match_locals,
+                context,
+            );
+        }
+        let loc = self.to_loc(&list.loc);
+        // Ensure to maximize precision of expected type for elements
+        let expected_type = self.subs.specialize(expected_type);
+        let elem_expected_types = if let Type::Tuple(tys) = expected_type {
+            tys
+        } else {
+            let vars = self.fresh_type_vars(list.value.len());
+            // Just bind the variables
+            self.check_type_with_order(
+                expected_order,
+                &loc,
+                &Type::Tuple(vars.clone()),
+                &expected_type,
+                context,
+            );
+            vars
+        };
+        if elem_expected_types.len() != list.value.len() {
+            self.error(
+                &loc,
+                &context.arity_mismatch(false, elem_expected_types.len(), list.value.len()),
+            );
+            return self.new_error_pat(&loc);
+        }
+        let mut args = vec![];
+        let mut elem_types = vec![];
+        for (lv, expected) in list.value.iter().zip(elem_expected_types.iter()) {
+            let value =
+                self.translate_typed_lvalue(lv, expected, expected_order, match_locals, context);
+            elem_types.push(self.get_node_type(value.node_id()));
+            args.push(value)
+        }
+        let ty = Type::Tuple(elem_types);
+        let id = self.new_node_id_with_type_loc(&ty, &loc);
+        Pattern::Tuple(id, args)
+    }
+
     fn translate_lvalue_list(
         &mut self,
         list: &EA::LValueList,
@@ -2325,6 +2452,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ),
                 )
             }
+        }
+    }
+
+    fn translate_typed_lvalue(
+        &mut self,
+        tlv: &EA::TypedLValue,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        match_locals: bool,
+        context: &ErrorMessageContext,
+    ) -> Pattern {
+        use move_ir_types::sp;
+        let sp!(loc, EA::TypedLValue_(lv, opt_ty)) = tlv;
+        match opt_ty {
+            Some(ty) => {
+                let loc = self.to_loc(loc);
+                let bound_type = self.translate_type(ty);
+                self.check_type_with_order(
+                    expected_order,
+                    &loc,
+                    &bound_type, // is this arg ordering right?
+                    expected_type,
+                    context,
+                );
+                self.translate_lvalue(lv, &bound_type, expected_order, match_locals, context)
+            },
+            None => self.translate_lvalue(lv, expected_type, expected_order, match_locals, context),
         }
     }
 
@@ -2917,10 +3071,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        if !self.parent.check_no_variant(maccess) {
+        let (no_variant, maccess) = self.parent.check_no_variant_and_convert_maccess(maccess);
+        if !no_variant {
             return self.new_error_exp();
         }
-        let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
+        let (module_name, name, _) = self.parent.module_access_to_parts(&maccess);
 
         // Process `old(E)` scoping
         let is_old =
@@ -3557,12 +3712,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         } else {
             expected_type.clone()
         };
-        let ref_vec_exp_e = &sp(
-            vec_exp.loc,
-            EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
-        );
+        let (ty, _) = self.translate_exp_free(vec_exp);
+        let ref_vec_exp_e = if ty.is_reference() {
+            vec_exp.clone()
+        } else {
+            sp(
+                vec_exp.loc,
+                EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
+            )
+        };
         let vec_exp_e = self.translate_exp_in_context(
-            ref_vec_exp_e,
+            &ref_vec_exp_e,
             &Type::Reference(
                 ReferenceKind::from_is_mut(mutable),
                 Box::new(Type::Vector(Box::new(inner_ty.clone()))),
@@ -3718,7 +3878,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         dotted: &EA::ExpDotted,
         expected_type: &Type,
-        index_mutate: bool,
+        index_mutate: bool, // type of reference for type checking of index expression
         context: &ErrorMessageContext,
     ) -> ExpData {
         match &dotted.value {
@@ -3773,7 +3933,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Creates a select operation for the given field name, the kind dependening on whether
+    /// Creates a select operation for the given field name, the kind depending on whether
     /// variant fields or struct fields are selected.
     fn create_select_oper(
         &mut self,
@@ -4937,14 +5097,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn translate_lambda(
         &mut self,
         loc: &Loc,
-        args: &EA::LValueList,
+        args: &EA::TypedLValueList,
         body: &EA::Exp,
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
         // Translate the argument list
         let arg_type = self.fresh_type_var();
-        let pat = self.translate_lvalue_list(
+        let pat = self.translate_typed_lvalue_list(
             args,
             &arg_type,
             WideningOrder::LeftToRight,

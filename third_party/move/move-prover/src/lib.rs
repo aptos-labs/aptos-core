@@ -149,7 +149,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
         error_writer,
         "exiting with model building errors",
     )?;
-    env.report_diag(error_writer, options.prover.report_severity);
 
     // Add the prover options as an extension to the environment, so they can be accessed
     // from there.
@@ -319,6 +318,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             &dump_file_base,
             options.prover.dump_cfg,
             &|_| {},
+            || true,
         )
     } else {
         pipeline.run(env, &mut targets);

@@ -27,6 +27,11 @@ module M {
         cds<signer>();
         cds<vector<NoC>>();
         cds<vector<Cup<u8>>>();
+    }
+
+    /// Not all above errors are shown because of duplicate removal,
+    /// so some moved here.
+    fun t2() {
         let Sc {} = Sc<signer> {};
         let Sc {} = Sc<vector<signer>> {};
         let Sc {} = Sc<vector<NoC>> {};
@@ -38,7 +43,5 @@ module M {
         let Scds {} = Scds<vector<NoC>> {};
         let Scds {} = Scds<vector<Cup<u8>>> {};
     }
-
-
 }
 }

@@ -25,7 +25,7 @@ fun borrow_wrong_type() {
     let scenario = begin(sender);
     let x = new(&mut scenario);
     add(&mut x, 0, 0);
-    borrow<u64, u64>(&mut x, 0, 0);
+    borrow<u64, u64>(&mut x, 0);
     abort 42
 }
 

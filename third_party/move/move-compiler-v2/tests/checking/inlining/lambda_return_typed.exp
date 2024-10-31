@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Return not currently supported in inline functions
+  ┌─ tests/checking/inlining/lambda_return_typed.move:3:2
+  │
+3 │     return f(b)
+  │     ^^^^^^^^^^^

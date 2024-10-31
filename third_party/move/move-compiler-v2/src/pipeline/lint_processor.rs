@@ -6,10 +6,14 @@
 //! The lint checks also assume that all the correctness checks have already been performed.
 
 mod avoid_copy_on_identity_comparison;
+mod needless_mutable_reference;
 
 use crate::{
     lint_common::{lint_skips_from_attributes, LintChecker},
-    pipeline::lint_processor::avoid_copy_on_identity_comparison::AvoidCopyOnIdentityComparison,
+    pipeline::lint_processor::{
+        avoid_copy_on_identity_comparison::AvoidCopyOnIdentityComparison,
+        needless_mutable_reference::NeedlessMutableReference,
+    },
 };
 use move_compiler::shared::known_attributes::LintAttribute;
 use move_model::model::{FunctionEnv, GlobalEnv, Loc};
@@ -72,7 +76,10 @@ impl FunctionTargetProcessor for LintProcessor {
 impl LintProcessor {
     /// Returns the default pipeline of stackless bytecode linters to run.
     fn get_default_linter_pipeline() -> Vec<Box<dyn StacklessBytecodeLinter>> {
-        vec![Box::new(AvoidCopyOnIdentityComparison {})]
+        vec![
+            Box::new(AvoidCopyOnIdentityComparison {}),
+            Box::new(NeedlessMutableReference {}),
+        ]
     }
 
     /// Returns a filtered pipeline of stackless bytecode linters to run.

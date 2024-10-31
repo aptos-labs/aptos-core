@@ -1,4 +1,15 @@
 module 0xc0ffee::m {
+
+    entry fun while_loop_with_lambda_break<T>(s: u64) {
+        let spined = &mut 0;
+        while (*spined < s) {
+            brk2(|| {
+                break;
+            });
+            *spined = *spined + 1;
+        }
+    }
+
     inline fun brk() {
         break;
     }

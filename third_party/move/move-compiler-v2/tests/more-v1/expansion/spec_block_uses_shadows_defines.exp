@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot use `u256` with an operator which expects a value of type `address`
+   ┌─ tests/more-v1/expansion/spec_block_uses_shadows_defines.move:16:32
+   │
+16 │         ensures exists<S<u64>>(0x1) == exists<R>(0x1);
+   │                                ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+   ┌─ tests/more-v1/expansion/spec_block_uses_shadows_defines.move:16:50
+   │
+16 │         ensures exists<S<u64>>(0x1) == exists<R>(0x1);
+   │                                                  ^^^
+
+error: `ensures` not allowed in module context
+   ┌─ tests/more-v1/expansion/spec_block_uses_shadows_defines.move:16:9
+   │
+16 │         ensures exists<S<u64>>(0x1) == exists<R>(0x1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

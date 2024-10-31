@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/spec_parsing_emits_fail.move:3:19
+  │
+3 │         emits _msg;
+  │                   ^
+  │                   │
+  │                   Unexpected ';'
+  │                   Expected 'to'

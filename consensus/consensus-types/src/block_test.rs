@@ -17,7 +17,7 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
-    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithVerifiedSignatures},
     on_chain_config::ValidatorSet,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
@@ -131,7 +131,7 @@ fn test_same_qc_different_authors() {
     .unwrap();
 
     let signature = signer.sign(genesis_qc.ledger_info().ledger_info()).unwrap();
-    let mut ledger_info_altered = LedgerInfoWithPartialSignatures::new(
+    let mut ledger_info_altered = LedgerInfoWithVerifiedSignatures::new(
         genesis_qc.ledger_info().ledger_info().clone(),
         PartialSignatures::empty(),
     );
@@ -201,7 +201,7 @@ fn test_block_metadata_bitvec() {
     );
 
     let mut ledger_info_1 =
-        LedgerInfoWithPartialSignatures::new(ledger_info.clone(), PartialSignatures::empty());
+        LedgerInfoWithVerifiedSignatures::new(ledger_info.clone(), PartialSignatures::empty());
     let votes_1 = vec![true, false, true, true];
     votes_1
         .iter()

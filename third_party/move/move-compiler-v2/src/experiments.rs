@@ -112,8 +112,29 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::LAMBDA_FIELDS.to_string(),
+            description: "Turns on or off function values in struct fields".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::LAMBDA_LIFTING.to_string(),
             description: "Turns on or off lambda lifting".to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::LAMBDA_IN_PARAMS.to_string(),
+            description: "Turns on or off function values as parameters to non-inline functions"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::LAMBDA_IN_RETURNS.to_string(),
+            description: "Turns on or off function values in function return values".to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::LAMBDA_VALUES.to_string(),
+            description: "Turns on or off first-class function values".to_string(),
             default: Given(false),
         },
         Experiment {
@@ -125,7 +146,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::SPLIT_CRITICAL_EDGES.to_string(),
             description: "Turns on or off splitting of critical edges".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
@@ -145,7 +166,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::CFG_SIMPLIFICATION.to_string(),
             description: "Whether to do the control flow graph simplification".to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),
@@ -222,7 +243,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::FLUSH_WRITES_OPTIMIZATION.to_string(),
             description: "Whether to run flush writes processor and optimization".to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
             name: Experiment::STOP_BEFORE_STACKLESS_BYTECODE.to_string(),
@@ -275,7 +296,11 @@ impl Experiment {
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
+    pub const LAMBDA_FIELDS: &'static str = "lambda-fields";
+    pub const LAMBDA_IN_PARAMS: &'static str = "lambda-in-params";
+    pub const LAMBDA_IN_RETURNS: &'static str = "lambda-in-returns";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
+    pub const LAMBDA_VALUES: &'static str = "lambda-values";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";

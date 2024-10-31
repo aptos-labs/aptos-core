@@ -1,0 +1,29 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/bv_aborts.move:16:9
+   │
+16 │         aborts_if x > 815 with std::error::internal(0) | (0xCA26CBD9BE << 24);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bv_aborts.move:11: assert_with_spec
+   =         x = <redacted>
+   =     at tests/sources/functional/bv_aborts.move:12: assert_with_spec
+   =     at tests/sources/functional/bv_aborts.move:13: assert_with_spec
+   =     at tests/sources/functional/bv_aborts.move:16: assert_with_spec (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/bv_aborts.move:14:5
+   │
+12 │           assert!(x > 815);
+   │           ------ abort happened here
+13 │       }
+14 │ ╭     spec assert_with_spec  {
+15 │ │         // This will fail
+16 │ │         aborts_if x > 815 with std::error::internal(0) | (0xCA26CBD9BE << 24);
+17 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/bv_aborts.move:11: assert_with_spec
+   =         x = <redacted>
+   =     at tests/sources/functional/bv_aborts.move:12: assert_with_spec
+   =         ABORTED

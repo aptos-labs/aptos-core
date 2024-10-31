@@ -1,31 +1,28 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    node::{InternalNode, NodeStrongRef},
-    LayeredMap,
-};
+use crate::node::{InternalNode, NodeRef, NodeStrongRef};
 use aptos_drop_helper::ArcAsyncDrop;
 use std::sync::Arc;
 
-pub struct LayeredMapIterator<'a, K: ArcAsyncDrop, V: ArcAsyncDrop, S> {
-    layered_map: &'a LayeredMap<K, V, S>,
+pub(crate) struct DescendantIterator<'a, K: ArcAsyncDrop, V: ArcAsyncDrop> {
+    root: Option<&'a NodeRef<K, V>>,
+    base_layer: u64,
     current_leaf: Option<Box<dyn 'a + Iterator<Item = (K, V)>>>,
     ancestors: Vec<Arc<InternalNode<K, V>>>,
-    started: bool,
 }
 
-impl<'a, K, V, S> LayeredMapIterator<'a, K, V, S>
+impl<'a, K, V> DescendantIterator<'a, K, V>
 where
     K: ArcAsyncDrop + Clone,
     V: ArcAsyncDrop + Clone,
 {
-    pub fn new(layered_map: &'a LayeredMap<K, V, S>) -> Self {
+    pub fn new(root: &'a NodeRef<K, V>, base_layer: u64) -> Self {
         Self {
-            layered_map,
+            root: Some(root),
+            base_layer,
             current_leaf: None,
             ancestors: Vec::new(),
-            started: false,
         }
     }
 
@@ -36,7 +33,7 @@ where
         match current_node {
             None => {
                 if let Some(internal) = self.ancestors.pop() {
-                    let right = self.layered_map.get_node_strong(&internal.right);
+                    let right = internal.right.get_strong(self.base_layer);
                     self.find_next_leaf(Some(right))
                 } else {
                     None
@@ -44,13 +41,11 @@ where
             },
             Some(node) => match node {
                 NodeStrongRef::Empty => self.find_next_leaf(None),
-                NodeStrongRef::Leaf(leaf) => Some(Box::new(
-                    leaf.content
-                        .clone()
-                        .into_iter(self.layered_map.base_layer()),
-                )),
+                NodeStrongRef::Leaf(leaf) => {
+                    Some(Box::new(leaf.content.clone().into_iter(self.base_layer)))
+                },
                 NodeStrongRef::Internal(internal) => {
-                    let left = self.layered_map.get_node_strong(&internal.left);
+                    let left = internal.left.get_strong(self.base_layer);
                     self.ancestors.push(internal);
                     self.find_next_leaf(Some(left))
                 },
@@ -58,19 +53,18 @@ where
         }
     }
 
-    pub fn next_impl(&mut self) -> Option<(K, V)> {
+    fn next_impl(&mut self) -> Option<(K, V)> {
         loop {
             match &mut self.current_leaf {
                 None => {
-                    if self.started {
-                        if self.ancestors.is_empty() {
-                            return None;
-                        } else {
-                            self.current_leaf = self.find_next_leaf(None);
-                        }
+                    if let Some(root) = self.root.take() {
+                        // Iterater not started yet, consume root and go down.
+                        self.current_leaf =
+                            self.find_next_leaf(Some(root.get_strong(self.base_layer)));
+                    } else if self.ancestors.is_empty() {
+                        return None;
                     } else {
-                        self.current_leaf = self.find_next_leaf(Some(self.layered_map.root()));
-                        self.started = true
+                        self.current_leaf = self.find_next_leaf(None);
                     }
                 },
                 Some(kv_iter) => {
@@ -85,7 +79,7 @@ where
     }
 }
 
-impl<'a, K, V, S> Iterator for LayeredMapIterator<'a, K, V, S>
+impl<'a, K, V> Iterator for DescendantIterator<'a, K, V>
 where
     K: ArcAsyncDrop + Clone,
     V: ArcAsyncDrop + Clone,

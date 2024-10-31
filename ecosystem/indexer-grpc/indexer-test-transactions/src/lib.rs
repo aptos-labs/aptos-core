@@ -10,10 +10,10 @@ mod tests {
 
     #[test]
     fn test_generate_transactions() {
-        let json_bytes = GENERATED_USER_SCRIPT_TRANSACTION;
+        let json_bytes = SCRIPTED_TRANSACTIONS_SIMPLE_USER_SCRIPT1;
         // Check that the transaction is valid JSON
         let transaction = serde_json::from_slice::<Transaction>(json_bytes).unwrap();
 
-        assert_eq!(transaction.version, 1);
+        assert_eq!(transaction.version, 65);
     }
 }

@@ -9,7 +9,7 @@ use aptos_forge::{
     test_utils::consensus_utils::{
         no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
-    LocalSwarm, Swarm, SwarmExt,
+    LocalSwarm, NodeExt, Swarm, SwarmExt,
 };
 use aptos_logger::info;
 use rand::{self, rngs::SmallRng, Rng, SeedableRng};
@@ -200,6 +200,59 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_faulty_votes() {
+    let num_validators = 7;
+
+    let swarm = create_swarm(num_validators, 1).await;
+
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
+    test_consensus_fault_tolerance(
+        validator_clients,
+        public_info,
+        3,
+        5.0,
+        1,
+        Box::new(FailPointFailureInjection::new(Box::new(move |cycle, _| {
+            (
+                vec![
+                    (
+                        cycle % num_validators,
+                        "consensus::create_invalid_vote".to_string(),
+                        format!("{}%return", 50),
+                    ),
+                    (
+                        (cycle + 1) % num_validators,
+                        "consensus::create_invalid_order_vote".to_string(),
+                        format!("{}%return", 50),
+                    ),
+                    (
+                        (cycle + 2) % num_validators,
+                        "consensus::create_invalid_commit_vote".to_string(),
+                        format!("{}%return", 50),
+                    ),
+                ],
+                true,
+            )
+        }))),
         Box::new(
             move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
                 successful_criteria(executed_epochs, executed_rounds, executed_transactions);
@@ -549,4 +602,65 @@ async fn test_alternating_having_consensus() {
         ),
     )
     .await;
+}
+
+#[tokio::test]
+async fn test_round_timeout_msg_rollout() {
+    let num_validators = 3;
+
+    let mut swarm = create_swarm(num_validators, 1).await;
+
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
+    test_consensus_fault_tolerance(
+        validator_clients.clone(),
+        public_info.clone(),
+        3,
+        5.0,
+        1,
+        no_failure_injection(),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    for val in swarm.validators_mut() {
+        val.stop();
+        val.config_mut().consensus.enable_round_timeout_msg = true;
+        val.start().unwrap();
+
+        val.wait_until_healthy(Instant::now().checked_add(Duration::from_secs(60)).unwrap())
+            .await
+            .unwrap();
+
+        test_consensus_fault_tolerance(
+            validator_clients.clone(),
+            public_info.clone(),
+            1,
+            30.0,
+            1,
+            no_failure_injection(),
+            Box::new(
+                move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                    successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                    Ok(())
+                },
+            ),
+            true,
+            false,
+        )
+        .await
+        .unwrap();
+    }
 }

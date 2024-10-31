@@ -1,0 +1,21 @@
+[package]
+name = "move-ast-generator-tests"
+version = "0.1.0"
+edition = "2021"
+license = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
+datatest-stable = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
+move-prover-test-utils = { workspace = true }
+move-stackless-bytecode = { workspace = true }
+
+[[test]]
+name = "testsuite"
+harness = false
+
+[lib]
+doctest = false

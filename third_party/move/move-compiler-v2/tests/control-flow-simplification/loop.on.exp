@@ -1,0 +1,20 @@
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+fun test::test() {
+  0: label L0
+  1: goto 0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.test {
+
+
+test() /* def_idx: 0 */ {
+B0:
+	0: Branch(0)
+}
+}
+============ bytecode verification succeeded ========

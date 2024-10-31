@@ -9,16 +9,22 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    abstract_write_op::GroupWrite, resolver::ResourceGroupSize,
-    resource_group_adapter::group_tagged_resource_size,
+    abstract_write_op::GroupWrite,
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWrite,
+    resource_group_adapter::{
+        check_size_and_existence_match, decrement_size_for_remove_tag, group_tagged_resource_size,
+        increment_size_for_add_tag,
+    },
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
+    effects::{Op as MoveStorageOp, Op},
+    language_storage::{ModuleId, StructTag},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_types::delayed_values::error::code_invariant_error;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct WriteOpConverter<'r> {
@@ -47,96 +53,6 @@ macro_rules! convert_impl {
     };
 }
 
-// We set SPECULATIVE_EXECUTION_ABORT_ERROR here, as the error can happen due to
-// speculative reads (and in a non-speculative context, e.g. during commit, it
-// is a more serious error and block execution must abort).
-// BlockExecutor is responsible with handling this error.
-fn group_size_arithmetics_error() -> PartialVMError {
-    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-        .with_message("Group size arithmetics error while applying updates".to_string())
-}
-
-fn decrement_size_for_remove_tag(
-    size: &mut ResourceGroupSize,
-    old_tagged_resource_size: u64,
-) -> PartialVMResult<()> {
-    match size {
-        ResourceGroupSize::Concrete(_) => Err(code_invariant_error(
-            "Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag",
-        )),
-        ResourceGroupSize::Combined {
-            num_tagged_resources,
-            all_tagged_resources_size,
-        } => {
-            *num_tagged_resources = num_tagged_resources
-                .checked_sub(1)
-                .ok_or_else(group_size_arithmetics_error)?;
-            *all_tagged_resources_size = all_tagged_resources_size
-                .checked_sub(old_tagged_resource_size)
-                .ok_or_else(group_size_arithmetics_error)?;
-            Ok(())
-        },
-    }
-}
-
-fn increment_size_for_add_tag(
-    size: &mut ResourceGroupSize,
-    new_tagged_resource_size: u64,
-) -> PartialVMResult<()> {
-    match size {
-        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )
-        .with_message(
-            "Unexpected ResourceGroupSize::Concrete in increment_size_for_add_tag".to_string(),
-        )),
-        ResourceGroupSize::Combined {
-            num_tagged_resources,
-            all_tagged_resources_size,
-        } => {
-            *num_tagged_resources = num_tagged_resources
-                .checked_add(1)
-                .ok_or_else(group_size_arithmetics_error)?;
-            *all_tagged_resources_size = all_tagged_resources_size
-                .checked_add(new_tagged_resource_size)
-                .ok_or_else(group_size_arithmetics_error)?;
-            Ok(())
-        },
-    }
-}
-
-fn check_size_and_existence_match(
-    size: &ResourceGroupSize,
-    exists: bool,
-    state_key: &StateKey,
-) -> PartialVMResult<()> {
-    if exists {
-        if size.get() == 0 {
-            Err(
-                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
-                    format!(
-                        "Group tag count/size shouldn't be 0 for an existing group: {:?}",
-                        state_key
-                    ),
-                ),
-            )
-        } else {
-            Ok(())
-        }
-    } else if size.get() > 0 {
-        Err(
-            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
-                format!(
-                    "Group tag count/size should be 0 for a new group: {:?}",
-                    state_key
-                ),
-            ),
-        )
-    } else {
-        Ok(())
-    }
-}
-
 impl<'r> WriteOpConverter<'r> {
     convert_impl!(convert_module, get_module_state_value_metadata);
 
@@ -159,6 +75,39 @@ impl<'r> WriteOpConverter<'r> {
             remote,
             new_slot_metadata,
         }
+    }
+
+    pub(crate) fn convert_modules_into_write_ops(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        verified_module_bundle: impl Iterator<Item = (ModuleId, Bytes)>,
+    ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
+        let mut writes = BTreeMap::new();
+        for (module_id, bytes) in verified_module_bundle {
+            let addr = module_id.address();
+            let name = module_id.name();
+
+            let module_exists = module_storage
+                .check_module_exists(addr, name)
+                .map_err(|e| e.to_partial())?;
+            let op = if module_exists {
+                Op::Modify(bytes)
+            } else {
+                Op::New(bytes)
+            };
+
+            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let write_op = self.convert(
+                state_value_metadata,
+                op,
+                // For modules, creation is never a modification.
+                false,
+            )?;
+
+            let state_key = StateKey::module_id(&module_id);
+            writes.insert(state_key, ModuleWrite::new(module_id, write_op));
+        }
+        Ok(writes)
     }
 
     pub(crate) fn convert_resource(
@@ -338,7 +287,7 @@ impl<'r> WriteOpConverter<'r> {
 mod tests {
     use super::*;
     use crate::{
-        data_cache::tests::as_resolver_with_group_size_kind,
+        data_cache::{tests::as_resolver_with_group_size_kind, AsMoveResolver},
         move_vm_ext::resolver::ResourceGroupResolver,
     };
     use aptos_types::{
@@ -347,9 +296,17 @@ mod tests {
             errors::StateviewError, state_storage_usage::StateStorageUsage,
             state_value::StateValue, TStateView,
         },
+        write_set::TransactionWrite,
     };
-    use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
-    use claims::{assert_none, assert_some_eq};
+    use aptos_vm_environment::environment::AptosEnvironment;
+    use aptos_vm_types::{
+        module_and_script_storage::AsAptosCodeStorage,
+        resource_group_adapter::{group_size_as_sum, GroupSizeKind},
+    };
+    use claims::{assert_none, assert_ok, assert_some, assert_some_eq};
+    use move_binary_format::{
+        file_format::empty_module_with_dependencies_and_friends, CompiledModule,
+    };
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -410,6 +367,107 @@ mod tests {
         fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
+    }
+
+    fn module(name: &str) -> (StateKey, Bytes, CompiledModule) {
+        let module = empty_module_with_dependencies_and_friends(name, vec![], vec![]);
+        let state_key = StateKey::module(module.self_addr(), module.self_name());
+        let mut module_bytes = vec![];
+        assert_ok!(module.serialize(&mut module_bytes));
+        (state_key, module_bytes.into(), module)
+    }
+
+    #[test]
+    fn test_convert_modules_into_write_ops() {
+        // Create a state value with no metadata.
+        let (a_state_key, a_bytes, a) = module("a");
+        let a_state_value = StateValue::new_legacy(a_bytes.clone());
+
+        // Create a state value with legacy metadata.
+        let (b_state_key, b_bytes, b) = module("b");
+        let b_state_value = StateValue::new_with_metadata(
+            b_bytes.clone(),
+            StateValueMetadata::legacy(10, &CurrentTimeMicroseconds { microseconds: 100 }),
+        );
+
+        // Create a state value with non-legacy metadata.
+        let (c_state_key, c_bytes, c) = module("c");
+        let c_state_value = StateValue::new_with_metadata(
+            c_bytes.clone(),
+            StateValueMetadata::new(20, 30, &CurrentTimeMicroseconds { microseconds: 200 }),
+        );
+
+        // Module that does not yet exist.
+        let (d_state_key, d_bytes, d) = module("d");
+
+        // Create the configuration time resource in the state as well;
+        let current_time = CurrentTimeMicroseconds { microseconds: 300 };
+        let state_key = assert_ok!(StateKey::resource(
+            CurrentTimeMicroseconds::address(),
+            &CurrentTimeMicroseconds::struct_tag()
+        ));
+        let bytes = assert_ok!(bcs::to_bytes(&current_time));
+        let state_value = StateValue::new_legacy(bytes.into());
+
+        // Setting up the state.
+        let state_view = MockStateView::new(BTreeMap::from([
+            (state_key, state_value),
+            (a_state_key.clone(), a_state_value.clone()),
+            (b_state_key.clone(), b_state_value.clone()),
+            (c_state_key.clone(), c_state_value.clone()),
+        ]));
+        let resolver = state_view.as_move_resolver();
+        let env = AptosEnvironment::new(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(env);
+        // Storage slot metadata is enabled on the mainnet.
+        let woc = WriteOpConverter::new(&resolver, true);
+
+        let modules = vec![
+            (a.self_id(), a_bytes.clone()),
+            (b.self_id(), b_bytes.clone()),
+            (c.self_id(), c_bytes.clone()),
+            (d.self_id(), d_bytes.clone()),
+        ];
+
+        let results =
+            assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules.into_iter()));
+        assert_eq!(results.len(), 4);
+
+        // For `a`, `b`, and `c`, since they exist, metadata is inherited
+        // the write op is a creation.
+
+        let a_write = assert_some!(results.get(&a_state_key));
+        assert!(a_write.write_op().is_modification());
+        assert_eq!(assert_some!(a_write.write_op().bytes()), &a_bytes);
+        assert_eq!(
+            a_write.write_op().metadata(),
+            &a_state_value.into_metadata()
+        );
+
+        let b_write = assert_some!(results.get(&b_state_key));
+        assert!(b_write.write_op().is_modification());
+        assert_eq!(assert_some!(b_write.write_op().bytes()), &b_bytes);
+        assert_eq!(
+            b_write.write_op().metadata(),
+            &b_state_value.into_metadata()
+        );
+
+        let c_write = assert_some!(results.get(&c_state_key));
+        assert!(c_write.write_op().is_modification());
+        assert_eq!(assert_some!(c_write.write_op().bytes()), &c_bytes);
+        assert_eq!(
+            c_write.write_op().metadata(),
+            &c_state_value.into_metadata()
+        );
+
+        // Since `d` does not exist, its metadata is a placeholder.
+        let d_write = assert_some!(results.get(&d_state_key));
+        assert!(d_write.write_op().is_creation());
+        assert_eq!(assert_some!(d_write.write_op().bytes()), &d_bytes);
+        assert_eq!(
+            d_write.write_op().metadata(),
+            &StateValueMetadata::placeholder(&current_time)
+        )
     }
 
     // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum

@@ -5,6 +5,3 @@ error: unresolved spec target
    │
 15 │     spec baz {
    │          ^^^
-
-
-============ bytecode verification succeeded ========

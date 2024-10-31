@@ -161,14 +161,14 @@ fn compare_maps(c: &mut Criterion) {
 
     {
         let mut group = c.benchmark_group("get_existing");
-        for map_size_k in [1000, 128_000] {
+        for map_size_k in [100, 1000, 128_000] {
             get_existing(&mut group, map_size_k);
         }
     }
 
     {
         let mut group = c.benchmark_group("get_non_existing");
-        for map_size_k in [1000, 128_000] {
+        for map_size_k in [100, 1000, 128_000] {
             get_non_existing(&mut group, map_size_k);
         }
     }

@@ -26,9 +26,8 @@ use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
     metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS, APTOS_PROCESSED_TXNS_OUTPUT_SIZE,
+        COMMIT_BLOCKS, EXECUTE_BLOCK, OTHER_TIMERS, PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
+        VM_EXECUTE_BLOCK,
     },
 };
 use aptos_jellyfish_merkle::metrics::{
@@ -166,10 +165,9 @@ pub fn run_benchmark<V>(
         ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
-    let version = db.reader.expect_synced_version();
-
+    let start_version = db.reader.expect_synced_version();
     let (pipeline, block_sender) =
-        Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
+        Pipeline::new(executor, start_version, &pipeline_config, Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
@@ -236,7 +234,8 @@ pub fn run_benchmark<V>(
     );
 
     if !pipeline_config.skip_commit {
-        let num_txns = db.reader.expect_synced_version() - version - num_blocks_created as u64;
+        let num_txns =
+            db.reader.expect_synced_version() - start_version - num_blocks_created as u64;
         overall_measuring.print_end("Overall", num_txns);
 
         if verify_sequence_numbers {
@@ -260,10 +259,10 @@ fn init_workload<V>(
 where
     V: TransactionBlockExecutor + 'static,
 {
-    let version = db.reader.expect_synced_version();
+    let start_version = db.reader.expect_synced_version();
     let (pipeline, block_sender) = Pipeline::<V>::new(
         BlockExecutor::new(db.clone()),
-        version,
+        start_version,
         pipeline_config,
         None,
     );
@@ -536,29 +535,29 @@ struct ExecutionTimeMeasurement {
 
 impl ExecutionTimeMeasurement {
     pub fn now() -> Self {
-        let output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE
+        let output_size = PROCESSED_TXNS_OUTPUT_SIZE
             .with_label_values(&["execution"])
             .get_sample_sum();
 
         let partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
-        let execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-        let vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+        let execution_total = EXECUTE_BLOCK.get_sample_sum();
+        let vm_only = VM_EXECUTE_BLOCK.get_sample_sum();
 
         let by_other = OTHER_LABELS
             .iter()
             .map(|(_prefix, _top_level, other_label)| {
                 (
                     *other_label,
-                    APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    OTHER_TIMERS
                         .with_label_values(&[other_label])
                         .get_sample_sum(),
                 )
             })
             .collect::<HashMap<_, _>>();
-        let ledger_update_total = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum();
-        let commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
+        let ledger_update_total = UPDATE_LEDGER.get_sample_sum();
+        let commit_total = COMMIT_BLOCKS.get_sample_sum();
 
-        let vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+        let vm_time = VM_EXECUTE_BLOCK.get_sample_sum();
 
         Self {
             output_size,

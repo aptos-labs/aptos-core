@@ -127,7 +127,7 @@ impl<K, V> LeafNode<K, V> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) enum NodeRef<K, V> {
     Empty,
     Leaf(Ref<LeafNode<K, V>>),
@@ -172,12 +172,15 @@ impl<K, V> NodeRef<K, V> {
             },
         }
     }
+}
 
-    pub fn take_for_drop(&mut self) -> Self {
-        let mut ret = Self::Empty;
-        std::mem::swap(self, &mut ret);
-
-        ret
+impl<K, V> Clone for NodeRef<K, V> {
+    fn clone(&self) -> Self {
+        match self {
+            NodeRef::Empty => NodeRef::Empty,
+            NodeRef::Leaf(leaf) => NodeRef::Leaf(leaf.clone()),
+            NodeRef::Internal(internal) => NodeRef::Internal(internal.clone()),
+        }
     }
 }
 
@@ -206,6 +209,25 @@ impl<K, V> NodeStrongRef<K, V> {
             NodeStrongRef::Internal(internal) => {
                 NodeRef::Internal(Ref::Weak(Arc::downgrade(internal)))
             },
+        }
+    }
+
+    pub fn children(&self, depth: usize, base_layer: u64) -> (Self, Self) {
+        use NodeStrongRef::*;
+
+        match self {
+            Empty => (Empty, Empty),
+            Leaf(leaf) => {
+                if leaf.key_hash.bit(depth) {
+                    (Empty, self.clone())
+                } else {
+                    (self.clone(), Empty)
+                }
+            },
+            Internal(internal) => (
+                internal.left.get_strong(base_layer),
+                internal.right.get_strong(base_layer),
+            ),
         }
     }
 }

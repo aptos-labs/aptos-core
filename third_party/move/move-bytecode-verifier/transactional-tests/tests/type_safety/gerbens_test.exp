@@ -5,6 +5,6 @@ Error: error[E04024]: invalid usage of function type
   ┌─ TEMPFILE:9:62
   │
 9 │     public fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
-  │                                                              ^^^^^^^^^^ function type only allowed for inline function arguments
+  │                                                              ^^^^^^^^^^ function-typed values only allowed for inline function arguments
 
 

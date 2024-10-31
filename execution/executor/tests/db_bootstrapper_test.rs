@@ -21,6 +21,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{
         aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     },
     contract_event::ContractEvent,
     event::EventHandle,
@@ -32,6 +33,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
     write_set::{WriteOp, WriteSetMut},
+    AptosCoinType,
 };
 use aptos_vm::AptosVM;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
@@ -88,7 +90,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
-    assert_eq!(output.num_leaves(), target_version + 1);
+    assert_eq!(output.next_version(), target_version + 1);
     let ledger_info_with_sigs =
         gen_ledger_info_with_sigs(epoch, &output, block_id, &[signer.clone()]);
     executor
@@ -167,7 +169,7 @@ fn get_aptos_coin_transfer_transaction(
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    CoinStoreResource::fetch_move_resource(&db_state_view, account)
+    CoinStoreResource::<AptosCoinType>::fetch_move_resource(&db_state_view, account)
         .unwrap()
         .unwrap()
         .coin()
@@ -227,9 +229,9 @@ fn test_new_genesis() {
                 ),
             ),
             (
-                StateKey::resource_typed::<CoinStoreResource>(&account1).unwrap(),
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&account1).unwrap(),
                 WriteOp::legacy_modification(
-                    bcs::to_bytes(&CoinStoreResource::new(
+                    bcs::to_bytes(&CoinStoreResource::<AptosCoinType>::new(
                         100_000_000,
                         false,
                         EventHandle::random(0),
@@ -243,14 +245,7 @@ fn test_new_genesis() {
         .freeze()
         .unwrap(),
         vec![
-            ContractEvent::new_v1(
-                *configuration.events().key(),
-                0,
-                TypeTag::Struct(Box::new(
-                    <ConfigurationResource as MoveStructType>::struct_tag(),
-                )),
-                vec![],
-            ),
+            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]),
             ContractEvent::new_v1(
                 new_block_event_key(),
                 0,

@@ -13,7 +13,7 @@ use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const FORMATTER_BINARY_NAME: &str = "movefmt";
-const TARGET_FORMATTER_VERSION: &str = "1.0.4";
+const TARGET_FORMATTER_VERSION: &str = "1.0.5";
 
 const FORMATTER_EXE_ENV: &str = "FORMATTER_EXE";
 #[cfg(target_os = "windows")]
@@ -64,8 +64,8 @@ impl BinaryUpdater for FormatterUpdateTool {
         self.check
     }
 
-    fn pretty_name(&self) -> &'static str {
-        "movefmt"
+    fn pretty_name(&self) -> String {
+        "movefmt".to_string()
     }
 
     /// Return information about whether an update is required.
@@ -127,5 +127,6 @@ pub fn get_movefmt_path() -> Result<PathBuf> {
         FORMATTER_EXE_ENV,
         FORMATTER_BINARY_NAME,
         FORMATTER_EXE,
+        true,
     )
 }

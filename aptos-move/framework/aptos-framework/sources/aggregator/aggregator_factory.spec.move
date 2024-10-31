@@ -54,10 +54,10 @@ spec aptos_framework::aggregator_factory {
         ensures exists<AggregatorFactory>(addr);
     }
 
-    spec create_aggregator_internal(limit: u128): Aggregator {
+    spec create_aggregator_internal(): Aggregator {
         /// [high-level-req-2]
         include CreateAggregatorInternalAbortsIf;
-        ensures aggregator::spec_get_limit(result) == limit;
+        ensures aggregator::spec_get_limit(result) == MAX_U128;
         ensures aggregator::spec_aggregator_get_val(result) == 0;
     }
     spec schema CreateAggregatorInternalAbortsIf {
@@ -71,6 +71,7 @@ spec aptos_framework::aggregator_factory {
         let addr = signer::address_of(account);
         /// [high-level-req-3]
         aborts_if addr != @aptos_framework;
+        aborts_if limit != MAX_U128;
         aborts_if !exists<AggregatorFactory>(@aptos_framework);
     }
 

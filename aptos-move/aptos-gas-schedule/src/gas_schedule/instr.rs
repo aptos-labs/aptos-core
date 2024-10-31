@@ -50,15 +50,15 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [mut_borrow_variant_field: InternalGas,
             { RELEASE_V1_18.. => "mut_borrow_variant_field" }, 835],
         [imm_borrow_variant_field_generic: InternalGas,
-            { RELEASE_V1_18 => "imm_borrow_variant_field_generic" }, 835],
+            { RELEASE_V1_18.. => "imm_borrow_variant_field_generic" }, 835],
         [mut_borrow_variant_field_generic: InternalGas,
-            { RELEASE_V1_18 => "mut_borrow_variant_field_generic" }, 835],
+            { RELEASE_V1_18.. => "mut_borrow_variant_field_generic" }, 835],
 
         // variant testing
         [test_variant: InternalGas,
-            { RELEASE_V1_18 => "test_variant" }, 535],
+            { RELEASE_V1_18.. => "test_variant" }, 535],
         [test_variant_generic: InternalGas,
-            { RELEASE_V1_18 => "test_variant_generic" }, 535],
+            { RELEASE_V1_18.. => "test_variant_generic" }, 535],
 
         // locals
         [copy_loc_base: InternalGas, "copy_loc.base", 294],

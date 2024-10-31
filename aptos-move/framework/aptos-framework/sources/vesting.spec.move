@@ -163,10 +163,6 @@ spec aptos_framework::vesting {
     spec schema TotalAccumulatedRewardsAbortsIf {
         vesting_contract_address: address;
 
-        // Note: commission percentage should not be under 0 or higher than 100, cause it's a percentage number
-        // This requirement will solve the timeout issue of total_accumulated_rewards
-        // However, accumulated_rewards is still timeout
-        requires staking_contract.commission_percentage >= 0 && staking_contract.commission_percentage <= 100;
 
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
         let vesting_contract = global<VestingContract>(vesting_contract_address);
@@ -294,7 +290,6 @@ spec aptos_framework::vesting {
         // TODO: Calls `unlock_rewards` in loop.
         pragma verify = false;
         aborts_if len(contract_addresses) == 0;
-        include PreconditionAbortsIf;
     }
 
     spec vest(contract_address: address) {
@@ -307,14 +302,6 @@ spec aptos_framework::vesting {
         // TODO: Calls `vest` in loop.
         pragma verify = false;
         aborts_if len(contract_addresses) == 0;
-        include PreconditionAbortsIf;
-    }
-
-    spec schema PreconditionAbortsIf {
-        contract_addresses: vector<address>;
-
-        requires forall i in 0..len(contract_addresses): simple_map::spec_get(global<staking_contract::Store>(contract_addresses[i]).staking_contracts, global<VestingContract>(contract_addresses[i]).staking.operator).commission_percentage >= 0
-            && simple_map::spec_get(global<staking_contract::Store>(contract_addresses[i]).staking_contracts, global<VestingContract>(contract_addresses[i]).staking.operator).commission_percentage <= 100;
     }
 
     spec distribute(contract_address: address) {

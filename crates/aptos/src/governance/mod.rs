@@ -905,10 +905,10 @@ pub struct CompileScriptFunction {
     pub compiled_script_path: Option<PathBuf>,
 
     #[clap(flatten)]
-    pub(crate) framework_package_args: FrameworkPackageArgs,
+    pub framework_package_args: FrameworkPackageArgs,
 
     #[clap(long, default_value_if("move_2", "true", "7"))]
-    pub(crate) bytecode_version: Option<u32>,
+    pub bytecode_version: Option<u32>,
 
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            default_value_if("move_2", "true", "2.0"))]
@@ -1033,10 +1033,14 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             // If we're generating a multi-step proposal
         } else {
             let next_execution_hash_bytes = hex::decode(next_execution_hash)?;
+            let next_execution_hash =
+                HashValue::from_slice(next_execution_hash_bytes).map_err(|_err| {
+                    CliError::CommandArgumentError("Invalid next execution hash".to_string())
+                })?;
             release.generate_script_proposal_multi_step(
                 account,
                 output,
-                next_execution_hash_bytes,
+                Some(next_execution_hash),
             )?;
         };
         Ok(())

@@ -29,7 +29,6 @@ pub struct VerifierConfig {
     pub max_value_stack_size: usize,
     pub max_type_nodes: Option<usize>,
     pub max_push_size: Option<usize>,
-    pub max_dependency_depth: Option<usize>,
     pub max_struct_definitions: Option<usize>,
     pub max_struct_variants: Option<usize>,
     pub max_fields_in_struct: Option<usize>,
@@ -64,9 +63,20 @@ pub fn verify_module_with_config_for_test(
     config: &VerifierConfig,
     module: &CompiledModule,
 ) -> VMResult<()> {
+    verify_module_with_config_for_test_with_version(name, config, module, None)
+}
+
+pub fn verify_module_with_config_for_test_with_version(
+    name: &str,
+    config: &VerifierConfig,
+    module: &CompiledModule,
+    bytecode_version: Option<u32>,
+) -> VMResult<()> {
     const MAX_MODULE_SIZE: usize = 65355;
     let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();
+    module
+        .serialize_for_version(bytecode_version, &mut bytes)
+        .unwrap();
     let now = Instant::now();
     let result = verify_module_with_config(config, module);
     eprintln!(
@@ -91,6 +101,8 @@ pub fn verify_module_with_config_for_test(
 }
 
 pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
+
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         // Always needs to run bound checker first as subsequent passes depend on it
@@ -150,7 +162,7 @@ pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
 }
 
 pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
-    fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
 
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
@@ -199,8 +211,6 @@ impl Default for VerifierConfig {
             max_value_stack_size: 1024,
             // Max number of pushes in one function
             max_push_size: None,
-            // Max depth in dependency tree for both direct and friend dependencies
-            max_dependency_depth: None,
             // Max count of structs in a module
             max_struct_definitions: None,
             // Max count of fields in a struct
@@ -255,7 +265,6 @@ impl VerifierConfig {
             max_value_stack_size: 1024,
             max_type_nodes: Some(256),
             max_push_size: Some(10000),
-            max_dependency_depth: Some(100),
             max_struct_definitions: Some(200),
             max_fields_in_struct: Some(30),
             max_struct_variants: Some(90),

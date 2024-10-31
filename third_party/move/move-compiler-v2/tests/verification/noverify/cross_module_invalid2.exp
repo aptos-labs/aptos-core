@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `0x1::B::Foo`
+   ┌─ tests/verification/noverify/cross_module_invalid2.move:24:23
+   │
+24 │     public fun bad(): Foo {
+   │                       ^^^

@@ -10,12 +10,12 @@ on:
       - 'aptos-move/e2e-move-tests/**'
       - 'aptos-move/framework/**'
       - '.github/workflows/coverage-move-only.yaml'
-  pull_request:
-    paths:
-      - 'third_party/move/**'
-      - 'aptos-move/e2e-move-tests/**'
-      - 'aptos-move/framework/**'
-      - '.github/workflows/coverage-move-only.yaml'
+  # pull_request:
+  # paths:
+  #   - 'third_party/move/**'
+  #   - 'aptos-move/e2e-move-tests/**'
+  #   - 'aptos-move/framework/**'
+  #   - '.github/workflows/coverage-move-only.yaml'
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 60
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: prepare move lang prover tooling.
         shell: bash

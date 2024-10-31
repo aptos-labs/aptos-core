@@ -1,0 +1,52 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-11:
+- Error: error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:8:19
++ Error: compilation errors:
++  error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
++   ┌─ TEMPFILE:8:9
+=   │
+= 8 │         x + call(|_x: u64| {x = x + 1; x}) + call(|_x: u64| {x = x + 7; x})
+-   │                   ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │                  │
++   │         │                  non-empty sequence
++   │         binary operation `+`
++   │
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or later (which uses strict left-to-right evaluation order),
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
++   = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
+= 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:8:52
++ error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
++   ┌─ TEMPFILE:8:9
+=   │
+= 8 │         x + call(|_x: u64| {x = x + 1; x}) + call(|_x: u64| {x = x + 7; x})
+-   │                                                    ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │                                                   │
++   │         │                                                   non-empty sequence
++   │         binary operation `+`
++   │
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or later (which uses strict left-to-right evaluation order),
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
++   = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
+= 
+= 
+= 
+= task 1 'run'. lines 13-13:
+= Error: Function execution failed with VMError: {
+=     major_status: LINKER_ERROR,
+=     sub_status: None,
+=     location: undefined,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 

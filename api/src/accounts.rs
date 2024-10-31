@@ -66,7 +66,7 @@ impl AccountsApi {
 
         let context = self.context.clone();
         api_spawn_blocking(move || {
-            let account = Account::new(context, address.0, ledger_version.0, None, None, false)?;
+            let account = Account::new(context, address.0, ledger_version.0, None, None)?;
             account.account(&accept_type)
         })
         .await
@@ -118,7 +118,6 @@ impl AccountsApi {
                 ledger_version.0,
                 start.0.map(StateKey::from),
                 limit.0,
-                true,
             )?;
             account.resources(&accept_type)
         })
@@ -171,7 +170,6 @@ impl AccountsApi {
                 ledger_version.0,
                 start.0.map(StateKey::from),
                 limit.0,
-                true,
             )?;
             account.modules(&accept_type)
         })
@@ -201,24 +199,11 @@ impl Account {
         requested_ledger_version: Option<U64>,
         start: Option<StateKey>,
         limit: Option<u16>,
-        require_state_indices: bool,
     ) -> Result<Self, BasicErrorWith404> {
-        let sharding_enabled = context
-            .node_config
-            .storage
-            .rocksdb_configs
-            .enable_storage_sharding;
-
-        let (latest_ledger_info, requested_version) = if sharding_enabled && require_state_indices {
-            context.get_latest_ledger_info_and_verify_internal_indexer_lookup_version(
+        let (latest_ledger_info, requested_version) = context
+            .get_latest_ledger_info_and_verify_lookup_version(
                 requested_ledger_version.map(|inner| inner.0),
-            )?
-        } else {
-            // Use the latest ledger version, or the requested associated version
-            context.get_latest_ledger_info_and_verify_lookup_version(
-                requested_ledger_version.map(|inner| inner.0),
-            )?
-        };
+            )?;
 
         Ok(Self {
             context,

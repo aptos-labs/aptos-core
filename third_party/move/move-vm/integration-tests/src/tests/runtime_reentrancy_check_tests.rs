@@ -8,11 +8,15 @@ use move_core_types::{
     account_address::AccountAddress, gas_algebra::GasQuantity, identifier::Identifier,
     language_storage::ModuleId, vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, AsUnsyncModuleStorage,
+    RuntimeEnvironment,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
 use smallvec::SmallVec;
 use std::sync::Arc;
+
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
 fn make_load_c() -> NativeFunction {
@@ -64,7 +68,7 @@ fn compile_and_publish(storage: &mut InMemoryStorage, code: String) {
     let m = as_module(units.pop().unwrap());
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
-    storage.publish_or_overwrite_module(m.self_id(), blob);
+    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 }
 
 #[test]
@@ -157,8 +161,10 @@ fn runtime_reentrancy_check() {
     let args: Vec<Vec<u8>> = vec![];
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
-    let vm = MoveVM::new(natives);
+    let runtime_environment = RuntimeEnvironment::new(natives);
+    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
     let mut sess = vm.new_session(&storage);
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
     let traversal_storage = TraversalStorage::new();
 
     // Call stack look like following:
@@ -170,7 +176,8 @@ fn runtime_reentrancy_check() {
             vec![],
             args.clone(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage)
+            &mut TraversalContext::new(&traversal_storage),
+            &module_storage,
         )
         .unwrap_err()
         .major_status(),
@@ -189,11 +196,12 @@ fn runtime_reentrancy_check() {
         args.clone(),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &module_storage,
     )
     .unwrap();
 
     // Call stack look like following:
-    // A::foo3 -> B::foo3 -> B::dispatch_d -> D::foo3, D doesn't exists, thus FUNCTION_RESOLUTION_FAILURE.
+    // A::foo3 -> B::foo3 -> B::dispatch_d -> D::foo3, D doesn't exist, thus an error.
     let fun_name = Identifier::new("foo3").unwrap();
     assert_eq!(
         sess.execute_function_bypass_visibility(
@@ -202,7 +210,8 @@ fn runtime_reentrancy_check() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage)
+            &mut TraversalContext::new(&traversal_storage),
+            &module_storage,
         )
         .unwrap_err()
         .major_status(),

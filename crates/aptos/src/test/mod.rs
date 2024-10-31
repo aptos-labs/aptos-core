@@ -15,11 +15,12 @@ use crate::{
         init::{InitTool, Network},
         types::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
-            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
-            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
-            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
+            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -52,6 +53,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey,
 };
+use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
@@ -891,6 +893,13 @@ impl CliTestFramework {
             },
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
+            chunked_publish_option: ChunkedPublishOption {
+                chunked_publish: false,
+                large_packages_module_address: AccountAddress::from_str(
+                    LARGE_PACKAGES_MODULE_ADDRESS,
+                )
+                .unwrap(),
             },
         }
         .execute()

@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/more-v1/expansion/duplicate_field.move:4:9
+  │
+3 │         f: u64,
+  │         - Field previously defined here
+4 │         f: u64,
+  │         ^ Duplicate definition for field 'f'

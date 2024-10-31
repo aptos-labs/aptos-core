@@ -4,6 +4,9 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  TRUNK_API_TOKEN:
+    description: "Api key for uploading test results to trunk.io"
+    required: false
 
 runs:
   using: composite
@@ -28,11 +31,22 @@ runs:
     # Run the rust unit tests
     - name: Run all unit tests
       run: |
-        NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --retries 3 --no-fail-fast --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
+        cargo nextest run \
+          --profile ci \
+          --cargo-profile ci \
+          --locked \
+          --workspace \
+          --exclude smoke-test \
+          --exclude aptos-testcases \
+          --exclude aptos-keyless-circuit \
+          --retries 3 \
+          --no-fail-fast \
+          --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
         python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" || echo "summary generation had an error"
         rm nextest_output.json
       shell: bash
       env:
+        NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: "4297152"
         MVP_TEST_ON_CI: "true"
@@ -41,3 +55,14 @@ runs:
         CVC5_EXE: /home/runner/bin/cvc5
         DOTNET_ROOT: /home/runner/.dotnet
         BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+    - name: Upload results
+      # Run this step even if the test step ahead fails
+      if: "!cancelled() && ${{ inputs.TRUNK_API_TOKEN }}"
+      uses: trunk-io/analytics-uploader@main
+      with:
+        # Configured in the nextest.toml file
+        junit-paths: target/nextest/ci/junit.xml
+        org-slug: aptoslabs
+        token: ${{ inputs.TRUNK_API_TOKEN }}
+      continue-on-error: true

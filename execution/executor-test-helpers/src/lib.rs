@@ -10,7 +10,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     account_address::AccountAddress,
@@ -50,7 +50,7 @@ pub fn gen_ledger_info_with_sigs(
             0, /* round */
             commit_block_id,
             output.root_hash(),
-            output.version(),
+            output.expect_last_version(),
             0, /* timestamp */
             output.epoch_state().clone(),
         ),

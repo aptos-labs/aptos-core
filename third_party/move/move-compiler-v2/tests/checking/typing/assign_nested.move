@@ -11,7 +11,7 @@ module 0x8675309::A {
         let r = 0;
         let r_ref = &mut r;
         let s = S { f: 0 };
-        (_, x, _) = four();
+        (_, x, _, s.f) = four();
     }
 
 }
