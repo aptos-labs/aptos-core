@@ -18,7 +18,7 @@ testnet:
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  api_key: aptoslabs_hxr2RZXYUSR_GH15n92wXVvCh4rxZYMKuWJ35wgMhHkMS
+  api_key: MAINNET_API_KEY
   versions_to_import:
     308783012: 308783012_fa_transfer
     999930475: 999930475_token_v2_concurrent_mint
