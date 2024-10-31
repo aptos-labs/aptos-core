@@ -2655,7 +2655,7 @@ impl GlobalEnv {
         if let Some(exp) = fun_def {
             emitln!(writer, " {");
             writer.indent();
-            emitln!(writer, "{}", exp.display_for_fun(&fun));
+            emitln!(writer, "{}", exp.display_for_fun(fun));
             writer.unindent();
             emitln!(writer, "}");
         } else {
@@ -4111,7 +4111,7 @@ pub struct Parameter(pub Symbol, pub Type, pub Loc);
 
 impl Parameter {
     pub fn get_name(&self) -> Symbol {
-        self.0.clone()
+        self.0
     }
 
     pub fn get_type(&self) -> Type {
