@@ -21,6 +21,12 @@ mainnet:
   api_key: MAINNET_API_KEY
   versions_to_import:
     308783012: 308783012_fa_transfer
+    1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
+    11648867: 11648867_token_v1_burn_event
+    178179220: 178179220_token_v1_mutate_event
+    141135867: 141135867_token_v1_offer
+    97963136: 97963136_token_v2_cancel_offer
+    84023785: 84023785_token_v2_claim_offer
     999930475: 999930475_token_v2_concurrent_mint
     537250181: 537250181_token_v2_fixed_supply_mint
     325355235: 325355235_token_v2_unlimited_supply_mint
