@@ -427,7 +427,6 @@ fn test_module_publishing_does_not_fallback() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
     let account = h.new_account_at(addr);
 
@@ -530,7 +529,6 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::random();
     let account = h.new_account_at(addr);
 

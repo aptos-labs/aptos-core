@@ -174,8 +174,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
-            // TODO(loader_v2): Enable V2 loader.
-            // FeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
