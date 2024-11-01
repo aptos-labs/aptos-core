@@ -6,7 +6,6 @@ use crate::{
     PeerState,
 };
 use aptos_config::{config::PeerMonitoringServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::RwLock;
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
@@ -31,7 +30,7 @@ pub fn refresh_peer_states(
     monitoring_service_config: &PeerMonitoringServiceConfig,
     peer_monitor_state: PeerMonitorState,
     peer_monitoring_client: Arc<
-        RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
+        PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
     >,
     connected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
     time_service: TimeService,

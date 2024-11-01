@@ -44,7 +44,7 @@ impl PeerState {
         node_config: NodeConfig,
         time_service: TimeService,
         peer_monitoring_service_client: Arc<
-            RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
+            PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
         >,
     ) -> Self {
         // Create a state entry for each peer state key
@@ -79,7 +79,7 @@ impl PeerState {
         monitoring_service_config: &PeerMonitoringServiceConfig,
         peer_state_key: &PeerStateKey,
         peer_monitoring_client: Arc<
-            RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
+            PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
         >,
         peer_network_id: PeerNetworkId,
         peer_metadata: PeerMetadata,

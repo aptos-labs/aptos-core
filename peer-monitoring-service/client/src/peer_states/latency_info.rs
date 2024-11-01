@@ -41,7 +41,7 @@ pub struct LatencyInfoState {
     request_tracker: Arc<RwLock<RequestTracker>>,
     // Peer monitoring service for disconnecting peers and other network functionality
     peer_monitoring_service_client:
-        Arc<RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>>,
+        Arc<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
 }
 
 impl LatencyInfoState {
@@ -49,7 +49,7 @@ impl LatencyInfoState {
         latency_monitoring_config: LatencyMonitoringConfig,
         time_service: TimeService,
         peer_monitoring_service_client: Arc<
-            RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
+            PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
         >,
     ) -> Self {
         let request_tracker = RequestTracker::new(
@@ -92,12 +92,7 @@ impl LatencyInfoState {
                 self.latency_monitoring_config.max_latency_ping_failures;
 
             tokio::spawn(async move {
-                let client = {
-                    let read_guard = service_client.read();
-                    read_guard.clone()
-                };
-
-                let result = client
+                let result = service_client
                     .disconnect_from_peer(
                         peer_network_id,
                         DisconnectReason::FailedPeerMonitoringPing(PingDisconnectContext::new(
@@ -291,7 +286,6 @@ mod test {
         config::{LatencyMonitoringConfig, PeerRole},
         network_id::{NetworkId, PeerNetworkId},
     };
-    use aptos_infallible::RwLock;
     use aptos_netcore::transport::ConnectionOrigin;
     use aptos_network::{
         application::metadata::PeerMetadata,
@@ -316,7 +310,7 @@ mod test {
         let (peer_monitoring_client, .., time_service) =
             MockMonitoringServer::new(all_network_ids.clone());
         let latency_monitoring_config = LatencyMonitoringConfig::default();
-        let peer_monitoring_client = Arc::new(RwLock::new(peer_monitoring_client));
+        let peer_monitoring_client = Arc::new(peer_monitoring_client);
         let mut latency_info_state = LatencyInfoState::new(
             latency_monitoring_config,
             time_service,
@@ -368,7 +362,7 @@ mod test {
         let all_network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
         let (peer_monitoring_client, .., time_service) = MockMonitoringServer::new(all_network_ids);
         let latency_monitoring_config = LatencyMonitoringConfig::default();
-        let peer_monitoring_client = Arc::new(RwLock::new(peer_monitoring_client));
+        let peer_monitoring_client = Arc::new(peer_monitoring_client);
         let mut latency_info_state = LatencyInfoState::new(
             latency_monitoring_config,
             time_service,

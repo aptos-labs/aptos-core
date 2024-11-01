@@ -99,7 +99,7 @@ async fn start_peer_monitor_with_state(
 ) {
     // Get the peers and metadata
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
-    let peer_monitoring_client = Arc::new(RwLock::new(peer_monitoring_client));
+    let peer_monitoring_client = Arc::new(peer_monitoring_client);
 
     // Create an interval ticker for the monitor loop
     let monitoring_service_config = node_config.peer_monitoring_service;
@@ -165,7 +165,7 @@ fn create_states_for_new_peers(
     time_service: &TimeService,
     connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
     peer_monitoring_service_client: Arc<
-        RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
+        PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
     >,
 ) {
     for peer_network_id in connected_peers_and_metadata.keys() {

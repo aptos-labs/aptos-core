@@ -39,10 +39,10 @@ async fn test_peer_updater_loop_multiple_peers() {
     let all_network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(all_network_ids.clone());
-    let peer_monitoring_client = Arc::new(aptos_infallible::RwLock::new(peer_monitoring_client));
+    let peer_monitoring_client = Arc::new(peer_monitoring_client);
 
     // Verify peers and metadata is empty
-    let peers_and_metadata = peer_monitoring_client.read().get_peers_and_metadata();
+    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
     assert!(peers_and_metadata.get_all_peers().is_empty());
 
     // Add a connected validator peer
@@ -86,7 +86,7 @@ async fn test_peer_updater_loop_multiple_peers() {
     }
 
     // Spawn the peer metadata updater
-    let peers_and_metadata = peer_monitoring_client.read().get_peers_and_metadata();
+    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
     start_peer_metadata_updater(
         &peer_monitor_state,
         peers_and_metadata.clone(),

@@ -6,7 +6,6 @@ use crate::{
     metrics, Error,
 };
 use aptos_config::network_id::PeerNetworkId;
-use aptos_infallible::RwLock;
 use aptos_logger::{trace, warn};
 use aptos_network::{
     application::{
@@ -85,7 +84,7 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
 /// Sends a request to a specific peer
 pub async fn send_request_to_peer(
     peer_monitoring_client: Arc<
-        RwLock<PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>>,
+        PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
     >,
     peer_network_id: &PeerNetworkId,
     request_id: u64,
@@ -106,13 +105,8 @@ pub async fn send_request_to_peer(
         peer_network_id,
     );
 
-    let client = {
-        let read_guard = peer_monitoring_client.read();
-        read_guard.clone()
-    };
-
     // Send the request and process the result
-    let result = client
+    let result = peer_monitoring_client
         .send_request(
             *peer_network_id,
             request.clone(),
