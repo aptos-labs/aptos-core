@@ -597,7 +597,7 @@ pub static AGGREGATED_ROUND_TIMEOUT_REASON: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_agg_round_timeout_reason",
         "Count of round timeouts by reason",
-        &["reason", "is_next_proposer"],
+        &["reason", "author", "is_next_proposer"],
     )
     .unwrap()
 });
