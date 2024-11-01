@@ -309,7 +309,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
                 env.error(
                     &loc,
                     &format!(
-                        "captured variable `{}` cannot be modified inside of a lambda",
+                        "captured variable `{}` cannot be modified inside of a lambda", // TODO(LAMBDA)
                         name.display(env.symbol_pool())
                     ),
                 );
@@ -327,7 +327,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
                 env.error(
                     &loc,
                     &format!(
-                        "captured variable `{}` cannot be modified inside of a lambda",
+                        "captured variable `{}` cannot be modified inside of a lambda", // TODO(LAMBDA)
                         name.display(env.symbol_pool())
                     ),
                 );

@@ -9,6 +9,7 @@ use move_model::model::GlobalEnv;
 use std::fmt::Write;
 
 pub mod annotations;
+pub mod astifier;
 pub mod borrow_analysis;
 pub mod compositional_analysis;
 pub mod dataflow_analysis;

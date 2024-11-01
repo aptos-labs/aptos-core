@@ -35,3 +35,11 @@ error: cannot pass `|&u64|u64` to a function which expects argument of type `|&u
    │
 73 │         foreach(&v, |e: &u64| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
    │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function type `|u64|u64` is not allowed as a field type
+   ┌─ tests/checking/typing/lambda_typed.move:81:12
+   │
+81 │         f: |u64|u64, // expected lambda not allowed
+   │            ^^^^^^^^
+   │
+   = required by declaration of field `f`

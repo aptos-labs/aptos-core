@@ -55,12 +55,16 @@ fn used_type_parameters_in_fields(struct_env: &StructEnv) -> BTreeSet<u16> {
 fn used_type_parameters_in_ty(ty: &Type) -> BTreeSet<u16> {
     match ty {
         Type::Primitive(_) => BTreeSet::new(),
-        Type::Struct(_, _, tys) => tys.iter().flat_map(used_type_parameters_in_ty).collect(),
+        Type::Tuple(tys) | Type::Struct(_, _, tys) => {
+            tys.iter().flat_map(used_type_parameters_in_ty).collect()
+        },
         Type::TypeParameter(i) => BTreeSet::from([*i]),
         Type::Vector(ty) => used_type_parameters_in_ty(ty),
+        Type::Fun(t1, t2) => [t1, t2]
+            .iter()
+            .flat_map(|t| used_type_parameters_in_ty(t))
+            .collect(),
         Type::Reference(..)
-        | Type::Fun(..)
-        | Type::Tuple(..)
         | Type::TypeDomain(..)
         | Type::ResourceDomain(..)
         | Type::Error

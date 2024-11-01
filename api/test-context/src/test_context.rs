@@ -194,8 +194,9 @@ pub fn new_test_context_inner(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address = attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true)
-        .expect("Failed to attach poem to runtime");
+    let poem_address =
+        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach poem to runtime");
     let api_specific_config = ApiSpecificConfig::V1(poem_address);
 
     TestContext::new(

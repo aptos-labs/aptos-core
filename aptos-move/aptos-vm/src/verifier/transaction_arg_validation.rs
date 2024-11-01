@@ -455,11 +455,15 @@ fn validate_and_construct(
     )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
-    let deserialize_error = VMStatus::error(
-        StatusCode::INTERNAL_TYPE_ERROR,
-        Some(String::from("Constructor did not return value")),
-    );
-    Ok(ret_vals.pop().ok_or(deserialize_error)?.0)
+    Ok(ret_vals
+        .pop()
+        .ok_or_else(|| {
+            VMStatus::error(
+                StatusCode::INTERNAL_TYPE_ERROR,
+                Some(String::from("Constructor did not return value")),
+            )
+        })?
+        .0)
 }
 
 // String is a vector of bytes, so both string and vector carry a length in the serialized format.

@@ -8,7 +8,7 @@ module 0x8675309::M {
     }
     private fun t() {
         {
-          let s: M::S = pack M::S(false);
+          let s: S = pack M::S(false);
           Copy(0);
           Copy(s);
           s;
@@ -17,3 +17,18 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+    }
+    struct S has copy, drop {
+    }
+    fun t() {
+        let s = S{};
+        copy 0;
+        copy s;
+        s;
+        0;
+    }
+}

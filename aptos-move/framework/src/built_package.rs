@@ -472,16 +472,17 @@ impl BuiltPackage {
             .package
             .deps_compiled_units
             .iter()
-            .map(|(name, unit)| {
-                let package_name = name.as_str().to_string();
-                let account = match &unit.unit {
-                    CompiledUnit::Module(m) => AccountAddress::new(m.address.into_bytes()),
-                    _ => panic!("script not a dependency"),
-                };
-                PackageDep {
-                    account,
-                    package_name,
-                }
+            .flat_map(|(name, unit)| match &unit.unit {
+                CompiledUnit::Module(m) => {
+                    let package_name = name.as_str().to_string();
+                    let account = AccountAddress::new(m.address.into_bytes());
+
+                    Some(PackageDep {
+                        account,
+                        package_name,
+                    })
+                },
+                CompiledUnit::Script(_) => None,
             })
             .collect::<BTreeSet<_>>()
             .into_iter()

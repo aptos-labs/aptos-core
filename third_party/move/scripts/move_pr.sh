@@ -103,6 +103,7 @@ MOVE_CRATES="\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
   -p move-vm-types\
+  -p move-ast-generator-tests\
 "
 
 # This is a list of crates for integration testing which depends on the

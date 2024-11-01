@@ -7,6 +7,7 @@
 use crate::{
     components::{
         chunk_output::{update_counters_for_processed_chunk, ChunkOutput},
+        executed_chunk::ExecutedChunk,
         in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     },
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
@@ -17,7 +18,7 @@ use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
     should_forward_to_subscription_service,
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
-    ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput,
+    LedgerUpdateOutput, ParsedTransactionOutput,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::error;

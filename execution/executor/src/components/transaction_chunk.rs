@@ -11,9 +11,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
-    ledger_info::LedgerInfo,
-    proof::TransactionInfoListWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMExecutor;
 use once_cell::sync::Lazy;
@@ -30,12 +28,8 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
-pub trait TransactionChunkWithProof {
-    fn verify_chunk(
-        &self,
-        ledger_info: &LedgerInfo,
-        first_transaction_version: Version,
-    ) -> Result<()>;
+pub trait TransactionChunk {
+    fn first_version(&self) -> Version;
 
     fn len(&self) -> usize;
 
@@ -43,37 +37,27 @@ pub trait TransactionChunkWithProof {
         self.len() == 0
     }
 
-    fn into_chunk_output<V: VMExecutor>(
-        self,
-        state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)>;
+    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ChunkOutput>;
 }
 
-impl TransactionChunkWithProof for TransactionListWithProof {
-    fn verify_chunk(
-        &self,
-        ledger_info: &LedgerInfo,
-        first_transaction_version: Version,
-    ) -> Result<()> {
-        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["verify_txn_chunk"]);
+pub struct ChunkToExecute {
+    pub transactions: Vec<Transaction>,
+    pub first_version: Version,
+}
 
-        self.proof
-            .verify(ledger_info, Some(first_transaction_version))
+impl TransactionChunk for ChunkToExecute {
+    fn first_version(&self) -> Version {
+        self.first_version
     }
 
     fn len(&self) -> usize {
         self.transactions.len()
     }
 
-    fn into_chunk_output<V: VMExecutor>(
-        self,
-        state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)> {
-        let TransactionListWithProof {
+    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ChunkOutput> {
+        let ChunkToExecute {
             transactions,
-            events: _,
-            first_transaction_version: _,
-            proof: txn_infos_with_proof,
+            first_version: _,
         } = self;
 
         // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
@@ -91,46 +75,37 @@ impl TransactionChunkWithProof for TransactionListWithProof {
             })
         };
 
-        let chunk_out = {
-            let _timer = VM_EXECUTE_CHUNK.start_timer();
-
-            ChunkOutput::by_transaction_execution::<V>(
-                sig_verified_txns.into(),
-                state_view,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(),
-            )?
-        };
-
-        Ok((chunk_out, txn_infos_with_proof))
+        let _timer = VM_EXECUTE_CHUNK.start_timer();
+        ChunkOutput::by_transaction_execution::<V>(
+            sig_verified_txns.into(),
+            state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )
     }
 }
 
-impl TransactionChunkWithProof for TransactionOutputListWithProof {
-    fn verify_chunk(
-        &self,
-        ledger_info: &LedgerInfo,
-        first_transaction_version: Version,
-    ) -> Result<()> {
-        self.proof
-            .verify(ledger_info, Some(first_transaction_version))
+pub struct ChunkToApply {
+    pub transactions: Vec<Transaction>,
+    pub transaction_outputs: Vec<TransactionOutput>,
+    pub first_version: Version,
+}
+
+impl TransactionChunk for ChunkToApply {
+    fn first_version(&self) -> Version {
+        self.first_version
     }
 
     fn len(&self) -> usize {
-        self.transactions_and_outputs.len()
+        self.transactions.len()
     }
 
-    fn into_chunk_output<V: VMExecutor>(
-        self,
-        state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)> {
-        let TransactionOutputListWithProof {
-            transactions_and_outputs,
-            first_transaction_output_version: _,
-            proof: txn_infos_with_proof,
+    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ChunkOutput> {
+        let Self {
+            transactions,
+            transaction_outputs,
+            first_version: _,
         } = self;
 
-        let chunk_out = ChunkOutput::by_transaction_output(transactions_and_outputs, state_view)?;
-
-        Ok((chunk_out, txn_infos_with_proof))
+        ChunkOutput::by_transaction_output(transactions, transaction_outputs, state_view)
     }
 }

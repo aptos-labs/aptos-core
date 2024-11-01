@@ -22,3 +22,21 @@ module 0x42::bit_vector_infer {
         }
     }
 } // end 0x42::bit_vector_infer
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::bit_vector_infer {
+    public fun new(_length: u64) {
+        let counter = 1;
+        if (counter > 0) {
+            counter = counter - 1;
+        };
+        let bit_field = 0x1::vector::empty<bool>();
+        0x1::vector::push_back<bool>(&mut bit_field, false);
+
+        /* spec {
+          assert Eq<num>(Len<bool>(bit_field), 0);
+        }
+         */
+        ;
+    }
+}

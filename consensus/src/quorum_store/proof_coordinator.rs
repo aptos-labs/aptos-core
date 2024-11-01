@@ -297,7 +297,7 @@ impl ProofCoordinator {
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
         mut network_sender: impl QuorumStoreSender,
-        validator_verifier: ValidatorVerifier,
+        validator_verifier: Arc<ValidatorVerifier>,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {

@@ -67,6 +67,7 @@ pub const SUCCESS_LABEL: &str = "success";
 // Bounded executor task labels
 pub const CLIENT_EVENT_LABEL: &str = "client_event";
 pub const CLIENT_EVENT_GET_TXN_LABEL: &str = "client_event_get_txn";
+pub const CLIENT_EVENT_GET_PARKING_LOT_ADDRESSES: &str = "client_event_get_parking_lot_addresses";
 pub const RECONFIG_EVENT_LABEL: &str = "reconfig";
 pub const PEER_BROADCAST_EVENT_LABEL: &str = "peer_broadcast";
 
@@ -284,7 +285,7 @@ pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_core_mempool_gc_event_count",
         "Number of times the periodic garbage-collection event occurs, regardless of how many txns were actually removed",
         &["type"])
-       .unwrap()
+        .unwrap()
 });
 
 /// Counter for number of periodic client garbage-collection (=GC) events that happen with eager
@@ -362,7 +363,7 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
         &["type"],
         TXN_COUNT_BUCKETS.clone()
     )
-    .unwrap()
+        .unwrap()
 });
 
 pub fn mempool_service_transactions(label: &'static str, num: usize) {

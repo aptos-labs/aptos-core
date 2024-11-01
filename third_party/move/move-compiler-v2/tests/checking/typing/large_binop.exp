@@ -5,3 +5,10 @@ module <SELF>_0 {
         Tuple()
     }
 } // end <SELF>_0
+
+// -- Sourcified model before bytecode pipeline
+script {
+    fun main() {
+        true;
+    }
+}

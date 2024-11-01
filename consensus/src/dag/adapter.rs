@@ -297,11 +297,13 @@ impl StorageAdapter {
                 usize::try_from(*index)
                     .map_err(|_err| anyhow!("index {} out of bounds", index))
                     .and_then(|index| {
-                        validators.get(index).cloned().ok_or(anyhow!(
-                            "index {} is larger than number of validators {}",
-                            index,
-                            validators.len()
-                        ))
+                        validators.get(index).cloned().ok_or_else(|| {
+                            anyhow!(
+                                "index {} is larger than number of validators {}",
+                                index,
+                                validators.len()
+                            )
+                        })
                     })
             })
             .collect()

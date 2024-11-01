@@ -3,7 +3,7 @@ module 0x2::M {
     struct S {
         dummy_field: bool,
     }
-    private fun foo<S>(s: #0): #0 {
+    private fun foo<S>(s: S): S {
         {
           let s: S = s;
           {
@@ -13,3 +13,14 @@ module 0x2::M {
         }
     }
 } // end 0x2::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x2::M {
+    struct S {
+    }
+    fun foo<S: copy + drop>(s: S): S {
+        let s = s;
+        let s = s;
+        s
+    }
+}

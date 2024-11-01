@@ -78,11 +78,6 @@ resource "helm_release" "pfn-addons" {
         acm_certificate          = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
       }
-      load_test = {
-        config = {
-          numFullnodeGroups = var.num_fullnodes
-        }
-      }
     }),
     jsonencode(var.pfn_helm_values),
   ]

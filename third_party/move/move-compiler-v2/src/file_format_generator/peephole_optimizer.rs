@@ -5,16 +5,16 @@
 //! Peephole optimizations assume that the bytecode is valid, and all user-facing
 //! error checks have already been performed.
 
-pub mod inefficient_binops;
+pub mod inefficient_loads;
 pub mod optimizers;
 pub mod reducible_pairs;
 
-use inefficient_binops::TransformInefficientBinops;
+use inefficient_loads::InefficientLoads;
 use move_binary_format::{
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
     file_format::{Bytecode, CodeOffset, CodeUnit},
 };
-use optimizers::{BasicBlockOptimizer, FixedWindowProcessor};
+use optimizers::{BasicBlockOptimizer, WindowProcessor};
 use reducible_pairs::ReduciblePairs;
 use std::{collections::BTreeMap, mem};
 
@@ -36,8 +36,8 @@ impl BasicBlockOptimizerPipeline {
     pub fn default() -> Self {
         Self {
             optimizers: vec![
-                Box::new(FixedWindowProcessor::new(ReduciblePairs)),
-                Box::new(FixedWindowProcessor::new(TransformInefficientBinops)),
+                Box::new(WindowProcessor::new(ReduciblePairs)),
+                Box::new(WindowProcessor::new(InefficientLoads)),
             ],
         }
     }

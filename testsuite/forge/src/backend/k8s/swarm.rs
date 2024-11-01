@@ -62,6 +62,7 @@ pub struct K8sSwarm {
     era: Option<String>,
     use_port_forward: bool,
     chaos_experiment_ops: Box<dyn ChaosExperimentOps + Send + Sync>,
+    has_indexer: bool,
 }
 
 impl K8sSwarm {
@@ -75,6 +76,7 @@ impl K8sSwarm {
         keep: bool,
         era: Option<String>,
         use_port_forward: bool,
+        has_indexer: bool,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await?;
 
@@ -123,6 +125,7 @@ impl K8sSwarm {
                 kube_client: kube_client.clone(),
                 kube_namespace: kube_namespace.to_string(),
             }),
+            has_indexer,
         };
 
         // test hitting the configured prometheus endpoint
@@ -446,6 +449,10 @@ impl Swarm for K8sSwarm {
     fn get_default_pfn_node_config(&self) -> NodeConfig {
         get_default_pfn_node_config()
     }
+
+    fn has_indexer(&self) -> bool {
+        self.has_indexer
+    }
 }
 
 /// Amount of time to wait for genesis to complete
@@ -456,11 +463,6 @@ pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
 
 /// Amount of time to wait for nodes to spin up, from provisioning to API ready
 pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
-    // retry every 10 seconds for 20 minutes
-    fixed_retry_strategy(10 * 1000, 120)
-}
-
-pub fn k8s_wait_indexer_strategy() -> impl Iterator<Item = Duration> {
     // retry every 10 seconds for 20 minutes
     fixed_retry_strategy(10 * 1000, 120)
 }

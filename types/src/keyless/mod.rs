@@ -23,7 +23,7 @@ use std::{
 
 mod bn254_circom;
 mod circuit_constants;
-mod circuit_testcases;
+pub mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
 mod groth16_vk;
@@ -76,6 +76,7 @@ macro_rules! serialize {
 /// the expiration time
 /// `exp_timestamp_secs`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralCertificate {
     ZeroKnowledgeSig(ZeroKnowledgeSig),
     OpenIdSig(OpenIdSig),
@@ -161,6 +162,7 @@ impl KeylessSignature {
 /// This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
 /// hashing with a larger pepper would lead to a different address).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Pepper(pub(crate) [u8; poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR]);
 
 impl Pepper {
@@ -226,6 +228,7 @@ impl Serialize for Pepper {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct IdCommitment(#[serde(with = "serde_bytes")] pub(crate) Vec<u8>);
 
 impl IdCommitment {
@@ -293,6 +296,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 /// `PublicKey` struct. But the `key_name` procedural macro only works with the `[De]SerializeKey`
 /// procedural macros, which we cannot use since they force us to reimplement serialization.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
     /// e.g., <https://accounts.google.com>
@@ -311,6 +315,7 @@ pub struct KeylessPublicKey {
 /// Unlike a normal keyless account, a "federated" keyless account will accept JWKs published at a
 /// specific contract address.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct FederatedKeylessPublicKey {
     pub jwk_addr: AccountAddress,
     pub pk: KeylessPublicKey,
@@ -336,6 +341,7 @@ impl TryFrom<&[u8]> for FederatedKeylessPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum AnyKeylessPublicKey {
     Normal(KeylessPublicKey),
     Federated(FederatedKeylessPublicKey),

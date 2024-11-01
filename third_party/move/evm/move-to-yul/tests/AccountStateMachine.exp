@@ -48,9 +48,9 @@ object "A3_AccountStateMachine" {
             $t0 := 0
             // $t1 := 0
             $t1 := 0
-            // $t2 := vector::empty<AccountStateMachine::PendingTransfer>()
+            // $t2 := vector::empty<0x3::AccountStateMachine::PendingTransfer>()
             $t2 := A1_vector_empty$A3_AccountStateMachine_PendingTransfer$()
-            // $t3 := pack AccountStateMachine::Account($t0, $t1, $t2)
+            // $t3 := pack 0x3::AccountStateMachine::Account($t0, $t1, $t2)
             {
                 let $mem := $Malloc(48)
                 $MemoryStoreU64(add($mem, 32), $t0)
@@ -245,7 +245,7 @@ object "A3_AccountStateMachine" {
                         // label L6
                         // $t7 := freeze_ref($t5)
                         $t7 := $t5
-                        // $t8 := vector::length<AccountStateMachine::PendingTransfer>($t7)
+                        // $t8 := vector::length<0x3::AccountStateMachine::PendingTransfer>($t7)
                         $t8 := A1_vector_length$A3_AccountStateMachine_PendingTransfer$($t7)
                         // $t9 := <($t2, $t8)
                         $t9 := $Lt(i, $t8)
@@ -255,7 +255,7 @@ object "A3_AccountStateMachine" {
                         default { $block := 4 }
                     }
                     case 3 {
-                        // $t5 := borrow_field<AccountStateMachine::Account>.pending($t0)
+                        // $t5 := borrow_field<0x3::AccountStateMachine::Account>.pending($t0)
                         $t5 := this
                         // $t6 := 0
                         $t6 := 0
@@ -279,11 +279,11 @@ object "A3_AccountStateMachine" {
                         // label L2
                         // $t10 := freeze_ref($t5)
                         $t10 := $t5
-                        // $t11 := vector::borrow<AccountStateMachine::PendingTransfer>($t10, $t2)
+                        // $t11 := vector::borrow<0x3::AccountStateMachine::PendingTransfer>($t10, $t2)
                         $t11 := A1_vector_borrow$A3_AccountStateMachine_PendingTransfer$($t10, i)
                         // $t12 := Actor::virtual_time()
                         $t12 := A1_Actor_virtual_time()
-                        // $t13 := borrow_field<AccountStateMachine::PendingTransfer>.initiated_at($t11)
+                        // $t13 := borrow_field<0x3::AccountStateMachine::PendingTransfer>.initiated_at($t11)
                         $t13 := $t11
                         // $t14 := read_ref($t13)
                         $t14 := $LoadU128($t13)
@@ -300,7 +300,7 @@ object "A3_AccountStateMachine" {
                     }
                     case 7 {
                         // label L4
-                        // $t18 := vector::remove<AccountStateMachine::PendingTransfer>($t5, $t2)
+                        // $t18 := vector::remove<0x3::AccountStateMachine::PendingTransfer>($t5, $t2)
                         $t18 := A1_vector_remove$A3_AccountStateMachine_PendingTransfer$($t5, i)
                         // drop($t18)
                         $Free($t18, 32)
@@ -345,7 +345,7 @@ object "A3_AccountStateMachine" {
                     case 4 {
                         // $t2 := 43
                         $t2 := 43
-                        // $t3 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t3 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t3 := $IndexPtr(this, 32)
                         // $t4 := read_ref($t3)
                         $t4 := $LoadU64($t3)
@@ -360,13 +360,13 @@ object "A3_AccountStateMachine" {
                     }
                     case 5 {
                         // label L2
-                        // $t8 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t8 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t8 := $IndexPtr(this, 32)
                         // $t9 := read_ref($t8)
                         $t9 := $LoadU64($t8)
                         // $t10 := +($t9, $t1)
                         $t10 := $AddU64($t9, v)
-                        // $t11 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t11 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t11 := $IndexPtr(this, 32)
                         // write_ref($t11, $t10)
                         $StoreU64($t11, $t10)
@@ -395,7 +395,7 @@ object "A3_AccountStateMachine" {
                         $Abort($t5)
                     }
                     case 4 {
-                        // $t2 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t2 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t2 := $IndexPtr(this, 32)
                         // $t3 := read_ref($t2)
                         $t3 := $LoadU64($t2)
@@ -408,13 +408,13 @@ object "A3_AccountStateMachine" {
                     }
                     case 5 {
                         // label L2
-                        // $t6 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t6 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t6 := $IndexPtr(this, 32)
                         // $t7 := read_ref($t6)
                         $t7 := $LoadU64($t6)
                         // $t8 := -($t7, $t1)
                         $t8 := $Sub($t7, v)
-                        // $t9 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t9 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t9 := $IndexPtr(this, 32)
                         // write_ref($t9, $t8)
                         $StoreU64($t9, $t8)
@@ -443,7 +443,7 @@ object "A3_AccountStateMachine" {
                         $Abort($t7)
                     }
                     case 4 {
-                        // $t4 := borrow_field<AccountStateMachine::Account>.value($t0)
+                        // $t4 := borrow_field<0x3::AccountStateMachine::Account>.value($t0)
                         $t4 := $IndexPtr(this, 32)
                         // $t5 := read_ref($t4)
                         $t5 := $LoadU64($t4)
@@ -458,11 +458,11 @@ object "A3_AccountStateMachine" {
                         // label L2
                         // $t8 := AccountStateMachine::new_xfer_id($t0)
                         $t8 := A3_AccountStateMachine_new_xfer_id(this)
-                        // $t9 := borrow_field<AccountStateMachine::Account>.pending($t0)
+                        // $t9 := borrow_field<0x3::AccountStateMachine::Account>.pending($t0)
                         $t9 := this
                         // $t10 := Actor::virtual_time()
                         $t10 := A1_Actor_virtual_time()
-                        // $t11 := pack AccountStateMachine::PendingTransfer($t8, $t2, $t10)
+                        // $t11 := pack 0x3::AccountStateMachine::PendingTransfer($t8, $t2, $t10)
                         {
                             let $mem := $Malloc(32)
                             $MemoryStoreU64(add($mem, 16), $t8)
@@ -470,7 +470,7 @@ object "A3_AccountStateMachine" {
                             $MemoryStoreU128(add($mem, 0), $t10)
                             $t11 := $mem
                         }
-                        // vector::push_back<AccountStateMachine::PendingTransfer>($t9, $t11)
+                        // vector::push_back<0x3::AccountStateMachine::PendingTransfer>($t9, $t11)
                         A1_vector_push_back$A3_AccountStateMachine_PendingTransfer$($t9, $t11)
                         // $t12 := Actor::self()
                         $t12 := A1_Actor_self()
@@ -496,17 +496,17 @@ object "A3_AccountStateMachine" {
                 $t5 := this
                 // $t6 := AccountStateMachine::find_xfer($t5, $t1)
                 $t6 := A3_AccountStateMachine_find_xfer($t5, xfer_id)
-                // $t7 := borrow_field<AccountStateMachine::Account>.pending($t0)
+                // $t7 := borrow_field<0x3::AccountStateMachine::Account>.pending($t0)
                 $t7 := this
-                // $t8 := vector::borrow<AccountStateMachine::PendingTransfer>($t7, $t6)
+                // $t8 := vector::borrow<0x3::AccountStateMachine::PendingTransfer>($t7, $t6)
                 $t8 := A1_vector_borrow$A3_AccountStateMachine_PendingTransfer$($t7, $t6)
-                // $t9 := borrow_field<AccountStateMachine::PendingTransfer>.amount($t8)
+                // $t9 := borrow_field<0x3::AccountStateMachine::PendingTransfer>.amount($t8)
                 $t9 := $IndexPtr($t8, 24)
                 // $t10 := read_ref($t9)
                 $t10 := $LoadU64($t9)
-                // $t11 := borrow_field<AccountStateMachine::Account>.pending($t0)
+                // $t11 := borrow_field<0x3::AccountStateMachine::Account>.pending($t0)
                 $t11 := this
-                // $t12 := vector::remove<AccountStateMachine::PendingTransfer>($t11, $t6)
+                // $t12 := vector::remove<0x3::AccountStateMachine::PendingTransfer>($t11, $t6)
                 $t12 := A1_vector_remove$A3_AccountStateMachine_PendingTransfer$($t11, $t6)
                 // drop($t12)
                 $Free($t12, 32)
@@ -639,7 +639,7 @@ object "A3_AccountStateMachine" {
                     switch $block
                     case 2 {
                         // label L6
-                        // $t7 := vector::length<AccountStateMachine::PendingTransfer>($t5)
+                        // $t7 := vector::length<0x3::AccountStateMachine::PendingTransfer>($t5)
                         $t7 := A1_vector_length$A3_AccountStateMachine_PendingTransfer$($t5)
                         // $t8 := <($t3, $t7)
                         $t8 := $Lt(i, $t7)
@@ -649,7 +649,7 @@ object "A3_AccountStateMachine" {
                         default { $block := 4 }
                     }
                     case 3 {
-                        // $t5 := borrow_field<AccountStateMachine::Account>.pending($t0)
+                        // $t5 := borrow_field<0x3::AccountStateMachine::Account>.pending($t0)
                         $t5 := this
                         // $t6 := 0
                         $t6 := 0
@@ -674,9 +674,9 @@ object "A3_AccountStateMachine" {
                     }
                     case 6 {
                         // label L2
-                        // $t9 := vector::borrow<AccountStateMachine::PendingTransfer>($t5, $t3)
+                        // $t9 := vector::borrow<0x3::AccountStateMachine::PendingTransfer>($t5, $t3)
                         $t9 := A1_vector_borrow$A3_AccountStateMachine_PendingTransfer$($t5, i)
-                        // $t10 := borrow_field<AccountStateMachine::PendingTransfer>.xfer_id($t9)
+                        // $t10 := borrow_field<0x3::AccountStateMachine::PendingTransfer>.xfer_id($t9)
                         $t10 := $IndexPtr($t9, 16)
                         // $t11 := read_ref($t10)
                         $t11 := $LoadU64($t10)
@@ -703,7 +703,7 @@ object "A3_AccountStateMachine" {
                     }
                     case 9 {
                         // label L4
-                        // $t14 := vector::length<AccountStateMachine::PendingTransfer>($t5)
+                        // $t14 := vector::length<0x3::AccountStateMachine::PendingTransfer>($t5)
                         $t14 := A1_vector_length$A3_AccountStateMachine_PendingTransfer$($t5)
                         // $t15 := <($t3, $t14)
                         $t15 := $Lt(i, $t14)
@@ -782,7 +782,7 @@ object "A3_AccountStateMachine" {
             }
             function A3_AccountStateMachine_new_xfer_id(this) -> $result {
                 let counter, xfer_id, $t3, $t4, $t5, $t6, $t7
-                // $t3 := borrow_field<AccountStateMachine::Account>.xfer_id_counter($t0)
+                // $t3 := borrow_field<0x3::AccountStateMachine::Account>.xfer_id_counter($t0)
                 $t3 := $IndexPtr(this, 40)
                 // $t4 := read_ref($t3)
                 $t4 := $LoadU64($t3)

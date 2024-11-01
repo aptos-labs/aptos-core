@@ -64,7 +64,8 @@ unittest.util._MAX_LENGTH = 2000  # type: ignore
 
 
 class HasAssertMultiLineEqual(Protocol):
-    def assertMultiLineEqual(self, first: str, second: str, msg: Any = ...) -> None: ...
+    def assertMultiLineEqual(self, first: str, second: str, msg: Any = ...) -> None:
+        ...
 
 
 def get_cwd() -> Path:

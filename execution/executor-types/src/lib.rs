@@ -28,7 +28,6 @@ use aptos_types::{
     write_set::WriteSet,
 };
 pub use error::{ExecutorError, ExecutorResult};
-pub use executed_chunk::ExecutedChunk;
 pub use ledger_update_output::LedgerUpdateOutput;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
@@ -44,8 +43,6 @@ use std::{
 };
 
 mod error;
-mod executed_chunk;
-pub mod execution_output;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
@@ -262,16 +259,16 @@ impl VerifyExecutionMode {
 }
 
 pub trait TransactionReplayer: Send {
-    fn replay(
+    fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
-    ) -> Result<()>;
+    ) -> Result<usize>;
 
-    fn commit(&self) -> Result<ExecutedChunk>;
+    fn commit(&self) -> Result<Version>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.

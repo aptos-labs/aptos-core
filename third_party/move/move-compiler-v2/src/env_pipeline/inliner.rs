@@ -800,7 +800,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                          (lambda expressions)",
                     )
                 },
-                ExpData::LoopCont(node_id, is_continue) if !post && in_loop == 0 => {
+                ExpData::LoopCont(node_id, _, is_continue) if !post && in_loop == 0 => {
                     let node_loc = env.get_node_loc(*node_id);
                     env.error(
                         &node_loc,
@@ -1046,7 +1046,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 self.in_loop += 1;
                 true
             },
-            ExpData::LoopCont(node_id, is_continue) if self.in_loop == 0 => {
+            ExpData::LoopCont(node_id, _, is_continue) if self.in_loop == 0 => {
                 let node_loc = self.env.get_node_loc(*node_id);
                 self.env.error(
                     &node_loc,

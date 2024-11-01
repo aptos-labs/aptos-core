@@ -80,12 +80,12 @@ async fn test_indexer() {
 
     client.submit_and_wait(&txn).await.unwrap();
     let balance = client
-        .get_account_balance(account2.address())
+        .view_apt_account_balance(account2.address())
         .await
         .unwrap()
         .into_inner();
 
-    assert_eq!(balance.get(), 10);
+    assert_eq!(balance, 10);
 }
 
 async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Result<()> {
