@@ -217,7 +217,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
-      max-parallel: ${{ fromJson(inputs.JOB_PARALLELISM) || 1 }}
+      max-parallel: ${{ inputs.JOB_PARALLELISM && fromJson(inputs.JOB_PARALLELISM) || 1 }}
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
