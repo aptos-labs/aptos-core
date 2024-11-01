@@ -1,24 +1,24 @@
-testnet:
-  # Transaction Stream endpoint addresss.
-  transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-  # (Optional) The key to use with developers.aptoslabs.com
-  api_key: TESTNET_API_KEY
-  # A map from versions to dump and their output names.
-  versions_to_import:
-    # naming: <version_descriptive_name>
-    1: 1_genesis
-    2: 2_new_block_event
-    3: 3_empty_txn
-    278556781: 278556781_v1_coin_register_fa_metadata
-    1255836496: 1255836496_v2_fa_metadata_
-    5979639459: 5979639459_coin_register
-    5992795934: 5992795934_fa_activities
-    5523474016: 5523474016_validator_txn
+# testnet:
+#   # Transaction Stream endpoint addresss.
+#   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
+#   # (Optional) The key to use with developers.aptoslabs.com
+#   api_key: TESTNET_API_KEY
+#   # A map from versions to dump and their output names.
+#   versions_to_import:
+#     # naming: <version_descriptive_name>
+#     1: 1_genesis
+#     2: 2_new_block_event
+#     3: 3_empty_txn
+#     278556781: 278556781_v1_coin_register_fa_metadata
+#     1255836496: 1255836496_v2_fa_metadata_
+#     5979639459: 5979639459_coin_register
+#     5992795934: 5992795934_fa_activities
+#     5523474016: 5523474016_validator_txn
 
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  api_key: MAINNET_API_KEY
+  api_key: aptoslabs_hxr2RZXYUSR_GH15n92wXVvCh4rxZYMKuWJ35wgMhHkMS
   versions_to_import:
     308783012: 308783012_fa_transfer
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
@@ -39,3 +39,10 @@ mainnet:
     513424821: 513424821_default_block_metadata_transactions
     155112189: 155112189_default_table_items
     145959468: 145959468_account_transaction
+    2739163: 2739163_ans_current_ans_lookup
+    214433968: 214433968_ans_lookup
+    275584410: 275584410_ans_current_ans_primary_name
+    92331132: 92331132_ans_primary_name
+    438536688: 438536688_ans_current_ans_lookup_v2
+    303690531: 303690531_ans_lookup_v2
+    1056780409: 1056780409_ans_current_ans_primary_name_v2
