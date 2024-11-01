@@ -23,6 +23,7 @@ aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+arr_macro = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }

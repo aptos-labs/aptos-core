@@ -611,7 +611,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,
-            execution_output.to_commit.transaction_outputs(),
+            &execution_output.to_commit.transaction_outputs,
             transaction_infos.iter(),
             write_sets.iter(),
             event_vecs.iter(),

@@ -27,6 +27,7 @@ criterion = { workspace = true }
 derive_more = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
+ouroboros = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
