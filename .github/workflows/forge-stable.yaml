@@ -213,6 +213,7 @@ jobs:
           echo "To cancel this job, do `pnpm infra ci cancel-workflow ${{ github.run_id }}` from internal-ops" >> $GITHUB_STEP_SUMMARY
 
   run:
+    name: forge-${{ matrix.TEST_NAME }}
     needs: [determine-test-metadata, generate-matrix]
     if: ${{ github.event_name != 'pull_request' }}
     strategy:
