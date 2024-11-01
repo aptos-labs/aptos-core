@@ -554,7 +554,9 @@ impl BlockAptosVM {
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,
-            Arc::clone(&GLOBAL_MODULE_CACHE),
+            // TODO(loader_v2): Remove me once replay is done. For debug only.
+            Arc::new(ImmutableModuleCache::empty()),
+            // Arc::clone(&GLOBAL_MODULE_CACHE),
             config,
             transaction_commit_listener,
         )
