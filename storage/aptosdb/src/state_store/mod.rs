@@ -671,7 +671,6 @@ impl StateStore {
             None,
             batch,
             sharded_state_kv_batches,
-            /*skip_usage=*/ false,
             None,
             enable_sharding,
         )?;
@@ -696,7 +695,6 @@ impl StateStore {
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
-        skip_usage: bool,
         last_checkpoint_index: Option<usize>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -710,7 +708,6 @@ impl StateStore {
             sharded_state_cache,
             ledger_batch,
             sharded_state_kv_batches,
-            skip_usage,
             last_checkpoint_index,
             enable_sharding,
         )?;
@@ -786,7 +783,6 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        skip_usage: bool,
         last_checkpoint_index: Option<usize>,
         enable_sharding: bool,
     ) -> Result<()> {
@@ -947,16 +943,10 @@ impl StateStore {
                 (usage.items() as i64 + items_delta) as usize,
                 (usage.bytes() as i64 + bytes_delta) as usize,
             );
-            let should_write_index_for_version =
-                (i == num_versions - 1) || Some(i) == last_checkpoint_index;
-            if !skip_usage || should_write_index_for_version {
+            if (i == num_versions - 1) || Some(i) == last_checkpoint_index {
                 let version = first_version + i as u64;
-                if should_write_index_for_version {
-                    info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
-                }
-                batch
-                    .put::<VersionDataSchema>(&version, &usage.into())
-                    .unwrap();
+                info!("Write usage at version {version}, {usage:?}.");
+                batch.put::<VersionDataSchema>(&version, &usage.into())?
             }
         }
 
