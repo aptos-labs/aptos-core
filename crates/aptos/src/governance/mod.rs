@@ -30,6 +30,7 @@ use aptos_rest_client::{
 use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::is_aptos_governance_create_proposal_event,
     event::EventHandle,
     governance::VotingRecords,
     stake_pool::StakePool,
@@ -444,20 +445,21 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
 fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
     if let Transaction::UserTransaction(inner) = txn {
         // Find event with proposal id
-        let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
-            event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
-        }) {
-            let data: CreateProposalEvent =
-                serde_json::from_value(event.data.clone()).map_err(|_| {
-                    CliError::UnexpectedError(
-                        "Failed to parse Proposal event to get ProposalId".to_string(),
-                    )
-                })?;
-            Some(data.proposal_id.0)
-        } else {
-            warn!("No proposal event found to find proposal id");
-            None
-        };
+        let proposal_id =
+            if let Some(event) = inner.events.iter().find(|event| {
+                is_aptos_governance_create_proposal_event(event.typ.to_string().as_str())
+            }) {
+                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
+                    .map_err(|_| {
+                        CliError::UnexpectedError(
+                            "Failed to parse Proposal event to get ProposalId".to_string(),
+                        )
+                    })?;
+                Some(data.proposal_id.0)
+            } else {
+                warn!("No proposal event found to find proposal id");
+                None
+            };
 
         return Ok(proposal_id);
     }
@@ -473,7 +475,7 @@ struct CreateProposalEvent {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProposalSubmissionSummary {
-    proposal_id: Option<u64>,
+    pub proposal_id: Option<u64>,
     #[serde(flatten)]
     transaction: TransactionSummary,
 }
