@@ -13,7 +13,9 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorResult};
+use aptos_executor_types::{
+    state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::{
@@ -28,7 +30,7 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
 };
 use derivative::Derivative;
-use futures::future::{BoxFuture, Shared};
+use futures::future::{join4, BoxFuture, Shared};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -67,8 +69,8 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type PrepareResult = Arc<Vec<SignatureVerifiedTransaction>>;
-pub type ExecuteResult = ();
-pub type LedgerUpdateResult = (StateComputeResult, Option<u64>);
+pub type ExecuteResult = Duration;
+pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;
@@ -87,6 +89,19 @@ pub struct PipelineFutures {
     pub post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
+}
+
+impl PipelineFutures {
+    // Wait for futures involved executor to complete
+    pub async fn wait_until_executor_finishes(self) {
+        let _ = join4(
+            self.execute_fut,
+            self.ledger_update_fut,
+            self.pre_commit_fut,
+            self.commit_ledger_fut,
+        )
+        .await;
+    }
 }
 
 pub struct PipelineInputTx {
@@ -125,11 +140,11 @@ pub struct PipelinedBlock {
     pre_commit_fut: Arc<Mutex<Option<BoxFuture<'static, ExecutorResult<()>>>>>,
     // pipeline related fields
     #[derivative(PartialEq = "ignore")]
-    pipeline_futures: Arc<Mutex<Option<PipelineFutures>>>,
+    pipeline_futs: Arc<Mutex<Option<PipelineFutures>>>,
     #[derivative(PartialEq = "ignore")]
-    pipeline_tx: Option<Arc<Mutex<PipelineInputTx>>>,
+    pipeline_tx: Arc<Mutex<Option<PipelineInputTx>>>,
     #[derivative(PartialEq = "ignore")]
-    pipeline_abort_handle: Option<Vec<AbortHandle>>,
+    pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -182,24 +197,12 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
 }
 
 impl PipelinedBlock {
-    pub fn set_compute_result(&mut self, compute_result: StateComputeResult) {
+    pub fn set_compute_result(
+        &mut self,
+        compute_result: StateComputeResult,
+        execution_time: Duration,
+    ) {
         self.state_compute_result = compute_result;
-    }
-
-    pub fn set_execution_result(
-        mut self,
-        pipeline_execution_result: PipelineExecutionResult,
-    ) -> Self {
-        let PipelineExecutionResult {
-            input_txns,
-            result,
-            execution_time,
-            pre_commit_fut,
-        } = pipeline_execution_result;
-
-        self.state_compute_result = result;
-        self.input_transactions = input_txns;
-        self.pre_commit_fut = Arc::new(Mutex::new(Some(pre_commit_fut)));
 
         let mut to_commit = 0;
         let mut to_retry = 0;
@@ -243,6 +246,24 @@ impl PipelinedBlock {
                 .set(execution_summary)
                 .expect("inserting into empty execution summary");
         }
+    }
+
+    pub fn set_execution_result(
+        mut self,
+        pipeline_execution_result: PipelineExecutionResult,
+    ) -> Self {
+        let PipelineExecutionResult {
+            input_txns,
+            result,
+            execution_time,
+            pre_commit_fut,
+        } = pipeline_execution_result;
+
+        self.input_transactions = input_txns;
+        self.pre_commit_fut = Arc::new(Mutex::new(Some(pre_commit_fut)));
+
+        self.set_compute_result(result, execution_time);
+
         self
     }
 
@@ -293,9 +314,9 @@ impl PipelinedBlock {
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
             pre_commit_fut: Arc::new(Mutex::new(None)),
-            pipeline_futures: Arc::new(Mutex::new(None)),
-            pipeline_tx: None,
-            pipeline_abort_handle: None,
+            pipeline_futs: Arc::new(Mutex::new(None)),
+            pipeline_tx: Arc::new(Mutex::new(None)),
+            pipeline_abort_handle: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -401,34 +422,60 @@ impl PipelinedBlock {
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
     }
+}
 
-    pub fn pipeline_fut(&self) -> Option<PipelineFutures> {
-        self.pipeline_futures.lock().clone()
+/// Pipeline related functions
+impl PipelinedBlock {
+    pub fn pipeline_enabled(&self) -> bool {
+        self.pipeline_futs.lock().is_some()
     }
 
-    pub fn set_pipeline_fut(&mut self, pipeline_futures: PipelineFutures) {
-        *self.pipeline_futures.lock() = Some(pipeline_futures);
+    pub fn pipeline_futs(&self) -> Option<PipelineFutures> {
+        self.pipeline_futs.lock().clone()
     }
 
-    pub fn set_pipeline_tx(&mut self, pipeline_tx: PipelineInputTx) {
-        self.pipeline_tx = Some(Arc::new(Mutex::new(pipeline_tx)));
+    pub fn set_pipeline_futs(&self, pipeline_futures: PipelineFutures) {
+        *self.pipeline_futs.lock() = Some(pipeline_futures);
     }
 
-    pub fn set_pipeline_abort_handles(&mut self, abort_handles: Vec<AbortHandle>) {
-        self.pipeline_abort_handle = Some(abort_handles);
+    pub fn set_pipeline_tx(&self, pipeline_tx: PipelineInputTx) {
+        *self.pipeline_tx.lock() = Some(pipeline_tx);
     }
 
-    pub fn pipeline_tx(&self) -> Option<&Arc<Mutex<PipelineInputTx>>> {
-        self.pipeline_tx.as_ref()
+    pub fn set_pipeline_abort_handles(&self, abort_handles: Vec<AbortHandle>) {
+        *self.pipeline_abort_handle.lock() = Some(abort_handles);
+    }
+
+    pub fn pipeline_tx(&self) -> Arc<Mutex<Option<PipelineInputTx>>> {
+        self.pipeline_tx.clone()
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
-        if let Some(abort_handles) = &self.pipeline_abort_handle {
+        if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
             for handle in abort_handles {
                 handle.abort();
             }
         }
-        self.pipeline_futures.lock().take()
+        self.pipeline_futs.lock().take()
+    }
+
+    pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
+        self.pipeline_futs()
+            .expect("Pipeline needs to be enabled")
+            .ledger_update_fut
+            .await
+            .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
+            .map_err(|e| ExecutorError::InternalError {
+                error: e.to_string(),
+            })
+    }
+
+    pub async fn wait_for_commit_ledger(&self) {
+        self.pipeline_futs()
+            .expect("Pipeline needs to be enabled")
+            .commit_ledger_fut
+            .await
+            .expect("Commit ledger should succeed");
     }
 }
 
