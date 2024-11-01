@@ -11,8 +11,7 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::{
     pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeoutCertificate, vote_data::VoteData,
-    wrapped_ledger_info::WrappedLedgerInfo,
+    timeout_2chain::TwoChainTimeoutCertificate, wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -346,6 +345,7 @@ impl BlockTree {
         let mut blocks_pruned = VecDeque::new();
         let mut blocks_to_be_pruned = vec![self.linkable_root()];
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
+            block_to_remove.executed_block().abort_pipeline();
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
@@ -449,7 +449,7 @@ impl BlockTree {
     }
 
     /// Update the counters for committed blocks and prune them from the in-memory and persisted store.
-    pub fn commit_callback(
+    pub fn commit_callback_deprecated(
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,
         blocks_to_commit: &[Arc<PipelinedBlock>],
@@ -459,42 +459,25 @@ impl BlockTree {
         let commit_proof = finality_proof
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
-
-        let block_to_commit = blocks_to_commit.last().expect("pipeline is empty").clone();
         update_counters_for_committed_blocks(blocks_to_commit);
-        let current_round = self.commit_root().round();
-        let committed_round = block_to_commit.round();
-        debug!(
-            LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
-            committed_round = committed_round,
-            block_id = block_to_commit.id(),
-        );
+        let last_block = blocks_to_commit.last().expect("pipeline is empty").clone();
 
-        let ids_to_remove = self.find_blocks_to_prune(block_to_commit.id());
-        if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
-            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
-            // up dangling blocks, and we need to prune the tree to keep the root consistent with
-            // executor.
-            warn!(error = ?e, "fail to delete block");
-        }
-        self.process_pruned_blocks(ids_to_remove);
-        self.update_highest_commit_cert(commit_proof);
+        let block_id = last_block.id();
+        let block_round = last_block.round();
+
+        self.commit_callback(storage, block_id, block_round, commit_proof);
     }
 
-    #[allow(dead_code)]
-    pub fn commit_callback_v2(
+    pub fn commit_callback(
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,
         block_id: HashValue,
         block_round: Round,
-        commit_decision: LedgerInfoWithSignatures,
+        commit_proof: WrappedLedgerInfo,
     ) {
-        let commit_proof = WrappedLedgerInfo::new(VoteData::dummy(), commit_decision);
-
-        // let block_to_commit = blocks_to_commit.last().expect("pipeline is empty").clone();
-        // update_counters_for_committed_blocks(blocks_to_commit);
         let current_round = self.commit_root().round();
         let committed_round = block_round;
+
         debug!(
             LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
             committed_round = committed_round,
