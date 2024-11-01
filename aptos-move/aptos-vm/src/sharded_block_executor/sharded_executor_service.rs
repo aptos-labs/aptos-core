@@ -348,6 +348,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     } = cmd;
                     cumulative_txns += num_txns;
 
+                    let aggr_overridden_state_view = Arc::new(AggregatorOverriddenStateView::new(
+                        state_view.as_ref(),
+                        TOTAL_SUPPLY_AGGR_BASE_VAL,
+                    ));
                     //let execution_done = Arc::new(AtomicBool::new(false));
                    // let execution_done_clone = execution_done.clone();
 
@@ -392,7 +396,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     let result = BlockAptosVM::execute_block(
                         self.executor_thread_pool.clone(),
                         Arc::new(blocking_transactions_provider),
-                        state_view.as_ref(),
+                        aggr_overridden_state_view.as_ref(),
                         BlockExecutorConfig {
                             local: BlockExecutorLocalConfig {
                                 concurrency_level: AptosVM::get_concurrency_level(),

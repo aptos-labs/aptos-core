@@ -28,7 +28,7 @@ pub fn get_state_value<S: StateView, T: DeserializeOwned>(
 /// However, it does not handle overflow and underflow. That is, it will indicate to the caller of
 /// the faulty logic with their usage of deltas.
 #[derive(Clone, Copy)]
-struct DeltaU128 {
+pub struct DeltaU128 {
     delta: u128,
     is_positive: bool,
 }
@@ -48,7 +48,7 @@ impl DeltaU128 {
         }
     }
 
-    fn add_delta(self, other: u128) -> u128 {
+    pub fn add_delta(self, other: u128) -> u128 {
         if self.is_positive {
             self.delta + other
         } else {

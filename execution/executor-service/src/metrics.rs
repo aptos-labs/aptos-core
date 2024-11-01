@@ -24,7 +24,8 @@ pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
          9. kv_requests: processing the remote key value requests; \
          10. kv_resp_ser: serializing the remote key value responses; \
          11. kv_requests_handler_timer: time spent by handler that spawns kv_request handling tasks on coordinator; \
-         12. get_txn_waiting_time: the time waited for a transaction to fetch from a local kv store; ",
+         12. get_txn_waiting_time: the time waited for a transaction to fetch from a local kv store; \
+         13. aggr_total_supply: the time spent in aggregating the total supply;",
         // metric labels (dimensions)
         &["shard_id", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),

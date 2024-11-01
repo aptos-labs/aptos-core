@@ -12,6 +12,7 @@ use aptos_types::{
     state_store::StateView,
     transaction::TransactionOutput,
     vm_status::VMStatus,
+    write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use aptos_vm::sharded_block_executor::{
     executor_client::{ExecutorClient, ShardedExecutionOutput},
@@ -24,19 +25,22 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::AtomicU64;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 use itertools::Itertools;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng, thread_rng};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use rayon::slice::ParallelSlice;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use aptos_types::block_executor::partitioner::PartitionV3;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_vm::sharded_block_executor::aggr_overridden_state_view::TOTAL_SUPPLY_AGGR_BASE_VAL;
+use aptos_vm::sharded_block_executor::sharded_aggregator_service::{DeltaU128, get_state_value};
 use aptos_vm::sharded_block_executor::sharded_executor_service::{CmdsAndMetaDataRef, TransactionIdxAndOutput, V3CmdsOrMetaDataRef, V3CmdsRef, V3MetaDataRef};
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 
@@ -229,13 +233,34 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         Ok(res)
     }
 
-    fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>, duration_since_epoch: u64) -> Result<Vec<TransactionOutput>, VMStatus> {
+    fn get_shard_id_from_txn_id(shard_st_txn_idx_to_shard: &BTreeMap<usize, usize>, txn_id: usize) -> usize {
+        *shard_st_txn_idx_to_shard.range(..=txn_id).next_back().unwrap().1
+    }
+
+    fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>, duration_since_epoch: u64,
+                                       total_supply_base_val: u128) -> Result<Vec<TransactionOutput>, VMStatus> {
         #[derive(Copy, Clone)]
         struct Pointer(*mut TransactionOutput);
         unsafe impl Send for Pointer {}
         unsafe impl Sync for Pointer {}
 
         let total_expected_outputs = expected_outputs.iter().sum::<u64>();
+        let mut shard_st_txn_idx_to_shard: BTreeMap<usize, usize> = BTreeMap::new();
+        let mut cumulative_txns = 0;
+        for (idx, num_outputs) in expected_outputs.iter().enumerate() {
+            shard_st_txn_idx_to_shard.insert(cumulative_txns as usize, idx);
+            cumulative_txns += *num_outputs;
+        }
+        assert_eq!(total_expected_outputs, cumulative_txns);
+
+        let total_supply_delta_by_shard: Arc<Vec<Mutex<DeltaU128>>> = Arc::new(
+            (0..self.num_shards()).map(|_| Mutex::new(DeltaU128::default())).collect()
+        );
+
+        let highest_output_idx_by_shard: Arc<Vec<Mutex<usize>>> = Arc::new(
+            (0..self.num_shards()).map(|_| Mutex::new(0)).collect()
+        );
+
         let mut results = vec![TransactionOutput::default(); total_expected_outputs as usize];
         let results_ptr = Pointer(results.as_mut_ptr());
         let num_deser_threads = self.num_shards();
@@ -247,6 +272,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let results_clone = results_ptr.clone();
             let deser_rx_clone: Receiver<Message> = deser_rx.clone();
             let deser_finished_tx_clone = deser_finished_tx.clone();
+            let shard_st_txn_idx_to_shard_clone = shard_st_txn_idx_to_shard.clone();
+            let total_supply_delta_by_shard_clone = total_supply_delta_by_shard.clone();
+            let highest_output_idx_by_shard_clone = highest_output_idx_by_shard.clone();
             self.cmd_tx_thread_pool.spawn(move || {
                 while let Ok(msg) = deser_rx_clone.recv() {
                     let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
@@ -254,9 +282,19 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                         .start_timer();
                     let result: Vec<TransactionIdxAndOutput> = bcs::from_bytes(&msg.to_bytes()).unwrap();
                     drop(bcs_deser_timer);
+
                     for txn_output in result {
+                        let txn_idx = txn_output.txn_idx as usize;
+                        let shard_id = Self::get_shard_id_from_txn_id(&shard_st_txn_idx_to_shard_clone, txn_idx);
+                        if txn_idx >= *highest_output_idx_by_shard_clone[shard_id].lock().unwrap() {
+                            if let Some(total_supply) = txn_output.txn_output.write_set().get_total_supply() {
+                                *total_supply_delta_by_shard_clone[shard_id].lock().unwrap() =
+                                    DeltaU128::get_delta(total_supply, TOTAL_SUPPLY_AGGR_BASE_VAL);
+                                *highest_output_idx_by_shard_clone[shard_id].lock().unwrap() = txn_idx;
+                            }
+                        }
                         // correctness guaranteed by disjointness of txn indices
-                        unsafe { *{results_clone}.0.wrapping_add(txn_output.txn_idx as usize) = txn_output.txn_output; }
+                        unsafe { *{results_clone}.0.wrapping_add(txn_idx) = txn_output.txn_output; }
                     }
                 }
                 deser_finished_tx_clone.send(()).unwrap();
@@ -289,6 +327,26 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["9_2_results_rx_all_shards"]).observe(delta as f64);
 
+        let ts_aggr_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "aggr_total_supply"])
+            .start_timer();
+        let mut aggr_total_supply_delta_by_shard = vec![DeltaU128::default(); self.num_shards()];
+        aggr_total_supply_delta_by_shard[0] = *total_supply_delta_by_shard[0].lock().unwrap();
+        for shard_id in 1..self.num_shards() {
+            aggr_total_supply_delta_by_shard[shard_id] = aggr_total_supply_delta_by_shard[shard_id - 1]
+                + *total_supply_delta_by_shard[shard_id].lock().unwrap();
+        }
+
+        let base_val_delta = DeltaU128::get_delta(total_supply_base_val, TOTAL_SUPPLY_AGGR_BASE_VAL);
+        results.par_iter_mut().enumerate().for_each(|(index, result)| {
+            let shard_id = Self::get_shard_id_from_txn_id(&shard_st_txn_idx_to_shard, index);
+            let delta_for_shard = aggr_total_supply_delta_by_shard[shard_id] + base_val_delta;
+            if let Some(total_supply) = result.write_set().get_total_supply() {
+                result.update_total_supply(delta_for_shard.add_delta(total_supply));
+            }
+        });
+        drop(ts_aggr_timer);
+
         Ok(results)
     }
 }
@@ -315,6 +373,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         duration_since_epoch: u64
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
+        let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
+        // dummy call
+        state_view.get_state_value(&(*TOTAL_SUPPLY_STATE_KEY)).expect("dummy read to total supply failed");
         let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         info!("Executing block started at time {}", current_time);
         self.state_view_service.set_state_view(state_view);
@@ -424,7 +485,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
 
         //let execution_results = self.get_output_from_shards()?;
         info!("Waiting to receive results from shards");
-        let results = self.get_streamed_output_from_shards(expected_outputs, duration_since_epoch);
+        let results = self.get_streamed_output_from_shards(
+            expected_outputs, duration_since_epoch, total_supply_base_val);
 
         let timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "drop_state_view_finally"])
