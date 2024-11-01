@@ -43,6 +43,7 @@ mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
+pub mod sharded_state_update_refs;
 pub mod state_delta;
 pub mod state_view;
 

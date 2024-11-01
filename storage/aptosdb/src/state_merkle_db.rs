@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db_options::gen_state_merkle_cfds,
     lru_node_cache::LruNodeCache,
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
@@ -30,7 +29,7 @@ use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;

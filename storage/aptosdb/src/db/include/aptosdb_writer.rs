@@ -338,8 +338,8 @@ impl AptosDB {
 
         // TODO(grao): Make state_store take sharded state updates.
         self.state_store.put_value_sets(
-            chunk.per_version_state_updates,
             chunk.first_version,
+            chunk.state_update_refs,
             chunk.latest_in_memory_state.current.usage(),
             chunk.sharded_state_cache,
             &ledger_metadata_batch,

@@ -14,6 +14,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use arr_macro::arr;
 use bytes::Bytes;
 use move_core_types::move_resource::MoveResource;
+use rayon::prelude::*;
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
 use std::{collections::HashMap, ops::Deref};
@@ -24,6 +25,8 @@ pub mod state_key;
 pub mod state_storage_usage;
 pub mod state_value;
 pub mod table;
+
+pub const NUM_STATE_SHARDS: usize = 16;
 
 pub type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
@@ -129,22 +132,53 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
     }
 }
 
-pub type ShardedStateUpdates = [HashMap<StateKey, Option<StateValue>>; 16];
-
-pub fn create_empty_sharded_state_updates() -> ShardedStateUpdates {
-    arr![HashMap::new(); 16]
+#[derive(Clone, Debug)]
+pub struct ShardedStateUpdates {
+    pub shards: [HashMap<StateKey, Option<StateValue>>; 16],
 }
 
-pub fn combine_sharded_state_updates(lhs: &mut ShardedStateUpdates, rhs: &ShardedStateUpdates) {
-    use rayon::prelude::*;
+impl ShardedStateUpdates {
+    pub fn new_empty() -> Self {
+        Self {
+            shards: arr![HashMap::new(); 16],
+        }
+    }
 
-    THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-        lhs.par_iter_mut()
-            .zip_eq(rhs.par_iter())
+    pub fn all_shards_empty(&self) -> bool {
+        self.shards.iter().all(|shard| shard.is_empty())
+    }
+
+    pub fn total_len(&self) -> usize {
+        self.shards.iter().map(|shard| shard.len()).sum()
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        self.shards
+            .par_iter_mut()
+            .zip_eq(other.shards.into_par_iter())
             .for_each(|(l, r)| {
-                l.extend(r.clone());
+                l.extend(r);
             })
-    })
+    }
+
+    pub fn clone_merge(&mut self, other: &Self) {
+        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+            self.shards
+                .par_iter_mut()
+                .zip_eq(other.shards.par_iter())
+                .for_each(|(l, r)| {
+                    l.extend(r.clone());
+                })
+        })
+    }
+
+    pub fn insert(
+        &mut self,
+        key: StateKey,
+        value: Option<StateValue>,
+    ) -> Option<Option<StateValue>> {
+        self.shards[key.get_shard_id() as usize].insert(key, value)
+    }
 }
 
 pub trait MoveResourceExt: MoveResource {

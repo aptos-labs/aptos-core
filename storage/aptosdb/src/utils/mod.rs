@@ -4,13 +4,10 @@
 pub mod iterators;
 pub(crate) mod truncation_helper;
 
-use crate::{
-    common::NUM_STATE_SHARDS,
-    schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
-};
+use crate::schema::db_metadata::{DbMetadataKey, DbMetadataSchema};
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::Result;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 use arr_macro::arr;
 
 pub(crate) type ShardedStateKvSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];

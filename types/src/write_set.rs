@@ -427,6 +427,33 @@ impl WriteSet {
             Self::V0(write_set) => write_set.0,
         }
     }
+
+    pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
+        WriteSetMut::new(write_ops).freeze()
+    }
+
+    pub fn new_for_test(kvs: impl IntoIterator<Item = (StateKey, Option<StateValue>)>) -> Self {
+        Self::new(kvs.into_iter().map(|(k, v_opt)| {
+            (
+                k,
+                v_opt.map_or_else(WriteOp::legacy_deletion, |v| {
+                    WriteOp::legacy_modification(v.bytes().clone())
+                }),
+            )
+        }))
+        .expect("Must succeed")
+    }
+
+    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
+        self.iter().map(|(key, op)| (key, op.state_value_ref()))
+    }
+
+    pub fn state_updates_cloned(
+        &self,
+    ) -> impl Iterator<Item = (StateKey, Option<StateValue>)> + '_ {
+        self.state_update_refs()
+            .map(|(k, v)| (k.clone(), v.cloned()))
+    }
 }
 
 impl Deref for WriteSet {

@@ -4,7 +4,6 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db_options::gen_state_kv_cfds,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
@@ -22,7 +21,7 @@ use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;

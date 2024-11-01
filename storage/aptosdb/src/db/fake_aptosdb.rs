@@ -118,10 +118,9 @@ impl FakeBufferedState {
                 new_state_after_checkpoint.base_version > self.state_after_checkpoint.base_version,
                 "Diff between base and latest checkpoints provided, while they are the same.",
             );
-            combine_sharded_state_updates(
-                &mut self.state_after_checkpoint.updates_since_base,
-                updates_until_next_checkpoint_since_current,
-            );
+            self.state_after_checkpoint
+                .updates_since_base
+                .clone_merge(updates_until_next_checkpoint_since_current);
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             let state_after_checkpoint = self

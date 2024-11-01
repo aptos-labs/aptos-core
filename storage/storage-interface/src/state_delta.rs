@@ -6,7 +6,6 @@ use aptos_drop_helper::DropHelper;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
     state_store::{
-        combine_sharded_state_updates, create_empty_sharded_state_updates,
         state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
     },
     transaction::Version,
@@ -54,7 +53,7 @@ impl StateDelta {
             version,
             smt,
             version,
-            create_empty_sharded_state_updates(),
+            ShardedStateUpdates::new_empty(),
         )
     }
 
@@ -73,16 +72,17 @@ impl StateDelta {
             checkpoint_version,
             smt,
             checkpoint_version,
-            create_empty_sharded_state_updates(),
+            ShardedStateUpdates::new_empty(),
         )
     }
 
     pub fn merge(&mut self, other: StateDelta) {
         assert!(other.follow(self));
-        combine_sharded_state_updates(&mut self.updates_since_base, &other.updates_since_base);
 
         self.current = other.current;
         self.current_version = other.current_version;
+        self.updates_since_base
+            .merge(other.updates_since_base.into_inner());
     }
 
     pub fn follow(&self, other: &StateDelta) -> bool {

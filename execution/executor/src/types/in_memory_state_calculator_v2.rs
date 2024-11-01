@@ -4,6 +4,7 @@
 use crate::metrics::OTHER_TIMERS;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_drop_helper::DropHelper;
 use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     transactions_with_output::TransactionsWithOutput, ProofReader,
@@ -13,21 +14,21 @@ use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
+    sharded_state_update_refs::ShardedStateUpdateRefs,
     state_delta::StateDelta,
 };
 use aptos_types::{
     state_store::{
-        create_empty_sharded_state_updates, state_key::StateKey,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        ShardedStateUpdates,
     },
     transaction::Version,
-    write_set::{TransactionWrite, WriteSet},
+    write_set::WriteSet,
 };
-use arr_macro::arr;
 use dashmap::DashMap;
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
 use rayon::prelude::*;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 /// Helper class for calculating state changes after a block of transactions are executed.
 pub struct InMemoryStateCalculatorV2 {}
@@ -42,23 +43,11 @@ impl InMemoryStateCalculatorV2 {
             Self::validate_input_for_block(parent_state, &execution_output.to_commit)?;
         }
 
-        let state_updates_vec = Self::get_sharded_state_updates(
-            execution_output.to_commit.transaction_outputs(),
-            |txn_output| txn_output.write_set(),
-        );
-
-        // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
-        // hash) for the last one.
-        let last_checkpoint_index = {
-            let _timer = OTHER_TIMERS.timer_with(&["get_last_checkpoint_index"]);
-            execution_output.to_commit.get_last_checkpoint_index()
-        };
-
         Self::calculate_impl(
             parent_state,
             &execution_output.state_cache,
-            state_updates_vec,
-            last_checkpoint_index,
+            execution_output.to_commit.state_update_refs(),
+            execution_output.to_commit.last_checkpoint_index(),
             execution_output.is_block,
             known_state_checkpoints,
         )
@@ -70,12 +59,13 @@ impl InMemoryStateCalculatorV2 {
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
     ) -> Result<StateCheckpointOutput> {
-        let state_updates_vec = Self::get_sharded_state_updates(write_sets, |write_set| write_set);
+        let state_update_refs =
+            ShardedStateUpdateRefs::index_write_sets(write_sets, write_sets.len());
 
         Self::calculate_impl(
             parent_state,
             state_cache,
-            state_updates_vec,
+            &state_update_refs,
             last_checkpoint_index,
             false,
             Option::<Vec<_>>::None,
@@ -85,7 +75,7 @@ impl InMemoryStateCalculatorV2 {
     fn calculate_impl(
         parent_state: &Arc<StateDelta>,
         state_cache: &StateCache,
-        state_updates_vec: Vec<ShardedStateUpdates>,
+        state_update_refs: &ShardedStateUpdateRefs,
         last_checkpoint_index: Option<usize>,
         is_block: bool,
         known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
@@ -99,27 +89,31 @@ impl InMemoryStateCalculatorV2 {
         } = state_cache;
         assert!(frozen_base.smt.is_the_same(&parent_state.current));
 
+        // TODO(aldenhu): use maps of refs instead of cloning the state kvs
         let (updates_before_last_checkpoint, updates_after_last_checkpoint) =
-            if let Some(index) = last_checkpoint_index {
-                (
-                    Self::calculate_updates(&state_updates_vec[..=index]),
-                    Self::calculate_updates(&state_updates_vec[index + 1..]),
-                )
-            } else {
-                (
-                    create_empty_sharded_state_updates(),
-                    Self::calculate_updates(&state_updates_vec),
-                )
-            };
+            Self::calculate_updates(state_update_refs, last_checkpoint_index);
+        // TODO(aldenhu): calculate on the checkpoint as well, and don't need to combine
+        let mut _all_updates_owned: Option<DropHelper<ShardedStateUpdates>> = None;
+        let all_updates = if updates_after_last_checkpoint.all_shards_empty() {
+            &updates_before_last_checkpoint
+        } else if updates_before_last_checkpoint.all_shards_empty() {
+            &updates_after_last_checkpoint
+        } else {
+            let _timer = OTHER_TIMERS.timer_with(&["calculate_all_updates"]);
+            let mut all_updates = updates_before_last_checkpoint.clone();
+            all_updates.clone_merge(&updates_after_last_checkpoint);
+            _all_updates_owned = Some(DropHelper::new(all_updates));
+            _all_updates_owned.as_ref().expect("Just set").deref()
+        };
 
-        let num_txns = state_updates_vec.len();
-
-        let usage = Self::calculate_usage(parent_state.current.usage(), sharded_state_cache, &[
-            &updates_before_last_checkpoint,
-            &updates_after_last_checkpoint,
-        ]);
+        let usage = Self::calculate_usage(
+            parent_state.current.usage(),
+            sharded_state_cache,
+            all_updates,
+        );
 
         let first_version = parent_state.current_version.map_or(0, |v| v + 1);
+        let num_txns = state_update_refs.num_versions;
         let proof_reader = ProofReader::new(proofs);
         let latest_checkpoint = if let Some(index) = last_checkpoint_index {
             Self::make_checkpoint(
@@ -185,8 +179,8 @@ impl InMemoryStateCalculatorV2 {
             let mut updates_since_latest_checkpoint =
                 parent_state.updates_since_base.deref().clone();
             zip_eq(
-                updates_since_latest_checkpoint.iter_mut(),
-                updates_after_last_checkpoint,
+                updates_since_latest_checkpoint.shards.iter_mut(),
+                updates_after_last_checkpoint.shards,
             )
             .for_each(|(base, delta)| base.extend(delta));
             updates_since_latest_checkpoint
@@ -212,63 +206,61 @@ impl InMemoryStateCalculatorV2 {
             parent_state.clone(),
             Arc::new(result_state),
             last_checkpoint_index.map(|_| updates_before_last_checkpoint),
-            state_updates_vec,
             state_checkpoint_hashes,
         ))
     }
 
-    fn get_sharded_state_updates<'a, T, F>(
-        outputs: &'a [T],
-        write_set_fn: F,
-    ) -> Vec<ShardedStateUpdates>
-    where
-        T: Sync + 'a,
-        F: Fn(&'a T) -> &'a WriteSet + Sync,
-    {
-        let _timer = OTHER_TIMERS.timer_with(&["get_sharded_state_updates"]);
-
-        outputs
-            .par_iter()
-            .map(|output| {
-                let mut updates = arr![HashMap::new(); 16];
-                write_set_fn(output)
-                    .iter()
-                    .for_each(|(state_key, write_op)| {
-                        updates[state_key.get_shard_id() as usize]
-                            .insert(state_key.clone(), write_op.as_state_value());
-                    });
-                updates
-            })
-            .collect()
-    }
-
-    fn calculate_updates(state_updates_vec: &[ShardedStateUpdates]) -> ShardedStateUpdates {
+    fn calculate_updates(
+        state_update_refs: &ShardedStateUpdateRefs,
+        last_checkpoint_index: Option<usize>,
+    ) -> (ShardedStateUpdates, ShardedStateUpdates) {
         let _timer = OTHER_TIMERS.timer_with(&["calculate_updates"]);
-        let mut updates: ShardedStateUpdates = create_empty_sharded_state_updates();
-        updates
-            .par_iter_mut()
-            .enumerate()
-            .for_each(|(i, per_shard_update)| {
-                per_shard_update.extend(
-                    state_updates_vec
-                        .iter()
-                        .flat_map(|hms| &hms[i])
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect::<Vec<_>>(),
-                )
-            });
-        updates
+
+        let mut shard_iters = state_update_refs
+            .shards
+            .iter()
+            .map(|shard| shard.iter())
+            .collect::<Vec<_>>();
+        let mut before_last_checkpoint = ShardedStateUpdates::new_empty();
+        let mut after_last_checkpoint = ShardedStateUpdates::new_empty();
+
+        // TODO(aldenhu): no need to par_iter() if no need to clone.
+        if let Some(last_checkpoint_index) = last_checkpoint_index {
+            shard_iters
+                .par_iter_mut()
+                .zip_eq(before_last_checkpoint.shards.par_iter_mut())
+                .for_each(|(shard_iter, shard_updates)| {
+                    shard_updates.extend(
+                        shard_iter
+                            // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
+                            .take_while_ref(|(idx, _k, _v)| *idx <= last_checkpoint_index)
+                            .map(|(_idx, k, v)| ((*k).clone(), v.cloned())),
+                    )
+                });
+        }
+
+        let num_txns = state_update_refs.num_versions;
+        if num_txns != 0 && last_checkpoint_index != Some(num_txns - 1) {
+            shard_iters
+                .par_iter_mut()
+                .zip_eq(after_last_checkpoint.shards.par_iter_mut())
+                .for_each(|(shard_iter, shard_updates)| {
+                    shard_updates.extend(shard_iter.map(|(_idx, k, v)| ((*k).clone(), v.cloned())))
+                });
+        }
+
+        (before_last_checkpoint, after_last_checkpoint)
     }
 
     fn add_to_delta(
         k: &StateKey,
-        v: &Option<StateValue>,
+        v: &Option<&StateValue>,
         state_cache: &DashMap<StateKey, (Option<Version>, Option<StateValue>)>,
         items_delta: &mut i64,
         bytes_delta: &mut i64,
     ) {
         let key_size = k.size();
-        if let Some(ref value) = v {
+        if let Some(value) = v {
             *items_delta += 1;
             *bytes_delta += (key_size + value.size()) as i64;
         }
@@ -285,52 +277,33 @@ impl InMemoryStateCalculatorV2 {
     fn calculate_usage(
         old_usage: StateStorageUsage,
         sharded_state_cache: &ShardedStateCache,
-        updates: &[&ShardedStateUpdates; 2],
+        updates: &ShardedStateUpdates,
     ) -> StateStorageUsage {
-        let _timer = OTHER_TIMERS
-            .with_label_values(&["calculate_usage"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["calculate_usage"]);
+
         if old_usage.is_untracked() {
             return StateStorageUsage::new_untracked();
         }
-        let (items_delta, bytes_delta) = updates[0]
+
+        let (items_delta, bytes_delta) = sharded_state_cache
             .par_iter()
-            .zip_eq(updates[1].par_iter())
-            .enumerate()
-            .map(
-                |(i, (shard_updates_before_checkpoint, shard_updates_after_checkpoint))| {
-                    let mut items_delta = 0i64;
-                    let mut bytes_delta = 0i64;
-                    let num_updates_before_checkpoint = shard_updates_before_checkpoint.len();
-                    for (index, (k, v)) in shard_updates_before_checkpoint
-                        .iter()
-                        .chain(shard_updates_after_checkpoint.iter())
-                        .enumerate()
-                    {
-                        // Ignore updates before the checkpoint if there is an update for the same
-                        // key after the checkpoint.
-                        if index < num_updates_before_checkpoint
-                            && shard_updates_after_checkpoint.contains_key(k)
-                        {
-                            continue;
-                        }
-                        Self::add_to_delta(
-                            k,
-                            v,
-                            sharded_state_cache.shard(i as u8),
-                            &mut items_delta,
-                            &mut bytes_delta,
-                        );
-                    }
-                    (items_delta, bytes_delta)
-                },
-            )
-            .reduce(
-                || (0i64, 0i64),
-                |(items_now, bytes_now), (items_delta, bytes_delta)| {
-                    (items_now + items_delta, bytes_now + bytes_delta)
-                },
-            );
+            .zip_eq(updates.shards.par_iter())
+            .map(|(cache, updates)| {
+                let mut items_delta = 0;
+                let mut bytes_delta = 0;
+                updates.iter().for_each(|(key, value)| {
+                    Self::add_to_delta(
+                        key,
+                        &value.as_ref(),
+                        cache,
+                        &mut items_delta,
+                        &mut bytes_delta,
+                    )
+                });
+                (items_delta, bytes_delta)
+            })
+            .reduce(|| (0, 0), |(i1, b1), (i2, b2)| (i1 + i2, b1 + b2));
+
         StateStorageUsage::new(
             (old_usage.items() as i64 + items_delta) as usize,
             (old_usage.bytes() as i64 + bytes_delta) as usize,
@@ -347,13 +320,20 @@ impl InMemoryStateCalculatorV2 {
 
         // Update SMT.
         //
-        // TODO(grao): Consider use the sharded updates directly instead of flatten.
-        let smt_updates: Vec<_> = updates
-            .iter()
-            .flatten()
-            .map(|(key, value)| (key.hash(), value.as_ref()))
-            .collect();
-        let new_checkpoint = latest_checkpoint.batch_update(smt_updates, usage, proof_reader)?;
+        // TODO(aldenhu): avoid collecting into vec
+        let smt_updates: Vec<_> = {
+            let _timer = OTHER_TIMERS.timer_with(&["make_smt_updates"]);
+            updates
+                .shards
+                .iter()
+                .flatten()
+                .map(|(key, value)| (key.hash(), value.as_ref()))
+                .collect()
+        };
+        let new_checkpoint = {
+            let _timer = OTHER_TIMERS.timer_with(&["smt_batch_update"]);
+            latest_checkpoint.batch_update(smt_updates, usage, proof_reader)?
+        };
         Ok(new_checkpoint)
     }
 
@@ -370,7 +350,7 @@ impl InMemoryStateCalculatorV2 {
             base.current_version,
         );
         ensure!(
-            base.updates_since_base.iter().all(|shard| shard.is_empty()),
+            base.updates_since_base.all_shards_empty(),
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
