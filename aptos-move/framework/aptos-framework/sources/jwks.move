@@ -16,6 +16,8 @@ module aptos_framework::jwks {
     use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
+    use aptos_std::regex;
+    use aptos_std::regex::Regex;
     use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
     use aptos_framework::event::emit;
@@ -434,6 +436,39 @@ module aptos_framework::jwks {
         move_to(fx, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
         move_to(fx, Patches { patches: vector[] });
         move_to(fx, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
+    }
+
+    struct IssRegex has key {
+        regex: Regex,
+    }
+
+    fun find_jwk_by_iss_kid(framework: &signer, use_regex: bool, iss: vector<u8>, kid: vector<u8>): Option<JWK> acquires PatchedJWKs, IssRegex {
+        if (use_regex) {
+            if (!exists<IssRegex>(@aptos_framework)) {
+                let pattern = b"https://securetoken\\.google\\.com/[a-zA-Z0-9_\\-]+";
+                let regex = option::extract(&mut regex::compile(pattern));
+                move_to(framework, IssRegex { regex });
+            };
+            let regex = &borrow_global<IssRegex>(@aptos_framework).regex;
+
+            let match = regex::match(regex, iss);
+            if (option::is_some(&match)) {
+                iss = b"https://securetoken.google.com/google";
+            }
+        };
+        let jwks = borrow_global<PatchedJWKs>(@aptos_framework);
+        let (iss_found, iss_idx) = vector::find(&jwks.jwks.entries, |provider_jwks|{
+            let provider_jwks: &ProviderJWKs = provider_jwks;
+            provider_jwks.issuer == iss
+        });
+        if (!iss_found) return option::none();
+        let provider_jwks = vector::borrow(&jwks.jwks.entries, iss_idx);
+        let (jwk_found, jwk_idx) = vector::find(&provider_jwks.jwks, |jwk|{
+            let jwk: &JWK = jwk;
+            get_jwk_id(jwk) == kid
+        });
+        if (!jwk_found) return option::none();
+        option::some(*vector::borrow(&provider_jwks.jwks, jwk_idx))
     }
 
     /// Helper function that removes an OIDC provider from the `SupportedOIDCProviders`.

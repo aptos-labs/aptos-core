@@ -30,11 +30,14 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         ..Default::default()
     };
 
+    let mut ut_config = UnitTestingConfig::default();
+    ut_config.filter = std::env::var("MOVE_TEST_FILTER").ok();
+    ut_config.report_statistics = true;
     let mut ok = run_move_unit_tests(
         &pkg_path,
         build_config.clone(),
         // TODO(Gas): double check if this is correct
-        UnitTestingConfig::default(),
+        ut_config,
         aptos_test_natives(),
         aptos_test_feature_flags_genesis(),
         /* gas limit */ Some(100_000),

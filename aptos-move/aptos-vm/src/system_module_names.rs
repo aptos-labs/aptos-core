@@ -46,6 +46,7 @@ pub static JWKS_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     )
 });
 
+pub const FIND_JWK_BY_ISS_KID: &IdentStr = ident_str!("find_jwk_by_iss_kid");
 pub const UPSERT_INTO_OBSERVED_JWKS: &IdentStr = ident_str!("upsert_into_observed_jwks");
 
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {

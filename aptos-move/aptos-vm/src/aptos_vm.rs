@@ -1838,6 +1838,7 @@ impl AptosVM {
         // If there are keyless TXN authenticators, validate them all.
         if !keyless_authenticators.is_empty() && !self.is_simulation {
             keyless_validation::validate_authenticators(
+                session,
                 &self.pvk,
                 &keyless_authenticators,
                 self.features(),

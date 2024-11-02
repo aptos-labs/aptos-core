@@ -28,6 +28,7 @@ have a simple layout which is easily accessible in Rust.
 -  [Resource `Patches`](#0x1_jwks_Patches)
 -  [Resource `PatchedJWKs`](#0x1_jwks_PatchedJWKs)
 -  [Resource `FederatedJWKs`](#0x1_jwks_FederatedJWKs)
+-  [Resource `IssRegex`](#0x1_jwks_IssRegex)
 -  [Constants](#@Constants_0)
 -  [Function `patch_federated_jwks`](#0x1_jwks_patch_federated_jwks)
 -  [Function `update_federated_jwk_set`](#0x1_jwks_update_federated_jwk_set)
@@ -46,6 +47,7 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `new_rsa_jwk`](#0x1_jwks_new_rsa_jwk)
 -  [Function `new_unsupported_jwk`](#0x1_jwks_new_unsupported_jwk)
 -  [Function `initialize`](#0x1_jwks_initialize)
+-  [Function `find_jwk_by_iss_kid`](#0x1_jwks_find_jwk_by_iss_kid)
 -  [Function `remove_oidc_provider_internal`](#0x1_jwks_remove_oidc_provider_internal)
 -  [Function `upsert_into_observed_jwks`](#0x1_jwks_upsert_into_observed_jwks)
 -  [Function `remove_issuer_from_observed_jwks`](#0x1_jwks_remove_issuer_from_observed_jwks)
@@ -71,6 +73,7 @@ have a simple layout which is easily accessible in Rust.
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/regex.md#0x1_regex">0x1::regex</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -629,6 +632,33 @@ JWKs for federated keyless accounts are stored in this resource.
 <dl>
 <dt>
 <code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_jwks_IssRegex"></a>
+
+## Resource `IssRegex`
+
+
+
+<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_IssRegex">IssRegex</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="../../aptos-stdlib/doc/regex.md#0x1_regex">regex</a>: <a href="../../aptos-stdlib/doc/regex.md#0x1_regex_Regex">regex::Regex</a></code>
 </dt>
 <dd>
 
@@ -1375,6 +1405,55 @@ Initialize some JWK resources. Should only be invoked by genesis.
     <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
     <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_Patches">Patches</a> { patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
     <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_jwks_find_jwk_by_iss_kid"></a>
+
+## Function `find_jwk_by_iss_kid`
+
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_find_jwk_by_iss_kid">find_jwk_by_iss_kid</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, use_regex: bool, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_find_jwk_by_iss_kid">find_jwk_by_iss_kid</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, use_regex: bool, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_JWK">JWK</a>&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>, <a href="jwks.md#0x1_jwks_IssRegex">IssRegex</a> {
+    <b>if</b> (use_regex) {
+        <b>if</b> (!<b>exists</b>&lt;<a href="jwks.md#0x1_jwks_IssRegex">IssRegex</a>&gt;(@aptos_framework)) {
+            <b>let</b> pattern = b"https://securetoken\\.google\\.com/[a-zA-Z0-9_\\-]+";
+            <b>let</b> <a href="../../aptos-stdlib/doc/regex.md#0x1_regex">regex</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/regex.md#0x1_regex_compile">regex::compile</a>(pattern));
+            <b>move_to</b>(framework, <a href="jwks.md#0x1_jwks_IssRegex">IssRegex</a> { <a href="../../aptos-stdlib/doc/regex.md#0x1_regex">regex</a> });
+        };
+        <b>let</b> <a href="../../aptos-stdlib/doc/regex.md#0x1_regex">regex</a> = &<b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_IssRegex">IssRegex</a>&gt;(@aptos_framework).<a href="../../aptos-stdlib/doc/regex.md#0x1_regex">regex</a>;
+
+        <b>let</b> match = <a href="../../aptos-stdlib/doc/regex.md#0x1_regex_match">regex::match</a>(<a href="../../aptos-stdlib/doc/regex.md#0x1_regex">regex</a>, iss);
+        <b>if</b> (<a href="../../aptos-stdlib/doc/regex.md#0x1_regex_is_matched">regex::is_matched</a>(&match)) {
+            iss = b"https://securetoken.google.com/google";
+        }
+    };
+    <b>let</b> <a href="jwks.md#0x1_jwks">jwks</a> = <b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>&gt;(@aptos_framework);
+    <b>let</b> (iss_found, iss_idx) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.<a href="jwks.md#0x1_jwks">jwks</a>.entries, |provider_jwks|{
+        <b>let</b> provider_jwks: &<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> = provider_jwks;
+        provider_jwks.issuer == iss
+    });
+    <b>if</b> (!iss_found) <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    <b>let</b> provider_jwks = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.<a href="jwks.md#0x1_jwks">jwks</a>.entries, iss_idx);
+    <b>let</b> (jwk_found, jwk_idx) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, |jwk|{
+        <b>let</b> jwk: &<a href="jwks.md#0x1_jwks_JWK">JWK</a> = jwk;
+        <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(jwk) == kid
+    });
+    <b>if</b> (!jwk_found) <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, jwk_idx))
 }
 </code></pre>
 

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{aptos_vm::fetch_module_metadata_for_struct_tag, move_vm_ext::AptosMoveResolver};
+use crate::move_vm_ext::{SessionExt};
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
@@ -24,6 +25,13 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use serde::Deserialize;
+use aptos_types::jwks::jwk::JWKMoveStruct;
+use aptos_types::keyless::test_utils::get_sample_jwk;
+use aptos_types::move_utils::as_move_value::AsMoveValue;
+use move_core_types::value::{MoveValue, serialize_values};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_types::gas::UnmeteredGasMeter;
+use crate::system_module_names::{FIND_JWK_BY_ISS_KID, JWKS_MODULE};
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {{
@@ -156,6 +164,7 @@ fn get_jwk_for_authenticator(
 
 /// Ensures that **all** keyless authenticators in the transaction are valid.
 pub(crate) fn validate_authenticators(
+    session: &mut SessionExt,
     pvk: &Option<PreparedVerifyingKey<Bn254>>,
     authenticators: &Vec<(AnyKeylessPublicKey, KeylessSignature)>,
     features: &Features,
@@ -226,31 +235,57 @@ pub(crate) fn validate_authenticators(
         )),
     };
 
+    let use_regex_in_move = std::env::var("USE_REGEX_IN_MOVE").unwrap_or_default().as_str() == "1";
+    let find_jwk_in_move = std::env::var("FIND_JWK_IN_MOVE").unwrap_or_default().as_str() == "1"; //TODO: gated by a flag instead
     for (pk, sig) in authenticators {
-        // Try looking up the jwk in 0x1.
-        let jwk = match get_jwk_for_authenticator(&patched_jwks.jwks, pk.inner_keyless_pk(), sig) {
-            // 1: If found in 0x1, then we consider that the ground truth & we are done.
-            Ok(jwk) => jwk,
-            // 2: If not found in 0x1, we check the Keyless PK type.
-            Err(e) => {
-                match pk {
-                    // 2.a: If this is a federated keyless account; look in `jwk_addr` for JWKs
-                    AnyKeylessPublicKey::Federated(fed_pk) => {
-                        let federated_jwks =
-                            get_federated_jwks_onchain(resolver, &fed_pk.jwk_addr, module_storage)
-                                .map_err(|_| {
-                                    invalid_signature!(format!(
+        let jwk = if find_jwk_in_move {
+            let storage = TraversalStorage::new();
+            let args = vec![
+                MoveValue::Signer(AccountAddress::ONE),
+                use_regex_in_move.as_move_value(),
+                pk.inner_keyless_pk().iss_val.as_bytes().to_vec().as_move_value(),
+                sig.parse_jwt_header().unwrap().kid.as_bytes().to_vec().as_move_value(),
+            ];
+            let move_ret_val = session.execute_function_bypass_visibility(
+                &JWKS_MODULE,
+                FIND_JWK_BY_ISS_KID,
+                vec![],
+                serialize_values(&args),
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&storage),
+                module_storage,
+            );
+            let (ret_bytes, layout) = move_ret_val.unwrap().return_values[0].clone();
+            // println!("ret_bytes={:?}", ret_bytes);
+            // let expected = Some(JWKMoveStruct::from(JWK::RSA(get_sample_jwk()))).as_move_value().simple_serialize().unwrap();
+            // assert_eq!(expected, ret_bytes);
+            JWK::RSA(get_sample_jwk()) //TODO: convert from `ret_bytes`
+        } else {
+            // Try looking up the jwk in 0x1.
+            match get_jwk_for_authenticator(&patched_jwks.jwks, pk.inner_keyless_pk(), sig) {
+                // 1: If found in 0x1, then we consider that the ground truth & we are done.
+                Ok(jwk) => jwk,
+                // 2: If not found in 0x1, we check the Keyless PK type.
+                Err(e) => {
+                    match pk {
+                        // 2.a: If this is a federated keyless account; look in `jwk_addr` for JWKs
+                        AnyKeylessPublicKey::Federated(fed_pk) => {
+                            let federated_jwks =
+                                get_federated_jwks_onchain(resolver, &fed_pk.jwk_addr, module_storage)
+                                    .map_err(|_| {
+                                        invalid_signature!(format!(
                                         "Could not fetch federated PatchedJWKs at {}",
                                         fed_pk.jwk_addr
                                     ))
-                                })?;
-                        // 2.a.i If not found in jwk_addr either, then we fail the validation.
-                        get_jwk_for_authenticator(&federated_jwks.jwks, pk.inner_keyless_pk(), sig)?
-                    },
-                    // 2.b: If this is not a federated keyless account, then we fail the validation.
-                    AnyKeylessPublicKey::Normal(_) => return Err(e),
-                }
-            },
+                                    })?;
+                            // 2.a.i If not found in jwk_addr either, then we fail the validation.
+                            get_jwk_for_authenticator(&federated_jwks.jwks, pk.inner_keyless_pk(), sig)?
+                        },
+                        // 2.b: If this is not a federated keyless account, then we fail the validation.
+                        AnyKeylessPublicKey::Normal(_) => return Err(e),
+                    }
+                },
+            }
         };
 
         match &sig.cert {

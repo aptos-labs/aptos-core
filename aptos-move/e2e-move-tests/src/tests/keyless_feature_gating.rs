@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Instant;
+use rstest::timeout::execute_with_timeout_sync;
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, SigningKey};
@@ -84,6 +86,36 @@ fn test_feature_gating(
             output.status()
         );
     }
+}
+
+#[test]
+fn naive_bench() {
+    let (mut h, recipient, core_resources) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::KEYLESS_ACCOUNTS,
+        ],
+        vec![],
+    );
+
+    // Old proof for old VK
+    let (old_sig, pk) = get_sample_groth16_sig_and_pk();
+    let account = create_keyless_account(&mut h, pk);
+
+    let mut all_times = vec![];
+    for i in 0..99 {
+        let transaction =
+            spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
+        let timer = Instant::now();
+        let output = h.run_raw(transaction);
+        let exe_time = timer.elapsed();
+        all_times.push(exe_time);
+        assert_success!(output.status().clone());
+    }
+
+    all_times.sort();
+    println!("P50={:?}", all_times[50]);
 }
 
 #[test]
