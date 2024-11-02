@@ -11,20 +11,22 @@ use std::{
     hash::Hash,
     ops::Deref,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
 };
 
 /// Module code stored in cross-block module cache.
-// TODO(loader_v2):
-//   We can move this to move-vm-types, but then we also need to have version generic or expose
-//   transaction index there, and define PanicError in Move (or convert from VMError).
 struct ImmutableModuleCode<DC, VC, E> {
     /// True if this code is "valid" within the block execution context (i.e, there has been no
     /// republishing of this module so far). If false, executor needs to read the module from the
     /// sync/unsync module caches.
     valid: CachePadded<AtomicBool>,
+    /// Represents the generation of the module cache for which this entry has been validated
+    /// against the global state. For example, if the generation of the cache is 1, but the entry
+    /// has generation 0, it should be re-validated against the state and has its generation reset
+    /// accordingly.
+    generation: CachePadded<AtomicU32>,
     /// Cached verified module. While [ModuleCode] type is used, the following invariants always
     /// hold:
     ///    1. Module's version is [None] (storage version).
@@ -38,7 +40,10 @@ where
 {
     /// Returns a new valid module. Returns a (panic) error if the module is not verified or has
     /// non-storage version.
-    fn new(module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) -> Result<Self, PanicError> {
+    fn new(
+        module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>,
+        generation: u32,
+    ) -> Result<Self, PanicError> {
         if !module.code().is_verified() || module.version().is_some() {
             let msg = format!(
                 "Invariant violated for immutable module code : verified ({}), version({:?})",
@@ -50,6 +55,7 @@ where
 
         Ok(Self {
             valid: CachePadded::new(AtomicBool::new(true)),
+            generation: CachePadded::new(AtomicU32::new(generation)),
             module: CachePadded::new(module),
         })
     }
@@ -57,6 +63,16 @@ where
     /// Marks the module as invalid.
     fn mark_invalid(&self) {
         self.valid.store(false, Ordering::Release)
+    }
+
+    /// Returns the generation of this module.
+    pub(crate) fn generation(&self) -> u32 {
+        self.generation.load(Ordering::Acquire)
+    }
+
+    /// Resets the generation of this module.
+    fn set_generation(&self, new_generation: u32) {
+        self.generation.store(new_generation, Ordering::Release);
     }
 
     /// Returns true if the module is valid.
@@ -78,6 +94,9 @@ pub struct ImmutableModuleCache<K, DC, VC, E> {
     /// Maximum cache size. If the size is greater than this limit, the cache is flushed. Note that
     /// this can only be done at block boundaries.
     capacity: usize,
+
+    /// Represents the generation of this cache. Incremented for every block.
+    generation: ExplicitSyncWrapper<u32>,
 }
 
 impl<K, DC, VC, E> ImmutableModuleCache<K, DC, VC, E>
@@ -96,6 +115,7 @@ where
         Self {
             module_cache: ExplicitSyncWrapper::new(HashMap::new()),
             capacity,
+            generation: ExplicitSyncWrapper::new(0),
         }
     }
 
@@ -116,12 +136,24 @@ where
         }
     }
 
+    /// Sets the generation of the module stored at associated key to the generation of the cache.
+    pub(crate) fn set_generation(&self, key: &K) {
+        if let Some(module) = self.module_cache.acquire().get(key) {
+            module.set_generation(*self.generation.acquire());
+        }
+    }
+
     /// Returns the module stored in cache. If the module has not been cached, or it exists but is
-    /// not valid, [None] is returned.
-    pub(crate) fn get(&self, key: &K) -> Option<Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>> {
+    /// not valid, [None] is returned. Also returns a boolean flag to indicate if the cached module
+    /// needs validation (i.e., its generation is not equal to the generation of the cache).
+    pub(crate) fn get(
+        &self,
+        key: &K,
+    ) -> Option<(Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>, bool)> {
         self.module_cache.acquire().get(key).and_then(|module| {
             if module.is_valid() {
-                Some(module.inner().clone())
+                let needs_validation = *self.generation.acquire() != module.generation();
+                Some((module.inner().clone(), needs_validation))
             } else {
                 None
             }
@@ -133,8 +165,8 @@ where
         self.module_cache.acquire().clear();
     }
 
-    /// Inserts modules into the cache. Should never be called throughout block-execution. Use with
-    /// caution.
+    /// Inserts modules into the cache, and increments the generation counter of the cache. Should
+    /// never be called throughout block-execution. Use with caution.
     ///
     /// Notes:
     ///   1. Only verified modules are inserted.
@@ -143,12 +175,13 @@ where
     ///      these constraints are violated, a panic error is returned.
     ///   4. If the cache size exceeds its capacity after all verified modules have been inserted,
     ///      the cache is flushed.
-    pub(crate) fn insert_verified_unchecked(
+    pub(crate) fn insert_verified_and_increment_generation_unchecked(
         &self,
         modules: impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>)>,
     ) -> Result<(), PanicError> {
         use hashbrown::hash_map::Entry::*;
 
+        let current_generation = *self.generation.acquire();
         let mut guard = self.module_cache.acquire();
         let module_cache = guard.dereference_mut();
 
@@ -167,17 +200,23 @@ where
             if module.code().is_verified() {
                 let mut module = module.as_ref().clone();
                 module.set_version(None);
-                let prev =
-                    module_cache.insert(key.clone(), ImmutableModuleCode::new(Arc::new(module))?);
+
+                let code = ImmutableModuleCode::new(Arc::new(module), current_generation)?;
+                let prev = module_cache.insert(key.clone(), code);
 
                 // At this point, we must have removed the entry, or returned a panic error.
                 assert!(prev.is_none())
             }
         }
 
+        // In case capacity is exceeded, flush the cache.
         if module_cache.len() > self.capacity {
             module_cache.clear();
         }
+
+        // Increment generation counter to ensure we can later check that module cache is in sync
+        // with the state.
+        *self.generation.acquire() = current_generation.wrapping_add(1);
 
         Ok(())
     }
@@ -187,7 +226,7 @@ where
     pub fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) {
         self.module_cache
             .acquire()
-            .insert(key, ImmutableModuleCode::new(module).unwrap());
+            .insert(key, ImmutableModuleCode::new(module, 0).unwrap());
     }
 
     /// Removes the module from cache. Used for tests only.
@@ -201,6 +240,12 @@ where
     pub fn size(&self) -> usize {
         self.module_cache.acquire().len()
     }
+
+    /// Returns the generation counter for the cache. Used for tests only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn generation(&self) -> u32 {
+        *self.generation.acquire()
+    }
 }
 
 #[cfg(test)]
@@ -211,19 +256,28 @@ mod test {
 
     #[test]
     fn test_immutable_module_code() {
-        assert!(ImmutableModuleCode::new(mock_deserialized_code(0, None)).is_err());
-        assert!(ImmutableModuleCode::new(mock_deserialized_code(0, Some(22))).is_err());
-        assert!(ImmutableModuleCode::new(mock_verified_code(0, Some(22))).is_err());
-        assert!(ImmutableModuleCode::new(mock_verified_code(0, None)).is_ok());
+        assert!(ImmutableModuleCode::new(mock_deserialized_code(0, None), 0).is_err());
+        assert!(ImmutableModuleCode::new(mock_deserialized_code(0, Some(22)), 0).is_err());
+        assert!(ImmutableModuleCode::new(mock_verified_code(0, Some(22)), 0).is_err());
+        assert!(ImmutableModuleCode::new(mock_verified_code(0, None), 0).is_ok());
     }
 
     #[test]
     fn test_immutable_module_code_validity() {
-        let module_code = assert_ok!(ImmutableModuleCode::new(mock_verified_code(0, None)));
+        let module_code = assert_ok!(ImmutableModuleCode::new(mock_verified_code(0, None), 0));
         assert!(module_code.is_valid());
 
         module_code.mark_invalid();
         assert!(!module_code.is_valid());
+    }
+
+    #[test]
+    fn test_immutable_module_code_generation() {
+        let module_code = assert_ok!(ImmutableModuleCode::new(mock_verified_code(0, None), 7));
+        assert_eq!(module_code.generation(), 7);
+
+        module_code.set_generation(10);
+        assert_eq!(module_code.generation(), 10);
     }
 
     #[test]
@@ -254,37 +308,53 @@ mod test {
         for i in 0..capacity {
             new_modules.push((i, mock_verified_code(i, Some(i as TxnIndex))));
         }
-        let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
+        let result = global_cache
+            .insert_verified_and_increment_generation_unchecked(new_modules.into_iter());
         assert!(result.is_ok());
         assert_eq!(global_cache.size(), capacity);
+        assert_eq!(global_cache.generation(), 1);
 
         // Versions should be set to storage.
         for key in 0..capacity {
-            let code = assert_some!(global_cache.get(&key));
+            let (code, _) = assert_some!(global_cache.get(&key));
             assert!(code.version().is_none())
         }
 
         // Too many modules added, the cache should be flushed.
         let new_modules = vec![(11, mock_verified_code(11, None))];
-        let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
+        let result = global_cache
+            .insert_verified_and_increment_generation_unchecked(new_modules.into_iter());
         assert!(result.is_ok());
         assert_eq!(global_cache.size(), 0);
+        assert_eq!(global_cache.generation(), 2);
 
         // Should not add deserialized code.
         let deserialized_modules = vec![(0, mock_deserialized_code(0, None))];
-        assert_ok!(global_cache.insert_verified_unchecked(deserialized_modules.into_iter()));
+        assert_ok!(global_cache
+            .insert_verified_and_increment_generation_unchecked(deserialized_modules.into_iter()));
         assert_eq!(global_cache.size(), 0);
+        assert_eq!(global_cache.generation(), 3);
 
         // Should not override valid modules.
         global_cache.insert(0, mock_verified_code(0, None));
         let new_modules = vec![(0, mock_verified_code(100, None))];
-        assert_err!(global_cache.insert_verified_unchecked(new_modules.into_iter()));
+        assert_err!(global_cache
+            .insert_verified_and_increment_generation_unchecked(new_modules.into_iter()));
+        assert_eq!(global_cache.generation(), 3);
 
         // Can override invalid modules.
         global_cache.mark_invalid(&0);
         let new_modules = vec![(0, mock_verified_code(100, None))];
-        let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
+        let result = global_cache
+            .insert_verified_and_increment_generation_unchecked(new_modules.into_iter());
         assert!(result.is_ok());
         assert_eq!(global_cache.size(), 1);
+        assert_eq!(global_cache.generation(), 4);
+
+        // Generation incremented even if there are no code publishes.
+        let result =
+            global_cache.insert_verified_and_increment_generation_unchecked(vec![].into_iter());
+        assert!(result.is_ok());
+        assert_eq!(global_cache.generation(), 5);
     }
 }

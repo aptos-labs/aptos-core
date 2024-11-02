@@ -1169,7 +1169,7 @@ where
 
         counters::update_state_counters(versioned_cache.stats(), true);
         self.global_module_cache
-            .insert_verified_unchecked(versioned_cache.take_modules_iter())
+            .insert_verified_and_increment_generation_unchecked(versioned_cache.take_modules_iter())
             .map_err(|err| {
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
@@ -1652,7 +1652,7 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
         self.global_module_cache
-            .insert_verified_unchecked(unsync_map.into_modules_iter())?;
+            .insert_verified_and_increment_generation_unchecked(unsync_map.into_modules_iter())?;
 
         let block_end_info = if self
             .config

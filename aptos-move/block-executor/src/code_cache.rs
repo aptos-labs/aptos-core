@@ -25,7 +25,7 @@ use move_core_types::{
 use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
-    WithBytes,
+    WithBytes, WithHash,
 };
 use std::sync::Arc;
 
@@ -145,17 +145,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
     > {
         // First, look up the module in the cross-block global module cache. Record the read for
         // later validation in case the read module is republished.
-        if let Some(module) = self.global_module_cache.get(key) {
-            match &self.latest_view {
-                ViewState::Sync(state) => state
-                    .captured_reads
-                    .borrow_mut()
-                    .capture_global_cache_read(key.clone()),
-                ViewState::Unsync(state) => {
-                    state.read_set.borrow_mut().capture_module_read(key.clone())
-                },
+        if let Some((module, needs_validation)) = self.global_module_cache.get(key) {
+            // If we do not need to validate global cache, return early.
+            if !needs_validation {
+                self.capture_global_cache_read(key);
+                return Ok(Some(module.clone()));
             }
-            return Ok(Some(module.clone()));
+
+            // Otherwise, this is the first time this module gets accessed in this block. We need
+            // to validate it is the same as in the state. We do it only once on the first access.
+            let is_valid = builder.build(key)?.is_some_and(|m| {
+                m.extension().hash() == module.extension().hash()
+                    && m.extension().state_value_metadata()
+                        == module.extension().state_value_metadata()
+            });
+            if is_valid {
+                // This module is valid for this block, mark as so.
+                self.global_module_cache.set_generation(key);
+                self.capture_global_cache_read(key);
+                return Ok(Some(module.clone()));
+            }
+
+            // Validation failed, global cache is not consistent with the state! Mark the entry as
+            // invalid and fall-back to slow path via sync module cache.
+            self.global_module_cache.mark_invalid(key);
         }
 
         // Global cache miss: check module cache in versioned/unsync maps.
@@ -239,6 +252,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         match &self.latest_view {
             ViewState::Sync(state) => state.versioned_map.module_cache(),
             ViewState::Unsync(state) => state.unsync_map.module_cache(),
+        }
+    }
+
+    /// Captures the read from global module cache.
+    fn capture_global_cache_read(&self, key: &ModuleId) {
+        match &self.latest_view {
+            ViewState::Sync(state) => state
+                .captured_reads
+                .borrow_mut()
+                .capture_global_cache_read(key.clone()),
+            ViewState::Unsync(state) => {
+                state.read_set.borrow_mut().capture_module_read(key.clone())
+            },
         }
     }
 }
