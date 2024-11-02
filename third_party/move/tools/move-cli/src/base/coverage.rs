@@ -60,7 +60,7 @@ pub struct Coverage {
 impl Coverage {
     pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
         let path = reroot_path(path)?;
-        let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"))?;
+        let coverage_map = CoverageMap::from_binary_file(&path.join(".coverage_map.mvcov"))?;
         let package = config.compile_package(&path, &mut Vec::new())?;
         let modules: Vec<_> = package
             .root_modules()

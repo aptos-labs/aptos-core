@@ -343,8 +343,8 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
             let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
             buf_writer.flush().unwrap();
         }
-        let coverage_map = CoverageMap::from_trace_file(trace_path.clone());
-        output_map_to_file(coverage_map_path, &coverage_map).unwrap();
+        let coverage_map = CoverageMap::from_trace_file(&trace_path)?;
+        output_map_to_file(&coverage_map_path, &coverage_map).unwrap();
     }
     cleanup_trace();
     Ok(UnitTestResult::Success)

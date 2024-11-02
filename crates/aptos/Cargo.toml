@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
+anyhow = { workspace = true, features = [ "backtrace" ] }
 aptos-api-types = { workspace = true }
 aptos-backup-cli = { workspace = true }
 aptos-bitvec = { workspace = true }

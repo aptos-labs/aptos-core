@@ -184,7 +184,7 @@ fn compile_coverage(
 
     let path = move_options.get_package_path()?;
     let coverage_map =
-        CoverageMap::from_binary_file(path.join(".coverage_map.mvcov")).map_err(|err| {
+        CoverageMap::from_binary_file(&path.join(".coverage_map.mvcov")).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to retrieve coverage map {}", err))
         })?;
     let package = config

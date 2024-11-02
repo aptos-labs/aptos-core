@@ -8,7 +8,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = { workspace = true }
+anyhow = { workspace = true, features = ["backtrace"] }
 clap = { workspace = true, features = ["derive"] }
 colored = { workspace = true }
 itertools = { workspace = true }

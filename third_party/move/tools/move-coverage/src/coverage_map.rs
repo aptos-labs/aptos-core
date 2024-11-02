@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{format_err, Result};
+use anyhow::{format_err, Context, Result};
 use move_binary_format::file_format::{CodeOffset, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -61,12 +61,12 @@ impl CoverageMap {
     /// Takes in a file containing a raw VM trace, and returns an updated coverage map.
     pub fn update_coverage_from_trace_file<P: AsRef<Path> + std::fmt::Debug>(
         mut self,
-        filename: P,
-    ) -> Self {
-        let file = File::open(&filename)
-            .unwrap_or_else(|_| panic!("Unable to open coverage trace file '{:?}'", filename));
+        filename: &P,
+    ) -> Result<Self> {
+        let file = File::open(filename)
+            .map_err(|e| format_err!("Unable to open coverage trace file {:?}: {}", filename, e))?;
         for line in BufReader::new(file).lines() {
-            let line = line.unwrap();
+            let line = line?;
             let mut splits = line.split(',');
             // Use a dummy key so that the data structure of the coverage map does not need to be changed
             let exec_id = "dummy_exec_id";
@@ -87,26 +87,29 @@ impl CoverageMap {
                 assert_eq!(context_segs.pop().unwrap(), "Script",);
             }
         }
-        self
+        Ok(self)
     }
 
     /// Takes in a file containing a raw VM trace, and returns a coverage map.
-    pub fn from_trace_file<P: AsRef<Path> + std::fmt::Debug>(filename: P) -> Self {
+    pub fn from_trace_file<P: AsRef<Path> + std::fmt::Debug>(filename: &P) -> Result<Self> {
         let empty_module_map = CoverageMap {
             exec_maps: BTreeMap::new(),
         };
-        empty_module_map.update_coverage_from_trace_file(filename)
+        empty_module_map
+            .update_coverage_from_trace_file(filename)
+            .with_context(|| format!("Updating coverage from trace file {:?}", filename))
     }
 
     /// Takes in a file containing a serialized coverage map and returns a coverage map.
-    pub fn from_binary_file<P: AsRef<Path> + std::fmt::Debug>(filename: P) -> Result<Self> {
+    pub fn from_binary_file<P: AsRef<Path> + std::fmt::Debug>(filename: &P) -> Result<Self> {
         let mut bytes = Vec::new();
-        File::open(&filename)
+        File::open(filename)
             .map_err(|e| format_err!("{}: Coverage map file '{:?}' doesn't exist", e, filename))?
             .read_to_end(&mut bytes)
             .ok()
             .ok_or_else(|| format_err!("Unable to read coverage map"))?;
-        bcs::from_bytes(&bytes).map_err(|_| format_err!("Error deserializing coverage map"))
+        bcs::from_bytes(&bytes)
+            .with_context(|| format!("Deserializing coverage map from binary file {:?}", filename))
     }
 
     // add entries in a cascading manner
@@ -267,10 +270,13 @@ impl ExecCoverageMapWithModules {
 
 impl TraceMap {
     /// Takes in a file containing a raw VM trace, and returns an updated coverage map.
-    pub fn update_from_trace_file<P: AsRef<Path>>(mut self, filename: P) -> Self {
-        let file = File::open(filename).unwrap();
+    pub fn update_from_trace_file<P: AsRef<Path> + std::fmt::Debug>(
+        mut self,
+        filename: &P,
+    ) -> Result<Self> {
+        let file = File::open(filename)?;
         for line in BufReader::new(file).lines() {
-            let line = line.unwrap();
+            let line = line?;
             let mut splits = line.split(',');
             // Use a dummy key so that the data structure of the coverage map does not need to be changed
             let exec_id = "dummy_exec_id";
@@ -291,11 +297,11 @@ impl TraceMap {
                 assert_eq!(context_segs.pop().unwrap(), "Script",);
             }
         }
-        self
+        Ok(self)
     }
 
     // Takes in a file containing a raw VM trace, and returns a parsed trace.
-    pub fn from_trace_file<P: AsRef<Path>>(filename: P) -> Self {
+    pub fn from_trace_file<P: AsRef<Path> + std::fmt::Debug>(filename: &P) -> Result<Self> {
         let trace_map = TraceMap {
             exec_maps: BTreeMap::new(),
         };
@@ -303,16 +309,14 @@ impl TraceMap {
     }
 
     // Takes in a file containing a serialized trace and deserialize it.
-    pub fn from_binary_file<P: AsRef<Path>>(filename: P) -> Self {
+    pub fn from_binary_file<P: AsRef<Path> + std::fmt::Debug>(filename: &P) -> Result<Self> {
         let mut bytes = Vec::new();
         File::open(filename)
             .ok()
             .and_then(|mut file| file.read_to_end(&mut bytes).ok())
-            .ok_or_else(|| format_err!("Error while reading in coverage map binary"))
-            .unwrap();
+            .ok_or_else(|| format_err!("Error while reading in coverage map binary"))?;
         bcs::from_bytes(&bytes)
-            .map_err(|_| format_err!("Error deserializing into coverage map"))
-            .unwrap()
+            .with_context(|| format!("Deserializing {:?} into coverage map", filename))
     }
 
     // add entries in a cascading manner
@@ -334,7 +338,10 @@ impl TraceMap {
     }
 }
 
-pub fn output_map_to_file<M: Serialize, P: AsRef<Path>>(file_name: P, data: &M) -> Result<()> {
+pub fn output_map_to_file<M: Serialize, P: AsRef<Path> + std::fmt::Debug>(
+    file_name: &P,
+    data: &M,
+) -> Result<()> {
     let bytes = bcs::to_bytes(data)?;
     let mut file = File::create(file_name)?;
     file.write_all(&bytes)?;

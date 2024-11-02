@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+use anyhow::{Context, Result};
 use clap::Parser;
 use move_binary_format::file_format::CompiledModule;
 use move_bytecode_source_map::utils::source_map_from_file;
@@ -50,23 +51,29 @@ struct Args {
     pub tag: TextIndicator,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::parse();
     let source_map_extension = SOURCE_MAP_EXTENSION;
     let coverage_map = if args.is_raw_trace_file {
-        CoverageMap::from_trace_file(&args.input_trace_path)
+        CoverageMap::from_trace_file(&args.input_trace_path)?
     } else {
-        CoverageMap::from_binary_file(&args.input_trace_path).unwrap()
+        CoverageMap::from_binary_file(&args.input_trace_path)?
     };
 
-    let bytecode_bytes = fs::read(&args.module_binary_path).expect("Unable to read bytecode file");
-    let compiled_module =
-        CompiledModule::deserialize(&bytecode_bytes).expect("Module blob can't be deserialized");
+    let bytecode_bytes = fs::read(&args.module_binary_path)
+        .with_context(|| format!("Reading module binary file {}", args.module_binary_path))?;
+    let compiled_module = CompiledModule::deserialize(&bytecode_bytes)
+        .with_context(|| format!("Deserializing file {}", args.module_binary_path))?;
 
     let source_map = source_map_from_file(
         &Path::new(&args.module_binary_path).with_extension(source_map_extension),
     )
-    .unwrap();
+    .with_context(|| {
+        format!(
+            "Reading source map from file {}{}",
+            args.module_binary_path, source_map_extension,
+        )
+    })?;
     let source_path = Path::new(&args.source_file_path);
     let source_cov = SourceCoverageBuilder::new(&compiled_module, &coverage_map, &source_map);
 
@@ -81,7 +88,7 @@ fn main() {
     let source_coverage = source_cov.compute_source_coverage(source_path);
     source_coverage
         .output_source_coverage(&mut coverage_writer, args.color, args.tag)
-        .unwrap();
+        .with_context(|| format!("Outputting source coverage"))
 }
 
 #[test]
