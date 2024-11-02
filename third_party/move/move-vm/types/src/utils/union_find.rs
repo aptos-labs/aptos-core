@@ -1,5 +1,4 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[derive(Debug)]
@@ -112,7 +111,7 @@ impl UnionFind {
     /// Adds a new element to the UnionFind structure.
     pub fn add_one(&mut self) -> Result<u32, &'static str> {
         if self.size() >= self.capacity() {
-            return Err("Reched maximal capacity");
+            return Err("Reached maximal capacity");
         }
 
         self.num_sets += 1;
@@ -139,8 +138,109 @@ impl UnionFind {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
+
     use super::*;
+
+    struct NaiveUnionFind {
+        representative: Vec<u32>,
+        num_sets: usize,
+        capacity: usize,
+    }
+
+    impl NaiveUnionFind {
+        /// Creates a new UnionFind instance with `num_elements` and `capacity`
+        pub fn new_with_size_and_capacity(
+            num_elements: usize,
+            capacity: usize,
+        ) -> Result<Self, &'static str> {
+            if num_elements > std::u32::MAX as usize {
+                return Err("num_elements larger than std::u32::MAX");
+            }
+            if capacity > std::u32::MAX as usize {
+                return Err("capacity larger than std::u32::MAX");
+            }
+            if num_elements > capacity {
+                return Err("num_elements larger than given capacity");
+            }
+
+            let representative = (0..num_elements as u32).collect::<Vec<u32>>();
+            Ok(Self {
+                representative,
+                num_sets: num_elements,
+                capacity,
+            })
+        }
+
+        /// Creates a new UnionFind instance with given `capacity` and 0 elements
+        pub fn new_with_capacity(capacity: usize) -> Result<Self, &'static str> {
+            Self::new_with_size_and_capacity(0, capacity)
+        }
+
+        /// Creates a new UnionFind instance with `num_elements` and maximal capacity.
+        pub fn new_with_size(num_elements: usize) -> Result<Self, &'static str> {
+            Self::new_with_size_and_capacity(num_elements, std::u32::MAX as usize)
+        }
+
+        /// Creates a new UnionFind instance with `0` elements and maximal capacity.
+        pub fn new() -> Result<Self, &'static str> {
+            Self::new_with_size_and_capacity(0, std::u32::MAX as usize)
+        }
+
+        /// Finds the representative of the set containing `id`
+        pub fn find_set(&mut self, id: u32) -> Result<u32, &'static str> {
+            if (id as usize) >= self.size() {
+                return Err("Element out of bounds");
+            }
+            Ok(self.representative[id as usize])
+        }
+
+        /// Unites the sets containing `x` and `y`.
+        pub fn join(&mut self, mut x: u32, mut y: u32) -> Result<u32, &'static str> {
+            if ((x as usize) >= self.size()) || ((y as usize) >= self.size()) {
+                return Err("Element out of bounds");
+            }
+
+            x = self.find_set(x)?;
+            y = self.find_set(y)?;
+
+            for e in &mut self.representative {
+                if *e == x {
+                    *e = y;
+                }
+            }
+
+            Ok(y)
+        }
+
+        /// Adds a new element to the UnionFind structure.
+        pub fn add_one(&mut self) -> Result<u32, &'static str> {
+            if self.size() >= self.capacity() {
+                return Err("Reached maximal capacity");
+            }
+
+            self.num_sets += 1;
+            let ret = self.representative.len() as u32;
+            self.representative.push(ret);
+            Ok(ret)
+        }
+
+        /// Returns the total number of elements.
+        pub fn size(&self) -> usize {
+            self.representative.len()
+        }
+
+        /// Returns the number of disjoint sets.
+        pub fn set_count(&self) -> usize {
+            self.num_sets
+        }
+
+        /// Returns the capacity of disjoint sets.
+        pub fn capacity(&self) -> usize {
+            self.capacity
+        }
+    }
 
     #[test]
     fn basic_tests() -> Result<(), &'static str> {
