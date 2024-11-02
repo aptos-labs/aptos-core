@@ -92,12 +92,13 @@ impl RestoreCoordinator {
     /// Support two modes
     /// 1. restore to target version when do_phase_1 is false. We restore a closest snapshot and replay txns till the target version
     /// 2. restore a DB with all data ranging from start_version to target_version with all KV restored between ledger_history_start_version and target_version along with the latest tree at target version.
-
-    /// The overall flow is as follows:
+    ///
+    /// The overall flow is as follows.
+    ///
     /// The first phase is restore till the tree snapshot before the target version. It includes the following work
-    /// a. restore the KV snapshot before ledger history start version, which also restore StateStorageUsage at the version
-    /// b. start from the first transaction of loaded chunk, save the txn accumualator, and apply transactions till the KV snapshot. We don't restore state KVs here since we can't calculate StateStorageUsage before the KV snapshot.
-    /// we start save transaction and restore KV after kv_snapshot version till the tree_snapshot before target version
+    ///    a. restore the KV snapshot before ledger history start version, which also restore StateStorageUsage at the version
+    ///    b. start from the first transaction of loaded chunk, save the txn accumualator, and apply transactions till the KV snapshot. We don't restore state KVs here since we can't calculate StateStorageUsage before the KV snapshot.
+    ///       we start save transaction and restore KV after kv_snapshot version till the tree_snapshot before target version
     ///
     /// The second phase is restore the tree snapshot and replay txns till the target version
     /// a. restore the tree snapshot

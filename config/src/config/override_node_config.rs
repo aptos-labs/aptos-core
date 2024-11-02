@@ -219,7 +219,7 @@ mod test {
         config.full_node_networks.push(Default::default());
 
         let diff_yaml = override_config.get_yaml().unwrap();
-        let default_node_config = serde_yaml::to_value(&NetworkConfig::default()).unwrap();
+        let default_node_config = serde_yaml::to_value(NetworkConfig::default()).unwrap();
         let mut expected_yaml: serde_yaml::Value = serde_yaml::Value::Null;
         expected_yaml["full_node_networks"] =
             serde_yaml::Value::Sequence(vec![default_node_config.clone(), default_node_config]);
@@ -238,7 +238,7 @@ mod test {
 
         // Note, the diff will include the entire vector, not just the non-equal elements
         let diff_yaml = override_config.get_yaml().unwrap();
-        let default_node_config = serde_yaml::to_value(&NetworkConfig::default()).unwrap();
+        let default_node_config = serde_yaml::to_value(NetworkConfig::default()).unwrap();
         let mut expected_yaml: serde_yaml::Value = serde_yaml::Value::Null;
         expected_yaml["full_node_networks"] =
             serde_yaml::Value::Sequence(vec![default_node_config.clone(), default_node_config]);

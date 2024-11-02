@@ -72,6 +72,7 @@ impl InitializedState {
     /// Create a new initialized state with:
     /// * all param locals set to `Yes`
     /// * all other locals set to `No`.
+    ///
     /// Note: `num_locals` is the total number of locals, including params.
     pub fn new(num_params: usize, num_locals: usize) -> Self {
         if num_locals < num_params {

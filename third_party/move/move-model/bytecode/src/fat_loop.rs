@@ -273,6 +273,7 @@ impl FatLoopBuilder {
     /// 2) `PropKind::Assert` propositions
     /// 3) in the loop header block, immediately after the `Label` statement,
     /// 4) which are also marked in the `loop_invariants` field in the `FunctionData`.
+    ///
     /// All above conditions must be met to be qualified as a loop invariant.
     ///
     /// The reason we piggyback on `PropKind::Assert` instead of introducing a new

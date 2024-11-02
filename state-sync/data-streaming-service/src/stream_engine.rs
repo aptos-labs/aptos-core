@@ -1426,6 +1426,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct EpochEndingStreamEngine {
     // The original epoch ending ledger infos request made by the client

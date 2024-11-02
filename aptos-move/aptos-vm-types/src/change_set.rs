@@ -214,6 +214,7 @@ impl VMChangeSet {
     /// serialized changes. The conversion fails if:
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
+    ///
     /// In addition, the caller can include changes to published modules.
     pub fn try_combine_into_storage_change_set(
         self,

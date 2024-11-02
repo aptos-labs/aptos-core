@@ -5,6 +5,7 @@
 //! A Move function `m::f` must be annotated with acquires `T`` if and only if,
 //! - The body of `m::f` contains a `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>` instruction, or
 //! - The body of `m::f` invokes a function `m::g` declared in the same module that is annotated with acquires
+//!
 //! Warn if access specifiers other than plain `acquires R` is used.
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`.
 
@@ -145,10 +146,10 @@ impl<'a> AcquireChecker<'a> {
 
     /// Returns
     /// - the call graph where `f` maps to `(g, loc)` if `f` calls `g` at `loc`,
-    /// (just one example is provided if there are multiple such calls)
-    /// only functions defined in the current module are included
+    ///   (just one example is provided if there are multiple such calls)
+    ///   only functions defined in the current module are included
     /// - a map from functions to resources directly acquired by `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>`
-    /// by the function
+    ///   by the function
     fn get_call_graph_and_directly_acquired_resources(
         &self,
     ) -> (
@@ -217,7 +218,7 @@ impl<'a> AcquireChecker<'a> {
 /// Returns
 /// - the calles of the given function that are defined in M
 /// - resources acquired by move_from\<T>, borrow_global_mut\<T>, or borrow_global\<T>,
-/// where T is define in M
+///   where T is define in M
 fn get_callees_and_acquired_resources(
     fun_env: FunctionEnv,
 ) -> (BTreeMap<FunId, Loc>, BTreeMap<StructId, Loc>) {

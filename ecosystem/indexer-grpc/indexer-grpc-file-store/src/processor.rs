@@ -107,9 +107,9 @@ impl Processor {
     /// 1. Check chain id at the beginning and every step after
     /// 2. Get the batch start version from file store metadata
     /// 3. Start loop
-    ///   3.1 Check head from cache, decide whether we need to parallel process or just wait
-    ///   3.2 If we're ready to process, create max of 10 threads and fetch / upload data
-    ///   3.3 Update file store metadata at the end of a batch
+    ///    3.1 Check head from cache, decide whether we need to parallel process or just wait
+    ///    3.2 If we're ready to process, create max of 10 threads and fetch / upload data
+    ///    3.3 Update file store metadata at the end of a batch
     pub async fn run(&mut self) -> Result<()> {
         let chain_id = self.chain_id;
 

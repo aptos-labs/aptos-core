@@ -103,14 +103,14 @@ impl From<serde_json::Error> for Error {
 /// A brief overview of Vault:
 ///
 /// * Vault stores data in various paths, in the case of a WebAPI, different URLs. So, for example,
-/// both a secret and a policy are hosted at distinct paths. Policies are then used to define which
-/// actors can access those paths and with what actions.
+///   both a secret and a policy are hosted at distinct paths. Policies are then used to define which
+///   actors can access those paths and with what actions.
 /// * Vault uses a KV store separated into various containers or secrets. In the concept of a file
-/// system, a secret might represent a folder, where keys would be files, and the contents the
-/// values. Policies are only applied at the folder level.
+///   system, a secret might represent a folder, where keys would be files, and the contents the
+///   values. Policies are only applied at the folder level.
 /// * Data is accessed in Vault via tokens. Policies can only be granted during creation of a
-/// token, but policies can be amended afterward. So you cannot add new policies to a token, but
-/// you can increase the tokens abilities by modifying the underlying policies.
+///   token, but policies can be amended afterward. So you cannot add new policies to a token, but
+///   you can increase the tokens abilities by modifying the underlying policies.
 pub struct Client {
     agent: ureq::Agent,
     host: String,

@@ -1977,10 +1977,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// This function:
     /// 1) Post processes any placeholders which have been generated while translating expressions
-    /// with this builder. This rewrites the given result expression and fills in placeholders
-    /// with the final expressions.
+    ///    with this builder. This rewrites the given result expression and fills in placeholders
+    ///    with the final expressions.
     /// 2) Instantiates types for all all struct patterns in the block expression
-    /// This step is necessary because struct pattern may contain uninstantiated variable types
+    ///    This step is necessary because struct pattern may contain uninstantiated variable types
     pub fn post_process_body(&mut self, result_exp: Exp) -> Exp {
         let subs = self.subs.clone();
         ExpData::rewrite_exp_and_pattern(

@@ -15,7 +15,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{Deserialize, Serialize};
-use std::{marker::PhantomData, string::FromUtf8Error, u128};
+use std::{marker::PhantomData, string::FromUtf8Error};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CoinInfoResource<C: CoinType> {

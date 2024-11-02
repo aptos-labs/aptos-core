@@ -78,7 +78,7 @@ async fn test_upgrade_flow() {
 
     assert!(Command::new(aptos_cli.as_path())
         .current_dir(workspace_root())
-        .args(&vec![
+        .args(vec![
             "move",
             "run-script",
             "--script-path",
@@ -175,7 +175,7 @@ async fn test_upgrade_flow() {
     for path in scripts.iter() {
         assert!(Command::new(aptos_cli.as_path())
             .current_dir(workspace_root())
-            .args(&vec![
+            .args(vec![
                 "move",
                 "run-script",
                 "--script-path",

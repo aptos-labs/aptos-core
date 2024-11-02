@@ -541,7 +541,7 @@ impl LifetimeState {
     /// represents an abstract borrow operation.
     ///
     /// 1) All edges which lead into the same node are considered to be part of the same hyper
-    /// edge. Consider:
+    ///    edge. Consider:
     ///
     /// ```text
     ///           \     /
@@ -553,7 +553,7 @@ impl LifetimeState {
     /// group because `n` has a 'weak' borrow history, it can either stem from `e1` or `e2`.
     ///
     /// 2) For all other edges not leading into the same node, they are grouped according
-    /// their kind. Consider:
+    ///    their kind. Consider:
     ///
     /// ```text
     ///            |    |
@@ -1628,7 +1628,8 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a function call. For now, we implement standard Move semantics, where
     /// 1) every output immutable reference is a child of all input references;
     /// 2) every output mutable reference is a child of all input mutable references,
-    /// because mutable references cannot be derived from immutable references.
+    ///    because mutable references cannot be derived from immutable references.
+    ///
     /// Here would be the point where to
     /// evaluate lifetime modifiers in future language versions.
     fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
@@ -1974,6 +1975,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         // Preprocessing: check borrow safety of the currently active borrow graph for
         // selected instructions.
         #[allow(clippy::single_match)]
+        #[allow(clippy::collapsible_match)]
         match instr {
             // Call operations which can take references
             Call(_, _, oper, srcs, ..) => match oper {

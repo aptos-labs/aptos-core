@@ -93,7 +93,7 @@ proptest! {
             );
         }
 
-        prop_assert!(transaction_db.get_transaction_iter(10, usize::max_value()).is_err());
+        prop_assert!(transaction_db.get_transaction_iter(10, usize::MAX).is_err());
     }
 
     #[test]

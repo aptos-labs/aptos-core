@@ -213,11 +213,12 @@ impl<'t> AccountMinter<'t> {
 
     /// workflow of create accounts:
     /// 1. Use given source_account as the money source
-    /// 1a. Optionally, and if it is root account, mint balance to that account
+    ///    1a. Optionally, and if it is root account, mint balance to that account
     /// 2. load tc account to create seed accounts, one seed account for each endpoint
     /// 3. mint coins from faucet to new created seed accounts
     /// 4. split number of requested accounts into equally size of groups
     /// 5. each seed account take responsibility to create one size of group requested accounts and mint coins to them
+    ///
     /// example:
     /// requested totally 100 new accounts with 10 endpoints
     /// will create 10 seed accounts, each seed account create 10 new accounts

@@ -1333,6 +1333,7 @@ impl ExpData {
     /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
     /// - `visitor` returns `None` to indicate that visit should stop early, and `Some(())` to continue.
     /// - `visit_positions_impl` returns `None` if visitor returned `None`.
+    ///
     /// See `visit_positions` for more
     fn visit_positions_impl<F>(&self, visitor: &mut F) -> Option<()>
     where

@@ -217,6 +217,7 @@ pub fn start(
     start_and_report_ports(config, log_file, create_global_rayon_pool, None, None)
 }
 
+#[allow(unexpected_cfgs)]
 /// Start an Aptos node
 pub fn start_and_report_ports(
     config: NodeConfig,

@@ -71,6 +71,7 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
 ///   2) Published modules satisfy compatibility constraints.
 ///   3) Published modules are verifiable and can link to existing modules without breaking
 ///      invariants such as cyclic dependencies.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(WithRuntimeEnvironment, where = "M: ModuleStorage")]
 #[delegate(ModuleStorage, where = "M: ModuleStorage")]

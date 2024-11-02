@@ -9,8 +9,8 @@
 //! - (DEPRECATED) Has an empty return type
 //! - All return types are not references
 //! - Satisfies the additional checks provided as an argument via `check_signature`
-//! `check_signature` should be used by adapters to quickly and easily verify custom signature
-//! rules for entrypoints
+//!   `check_signature` should be used by adapters to quickly and easily verify custom signature
+//!   rules for entrypoints
 
 use move_binary_format::{
     access::ModuleAccess,

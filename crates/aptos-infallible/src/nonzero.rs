@@ -19,7 +19,7 @@ mod tests {
     #[test]
     fn test_nonzero() {
         assert_eq!(1, NonZeroUsize!(1).get());
-        assert_eq!(std::usize::MAX, NonZeroUsize!(std::usize::MAX).get());
+        assert_eq!(usize::MAX, NonZeroUsize!(usize::MAX).get());
     }
 
     #[test]

@@ -1127,6 +1127,7 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
     }
 }
 
+#[allow(unexpected_cfgs)]
 fn module_call(
     context: &mut Context,
     loc: Loc,

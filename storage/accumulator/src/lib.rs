@@ -319,8 +319,8 @@ where
     ///         height - (log2(num_new_leaves) + 1) < height - 1 = root_level
     fn max_to_freeze(num_new_leaves: usize, root_level: u32) -> usize {
         assert!(root_level as usize <= MAX_ACCUMULATOR_PROOF_DEPTH);
-        assert!(num_new_leaves < (usize::max_value() / 2));
-        assert!(num_new_leaves * 2 <= usize::max_value() - root_level as usize);
+        assert!(num_new_leaves < (usize::MAX / 2));
+        assert!(num_new_leaves * 2 <= usize::MAX - root_level as usize);
         num_new_leaves * 2 + root_level as usize
     }
 

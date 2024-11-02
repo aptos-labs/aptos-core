@@ -61,7 +61,7 @@ impl LocalFactory {
     pub fn from_workspace(swarm_dir: Option<String>) -> Result<Self> {
         let mut versions = HashMap::new();
         let new_version = cargo::get_aptos_node_binary_from_worktree().map(|(revision, bin)| {
-            let version = Version::new(usize::max_value(), revision);
+            let version = Version::new(usize::MAX, revision);
             LocalVersion { bin, version }
         })?;
 
@@ -73,7 +73,7 @@ impl LocalFactory {
         let mut versions = HashMap::new();
         let new_version =
             cargo::get_aptos_node_binary_at_revision(revision).map(|(revision, bin)| {
-                let version = Version::new(usize::max_value(), revision);
+                let version = Version::new(usize::MAX, revision);
                 LocalVersion { bin, version }
             })?;
 
@@ -83,12 +83,12 @@ impl LocalFactory {
 
     pub fn with_revision_and_workspace(revision: &str) -> Result<Self> {
         let workspace = cargo::get_aptos_node_binary_from_worktree().map(|(revision, bin)| {
-            let version = Version::new(usize::max_value(), revision);
+            let version = Version::new(usize::MAX, revision);
             LocalVersion { bin, version }
         })?;
         let revision =
             cargo::get_aptos_node_binary_at_revision(revision).map(|(revision, bin)| {
-                let version = Version::new(usize::min_value(), revision);
+                let version = Version::new(usize::MIN, revision);
                 LocalVersion { bin, version }
             })?;
 

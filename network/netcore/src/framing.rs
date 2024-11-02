@@ -34,7 +34,7 @@ where
 }
 
 /// Write the contents of `buf` to `stream` prefixed with a u16 length.
-/// The length of `buf` must be less than or equal to u16::max_value().
+/// The length of `buf` must be less than or equal to u16::MAX.
 ///
 /// Caller is responsible for flushing the write to `stream`.
 pub async fn write_u16frame<'stream, 'buf, 'c, TSocket>(
@@ -152,7 +152,7 @@ mod test {
     fn write_large_u16frame() {
         let (mut a, _b) = MemorySocket::new_pair();
 
-        let buf = vec![0; (u16::max_value() as usize) * 2];
+        let buf = vec![0; (u16::MAX as usize) * 2];
 
         let result = block_on(write_u16frame(&mut a, &buf));
         assert!(result.is_err());

@@ -248,7 +248,7 @@ impl BlockStore {
     /// It works as follows:
     /// 1. request the gap blocks from the peer (from highest_ledger_info to highest_ordered_cert)
     /// 2. We persist the gap blocks to storage before start sync to ensure we could restart if we
-    /// crash in the middle of the sync.
+    ///    crash in the middle of the sync.
     /// 3. We prune the old tree and replace with a new tree built with the 3-chain.
     async fn sync_to_highest_quorum_cert(
         &self,
@@ -312,7 +312,7 @@ impl BlockStore {
             + 1;
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
-        assert!(num_blocks < std::usize::MAX as u64);
+        assert!(num_blocks < usize::MAX as u64);
 
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(num_blocks);
         let mut blocks = retriever
