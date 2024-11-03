@@ -789,6 +789,10 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         UnpackVariantGeneric(_) => Opcodes::UNPACK_VARIANT_GENERIC,
         TestVariant(_) => Opcodes::TEST_VARIANT,
         TestVariantGeneric(_) => Opcodes::TEST_VARIANT_GENERIC,
+        // Since bytecode version 8
+        ClosPack(..) | ClosPackGeneric(..) | ClosEval(_) => {
+            unimplemented!("serialization of closure opcodes")
+        },
     };
     opcode as u8
 }

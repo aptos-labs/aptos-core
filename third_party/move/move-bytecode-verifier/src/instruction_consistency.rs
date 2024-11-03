@@ -11,8 +11,8 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, FieldHandleIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex,
+        Bytecode, ClosureMask, CodeOffset, CodeUnit, CompiledModule, CompiledScript,
+        FieldHandleIndex, FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex,
         StructVariantHandleIndex, TableIndex, VariantFieldHandleIndex,
     },
 };
@@ -91,11 +91,21 @@ impl<'a> InstructionConsistency<'a> {
                     )?;
                 },
                 Call(idx) => {
+                    // Nothing to verify for `_mask`, so  merge with Call
                     self.check_function_op(offset, *idx, /* generic */ false)?;
                 },
                 CallGeneric(idx) => {
                     let func_inst = self.resolver.function_instantiation_at(*idx);
                     self.check_function_op(offset, func_inst.handle, /* generic */ true)?;
+                },
+                ClosPack(idx, mask) => {
+                    self.check_function_op(offset, *idx, /* generic */ false)?;
+                    self.check_closure_mask(offset, *idx, *mask)?
+                },
+                ClosPackGeneric(idx, mask) => {
+                    let func_inst = self.resolver.function_instantiation_at(*idx);
+                    self.check_function_op(offset, func_inst.handle, /* generic */ true)?;
+                    self.check_closure_mask(offset, func_inst.handle, *mask)?
                 },
                 Pack(idx) | Unpack(idx) => {
                     self.check_struct_op(offset, *idx, /* generic */ false)?;
@@ -135,11 +145,11 @@ impl<'a> InstructionConsistency<'a> {
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
-                FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_)
-                | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16
-                | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | ReadRef
-                | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl | Shr
-                | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
+                ClosEval(_) | FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_)
+                | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_)
+                | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse
+                | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
+                | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
                 | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_) | VecImmBorrow(_)
                 | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop => (),
             }
@@ -224,6 +234,21 @@ impl<'a> InstructionConsistency<'a> {
                 PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
                     .at_code_offset(self.current_function(), offset as CodeOffset),
             );
+        }
+        Ok(())
+    }
+
+    fn check_closure_mask(
+        &self,
+        offset: usize,
+        func_handle_index: FunctionHandleIndex,
+        mask: ClosureMask,
+    ) -> PartialVMResult<()> {
+        let function_handle = self.resolver.function_handle_at(func_handle_index);
+        let signature = self.resolver.signature_at(function_handle.parameters);
+        if mask.max_captured() >= signature.len() {
+            return Err(PartialVMError::new(StatusCode::INVALID_CLOSURE_MASK)
+                .at_code_offset(self.current_function(), offset as CodeOffset));
         }
         Ok(())
     }

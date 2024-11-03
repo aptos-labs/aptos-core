@@ -1524,6 +1524,14 @@ impl Frame {
                 }
 
                 match instruction {
+                    // TODO: implement closures
+                    Bytecode::ClosPack(..)
+                    | Bytecode::ClosPackGeneric(..)
+                    | Bytecode::ClosEval(..) => {
+                        return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                            .with_message("closure opcodes in interpreter".to_owned()))
+                    },
+
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
                         gas_meter.charge_pop(popped_val)?;
