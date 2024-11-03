@@ -1587,7 +1587,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_loop_exit() {
+                let loop_type = if body.branches_to(0..usize::MAX) {
                     self.check_type(&loc, &Type::unit(), expected_type, context)
                 } else {
                     expected_type.clone()
