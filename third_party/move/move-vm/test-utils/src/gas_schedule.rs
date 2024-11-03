@@ -10,8 +10,8 @@
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
-        FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
+        Bytecode, ClosureMask, CodeOffset, ConstantPoolIndex, FieldHandleIndex,
+        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
         StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
         StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
     },
@@ -688,6 +688,15 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
             TestVariantGeneric(StructVariantInstantiationIndex::new(0)),
             GasCost::new(0, 0),
         ),
+        (
+            PackClosure(FunctionHandleIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            PackClosureGeneric(FunctionInstantiationIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (CallClosure(SignatureIndex::new(0)), GasCost::new(0, 0)),
         (Nop, GasCost::new(0, 0)),
         (VecPack(SignatureIndex::new(0), 0), GasCost::new(0, 0)),
         (VecLen(SignatureIndex::new(0)), GasCost::new(0, 0)),
@@ -861,6 +870,15 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
             TestVariantGeneric(StructVariantInstantiationIndex::new(0)),
             GasCost::new(2, 1),
         ),
+        (
+            PackClosure(FunctionHandleIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            PackClosureGeneric(FunctionInstantiationIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (CallClosure(SignatureIndex::new(0)), GasCost::new(1132, 1)),
         (Nop, GasCost::new(1, 1)),
         (VecPack(SignatureIndex::new(0), 0), GasCost::new(84, 1)),
         (VecLen(SignatureIndex::new(0)), GasCost::new(98, 1)),

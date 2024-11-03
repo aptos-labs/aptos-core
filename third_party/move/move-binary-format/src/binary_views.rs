@@ -343,6 +343,7 @@ impl<'a> BinaryIndexedView<'a> {
             Vector(ty) => AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
                 self.abilities(ty, constraints)?,
             ]),
+            Function(_, _, abilities) => Ok(*abilities),
             Struct(idx) => {
                 let sh = self.struct_handle_at(*idx);
                 Ok(sh.abilities)

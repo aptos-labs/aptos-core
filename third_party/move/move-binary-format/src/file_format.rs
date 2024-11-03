@@ -1255,6 +1255,8 @@ pub enum SignatureToken {
     Signer,
     /// Vector
     Vector(Box<SignatureToken>),
+    /// Function, with n argument types and m result types, and an associated ability set.
+    Function(Vec<SignatureToken>, Vec<SignatureToken>, AbilitySet),
     /// User defined type
     Struct(StructHandleIndex),
     StructInstantiation(StructHandleIndex, Vec<SignatureToken>),
@@ -1297,6 +1299,11 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(inner_toks.iter().rev())
                     },
 
+                    Function(args, result, _) => {
+                        self.stack.extend(args.iter().rev());
+                        self.stack.extend(result.iter().rev());
+                    },
+
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
                     | TypeParameter(_) => (),
                 }
@@ -1329,6 +1336,13 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                     StructInstantiation(_, inner_toks) => self
                         .stack
                         .extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev()),
+
+                    Function(args, result, _) => {
+                        self.stack
+                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
+                        self.stack
+                            .extend(result.iter().map(|tok| (tok, depth + 1)).rev());
+                    },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
                     | TypeParameter(_) => (),
@@ -1390,11 +1404,14 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
+            SignatureToken::Function(args, result, abilities) => {
+                write!(f, "Function({:?}, {:?}, {})", args, result, abilities)
+            },
+            SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
             SignatureToken::Struct(idx) => write!(f, "Struct({:?})", idx),
             SignatureToken::StructInstantiation(idx, types) => {
                 write!(f, "StructInstantiation({:?}, {:?})", idx, types)
             },
-            SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
             SignatureToken::MutableReference(boxed) => write!(f, "MutableReference({:?})", boxed),
             SignatureToken::TypeParameter(idx) => write!(f, "TypeParameter({:?})", idx),
         }
@@ -1411,6 +1428,7 @@ impl SignatureToken {
             | Address
             | Signer
             | Vector(_)
+            | Function(..)
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1449,6 +1467,7 @@ impl SignatureToken {
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
+            | Function(..)
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1491,6 +1510,9 @@ impl SignatureToken {
 
     pub fn instantiate(&self, subst_mapping: &[SignatureToken]) -> SignatureToken {
         use SignatureToken::*;
+        let inst_vec = |v: &[SignatureToken]| -> Vec<SignatureToken> {
+            v.iter().map(|ty| ty.instantiate(subst_mapping)).collect()
+        };
         match self {
             Bool => Bool,
             U8 => U8,
@@ -1502,18 +1524,104 @@ impl SignatureToken {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
+            Function(args, result, abilities) => {
+                Function(inst_vec(args), inst_vec(result), *abilities)
+            },
             Struct(idx) => Struct(*idx),
-            StructInstantiation(idx, struct_type_args) => StructInstantiation(
-                *idx,
-                struct_type_args
-                    .iter()
-                    .map(|ty| ty.instantiate(subst_mapping))
-                    .collect(),
-            ),
+            StructInstantiation(idx, struct_type_args) => {
+                StructInstantiation(*idx, inst_vec(struct_type_args))
+            },
             Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
             MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
             TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
         }
+    }
+}
+
+/// A `ClosureMask` is a value which determines how to distinguish those function arguments
+/// which are captured and which are not when a closure is constructed. For instance,
+/// with `_` representing an omitted argument, the mask for `f(a,_,b,_)` would have the argument
+/// at index 0 and at index 2 captured. The mask can be used to transform lists of types.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary),
+    derive(dearbitrary::Dearbitrary)
+)]
+pub struct ClosureMask {
+    pub mask: u64,
+}
+
+impl fmt::Display for ClosureMask {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:b}", self.mask)
+    }
+}
+
+impl ClosureMask {
+    pub fn new(mask: u64) -> Self {
+        Self { mask }
+    }
+
+    /// Apply a closure mask to a list of elements, returning only those
+    /// where position `i` is set in the mask (if `collect_captured` is true) or not
+    /// set (otherwise).
+    pub fn extract<'a, T: Clone>(&self, values: &'a [T], collect_captured: bool) -> Vec<&'a T> {
+        let mut mask = self.mask;
+        values
+            .iter()
+            .filter(|_| {
+                let set = mask & 0x1 != 0;
+                mask >>= 1;
+                set && collect_captured || !set && !collect_captured
+            })
+            .collect()
+    }
+
+    /// Compose two lists of elements into one based on the given mask such that the
+    /// following holds:
+    /// ```ignore
+    ///   mask.compose(mask.extract(v, true), mask.extract(v, false)) == v
+    /// ```
+    /// This returns `None` if the provided lists are inconsistent w.r.t the mask
+    /// and cannot be composed. This should not happen in verified code, but
+    /// a caller should decide whether to crash or to error.
+    pub fn compose<T: Clone>(
+        &self,
+        captured: impl IntoIterator<Item = T>,
+        provided: impl IntoIterator<Item = T>,
+    ) -> Option<Vec<T>> {
+        let mut captured = captured.into_iter();
+        let mut provided = provided.into_iter();
+        let mut result = vec![];
+        let mut mask = self.mask;
+        while mask != 0 {
+            if mask & 0x1 != 0 {
+                result.push(captured.next()?)
+            } else {
+                result.push(provided.next()?)
+            }
+            mask >>= 1;
+        }
+        if captured.next().is_some() {
+            // Not all captured arguments consumed
+            return None;
+        }
+        result.extend(provided);
+        Some(result)
+    }
+
+    /// Return the max index of captured arguments
+    pub fn max_captured(&self) -> usize {
+        let mut i = 0;
+        let mut mask = self.mask;
+        while mask != 0 {
+            mask >>= 1;
+            i += 1
+        }
+        i
     }
 }
 
@@ -1897,7 +2005,6 @@ pub enum Bytecode {
     #[gas_type_creation_tier_1 = "field_tys"]
     PackVariantGeneric(StructVariantInstantiationIndex),
 
-    //TODO: Unpack, Test
     #[group = "struct"]
     #[static_operands = "[struct_def_idx]"]
     #[description = "Destroy an instance of a struct and push the values bound to each field onto the stack."]
@@ -2935,6 +3042,84 @@ pub enum Bytecode {
     "#]
     VecSwap(SignatureIndex),
 
+    #[group = "closure"]
+    #[description = r#"
+        `PackClosure(fun, mask)` creates a closure for a given function handle as controlled by
+        the given `mask`. `mask` is a u64 bitset which describes which of the arguments
+        of `fun` are captured by the closure.
+
+        If the function `fun` has type `|t1..tn|r`, then the following holds:
+
+        - If `m` are the number of bits set in the mask, then `m <= n`, and the stack is
+          `[vm..v1] + stack`, and if `i` is the `j`th bit set in the mask,
+           then `vj` has type `ti`.
+        - type ti is not a reference.
+
+        Thus the values on the stack must match the types in the function
+        signature which have the bit to be captured set in the mask.
+
+        The type of the resulting value on the stack is derived from the types `|t1..tn|`
+        for which the bit is not set, which build the arguments of a function type
+        with `fun`'s result types.
+
+        The `abilities` of this function type are derived from the inputs as follows.
+        First, take the intersection of the abilities of all captured arguments
+        with type `t1..tn`. Then intersect this with the abilities derived from the
+        function: a function handle has `drop` and `copy`, never has `key`, and only
+        `store` if the underlying function is public, and therefore cannot change
+        its signature.
+
+        Notice that an implementation can derive the types of the captured arguments
+        at runtime from a closure value as long as the closure value stores the function
+        handle (or a derived form of it) and the mask, where the handle allows to lookup the
+        function's type at runtime. Then the same procedure as outlined above can be used.
+    "#]
+    #[static_operands = "[fun, mask]"]
+    #[semantics = ""]
+    #[runtime_check_epilogue = ""]
+    #[gas_type_creation_tier_0 = "closure_ty"]
+    PackClosure(FunctionHandleIndex, ClosureMask),
+
+    #[group = "closure"]
+    #[static_operands = "[fun, mask]"]
+    #[semantics = ""]
+    #[runtime_check_epilogue = ""]
+    #[description = r#"
+        Same as `PackClosure` but for the instantiation of a generic function.
+
+        Notice that an uninstantiated generic function cannot be used to create a closure.
+    "#]
+    #[gas_type_creation_tier_0 = "closure_ty"]
+    PackClosureGeneric(FunctionInstantiationIndex, ClosureMask),
+
+    #[group = "closure"]
+    #[description = r#"
+        `CallClosure(|t1..tn|r has a)` evalutes a closure of the given function type,
+        taking the captured arguments and mixing in the provided ones on the stack.
+
+        On top of the stack is the closure being evaluated, underneath the arguments:
+        `[c,vn,..,v1] + stack`. The type of the closure must match the type specified in
+        the instruction, with abilities `a` a subset of the abilities of the closure value.
+        A value `vi` on the stack must have type `ti`.
+
+        Notice that the type as part of the closure instruction is redundant for
+        execution semantics. Since the closure is expected to be on top of the stack,
+        it can decode the arguments underneath without type information.
+        However, the type is required to do static bytecode verification.
+
+        The semantics of this instruction can be characterized by the following equation:
+
+        ```
+          CallClosure(PackClosure(f, mask, c1..cn), a1..am) ==
+             f(mask.compose(c1..cn, a1..am))
+        ```
+    "#]
+    #[static_operands = "[]"]
+    #[semantics = ""]
+    #[runtime_check_epilogue = ""]
+    #[gas_type_creation_tier_0 = "closure_ty"]
+    CallClosure(SignatureIndex),
+
     #[group = "stack_and_local"]
     #[description = "Push a u16 constant onto the stack."]
     #[static_operands = "[u16_value]"]
@@ -3045,6 +3230,11 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::UnpackGeneric(a) => write!(f, "UnpackGeneric({})", a),
             Bytecode::UnpackVariant(a) => write!(f, "UnpackVariant({})", a),
             Bytecode::UnpackVariantGeneric(a) => write!(f, "UnpackVariantGeneric({})", a),
+            Bytecode::PackClosureGeneric(a, mask) => {
+                write!(f, "PackClosureGeneric({}, {})", a, mask)
+            },
+            Bytecode::PackClosure(a, mask) => write!(f, "PackClosure({}, {})", a, mask),
+            Bytecode::CallClosure(a) => write!(f, "CallClosure({})", a),
             Bytecode::ReadRef => write!(f, "ReadRef"),
             Bytecode::WriteRef => write!(f, "WriteRef"),
             Bytecode::FreezeRef => write!(f, "FreezeRef"),

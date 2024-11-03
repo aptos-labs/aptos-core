@@ -120,6 +120,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         match instruction {
+            // TODO(#15664): implement closures
+            Bytecode::PackClosure(..)
+            | Bytecode::PackClosureGeneric(..)
+            | Bytecode::CallClosure(..) => {
+                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                    .with_message("closure opcodes in interpreter".to_owned()))
+            },
             // Call instruction will be checked at execute_main.
             Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
             Bytecode::BrFalse(_) | Bytecode::BrTrue(_) => {
@@ -247,6 +254,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         let ty_builder = resolver.loader().ty_builder();
 
         match instruction {
+            // TODO(#15664): implement closures
+            Bytecode::PackClosure(..)
+            | Bytecode::PackClosureGeneric(..)
+            | Bytecode::CallClosure(..) => {
+                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                    .with_message("closure opcodes in interpreter".to_owned()))
+            },
+
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
             | Bytecode::Ret

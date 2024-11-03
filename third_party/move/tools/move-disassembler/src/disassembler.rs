@@ -570,6 +570,9 @@ impl<'a> Disassembler<'a> {
         type_param_context: &[SourceName],
     ) -> Result<String> {
         Ok(match sig_tok {
+            // TODO(#15664): function types
+            SignatureToken::Function(..) => unimplemented!("disassembling function sig tokens"),
+
             SignatureToken::Bool => "bool".to_string(),
             SignatureToken::U8 => "u8".to_string(),
             SignatureToken::U16 => "u16".to_string(),
@@ -641,6 +644,12 @@ impl<'a> Disassembler<'a> {
         default_location: &Loc,
     ) -> Result<String> {
         match instruction {
+            Bytecode::PackClosure(..)
+            | Bytecode::PackClosureGeneric(..)
+            | Bytecode::CallClosure(..) => {
+                // TODO(#15664): implement
+                bail!("closure opcodes not implemented")
+            },
             Bytecode::LdConst(idx) => {
                 let constant = self.source_mapper.bytecode.constant_at(*idx);
                 Ok(format!(

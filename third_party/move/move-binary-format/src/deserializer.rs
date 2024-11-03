@@ -321,6 +321,10 @@ fn load_struct_variant_inst_index(
     )?))
 }
 
+fn load_closure_mask(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ClosureMask> {
+    Ok(ClosureMask::new(read_uleb_internal(cursor, u64::MAX)?))
+}
+
 fn load_constant_pool_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ConstantPoolIndex> {
     Ok(ConstantPoolIndex(read_uleb_internal(
         cursor,
@@ -1646,6 +1650,16 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                     )),
                 );
             },
+            Opcodes::PACK_CLOSURE | Opcodes::PACK_CLOSURE_GENERIC | Opcodes::CALL_CLOSURE
+                if cursor.version() < VERSION_8 =>
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "Closure operations not available before bytecode version {}",
+                        VERSION_8
+                    )),
+                );
+            },
             _ => {},
         };
 
@@ -1745,6 +1759,15 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::TEST_VARIANT_GENERIC => {
                 Bytecode::TestVariantGeneric(load_struct_variant_inst_index(cursor)?)
             },
+            Opcodes::PACK_CLOSURE => Bytecode::PackClosure(
+                load_function_handle_index(cursor)?,
+                load_closure_mask(cursor)?,
+            ),
+            Opcodes::PACK_CLOSURE_GENERIC => Bytecode::PackClosureGeneric(
+                load_function_inst_index(cursor)?,
+                load_closure_mask(cursor)?,
+            ),
+            Opcodes::CALL_CLOSURE => Bytecode::CallClosure(load_signature_index(cursor)?),
             Opcodes::READ_REF => Bytecode::ReadRef,
             Opcodes::WRITE_REF => Bytecode::WriteRef,
             Opcodes::ADD => Bytecode::Add,
@@ -2011,7 +2034,12 @@ impl Opcodes {
             0x55 => Ok(Opcodes::UNPACK_VARIANT_GENERIC),
             0x56 => Ok(Opcodes::TEST_VARIANT),
             0x57 => Ok(Opcodes::TEST_VARIANT_GENERIC),
-            _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
+            // Since bytecode version 8
+            0x58 => Ok(Opcodes::PACK_CLOSURE),
+            0x59 => Ok(Opcodes::PACK_CLOSURE_GENERIC),
+            0x5A => Ok(Opcodes::CALL_CLOSURE),
+            _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
+                .with_message(format!("code {:X}", value))),
         }
     }
 }

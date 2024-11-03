@@ -173,6 +173,18 @@ fn check_ty<const N: usize>(
                 param_constraints,
             )?;
         },
+        Function(args, result, abilities) => {
+            assert_abilities(*abilities, required_abilities)?;
+            for ty in args.iter().chain(result.iter()) {
+                check_ty(
+                    struct_handles,
+                    ty,
+                    false,
+                    required_abilities.requires(),
+                    param_constraints,
+                )?;
+            }
+        },
         Struct(sh_idx) => {
             let handle = &struct_handles[sh_idx.0 as usize];
             assert_abilities(handle.abilities, required_abilities)?;
@@ -259,6 +271,11 @@ fn check_phantom_params(
 
     match ty {
         Vector(ty) => check_phantom_params(struct_handles, context, false, ty)?,
+        Function(args, result, _) => {
+            for ty in args.iter().chain(result) {
+                check_phantom_params(struct_handles, context, false, ty)?
+            }
+        },
         StructInstantiation(idx, type_arguments) => {
             let sh = &struct_handles[idx.0 as usize];
             for (i, ty) in type_arguments.iter().enumerate() {
@@ -822,7 +839,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 })
             };
             match instr {
-                CallGeneric(idx) => {
+                CallGeneric(idx) | PackClosureGeneric(idx, _) => {
                     if let btree_map::Entry::Vacant(entry) = checked_func_insts.entry(*idx) {
                         let constraints = self.verify_function_instantiation_contextless(*idx)?;
                         map_err(constraints.check_in_context(&ability_context))?;
@@ -881,6 +898,15 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         entry.insert(());
                     }
                 },
+                CallClosure(idx) => {
+                    let sgn = self.resolver.signature_at(*idx);
+                    if sgn.len() != 1 || !matches!(&sgn.0[0], SignatureToken::Function(..)) {
+                        return map_err(Err(PartialVMError::new(
+                            StatusCode::CLOSURE_CALL_REQUIRES_FUNCTION,
+                        )
+                        .with_message("expected a function type for closure call".to_string())));
+                    }
+                },
                 VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
@@ -936,6 +962,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | LdTrue
                 | LdFalse
                 | Call(_)
+                | PackClosure(..)
                 | Pack(_)
                 | Unpack(_)
                 | TestVariant(_)
