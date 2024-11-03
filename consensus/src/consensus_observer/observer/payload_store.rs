@@ -297,59 +297,97 @@ mod test {
         PeerId,
     };
     use claims::assert_matches;
+    use std::time::Duration;
+    use tokio::time::timeout;
 
-    #[test]
-    fn test_all_payloads_exist() {
-        // Create the consensus observer config
-        let max_num_pending_blocks = 1000;
-        let consensus_observer_config = ConsensusObserverConfig {
-            max_num_pending_blocks,
-            ..ConsensusObserverConfig::default()
-        };
+    #[tokio::test]
+    async fn test_all_payloads_exist() {
+        // Create the test tasks
+        let mut test_tasks = vec![];
+        for i in 0..100 {
+            let test_task = async move {
+                println!("Starting test_all_payloads_exist run: {:?}", i);
 
-        // Create a new block payload store
-        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+                // Create the consensus observer config
+                let max_num_pending_blocks = 1000;
+                let consensus_observer_config = ConsensusObserverConfig {
+                    max_num_pending_blocks,
+                    ..ConsensusObserverConfig::default()
+                };
 
-        // Add some unverified blocks to the payload store
-        let num_blocks_in_store = 100;
-        let unverified_blocks =
-            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 1, false);
+                // Create a new block payload store
+                let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+                println!("Created block payload store!");
 
-        // Verify the payloads don't exist in the block payload store
-        assert!(!block_payload_store.all_payloads_exist(&unverified_blocks));
-        assert_eq!(get_num_verified_payloads(&block_payload_store), 0);
-        assert_eq!(
-            get_num_unverified_payloads(&block_payload_store),
-            num_blocks_in_store
-        );
+                // Add some unverified blocks to the payload store
+                let num_blocks_in_store = 100;
+                let unverified_blocks = create_and_add_blocks_to_store(
+                    &mut block_payload_store,
+                    num_blocks_in_store,
+                    1,
+                    false,
+                );
+                println!("Added unverified blocks to the store!");
 
-        // Add some verified blocks to the payload store
-        let num_blocks_in_store = 100;
-        let verified_blocks =
-            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, true);
+                // Verify the payloads don't exist in the block payload store
+                assert!(!block_payload_store.all_payloads_exist(&unverified_blocks));
+                assert_eq!(get_num_verified_payloads(&block_payload_store), 0);
+                assert_eq!(
+                    get_num_unverified_payloads(&block_payload_store),
+                    num_blocks_in_store
+                );
+                println!("Verified unverified blocks don't exist in the store!");
 
-        // Check that all the payloads exist in the block payload store
-        assert!(block_payload_store.all_payloads_exist(&verified_blocks));
+                // Add some verified blocks to the payload store
+                let num_blocks_in_store = 100;
+                let verified_blocks = create_and_add_blocks_to_store(
+                    &mut block_payload_store,
+                    num_blocks_in_store,
+                    0,
+                    true,
+                );
+                println!("Added verified blocks to the store!");
 
-        // Check that a subset of the payloads exist in the block payload store
-        let subset_verified_blocks = &verified_blocks[0..50];
-        assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
+                // Check that all the payloads exist in the block payload store
+                assert!(block_payload_store.all_payloads_exist(&verified_blocks));
+                println!("Verified all verified blocks exist in the store!");
 
-        // Remove some of the payloads from the block payload store
-        block_payload_store.remove_committed_blocks(subset_verified_blocks);
+                // Check that a subset of the payloads exist in the block payload store
+                let subset_verified_blocks = &verified_blocks[0..50];
+                assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
+                println!("Verified a subset of verified blocks exist in the store!");
 
-        // Check that the payloads no longer exist in the block payload store
-        assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
+                // Remove some of the payloads from the block payload store
+                block_payload_store.remove_committed_blocks(subset_verified_blocks);
+                println!("Removed a subset of verified blocks from the store!");
 
-        // Check that the remaining payloads still exist in the block payload store
-        let subset_verified_blocks = &verified_blocks[50..100];
-        assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
+                // Check that the payloads no longer exist in the block payload store
+                assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
+                println!("Verified a subset of verified blocks no longer exist in the store!");
 
-        // Remove the remaining payloads from the block payload store
-        block_payload_store.remove_committed_blocks(subset_verified_blocks);
+                // Check that the remaining payloads still exist in the block payload store
+                let subset_verified_blocks = &verified_blocks[50..100];
+                assert!(block_payload_store.all_payloads_exist(subset_verified_blocks));
+                println!("Verified the remaining verified blocks still exist in the store!");
 
-        // Check that the payloads no longer exist in the block payload store
-        assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
+                // Remove the remaining payloads from the block payload store
+                block_payload_store.remove_committed_blocks(subset_verified_blocks);
+                println!("Removed the remaining verified blocks from the store!");
+
+                // Check that the payloads no longer exist in the block payload store
+                assert!(!block_payload_store.all_payloads_exist(subset_verified_blocks));
+                println!("Verified the remaining verified blocks no longer exist in the store!");
+            };
+            test_tasks.push(test_task);
+        }
+
+        // Run the test tasks with a timeout
+        for test_task in test_tasks {
+            match timeout(Duration::from_secs(10), test_task).await {
+                Ok(()) => println!("Test completed successfully!"),
+                error => panic!("Test timed-out with error: {:?}", error),
+            }
+        }
     }
 
     #[test]
