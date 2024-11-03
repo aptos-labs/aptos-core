@@ -19,7 +19,7 @@ module hello_blockchain::message {
         to_message: string::String,
     }
 
-    /// There is no message present
+    /// There is no message at present
     const ENO_MESSAGE: u64 = 0;
 
     #[view]
