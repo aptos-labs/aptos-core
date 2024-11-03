@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: unbound module
+  ┌─ tests/checking/variants/bug_15073.move:8:13
+  │
+8 │             ToolType::Http { uri } => {
+  │             ^^^^^^^^ Unbound module or type alias 'ToolType'
+
+error: invalid assignment
+   ┌─ tests/checking/variants/bug_15073.move:8:13
+   │
+ 8 │ ╭             ToolType::Http { uri } => {
+ 9 │ │
+10 │ │             },
+   │ ╰──────────────^ bind list cannot be constructed

@@ -2600,13 +2600,20 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             let discriminator = exp(context, *pd);
             let match_arms = parms
                 .into_iter()
-                .map(|parm| {
+                .filter_map(|parm| {
                     let loc = parm.loc;
                     let (pbl, pc, pb) = parm.value;
-                    let bind_list = bind_list(context, pbl).expect("bind list always present");
-                    let opt_cond = pc.map(|e| *exp(context, e));
-                    let body = *exp(context, pb);
-                    sp(loc, (bind_list, opt_cond, body))
+                    if let Some(bind_list) = bind_list(context, pbl) {
+                        let opt_cond = pc.map(|e| *exp(context, e));
+                        let body = *exp(context, pb);
+                        Some(sp(loc, (bind_list, opt_cond, body)))
+                    } else {
+                        context.env.add_diag(diag!(
+                            Syntax::InvalidLValue,
+                            (loc, "bind list cannot be constructed")
+                        ));
+                        None
+                    }
                 })
                 .collect::<Vec<_>>();
             EE::Match(discriminator, match_arms)
