@@ -130,10 +130,20 @@ impl CoverageMap {
 
     pub fn to_unified_exec_map(&self) -> ExecCoverageMap {
         let mut unified_map = ExecCoverageMap::new(String::new());
-        for (_, exec_map) in self.exec_maps.iter() {
+        eprintln!("to_unified_exec_map");
+        for (_key, exec_map) in self.exec_maps.iter() {
+            eprintln!("looking at key {}", _key);
             for ((module_addr, module_name), module_map) in exec_map.module_maps.iter() {
                 for (func_name, func_map) in module_map.function_maps.iter() {
                     for (pc, count) in func_map.iter() {
+                        eprintln!(
+                            "Adding item ({}, {}, {}, {}, {}) to unified_map",
+                            module_addr.short_str_lossless(),
+                            module_name.clone().into_string(),
+                            func_name.clone().into_string(),
+                            pc,
+                            count,
+                        );
                         unified_map.insert_multi(
                             *module_addr,
                             module_name.clone(),
@@ -145,6 +155,7 @@ impl CoverageMap {
                 }
             }
         }
+        eprintln!("finished to_unified_exec_map");
         unified_map
     }
 }

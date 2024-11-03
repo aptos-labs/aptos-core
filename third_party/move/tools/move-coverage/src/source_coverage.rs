@@ -280,7 +280,8 @@ impl<'a> SourceCoverageBuilder<'a> {
                 let start_line = start_loc.line.0;
                 let end_line = end_loc.line.0;
                 eprintln!(
-                    "Looking at span = ({}, {}), line = ({}, {})",
+                    "Looking at key = {}, span = ({}, {}), line = ({}, {})",
+                    _key.clone().into_string(),
                     span.start(),
                     span.end(),
                     start_line,
@@ -324,6 +325,15 @@ impl<'a> SourceCoverageBuilder<'a> {
                 Some(segments) => {
                     // Note: segments are already pre-sorted by construction so don't need to be
                     // resorted.
+                    eprintln!(
+                        "Segments for line {} are: {}",
+                        line_number,
+                        segments
+                            .iter()
+                            .map(|seg| format!("{:?}", seg).to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
                     let mut line_acc = Vec::new();
                     let mut cursor = 0;
                     for segment in segments {
@@ -420,6 +430,25 @@ fn merge_spans(file_hash: FileHash, cov: FunctionSourceCoverage) -> Vec<Span> {
         return vec![];
     }
 
+    let mut last_loc: Option<Loc> = None;
+    for loc in cov.uncovered_locations.iter() {
+        if loc.file_hash() != file_hash {
+            if let Some(last_loc) = last_loc {
+                eprintln!(
+                    "dropping loc ({}, {}, {}) after ({}, {}, {})",
+                    loc.file_hash(),
+                    loc.start(),
+                    loc.end(),
+                    last_loc.file_hash(),
+                    loc.start(),
+                    loc.end(),
+                );
+            }
+            last_loc = None;
+        } else {
+            last_loc = Some(*loc);
+        }
+    }
     let mut covs: Vec<_> = cov
         .uncovered_locations
         .iter()
