@@ -14,7 +14,7 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     control_flow_graph::{BlockId, ControlFlowGraph},
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature},
+    file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature, SignatureToken},
 };
 use move_core_types::vm_status::StatusCode;
 
@@ -226,6 +226,43 @@ impl<'a> StackUsageVerifier<'a> {
                 let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u64;
                 let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
+            },
+
+            // ClosEval pops the number of arguments and pushes the results of the given function
+            // type
+            Bytecode::ClosEval(idx) => {
+                if let Some(SignatureToken::Function(args, result, _)) =
+                    self.resolver.signature_at(*idx).0.first()
+                {
+                    ((1 + args.len()) as u64, result.len() as u64)
+                } else {
+                    // We don't know what it will pop/push, but the signature checker
+                    // ensures we never reach this
+                    (0, 0)
+                }
+            },
+
+            // ClosPack pops the captured arguments and returns 1 value
+            Bytecode::ClosPack(idx, mask) => {
+                let function_handle = self.resolver.function_handle_at(*idx);
+                let arg_count = mask
+                    .extract(
+                        &self.resolver.signature_at(function_handle.parameters).0,
+                        true,
+                    )
+                    .len() as u64;
+                (arg_count, 1)
+            },
+            Bytecode::ClosPackGeneric(idx, mask) => {
+                let func_inst = self.resolver.function_instantiation_at(*idx);
+                let function_handle = self.resolver.function_handle_at(func_inst.handle);
+                let arg_count = mask
+                    .extract(
+                        &self.resolver.signature_at(function_handle.parameters).0,
+                        true,
+                    )
+                    .len() as u64;
+                (arg_count, 1)
             },
 
             // Pack performs `num_fields` pops and one push

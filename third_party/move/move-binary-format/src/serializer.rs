@@ -800,6 +800,9 @@ fn serialize_signature_token_single_node_impl(
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
         },
+        SignatureToken::Function(..) => {
+            unimplemented!("serialization of function types")
+        },
     }
     Ok(())
 }
@@ -1091,6 +1094,9 @@ fn serialize_instruction_inner(
         Bytecode::TestVariantGeneric(class_idx) => {
             binary.push(Opcodes::TEST_VARIANT_GENERIC as u8)?;
             serialize_struct_variant_inst_index(binary, class_idx)
+        },
+        Bytecode::ClosPack(..) | Bytecode::ClosPackGeneric(..) | Bytecode::ClosEval(_) => {
+            unimplemented!("serialization of closure opcodes")
         },
         Bytecode::ReadRef => binary.push(Opcodes::READ_REF as u8),
         Bytecode::WriteRef => binary.push(Opcodes::WRITE_REF as u8),

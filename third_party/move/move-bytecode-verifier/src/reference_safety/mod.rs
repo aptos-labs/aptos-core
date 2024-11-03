@@ -22,8 +22,9 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle, VariantIndex,
+        Bytecode, ClosureMask, CodeOffset, FunctionDefinitionIndex, FunctionHandle,
+        IdentifierIndex, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
+        VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -94,6 +95,43 @@ fn call(
     };
     let return_ = verifier.resolver.signature_at(function_handle.return_);
     let values = state.call(offset, arguments, &acquired_resources, return_, meter)?;
+    for value in values {
+        verifier.stack.push(value)
+    }
+    Ok(())
+}
+
+fn clos_pack(
+    verifier: &mut ReferenceSafetyAnalysis,
+    function_handle: &FunctionHandle,
+    mask: ClosureMask,
+) -> PartialVMResult<()> {
+    let parameters = verifier.resolver.signature_at(function_handle.parameters);
+    // Extract the captured arguments and pop them from the stack
+    let argc = mask.extract(&parameters.0, true).len();
+    for _ in 0..argc {
+        // Currently closures require captured arguments to be values. This is verified
+        // by type safety.
+        safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value())
+    }
+    verifier.stack.push(AbstractValue::NonReference);
+    Ok(())
+}
+
+fn clos_eval(
+    verifier: &mut ReferenceSafetyAnalysis,
+    state: &mut AbstractState,
+    offset: CodeOffset,
+    arg_tys: Vec<SignatureToken>,
+    result_tys: Vec<SignatureToken>,
+    meter: &mut impl Meter,
+) -> PartialVMResult<()> {
+    let arguments = arg_tys
+        .iter()
+        .map(|_| verifier.stack.pop().unwrap())
+        .rev()
+        .collect();
+    let values = state.clos_eval(offset, arguments, &result_tys, meter)?;
     for value in values {
         verifier.stack.push(value)
     }
@@ -180,6 +218,18 @@ fn vec_element_type(
     match verifier.resolver.signature_at(idx).0.first() {
         Some(ty) => Ok(ty.clone()),
         None => Err(PartialVMError::new(
+            StatusCode::VERIFIER_INVARIANT_VIOLATION,
+        )),
+    }
+}
+
+fn fun_type(
+    verifier: &mut ReferenceSafetyAnalysis,
+    idx: SignatureIndex,
+) -> PartialVMResult<(Vec<SignatureToken>, Vec<SignatureToken>)> {
+    match verifier.resolver.signature_at(idx).0.first() {
+        Some(SignatureToken::Function(args, result, _)) => Ok((args.clone(), result.clone())),
+        _ => Err(PartialVMError::new(
             StatusCode::VERIFIER_INVARIANT_VIOLATION,
         )),
     }
@@ -497,6 +547,20 @@ fn execute_inner(
             unpack_variant(verifier, handle)?
         },
 
+        Bytecode::ClosPack(idx, mask) => {
+            let function_handle = verifier.resolver.function_handle_at(*idx);
+            clos_pack(verifier, function_handle, *mask)?
+        },
+        Bytecode::ClosPackGeneric(idx, mask) => {
+            let func_inst = verifier.resolver.function_instantiation_at(*idx);
+            let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
+            clos_pack(verifier, function_handle, *mask)?
+        },
+        Bytecode::ClosEval(idx) => {
+            let (arg_tys, result_tys) = fun_type(verifier, *idx)?;
+            clos_eval(verifier, state, offset, arg_tys, result_tys, meter)?
+        },
+
         Bytecode::VecPack(idx, num) => {
             for _ in 0..*num {
                 safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value())
@@ -559,7 +623,6 @@ fn execute_inner(
     };
     Ok(())
 }
-
 impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
     type State = AbstractState;
 

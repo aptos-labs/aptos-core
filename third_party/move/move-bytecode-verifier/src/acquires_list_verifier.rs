@@ -102,7 +102,10 @@ impl<'a> AcquiresVerifier<'a> {
                 self.struct_acquire(si.def, offset)
             },
 
-            Bytecode::Pop
+            Bytecode::ClosPack(..)
+            | Bytecode::ClosPackGeneric(..)
+            | Bytecode::ClosEval(_)
+            | Bytecode::Pop
             | Bytecode::BrTrue(_)
             | Bytecode::BrFalse(_)
             | Bytecode::Abort

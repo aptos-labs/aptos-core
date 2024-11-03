@@ -192,6 +192,8 @@ impl Type {
             TypeParameter(i) => Type::TypeParameter(*i),
             Reference(t) => Type::Reference(Box::new(Type::new(m, t))),
             MutableReference(t) => Type::MutableReference(Box::new(Type::new(m, t))),
+
+            Function(..) => panic!("normalized representation does not support function types"),
         }
     }
 
