@@ -455,6 +455,18 @@ fn compare_types(
         (SignatureToken::Vector(ty1), SignatureToken::Vector(ty2)) => {
             compare_types(context, ty1, ty2, def_module)
         },
+        (
+            SignatureToken::Function(args1, result1, ab1),
+            SignatureToken::Function(args2, result2, ab2),
+        ) => {
+            compare_cross_module_signatures(context, args1, args2, def_module)?;
+            compare_cross_module_signatures(context, result1, result2, def_module)?;
+            if ab1 != ab2 {
+                Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
+            } else {
+                Ok(())
+            }
+        },
         (SignatureToken::Struct(idx1), SignatureToken::Struct(idx2)) => {
             compare_structs(context, *idx1, *idx2, def_module)
         },
@@ -483,6 +495,7 @@ fn compare_types(
         | (SignatureToken::Address, _)
         | (SignatureToken::Signer, _)
         | (SignatureToken::Vector(_), _)
+        | (SignatureToken::Function(..), _)
         | (SignatureToken::Struct(_), _)
         | (SignatureToken::StructInstantiation(_, _), _)
         | (SignatureToken::Reference(_), _)

@@ -68,7 +68,7 @@ impl<'a> BinaryComplexityMeter<'a> {
                     cost = cost.saturating_add(moduel_name.len() as u64 * COST_PER_IDENT_BYTE);
                 },
                 U8 | U16 | U32 | U64 | U128 | U256 | Signer | Address | Bool | Vector(_)
-                | TypeParameter(_) | Reference(_) | MutableReference(_) => (),
+                | Function(..) | TypeParameter(_) | Reference(_) | MutableReference(_) => (),
             }
         }
 
@@ -262,7 +262,7 @@ impl<'a> BinaryComplexityMeter<'a> {
 
         for instr in &code.code {
             match instr {
-                CallGeneric(idx) => {
+                CallGeneric(idx) | ClosPackGeneric(idx, ..) => {
                     self.meter_function_instantiation(*idx)?;
                 },
                 PackGeneric(idx) | UnpackGeneric(idx) => {
@@ -284,7 +284,8 @@ impl<'a> BinaryComplexityMeter<'a> {
                 ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
                     self.meter_variant_field_instantiation(*idx)?;
                 },
-                VecPack(idx, _)
+                ClosEval(idx)
+                | VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
                 | VecMutBorrow(idx)
@@ -323,6 +324,7 @@ impl<'a> BinaryComplexityMeter<'a> {
                 | PackVariant(_)
                 | UnpackVariant(_)
                 | TestVariant(_)
+                | ClosPack(..)
                 | ReadRef
                 | WriteRef
                 | FreezeRef
