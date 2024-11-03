@@ -744,7 +744,7 @@ pub fn setup_environment_and_start_node(
 
     // Wait until state sync has been initialized
     debug!("Waiting until state sync is initialized!");
-    state_sync_runtimes.block_until_initialized();
+    // state_sync_runtimes.block_until_initialized();
     debug!("State sync initialization complete.");
 
     // Create the consensus observer and publisher (if enabled)
