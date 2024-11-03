@@ -348,6 +348,12 @@ fn write_return_type(ctx: &mut Context, tys: &[SignatureToken]) -> String {
 }
 
 fn write_signature_token(ctx: &mut Context, t: &SignatureToken) -> String {
+    let tok_list = |c: &mut Context, v: &[SignatureToken]| {
+        v.iter()
+            .map(|ty| write_signature_token(c, ty))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
     match t {
         SignatureToken::Bool => "bool".to_string(),
         SignatureToken::U8 => "u8".to_string(),
@@ -359,15 +365,13 @@ fn write_signature_token(ctx: &mut Context, t: &SignatureToken) -> String {
         SignatureToken::Address => "address".to_string(),
         SignatureToken::Signer => "signer".to_string(),
         SignatureToken::Vector(inner) => format!("vector<{}>", write_signature_token(ctx, inner)),
+        SignatureToken::Function(args, result, _) => {
+            format!("|{}|{}", tok_list(ctx, args), tok_list(ctx, result))
+        },
         SignatureToken::Struct(idx) => write_struct_handle_type(ctx, *idx),
         SignatureToken::StructInstantiation(idx, types) => {
             let n = write_struct_handle_type(ctx, *idx);
-            let tys = types
-                .iter()
-                .map(|ty| write_signature_token(ctx, ty))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("{}<{}>", n, tys)
+            format!("{}<{}>", n, tok_list(ctx, types))
         },
         SignatureToken::Reference(inner) => format!("&{}", write_signature_token(ctx, inner)),
         SignatureToken::MutableReference(inner) => {

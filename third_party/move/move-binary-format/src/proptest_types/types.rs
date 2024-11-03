@@ -71,6 +71,7 @@ impl StDefnMaterializeState {
                 let inner = self.potential_abilities(ty);
                 inner.intersect(AbilitySet::VECTOR)
             },
+            Function(_, _, a) => *a,
             Struct(idx) => {
                 let sh = &self.struct_handles[idx.0 as usize];
                 sh.abilities

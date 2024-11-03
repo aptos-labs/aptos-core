@@ -123,6 +123,11 @@ impl<'a> StructDefGraphBuilder<'a> {
                 )
             },
             T::Vector(inner) => self.add_signature_token(neighbors, cur_idx, inner)?,
+            T::Function(args, result, _) => {
+                for t in args.iter().chain(result) {
+                    self.add_signature_token(neighbors, cur_idx, t)?
+                }
+            },
             T::Struct(sh_idx) => {
                 if let Some(struct_def_idx) = self.handle_to_def.get(sh_idx) {
                     neighbors

@@ -768,6 +768,9 @@ impl<'a> Context<'a> {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;
                 SignatureToken::Vector(Box::new(correct_inner))
             },
+            SignatureToken::Function(..) => {
+                unimplemented!("function types not supported by MoveIR")
+            },
             SignatureToken::Reference(inner) => {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;
                 SignatureToken::Reference(Box::new(correct_inner))
