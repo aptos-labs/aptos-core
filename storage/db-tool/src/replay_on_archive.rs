@@ -270,6 +270,9 @@ impl Verifier {
         expected_epoch_events: &Vec<Vec<ContractEvent>>,
         expected_epoch_writesets: &Vec<WriteSet>,
     ) -> Result<Vec<Error>> {
+        if cur_txns.is_empty() {
+            return Ok(Vec::new());
+        }
         let executed_outputs = AptosVM::execute_block_no_limit(
             cur_txns
                 .iter()
