@@ -31,7 +31,7 @@ use std::{
     time::Instant,
 };
 mod utils;
-use utils::{
+use utils::vm::{
     check_for_invariant_violation, publish_group, sort_by_deps, ExecVariant,
     FuzzerRunnableAuthenticator, RunnableState,
 };

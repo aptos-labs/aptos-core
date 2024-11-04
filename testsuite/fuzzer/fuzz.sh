@@ -217,14 +217,9 @@ function flamegraph() {
         error "$testcase does not exist"
     fi
     info "Generating flamegraph for $fuzz_target with $testcase"
-    # find the binary
-    binary=$(find ./target -name $fuzz_target -type f -perm /111)
-    if [ -z "$binary" ]; then
-        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
-    fi
     # run the binary with cargo-flamegraph
     time=$(date +%s)
-    cargo flamegraph -o "${fuzz_target}_${time}.svg" --bin "$binary" "$testcase -- -runs=1"
+    cargo flamegraph -o "${fuzz_target}_${time}.svg" --root -p="fuzzer-fuzz" --bin="$fuzz_target" -- "$testcase" "-- -runs=1"
 }
 
 function run() {

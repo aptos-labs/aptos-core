@@ -24,10 +24,10 @@ move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+base64 = { workspace = true }
+ring = { workspace = true }
+hex = { workspace = true }
 serde_json = { workspace = true }
-
-[features]
-disabled = []
 
 [[bin]]
 name = "move_bytecode_verifier_code_unit"
@@ -38,6 +38,30 @@ doc = false
 [[bin]]
 name = "move_bytecode_verifier_mixed"
 path = "fuzz_targets/move/bytecode_verifier_mixed.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_value_deserialize"
+path = "fuzz_targets/move/value_deserialize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_move_value_deserialize"
+path = "fuzz_targets/move/move_value_deserialize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_move_value_decorate"
+path = "fuzz_targets/move/move_value_decorate.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "signed_transaction_deserialize"
+path = "fuzz_targets/signed_transaction_deserialize.rs"
 test = false
 doc = false
 
@@ -58,30 +82,3 @@ name = "move_aptosvm_authenticators"
 path = "fuzz_targets/move/aptosvm_authenticators.rs"
 test = false
 doc = false
-
-#[[bin]]#name = "move_value_deserialize"
-#path = "fuzz_targets/move/value_deserialize.rs"
-#test = false
-#doc = false
-#required-features = ["disabled"]
-
-#[[bin]]
-#name = "move_move_value_deserialize"
-#path = "fuzz_targets/move/move_value_deserialize.rs"
-#test = false
-#doc = false
-#required-features = ["disabled"]
-
-#[[bin]]
-#name = "move_move_value_decorate"
-#path = "fuzz_targets/move/move_value_decorate.rs"
-#test = false
-#doc = false
-#required-features = ["disabled"]
-
-#[[bin]]
-#name = "signed_transaction_deserialize"
-#path = "fuzz_targets/signed_transaction_deserialize.rs"
-#test = false
-#doc = false
-#required-features = ["disabled"]
