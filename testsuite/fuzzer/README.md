@@ -22,7 +22,22 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh build-oss-fuzz <target_dir>
     ```
-
+- `coverage`: Generates coverage report in HTML format
+    ```bash
+    ./fuzz.sh coverage <fuzz_target>
+    ```
+- `coverage-cleanup`:
+    ```bash
+    ./fuzz.sh clean-coverage <fuzz_target|all>
+    ```
+- `degub`: Run fuzzer with GDB and pass test_case as input
+    ```bash
+    ./fuzz.sh debug <fuzz_target> <test_case>
+    ```
+- `flamegraph`: Generates flamegraph report (might requires addition setups on the os)
+    ```
+    ./fuzz.sh flamegraph <fuzz_target> <test_case>
+    ```
 - `list`: List all existing fuzz targets.
     ```bash
     ./fuzz.sh list
@@ -96,6 +111,11 @@ When building in the OSS-Fuzz environment, `fuzz.sh` will place the corpus archi
 - **Handle Diverse Inputs:** Ensure that the harness can handle a wide range of input formats and sizes.
 - **Error Handling:** Implement robust error handling to intercept crashes or unwanted/unexpected behavior.
 - **Performance Optimization:** Optimize for performance to enable more iterations and deeper fuzzing.
+
+## fuzzer CLI
+`cargo run fuzzer <command>`
+
+A CLI that introduces helpful commands to build fuzzers, focusing on static code generation and corpus preparation.
 
 ## References
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)
