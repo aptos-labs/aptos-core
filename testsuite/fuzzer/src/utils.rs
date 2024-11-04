@@ -1,16 +1,15 @@
-
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[allow(dead_code)]
 pub(crate) mod cli {
     use aptos_framework::{BuildOptions, BuiltPackage};
-    use std::path::PathBuf;
     use aptos_types::{
         account_address::AccountAddress,
         transaction::{EntryFunction, Script, TransactionPayload},
     };
     use move_core_types::{ident_str, language_storage::ModuleId};
+    use std::path::PathBuf;
 
     /// Compiles a Move module from source code.
     /// The compiled module and its metadata are returned serialized.
@@ -20,14 +19,17 @@ pub(crate) mod cli {
             .map_err(|e| e.to_string())?;
 
         let transaction_payload = generate_script_payload_jwk(&package);
-        let code_snippet = format!(r#"
+        let code_snippet = format!(
+            r#"
             let tx = acc
                 .transaction()
                 .gas_unit_price(100)
                 .sequence_number(sequence_number)
                 .payload(bcs::from_bytes(&{:?}).unwrap())
                 .sign();
-            "#, bcs::to_bytes(&transaction_payload).unwrap());
+            "#,
+            bcs::to_bytes(&transaction_payload).unwrap()
+        );
         println!("{}", code_snippet);
 
         Ok(())
@@ -75,8 +77,8 @@ pub(crate) mod cli {
         TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(
                 AccountAddress::new([
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 1,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 1,
                 ]),
                 ident_str!("code").to_owned(),
             ),

@@ -12,9 +12,16 @@ use aptos_language_e2e_tests::{
     account::Account, data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor,
 };
 use aptos_types::{
-    chain_id::ChainId, jwks::{secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs}, keyless::{
-        test_utils::get_sample_iss, AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16Proof, Groth16ProofAndStatement, IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, TransactionAndProof, ZeroKnowledgeSig, ZKP
-    }, on_chain_config::OnChainConfig, state_store::state_key::StateKey, transaction::{
+    chain_id::ChainId,
+    jwks::{secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs},
+    keyless::{
+        test_utils::get_sample_iss, AnyKeylessPublicKey, Configuration, EphemeralCertificate,
+        Groth16Proof, Groth16ProofAndStatement, IdCommitment, KeylessPublicKey, KeylessSignature,
+        OpenIdSig, TransactionAndProof, ZeroKnowledgeSig, ZKP,
+    },
+    on_chain_config::OnChainConfig,
+    state_store::state_key::StateKey,
+    transaction::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, EphemeralPublicKey,
             EphemeralSignature, SingleKeyAuthenticator, TransactionAuthenticator,
@@ -25,13 +32,21 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use libfuzzer_sys::{fuzz_target, Corpus};
-use move_core_types::{vm_status::{StatusCode, StatusType},account_address::AccountAddress};
+use move_core_types::{
+    account_address::AccountAddress,
+    vm_status::{StatusCode, StatusType},
+};
 use once_cell::sync::Lazy;
 use ring::signature;
 use std::sync::Arc;
 mod utils;
 use utils::{
-    authenticator::{miscellaneous::{SampleJwtPayload, SAMPLE_EPK_BLINDER, SAMPLE_JWK_SK, SAMPLE_PEPPER}, FuzzerTransactionAuthenticator, Style, TransactionState}, helpers::base64url_encode_str, vm::check_for_invariant_violation,
+    authenticator::{
+        miscellaneous::{SampleJwtPayload, SAMPLE_EPK_BLINDER, SAMPLE_JWK_SK, SAMPLE_PEPPER},
+        FuzzerTransactionAuthenticator, Style, TransactionState,
+    },
+    helpers::base64url_encode_str,
+    vm::check_for_invariant_violation,
 };
 
 // genesis write set generated once for each fuzzing session
@@ -259,7 +274,6 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
 
                 //             vm.execute_and_apply(tx.clone());
 
-
                 //             let public_inputs_hash = fr_to_bytes_le(&get_public_inputs_hash(&sig, pk, jwk, config).unwrap());
 
                 //             // Build ZKP
@@ -300,7 +314,6 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
                 //     let any_signature = AnySignature::Keyless {
                 //         signature: ks_sig,
                 //     };
-
 
                 //     // Build an authenticator
                 //     let authenticator = TransactionAuthenticator::SingleSender {

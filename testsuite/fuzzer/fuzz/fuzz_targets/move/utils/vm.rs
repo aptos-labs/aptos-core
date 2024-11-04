@@ -3,14 +3,14 @@
 
 #![allow(dead_code)]
 
+use super::helpers::UserAccount;
+use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
 use aptos_framework::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::
-    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus}
-;
+use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
 use arbitrary::Arbitrary;
 use libfuzzer_sys::Corpus;
 use move_binary_format::{
@@ -23,8 +23,6 @@ use move_core_types::{
     vm_status::{StatusType, VMStatus},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use crate::tdbg;
-use super::helpers::UserAccount;
 
 // Used to fuzz the MoveVM
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]

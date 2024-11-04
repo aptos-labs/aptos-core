@@ -33,10 +33,10 @@ fn main() {
             } else {
                 println!("Module compiled successfully.");
             }
-        }
+        },
         // Handle other subcommands or default behavior
         _ => {
             println!("No valid subcommand was used. Use --help for more information.");
-        }
+        },
     }
 }
