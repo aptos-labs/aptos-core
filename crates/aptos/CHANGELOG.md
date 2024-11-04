@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 - Fix typos in `aptos move compile` help text.
+- Update the default version of `movefmt` to be installed from 1.0.5 to 1.0.6
 
 ## [4.3.0] - 2024/10/30
 - Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`
