@@ -4691,11 +4691,14 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-node",
  "aptos-types",
+ "bollard",
  "futures",
+ "maplit",
  "rand 0.7.3",
  "tempfile",
  "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]
