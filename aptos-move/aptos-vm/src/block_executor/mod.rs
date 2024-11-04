@@ -568,8 +568,12 @@ mod test {
     use aptos_block_executor::{
         code_cache_global::ImmutableModuleCache, txn_commit_hook::NoOpTransactionCommitHook,
     };
+    use aptos_crypto::HashValue;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::on_chain_config::{FeatureFlag, Features};
+    use aptos_types::{
+        on_chain_config::{FeatureFlag, Features},
+        transaction::Transaction,
+    };
     use aptos_vm_environment::environment::AptosEnvironment;
     use claims::assert_ok;
     use move_vm_types::code::mock_verified_code;
@@ -621,9 +625,15 @@ mod test {
         );
         let config = BlockExecutorConfig::new_no_block_limit(concurrency_level);
 
+        // Put at least one transaction in the block so that the block executor does not return
+        // early.
+        let block = vec![SignatureVerifiedTransaction::Invalid(
+            Transaction::StateCheckpoint(HashValue::zero()),
+        )];
+
         let result = BlockAptosVM::execute_block_on_thread_pool_with_module_cache(
             executor_thread_pool,
-            &[],
+            &block,
             &FakeDataStore::default(),
             global_module_cache.clone(),
             config,
