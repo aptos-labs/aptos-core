@@ -195,10 +195,6 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-
-        // TODO(loader_v2): Remove after replay.
-        features.enable(FeatureFlag::ENABLE_LOADER_V2);
-
         features
     }
 }
