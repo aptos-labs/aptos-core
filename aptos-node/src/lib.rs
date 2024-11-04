@@ -20,16 +20,38 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::{
+    config::{merge_node_config, NodeConfig, PersistableConfig},
+    utils::get_genesis_txn,
+};
+use aptos_consensus_notifications::{
+    new_consensus_notifier_listener_pair, ConsensusNotificationListener, ConsensusNotifier,
+};
+use aptos_event_notifications::{
+    DbConfigStorageProvider, EventNotificationSender, EventSubscriptionService,
+    InMemConfigStorageProvider,
+};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_mempool::QuorumStoreRequest;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
+use aptos_types::{
+    account_config::ChainIdResource,
+    chain_id::ChainId,
+    on_chain_config::{
+        ConfigurationResource, InMemoryOnChainConfig, OnChainConfig, OnChainJWKConsensusConfig,
+        ValidatorSet,
+    },
+    state_store::state_key::StateKey,
+    transaction::{Transaction::GenesisTransaction, WriteSetPayload},
+    write_set::WriteSet,
+};
 use clap::Parser;
 use futures::channel::{mpsc, oneshot};
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
+    collections::HashMap,
     env, fs,
     io::Write,
     path::{Path, PathBuf},
@@ -181,6 +203,50 @@ impl AptosNodeArgs {
             start(config, None, true).expect("Node should start correctly");
         };
     }
+
+    /// Runs an Aptos node based on the given command line arguments and config flags
+    pub fn run_consensus_only(self) {
+        #[cfg(target_os = "linux")]
+        // https://sfackler.github.io/rstack/doc/rstack_self/index.html
+        //
+        // TODO(grao): I don't like this way, but I didn't find other existing solution in Rust.
+        // Maybe try to use libc directly?
+        if self.stacktrace {
+            let _ = rstack_self::child();
+            return;
+        }
+
+        if self.info {
+            let build_information = build_information!();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&build_information)
+                    .expect("Failed to print build information")
+            );
+            return;
+        }
+
+        // Get the config file path
+        let config_path = self.config.expect("Config is required to launch node");
+        if !config_path.exists() {
+            panic!(
+                "The node config file could not be found! Ensure the given path is correct: {:?}",
+                config_path.display()
+            )
+        }
+
+        // A config file exists, attempt to parse the config
+        let config = NodeConfig::load_from_path(config_path.clone()).unwrap_or_else(|error| {
+            panic!(
+                "Failed to load the node config file! Given file path: {:?}. Error: {:?}",
+                config_path.display(),
+                error
+            )
+        });
+
+        // Start the node
+        start(config, None, true).expect("Node should start correctly");
+    }
 }
 
 pub fn load_seed(input: &str) -> Result<[u8; 32], FromHexError> {
@@ -201,12 +267,15 @@ pub struct AptosHandle {
     _indexer_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
     _jwk_consensus_runtime: Option<Runtime>,
-    _mempool_runtime: Runtime,
+    _mempool_runtime: Option<Runtime>,
     _network_runtimes: Vec<Runtime>,
-    _peer_monitoring_service_runtime: Runtime,
-    _state_sync_runtimes: StateSyncRuntimes,
+    _peer_monitoring_service_runtime: Option<Runtime>,
+    _state_sync_runtimes: Option<StateSyncRuntimes>,
     _telemetry_runtime: Option<Runtime>,
     _indexer_db_runtime: Option<Runtime>,
+    _consensus_notif_listener: Option<ConsensusNotificationListener>,
+    _consensus_to_mempool_receiver: Option<futures::channel::mpsc::Receiver<QuorumStoreRequest>>,
+    _event_subscription_service: Option<EventSubscriptionService>,
 }
 
 pub fn start(
@@ -262,12 +331,10 @@ pub fn start_and_report_ports(
     }
 
     // Set up the node environment and start it
-    let _node_handle = setup_environment_and_start_node(
+    let _node_handle = consensus_only_setup_environment_and_start_node(
         config,
         remote_log_receiver,
         Some(logger_filter_update),
-        api_port_tx,
-        indexer_grpc_port_tx,
     )?;
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
@@ -652,7 +719,10 @@ pub fn setup_environment_and_start_node(
         consensus_reconfig_subscription,
         dkg_subscriptions,
         jwk_consensus_subscriptions,
-    ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
+    ) = state_sync::create_event_subscription_service(
+        &node_config,
+        Arc::new(DbConfigStorageProvider::new(db_rw.reader.clone())),
+    );
 
     // Set up the networks and gather the application network handles
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
@@ -692,8 +762,8 @@ pub fn setup_environment_and_start_node(
     // Start the node inspection service
     services::start_node_inspection_service(
         &node_config,
-        aptos_data_client,
-        peers_and_metadata.clone(),
+        // aptos_data_client,
+        // peers_and_metadata.clone(),
     );
 
     // Bootstrap the API and indexer
@@ -783,12 +853,15 @@ pub fn setup_environment_and_start_node(
         _indexer_runtime: indexer_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
         _jwk_consensus_runtime: jwk_consensus_runtime,
-        _mempool_runtime: mempool_runtime,
+        _mempool_runtime: Some(mempool_runtime),
         _network_runtimes: network_runtimes,
-        _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
-        _state_sync_runtimes: state_sync_runtimes,
+        _peer_monitoring_service_runtime: Some(peer_monitoring_service_runtime),
+        _state_sync_runtimes: Some(state_sync_runtimes),
         _telemetry_runtime: telemetry_runtime,
         _indexer_db_runtime: internal_indexer_db_runtime,
+        _consensus_notif_listener: None,
+        _consensus_to_mempool_receiver: None,
+        _event_subscription_service: None,
     })
 }
 
@@ -796,4 +869,254 @@ pub fn setup_environment_and_start_node(
 fn verify_tool() {
     use clap::CommandFactory;
     AptosNodeArgs::command().debug_assert()
+}
+
+pub fn start_consensus_only() {}
+
+fn read_config_bytes<T: OnChainConfig>(write_set: &WriteSet) -> Vec<u8> {
+    write_set
+        .get(&StateKey::on_chain_config::<T>().expect("must exist"))
+        .unwrap()
+        .bytes()
+        .unwrap()
+        .to_vec()
+}
+
+fn read_config<T: OnChainConfig>(write_set: &WriteSet) -> T {
+    let bytes = read_config_bytes::<T>(write_set);
+    T::deserialize_into_config(&bytes).expect("[aptos-node] missing chain ID resource")
+}
+
+/// Initializes the node environment and starts the node
+pub fn consensus_only_setup_environment_and_start_node(
+    mut node_config: NodeConfig,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
+) -> anyhow::Result<AptosHandle> {
+    // Log the node config at node startup
+    node_config.log_all_configs();
+
+    // Starts the admin service
+    let mut admin_service = services::start_admin_service(&node_config);
+
+    // Set up the storage database and any RocksDB checkpoints
+    let (db_rw, backup_service, _genesis_waypoint, _indexer_db_optt, _update_receiver) =
+        storage::initialize_database_and_checkpoints(&mut node_config)?;
+
+    // TODO(ibalajiarun): Read Genesis Blob
+    let maybe_genesis_txn = get_genesis_txn(&node_config).expect("Genesis is required");
+    let genesis_write_set = if let GenesisTransaction(payload) = maybe_genesis_txn {
+        if let WriteSetPayload::Direct(change_set) = payload {
+            change_set.write_set()
+        } else {
+            panic!()
+        }
+    } else {
+        panic!()
+    };
+
+    let chain_id = read_config::<ChainIdResource>(genesis_write_set).chain_id();
+
+    let mut configs = HashMap::new();
+    configs.insert(
+        StateKey::on_chain_config::<ValidatorSet>().unwrap(),
+        read_config_bytes::<ValidatorSet>(genesis_write_set),
+    );
+    configs.insert(
+        StateKey::on_chain_config::<ChainId>().unwrap(),
+        read_config_bytes::<ChainId>(genesis_write_set),
+    );
+    configs.insert(
+        StateKey::on_chain_config::<ConfigurationResource>().unwrap(),
+        read_config_bytes::<ConfigurationResource>(genesis_write_set),
+    );
+
+    // admin_service.set_aptos_db(db_rw.clone().into());
+
+    // Set the Aptos VM configurations
+    // utils::set_aptos_vm_configurations(&node_config);
+
+    // // Obtain the chain_id from the DB
+    // let chain_id = utils::fetch_chain_id(&db_rw)?;
+
+    // Set the chain_id in global AptosNodeIdentity
+    aptos_node_identity::set_chain_id(chain_id)?;
+
+    // Start the telemetry service (as early as possible and before any blocking calls)
+    let telemetry_runtime = services::start_telemetry_service(
+        &node_config,
+        remote_log_rx,
+        logger_filter_update_job,
+        chain_id,
+    );
+
+    // // Create an event subscription service (and reconfig subscriptions for consensus and mempool)
+    // let (
+    //     mut event_subscription_service,
+    //     mempool_reconfig_subscription,
+    //     consensus_observer_reconfig_subscription,
+    //     consensus_reconfig_subscription,
+    //     dkg_subscriptions,
+    //     jwk_consensus_subscriptions,
+    // ) = state_sync::create_event_subscription_service(
+    //     &node_config,
+    //     Arc::new(DbConfigStorageProvider::new(db_rw.reader.clone())),
+    // );
+
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(InMemConfigStorageProvider::new(configs)));
+
+    // Set up the networks and gather the application network handles
+    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
+    let (
+        network_runtimes,
+        consensus_network_interfaces,
+        _consensus_observer_network_interfaces,
+        _dkg_network_interfaces,
+        _jwk_consensus_network_interfaces,
+        _mempool_network_interfaces,
+        _peer_monitoring_service_network_interfaces,
+        _storage_service_network_interfaces,
+    ) = network::setup_networks_and_get_interfaces(
+        &node_config,
+        chain_id,
+        peers_and_metadata.clone(),
+        &mut event_subscription_service,
+    );
+
+    // Start the peer monitoring service
+    // let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
+    //     &node_config,
+    //     peer_monitoring_service_network_interfaces,
+    //     db_rw.reader.clone(),
+    // );
+
+    // Start state sync and get the notification endpoints for mempool and consensus
+    // let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
+    //     state_sync::start_state_sync_and_get_notification_handles(
+    //         &node_config,
+    //         storage_service_network_interfaces,
+    //         genesis_waypoint,
+    //         event_subscription_service,
+    //         db_rw.clone(),
+    //     )?;
+
+    // Start the node inspection service
+    services::start_node_inspection_service(
+        &node_config,
+        //     aptos_data_client,
+        //     peers_and_metadata.clone(),
+    );
+
+    // Bootstrap the API and indexer
+    // let (
+    //     mempool_client_receiver,
+    //     api_runtime,
+    //     indexer_table_info_runtime,
+    //     indexer_runtime,
+    //     indexer_grpc_runtime,
+    //     internal_indexer_db_runtime,
+    //     mempool_client_sender,
+    // ) = services::bootstrap_api_and_indexer(
+    //     &node_config,
+    //     db_rw.clone(),
+    //     chain_id,
+    //     indexer_db_opt,
+    //     update_receiver,
+    //     api_port_tx,
+    //     indexer_grpc_port_tx,
+    // )?;
+
+    // // Set mempool client sender in order to enable the Mempool API in the admin service
+    // admin_service.set_mempool_client_sender(mempool_client_sender);
+
+    // Create mempool and get the consensus to mempool sender
+    // let (mempool_runtime, consensus_to_mempool_sender) =
+    //     services::start_mempool_runtime_and_get_consensus_sender(
+    //         &mut node_config,
+    //         &db_rw,
+    //         mempool_reconfig_subscription,
+    //         mempool_network_interfaces,
+    //         mempool_listener,
+    //         mempool_client_receiver,
+    //         peers_and_metadata,
+    //     );
+
+    // Create the DKG runtime and get the VTxn pool
+    // let (vtxn_pool, dkg_runtime) =
+    //     consensus::create_dkg_runtime(&mut node_config, dkg_subscriptions, dkg_network_interfaces);
+
+    // Create the JWK consensus runtime
+    // let jwk_consensus_runtime = consensus::create_jwk_consensus_runtime(
+    //     &mut node_config,
+    //     jwk_consensus_subscriptions,
+    //     jwk_consensus_network_interfaces,
+    //     &vtxn_pool,
+    // );
+
+    // // Wait until state sync has been initialized
+    // debug!("Waiting until state sync is initialized!");
+    // state_sync_runtimes.block_until_initialized();
+    // debug!("State sync initialization complete.");
+
+    // // Create the consensus observer and publisher (if enabled)
+    // let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =
+    //     consensus::create_consensus_observer_and_publisher(
+    //         &node_config,
+    //         consensus_observer_network_interfaces,
+    //         consensus_notifier.clone(),
+    //         consensus_to_mempool_sender.clone(),
+    //         db_rw.clone(),
+    //         consensus_observer_reconfig_subscription,
+    //     );
+
+    let consensus_reconfig_subscription = event_subscription_service
+        .subscribe_to_reconfigurations()
+        .ok();
+
+    let (consensus_notifier, listener) = new_consensus_notifier_listener_pair(5000);
+
+    let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
+        futures::channel::mpsc::channel(500);
+
+    let vtxn_pool = aptos_validator_transaction_pool::VTxnPoolState::default();
+
+    // Create the consensus runtime (if enabled)
+    let consensus_runtime = consensus::create_consensus_runtime(
+        &node_config,
+        db_rw.clone(),
+        consensus_reconfig_subscription,
+        consensus_network_interfaces,
+        consensus_notifier.clone(),
+        consensus_to_mempool_sender.clone(),
+        vtxn_pool,
+        None,
+        &mut admin_service,
+    );
+    event_subscription_service
+        .notify_initial_configs(0)
+        .unwrap();
+
+    Ok(AptosHandle {
+        _admin_service: admin_service,
+        _api_runtime: None,
+        _backup_runtime: backup_service,
+        _consensus_observer_runtime: None,
+        _consensus_publisher_runtime: None,
+        _consensus_runtime: consensus_runtime,
+        _dkg_runtime: None,
+        _indexer_grpc_runtime: None,
+        _indexer_runtime: None,
+        _indexer_table_info_runtime: None,
+        _jwk_consensus_runtime: None,
+        _mempool_runtime: None,
+        _network_runtimes: network_runtimes,
+        _peer_monitoring_service_runtime: None,
+        _state_sync_runtimes: None,
+        _telemetry_runtime: telemetry_runtime,
+        _indexer_db_runtime: None,
+        _consensus_notif_listener: Some(listener),
+        _consensus_to_mempool_receiver: Some(consensus_to_mempool_receiver),
+        _event_subscription_service: Some(event_subscription_service),
+    })
 }

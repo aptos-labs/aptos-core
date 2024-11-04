@@ -209,13 +209,13 @@ pub fn start_admin_service(node_config: &NodeConfig) -> AdminService {
 /// Spawns a new thread for the node inspection service
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,
-    aptos_data_client: AptosDataClient,
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    // aptos_data_client: AptosDataClient,
+    // peers_and_metadata: Arc<PeersAndMetadata>,
 ) {
     aptos_inspection_service::start_inspection_service(
         node_config.clone(),
-        aptos_data_client,
-        peers_and_metadata,
+        // aptos_data_client,
+        // peers_and_metadata,
     )
 }
 

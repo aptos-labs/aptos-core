@@ -24,6 +24,7 @@ aptos-secure-net = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 once_cell = { workspace = true }

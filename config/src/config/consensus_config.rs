@@ -11,7 +11,7 @@ use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{path::PathBuf, u64};
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
 const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 3000;

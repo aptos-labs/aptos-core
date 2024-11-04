@@ -14,7 +14,6 @@ use aptos_event_notifications::{
     ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
-use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{
     interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
@@ -32,7 +31,7 @@ use aptos_storage_service_server::{
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{on_chain_config::ConfigStorageProvider, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -41,7 +40,7 @@ use tokio::runtime::Runtime;
 /// notification listeners (for mempool and consensus, respectively).
 pub fn create_event_subscription_service(
     node_config: &NodeConfig,
-    db_rw: &DbReaderWriter,
+    db_rw: Arc<dyn ConfigStorageProvider>,
 ) -> (
     EventSubscriptionService,
     ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -57,8 +56,7 @@ pub fn create_event_subscription_service(
     )>, // (reconfig_events, jwk_updated_events) for JWK consensus
 ) {
     // Create the event subscription service
-    let mut event_subscription_service =
-        EventSubscriptionService::new(Arc::new(RwLock::new(db_rw.clone())));
+    let mut event_subscription_service = EventSubscriptionService::new(db_rw);
 
     // Create a reconfiguration subscription for mempool
     let mempool_reconfig_subscription = event_subscription_service

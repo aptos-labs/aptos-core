@@ -538,10 +538,11 @@ impl TExecutionClient for DummyExecutionClient {
 
     async fn finalize_order(
         &self,
-        _: &[Arc<PipelinedBlock>],
-        _: LedgerInfoWithSignatures,
-        _: StateComputerCommitCallBackType,
+        block: &[Arc<PipelinedBlock>],
+        li: LedgerInfoWithSignatures,
+        cb: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
+        cb(block, li);
         Ok(())
     }
 

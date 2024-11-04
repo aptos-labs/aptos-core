@@ -64,14 +64,14 @@ pub fn start_consensus(
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
 
-    let execution_proxy = ExecutionProxy::new(
-        Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
-        txn_notifier,
-        state_sync_notifier,
-        runtime.handle(),
-        TransactionFilter::new(node_config.execution.transaction_filter.clone()),
-        node_config.consensus.enable_pre_commit,
-    );
+    // let execution_proxy = ExecutionProxy::new(
+    //     Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
+    //     txn_notifier,
+    //     state_sync_notifier,
+    //     runtime.handle(),
+    //     TransactionFilter::new(node_config.execution.transaction_filter.clone()),
+    //     node_config.consensus.enable_pre_commit,
+    // );
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
@@ -86,17 +86,18 @@ pub fn start_consensus(
     );
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
 
-    let execution_client = Arc::new(ExecutionProxyClient::new(
-        node_config.consensus.clone(),
-        Arc::new(execution_proxy),
-        node_config.validator_network.as_ref().unwrap().peer_id(),
-        self_sender.clone(),
-        consensus_network_client.clone(),
-        bounded_executor.clone(),
-        rand_storage.clone(),
-        node_config.consensus_observer,
-        consensus_publisher.clone(),
-    ));
+    // let execution_client = Arc::new(ExecutionProxyClient::new(
+    //     node_config.consensus.clone(),
+    //     Arc::new(execution_proxy),
+    //     node_config.validator_network.as_ref().unwrap().peer_id(),
+    //     self_sender.clone(),
+    //     consensus_network_client.clone(),
+    //     bounded_executor.clone(),
+    //     rand_storage.clone(),
+    //     node_config.consensus_observer,
+    //     consensus_publisher.clone(),
+    // ));
+    let execution_client = Arc::new(DummyExecutionClient {});
 
     let epoch_mgr = EpochManager::new(
         node_config,
