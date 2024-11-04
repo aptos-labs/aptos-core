@@ -5,6 +5,8 @@ status-level = "skip"
 failure-output = "immediate-final"
 # Cancel test run on the first failure. Accounts for retries.
 fail-fast = true
+# Mark each test as requiring 3 threads. This avoids starvation (e.g., due to heavy tests that spawn additional threads).
+threads-required = 3
 
 junit = { path = "junit.xml" }
 

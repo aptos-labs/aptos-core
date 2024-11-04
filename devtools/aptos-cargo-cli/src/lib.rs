@@ -457,7 +457,7 @@ fn run_targeted_compiler_v2_tests(
     Ok(())
 }
 
-/// Runs the targeted unit tests
+/// Runs the targeted unit tests!
 fn run_targeted_unit_tests(
     packages_to_test: Vec<String>,
     mut direct_args: Vec<String>,
