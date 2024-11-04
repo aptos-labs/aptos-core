@@ -176,7 +176,7 @@ impl DataCollection {
             &mut compiled_cache.compiled_package_cache_v1,
             false,
         );
-        let compilation_cache = Arc::new(Mutex::new(compiled_cache));
+        let compilation_cache: Arc<Mutex<CompilationCache>> = Arc::new(Mutex::new(compiled_cache));
         let data_manager = Arc::new(Mutex::new(DataManager::new_with_dir_creation(
             &self.current_dir,
         )));
@@ -215,7 +215,7 @@ impl DataCollection {
                     let compilation_cache = compilation_cache.clone();
                     let current_dir = self.current_dir.clone();
                     let dump_write_set = self.dump_write_set;
-                    let data_manager = data_manager.clone();
+                    let data_manager= data_manager.clone();
                     let index = index_writer.clone();
 
                     let mut data_state = FakeDataStore::default();
