@@ -15,6 +15,7 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::arc_with_non_send_sync)]
 #![allow(clippy::get_first)]
+#![allow(clippy::doc_lazy_continuation)]
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},

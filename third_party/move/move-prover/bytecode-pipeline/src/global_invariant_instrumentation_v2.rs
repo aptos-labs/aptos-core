@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unexpected_cfgs)]
+
 // Transformation which injects global invariants into the bytecode.
 
 use crate::{options::ProverOptions, verification_analysis_v2::InvariantAnalysisData};

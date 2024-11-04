@@ -22,6 +22,7 @@ use move_vm_types::code::{
 use std::sync::Arc;
 
 /// Code storage that stores both modules and scripts (not thread-safe).
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(WithRuntimeEnvironment, where = "M: ModuleStorage")]
 #[delegate(ModuleStorage, where = "M: ModuleStorage")]
@@ -54,6 +55,7 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
 }
 
 /// Private implementation of code storage based on non-[Sync] script cache.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,

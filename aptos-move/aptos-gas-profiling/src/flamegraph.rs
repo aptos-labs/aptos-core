@@ -154,7 +154,7 @@ impl ExecutionAndIOCosts {
                     }
                 }
 
-                self.lines.push(&self.path(), frame_cost);
+                self.lines.push(self.path(), frame_cost);
                 self.path.pop();
             }
 

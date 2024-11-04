@@ -864,9 +864,9 @@ impl Scheduler {
 
     /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
     /// - If the index is out of bounds, return None (and invoke a check of whether
-    /// all txns can be committed).
+    ///   all txns can be committed).
     /// - If the transaction is ready for validation (EXECUTED state), return the version
-    /// to the caller.
+    ///   to the caller.
     /// - Otherwise, return None.
     fn try_validate_next_version(
         &self,
@@ -904,10 +904,10 @@ impl Scheduler {
 
     /// Grab an index to try and execute next (by fetch-and-incrementing execution_idx).
     /// - If the index is out of bounds, return None (and invoke a check of whether
-    /// all txns can be committed).
+    ///   all txns can be committed).
     /// - If the transaction is ready for execution (Ready state), attempt
-    /// to create the next incarnation (should happen exactly once), and if successful,
-    /// return the version to the caller for the corresponding ExecutionTask.
+    ///   to create the next incarnation (should happen exactly once), and if successful,
+    ///   return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(TxnIndex, Incarnation, ExecutionTaskType)> {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);

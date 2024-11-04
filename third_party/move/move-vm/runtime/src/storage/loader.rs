@@ -121,6 +121,7 @@ impl LoaderV2 {
     /// Loads the script:
     ///   1. Fetches it from the cache (or deserializes and verifies it if it is not cached).
     ///   2. Verifies type arguments (modules that define the type arguments are also loaded).
+    ///
     /// If both steps are successful, returns a [LoadedFunction] corresponding to the script's
     /// entrypoint.
     pub(crate) fn load_script(

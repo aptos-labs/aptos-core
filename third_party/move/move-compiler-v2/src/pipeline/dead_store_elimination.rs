@@ -36,6 +36,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Note that the *def* nodes are limited to side-effect-free instructions of the form:
 /// - `Assign(dst, src)`
 /// - `Load(dst, constant)`
+///
 /// This is a conservative over-approximation of side-effect-free instructions that
 /// define a local.
 ///

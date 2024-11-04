@@ -311,7 +311,7 @@ impl AnalyzeValidators {
     pub fn fetch_epoch(epoch: u64, aptos_db: &dyn DbReader) -> Result<Vec<VersionedNewBlockEvent>> {
         let batch = 100;
 
-        let mut cursor = u64::max_value();
+        let mut cursor = u64::MAX;
         let mut result: Vec<VersionedNewBlockEvent> = vec![];
         let ledger_version = aptos_db.get_latest_ledger_info()?.ledger_info().version();
 

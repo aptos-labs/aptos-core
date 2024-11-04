@@ -157,6 +157,7 @@ impl Serialize for LogEntry {
     }
 }
 
+#[allow(unexpected_cfgs)]
 impl LogEntry {
     fn new(event: &Event, thread_name: Option<&str>, enable_backtrace: bool) -> Self {
         use crate::{Value, Visitor};

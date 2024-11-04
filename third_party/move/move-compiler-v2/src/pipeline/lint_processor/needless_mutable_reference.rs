@@ -31,12 +31,14 @@ struct MutableReferenceUsageTracker {
     /// The origins tracked currently are:
     /// - function parameters that are mutable references.
     /// - mutable references acquired through `&mut` or `borrow_global_mut`.
+    ///
     /// The list above can be extended in the future.
     origins: BTreeMap<TempIndex, Loc>,
     /// Derived edges from mutable references.
     /// A derived edge y -> x is created in the following cases:
     /// - `x = y;`,  where y: &mut
     /// - `x = &mut y.f;`
+    ///
     /// Each origin also has an entry in `derived_edges` (usually mapping to an
     /// empty set, unless an origin is also derived).
     derived_edges: BTreeMap<TempIndex, BTreeSet<TempIndex>>,

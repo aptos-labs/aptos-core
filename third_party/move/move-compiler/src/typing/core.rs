@@ -37,6 +37,7 @@ pub enum Constraint {
 pub type Constraints = Vec<Constraint>;
 pub type TParamSubst = HashMap<TParamID, Type>;
 
+#[allow(dead_code)]
 pub struct FunctionInfo {
     pub defined_loc: Loc,
     pub visibility: Visibility,

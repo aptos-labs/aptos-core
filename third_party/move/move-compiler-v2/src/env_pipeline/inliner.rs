@@ -379,6 +379,7 @@ impl<'env> Inliner<'env> {
     ///   - the mapping found in `self.inline_results` for `callee`, or
     ///   - the original body of `callee` (as obtained from `self.env: &GlobalEnv`)
     /// - stores a mapping from `target` to inlining result in `self.inline_results`
+    ///
     /// Otherwise, stores a mapping from `target` to `InlineResult::Unchanged` in
     /// `self.inline_results`
     ///

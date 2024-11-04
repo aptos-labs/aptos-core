@@ -41,6 +41,7 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
 /// A (not thread-safe) implementation of code storage on top of a state view. It is never built
 /// directly by clients - only via [AsAptosCodeStorage] trait. Can be used to resolve both modules
 /// and cached scripts.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,

@@ -119,7 +119,7 @@ pub trait TResourceGroupView {
     /// Needed for backwards compatibility with the additional safety mechanism for resource
     /// groups, where the violation of the following invariant causes transaction failure:
     /// - if a resource is modified or deleted it must already exist within a group,
-    /// and if it is created, it must not previously exist.
+    ///   and if it is created, it must not previously exist.
     ///
     /// For normal resources, this is asserted, but for resource groups the behavior (that
     /// we maintain) is for the transaction to fail with INVARIANT_VIOLATION_ERROR.

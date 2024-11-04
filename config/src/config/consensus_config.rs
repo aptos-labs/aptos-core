@@ -472,6 +472,7 @@ impl ConfigSanitizer for ConsensusConfig {
     }
 }
 
+#[allow(unexpected_cfgs)]
 /// Returns true iff consensus-only-perf-test is enabled
 fn is_consensus_only_perf_test_enabled() -> bool {
     cfg_if! {

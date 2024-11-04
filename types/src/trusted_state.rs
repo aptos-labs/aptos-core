@@ -122,19 +122,19 @@ impl TrustedState {
     /// ledger info within our current epoch.
     ///
     /// + If there was a validation error, e.g., the epoch change proof was
-    /// invalid, we return an `Err`.
+    ///   invalid, we return an `Err`.
     ///
     /// + If the message was well formed but stale (i.e., the returned latest
-    /// ledger is behind our trusted version), we also return an `Err` since
-    /// stale responses should always be rejected.
+    ///   ledger is behind our trusted version), we also return an `Err` since
+    ///   stale responses should always be rejected.
     ///
     /// + If the response is fresh and there is no epoch change, we just ratchet
-    /// our trusted version to the latest ledger info and return
-    /// `Ok(TrustedStateChange::Version { .. })`.
+    ///   our trusted version to the latest ledger info and return
+    ///   `Ok(TrustedStateChange::Version { .. })`.
     ///
     /// + If there is a new epoch and the server provides a correct proof, we
-    /// ratchet our trusted version forward, update our verifier to contain
-    /// the new validator set, and return `Ok(TrustedStateChange::Epoch { .. })`.
+    ///   ratchet our trusted version forward, update our verifier to contain
+    ///   the new validator set, and return `Ok(TrustedStateChange::Epoch { .. })`.
     pub fn verify_and_ratchet<'a>(
         &self,
         state_proof: &'a StateProof,

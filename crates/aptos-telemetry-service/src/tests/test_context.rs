@@ -56,6 +56,7 @@ pub async fn new_test_context() -> TestContext {
     )
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct TestContext {
     pub config: TelemetryServiceConfig,

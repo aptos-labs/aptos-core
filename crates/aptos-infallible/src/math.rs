@@ -36,7 +36,7 @@
 /// assert_eq!(checked!(10_u32 - (1_u32 + 1_u32)).unwrap(), 8);
 /// assert_eq!(checked!(10_u32 + (1_u32 + 1_u32)).unwrap(), 12);
 ///
-/// let max = u32::max_value();
+/// let max = u32::MAX;
 /// assert!(checked!(max + 1_u32).is_err());
 /// assert!(checked!(0_u32 - 1_u32).is_err());
 ///

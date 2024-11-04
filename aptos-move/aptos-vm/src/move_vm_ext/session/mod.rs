@@ -255,6 +255,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * Remove resource group data from the deltas
     ///   * Attempt to read the existing resource group data or create a new empty container
     ///   * Apply the deltas to the resource group data
+    ///
     /// The process for translating Move deltas of resource groups to resources is
     /// * Add -- insert element in container
     ///   * If entry exists, Unreachable

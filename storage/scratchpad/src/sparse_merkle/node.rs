@@ -5,7 +5,7 @@
 //! This module defines all kinds of structures in the Sparse Merkle Tree maintained in scratch pad.
 //! There are four kinds of nodes:
 //! - A `SubTree::Empty` represents an empty subtree with zero leaf. Its root hash is assumed to be
-//! the default hash.
+//!   the default hash.
 //!
 //! - A `SubTree::NonEmpty` represents a subtree with one or more leaves, it carries its root hash.
 //!
@@ -15,12 +15,12 @@
 //! nodes as its root:
 //!
 //! - An `InternalNode` is a node that has two children. It is same as the internal node in a
-//! standard Merkle tree.
+//!   standard Merkle tree.
 //!
 //! - A `LeafNode` represents a single account. Similar to what is in storage, a leaf node has a
-//! key which is the hash of the account address as well as a value hash which is the hash of the
-//! corresponding account content. The difference is that a `LeafNode` does not always have the
-//! value, in the case when the leaf was loaded into memory as part of a non-inclusion proof.
+//!   key which is the hash of the account address as well as a value hash which is the hash of the
+//!   corresponding account content. The difference is that a `LeafNode` does not always have the
+//!   value, in the case when the leaf was loaded into memory as part of a non-inclusion proof.
 
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},

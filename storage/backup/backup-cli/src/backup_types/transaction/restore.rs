@@ -76,7 +76,7 @@ pub struct TransactionRestoreOpt {
 
 impl TransactionRestoreOpt {
     pub fn replay_from_version(&self) -> Version {
-        self.replay_from_version.unwrap_or(Version::max_value())
+        self.replay_from_version.unwrap_or(Version::MAX)
     }
 }
 

@@ -76,6 +76,7 @@ struct NoVersion;
 
 /// Private implementation of module storage based on non-[Sync] module cache and the baseline
 /// storage.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,
@@ -150,6 +151,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
 }
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,

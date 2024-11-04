@@ -69,6 +69,7 @@ impl GetPublicFullNodes {
 }
 
 /// This struct defines the format we expect each entry in the JSON to be.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct Entry {
     /// The account address of the node operator.

@@ -9,7 +9,7 @@
 //! - copy inference is already performed.
 //! - it is preferable, but not required, to have run dead store elimination (so that
 //!   dead stores do not consume and retain variable slots).
-//! side effect: this transformation removes all pre-existing annotations.
+//!   side effect: this transformation removes all pre-existing annotations.
 //!
 //! This transformation is closely related to the register allocation problem in
 //! compilers. As such, an optimal solution to reusing locals is NP-complete, as we
