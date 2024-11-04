@@ -8524,11 +8524,9 @@ name = "fuzzer"
 version = "0.1.0"
 dependencies = [
  "aptos-framework",
- "aptos-package-builder",
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.5.20",
- "move-binary-format",
  "move-core-types",
 ]
 
@@ -8545,7 +8543,6 @@ dependencies = [
  "arbitrary",
  "base64 0.13.1",
  "bcs 0.1.4",
- "hex",
  "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
