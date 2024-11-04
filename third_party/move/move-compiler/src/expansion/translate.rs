@@ -2608,10 +2608,12 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                         let body = *exp(context, pb);
                         Some(sp(loc, (bind_list, opt_cond, body)))
                     } else {
-                        context.env.add_diag(diag!(
-                            Syntax::InvalidLValue,
-                            (loc, "bind list cannot be constructed")
-                        ));
+                        if !context.env.has_errors() {
+                            context.env.add_diag(diag!(
+                                Syntax::InvalidLValue,
+                                (loc, "bind list cannot be constructed")
+                            ));
+                        }
                         None
                     }
                 })
