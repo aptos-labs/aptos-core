@@ -5,7 +5,7 @@
 //! This module contains the public APIs supported by the bytecode verifier.
 use crate::{
     ability_field_requirements, check_duplication::DuplicationChecker,
-    code_unit_verifier::CodeUnitVerifier, constants, friends,
+    code_unit_verifier::CodeUnitVerifier, constants, features::FeatureVerifier, friends,
     instantiation_loops::InstantiationLoopChecker, instruction_consistency::InstructionConsistency,
     limits::LimitsVerifier, script_signature,
     script_signature::no_additional_script_signature_checks, signature::SignatureChecker,
@@ -29,7 +29,6 @@ pub struct VerifierConfig {
     pub max_value_stack_size: usize,
     pub max_type_nodes: Option<usize>,
     pub max_push_size: Option<usize>,
-    pub max_dependency_depth: Option<usize>,
     pub max_struct_definitions: Option<usize>,
     pub max_struct_variants: Option<usize>,
     pub max_fields_in_struct: Option<usize>,
@@ -41,6 +40,8 @@ pub struct VerifierConfig {
     pub max_per_mod_meter_units: Option<u128>,
     pub use_signature_checker_v2: bool,
     pub sig_checker_v2_fix_script_ty_param_count: bool,
+    pub enable_enum_types: bool,
+    pub enable_resource_access_control: bool,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -62,9 +63,20 @@ pub fn verify_module_with_config_for_test(
     config: &VerifierConfig,
     module: &CompiledModule,
 ) -> VMResult<()> {
+    verify_module_with_config_for_test_with_version(name, config, module, None)
+}
+
+pub fn verify_module_with_config_for_test_with_version(
+    name: &str,
+    config: &VerifierConfig,
+    module: &CompiledModule,
+    bytecode_version: Option<u32>,
+) -> VMResult<()> {
     const MAX_MODULE_SIZE: usize = 65355;
     let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();
+    module
+        .serialize_for_version(bytecode_version, &mut bytes)
+        .unwrap();
     let now = Instant::now();
     let result = verify_module_with_config(config, module);
     eprintln!(
@@ -89,13 +101,17 @@ pub fn verify_module_with_config_for_test(
 }
 
 pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
+
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
+        // Always needs to run bound checker first as subsequent passes depend on it
         BoundsChecker::verify_module(module).map_err(|e| {
             // We can't point the error at the module, because if bounds-checking
             // failed, we cannot safely index into module's handle to itself.
             e.finish(Location::Undefined)
         })?;
+        FeatureVerifier::verify_module(config, module)?;
         LimitsVerifier::verify_module(config, module)?;
         DuplicationChecker::verify_module(module)?;
 
@@ -146,11 +162,17 @@ pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
 }
 
 pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
-    fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
 
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
-        BoundsChecker::verify_script(script).map_err(|e| e.finish(Location::Script))?;
+        // Always needs to run bound checker first as subsequent passes depend on it
+        BoundsChecker::verify_script(script).map_err(|e| {
+            // We can't point the error at the script, because if bounds-checking
+            // failed, we cannot safely index into script
+            e.finish(Location::Undefined)
+        })?;
+        FeatureVerifier::verify_script(config, script)?;
         LimitsVerifier::verify_script(config, script)?;
         DuplicationChecker::verify_script(script)?;
 
@@ -189,8 +211,6 @@ impl Default for VerifierConfig {
             max_value_stack_size: 1024,
             // Max number of pushes in one function
             max_push_size: None,
-            // Max depth in dependency tree for both direct and friend dependencies
-            max_dependency_depth: None,
             // Max count of structs in a module
             max_struct_definitions: None,
             // Max count of fields in a struct
@@ -217,6 +237,9 @@ impl Default for VerifierConfig {
             use_signature_checker_v2: true,
 
             sig_checker_v2_fix_script_ty_param_count: true,
+
+            enable_enum_types: true,
+            enable_resource_access_control: true,
         }
     }
 }
@@ -242,7 +265,6 @@ impl VerifierConfig {
             max_value_stack_size: 1024,
             max_type_nodes: Some(256),
             max_push_size: Some(10000),
-            max_dependency_depth: Some(100),
             max_struct_definitions: Some(200),
             max_fields_in_struct: Some(30),
             max_struct_variants: Some(90),
@@ -259,6 +281,9 @@ impl VerifierConfig {
             use_signature_checker_v2: true,
 
             sig_checker_v2_fix_script_ty_param_count: true,
+
+            enable_enum_types: true,
+            enable_resource_access_control: true,
         }
     }
 }

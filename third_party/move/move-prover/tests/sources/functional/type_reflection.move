@@ -105,6 +105,17 @@ module 0x42::test {
     spec test_type_info_aborts_if_full {
         aborts_if !type_info::spec_is_struct<T>();
     }
+
+    fun generic_type_info_verification_target<A>(): type_info::TypeInfo {
+       type_info::type_of<A>()
+    }
+    spec generic_type_info_verification_target {
+        ensures result == generic_type_info_spec_fun<A>();
+    }
+
+    spec fun generic_type_info_spec_fun<A>(): type_info::TypeInfo {
+        type_info::type_of<A>()
+    }
 }
 
 module 0x43::test {

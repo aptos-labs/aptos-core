@@ -18,7 +18,7 @@ impl std::fmt::Debug for UseCaseKey {
 
         match self {
             Platform => write!(f, "PP"),
-            ContractAddress(addr) => write!(f, "c{}", hex::encode_upper(&addr[31..])),
+            ContractAddress(addr) => write!(f, "c{}", hex::encode_upper(&addr[29..])),
             Others => write!(f, "OO"),
         }
     }

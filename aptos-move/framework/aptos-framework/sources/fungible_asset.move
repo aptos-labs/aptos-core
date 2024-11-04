@@ -960,19 +960,29 @@ module aptos_framework::fungible_asset {
         let mutable_metadata = borrow_global_mut<Metadata>(metadata_address);
 
         if (option::is_some(&name)){
-            mutable_metadata.name = option::extract(&mut name);
+            let name = option::extract(&mut name);
+            assert!(string::length(&name) <= MAX_NAME_LENGTH, error::out_of_range(ENAME_TOO_LONG));
+            mutable_metadata.name = name;
         };
         if (option::is_some(&symbol)){
-            mutable_metadata.symbol = option::extract(&mut symbol);
+            let symbol = option::extract(&mut symbol);
+            assert!(string::length(&symbol) <= MAX_SYMBOL_LENGTH, error::out_of_range(ESYMBOL_TOO_LONG));
+            mutable_metadata.symbol = symbol;
         };
         if (option::is_some(&decimals)){
-            mutable_metadata.decimals = option::extract(&mut decimals);
+            let decimals = option::extract(&mut decimals);
+            assert!(decimals <= MAX_DECIMALS, error::out_of_range(EDECIMALS_TOO_LARGE));
+            mutable_metadata.decimals = decimals;
         };
         if (option::is_some(&icon_uri)){
-            mutable_metadata.icon_uri = option::extract(&mut icon_uri);
+            let icon_uri = option::extract(&mut icon_uri);
+            assert!(string::length(&icon_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+            mutable_metadata.icon_uri = icon_uri;
         };
         if (option::is_some(&project_uri)){
-            mutable_metadata.project_uri = option::extract(&mut project_uri);
+            let project_uri = option::extract(&mut project_uri);
+            assert!(string::length(&project_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+            mutable_metadata.project_uri = project_uri;
         };
     }
 
@@ -1311,13 +1321,13 @@ module aptos_framework::fungible_asset {
         mutate_metadata(
             &mutate_metadata_ref,
             option::some(string::utf8(b"mutated_name")),
-            option::some(string::utf8(b"mutated_symbol")),
+            option::some(string::utf8(b"m_symbol")),
             option::none(),
             option::none(),
             option::none()
         );
         assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
-        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
@@ -1392,13 +1402,13 @@ module aptos_framework::fungible_asset {
         mutate_metadata(
             &mutate_metadata_ref,
             option::some(string::utf8(b"mutated_name")),
-            option::some(string::utf8(b"mutated_symbol")),
+            option::some(string::utf8(b"m_symbol")),
             option::some(10),
             option::some(string::utf8(b"http://www.mutated-example.com/favicon.ico")),
             option::some(string::utf8(b"http://www.mutated-example.com"))
         );
         assert!(name(metadata) == string::utf8(b"mutated_name"), 1);
-        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 2);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 2);
         assert!(decimals(metadata) == 10, 3);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.mutated-example.com/favicon.ico"), 4);
         assert!(project_uri(metadata) == string::utf8(b"http://www.mutated-example.com"), 5);
@@ -1414,16 +1424,113 @@ module aptos_framework::fungible_asset {
         mutate_metadata(
             &mutate_metadata_ref,
             option::some(string::utf8(b"mutated_name")),
-            option::some(string::utf8(b"mutated_symbol")),
+            option::some(string::utf8(b"m_symbol")),
             option::none(),
             option::none(),
             option::none()
         );
         assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
-        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x2000f, location = Self)]
+    fun test_mutate_metadata_name_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::some(string::utf8(b"mutated_name_will_be_too_long_for_the_maximum_length_check")),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20010, location = Self)]
+    fun test_mutate_metadata_symbol_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::some(string::utf8(b"mutated_symbol_will_be_too_long_for_the_maximum_length_check")),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20011, location = Self)]
+    fun test_mutate_metadata_decimals_over_maximum_amount(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::none(),
+            option::some(50),
+            option::none(),
+            option::none()
+        );
+    }
+
+    #[test_only]
+    fun create_exceedingly_long_uri(): vector<u8> {
+        use std::vector;
+
+        let too_long_of_uri = b"mutated_uri_will_be_too_long_for_the_maximum_length_check.com/";
+        for (i in 0..50) {
+            vector::append(&mut too_long_of_uri, b"too_long_of_uri");
+        };
+
+        too_long_of_uri
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20013, location = Self)]
+    fun test_mutate_metadata_icon_uri_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+        let too_long_of_uri = create_exceedingly_long_uri();
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::none(),
+            option::none(),
+            option::some(string::utf8(too_long_of_uri)),
+            option::none()
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20013, location = Self)]
+    fun test_mutate_metadata_project_uri_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+        let too_long_of_uri = create_exceedingly_long_uri();
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::some(string::utf8(too_long_of_uri))
+        );
     }
 
     #[test(creator = @0xcafe)]

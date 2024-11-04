@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::CONCURRENCY_GAUGE;
+use aptos_metrics_core::IntGaugeHelper;
 use aptos_storage_interface::block_info::BlockInfo;
 
 impl AptosDB {
@@ -42,8 +44,11 @@ impl AptosDB {
             internal_indexer_db.clone(),
         ));
 
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&ledger_db), pruner_config.ledger_pruner_config, internal_indexer_db);
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&ledger_db),
+            pruner_config.ledger_pruner_config,
+            internal_indexer_db,
+        );
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
@@ -57,9 +62,11 @@ impl AptosDB {
                 state_merkle_db,
                 state_kv_db,
             ),
-            ledger_commit_lock: std::sync::Mutex::new(()),
+            pre_commit_lock: std::sync::Mutex::new(()),
+            commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
+            update_subscriber: None,
         }
     }
 
@@ -114,7 +121,7 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self.get_synced_version().map_or(0, |v| v + 1);
+        let ledger_next_version = self.get_synced_version()?.map_or(0, |v| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -231,7 +238,7 @@ impl AptosDB {
             let (first_version, new_block_event) = self.event_store.get_event_by_key(
                 &new_block_event_key(),
                 block_height,
-                self.get_synced_version()?,
+                self.ensure_synced_version()?,
             )?;
             let new_block_event = bcs::from_bytes(new_block_event.event_data())?;
             Ok(BlockInfo::from_new_block_event(
@@ -243,9 +250,9 @@ impl AptosDB {
                 .ledger_db
                 .metadata_db()
                 .get_block_info(block_height)?
-                .ok_or(AptosDbError::NotFound(format!(
-                    "BlockInfo not found at height {block_height}"
-                )))?)
+                .ok_or_else(|| {
+                    AptosDbError::NotFound(format!("BlockInfo not found at height {block_height}"))
+                })?)
         }
     }
 
@@ -253,7 +260,7 @@ impl AptosDB {
         &self,
         version: Version,
     ) -> Result<(u64 /* block_height */, BlockInfo)> {
-        let synced_version = self.get_synced_version()?;
+        let synced_version = self.ensure_synced_version()?;
         ensure!(
             version <= synced_version,
             "Requested version {version} > synced version {synced_version}",
@@ -351,6 +358,8 @@ where
     if nested {
         api_impl()
     } else {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&[api_name]);
+
         let timer = Instant::now();
 
         let res = api_impl();

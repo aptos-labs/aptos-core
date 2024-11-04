@@ -60,7 +60,7 @@ jobs:
     runs-on: medium-perf-docker-with-local-ssd
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }} # the default run is 300 minutes (5 hours). Specified here because workflow_dispatch uses string rather than number
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/fullnode-sync
         with:
@@ -73,7 +73,7 @@ jobs:
           METRICS_DUMP_FILE_PATH: /tmp/metrics
 
       - name: Upload node logs as an artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: node_log
@@ -82,7 +82,7 @@ jobs:
           retention-days: 14
 
       - name: Upload the metrics dump as an artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: metrics
@@ -105,6 +105,6 @@ jobs:
       # Because we have to checkout the actions and then check out a different
       # git ref, it's possible the actions directory will be modified. So, we
       # need to check it out again for the Post Run actions/checkout to succeed.
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: actions

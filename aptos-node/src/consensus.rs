@@ -3,10 +3,20 @@
 
 use crate::{network::ApplicationNetworkInterfaces, services};
 use aptos_admin_service::AdminService;
+use aptos_channels::aptos_channel::Receiver;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
     consensus_observer::{
-        network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
+        network::{
+            network_events::ConsensusObserverNetworkEvents,
+            network_handler::{
+                ConsensusObserverNetworkHandler, ConsensusObserverNetworkMessage,
+                ConsensusPublisherNetworkMessage,
+            },
+            observer_client::ConsensusObserverClient,
+            observer_message::ConsensusObserverMessage,
+        },
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     consensus_provider::start_consensus_observer,
     network_interface::ConsensusMsg,
@@ -17,86 +27,13 @@ use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_jwk_consensus::{start_jwk_consensus_runtime, types::JWKConsensusMsg};
-use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
+use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-
-/// Creates and returns the consensus observer runtime (if either the
-/// observer or publisher is enabled).
-pub fn create_consensus_observer_runtime(
-    node_config: &NodeConfig,
-    consensus_observer_network_interfaces: Option<
-        ApplicationNetworkInterfaces<ConsensusObserverMessage>,
-    >,
-    consensus_publisher: Option<Arc<ConsensusPublisher>>,
-    consensus_notifier: ConsensusNotifier,
-    consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
-    db_rw: DbReaderWriter,
-    consensus_observer_reconfig_subscription: Option<
-        ReconfigNotificationListener<DbBackedOnChainConfig>,
-    >,
-) -> Option<Runtime> {
-    if node_config
-        .consensus_observer
-        .is_observer_or_publisher_enabled()
-    {
-        // Fetch the network interfaces and reconfig subscription
-        let consensus_observer_network_interfaces = consensus_observer_network_interfaces
-            .expect("Consensus observer is enabled, but network interfaces are missing!");
-
-        // Start the consensus observer runtime
-        let consensus_observer_runtime = start_consensus_observer(
-            node_config,
-            consensus_observer_network_interfaces.network_client,
-            consensus_observer_network_interfaces.network_service_events,
-            consensus_publisher,
-            Arc::new(consensus_notifier),
-            consensus_to_mempool_sender,
-            db_rw,
-            consensus_observer_reconfig_subscription,
-        );
-        Some(consensus_observer_runtime)
-    } else {
-        None
-    }
-}
-
-/// Creates and returns the consensus publisher and runtime (if enabled)
-pub fn create_consensus_publisher(
-    node_config: &NodeConfig,
-    consensus_observer_network_interfaces: &Option<
-        ApplicationNetworkInterfaces<ConsensusObserverMessage>,
-    >,
-) -> (Option<Runtime>, Option<Arc<ConsensusPublisher>>) {
-    if node_config.consensus_observer.publisher_enabled {
-        // Get the network interfaces
-        let consensus_observer_network_interfaces = consensus_observer_network_interfaces
-            .as_ref()
-            .expect("Consensus publisher is enabled, but network interfaces are missing!");
-
-        // Create the publisher runtime
-        let runtime = aptos_runtimes::spawn_named_runtime("publisher".into(), None);
-
-        // Create the consensus publisher
-        let (consensus_publisher, outbound_message_receiver) = ConsensusPublisher::new(
-            consensus_observer_network_interfaces.network_client.clone(),
-            node_config.consensus_observer,
-        );
-
-        // Start the consensus publisher
-        runtime.spawn(consensus_publisher.clone().start(outbound_message_receiver));
-
-        // Return the runtime and publisher
-        (Some(runtime), Some(Arc::new(consensus_publisher)))
-    } else {
-        (None, None)
-    }
-}
 
 /// Creates and starts the consensus runtime (if enabled)
 pub fn create_consensus_runtime(
@@ -136,13 +73,9 @@ pub fn create_dkg_runtime(
     )>,
     dkg_network_interfaces: Option<ApplicationNetworkInterfaces<DKGMessage>>,
 ) -> (VTxnPoolState, Option<Runtime>) {
-    let maybe_dkg_dealer_sk =
-        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
-    debug!("maybe_dkg_dealer_sk={:?}", maybe_dkg_dealer_sk);
-
     let vtxn_pool = VTxnPoolState::default();
-    let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
-        (Some(interfaces), Ok(dkg_dealer_sk)) => {
+    let dkg_runtime = match dkg_network_interfaces {
+        Some(interfaces) => {
             let ApplicationNetworkInterfaces {
                 network_client,
                 network_service_events,
@@ -153,7 +86,7 @@ pub fn create_dkg_runtime(
             let rb_config = node_config.consensus.rand_rb_config.clone();
             let dkg_runtime = start_dkg_runtime(
                 my_addr,
-                dkg_dealer_sk,
+                &node_config.consensus.safety_rules,
                 network_client,
                 network_service_events,
                 reconfig_events,
@@ -180,15 +113,8 @@ pub fn create_jwk_consensus_runtime(
     jwk_consensus_network_interfaces: Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     vtxn_pool: &VTxnPoolState,
 ) -> Option<Runtime> {
-    let maybe_jwk_consensus_key =
-        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
-    debug!(
-        "jwk_consensus_key_err={:?}",
-        maybe_jwk_consensus_key.as_ref().err()
-    );
-
-    let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, maybe_jwk_consensus_key) {
-        (Some(interfaces), Ok(consensus_key)) => {
+    let jwk_consensus_runtime = match jwk_consensus_network_interfaces {
+        Some(interfaces) => {
             let ApplicationNetworkInterfaces {
                 network_client,
                 network_service_events,
@@ -199,7 +125,7 @@ pub fn create_jwk_consensus_runtime(
             let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
             let jwk_consensus_runtime = start_jwk_consensus_runtime(
                 my_addr,
-                consensus_key,
+                &node_config.consensus.safety_rules,
                 network_client,
                 network_service_events,
                 reconfig_events,
@@ -211,4 +137,169 @@ pub fn create_jwk_consensus_runtime(
         _ => None,
     };
     jwk_consensus_runtime
+}
+
+/// Creates and starts the consensus observer and publisher (if enabled)
+pub fn create_consensus_observer_and_publisher(
+    node_config: &NodeConfig,
+    consensus_observer_interfaces: Option<ApplicationNetworkInterfaces<ConsensusObserverMessage>>,
+    consensus_notifier: ConsensusNotifier,
+    consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
+    db_rw: DbReaderWriter,
+    consensus_observer_reconfig_subscription: Option<
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+    >,
+) -> (
+    Option<Runtime>,
+    Option<Runtime>,
+    Option<Arc<ConsensusPublisher>>,
+) {
+    // If none of the consensus observer or publisher are enabled, return early
+    if !node_config
+        .consensus_observer
+        .is_observer_or_publisher_enabled()
+    {
+        return (None, None, None);
+    }
+
+    // Fetch the consensus observer network client and events
+    let consensus_observer_interfaces = consensus_observer_interfaces
+        .expect("Consensus observer is enabled, but the network interfaces are missing!");
+    let consensus_observer_client = consensus_observer_interfaces.network_client;
+    let consensus_observer_events = consensus_observer_interfaces.network_service_events;
+
+    // Create the consensus observer client and network handler
+    let consensus_observer_client =
+        Arc::new(ConsensusObserverClient::new(consensus_observer_client));
+    let (
+        consensus_observer_runtime,
+        consensus_observer_message_receiver,
+        consensus_publisher_message_receiver,
+    ) = create_observer_network_handler(node_config, consensus_observer_events);
+
+    // Create the consensus publisher (if enabled)
+    let (consensus_publisher_runtime, consensus_publisher) = create_consensus_publisher(
+        node_config,
+        consensus_observer_client.clone(),
+        consensus_publisher_message_receiver,
+    );
+
+    // Create the consensus observer (if enabled)
+    create_consensus_observer(
+        node_config,
+        &consensus_observer_runtime,
+        consensus_observer_client,
+        consensus_observer_message_receiver,
+        consensus_publisher.clone(),
+        consensus_notifier,
+        consensus_to_mempool_sender,
+        db_rw,
+        consensus_observer_reconfig_subscription,
+    );
+
+    (
+        Some(consensus_observer_runtime),
+        consensus_publisher_runtime,
+        consensus_publisher,
+    )
+}
+
+/// Creates and starts the consensus observer (if enabled)
+fn create_consensus_observer(
+    node_config: &NodeConfig,
+    consensus_observer_runtime: &Runtime,
+    consensus_observer_client: Arc<
+        ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+    >,
+    consensus_observer_message_receiver: Receiver<(), ConsensusObserverNetworkMessage>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    state_sync_notifier: ConsensusNotifier,
+    consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
+    db_rw: DbReaderWriter,
+    observer_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+) {
+    // If the observer is not enabled, return early
+    if !node_config.consensus_observer.observer_enabled {
+        return;
+    }
+
+    // Create the consensus observer
+    start_consensus_observer(
+        node_config,
+        consensus_observer_runtime,
+        consensus_observer_client,
+        consensus_observer_message_receiver,
+        consensus_publisher,
+        Arc::new(state_sync_notifier),
+        consensus_to_mempool_sender,
+        db_rw,
+        observer_reconfig_subscription,
+    );
+}
+
+/// Creates and returns the consensus publisher and runtime (if enabled)
+fn create_consensus_publisher(
+    node_config: &NodeConfig,
+    consensus_observer_client: Arc<
+        ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+    >,
+    publisher_message_receiver: Receiver<(), ConsensusPublisherNetworkMessage>,
+) -> (Option<Runtime>, Option<Arc<ConsensusPublisher>>) {
+    // If the publisher is not enabled, return early
+    if !node_config.consensus_observer.publisher_enabled {
+        return (None, None);
+    }
+
+    // Create the publisher runtime
+    let runtime = aptos_runtimes::spawn_named_runtime("publisher".into(), None);
+
+    // Create the consensus publisher
+    let (consensus_publisher, outbound_message_receiver) =
+        ConsensusPublisher::new(node_config.consensus_observer, consensus_observer_client);
+
+    // Start the consensus publisher
+    runtime.spawn(
+        consensus_publisher
+            .clone()
+            .start(outbound_message_receiver, publisher_message_receiver),
+    );
+
+    // Return the runtime and publisher
+    (Some(runtime), Some(Arc::new(consensus_publisher)))
+}
+
+/// Creates the consensus observer network handler, and returns the observer
+/// runtime, observer message receiver, and publisher message receiver.
+fn create_observer_network_handler(
+    node_config: &NodeConfig,
+    consensus_observer_events: NetworkServiceEvents<ConsensusObserverMessage>,
+) -> (
+    Runtime,
+    Receiver<(), ConsensusObserverNetworkMessage>,
+    Receiver<(), ConsensusPublisherNetworkMessage>,
+) {
+    // Create the consensus observer runtime
+    let consensus_observer_runtime = aptos_runtimes::spawn_named_runtime("observer".into(), None);
+
+    // Create the consensus observer network events
+    let consensus_observer_events = ConsensusObserverNetworkEvents::new(consensus_observer_events);
+
+    // Create the consensus observer network handler
+    let (
+        consensus_observer_network_handler,
+        consensus_observer_message_receiver,
+        consensus_publisher_message_receiver,
+    ) = ConsensusObserverNetworkHandler::new(
+        node_config.consensus_observer,
+        consensus_observer_events,
+    );
+
+    // Start the consensus observer network handler
+    consensus_observer_runtime.spawn(consensus_observer_network_handler.start());
+
+    (
+        consensus_observer_runtime,
+        consensus_observer_message_receiver,
+        consensus_publisher_message_receiver,
+    )
 }

@@ -53,27 +53,23 @@ fun explicate_drop::test0(): u8 {
      var $t1: &u8
      var $t2: u8
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := 42
      # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t1 := borrow_local($t2)
      # live vars: $t1
-     # graph: {@100=local($t2)[borrow_imm -> @101],@101=derived[]}
-     # locals: {$t1=@101,$t2=@100}
-     # globals: {}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   => #1 via [value] at line 4
      #
   2: $t0 := read_ref($t1)
      # live vars: $t0
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   3: return $t0
 }
@@ -87,30 +83,26 @@ fun explicate_drop::test0(): u8 {
      var $t2: u8
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := 42
      # abort state: {returns}
      # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t1 := borrow_local($t2)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {@100=local($t2)[borrow_imm -> @101],@101=derived[]}
-     # locals: {$t1=@101,$t2=@100}
-     # globals: {}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   => #1 via [value] at line 4
      #
   2: $t0 := read_ref($t1)
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   3: return $t0
 }

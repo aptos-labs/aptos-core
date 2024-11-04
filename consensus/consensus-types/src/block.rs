@@ -116,6 +116,9 @@ impl Block {
                 Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
                 },
+                Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                    opt_quorum_store_payload.num_txns()
+                },
             },
         }
     }

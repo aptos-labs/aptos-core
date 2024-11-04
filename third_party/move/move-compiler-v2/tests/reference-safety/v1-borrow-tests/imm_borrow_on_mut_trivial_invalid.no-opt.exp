@@ -1,15 +1,12 @@
 
 Diagnostics:
-error: cannot mutably borrow since immutable references exist
+error: cannot mutably borrow field `f` of value which is already borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_trivial_invalid.move:12:42
    │
 10 │         let returned_ref = bump_and_give(x_ref);
-   │                            -------------------- previous call result
+   │                            -------------------- previously borrowed here
 11 │         // ERROR Cannot mutably borrow from `x_ref` it is being borrowed by `returned_ref`
 12 │         assert!(*returned_ref == *freeze(&mut x_ref.f) + 1, 42);
-   │                                  --------^^^^^^^^^^^^-
-   │                                  │       │
-   │                                  │       mutable borrow attempted here
-   │                                  requirement enforced here
+   │                                          ^^^^^^^^^^^^ borrow attempted here
 13 │         returned_ref
    │         ------------ conflicting reference `returned_ref` used here

@@ -10,6 +10,7 @@ use crate::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
         TransactionPayload,
     },
+    AptosCoinType, CoinType,
 };
 use aptos_crypto::HashValue;
 pub use move_core_types::abi::{
@@ -161,7 +162,9 @@ pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
 }
 
 pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::resource_typed::<CoinStoreResource>(&address).unwrap())
+    StorageLocation::Specific(
+        StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&address).unwrap(),
+    )
 }
 
 pub fn current_ts_location() -> StorageLocation {
@@ -174,7 +177,10 @@ pub fn features_location() -> StorageLocation {
 
 pub fn aptos_coin_info_location() -> StorageLocation {
     StorageLocation::Specific(
-        StateKey::resource_typed::<CoinInfoResource>(&AccountAddress::ONE).unwrap(),
+        StateKey::resource_typed::<CoinInfoResource<AptosCoinType>>(
+            &AptosCoinType::coin_info_address(),
+        )
+        .unwrap(),
     )
 }
 

@@ -496,7 +496,7 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     | ImmBorrowVariantField(_)
                     | ImmBorrowVariantFieldGeneric(_) => {
                         // TODO(#13806): implement
-                        panic!("Struct variant bytecode NYI: {:?}", code[bytecode_idx])
+                        panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
                     },
                 };
 

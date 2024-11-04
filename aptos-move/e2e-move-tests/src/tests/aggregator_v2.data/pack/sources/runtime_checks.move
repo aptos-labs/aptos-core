@@ -118,6 +118,21 @@ module 0x1::runtime_checks {
         let _ = bcs::to_bytes(&a);
     }
 
+    public entry fun test_serialized_size_with_aggregators() {
+        let a = with_aggregator<u64>();
+        let _ = bcs::serialized_size(&a);
+    }
+
+    public entry fun test_serialized_size_with_snapshots() {
+        let a = with_snapshot<u128>(0);
+        let _ = bcs::serialized_size(&a);
+    }
+
+    public entry fun test_serialized_size_with_derived_string_snapshots() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let _ = bcs::serialized_size(&a);
+    }
+
     //
     // String utils:
     //   - to_string

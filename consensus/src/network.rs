@@ -29,6 +29,7 @@ use aptos_consensus_types::{
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
+    round_timeout::RoundTimeoutMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
@@ -170,16 +171,12 @@ pub struct NetworkReceivers {
 
 #[async_trait::async_trait]
 pub trait QuorumStoreSender: Send + Clone {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
-
     async fn request_batch(
         &self,
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse>;
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_batch_info_msg(
         &self,
@@ -202,7 +199,7 @@ pub struct NetworkSender {
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-    validators: ValidatorVerifier,
+    validators: Arc<ValidatorVerifier>,
     time_service: aptos_time_service::TimeService,
 }
 
@@ -211,7 +208,7 @@ impl NetworkSender {
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-        validators: ValidatorVerifier,
+        validators: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
             author,
@@ -321,6 +318,8 @@ impl NetworkSender {
     }
 
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+
         let self_author = self.author;
         let mut other_validators: Vec<_> = self
             .validators
@@ -350,7 +349,7 @@ impl NetworkSender {
             if self.author == peer {
                 let self_msg = Event::Message(self.author, msg.clone());
                 if let Err(err) = self_sender.send(self_msg).await {
-                    error!(error = ?err, "Error delivering a self msg");
+                    warn!(error = ?err, "Error delivering a self msg");
                 }
                 continue;
             }
@@ -406,6 +405,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg) {
+        fail_point!("consensus::send::round_timeout", |_| ());
+        let msg = ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout));
         self.broadcast(msg).await
     }
 
@@ -474,12 +479,6 @@ impl NetworkSender {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for NetworkSender {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
-        fail_point!("consensus::send::batch_request", |_| ());
-        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
-        self.send(msg, recipients).await
-    }
-
     async fn request_batch(
         &self,
         request: BatchRequest,
@@ -504,12 +503,6 @@ impl QuorumStoreSender for NetworkSender {
             },
             _ => Err(anyhow!("Invalid batch response")),
         }
-    }
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        fail_point!("consensus::send::batch", |_| ());
-        let msg = ConsensusMsg::BatchResponse(Box::new(batch));
-        self.send(msg, recipients).await
     }
 
     async fn send_signed_batch_info_msg(
@@ -765,6 +758,7 @@ impl NetworkTask {
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)

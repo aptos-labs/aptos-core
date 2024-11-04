@@ -466,7 +466,7 @@ impl<
         }
 
         // Get the highest synced and known ledger info versions
-        let highest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
+        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
@@ -555,12 +555,13 @@ impl<
                 .ok_or_else(|| {
                     Error::IntegerOverflow("The number of versions behind has overflown!".into())
                 })?;
-            if num_versions_behind
-                < self
-                    .driver_configuration
-                    .config
-                    .num_versions_to_skip_snapshot_sync
-            {
+            let max_num_versions_behind = self
+                .driver_configuration
+                .config
+                .num_versions_to_skip_snapshot_sync;
+
+            // Check if the node is too far behind to fast sync
+            if num_versions_behind < max_num_versions_behind {
                 info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                     "The node is only {} versions behind, will skip bootstrapping.",
                     num_versions_behind
@@ -570,10 +571,11 @@ impl<
                 // validator, consensus will take control and sync depending on how it sees fit.
                 self.bootstrapping_complete().await
             } else {
-                panic!("Fast syncing is currently unsupported for nodes with existing state! \
-                        You are currently {:?} versions behind the latest snapshot version ({:?}). Either \
-                        select a different syncing mode, or delete your storage and restart your node.",
-                       num_versions_behind, highest_known_ledger_version);
+                panic!("You are currently {:?} versions behind the latest snapshot version ({:?}). This is \
+                        more than the maximum allowed for fast sync ({:?}). If you want to fast sync to the \
+                        latest state, delete your storage and restart your node. Otherwise, if you want to \
+                        sync all the missing data, use intelligent syncing mode!",
+                       num_versions_behind, highest_known_ledger_version, max_num_versions_behind);
             }
         }
     }
@@ -1175,7 +1177,7 @@ impl<
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     utils::apply_transaction_outputs(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -1196,7 +1198,7 @@ impl<
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -1217,7 +1219,7 @@ impl<
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -1227,7 +1229,7 @@ impl<
                 } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
                 {
                     utils::apply_transaction_outputs(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,

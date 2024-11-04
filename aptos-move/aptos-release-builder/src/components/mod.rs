@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
+use aptos_crypto::HashValue;
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_infallible::duration_since_epoch;
 use aptos_rest_client::Client;
@@ -25,6 +26,7 @@ use aptos_types::{
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
+use move_binary_format::file_format_common::VERSION_6;
 use once_cell::sync::Lazy;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -232,8 +234,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )
                     .unwrap(),
                 );
@@ -251,7 +254,12 @@ impl ReleaseEntry {
                     ),
                     None => {
                         match client {
-                            Some(client) => Some(fetch_config::<GasScheduleV2>(client)?),
+                            Some(_client) => {
+                                // We could return `Some(fetch_config::<GasScheduleV2>(client)?)`,
+                                // but this makes certain test scenarios flaky, so just return
+                                // None here
+                                None
+                            },
                             None => {
                                 println!("!!! WARNING !!!");
                                 println!("Generating gas schedule upgrade without a base for comparison.");
@@ -275,8 +283,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -288,8 +297,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -316,8 +326,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -329,8 +340,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -343,8 +355,9 @@ impl ReleaseEntry {
                             if is_multi_step {
                                 get_execution_hash(result)
                             } else {
-                                "".to_owned().into_bytes()
+                                None
                             },
+                            is_multi_step,
                         )?,
                     );
                 }
@@ -356,8 +369,9 @@ impl ReleaseEntry {
                     if is_multi_step {
                         get_execution_hash(result)
                     } else {
-                        "".to_owned().into_bytes()
+                        None
                     },
+                    is_multi_step,
                 )?);
             },
             ReleaseEntry::RawScript(script_path) => {
@@ -409,8 +423,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?,
                 );
             },
@@ -422,8 +437,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?,
                 );
             },
@@ -717,7 +733,7 @@ impl Default for ReleaseConfig {
                     metadata: ProposalMetadata::default(),
                     name: "framework".to_string(),
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                        bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                        bytecode_version: VERSION_6,
                         git_hash: None,
                     })],
                 },
@@ -747,9 +763,9 @@ impl Default for ReleaseConfig {
                             transaction_shuffler_type:
                                 TransactionShufflerType::DeprecatedSenderAwareV1(32),
                         })),
-                        ReleaseEntry::RawScript(PathBuf::from(
-                            "data/proposals/empty_multi_step.move",
-                        )),
+                        //ReleaseEntry::RawScript(PathBuf::from(
+                        //    "data/proposals/empty_multi_step.move",
+                        //)),
                     ],
                 },
             ],
@@ -757,9 +773,9 @@ impl Default for ReleaseConfig {
     }
 }
 
-pub fn get_execution_hash(result: &[(String, String)]) -> Vec<u8> {
+pub fn get_execution_hash(result: &[(String, String)]) -> Option<HashValue> {
     if result.is_empty() {
-        "vector::empty<u8>()".to_owned().into_bytes()
+        None
     } else {
         let temp_script_path = TempPath::new();
         temp_script_path.create_as_file().unwrap();
@@ -780,7 +796,7 @@ pub fn get_execution_hash(result: &[(String, String)]) -> Vec<u8> {
         }
         .generate_hash()
         .unwrap();
-        hash.to_vec()
+        Some(hash)
     }
 }
 
@@ -821,8 +837,8 @@ impl Default for ProposalMetadata {
     }
 }
 
-fn get_signer_arg(is_testnet: bool, next_execution_hash: &[u8]) -> &str {
-    if is_testnet && next_execution_hash.is_empty() {
+fn get_signer_arg(is_testnet: bool, next_execution_hash: &Option<HashValue>) -> &str {
+    if is_testnet && next_execution_hash.is_none() {
         "framework_signer"
     } else {
         "&framework_signer"

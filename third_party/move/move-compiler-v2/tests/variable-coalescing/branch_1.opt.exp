@@ -28,12 +28,12 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64
   0: $t3 := move($t1)
-  1: if ($t0) goto 2 else goto 6
-  2: label L0
-  3: $t4 := 0
-  4: $t3 := move($t4)
-  5: goto 7
-  6: label L1
+  1: if ($t0) goto 4 else goto 2
+  2: label L3
+  3: goto 7
+  4: label L0
+  5: $t4 := 0
+  6: $t3 := move($t4)
   7: label L2
   8: $t5 := 1
   9: $t2 := +($t3, $t5)
@@ -53,19 +53,19 @@ fun m::foo($t0: bool, $t1: u64): u64 {
   0: $t3 := move($t1)
      # live vars: $t0, $t3
      # events: e:$t0
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 4 else goto 2
      # live vars: $t3
-  2: label L0
+  2: label L3
+     # live vars: $t3
+  3: goto 7
+     # live vars: $t3
+  4: label L0
      # live vars:
      # events: b:$t4
-  3: $t4 := 0
+  5: $t4 := 0
      # live vars: $t4
      # events: e:$t4
-  4: $t3 := move($t4)
-     # live vars: $t3
-  5: goto 7
-     # live vars: $t3
-  6: label L1
+  6: $t3 := move($t4)
      # live vars: $t3
   7: label L2
      # live vars: $t3
@@ -88,12 +88,12 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64 [unused]
   0: $t1 := move($t1)
-  1: if ($t0) goto 2 else goto 6
-  2: label L0
-  3: $t4 := 0
-  4: $t1 := move($t4)
-  5: goto 7
-  6: label L1
+  1: if ($t0) goto 4 else goto 2
+  2: label L3
+  3: goto 7
+  4: label L0
+  5: $t4 := 0
+  6: $t1 := move($t4)
   7: label L2
   8: $t4 := 1
   9: $t1 := +($t1, $t4)
@@ -108,12 +108,12 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t3: u64 [unused]
      var $t4: u64
      var $t5: u64 [unused]
-  0: if ($t0) goto 1 else goto 5
-  1: label L0
-  2: $t4 := 0
-  3: $t1 := move($t4)
-  4: goto 6
-  5: label L1
+  0: if ($t0) goto 3 else goto 1
+  1: label L3
+  2: goto 6
+  3: label L0
+  4: $t4 := 0
+  5: $t1 := move($t4)
   6: label L2
   7: $t4 := 1
   8: $t1 := +($t1, $t4)
@@ -130,18 +130,17 @@ foo(Arg0: bool, Arg1: u64): u64 /* def_idx: 0 */ {
 L2:	loc0: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
-	1: BrFalse(5)
+	1: BrTrue(3)
 B1:
-	2: LdU64(0)
-	3: StLoc[1](Arg1: u64)
-	4: Branch(5)
+	2: Branch(5)
 B2:
-	5: LdU64(1)
-	6: StLoc[2](loc0: u64)
-	7: MoveLoc[1](Arg1: u64)
-	8: MoveLoc[2](loc0: u64)
-	9: Add
-	10: Ret
+	3: LdU64(0)
+	4: StLoc[1](Arg1: u64)
+B3:
+	5: MoveLoc[1](Arg1: u64)
+	6: LdU64(1)
+	7: Add
+	8: Ret
 }
 }
 ============ bytecode verification succeeded ========

@@ -102,6 +102,21 @@ fn test_serialization() {
 }
 
 #[test]
+fn test_serialized_size() {
+    let func_names = vec![
+        "0x1::runtime_checks::test_serialized_size_with_aggregators",
+        "0x1::runtime_checks::test_serialized_size_with_snapshots",
+        "0x1::runtime_checks::test_serialized_size_with_derived_string_snapshots",
+    ];
+
+    // Serialized size of delayed values is deterministic and fixed, so running
+    // these functions should succeed, unlike regular serialization.
+    run_entry_functions(func_names, |status: ExecutionStatus| {
+        assert_eq!(status, ExecutionStatus::Success);
+    });
+}
+
+#[test]
 fn test_string_utils() {
     let func_names = vec![
         // Aggregators.

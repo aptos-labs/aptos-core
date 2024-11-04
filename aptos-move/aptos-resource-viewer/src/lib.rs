@@ -15,6 +15,7 @@ use move_binary_format::CompiledModule;
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    transaction_argument::TransactionArgument,
     value::{MoveTypeLayout, MoveValue},
 };
 use move_resource_viewer::MoveValueAnnotator;
@@ -65,7 +66,7 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         &self,
         tag: &StructTag,
         blob: &[u8],
-    ) -> anyhow::Result<Vec<(Identifier, MoveValue)>> {
+    ) -> anyhow::Result<(Option<Identifier>, Vec<(Identifier, MoveValue)>)> {
         self.0.move_struct_fields(tag, blob)
     }
 
@@ -78,6 +79,15 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         self.0
             .view_function_arguments(module, function, ty_args, args)
+    }
+
+    pub fn view_script_arguments(
+        &self,
+        script_bytes: &[u8],
+        args: &[TransactionArgument],
+        ty_args: &[TypeTag],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        self.0.view_script_arguments(script_bytes, args, ty_args)
     }
 
     pub fn view_fully_decorated_ty_layout(

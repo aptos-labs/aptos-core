@@ -180,7 +180,7 @@ pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
 pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_block_size_when_pull",
-        "Histogram for the number of transactions per block when pulled for consensus.",
+        "Histogram for the number of unique transactions per block when pulled for consensus.",
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
@@ -189,8 +189,40 @@ pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
 pub static TOTAL_BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_total_block_size_when_pull",
-        "Histogram for the total size of transactions per block when pulled for consensus.",
+        "Histogram for the total number of transactions including duplicates per block when pulled for consensus.",
         BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of transactions per block when pulled for consensus.
+pub static CONSENSUS_PULL_NUM_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_txns",
+        "Histogram for the number of transactions including duplicates when pulled for consensus.",
+        &["pull_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of transactions per block when pulled for consensus.
+pub static CONSENSUS_PULL_NUM_UNIQUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_unique_txns",
+        "Histogram for the number of unique transactions when pulled for consensus.",
+        &["pull_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PULL_SIZE_IN_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_size_in_bytes",
+        "Histogram for the size of the pulled transactions for consensus.",
+        &["pull_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -809,6 +841,15 @@ pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
+pub static GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_garbage_collected_batch_count",
+        "Count of the number of garbage collected batches.",
+        &["reason"]
+    )
+    .unwrap()
+});
+
 /// Histogram of the time it takes to compute bucketed batches after txns are pulled from mempool.
 pub static BATCH_CREATION_COMPUTE_LATENCY: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
@@ -843,10 +884,39 @@ pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+pub static SIGNED_BATCH_INFO_VERIFY_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_signed_batch_info_verify_duration",
+            "Histogram of the time durations for verifying signed batch info.",
+        )
+        .unwrap(),
+    )
+});
+
 pub static BATCH_SUCCESSFUL_CREATION: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_batch_successful_creation",
         "Counter for whether we are successfully creating batches",
+    )
+});
+
+pub static QUORUM_STORE_MSG_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_msg_count",
+        "Count of messages received by various quoroum store components",
+        &["type"]
+    )
+    .unwrap()
+});
+
+pub static TIME_LAG_IN_BATCH_PROOF_QUEUE: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_time_lag_in_proof_queue",
+            "Time lag between txn timestamp and current time when txn is added to proof queue",
+        )
+        .unwrap(),
     )
 });
 
@@ -874,6 +944,54 @@ pub static BATCH_RECEIVED_LATE_REPLIES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_batch_received_late_replies",
         "Number of votes that came late."
+    )
+    .unwrap()
+});
+
+pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_batch_coord_requests",
+        "Number of requests to batch coordinator.",
+        &["bucket"]
+    )
+    .unwrap()
+});
+
+// Histogram buckets that expand DEFAULT_BUCKETS with more granularity:
+// * 0.3 to 2.0: step 0.1
+// * 2.0 to 4.0: step 0.2
+// * 4.0 to 7.5: step 0.5
+const BATCH_TRACING_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1,
+    1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0,
+    4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 10.0,
+];
+
+pub static BATCH_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_tracing",
+        "Histogram for different stages of a QS batch",
+        &["author", "stage"],
+        BATCH_TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static BATCH_VOTE_PROGRESS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_vote_progress",
+        "Histogram for vote collection of a QS batch",
+        &["author", "vote_pct"],
+        BATCH_TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static PROOF_MANAGER_OUT_OF_ORDER_PROOF_INSERTION: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_proof_manager_ooo_proof_insert",
+        "Number of ooo proof insertions into proof manager",
+        &["author"]
     )
     .unwrap()
 });

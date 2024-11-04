@@ -133,7 +133,8 @@ pub(crate) struct StructEntry {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructLayout {
-    Singleton(BTreeMap<Symbol, FieldData>),
+    /// The second bool is true iff the struct has positional fields
+    Singleton(BTreeMap<Symbol, FieldData>, bool),
     Variants(Vec<StructVariant>),
     None,
 }
@@ -144,13 +145,15 @@ pub(crate) struct StructVariant {
     pub name: Symbol,
     pub attributes: Vec<Attribute>,
     pub fields: BTreeMap<Symbol, FieldData>,
+    pub is_positional: bool,
 }
 
 /// A declaration of a function.
 #[derive(Debug, Clone)]
 pub(crate) struct FunEntry {
-    pub loc: Loc,      // location of the entire function span
-    pub name_loc: Loc, // location of just the function name
+    pub loc: Loc,             // location of the entire function span
+    pub name_loc: Loc,        // location of just the function name
+    pub result_type_loc: Loc, // location of the result type declaration
     pub module_id: ModuleId,
     pub fun_id: FunId,
     pub visibility: Visibility,
@@ -266,6 +269,9 @@ impl<'env> ModelBuilder<'env> {
             builder_struct_table: Some(&self.reverse_struct_table),
             module_name: None,
             display_type_vars: false,
+            used_modules: BTreeSet::new(),
+            use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -394,7 +400,7 @@ impl<'env> ModelBuilder<'env> {
                         &entry.name_loc,
                         &format!(
                             "parameter name `{}` indicates a receiver function but \
-                        the type `{}` {}. Consider using a different name.",
+                             the type `{}` {}. Consider using a different name.",
                             well_known::RECEIVER_PARAM_NAME,
                             base_type.display(&type_ctx()),
                             reason
@@ -408,7 +414,7 @@ impl<'env> ModelBuilder<'env> {
                         if !matches!(ty, Type::TypeParameter(_)) {
                             diag(&format!(
                                 "must only use type parameters \
-                            but instead uses `{}`",
+                                 but instead uses `{}`",
                                 ty.display(&type_ctx())
                             ))
                         } else if !seen.insert(ty) {
@@ -428,7 +434,7 @@ impl<'env> ModelBuilder<'env> {
                         if &entry.module_id != mid {
                             diag(
                                 "is declared outside of this module \
-                            and new receiver functions cannot be added",
+                                 and new receiver functions cannot be added",
                             )
                         } else {
                             // The instantiation must be fully generic.
@@ -451,7 +457,7 @@ impl<'env> ModelBuilder<'env> {
                         {
                             diag(
                                 "is associated with the standard vector module \
-                                and new receiver functions cannot be added",
+                                 and new receiver functions cannot be added",
                             )
                         } else {
                             // See above  for structs
@@ -460,9 +466,12 @@ impl<'env> ModelBuilder<'env> {
                                 .insert(name.symbol, name.clone());
                         }
                     },
+                    Type::Error => {
+                        // Ignore this, there will be a message where the error type is generated.
+                    },
                     _ => diag(
                         "is not suitable for receiver functions. \
-                    Only structs and vectors can have receiver functions",
+                         Only structs and vectors can have receiver functions",
                     ),
                 }
             }
@@ -537,36 +546,34 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types. Returns empty
-    /// map if the struct has variants.
-    pub fn lookup_struct_fields(
+    /// Looks up field declaration, returning a list of optional variant name and type of the field
+    /// in the variant. The variant name is None and the list a singleton for proper struct types.
+    pub fn lookup_struct_field_decl(
         &self,
         id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool) {
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
+        let get_instantiated_field = |fields: &BTreeMap<Symbol, FieldData>| {
             fields
-                .values()
-                .filter_map(|f| {
-                    if !common_only || f.common_for_variants {
-                        Some((f.name, f.ty.instantiate(&id.inst)))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
+                .get(&field_name)
+                .map(|data| data.ty.instantiate(&id.inst))
         };
         match &entry.layout {
-            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Singleton(fields, _) => (
+                get_instantiated_field(fields)
+                    .map(|ty| vec![(None, ty)])
+                    .unwrap_or_default(),
+                false,
+            ),
             StructLayout::Variants(variants) => (
-                if variants.is_empty() {
-                    BTreeMap::new()
-                } else {
-                    instantiate_fields(&variants[0].fields, true)
-                },
+                variants
+                    .iter()
+                    .filter_map(|v| get_instantiated_field(&v.fields).map(|ty| (Some(v.name), ty)))
+                    .collect(),
                 true,
             ),
-            _ => (BTreeMap::new(), false),
+            _ => (vec![], false),
         }
     }
 

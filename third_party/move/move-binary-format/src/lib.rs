@@ -11,8 +11,10 @@ pub mod access;
 pub mod binary_views;
 pub mod check_bounds;
 pub mod compatibility;
+pub mod compatibility_legacy;
 #[macro_use]
 pub mod errors;
+pub mod builders;
 pub mod check_complexity;
 pub mod constant;
 pub mod control_flow_graph;

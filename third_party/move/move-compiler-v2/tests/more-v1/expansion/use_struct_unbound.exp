@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unbound module member
+  ┌─ tests/more-v1/expansion/use_struct_unbound.move:6:17
+  │
+2 │ module X {
+  │        - Module '0x2::X' declared here
+  ·
+6 │     use 0x2::X::S;
+  │                 ^ Invalid 'use'. Unbound member 'S' in module '0x2::X'

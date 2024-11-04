@@ -26,7 +26,7 @@ pub struct MempoolTransaction {
     pub insertion_info: InsertionInfo,
     pub was_parked: bool,
     // The priority of this node for the sender of this transaction.
-    pub priority_of_sender: BroadcastPeerPriority,
+    pub priority_of_sender: Option<BroadcastPeerPriority>,
 }
 
 impl MempoolTransaction {
@@ -38,7 +38,7 @@ impl MempoolTransaction {
         seqno: u64,
         insertion_time: SystemTime,
         client_submitted: bool,
-        priority_of_sender: BroadcastPeerPriority,
+        priority_of_sender: Option<BroadcastPeerPriority>,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
@@ -185,7 +185,7 @@ mod test {
             0,
             SystemTime::now(),
             false,
-            BroadcastPeerPriority::Primary,
+            Some(BroadcastPeerPriority::Primary),
         )
     }
 

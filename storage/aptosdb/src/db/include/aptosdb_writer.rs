@@ -1,75 +1,91 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use itertools::Itertools;
+use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
+
 impl DbWriter for AptosDB {
-    /// `first_version` is the version of the first transaction in `txns_to_commit`.
-    /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
-    /// it carries is generated after the `txns_to_commit` are applied.
-    /// Note that even if `txns_to_commit` is empty, `first_version` is checked to be
-    /// `ledger_info_with_sigs.ledger_info.version + 1` if `ledger_info_with_sigs` is not `None`.
-    fn save_transactions(
+    fn pre_commit_ledger(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        chunk: ChunkToCommit,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
-        gauged_api("save_transactions", || {
-            // Executing and committing from more than one threads not allowed -- consensus and
-            // state sync must hand over to each other after all pending execution and committing
-            // complete.
+        gauged_api("pre_commit_ledger", || {
+            // Pre-committing and committing in concurrency is allowed but not pre-committing at the
+            // same time from multiple threads, the same for committing.
+            // Consensus and state sync must hand over to each other after all pending execution and
+            // committing complete.
             let _lock = self
-                .ledger_commit_lock
+                .pre_commit_lock
                 .try_lock()
                 .expect("Concurrent committing detected.");
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
-            latest_in_memory_state.current.log_generation("db_save");
+            chunk.latest_in_memory_state.current.log_generation("db_save");
 
-            // For reconfig suffix.
-            if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
-                return Ok(());
-            }
-
-            self.save_transactions_validation(
-                txns_to_commit,
-                first_version,
-                base_state_version,
-                ledger_info_with_sigs,
-                &latest_in_memory_state,
-            )?;
-
-            let new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
-                txns_to_commit,
-                first_version,
-                latest_in_memory_state.current.usage(),
-                sharded_state_cache,
+            self.pre_commit_validation(&chunk)?;
+            let _new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
+                &chunk,
                 self.skip_index_and_usage,
             )?;
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
-                let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
-                self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
-
-                if !txns_to_commit.is_empty() {
-                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
-                    buffered_state.update(
-                        state_updates_until_last_checkpoint,
-                        latest_in_memory_state,
-                        sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
-                    )?;
-                }
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
+                buffered_state.update(
+                    chunk.state_updates_until_last_checkpoint,
+                    chunk.latest_in_memory_state,
+                    sync_commit || chunk.is_reconfig,
+                )?;
             }
-
-            self.post_commit(txns_to_commit, first_version, ledger_info_with_sigs)
+            self.ledger_db.metadata_db().set_pre_committed_version(chunk.expect_last_version());
+            Ok(())
         })
     }
+
+    fn commit_ledger(
+        &self,
+        version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        chunk_opt: Option<ChunkToCommit>,
+    ) -> Result<()> {
+        gauged_api("commit_ledger", || {
+            // Pre-committing and committing in concurrency is allowed but not pre-committing at the
+            // same time from multiple threads, the same for committing.
+            // Consensus and state sync must hand over to each other after all pending execution and
+            // committing complete.
+            let _lock = self
+                .commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_ledger"]);
+
+            let old_committed_ver = self.get_and_check_commit_range(version)?;
+
+            let ledger_batch = SchemaBatch::new();
+            // Write down LedgerInfo if provided.
+            if let Some(li) = ledger_info_with_sigs {
+                self.check_and_put_ledger_info(version, li, &ledger_batch)?;
+            }
+            // Write down commit progress
+            ledger_batch.put::<DbMetadataSchema>(
+                &DbMetadataKey::OverallCommitProgress,
+                &DbMetadataValue::Version(version),
+            )?;
+            self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
+
+            // Notify the pruners, invoke the indexer, and update in-memory ledger info.
+            self.post_commit(
+                old_committed_ver,
+                version,
+                ledger_info_with_sigs,
+                chunk_opt,
+            )
+        })
+    }
+
 
     fn get_state_snapshot_receiver(
         &self,
@@ -147,7 +163,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Option::Some((
+                Some((
                     &mut ledger_db_batch,
                     &mut sharded_kv_batch,
                     &state_kv_metadata_batch,
@@ -192,6 +208,7 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
+            self.ledger_db.metadata_db().set_pre_committed_version(version);
             self.state_store.reset();
 
             Ok(())
@@ -200,78 +217,57 @@ impl DbWriter for AptosDB {
 }
 
 impl AptosDB {
-    fn save_transactions_validation(
+    fn pre_commit_validation(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        latest_in_memory_state: &StateDelta,
+        chunk: &ChunkToCommit,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["save_transactions_validation"])
             .start_timer();
-        let buffered_state = self.state_store.buffered_state().lock();
+
         ensure!(
-            base_state_version == buffered_state.current_state().base_version,
-            "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
-            base_state_version,
-            buffered_state.current_state().base_version,
-            buffered_state.current_state().current_version,
+            !chunk.is_empty(),
+            "chunk is empty, nothing to save.",
         );
-
-        // Ensure the incoming committing requests are always consecutive and the version in
-        // buffered state is consistent with that in db.
-        let next_version_in_buffered_state = buffered_state
-            .current_state()
-            .current_version
-            .map(|version| version + 1)
-            .unwrap_or(0);
-        let num_transactions_in_db = self.get_synced_version().map_or(0, |v| v + 1);
-        ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
-            "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
-            first_version,
-            next_version_in_buffered_state,
-            num_transactions_in_db,
-        );
-
-        let num_txns = txns_to_commit.len() as u64;
-        // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
-        // txns_to_commit should not be empty. Otherwise it is okay to commit empty blocks.
         ensure!(
-            ledger_info_with_sigs.is_some() || num_txns > 0,
-            "txns_to_commit is empty while ledger_info_with_sigs is None.",
+            Some(chunk.expect_last_version()) == chunk.latest_in_memory_state.current_version,
+            "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
+            chunk.expect_last_version(),
+            chunk.latest_in_memory_state.current_version.expect("Must exist"),
         );
 
-        let last_version = first_version + num_txns - 1;
-
-        if let Some(x) = ledger_info_with_sigs {
-            let claimed_last_version = x.ledger_info().version();
+        let num_transactions_in_db = self.get_pre_committed_version()?.map_or(0, |v| v + 1);
+        {
+            let buffered_state = self.state_store.buffered_state().lock();
             ensure!(
-                claimed_last_version  == last_version,
-                "Transaction batch not applicable: first_version {}, num_txns {}, last_version_in_ledger_info {}",
-                first_version,
-                num_txns,
-                claimed_last_version,
+                chunk.base_state_version == buffered_state.current_state().base_version,
+                "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
+                chunk.base_state_version,
+                buffered_state.current_state().base_version,
+                buffered_state.current_state().current_version,
+            );
+
+            // Ensure the incoming committing requests are always consecutive and the version in
+            // buffered state is consistent with that in db.
+            let next_version_in_buffered_state = buffered_state
+                .current_state()
+                .current_version
+                .map(|version| version + 1)
+                .unwrap_or(0);
+            ensure!(num_transactions_in_db == chunk.first_version && num_transactions_in_db == next_version_in_buffered_state,
+                "The first version passed in ({}), the next version in buffered state ({}) and the next version in db ({}) are inconsistent.",
+                chunk.first_version,
+                next_version_in_buffered_state,
+                num_transactions_in_db,
             );
         }
-
-        ensure!(
-            Some(last_version) == latest_in_memory_state.current_version,
-            "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
-            last_version,
-            latest_in_memory_state.current_version.expect("Must exist"),
-        );
 
         Ok(())
     }
 
     fn calculate_and_commit_ledger_and_state_kv(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        expected_state_db_usage: StateStorageUsage,
-        sharded_state_cache: Option<&ShardedStateCache>,
+        chunk: &ChunkToCommit,
         skip_index_and_usage: bool,
     ) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -284,42 +280,44 @@ impl AptosDB {
             //
             // TODO(grao): Consider propagating the error instead of panic, if necessary.
             s.spawn(|_| {
-                self.commit_events(txns_to_commit, first_version, skip_index_and_usage)
+                self.commit_events(chunk.first_version, chunk.transaction_outputs, skip_index_and_usage)
                     .unwrap()
             });
             s.spawn(|_| {
                 self.ledger_db
                     .write_set_db()
-                    .commit_write_sets(txns_to_commit, first_version)
+                    .commit_write_sets(
+                        chunk.first_version,
+                        chunk.transaction_outputs.par_iter().map(TransactionOutput::write_set)
+                    )
                     .unwrap()
             });
             s.spawn(|_| {
                 self.ledger_db
                     .transaction_db()
-                    .commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+                    .commit_transactions(chunk.first_version, chunk.transactions, skip_index_and_usage)
                     .unwrap()
             });
             s.spawn(|_| {
                 self.commit_state_kv_and_ledger_metadata(
-                    txns_to_commit,
-                    first_version,
-                    expected_state_db_usage,
-                    sharded_state_cache,
+                    chunk,
                     skip_index_and_usage,
                 )
                 .unwrap()
             });
             s.spawn(|_| {
-                self.commit_transaction_infos(txns_to_commit, first_version)
+                self.commit_transaction_infos(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
             s.spawn(|_| {
                 new_root_hash = self
-                    .commit_transaction_accumulator(txns_to_commit, first_version)
+                    .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
             s.spawn(|_| {
-                self.commit_transaction_auxiliary_data(txns_to_commit, first_version)
+                self.commit_transaction_auxiliary_data(
+                    chunk.first_version,
+                    chunk.transaction_outputs.iter().map(TransactionOutput::auxiliary_data))
                     .unwrap()
             });
         });
@@ -329,19 +327,15 @@ impl AptosDB {
 
     fn commit_state_kv_and_ledger_metadata(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        expected_state_db_usage: StateStorageUsage,
-        sharded_state_cache: Option<&ShardedStateCache>,
+        chunk: &ChunkToCommit,
         skip_index_and_usage: bool,
     ) -> Result<()> {
+        if chunk.is_empty() {
+            return Ok(());
+        }
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_state_kv_and_ledger_metadata"])
             .start_timer();
-        let state_updates_vec = txns_to_commit
-            .iter()
-            .map(|txn_to_commit| txn_to_commit.state_updates())
-            .collect::<Vec<_>>();
 
         let ledger_metadata_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
@@ -349,28 +343,27 @@ impl AptosDB {
 
         // TODO(grao): Make state_store take sharded state updates.
         self.state_store.put_value_sets(
-            state_updates_vec,
-            first_version,
-            expected_state_db_usage,
-            sharded_state_cache,
+            chunk.per_version_state_updates,
+            chunk.first_version,
+            chunk.latest_in_memory_state.current.usage(),
+            chunk.sharded_state_cache,
             &ledger_metadata_batch,
             &sharded_state_kv_batches,
             // Always put in state value index for now.
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),
-            skip_index_and_usage,
-            txns_to_commit
+            chunk.transaction_infos
                 .iter()
-                .rposition(|txn| txn.has_state_checkpoint_hash()),
+                .rposition(|t| t.state_checkpoint_hash().is_some()),
         )?;
 
         // Write block index if event index is skipped.
         if skip_index_and_usage {
-            for (i, txn) in txns_to_commit.iter().enumerate() {
-                for event in txn.events() {
+            for (i, txn_out) in chunk.transaction_outputs.iter().enumerate() {
+                for event in txn_out.events() {
                     if let Some(event_key) = event.event_key() {
                         if *event_key == new_block_event_key() {
-                            let version = first_version + i as Version;
+                            let version = chunk.first_version + i as Version;
                             LedgerMetadataDb::put_block_info(
                                 version,
                                 event,
@@ -382,11 +375,10 @@ impl AptosDB {
             }
         }
 
-        let last_version = first_version + txns_to_commit.len() as u64 - 1;
         ledger_metadata_batch
             .put::<DbMetadataSchema>(
                 &DbMetadataKey::LedgerCommitProgress,
-                &DbMetadataValue::Version(last_version),
+                &DbMetadataValue::Version(chunk.expect_last_version()),
             )
             .unwrap();
 
@@ -403,7 +395,7 @@ impl AptosDB {
             s.spawn(|_| {
                 self.state_kv_db
                     .commit(
-                        last_version,
+                        chunk.expect_last_version(),
                         state_kv_metadata_batch,
                         sharded_state_kv_batches,
                     )
@@ -416,23 +408,22 @@ impl AptosDB {
 
     fn commit_events(
         &self,
-        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
+        transaction_outputs: &[TransactionOutput],
         skip_index: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_events"])
             .start_timer();
         let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
-        txns_to_commit
+        transaction_outputs
             .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 128))
+            .with_min_len(optimal_min_len(transaction_outputs.len(), 128))
             .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+            .try_for_each(|(i, txn_out)| -> Result<()> {
                 self.ledger_db.event_db().put_events(
-                    first_version + i as u64,
-                    txn_to_commit.events(),
+                    first_version + i as Version,
+                    txn_out.events(),
                     skip_index,
                     &batch,
                 )?;
@@ -447,12 +438,14 @@ impl AptosDB {
 
     fn commit_transaction_accumulator(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: u64,
+        first_version: Version,
+        transaction_infos: &[TransactionInfo],
     ) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_accumulator"])
             .start_timer();
+
+        let num_txns = transaction_infos.len() as Version;
 
         let batch = SchemaBatch::new();
         let root_hash = self
@@ -460,10 +453,7 @@ impl AptosDB {
             .transaction_accumulator_db()
             .put_transaction_accumulator(
                 first_version,
-                &txns_to_commit
-                    .iter()
-                    .map(|txn_to_commit| txn_to_commit.transaction_info())
-                    .collect::<Vec<_>>(),
+                transaction_infos,
                 &batch,
             )?;
 
@@ -474,32 +464,58 @@ impl AptosDB {
             .transaction_accumulator_db()
             .write_schemas(batch)?;
 
+        let batch = SchemaBatch::new();
+        let all_versions: Vec<_> =
+            (first_version..first_version + num_txns).collect();
+        THREAD_MANAGER
+            .get_non_exe_cpu_pool()
+            .install(|| -> Result<()> {
+                let all_root_hashes = all_versions
+                    .into_par_iter()
+                    .with_min_len(64)
+                    .map(|version| {
+                        self.ledger_db
+                            .transaction_accumulator_db()
+                            .get_root_hash(version)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                all_root_hashes
+                    .iter()
+                    .enumerate()
+                    .try_for_each(|(i, hash)| {
+                        let version = first_version + i as u64;
+                        batch.put::<TransactionAccumulatorRootHashSchema>(&version, hash)
+                    })?;
+                self.ledger_db
+                    .transaction_accumulator_db()
+                    .write_schemas(batch)
+            })?;
+
         Ok(root_hash)
     }
 
-    fn commit_transaction_auxiliary_data(
+    fn commit_transaction_auxiliary_data<'a>(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: u64,
+        first_version: Version,
+        auxiliary_data: impl IntoIterator<Item = &'a TransactionAuxiliaryData>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_auxiliary_data"])
             .start_timer();
 
         let batch = SchemaBatch::new();
-        txns_to_commit
-            .iter()
+        auxiliary_data
+            .into_iter()
             .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+            .try_for_each(|(i, aux_data)| -> Result<()> {
                 TransactionAuxiliaryDataDb::put_transaction_auxiliary_data(
-                    first_version + i as u64,
-                    txn_to_commit.transaction_auxiliary_data(),
+                    first_version + i as Version,
+                    aux_data,
                     &batch,
                 )?;
 
-
-            Ok(())
-        })?;
+                Ok(())
+            })?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_auxiliary_data___commit"])
@@ -511,23 +527,22 @@ impl AptosDB {
 
     fn commit_transaction_infos(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: u64,
+        first_version: Version,
+        txn_infos: &[TransactionInfo],
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_infos"])
             .start_timer();
         let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
-        txns_to_commit
+        txn_infos
             .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 128))
+            .with_min_len(optimal_min_len(txn_infos.len(), 128))
             .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+            .try_for_each(|(i, txn_info)| -> Result<()> {
                 let version = first_version + i as u64;
                 TransactionInfoDb::put_transaction_info(
                     version,
-                    txn_to_commit.transaction_info(),
+                    txn_info,
                     &batch,
                 )?;
 
@@ -540,82 +555,119 @@ impl AptosDB {
         self.ledger_db.transaction_info_db().write_schemas(batch)
     }
 
-    fn commit_ledger_info(
+    fn get_and_check_commit_range(
         &self,
-        last_version: Version,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_ledger_info"])
-            .start_timer();
+        version_to_commit: Version,
+    ) -> Result<Option<Version>> {
+        let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
+        let pre_committed_ver = self.ledger_db.metadata_db().get_pre_committed_version();
+        ensure!(
+            old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
+            "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",
+            old_committed_ver,
+            version_to_commit,
+        );
+        ensure!(
+            pre_committed_ver.is_some() && version_to_commit <= pre_committed_ver.unwrap(),
+            "Version too new to commit. Pre-committed: {:?}, Trying to commit with LI: {}",
+            pre_committed_ver,
+            version_to_commit,
+        );
+        Ok(old_committed_ver)
+    }
 
-        let ledger_batch = SchemaBatch::new();
+    fn check_and_put_ledger_info(
+        &self,
+        version: Version,
+        ledger_info_with_sig: &LedgerInfoWithSignatures,
+        ledger_batch: &SchemaBatch
+    ) -> Result<(), AptosDbError> {
+        let ledger_info = ledger_info_with_sig.ledger_info();
 
-        // If expected ledger info is provided, verify result root hash and save the ledger info.
-        if let Some(x) = ledger_info_with_sigs {
-            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
-            ensure!(
-                new_root_hash == expected_root_hash,
-                "Root hash calculated doesn't match expected. {:?} vs {:?}",
-                new_root_hash,
-                expected_root_hash,
-            );
-            let current_epoch = self
-                .ledger_db
-                .metadata_db()
-                .get_latest_ledger_info_option()
-                .map_or(0, |li| li.ledger_info().next_block_epoch());
-            ensure!(
-                x.ledger_info().epoch() == current_epoch,
-                "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
-                x.ledger_info().epoch(),
-                current_epoch,
-            );
+        // Verify the version.
+        ensure!(
+            ledger_info.version() == version,
+            "Version in LedgerInfo doesn't match last version. {:?} vs {:?}",
+            ledger_info.version(),
+            version,
+        );
 
-            self.ledger_db
-                .metadata_db()
-                .put_ledger_info(x, &ledger_batch)?;
-        }
+        // Verify the root hash.
+        let db_root_hash = self.ledger_db.transaction_accumulator_db().get_root_hash(version)?;
+        let li_root_hash = ledger_info_with_sig.ledger_info().transaction_accumulator_hash();
+        ensure!(
+            db_root_hash == li_root_hash,
+            "Root hash pre-committed doesn't match LedgerInfo. pre-commited: {:?} vs in LedgerInfo: {:?}",
+            db_root_hash,
+            li_root_hash,
+        );
 
-        ledger_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(last_version),
-        )?;
-        self.ledger_db.metadata_db().write_schemas(ledger_batch)
+        // Verify epoch continuity.
+        let current_epoch = self
+            .ledger_db
+            .metadata_db()
+            .get_latest_ledger_info_option()
+            .map_or(0, |li| li.ledger_info().next_block_epoch());
+        ensure!(
+            ledger_info_with_sig.ledger_info().epoch() == current_epoch,
+            "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+            ledger_info_with_sig.ledger_info().epoch(),
+            current_epoch,
+        );
+
+        // Put write to batch.
+        self.ledger_db
+            .metadata_db()
+            .put_ledger_info(ledger_info_with_sig, ledger_batch)?;
+        Ok(())
     }
 
     fn post_commit(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
+        old_committed_version: Option<Version>,
+        version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
         // If commit succeeds and there are at least one transaction written to the storage, we
         // will inform the pruner thread to work.
-        let num_txns = txns_to_commit.len() as u64;
-        if num_txns > 0 {
-            let last_version = first_version + num_txns - 1;
+        if old_committed_version.is_none() || version > old_committed_version.unwrap() {
+            let first_version = old_committed_version.map_or(0, |v| v + 1);
+            let num_txns = version + 1 - first_version;
+
             COMMITTED_TXNS.inc_by(num_txns);
-            LATEST_TXN_VERSION.set(last_version as i64);
+            LATEST_TXN_VERSION.set(version as i64);
+            if let Some(update_sender) = &self.update_subscriber {
+                update_sender.send(
+                    version
+                ).map_err(| err | {
+                        AptosDbError::Other(format!("Failed to send update to subscriber: {}", err))
+                    })?;
+            }
             // Activate the ledger pruner and state kv pruner.
             // Note the state merkle pruner is activated when state snapshots are persisted
             // in their async thread.
             self.ledger_pruner
-                .maybe_set_pruner_target_db_version(last_version);
+                .maybe_set_pruner_target_db_version(version);
             self.state_store
                 .state_kv_pruner
-                .maybe_set_pruner_target_db_version(last_version);
-        }
+                .maybe_set_pruner_target_db_version(version);
 
-        // Note: this must happen after txns have been saved to db because types can be newly
-        // created in this same chunk of transactions.
-        if let Some(indexer) = &self.indexer {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["indexer_index"])
-                .start_timer();
-            let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
-            indexer.index(self.state_store.clone(), first_version, &write_sets)?;
+            // Note: this must happen after txns have been saved to db because types can be newly
+            // created in this same chunk of transactions.
+            if let Some(indexer) = &self.indexer {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["indexer_index"]);
+                // n.b. txns_to_commit can be partial, when the control was handed over from consensus to state sync
+                // where state sync won't send the pre-committed part to the DB again.
+                if chunk_opt.is_some() && chunk_opt.as_ref().unwrap().len() == num_txns as usize {
+                    let write_sets = chunk_opt.as_ref().unwrap().transaction_outputs.iter().map(|t| t.write_set()).collect_vec();
+                    indexer.index(self.state_store.clone(), first_version, &write_sets)?;
+                } else {
+                    let write_sets: Vec<_> = self.ledger_db.write_set_db().get_write_set_iter(first_version, num_txns as usize)?.try_collect()?;
+                    let write_set_refs = write_sets.iter().collect_vec();
+                    indexer.index(self.state_store.clone(), first_version, &write_set_refs)?;
+                };
+            }
         }
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.

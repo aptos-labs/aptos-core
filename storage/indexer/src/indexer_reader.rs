@@ -40,6 +40,10 @@ impl IndexerReaders {
 }
 
 impl IndexerReader for IndexerReaders {
+    fn is_internal_indexer_enabled(&self) -> bool {
+        self.db_indexer_reader.is_some()
+    }
+
     fn get_table_info(&self, handle: TableHandle) -> anyhow::Result<Option<TableInfo>> {
         if let Some(table_info_reader) = &self.table_info_reader {
             return Ok(table_info_reader.get_table_info_with_retry(handle)?);

@@ -31,7 +31,10 @@ use std::{
     time::Instant,
 };
 mod utils;
-use utils::*;
+use utils::{
+    check_for_invariant_violation, publish_group, sort_by_deps, ExecVariant,
+    FuzzerRunnableAuthenticator, RunnableState,
+};
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -255,11 +258,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     };
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
-        Authenticator::Ed25519 { sender: _ } => raw_tx
+        FuzzerRunnableAuthenticator::Ed25519 { sender: _ } => raw_tx
             .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
             .map_err(|_| Corpus::Keep)?
             .into_inner(),
-        Authenticator::MultiAgent {
+        FuzzerRunnableAuthenticator::MultiAgent {
             sender: _,
             secondary_signers,
         } => {
@@ -282,7 +285,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .map_err(|_| Corpus::Keep)?
                 .into_inner()
         },
-        Authenticator::FeePayer {
+        FuzzerRunnableAuthenticator::FeePayer {
             sender: _,
             secondary_signers,
             fee_payer,

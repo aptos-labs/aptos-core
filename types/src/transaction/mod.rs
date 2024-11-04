@@ -58,8 +58,9 @@ pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
-    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
+    fee_statement::FeeStatement, keyless::FederatedKeylessPublicKey,
+    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -625,6 +626,18 @@ impl SignedTransaction {
         Self::new_single_sender(raw_txn, authenticator)
     }
 
+    pub fn new_federated_keyless(
+        raw_txn: RawTransaction,
+        public_key: FederatedKeylessPublicKey,
+        signature: KeylessSignature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::federated_keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
@@ -877,25 +890,24 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    pub fn aug_with_aux_data(self, aux_data: &TransactionAuxiliaryData) -> Self {
+        if let Some(aux_error) = aux_data.get_detail_error_message() {
+            if let ExecutionStatus::MiscellaneousError(status_code) = self {
+                if status_code.is_none() {
+                    return ExecutionStatus::MiscellaneousError(Some(aux_error.status_code()));
+                }
+            }
+        }
+        self
+    }
+
     // Used by simulation API for showing detail error message. Should not be used by production code.
     pub fn conmbine_vm_status_for_simulation(
         aux_data: &TransactionAuxiliaryData,
         partial_status: TransactionStatus,
     ) -> Self {
         match partial_status {
-            TransactionStatus::Keep(exec_status) => {
-                if let Some(aux_error) = aux_data.get_detail_error_message() {
-                    let status_code = aux_error.status_code;
-                    match exec_status {
-                        ExecutionStatus::MiscellaneousError(_) => {
-                            ExecutionStatus::MiscellaneousError(Some(status_code))
-                        },
-                        _ => exec_status,
-                    }
-                } else {
-                    exec_status
-                }
-            },
+            TransactionStatus::Keep(exec_status) => exec_status.aug_with_aux_data(aux_data),
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         }
@@ -1190,6 +1202,16 @@ impl TransactionOutput {
         }
     }
 
+    pub fn new_empty_success() -> Self {
+        Self {
+            write_set: WriteSet::default(),
+            events: vec![],
+            gas_used: 0,
+            status: TransactionStatus::Keep(ExecutionStatus::Success),
+            auxiliary_data: TransactionAuxiliaryData::None,
+        }
+    }
+
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
         (self.write_set, self.events)
     }
@@ -1265,10 +1287,11 @@ impl TransactionOutput {
         let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
         ensure!(
             self.status() == &expected_txn_status,
-            "{}: version:{}, status:{:?}, expected:{:?}",
+            "{}: version:{}, status:{:?}, auxiliary data:{:?}, expected:{:?}",
             ERR_MSG,
             version,
             self.status(),
+            self.auxiliary_data(),
             expected_txn_status,
         );
 
@@ -1322,15 +1345,9 @@ impl TransactionOutput {
         }
         Ok(None)
     }
-}
 
-pub trait TransactionOutputProvider {
-    fn get_transaction_output(&self) -> &TransactionOutput;
-}
-
-impl TransactionOutputProvider for TransactionOutput {
-    fn get_transaction_output(&self) -> &TransactionOutput {
-        self
+    pub fn has_new_epoch_event(&self) -> bool {
+        self.events.iter().any(ContractEvent::is_new_epoch_event)
     }
 }
 
@@ -1551,6 +1568,15 @@ impl TransactionToCommit {
     pub fn dummy_with_transaction_info(transaction_info: TransactionInfo) -> Self {
         Self {
             transaction_info,
+            ..Self::dummy()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction(transaction: Transaction) -> Self {
+        Self {
+            transaction,
+            transaction_info: TransactionInfo::dummy(),
             ..Self::dummy()
         }
     }
@@ -1979,6 +2005,13 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
+    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V0 {
+            block_id,
+            block_end_info,
+        })
+    }
+
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
@@ -2015,7 +2048,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(vt) => vt.type_name(),
-            Transaction::BlockMetadataExt(_) => "block_metadata_ext",
+            Transaction::BlockMetadataExt(bmet) => bmet.type_name(),
         }
     }
 

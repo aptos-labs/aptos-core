@@ -7,6 +7,13 @@ metadata:
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
     {{- include "aptos-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }} 
+  annotations:
+    {{- with $.Values.service.validator.internal.annotations }}
+    {{- toYaml $.Values.service.validator.internal.annotations | nindent 4 }}
+    {{- end }}
+    {{- if $.Values.service.internalDomain }}
+    external-dns.alpha.kubernetes.io/hostname: val{{$i}}.{{ $.Values.service.internalDomain }}
+    {{- end }}
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
@@ -87,6 +94,9 @@ spec:
         {{- if $.Values.metrics.destination }}
         aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
+        {{- with $.Values.fullnode.podAnnotations }}
+        {{- toYaml $.Values.fullnode.podAnnotations | nindent 8 }}
+        {{- end }}
     spec:
       securityContext:
         seccompProfile:
@@ -181,7 +191,7 @@ spec:
             - ALL
           {{- end }}
       {{- with $.Values.validator }}
-      {{- with $.nodeSelector }}
+      {{- with .nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}

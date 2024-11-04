@@ -19,17 +19,17 @@ module <SELF>_0 {
     }
 } // end <SELF>_0
 
+// -- Sourcified model before bytecode pipeline
+script {
+    fun main() {
+        let x;
+        let y = x;
+    }
+}
+
 
 Diagnostics:
 error: use of unassigned local `x`
-  ┌─ tests/simplifier-elimination/use_before_assign.move:4:13
-  │
-4 │     let y = x;
-  │             ^
-
-
-Diagnostics:
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
   ┌─ tests/simplifier-elimination/use_before_assign.move:4:13
   │
 4 │     let y = x;

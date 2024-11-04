@@ -30,7 +30,7 @@ use std::{
     fmt::{Debug, Error, Formatter},
     hash::Hash,
     iter,
-    ops::Deref,
+    ops::{Deref, Range},
 };
 
 // =================================================================================================
@@ -60,6 +60,8 @@ pub struct SpecFunDecl {
     pub body: Option<Exp>,
     pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
+    /// The instantiations for which this function is known to use generic type reflection.
+    pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
 }
 
 // =================================================================================================
@@ -537,6 +539,25 @@ impl ResourceSpecifier {
             },
         }
     }
+
+    /// Matches an unqualified struct name. This matches any resource pattern with that name,
+    /// regardless of type instantiation.
+    pub fn matches_modulo_type_instantiation(
+        &self,
+        env: &GlobalEnv,
+        struct_id: &QualifiedId<StructId>,
+    ) -> bool {
+        use ResourceSpecifier::*;
+        let struct_id = struct_id.instantiate(vec![]);
+        match self {
+            Resource(spec_struct_id) => Resource(
+                // Downgrade to a pattern without instantiation
+                spec_struct_id.to_qualified_id().instantiate(vec![]),
+            )
+            .matches(env, &[], &struct_id),
+            _ => self.matches(env, &[], &struct_id),
+        }
+    }
 }
 
 // =================================================================================================
@@ -605,11 +626,14 @@ pub enum ExpData {
     Return(NodeId, Exp),
     /// Represents a sequence of effects, the last value also being the result.
     Sequence(NodeId, Vec<Exp>),
-    /// Represents a loop, with a body expression.
+    /// Represents a loop.
     Loop(NodeId, Exp),
-    /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
-    /// loop is continued (true) or broken (false).
-    LoopCont(NodeId, bool),
+    /// Represents a loop continuation, as in `LoopCont(id, nest, is_continue)`. `nest`
+    /// determines how many nesting levels the associated loop is away from the given
+    /// expression. For example, `0` means the directly enclosing loop, `1` the
+    /// loop enclosing that inner loop, and so on. `is_continue` indicates whether
+    /// the loop is continued or broken.
+    LoopCont(NodeId, usize, bool),
     /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.  Note that Assign
     /// does *not* introduce new variables; they apparently be introduced by a Block or Lambda, or
     /// as a function formal parameter.
@@ -713,7 +737,7 @@ impl ExpData {
             self,
             ExpData::Sequence(_, _)
                 | ExpData::Loop(_, _)
-                | ExpData::LoopCont(_, _)
+                | ExpData::LoopCont(_, _, _)
                 | ExpData::Return(_, _)
         )
     }
@@ -724,6 +748,19 @@ impl ExpData {
             self,
             LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
         )
+    }
+
+    /// Checks for different ways how an unit (void) value is represented. This
+    /// can be an empty tuple or an empty sequence.
+    pub fn is_unit_exp(&self) -> bool {
+        matches!(self, ExpData::Sequence(_, stms) if stms.is_empty())
+            || matches!(self, ExpData::Call(_, Operation::Tuple, exps) if exps.is_empty())
+    }
+
+    pub fn is_loop_cont(&self, nest: Option<usize>, is_continue: bool) -> bool {
+        matches!(self,
+            ExpData::LoopCont(_, nest1, is_cont)
+            if Some(*nest1) == nest && *is_cont == is_continue)
     }
 
     pub fn ptr_eq(e1: &Exp, e2: &Exp) -> bool {
@@ -804,7 +841,7 @@ impl ExpData {
     }
 
     /// Visits free local variables with node id in this expression.
-    fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
+    pub fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
     where
         F: FnMut(NodeId, Symbol),
     {
@@ -973,11 +1010,19 @@ impl ExpData {
 
     /// Returns the temporaries used in this expression, with types. Result is ordered by occurrence.
     pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+        self.used_temporaries_with_ids()
+            .into_iter()
+            .map(|(t, i)| (t, env.get_node_type(i)))
+            .collect()
+    }
+
+    /// Returns the temporaries used in this expression, together with the node id of their usage.
+    pub fn used_temporaries_with_ids(&self) -> Vec<(TempIndex, NodeId)> {
         let mut temps = vec![];
         let mut visitor = |e: &ExpData| {
             if let ExpData::Temporary(id, idx) = e {
                 if !temps.iter().any(|(i, _)| i == idx) {
-                    temps.push((*idx, env.get_node_type(*id)));
+                    temps.push((*idx, *id));
                 }
             }
             true // keep going
@@ -1050,26 +1095,96 @@ impl ExpData {
         called
     }
 
-    /// Given that this expression is (part of) a loop body, returns `true` if
-    /// there is an early exit from the body of the nearest enclosing loop,
-    /// i.e., the expression contains a `continue` or `break` statement outside
-    /// of any nested loop.
-    pub fn has_loop_exit(&self) -> bool {
-        let mut loop_count = 0; // Count internal nested loops.
-        let mut has_exit = false;
+    /// Returns true if the given expression contains a `continue` or
+    /// `break` which refers to a loop in the given `nest_range`.
+    /// For example, `branches_to(loop { break }, 1..10)` will return false,
+    /// but `branches_to(loop { break }, 0..10)` will return true.
+    /// count as exit.
+    pub fn branches_to(&self, nest_range: Range<usize>) -> bool {
+        let mut loop_nest = 0;
+        let mut branches = false;
         let mut visitor = |post: bool, e: &ExpData| {
             match e {
-                ExpData::Loop(_, _) => loop_count += if post { -1 } else { 1 },
-                ExpData::LoopCont(_, _) if loop_count == 0 => {
-                    has_exit = true;
-                    return false; // found an exit, exit visit early
+                ExpData::Loop(_, _) => {
+                    if post {
+                        loop_nest -= 1
+                    } else {
+                        loop_nest += 1
+                    }
+                },
+                ExpData::LoopCont(_, nest, _)
+                    if *nest >= loop_nest && nest_range.contains(&(*nest - loop_nest)) =>
+                {
+                    branches = true;
+                    return false; // found a reference, exit visit early
                 },
                 _ => {},
             }
             true
         };
         self.visit_pre_post(&mut visitor);
-        has_exit
+        branches
+    }
+
+    /// Compute the bindings of break/continue expressions to the associated loop. This
+    /// returns two maps: the first maps loop ids to the ids of the loop-cont statements,
+    /// together with whether they are break or continue. The 2nd maps loop-cont ids
+    /// to the associated loop ids.
+    pub fn compute_loop_bindings(
+        &self,
+    ) -> (
+        BTreeMap<NodeId, BTreeMap<NodeId, bool>>,
+        BTreeMap<NodeId, NodeId>,
+    ) {
+        let mut loop_to_cont = BTreeMap::<NodeId, BTreeMap<NodeId, bool>>::new();
+        let mut cont_to_loop = BTreeMap::<NodeId, NodeId>::new();
+        let mut loop_stack = vec![];
+        let mut visit_binding = |post: bool, exp: &ExpData| {
+            use ExpData::*;
+            match exp {
+                Loop(id, _) => {
+                    if !post {
+                        loop_to_cont.insert(*id, BTreeMap::new());
+                        loop_stack.push(*id);
+                    } else {
+                        loop_stack.pop().expect("loop stack balanced");
+                    }
+                },
+                LoopCont(id, nest, is_continue) => {
+                    if !post && *nest < loop_stack.len() {
+                        assert!(
+                            *nest < loop_stack.len(),
+                            "nest={} out of range for len={}",
+                            nest,
+                            loop_stack.len()
+                        );
+                        let loop_id = loop_stack[loop_stack.len() - nest - 1];
+                        loop_to_cont
+                            .get_mut(&loop_id)
+                            .unwrap()
+                            .insert(*id, *is_continue);
+                        cont_to_loop.insert(*id, loop_id);
+                    }
+                },
+                _ => {},
+            }
+            true
+        };
+        self.visit_pre_post(&mut visit_binding);
+        (loop_to_cont, cont_to_loop)
+    }
+
+    /// Rewrite an expression such that any break/continue nests referring to outer loops
+    /// have the given delta added to their nesting. This simulates removing or adding a loop to
+    /// the given expression. Nests bound to loops of the given expression are not effected.
+    ///
+    /// If this is needed elsewhere we can move it out, currently it's a local helper.
+    pub fn rewrite_loop_nest(&self, delta: isize) -> Exp {
+        LoopNestRewriter {
+            loop_depth: 0,
+            delta,
+        }
+        .rewrite_exp(self.clone().into_exp())
     }
 
     /// Returns true of the given expression is valid for a constant expression.
@@ -1593,16 +1708,50 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
     }
 }
 
+/// A rewriter for lifting loop nests.
+struct LoopNestRewriter {
+    loop_depth: usize,
+    delta: isize,
+}
+
+impl ExpRewriterFunctions for LoopNestRewriter {
+    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        match exp.as_ref() {
+            ExpData::LoopCont(id, nest, cont) if *nest >= self.loop_depth => {
+                let new_nest = (*nest as isize) + self.delta;
+                assert!(
+                    new_nest >= 0,
+                    "loop removed which has break/continue references?"
+                );
+                ExpData::LoopCont(*id, new_nest as usize, *cont).into_exp()
+            },
+            ExpData::Loop(_, _) => {
+                self.loop_depth += 1;
+                let result = self.rewrite_exp_descent(exp);
+                self.loop_depth -= 1;
+                result
+            },
+            _ => self.rewrite_exp_descent(exp),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
     Tuple,
+    Select(ModuleId, StructId, FieldId),
+    SelectVariants(
+        ModuleId,
+        StructId,
+        /* fields from different variants */ Vec<FieldId>,
+    ),
+    TestVariants(ModuleId, StructId, /* variants */ Vec<Symbol>),
 
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     Closure(ModuleId, FunId),
-    Select(ModuleId, StructId, FieldId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
@@ -2119,7 +2268,7 @@ impl<'a> PatDisplay<'a> {
         Self { show_type, ..self }
     }
 
-    fn type_ctx(&self) -> TypeDisplayContext<'a> {
+    fn type_ctx(&self) -> TypeDisplayContext {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {
@@ -2428,8 +2577,9 @@ impl Operation {
             Closure(..) => false,      // Spec
             Pack(..) => false,         // Could yield an undroppable value
             Tuple => true,
-            Select(..) => false,      // Move-related
-            UpdateField(..) => false, // Move-related
+            Select(..) => false,         // Move-related
+            SelectVariants(..) => false, // Move-related
+            UpdateField(..) => false,    // Move-related
 
             // Specification specific
             Result(..) => false, // Spec
@@ -2521,6 +2671,7 @@ impl Operation {
             EventStoreIncludedIn => false, // Spec
 
             // Operation with no effect
+            TestVariants(..) => true, // Cannot abort
             NoOp => true,
         }
     }
@@ -2883,6 +3034,7 @@ impl ExpData {
             exp: self,
             fun_env: None,
             verbose: false,
+            annotator: None,
         }
     }
 
@@ -2894,6 +3046,7 @@ impl ExpData {
             exp: self,
             fun_env: Some(fun_env),
             verbose: false,
+            annotator: None,
         }
     }
 
@@ -2903,16 +3056,34 @@ impl ExpData {
             exp: self,
             fun_env: other.fun_env.clone(),
             verbose: other.verbose,
+            annotator: other.annotator,
         }
     }
 
-    #[allow(unused)]
     pub fn display_verbose<'a>(&'a self, env: &'a GlobalEnv) -> ExpDisplay<'a> {
         ExpDisplay {
             env,
             exp: self,
             fun_env: None,
             verbose: true,
+            annotator: None,
+        }
+    }
+
+    pub fn display_with_annotator<'a, F>(
+        &'a self,
+        env: &'a GlobalEnv,
+        annotator: &'a F,
+    ) -> ExpDisplay<'a>
+    where
+        F: Fn(NodeId) -> String,
+    {
+        ExpDisplay {
+            env,
+            exp: self,
+            fun_env: None,
+            verbose: false,
+            annotator: Some(annotator),
         }
     }
 }
@@ -2923,6 +3094,7 @@ pub struct ExpDisplay<'a> {
     exp: &'a ExpData,
     fun_env: Option<FunctionEnv<'a>>,
     verbose: bool,
+    annotator: Option<&'a dyn Fn(NodeId) -> String>,
 }
 
 impl<'a> fmt::Display for ExpDisplay<'a> {
@@ -2931,6 +3103,13 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
         if self.verbose {
             let node_id = self.exp.node_id();
             write!(f, "{}:(", node_id.as_usize())?;
+        }
+        if let Some(an) = &self.annotator {
+            let node_id = self.exp.node_id();
+            let s = (*an)(node_id);
+            if !s.is_empty() {
+                write!(f, "{{{}}} ", s)?;
+            }
         }
         match self.exp {
             Invalid(_) => write!(f, "*invalid*"),
@@ -3032,13 +3211,34 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                 write!(f, "({})({})", fun.display_cont(self), self.fmt_exps(args))
             },
             IfElse(_, cond, if_exp, else_exp) => {
-                write!(
-                    f,
-                    "if {} {{\n  {}\n}} else {{\n  {}\n}}",
-                    cond.display_cont(self),
-                    indent(if_exp.display_cont(self)),
-                    indent(else_exp.display_cont(self))
-                )
+                // Special case `if (c) simple_exp`
+                match (if_exp.as_ref(), else_exp.as_ref()) {
+                    (e, Sequence(_, stms)) if !matches!(e, Sequence(..)) && stms.is_empty() => {
+                        write!(
+                            f,
+                            "if ({}) {}",
+                            cond.display_cont(self),
+                            if_exp.display_cont(self)
+                        )
+                    },
+                    (_, Sequence(_, stms)) if stms.is_empty() => {
+                        write!(
+                            f,
+                            "if {} {{\n  {}\n}}",
+                            cond.display_cont(self),
+                            indent(if_exp.display_cont(self)),
+                        )
+                    },
+                    _ => {
+                        write!(
+                            f,
+                            "if {} {{\n  {}\n}} else {{\n  {}\n}}",
+                            cond.display_cont(self),
+                            indent(if_exp.display_cont(self)),
+                            indent(else_exp.display_cont(self))
+                        )
+                    },
+                }
             },
             Match(_, discriminator, arms) => {
                 writeln!(f, "match ({}) {{", discriminator.display_cont(self))?;
@@ -3065,8 +3265,18 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
             Loop(_, e) => {
                 write!(f, "loop {{\n  {}\n}}", indent(e.display_cont(self)))
             },
-            LoopCont(_, true) => write!(f, "continue"),
-            LoopCont(_, false) => write!(f, "break"),
+            LoopCont(_, nest, continues) => {
+                write!(
+                    f,
+                    "{}{}",
+                    if *continues { "continue" } else { "break" },
+                    if *nest > 0 {
+                        format!("[{}]", nest)
+                    } else {
+                        "".to_string()
+                    }
+                )
+            },
             Return(_, e) => write!(f, "return {}", e.display_cont(self)),
             Assign(_, lhs, rhs) => {
                 write!(
@@ -3100,7 +3310,7 @@ fn indent(fmt: impl fmt::Display) -> String {
 }
 
 impl<'a> ExpDisplay<'a> {
-    fn type_ctx(&self) -> TypeDisplayContext<'a> {
+    fn type_ctx(&self) -> TypeDisplayContext {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {
@@ -3245,6 +3455,26 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
             Select(mid, sid, fid) => {
                 write!(f, "select {}", self.field_str(mid, sid, fid))
             },
+            SelectVariants(mid, sid, fids) => {
+                write!(
+                    f,
+                    "select_variants {}",
+                    fids.iter()
+                        .map(|fid| self.field_str(mid, sid, fid))
+                        .join("|")
+                )
+            },
+            TestVariants(mid, sid, variants) => {
+                write!(
+                    f,
+                    "test_variants {}::{}",
+                    self.struct_str(mid, sid),
+                    variants
+                        .iter()
+                        .map(|v| v.display(self.env.symbol_pool()).to_string())
+                        .join("|")
+                )
+            },
             UpdateField(mid, sid, fid) => {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
@@ -3287,8 +3517,7 @@ impl<'a> OperationDisplay<'a> {
     }
 
     fn field_str(&self, mid: &ModuleId, sid: &StructId, fid: &FieldId) -> String {
-        let struct_env = self.env.get_module(*mid).into_struct(*sid);
-        let field_name = struct_env.get_field(*fid).get_name();
+        let field_name = fid.symbol();
         format!(
             "{}.{}",
             self.struct_str(mid, sid),

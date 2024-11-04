@@ -1340,6 +1340,7 @@ async fn test_owner_create_and_delegate_flow() {
             Some(owner_cli_index),
             operator_keys.consensus_public_key(),
             operator_keys.consensus_proof_of_possession(),
+            None,
         )
         .await
         .unwrap(),

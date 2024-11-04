@@ -85,14 +85,18 @@ module std::features {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
 
-    /// Whether gas fees are collected and distributed to the block proposers.
+    #[deprecated]
+    /// Deprecated feature
     /// Lifetime: transient
     const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
 
+    #[deprecated]
+    /// Deprecated feature
     public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
 
-    public fun collect_and_distribute_gas_fees(): bool acquires Features {
-        is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
+    #[deprecated]
+    public fun collect_and_distribute_gas_fees(): bool {
+        false
     }
 
     /// Whether the new `aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()` native is enabled.
@@ -580,6 +584,27 @@ module std::features {
 
     public fun abort_if_multisig_payload_mismatch_enabled(): bool acquires Features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    /// Whether the simulation enhancement is enabled. This enables the simulation without an authentication check,
+    /// the sponsored transaction simulation when the fee payer is set to 0x0, and the multisig transaction
+    /// simulation consistnet with the execution.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_SIMULATION_ENHANCEMENT: u64 = 78;
+
+    public fun get_transaction_simulation_enhancement_feature(): u64 { TRANSACTION_SIMULATION_ENHANCEMENT }
+
+    public fun transaction_simulation_enhancement_enabled(): bool acquires Features {
+        is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    const COLLECTION_OWNER: u64 = 79;
+
+    public fun get_collection_owner_feature(): u64 { COLLECTION_OWNER }
+
+    public fun is_collection_owner_enabled(): bool acquires Features {
+        is_enabled(COLLECTION_OWNER)
     }
 
     // ============================================================================================

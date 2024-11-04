@@ -10,6 +10,11 @@ To play with these examples:
 **WARNING:** These Move examples have NOT been audited. If you are using them in a production system, proceed at your own risk.
 Particular care should be taken with Move examples that contain complex cryptographic code (e.g., `drand`, `veiled_coin`).
 
+# Additional Resources
+
+-  [Aptos Learn](https://learn.aptoslabs.com/code-examples/) provides more step-by-step guides on some high-quality examples. 
+- We also have another repo [move-by-examples](https://github.com/aptos-labs/move-by-examples). It has more newer examples and is actively maintained.
+
 # Contributing
 
 ## Writing a Move example

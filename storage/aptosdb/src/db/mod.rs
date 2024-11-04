@@ -20,6 +20,7 @@ use crate::{
     schema::{
         block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -39,9 +40,8 @@ use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, db_ensure as ensure, db_other_bail as bail,
-    state_delta::StateDelta, AptosDbError, DbReader, DbWriter, ExecutedTrees, Order, Result,
-    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, DbWriter, ExecutedTrees,
+    Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -62,12 +62,11 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
-        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionToCommit, TransactionWithProof, Version,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -80,6 +79,7 @@ use std::{
     sync::Arc,
     time::Instant,
 };
+use tokio::sync::watch::Sender;
 
 #[cfg(test)]
 mod aptosdb_test;
@@ -96,9 +96,11 @@ pub struct AptosDB {
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
-    ledger_commit_lock: std::sync::Mutex<()>,
+    pre_commit_lock: std::sync::Mutex<()>,
+    commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
+    update_subscriber: Option<Sender<Version>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -182,6 +184,11 @@ impl AptosDB {
         )?;
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
+    }
+
+    pub fn add_version_update_subscriber(&mut self, sender: Sender<Version>) -> Result<()> {
+        self.update_subscriber = Some(sender);
+        Ok(())
     }
 
     /// Gets an instance of `BackupHandler` for data backup purpose.

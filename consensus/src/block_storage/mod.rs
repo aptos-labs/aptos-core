@@ -10,7 +10,10 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
-pub use block_store::{sync_manager::BlockRetriever, BlockStore};
+pub use block_store::{
+    sync_manager::{BlockRetriever, NeedFetchResult},
+    BlockStore,
+};
 use std::{sync::Arc, time::Duration};
 
 mod block_store;
@@ -45,6 +48,7 @@ pub trait BlockReader: Send + Sync {
     fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>>;
 
     /// Return the certified block with the highest round.
+    #[cfg(test)]
     fn highest_certified_block(&self) -> Arc<PipelinedBlock>;
 
     /// Return the quorum certificate with the highest round

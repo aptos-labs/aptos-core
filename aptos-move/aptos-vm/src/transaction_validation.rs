@@ -17,6 +17,7 @@ use aptos_types::{
     on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
@@ -40,6 +41,14 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
+        fee_payer_prologue_extended_name: Identifier::new("fee_payer_script_prologue_extended")
+            .unwrap(),
+        script_prologue_extended_name: Identifier::new("script_prologue_extended").unwrap(),
+        multi_agent_prologue_extended_name: Identifier::new("multi_agent_script_prologue_extended")
+            .unwrap(),
+        user_epilogue_extended_name: Identifier::new("epilogue_extended").unwrap(),
+        user_epilogue_gas_payer_extended_name: Identifier::new("epilogue_gas_payer_extended")
+            .unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -52,6 +61,11 @@ pub struct TransactionValidation {
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
+    pub fee_payer_prologue_extended_name: Identifier,
+    pub script_prologue_extended_name: Identifier,
+    pub multi_agent_prologue_extended_name: Identifier,
+    pub user_epilogue_extended_name: Identifier,
+    pub user_epilogue_gas_payer_extended_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -71,9 +85,12 @@ impl TransactionValidation {
 
 pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     txn_data: &TransactionMetadata,
+    features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
@@ -91,48 +108,107 @@ pub(crate) fn run_script_prologue(
         txn_data.fee_payer(),
         txn_data.fee_payer_authentication_key.as_ref(),
     ) {
-        let args = vec![
-            MoveValue::Signer(txn_data.sender),
-            MoveValue::U64(txn_sequence_number),
-            MoveValue::vector_u8(txn_authentication_key),
-            MoveValue::vector_address(txn_data.secondary_signers()),
-            MoveValue::Vector(secondary_auth_keys),
-            MoveValue::Address(fee_payer),
-            MoveValue::vector_u8(fee_payer_auth_key.to_vec()),
-            MoveValue::U64(txn_gas_price.into()),
-            MoveValue::U64(txn_max_gas_units.into()),
-            MoveValue::U64(txn_expiration_timestamp_secs),
-            MoveValue::U8(chain_id.id()),
-        ];
-        (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
+        if features.is_transaction_simulation_enhancement_enabled() {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::Address(fee_payer),
+                MoveValue::vector_u8(fee_payer_auth_key.to_vec()),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_extended_name,
+                args,
+            )
+        } else {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::Address(fee_payer),
+                MoveValue::vector_u8(fee_payer_auth_key.to_vec()),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+            ];
+            (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
+        }
     } else if txn_data.is_multi_agent() {
-        let args = vec![
-            MoveValue::Signer(txn_data.sender),
-            MoveValue::U64(txn_sequence_number),
-            MoveValue::vector_u8(txn_authentication_key),
-            MoveValue::vector_address(txn_data.secondary_signers()),
-            MoveValue::Vector(secondary_auth_keys),
-            MoveValue::U64(txn_gas_price.into()),
-            MoveValue::U64(txn_max_gas_units.into()),
-            MoveValue::U64(txn_expiration_timestamp_secs),
-            MoveValue::U8(chain_id.id()),
-        ];
-        (
-            &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_name,
-            args,
-        )
+        if features.is_transaction_simulation_enhancement_enabled() {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_extended_name,
+                args,
+            )
+        } else {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_name,
+                args,
+            )
+        }
     } else {
-        let args = vec![
-            MoveValue::Signer(txn_data.sender),
-            MoveValue::U64(txn_sequence_number),
-            MoveValue::vector_u8(txn_authentication_key),
-            MoveValue::U64(txn_gas_price.into()),
-            MoveValue::U64(txn_max_gas_units.into()),
-            MoveValue::U64(txn_expiration_timestamp_secs),
-            MoveValue::U8(chain_id.id()),
-            MoveValue::vector_u8(txn_data.script_hash.clone()),
-        ];
-        (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
+        #[allow(clippy::collapsible_else_if)]
+        if features.is_transaction_simulation_enhancement_enabled() {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::vector_u8(txn_data.script_hash.clone()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.script_prologue_extended_name,
+                args,
+            )
+        } else {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                MoveValue::U64(txn_sequence_number),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::vector_u8(txn_data.script_hash.clone()),
+            ];
+            (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
+        }
     };
     session
         .execute_function_bypass_visibility(
@@ -142,6 +218,7 @@ pub(crate) fn run_script_prologue(
             serialize_values(&args),
             &mut gas_meter,
             traversal_context,
+            module_storage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -155,6 +232,7 @@ pub(crate) fn run_script_prologue(
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
     features: &Features,
@@ -185,6 +263,7 @@ pub(crate) fn run_multisig_prologue(
             ]),
             &mut UnmeteredGasMeter,
             traversal_context,
+            module_storage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -193,11 +272,13 @@ pub(crate) fn run_multisig_prologue(
 
 fn run_epilogue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
     features: &Features,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -206,18 +287,34 @@ fn run_epilogue(
     // accepted it, in which case the gas payer feature is enabled.
     if let Some(fee_payer) = txn_data.fee_payer() {
         let (func_name, args) = {
-            let args = vec![
-                MoveValue::Signer(txn_data.sender),
-                MoveValue::Address(fee_payer),
-                MoveValue::U64(fee_statement.storage_fee_refund()),
-                MoveValue::U64(txn_gas_price.into()),
-                MoveValue::U64(txn_max_gas_units.into()),
-                MoveValue::U64(gas_remaining.into()),
-            ];
-            (
-                &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
-                args,
-            )
+            if features.is_transaction_simulation_enhancement_enabled() {
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(fee_payer),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                    MoveValue::Bool(is_simulation),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_extended_name,
+                    args,
+                )
+            } else {
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(fee_payer),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
+                    args,
+                )
+            }
         };
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -226,18 +323,34 @@ fn run_epilogue(
             serialize_values(&args),
             &mut UnmeteredGasMeter,
             traversal_context,
+            module_storage,
         )
     } else {
         // Regular tx, run the normal epilogue
         let (func_name, args) = {
-            let args = vec![
-                MoveValue::Signer(txn_data.sender),
-                MoveValue::U64(fee_statement.storage_fee_refund()),
-                MoveValue::U64(txn_gas_price.into()),
-                MoveValue::U64(txn_max_gas_units.into()),
-                MoveValue::U64(gas_remaining.into()),
-            ];
-            (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
+            if features.is_transaction_simulation_enhancement_enabled() {
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                    MoveValue::Bool(is_simulation),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_extended_name,
+                    args,
+                )
+            } else {
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                ];
+                (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
+            }
         };
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -246,6 +359,7 @@ fn run_epilogue(
             serialize_values(&args),
             &mut UnmeteredGasMeter,
             traversal_context,
+            module_storage,
         )
     }
     .map(|_return_vals| ())
@@ -253,7 +367,7 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, fee_statement, traversal_context)?;
+        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -263,6 +377,7 @@ fn run_epilogue(
 
 fn emit_fee_statement(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
@@ -274,6 +389,7 @@ fn emit_fee_statement(
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
             &mut UnmeteredGasMeter,
             traversal_context,
+            module_storage,
         )
         .map(|_return_vals| ())
 }
@@ -282,12 +398,14 @@ fn emit_fee_statement(
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -298,11 +416,13 @@ pub(crate) fn run_success_epilogue(
 
     run_epilogue(
         session,
+        module_storage,
         gas_remaining,
         fee_statement,
         txn_data,
         features,
         traversal_context,
+        is_simulation,
     )
     .or_else(|err| convert_epilogue_error(err, log_context))
 }
@@ -311,20 +431,24 @@ pub(crate) fn run_success_epilogue(
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
+        module_storage,
         gas_remaining,
         fee_statement,
         txn_data,
         features,
         traversal_context,
+        is_simulation,
     )
     .or_else(|e| {
         expect_only_successful_execution(

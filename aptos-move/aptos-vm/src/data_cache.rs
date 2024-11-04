@@ -3,21 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::{
-    gas::get_gas_config_from_storage,
-    move_vm_ext::{
-        resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
-        ResourceGroupResolver,
-    },
+use crate::move_vm_ext::{
+    resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+    ResourceGroupResolver,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{PanicError, PanicOr},
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         errors::StateviewError,
@@ -26,7 +23,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    vm::configs::aptos_prod_deserializer_config,
+};
+use aptos_vm_environment::{
+    gas::get_gas_feature_version, prod_configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
     resolver::{
@@ -301,7 +300,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let features = Features::fetch_config(self).unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features);
 
-        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+        let gas_feature_version = get_gas_feature_version(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,

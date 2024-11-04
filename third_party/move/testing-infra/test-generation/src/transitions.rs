@@ -839,7 +839,7 @@ pub fn stack_struct_borrow_field(
         },
         StructFieldInformation::DeclaredVariants(..) => {
             // TODO(#13806): consider implementing for struct variants
-            return Err(VMError::new("Variants not yet supported".to_string()));
+            return Err(VMError::new("Enum types not yet supported".to_string()));
         },
         StructFieldInformation::Declared(fields) => {
             let field_def = &fields[field_handle.field as usize];

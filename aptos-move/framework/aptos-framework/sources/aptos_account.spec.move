@@ -90,9 +90,6 @@ spec aptos_framework::aptos_account {
         pragma verify = false;
         let account_addr_source = signer::address_of(source);
 
-        // The 'from' addr is implictly not equal to 'to' addr
-        requires account_addr_source != to;
-
         include CreateAccountTransferAbortsIf;
         include GuidAbortsIf<AptosCoin>;
         include WithdrawAbortsIf<AptosCoin>{from: source};
@@ -131,10 +128,10 @@ spec aptos_framework::aptos_account {
         let coin_store_source = global<coin::CoinStore<AptosCoin>>(account_addr_source);
         let balance_source = coin_store_source.coin.value;
 
-        requires forall i in 0..len(recipients):
-            recipients[i] != account_addr_source;
-        requires exists i in 0..len(recipients):
-            amounts[i] > 0;
+        // requires forall i in 0..len(recipients):
+        //     recipients[i] != account_addr_source;
+        // requires exists i in 0..len(recipients):
+        //     amounts[i] > 0;
 
         // create account properties
         aborts_if len(recipients) != len(amounts);
@@ -182,11 +179,11 @@ spec aptos_framework::aptos_account {
         let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
         let balance_source = coin_store_source.coin.value;
 
-        requires forall i in 0..len(recipients):
-            recipients[i] != account_addr_source;
-
-        requires exists i in 0..len(recipients):
-            amounts[i] > 0;
+        // requires forall i in 0..len(recipients):
+        //     recipients[i] != account_addr_source;
+        //
+        // requires exists i in 0..len(recipients):
+        //     amounts[i] > 0;
 
         /// [high-level-req-7]
         aborts_if len(recipients) != len(amounts);
@@ -241,13 +238,23 @@ spec aptos_framework::aptos_account {
         ensures if_exist_coin ==> post_coin_store_to == coin_store_to + coins.value;
     }
 
+    spec deposit_fungible_assets(to: address, fa: FungibleAsset) {
+        pragma verify = false;
+    }
+
+    spec transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, to: address, amount: u64) {
+        pragma verify = false;
+    }
+
+    spec batch_transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, recipients: vector<address>, amounts: vector<u64>) {
+        pragma verify = false;
+    }
+
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
         // TODO(fa_migration)
         pragma verify = false;
         let account_addr_source = signer::address_of(from);
 
-        //The 'from' addr is implictly not equal to 'to' addr
-        requires account_addr_source != to;
 
         include CreateAccountTransferAbortsIf;
         include WithdrawAbortsIf<CoinType>;

@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::cached_state_view::ShardedStateCache;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 pub use aptos_types::indexer::indexer_db_reader::Order;
 use aptos_types::{
@@ -23,7 +22,6 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
-        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
@@ -39,6 +37,7 @@ use thiserror::Error;
 pub mod async_proof_fetcher;
 pub mod block_info;
 pub mod cached_state_view;
+pub mod chunk_to_commit;
 pub mod errors;
 mod executed_trees;
 mod metrics;
@@ -47,7 +46,7 @@ pub mod mock;
 pub mod state_delta;
 pub mod state_view;
 
-use crate::state_delta::StateDelta;
+use crate::chunk_to_commit::ChunkToCommit;
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
@@ -282,7 +281,12 @@ pub trait DbReader: Send + Sync {
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
         /// Returns the latest "synced" transaction version, potentially not "committed" yet.
-        fn get_synced_version(&self) -> Result<Version>;
+        fn get_synced_version(&self) -> Result<Option<Version>>;
+
+        /// Returns the latest "pre-committed" transaction version, which includes those written to
+        /// the DB but yet to be certified by consensus or a verified LedgerInfo from a state sync
+        /// peer.
+        fn get_pre_committed_version(&self) -> Result<Option<Version>>;
 
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
@@ -419,8 +423,8 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<TransactionAccumulatorSummary>;
 
-        /// Returns total number of leaves in state store at given version.
-        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+        /// Returns total number of state items in state store at given version.
+        fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
         /// Get a chunk of state store value, addressed by the index.
         fn get_state_value_chunk_with_proof(
@@ -487,6 +491,21 @@ pub trait DbReader: Send + Sync {
         self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
+
+    fn ensure_synced_version(&self) -> Result<Version> {
+        self.get_synced_version()?
+            .ok_or_else(|| AptosDbError::NotFound("Synced version not found.".to_string()))
+    }
+
+    fn expect_synced_version(&self) -> Version {
+        self.ensure_synced_version()
+            .expect("Failed to get synced version.")
+    }
+
+    fn ensure_pre_committed_version(&self) -> Result<Version> {
+        self.get_pre_committed_version()?
+            .ok_or_else(|| AptosDbError::NotFound("Pre-committed version not found.".to_string()))
+    }
 }
 
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
@@ -519,21 +538,51 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
-    /// Persist transactions. Called by the executor module when either syncing nodes or committing
-    /// blocks during normal operation.
-    /// See [`AptosDB::save_transactions`].
-    ///
-    /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
+    /// Persist transactions. Called by state sync to save verified transactions to the DB.
     fn save_transactions(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
+        chunk: ChunkToCommit,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> Result<()> {
+        // For reconfig suffix.
+        if ledger_info_with_sigs.is_none() && chunk.is_empty() {
+            return Ok(());
+        }
+
+        if !chunk.is_empty() {
+            self.pre_commit_ledger(chunk.clone(), sync_commit)?;
+        }
+        let version_to_commit = if let Some(ledger_info_with_sigs) = ledger_info_with_sigs {
+            ledger_info_with_sigs.ledger_info().version()
+        } else {
+            chunk.expect_last_version()
+        };
+        self.commit_ledger(version_to_commit, ledger_info_with_sigs, Some(chunk))
+    }
+
+    /// Optimistically persist transactions to the ledger.
+    ///
+    /// Called by consensus to pre-commit blocks before execution result is agreed on by the
+    /// validators.
+    ///
+    ///   If these blocks are later confirmed to be included in the ledger, commit_ledger should be
+    ///       called with a `LedgerInfoWithSignatures`.
+    ///   If not, the consensus needs to panic, resulting in a reboot of the node where the DB will
+    ///       truncate the unconfirmed data.
+    fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Commit pre-committed transactions to the ledger.
+    ///
+    /// If a LedgerInfoWithSigs is provided, both the "synced version" and "committed version" will
+    /// advance, otherwise only the synced version will advance.
+    fn commit_ledger(
+        &self,
+        version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
         unimplemented!()
     }

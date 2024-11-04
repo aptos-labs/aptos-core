@@ -8,7 +8,7 @@ use aptos_api_test_context::{current_function_name, find_value, TestContext};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
 use serde_json::json;
-use std::{str::FromStr, time::Duration};
+use std::str::FromStr;
 
 /* TODO: reactivate once cause of failure for `"8"` vs `8` in the JSON output is known.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -114,7 +114,9 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
 
     let ledger_version_1_resources = context
         .get(&account_resources(
@@ -142,6 +144,9 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
 async fn test_get_account_resources_by_ledger_version() {
     let context = new_test_context(current_function_name!());
     test_account_resources_by_ledger_version_with_context(context).await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_resources_by_ledger_version_with_shard_context() {
     let shard_context =
         new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
     test_account_resources_by_ledger_version_with_context(shard_context).await;
@@ -183,7 +188,9 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
         root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn.clone()]).await;
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
 
     let modules = context
         .get(&account_modules(

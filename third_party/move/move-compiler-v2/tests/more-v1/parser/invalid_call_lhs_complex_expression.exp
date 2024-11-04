@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/invalid_call_lhs_complex_expression.move:3:29
+  │
+3 │         (if (true) 5 else 0)();
+  │                             ^
+  │                             │
+  │                             Unexpected '('
+  │                             Expected ';'

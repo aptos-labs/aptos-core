@@ -1,91 +1,91 @@
 
 Diagnostics:
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:12:23
    │
 11 │         let r1 = borrow_global_mut<R>(addr);
-   │                  -------------------------- previous mutable global borrow
+   │                  -------------------------- struct `M::R` previously mutably borrowed here
 12 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+13 │         r1.f = f
+   │         ---- conflicting reference `r1` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:18:23
    │
 17 │         let f_ref = &mut borrow_global_mut<R>(addr).f;
-   │                     ---------------------------------
-   │                     │    │
-   │                     │    previous mutable global borrow
-   │                     used by mutable field borrow
+   │                     --------------------------------- struct `M::R` previously mutably borrowed here
 18 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+19 │         *f_ref = f
+   │         ---------- conflicting reference `f_ref` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:24:23
    │
 23 │         let r1 = id_mut(borrow_global_mut<R>(addr));
-   │                  ----------------------------------
-   │                  │      │
-   │                  │      previous mutable global borrow
-   │                  used by mutable call result
+   │                  ---------------------------------- struct `M::R` previously mutably borrowed here
 24 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+25 │         r1.f = f
+   │         ---- conflicting reference `r1` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:30:23
    │
 29 │         let f_ref = id_mut(&mut borrow_global_mut<R>(addr).f);
-   │                            ---------------------------------
-   │                            │    │
-   │                            │    previous mutable global borrow
-   │                            used by mutable field borrow
+   │                     ----------------------------------------- struct `M::R` previously mutably borrowed here
 30 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+31 │         *f_ref = f
+   │         ---------- conflicting reference `f_ref` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:36:23
    │
 35 │         let r1 = borrow_global<R>(addr);
-   │                  ---------------------- previous global borrow
+   │                  ---------------------- struct `M::R` previously borrowed here
 36 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+37 │         r1.f + f
+   │         ---- conflicting reference `r1` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:42:23
    │
 41 │         let f_ref = &borrow_global<R>(addr).f;
-   │                     -------------------------
-   │                     ││
-   │                     │previous global borrow
-   │                     used by field borrow
+   │                     ------------------------- struct `M::R` previously borrowed here
 42 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+43 │         *f_ref + f
+   │         ------ conflicting reference `f_ref` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:48:23
    │
 47 │         let r1 = id(borrow_global<R>(addr));
-   │                  --------------------------
-   │                  │  │
-   │                  │  previous global borrow
-   │                  used by call result
+   │                  -------------------------- struct `M::R` previously borrowed here
 48 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+49 │         r1.f + f
+   │         ---- conflicting reference `r1` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:54:23
    │
 53 │         let f_ref = id(&borrow_global<R>(addr).f);
-   │                        -------------------------
-   │                        ││
-   │                        │previous global borrow
-   │                        used by field borrow
+   │                     ----------------------------- struct `M::R` previously borrowed here
 54 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+55 │         *f_ref + f
+   │         ------ conflicting reference `f_ref` used here
 
-error: cannot extract resource `M::R` which is still borrowed
+error: cannot extract `M::R` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_from_invalid.move:62:23
    │
 61 │         let r1; if (cond) r1 = borrow_global_mut<R>(addr) else r1 = &mut r;
-   │                                -------------------------- previous mutable global borrow
+   │                                -------------------------- struct `M::R` previously mutably borrowed here
 62 │         let R { f } = move_from<R>(addr);
-   │                       ^^^^^^^^^^^^^^^^^^ extracted here
+   │                       ^^^^^^^^^^^^^^^^^^ extraction attempted here
+63 │         r1.f = f;
+   │         ---- conflicting reference `r1` used here

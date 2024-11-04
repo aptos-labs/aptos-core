@@ -104,7 +104,7 @@ impl FakeBufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
+        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
         new_state_after_checkpoint: StateDelta,
     ) -> Result<()> {
         ensure!(
@@ -236,7 +236,7 @@ impl FakeAptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self.get_synced_version().map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -406,7 +406,7 @@ impl FakeAptosDB {
                     base_state_version,
                     ledger_info_with_sigs,
                     sync_commit,
-                    latest_in_memory_state.clone(),
+                    &latest_in_memory_state,
                 )?;
             }
 
@@ -667,7 +667,7 @@ impl DbReader for FakeAptosDB {
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             ensure!(
-                version <= self.get_synced_version()?,
+                version <= self.ensure_synced_version()?,
                 "version older than latest version"
             );
 
@@ -835,7 +835,7 @@ impl DbReader for FakeAptosDB {
         // This is because when we call save_transactions for the genesis block, we call [AptosDB::save_transactions]
         // where there is an expectation that the root of the SMTs are the same pointers. Here,
         // we get from the inner AptosDB which ensures that the pointers match when save_transactions is called.
-        if self.get_synced_version().unwrap_or_default() == 0 {
+        if self.ensure_synced_version().unwrap_or_default() == 0 {
             return self.inner.get_latest_executed_trees();
         }
 
@@ -900,8 +900,8 @@ impl DbReader for FakeAptosDB {
             .map_err(Into::into)
     }
 
-    fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
-        self.inner.get_state_leaf_count(version)
+    fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        self.inner.get_state_item_count(version)
     }
 
     fn get_state_value_chunk_with_proof(
@@ -1008,7 +1008,7 @@ mod tests {
                     cur_ver.checked_sub(1), /* base_state_version */
                     Some(ledger_info_with_sigs),
                     false, /* sync_commit */
-                    in_memory_state.clone(),
+                    &in_memory_state,
                     None, // ignored
                     Some(&ShardedStateCache::default()) // ignored
                 )
@@ -1117,7 +1117,7 @@ mod tests {
         let signed_transaction = transaction_with_proof
             .transaction
             .try_as_signed_user_txn()
-            .ok_or(anyhow!("not user transaction"))?;
+            .ok_or_else(|| anyhow!("not user transaction"))?;
 
         ensure!(
             transaction_with_proof.version == version,

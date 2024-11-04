@@ -40,5 +40,29 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    public fun bar(): u64 {
+        let i = 0;
+        while (i < 10) {
+            i = i + 1;
+            if (i == 5) {
+                break;
+            }
+        };
+        i
+    }
+    inline fun foo(): u64 {
+        let i = 0;
+        while (i < 10) {
+            i = i + 1;
+            if (i == 5) {
+                break;
+            }
+        };
+        i
+    }
+}
+
 
 ============ bytecode verification succeeded ========

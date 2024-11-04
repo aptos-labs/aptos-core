@@ -26,7 +26,11 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
+use aptos_consensus_types::{
+    common::{Author, Payload, PayloadFilter},
+    payload_pull_params::PayloadPullParameters,
+    utils::PayloadTxnsSize,
+};
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
@@ -255,20 +259,23 @@ impl DagDriver {
         let (validator_txns, payload) = match self
             .payload_client
             .pull_payload(
-                Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
-                max_txns,
-                max_txns,
-                max_size_bytes,
-                // TODO: Set max_inline_items and max_inline_bytes correctly
-                100,
-                100 * 1024,
+                PayloadPullParameters {
+                    max_poll_time: Duration::from_millis(
+                        self.payload_config.payload_pull_max_poll_time_ms,
+                    ),
+                    max_txns: PayloadTxnsSize::new(max_txns, max_size_bytes),
+                    max_txns_after_filtering: max_txns,
+                    soft_max_txns_after_filtering: max_txns,
+                    max_inline_txns: PayloadTxnsSize::new(100, 100 * 1024),
+                    maybe_optqs_payload_pull_params: None,
+                    user_txn_filter: payload_filter,
+                    pending_ordering: false,
+                    pending_uncommitted_blocks: 0,
+                    recent_max_fill_fraction: 0.0,
+                    block_timestamp: self.time_service.now_unix_time(),
+                },
                 sys_payload_filter,
-                payload_filter,
                 Box::pin(async {}),
-                false,
-                0,
-                0.0,
-                self.time_service.now_unix_time(),
             )
             .await
         {

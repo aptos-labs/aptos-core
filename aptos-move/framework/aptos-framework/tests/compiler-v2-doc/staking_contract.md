@@ -91,6 +91,7 @@ pool.
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
+    -  [Struct `StakingContract`](#@Specification_1_StakingContract)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
     -  [Function `last_recorded_principal`](#@Specification_1_last_recorded_principal)
     -  [Function `commission_percentage`](#@Specification_1_commission_percentage)
@@ -1279,7 +1280,7 @@ Commission percentage has to be between 0 and 100.
 
 <a id="0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
 
-Chaning beneficiaries for operators is not supported.
+Changing beneficiaries for operators is not supported.
 
 
 <pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 9;
@@ -2763,6 +2764,62 @@ Create a new staking_contracts resource.
 
 
 
+<a id="@Specification_1_StakingContract"></a>
+
+### Struct `StakingContract`
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingContract">StakingContract</a> <b>has</b> store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>principal: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owner_cap: <a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>commission_percentage: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>distribution_pool: <a href="../../../aptos-stdlib/tests/compiler-v2-doc/pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>signer_cap: <a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100;
+</code></pre>
+
+
+
 <a id="@Specification_1_stake_pool_address"></a>
 
 ### Function `stake_pool_address`
@@ -2836,7 +2893,6 @@ Staking_contract exists the stacker/operator pair.
 
 
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.<a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100;
 <b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
 <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>;
@@ -3023,6 +3079,7 @@ Staking_contract exists the stacker/operator pair.
 <b>let</b> <b>post</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(store.staking_contracts, operator);
 <b>let</b> <b>post</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap.pool_address;
 <b>let</b> <b>post</b> new_delegated_voter = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address).delegated_voter;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>ensures</b> new_delegated_voter == new_voter;
 </code></pre>
 
@@ -3117,7 +3174,6 @@ Only staker or operator can call this.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>requires</b> amount &gt; 0;
 <b>let</b> staker_address = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a> { staker: staker_address };
 </code></pre>
@@ -3137,8 +3193,6 @@ Staking_contract exists the stacker/operator pair.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-<b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.<a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100;
 <b>let</b> staker_address = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address).staking_contracts;
 <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
@@ -3372,7 +3426,7 @@ The StakePool exists under the pool_address of StakingContract.
 
 
 The Account exists under the staker.
-The guid_creation_num of the ccount resource is up to MAX_U64.
+The guid_creation_num of the account resource is up to MAX_U64.
 
 
 <pre><code><b>include</b> <a href="staking_contract.md#0x1_staking_contract_NewStakingContractsHolderAbortsIf">NewStakingContractsHolderAbortsIf</a>;

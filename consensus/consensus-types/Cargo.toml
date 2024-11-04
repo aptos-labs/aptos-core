@@ -23,6 +23,7 @@ aptos-logger = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+derivative = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }

@@ -10,6 +10,4 @@ error: data invariant does not hold
   =     at tests/sources/functional/data_invariant_in_map.move:22: violation_1
   =     at tests/sources/functional/data_invariant_in_map.move:23: violation_1
   =         <redacted> = <redacted>
-  =         s = <redacted>
-  =         <redacted> = <redacted>
   =     at tests/sources/functional/data_invariant_in_map.move:8

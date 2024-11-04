@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected `#[lint::skip(...)]`, not an assigned value
+  ┌─ tests/lints/model_ast_lints/bad_lint_attribute_01.move:2:7
+  │
+2 │     #[lint::skip = true]
+  │       ^^^^^^^^^^^^^^^^^

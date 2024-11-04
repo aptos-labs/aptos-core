@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
@@ -27,6 +27,7 @@ use std::sync::{
 };
 
 /// build channels and return phases and buffer manager
+#[allow(clippy::too_many_arguments)]
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
     execution_proxy: Arc<dyn StateComputer>,
@@ -39,8 +40,11 @@ pub fn prepare_phases_and_buffer_manager(
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
+    back_pressure_enabled: bool,
+    highest_committed_round: u64,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    max_pending_rounds_in_commit_vote_cache: u64,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -93,11 +97,12 @@ pub fn prepare_phases_and_buffer_manager(
     // Persisting Phase
     let (persisting_phase_request_tx, persisting_phase_request_rx) =
         create_channel::<CountedRequest<PersistingRequest>>();
+    let (persisting_phase_response_tx, persisting_phase_response_rx) = create_channel();
 
     let persisting_phase_processor = PersistingPhase::new(persisting_proxy);
     let persisting_phase = PipelinePhase::new(
         persisting_phase_request_rx,
-        None,
+        Some(persisting_phase_response_tx),
         Box::new(persisting_phase_processor),
         reset_flag.clone(),
     );
@@ -118,6 +123,7 @@ pub fn prepare_phases_and_buffer_manager(
             Arc::new(commit_msg_tx),
             commit_msg_rx,
             persisting_phase_request_tx,
+            persisting_phase_response_rx,
             block_rx,
             sync_rx,
             epoch_state,
@@ -125,8 +131,11 @@ pub fn prepare_phases_and_buffer_manager(
             reset_flag.clone(),
             bounded_executor,
             order_vote_enabled,
+            back_pressure_enabled,
+            highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
+            max_pending_rounds_in_commit_vote_cache,
         ),
     )
 }

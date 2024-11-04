@@ -77,6 +77,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         named_address_mapping: cloned_options.move_named_address_values,
         output_dir: cloned_options.output_path,
         language_version: cloned_options.language_version,
+        compiler_version: None, // TODO: need to pass v2.x here
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: cloned_options.backend.stable_test_output,
@@ -148,7 +149,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
         error_writer,
         "exiting with model building errors",
     )?;
-    env.report_diag(error_writer, options.prover.report_severity);
 
     // Add the prover options as an extension to the environment, so they can be accessed
     // from there.
@@ -318,6 +318,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             &dump_file_base,
             options.prover.dump_cfg,
             &|_| {},
+            || true,
         )
     } else {
         pipeline.run(env, &mut targets);

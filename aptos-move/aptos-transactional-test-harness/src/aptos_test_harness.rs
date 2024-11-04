@@ -25,9 +25,10 @@ use aptos_types::{
         EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
         Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
-    vm::configs::set_paranoid_type_checks,
+    AptosCoinType,
 };
 use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
@@ -433,7 +434,7 @@ impl<'a> AptosTestAdapter<'a> {
 
     /// Obtain the AptosCoin amount under address `signer_addr`
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let aptos_coin_tag = CoinStoreResource::struct_tag();
+        let aptos_coin_tag = CoinStoreResource::<AptosCoinType>::struct_tag();
 
         let balance_blob = self
             .storage

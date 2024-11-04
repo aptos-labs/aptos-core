@@ -1,0 +1,62 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume($t0: u64, $t1: u64, $t2: u64) {
+     # live vars: $t0, $t1, $t2
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     # flush: $t0
+     # live vars:
+  0: $t0 := m::one()
+     # live vars: $t0
+  1: $t1 := m::one()
+     # live vars: $t0, $t1
+  2: m::consume($t1, $t0, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+consume(Arg0: u64, Arg1: u64, Arg2: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+one(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test() /* def_idx: 2 */ {
+L0:	loc0: u64
+B0:
+	0: Call one(): u64
+	1: StLoc[0](loc0: u64)
+	2: Call one(): u64
+	3: CopyLoc[0](loc0: u64)
+	4: MoveLoc[0](loc0: u64)
+	5: Call consume(u64, u64, u64)
+	6: Ret
+}
+}
+============ bytecode verification succeeded ========

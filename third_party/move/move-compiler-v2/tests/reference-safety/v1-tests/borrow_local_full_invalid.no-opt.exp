@@ -1,23 +1,44 @@
 
 Diagnostics:
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:23:17
+error: cannot read local `y` since it is mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:14:9
+   │
+12 │         let x = &mut v;
+   │                 ------ previously mutably borrowed here
+13 │         let y = &mut v;
+14 │         *y;
+   │         ^^ read attempted here
+15 │         *x;
+   │         -- conflicting reference `x` used here
+
+error: cannot transfer mutable value since it is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:18:17
+   │
+17 │         let x = &mut v;
+   │                 ------ previously mutably borrowed here
+18 │         let y = id_mut(&mut v);
+   │                 ^^^^^^^^^^^^^^ transfer attempted here
+19 │         *y;
+20 │         *x;
+   │         -- conflicting reference `x` used here
+
+error: cannot write local `y` since it is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:24:9
    │
 22 │         let x = &v;
-   │                 -- previous local borrow
+   │                 -- previously borrowed here
 23 │         let y = &mut v;
-   │                 ^^^^^^ mutable borrow attempted here
 24 │         *y = 0;
-   │         ------ requirement enforced here
+   │         ^^^^^^ write attempted here
 25 │         *x;
    │         -- conflicting reference `x` used here
 
-error: cannot immutably borrow since mutable references exist
+error: cannot immutably borrow local `y` which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:33:17
    │
 32 │         let x = &mut v;
-   │                 ------ previous mutable local borrow
+   │                 ------ local `v` previously mutably borrowed here
 33 │         let y = &v;
-   │                 ^^ immutable borrow attempted here
+   │                 ^^ borrow attempted here
 34 │         *x;
-   │         -- requirement enforced here
+   │         -- conflicting reference `x` used here

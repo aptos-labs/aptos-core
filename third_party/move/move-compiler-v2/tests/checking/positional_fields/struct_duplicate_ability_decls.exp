@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid modifier
+  ┌─ tests/checking/positional_fields/struct_duplicate_ability_decls.move:2:27
+  │
+2 │     struct S has copy {} has copy;
+  │                              ^^^^ Conflicting ability declarations. Abilities must be declared either before or after the variant list, not both.
+
+error: invalid modifier
+  ┌─ tests/checking/positional_fields/struct_duplicate_ability_decls.move:4:36
+  │
+4 │     struct T<T> has copy { x: T } has drop;
+  │                                       ^^^^ Conflicting ability declarations. Abilities must be declared either before or after the variant list, not both.

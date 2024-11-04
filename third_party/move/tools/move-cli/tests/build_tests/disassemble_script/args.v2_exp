@@ -5,14 +5,11 @@ script {
 
 main() /* def_idx: 0 */ {
 B0:
-	0: LdTrue
-	1: BrFalse(3)
+	0: Branch(3)
 B1:
-	2: Branch(5)
+	1: LdU64(0)
+	2: Abort
 B2:
-	3: LdU64(0)
-	4: Abort
-B3:
-	5: Ret
+	3: Ret
 }
 }

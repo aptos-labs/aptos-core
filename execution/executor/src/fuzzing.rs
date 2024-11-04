@@ -4,15 +4,14 @@
 
 use crate::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
-    components::chunk_output::ChunkOutput,
+    workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{execution_output::ExecutionOutput, BlockExecutorTrait};
 use aptos_storage_interface::{
-    cached_state_view::{CachedStateView, ShardedStateCache},
-    state_delta::StateDelta,
-    DbReader, DbReaderWriter, DbWriter,
+    cached_state_view::CachedStateView, chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter,
+    DbWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -20,13 +19,13 @@ use aptos_types::{
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{ShardedStateUpdates, StateView},
+    state_store::StateView,
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
+        BlockOutput, Transaction, TransactionOutput, Version,
     },
     vm_status::VMStatus,
 };
@@ -73,8 +72,14 @@ impl TransactionBlockExecutor for FakeVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, onchain_config)
+        append_state_checkpoint_to_block: Option<HashValue>,
+    ) -> Result<ExecutionOutput> {
+        DoGetExecutionOutput::by_transaction_execution::<FakeVM>(
+            transactions,
+            state_view,
+            onchain_config,
+            append_state_checkpoint_to_block,
+        )
     }
 }
 
@@ -113,16 +118,19 @@ impl DbReader for FakeDb {
 }
 
 impl DbWriter for FakeDb {
-    fn save_transactions(
+    fn pre_commit_ledger(
         &self,
-        _txns_to_commit: &[TransactionToCommit],
-        _first_version: Version,
-        _base_state_version: Option<Version>,
-        _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _chunk: ChunkToCommit,
         _sync_commit: bool,
-        _in_memory_state: StateDelta,
-        _block_state_updates: Option<ShardedStateUpdates>,
-        _sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> aptos_storage_interface::Result<()> {
+        Ok(())
+    }
+
+    fn commit_ledger(
+        &self,
+        _version: Version,
+        _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _chunk: Option<ChunkToCommit>,
     ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }

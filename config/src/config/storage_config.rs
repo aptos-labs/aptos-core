@@ -22,6 +22,7 @@ use std::{
 pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
 
 pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
+pub const BUFFERED_STATE_TARGET_ITEMS_FOR_TEST: usize = 10;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]

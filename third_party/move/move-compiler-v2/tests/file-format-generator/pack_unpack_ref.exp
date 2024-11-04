@@ -18,17 +18,15 @@ L2:	loc1: &mut u64
 B0:
 	0: CopyLoc[0](Arg0: &mut S)
 	1: MutBorrowField[0](S.f: u64)
-	2: CopyLoc[0](Arg0: &mut S)
+	2: MoveLoc[0](Arg0: &mut S)
 	3: MutBorrowField[1](S.g: u64)
-	4: MoveLoc[0](Arg0: &mut S)
-	5: Pop
-	6: StLoc[1](loc0: &mut u64)
-	7: StLoc[2](loc1: &mut u64)
-	8: MoveLoc[2](loc1: &mut u64)
+	4: StLoc[1](loc0: &mut u64)
+	5: StLoc[2](loc1: &mut u64)
+	6: MoveLoc[2](loc1: &mut u64)
+	7: ReadRef
+	8: MoveLoc[1](loc0: &mut u64)
 	9: ReadRef
-	10: MoveLoc[1](loc0: &mut u64)
-	11: ReadRef
-	12: Ret
+	10: Ret
 }
 unpack_ref(Arg0: &S): u64 * u64 /* def_idx: 1 */ {
 L1:	loc0: &u64
@@ -36,17 +34,15 @@ L2:	loc1: &u64
 B0:
 	0: CopyLoc[0](Arg0: &S)
 	1: ImmBorrowField[0](S.f: u64)
-	2: CopyLoc[0](Arg0: &S)
+	2: MoveLoc[0](Arg0: &S)
 	3: ImmBorrowField[1](S.g: u64)
-	4: MoveLoc[0](Arg0: &S)
-	5: Pop
-	6: StLoc[1](loc0: &u64)
-	7: StLoc[2](loc1: &u64)
-	8: MoveLoc[2](loc1: &u64)
+	4: StLoc[1](loc0: &u64)
+	5: StLoc[2](loc1: &u64)
+	6: MoveLoc[2](loc1: &u64)
+	7: ReadRef
+	8: MoveLoc[1](loc0: &u64)
 	9: ReadRef
-	10: MoveLoc[1](loc0: &u64)
-	11: ReadRef
-	12: Ret
+	10: Ret
 }
 unpack_ref_G(Arg0: &G): u64 * u64 * u64 * u64 /* def_idx: 2 */ {
 L1:	loc0: &S
@@ -59,30 +55,26 @@ B0:
 	1: ImmBorrowField[2](G.x1: u64)
 	2: CopyLoc[0](Arg0: &G)
 	3: ImmBorrowField[3](G.x2: u64)
-	4: CopyLoc[0](Arg0: &G)
+	4: MoveLoc[0](Arg0: &G)
 	5: ImmBorrowField[4](G.s: S)
 	6: StLoc[1](loc0: &S)
-	7: MoveLoc[0](Arg0: &G)
-	8: Pop
-	9: CopyLoc[1](loc0: &S)
-	10: ImmBorrowField[0](S.f: u64)
-	11: CopyLoc[1](loc0: &S)
-	12: ImmBorrowField[1](S.g: u64)
-	13: MoveLoc[1](loc0: &S)
-	14: Pop
-	15: StLoc[2](loc1: &u64)
-	16: StLoc[3](loc2: &u64)
-	17: StLoc[4](loc3: &u64)
-	18: StLoc[5](loc4: &u64)
-	19: MoveLoc[5](loc4: &u64)
+	7: CopyLoc[1](loc0: &S)
+	8: ImmBorrowField[0](S.f: u64)
+	9: MoveLoc[1](loc0: &S)
+	10: ImmBorrowField[1](S.g: u64)
+	11: StLoc[2](loc1: &u64)
+	12: StLoc[3](loc2: &u64)
+	13: StLoc[4](loc3: &u64)
+	14: StLoc[5](loc4: &u64)
+	15: MoveLoc[5](loc4: &u64)
+	16: ReadRef
+	17: MoveLoc[4](loc3: &u64)
+	18: ReadRef
+	19: MoveLoc[3](loc2: &u64)
 	20: ReadRef
-	21: MoveLoc[4](loc3: &u64)
+	21: MoveLoc[2](loc1: &u64)
 	22: ReadRef
-	23: MoveLoc[3](loc2: &u64)
-	24: ReadRef
-	25: MoveLoc[2](loc1: &u64)
-	26: ReadRef
-	27: Ret
+	23: Ret
 }
 }
 ============ bytecode verification succeeded ========

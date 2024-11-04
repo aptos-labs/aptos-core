@@ -222,7 +222,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructLayout {
-    Singleton(Vec<(Field, Type)>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Vec<(Field, Type)>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -233,6 +234,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Vec<(Field, Type)>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -500,18 +502,52 @@ pub type Type = Spanned<Type_>;
 //**************************************************************************************************
 
 new_name!(Var);
+new_name!(Label);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Bind_ {
     // x
     Var(Var),
-    // T { f1: b1, ... fn: bn }
-    // T<t1, ... , tn> { f1: b1, ... fn: bn }
-    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    // T { f1: b1, ... fn: bn, ".."? }
+    // T<t1, ... , tn> { f1: b1, ... fn: bn, ".."? }
+    Unpack(
+        Box<NameAccessChain>,
+        Option<Vec<Type>>,
+        Vec<BindFieldOrDotDot>,
+    ),
+    // T(e1, ..., en)
+    // T<t1, ... , tn>(e1, ..., en)
+    // where each e_i is an expression or a ".."
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotDot>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedBind_(pub Bind, pub Option<Type>);
+pub type TypedBind = Spanned<TypedBind_>;
+
+// b1 [":" <Type>], ..., bn [":" <Type>]
+pub type TypedBindList = Spanned<Vec<TypedBind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindFieldOrDotDot_ {
+    // f : b
+    FieldBind(Field, Bind),
+    // ..
+    DotDot,
+}
+pub type BindFieldOrDotDot = Spanned<BindFieldOrDotDot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindOrDotDot_ {
+    // a bind
+    Bind(Bind),
+    // ..
+    DotDot,
+}
+pub type BindOrDotDot = Spanned<BindOrDotDot_>;
 
 pub type BindWithRange = Spanned<(Bind, Exp)>;
 pub type BindWithRangeList = Spanned<Vec<BindWithRange>>;
@@ -643,17 +679,17 @@ pub enum Exp_ {
 
     // if (eb) et else ef
     IfElse(Box<Exp>, Box<Exp>, Option<Box<Exp>>),
-    // while (eb) eloop
-    While(Box<Exp>, Box<Exp>),
-    // loop eloop
-    Loop(Box<Exp>),
+    // [label] while (eb) eloop
+    While(Option<Label>, Box<Exp>, Box<Exp>),
+    // [label] loop eloop
+    Loop(Option<Label>, Box<Exp>),
     // match (e) { b1 [ if c_1] => e1, ... }
     Match(Box<Exp>, Vec<Spanned<(BindList, Option<Exp>, Exp)>>),
 
     // { seq }
     Block(Sequence),
-    // |x1, ..., xn| e
-    Lambda(BindList, Box<Exp>), // spec only
+    // | x1 [: t1], ..., xn [: tn] | e
+    Lambda(TypedBindList, Box<Exp>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -667,17 +703,17 @@ pub enum Exp_ {
     // ()
     Unit,
 
-    // a = e
-    Assign(Box<Exp>, Box<Exp>),
+    // a [binop]= e
+    Assign(Box<Exp>, Option<BinOp>, Box<Exp>),
 
     // return e
     Return(Option<Box<Exp>>),
     // abort e
     Abort(Box<Exp>),
     // break
-    Break,
+    Break(Option<Label>),
     // continue
-    Continue,
+    Continue(Option<Label>),
 
     // *e
     Dereference(Box<Exp>),
@@ -699,6 +735,9 @@ pub enum Exp_ {
     Cast(Box<Exp>, Type),
     // (e: t)
     Annotate(Box<Exp>, Type),
+
+    // (e is t1 | .. | tn)
+    Test(Box<Exp>, Vec<Type>),
 
     // spec { ... }
     Spec(SpecBlock),
@@ -1312,7 +1351,7 @@ impl AstDebug for StructDefinition {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         match layout {
-            StructLayout::Singleton(fields) => w.block(|w| {
+            StructLayout::Singleton(fields, _) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);
@@ -1749,6 +1788,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
             },
@@ -1756,6 +1796,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
                 w.write(" = ");
@@ -1842,20 +1883,26 @@ impl AstDebug for Exp_ {
                     arm.value.2.ast_debug(w)
                 }
             },
-            E::While(b, e) => {
+            E::While(l, b, e) => {
+                if let Some(l) = l {
+                    w.write(&format!("{}: ", l.value().as_str()))
+                }
                 w.write("while (");
                 b.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
             },
-            E::Loop(e) => {
+            E::Loop(l, e) => {
+                if let Some(l) = l {
+                    w.write(&format!("{}: ", l.value().as_str()))
+                }
                 w.write("loop ");
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, tbs), e) => {
                 w.write("|");
-                bs.ast_debug(w);
+                tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
             },
@@ -1876,9 +1923,13 @@ impl AstDebug for Exp_ {
                 w.comma(es, |w, e| e.ast_debug(w));
                 w.write(")");
             },
-            E::Assign(lvalue, rhs) => {
+            E::Assign(lvalue, op_opt, rhs) => {
                 lvalue.ast_debug(w);
-                w.write(" = ");
+                w.write(" ");
+                if let Some(op) = op_opt {
+                    op.ast_debug(w);
+                }
+                w.write("= ");
                 rhs.ast_debug(w);
             },
             E::Return(e) => {
@@ -1892,8 +1943,18 @@ impl AstDebug for Exp_ {
                 w.write("abort ");
                 e.ast_debug(w);
             },
-            E::Break => w.write("break"),
-            E::Continue => w.write("continue"),
+            E::Break(l) => {
+                w.write("break");
+                if let Some(l) = l {
+                    w.write(format!(" {}", l.value().as_str()));
+                }
+            },
+            E::Continue(l) => {
+                w.write("continue");
+                if let Some(l) = l {
+                    w.write(format!(" {}", l.value().as_str()));
+                }
+            },
             E::Dereference(e) => {
                 w.write("*");
                 e.ast_debug(w)
@@ -1926,6 +1987,16 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
                 w.write(" as ");
                 ty.ast_debug(w);
+                w.write(")");
+            },
+            E::Test(e, tys) => {
+                w.write("(");
+                e.ast_debug(w);
+                w.write(" is ");
+                w.list(tys, "|", |w, item| {
+                    item.ast_debug(w);
+                    false
+                });
                 w.write(")");
             },
             E::Index(e, i) => {
@@ -2021,6 +2092,29 @@ impl AstDebug for Vec<Bind> {
     }
 }
 
+impl AstDebug for BindOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindOrDotDot_ as B;
+        match self {
+            B::Bind(b) => b.ast_debug(w),
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
+impl AstDebug for BindFieldOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindFieldOrDotDot_ as B;
+        match self {
+            B::FieldBind(f, b) => {
+                w.write(&format!("{}: ", f));
+                b.ast_debug(w);
+            },
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
 impl AstDebug for Vec<Vec<Exp>> {
     fn ast_debug(&self, w: &mut AstWriter) {
         for trigger in self {
@@ -2044,12 +2138,39 @@ impl AstDebug for Bind_ {
                     w.write(">");
                 }
                 w.write("{");
-                w.comma(fields, |w, (f, b)| {
-                    w.write(&format!("{}: ", f));
-                    b.ast_debug(w);
+                w.comma(fields, |w, field| {
+                    field.ast_debug(w);
                 });
                 w.write("}");
             },
+            B::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, b| b.ast_debug(w));
+                w.write(")");
+            },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedBind> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedBind_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedBind_(b, ty_opt) = self;
+        b.ast_debug(w);
+        if let Some(ty) = ty_opt {
+            w.write(":");
+            ty.ast_debug(w)
         }
     }
 }

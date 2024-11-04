@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot freeze local `result` since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/freeze_mutable.move:9:9
+   │
+ 9 │         freeze(result);
+   │         ^^^^^^^^^^^^^^ frozen here
+10 │         returned_ref
+   │         ------------ used here

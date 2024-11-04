@@ -40,11 +40,20 @@ use aptos_types::{
         Result as StateStoreResult, StateView, TStateView,
     },
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
-    vm::configs::aptos_prod_deserializer_config,
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::flush_warm_vm_cache, AptosVM};
+use aptos_vm::{
+    data_cache::AsMoveResolver,
+    move_vm_ext::{flush_warm_vm_cache, SessionId},
+    AptosVM,
+};
+use aptos_vm_environment::{
+    environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
+};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::{
+    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
+};
 use clap::Parser;
 use move_binary_format::{
     access::ModuleAccess,
@@ -61,7 +70,8 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
-use move_vm_types::resolver::ModuleResolver;
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -293,7 +303,7 @@ where
     }
 
     fn get_usage(&self) -> StateStoreResult<StateStorageUsage> {
-        panic!("not supported")
+        Ok(StateStorageUsage::Untracked)
     }
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
@@ -453,6 +463,49 @@ fn add_script_execution_hash(
  * Simulation Workflow
  *
  **************************************************************************************************/
+fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
+    flush_warm_vm_cache();
+    let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+    let vm = AptosVM::new(env.clone(), &state_view);
+    let resolver = state_view.as_move_resolver();
+    let module_storage = state_view.as_aptos_code_storage(env);
+
+    let gas_schedule =
+        GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
+    let gas_feature_version = gas_schedule.feature_version;
+
+    let change_set_configs =
+        ChangeSetConfigs::unlimited_at_gas_feature_version(gas_feature_version);
+
+    let traversal_storage = TraversalStorage::new();
+    let mut sess = vm.new_session(&resolver, SessionId::void(), None);
+    sess.execute_function_bypass_visibility(
+        &MODULE_ID_APTOS_GOVERNANCE,
+        IdentStr::new("force_end_epoch").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&AccountAddress::ONE)?],
+        &mut UnmeteredGasMeter,
+        &mut TraversalContext::new(&traversal_storage),
+        &module_storage,
+    )?;
+    let (mut change_set, empty_module_write_set) =
+        sess.finish(&change_set_configs, &module_storage)?;
+    assert!(
+        empty_module_write_set.is_empty(),
+        "Modules cannot be published by 'force_end_epoch'"
+    );
+
+    change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
+    let (write_set, _events) = change_set
+        .try_combine_into_storage_change_set(empty_module_write_set)
+        .expect("Failed to convert to storage ChangeSet")
+        .into_inner();
+
+    state_view.apply_write_set(write_set);
+
+    Ok(())
+}
+
 pub async fn simulate_multistep_proposal(
     remote_url: Url,
     proposal_dir: &Path,
@@ -479,7 +532,9 @@ pub async fn simulate_multistep_proposal(
             path,
             &framework_package_args,
             PromptOptions::yes(),
-            None,
+            None, // bytecode_version
+            None, // language_version
+            None, // compiler_version
         )
         .with_context(|| format!("failed to compile script {}", path.display()))?;
 
@@ -513,6 +568,9 @@ pub async fn simulate_multistep_proposal(
     for (script_idx, (script_path, (script_blob, script_hash))) in
         proposal_scripts.iter().zip(compiled_scripts).enumerate()
     {
+        // Force-end the epoch so that buffered configuration changes get applied.
+        force_end_epoch(&state_view).context("failed to force end epoch")?;
+
         // Fetch the on-chain configs that are needed for the simulation.
         let chain_id =
             ChainIdResource::fetch_config(&state_view).context("failed to fetch chain id")?;
@@ -561,11 +619,16 @@ pub async fn simulate_multistep_proposal(
         // The warm vm cache also needs to be explicitly flushed as it cannot detect the
         // patches we performed.
         flush_warm_vm_cache();
-        let vm = AptosVM::new_for_gov_sim(&state_view);
+        let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+        let vm = AptosVM::new(env.clone(), &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
         let resolver = state_view.as_move_resolver();
+        let code_storage = state_view.as_aptos_code_storage(env);
+
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,
+            &code_storage,
             &account
                 .account()
                 .transaction()

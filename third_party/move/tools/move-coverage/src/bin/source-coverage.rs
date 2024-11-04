@@ -8,7 +8,10 @@ use clap::Parser;
 use move_binary_format::file_format::CompiledModule;
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_command_line_common::files::SOURCE_MAP_EXTENSION;
-use move_coverage::{coverage_map::CoverageMap, source_coverage::SourceCoverageBuilder};
+use move_coverage::{
+    coverage_map::CoverageMap,
+    source_coverage::{ColorChoice, SourceCoverageBuilder, TextIndicator},
+};
 use std::{
     fs,
     fs::File,
@@ -39,6 +42,12 @@ struct Args {
     /// Optional path to save coverage. Printed to stdout if not present.
     #[clap(long = "coverage-path", short = 'o')]
     pub coverage_path: Option<String>,
+    /// Colorize output based on coverage
+    #[clap(long, default_value_t = ColorChoice::Default)]
+    pub color: ColorChoice,
+    /// Tag each line with a textual indication of coverage
+    #[clap(long, default_value_t = TextIndicator::Explicit)]
+    pub tag: TextIndicator,
 }
 
 fn main() {
@@ -69,9 +78,9 @@ fn main() {
         None => Box::new(io::stdout()),
     };
 
-    source_cov
-        .compute_source_coverage(source_path)
-        .output_source_coverage(&mut coverage_writer)
+    let source_coverage = source_cov.compute_source_coverage(source_path);
+    source_coverage
+        .output_source_coverage(&mut coverage_writer, args.color, args.tag)
         .unwrap();
 }
 

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/dotdot/assign1.move:9:14
+  │
+9 │         S2 { .. } = s;
+  │              ^^
+  │              │
+  │              Unexpected '..'
+  │              Expected an identifier

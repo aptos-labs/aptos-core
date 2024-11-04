@@ -154,14 +154,14 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
             "rotate-key",
             "--new-private-key",
             new_private_key,
+            "--skip-saving-profile",
             "--assume-yes",
         ],
-        input="no\n",
     )
 
     if '"success": true' not in result.stdout:
         raise TestError(
-            f"[aptos account rotate-key --new-private-key {new_private_key} --assume-yes] failed"
+            f"[aptos account rotate-key --new-private-key {new_private_key} --skip-saving-profile --assume-yes] failed"
         )
 
     new_profile = run_helper.get_account_info()

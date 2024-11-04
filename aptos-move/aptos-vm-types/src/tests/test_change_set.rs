@@ -22,7 +22,8 @@ use aptos_aggregator::{
     delta_change_set::DeltaWithMax,
 };
 use aptos_types::{
-    delayed_fields::{PanicError, SnapshotToStringFormula},
+    delayed_fields::SnapshotToStringFormula,
+    error::PanicError,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
@@ -199,7 +200,7 @@ macro_rules! assert_invariant_violation {
             assert!(
                 err.major_status() == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                     || err.major_status()
-                        == StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+                        == StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
             );
         };
 

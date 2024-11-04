@@ -3,21 +3,21 @@ spec aptos_std::comparator {
         invariant inner == EQUAL || inner == SMALLER || inner == GREATER;
     }
 
-    spec is_equal(result: &Result): bool {
+    spec is_equal(self: &Result): bool {
         aborts_if false;
-        let res = result;
+        let res = self;
         ensures result == (res.inner == EQUAL);
     }
 
-    spec is_smaller_than(result: &Result): bool {
+    spec is_smaller_than(self: &Result): bool {
         aborts_if false;
-        let res = result;
+        let res = self;
         ensures result == (res.inner == SMALLER);
     }
 
-    spec is_greater_than(result: &Result): bool {
+    spec is_greater_than(self: &Result): bool {
         aborts_if false;
-        let res = result;
+        let res = self;
         ensures result == (res.inner == GREATER);
     }
 

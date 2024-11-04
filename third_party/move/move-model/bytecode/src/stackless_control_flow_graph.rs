@@ -11,7 +11,10 @@ use crate::{
 };
 use move_binary_format::file_format::CodeOffset;
 use petgraph::{dot::Dot, graph::Graph};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Range,
+};
 
 type Map<K, V> = BTreeMap<K, V>;
 type Set<V> = BTreeSet<V>;
@@ -52,6 +55,8 @@ impl StacklessControlFlowGraph {
 
     /// If from_all_blocks is false, perform backward analysis only from blocks that may exit.
     /// If from_all_blocks is true, perform backward analysis from all blocks.
+    /// Notice that it is guaranteed that forward and backward graphs use the
+    /// same block numbering.
     pub fn new_backward(code: &[Bytecode], from_all_blocks: bool) -> Self {
         let blocks = Self::collect_blocks(code);
         let mut block_id_to_predecessors: Map<BlockId, Vec<BlockId>> =
@@ -204,12 +209,46 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
+    /// Returns a map from a block to a vector of its successors
+    pub fn get_successors_map(&self) -> BTreeMap<BlockId, Vec<BlockId>> {
+        self.blocks
+            .iter()
+            .map(|(block_id, block)| (*block_id, block.successors.clone()))
+            .collect()
+    }
+
     pub fn content(&self, block_id: BlockId) -> &BlockContent {
         &self.blocks[&block_id].content
     }
 
+    pub fn code_range(&self, block_id: BlockId) -> Range<usize> {
+        match self.content(block_id) {
+            BlockContent::Basic { lower, upper } => *lower as usize..(*upper as usize + 1),
+            BlockContent::Dummy => 0..0,
+        }
+    }
+
     pub fn blocks(&self) -> Vec<BlockId> {
         self.blocks.keys().cloned().collect()
+    }
+
+    pub fn reachable_blocks(
+        &self,
+        from: BlockId,
+        mut edge_filter: impl FnMut(BlockId, BlockId) -> bool,
+    ) -> BTreeSet<BlockId> {
+        let mut result = BTreeSet::new();
+        let mut todo = vec![from];
+        while let Some(blk_id) = todo.pop() {
+            if result.insert(blk_id) {
+                for succ in self.successors(blk_id) {
+                    if edge_filter(blk_id, *succ) {
+                        todo.push(*succ)
+                    }
+                }
+            }
+        }
+        result
     }
 
     pub fn entry_block(&self) -> BlockId {
@@ -224,12 +263,28 @@ impl StacklessControlFlowGraph {
         }
     }
 
+    pub fn enclosing_block(&self, code_offset: CodeOffset) -> BlockId {
+        for blk_id in self.blocks.keys() {
+            if self.code_range(*blk_id).contains(&(code_offset as usize)) {
+                return *blk_id;
+            }
+        }
+        panic!("code offset not in the control flow graph")
+    }
+
     pub fn instr_indexes(
         &self,
         block_id: BlockId,
     ) -> Option<Box<dyn DoubleEndedIterator<Item = CodeOffset>>> {
         match self.blocks[&block_id].content {
             BlockContent::Basic { lower, upper } => Some(Box::new(lower..=upper)),
+            BlockContent::Dummy => None,
+        }
+    }
+
+    pub fn instr_offset_bounds(&self, block_id: BlockId) -> Option<(CodeOffset, CodeOffset)> {
+        match self.blocks[&block_id].content {
+            BlockContent::Basic { lower, upper } => Some((lower, upper)),
             BlockContent::Dummy => None,
         }
     }
@@ -248,6 +303,87 @@ impl StacklessControlFlowGraph {
         println!("blocks = {:?}", self.blocks);
         println!("is_backward = {}", self.backward);
         println!("+=======================+");
+    }
+}
+
+/// Iterator over blocks of a control flow graph in DFS order
+/// (always choosing the left-most child to visit first).
+pub struct DFSLeft<'a> {
+    successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
+    // blocks scheduled to visit
+    to_visit: Vec<BlockId>,
+    // blocks visited
+    visited: BTreeSet<BlockId>,
+    // blocks unvisited, used only when iterating over all blocks
+    unvisited: Option<BTreeSet<BlockId>>,
+}
+
+impl<'a> DFSLeft<'a> {
+    /// Create DFSLeft iterator starting from a specified start block
+    /// `successors`: should have all blocks as keys, even if they have no successors
+    /// `visit_all`: whether to visit all blocks or just blocks reachable from the start block
+    pub fn new(
+        successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
+        start: BlockId,
+        visit_all: bool,
+    ) -> Self {
+        let to_visit = vec![start];
+        Self {
+            successors,
+            to_visit,
+            visited: BTreeSet::new(),
+            unvisited: if visit_all {
+                Some(successors.keys().cloned().collect())
+            } else {
+                None
+            },
+        }
+    }
+
+    /// Gets the next block scheduled, but it may have been visited when scheduled by multiple predecessors
+    fn get_next_to_visit(&mut self) -> Option<BlockId> {
+        if let Some(to_visit) = self.to_visit.pop() {
+            Some(to_visit)
+        } else if let Some(unvisited_blocks) = &mut self.unvisited {
+            unvisited_blocks.pop_first()
+        } else {
+            return None;
+        }
+    }
+
+    /// Gets the next block to visit
+    fn get_next_unvisited(&mut self) -> Option<BlockId> {
+        let next_to_visit = self.get_next_to_visit()?;
+        if self.visited.contains(&next_to_visit) {
+            // we won't run into a infinite loop
+            // because eventually we will run out of scheduled blocks or unvisited blocks
+            // by calling `get_next_to_visit`
+            self.get_next_unvisited()
+        } else {
+            Some(next_to_visit)
+        }
+    }
+}
+
+impl<'a> Iterator for DFSLeft<'a> {
+    type Item = BlockId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let visiting = self.get_next_unvisited()?;
+        self.visited.insert(visiting);
+        if let Some(unvisited) = &mut self.unvisited {
+            unvisited.remove(&visiting);
+        }
+        for suc_block in self
+            .successors
+            .get(&visiting)
+            .expect("successors")
+            .iter()
+            .rev()
+        {
+            self.to_visit.push(*suc_block);
+        }
+        Some(visiting)
     }
 }
 

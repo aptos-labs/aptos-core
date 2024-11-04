@@ -1,11 +1,2 @@
 
-Diagnostics:
-error: mutable reference in local `s` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/dereference_field.move:18:9
-   │
-17 │         let f = &s.f;
-   │                 ---- previous field borrow
-18 │         *s;
-   │         ^^ requirement enforced here
-19 │         *f;
-   │         -- conflicting reference `f` used here
+============ bytecode verification succeeded ========

@@ -24,6 +24,7 @@ Aptos blockchain node deployment
 | fullnode.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
 | fullnode.groups | list | `[{"dns_name":"vfn","name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
 | fullnode.nodeSelector | object | `{}` |  |
+| fullnode.podAnnotations | string | `nil` |  |
 | fullnode.resources.limits.cpu | int | `14` |  |
 | fullnode.resources.limits.memory | string | `"56Gi"` |  |
 | fullnode.resources.requests.cpu | int | `14` |  |
@@ -79,13 +80,14 @@ Aptos blockchain node deployment
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
 | validator.affinity | object | `{}` |  |
 | validator.config | object | `{}` | Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
-| validator.enableNetworkPolicy | bool | `true` | Lock down network ingress and egress with Kubernetes NetworkPolicy |
+| validator.enableNetworkPolicy | bool | `false` | Lock down network ingress and egress with Kubernetes NetworkPolicy |
 | validator.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
 | validator.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for validator images |
 | validator.image.repo | string | `"aptoslabs/validator"` | Image repo to use for validator images |
 | validator.image.tag | string | `nil` | Image tag to use for validator images. If set, overrides `imageTag` |
 | validator.name | string | `nil` | Internal: name of your validator for use in labels |
 | validator.nodeSelector | object | `{}` |  |
+| validator.podAnnotations | string | `nil` |  |
 | validator.resources.limits.cpu | int | `14` |  |
 | validator.resources.limits.memory | string | `"56Gi"` |  |
 | validator.resources.requests.cpu | int | `14` |  |
@@ -180,9 +182,8 @@ You may also deploy multiple fullnodes into the cluster via `.Values.numFullnode
 
 ### Era
 
-The `.Values.chain.era` is a number that is incremented every time the validator's storage is wiped. This is ueful for testnets when the network is wiped.
+The `.Values.chain.era` is a number that is incremented every time the validator's storage is wiped. This is useful for testnets when the network is wiped.
 
 ### Privileged Mode
 
 For debugging purposes, it's sometimes useful to run the validator as root (privileged mode). This is enabled by `.Values.enablePrivilegedMode`.
-

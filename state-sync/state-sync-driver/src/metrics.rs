@@ -11,7 +11,10 @@ use std::time::Instant;
 /// Driver metric labels
 pub const DRIVER_CLIENT_NOTIFICATION: &str = "driver_client_notification";
 pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_notification";
-pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
+pub const DRIVER_CONSENSUS_SYNC_DURATION_NOTIFICATION: &str =
+    "driver_consensus_sync_duration_notification";
+pub const DRIVER_CONSENSUS_SYNC_TARGET_NOTIFICATION: &str =
+    "driver_consensus_sync_target_notification";
 
 /// Data notification metric labels
 pub const NOTIFICATION_CREATE_TO_APPLY: &str = "notification_create_to_apply";
@@ -31,10 +34,18 @@ pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS: &str = "commit_post_process";
 pub const STORAGE_SYNCHRONIZER_STATE_VALUE_CHUNK: &str = "state_value_chunk";
 
+/// Storage synchronizer pipeline channel labels
+pub const STORAGE_SYNCHRONIZER_EXECUTOR: &str = "executor";
+pub const STORAGE_SYNCHRONIZER_LEDGER_UPDATER: &str = "ledger_updater";
+pub const STORAGE_SYNCHRONIZER_COMMITTER: &str = "committer";
+pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESSOR: &str = "commit_post_processor";
+pub const STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER: &str = "state_snapshot_receiver";
+
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
     Bootstrapper,
     Consensus,
+    ConsensusObserver,
     ContinuousSyncer,
 }
 
@@ -43,18 +54,22 @@ impl ExecutingComponent {
         match self {
             ExecutingComponent::Bootstrapper => "bootstrapper",
             ExecutingComponent::Consensus => "consensus",
+            ExecutingComponent::ConsensusObserver => "consensus_observer",
             ExecutingComponent::ContinuousSyncer => "continuous_syncer",
         }
     }
 }
 
-/// An enum of storage synchronizer operations performed by state sync
+/// An enum of storage synchronizer operations performed by
+/// state sync. Each of these is a metric label to track.
 pub enum StorageSynchronizerOperations {
-    AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
-    ExecutedTransactions,      // Executed a chunk of transactions.
-    Synced,                    // Wrote a chunk of transactions and outputs to storage.
-    SyncedStates,              // Wrote a chunk of state values to storage.
-    SyncedEpoch, // Wrote a chunk of transactions and outputs to storage that resulted in a new epoch.
+    AppliedTransactionOutputs, // The total number of applied transaction outputs
+    ExecutedTransactions,      // The total number of executed transactions
+    Synced,                    // The latest synced version (as read from storage)
+    SyncedIncremental, // The latest synced version (calculated as the sum of all processed transactions)
+    SyncedStates,      // The total number of synced states
+    SyncedEpoch,       // The latest synced epoch (as read from storage)
+    SyncedEpochIncremental, // The latest synced epoch (calculated as the sum of all processed epochs)
 }
 
 impl StorageSynchronizerOperations {
@@ -65,8 +80,10 @@ impl StorageSynchronizerOperations {
             },
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
-            StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedIncremental => "synced_incremental",
             StorageSynchronizerOperations::SyncedStates => "synced_states",
+            StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedEpochIncremental => "synced_epoch_incremental",
         }
     }
 }
@@ -189,6 +206,17 @@ pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Gauges for tracking the storage synchronizer pipeline channel backpressure
+pub static STORAGE_SYNCHRONIZER_PIPELINE_CHANNEL_BACKPRESSURE: Lazy<IntGaugeVec> =
+    Lazy::new(|| {
+        register_int_gauge_vec!(
+            "aptos_state_sync_storage_synchronizer_pipeline_channel_backpressure",
+            "Gauges for tracking the storage synchronizer pipeline channel backpressure",
+            &["channel"]
+        )
+        .unwrap()
+    });
 
 /// Increments the given counter with the provided label values.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {

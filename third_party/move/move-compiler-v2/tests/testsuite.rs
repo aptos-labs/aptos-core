@@ -11,7 +11,7 @@ use move_compiler_v2::{
     logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
     Options,
 };
-use move_model::{metadata::LanguageVersion, model::GlobalEnv};
+use move_model::{metadata::LanguageVersion, model::GlobalEnv, sourcifier::Sourcifier};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use once_cell::unsync::Lazy;
@@ -105,7 +105,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         .set_experiment(Experiment::SPEC_REWRITE, true)
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
-        .set_language_version(LanguageVersion::V2_0);
+        .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
+        .set_language_version(LanguageVersion::V2_1);
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -121,14 +122,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
-            exclude: vec!["/inlining/"],
+            exclude: vec!["/inlining/", "/more-v1/"],
             exp_suffix: None,
             options: opts
                 .clone()
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
-            stop_after: StopAfter::AstPipeline,
+            stop_after: StopAfter::BytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::None, // EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for checking v2 language features only supported if v2
@@ -159,27 +160,24 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
-        // Tests for lambda lifting
+        // Tests for lambda lifting and lambdas -- with full lambda support
         TestConfig {
-            name: "lambda-lifting",
-            runner: |p| run_test(p, get_config_by_name("lambda-lifting")),
-            include: vec!["/lambda-lifting/"],
+            name: "lambda",
+            runner: |p| run_test(p, get_config_by_name("lambda")),
+            include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
-            exp_suffix: None,
+            exp_suffix: Some("lambda.exp"),
             options: opts
                 .clone()
-                // Need to turn off usage checks because they complain about
-                // lambda parameters outside of inline functions. Other checks
-                // also turned off for now since they mess up baseline.
-                .set_experiment(Experiment::CHECKS, false)
-                .set_experiment(Experiment::OPTIMIZE, false)
-                .set_experiment(Experiment::INLINING, false)
-                .set_experiment(Experiment::RECURSIVE_TYPE_CHECK, false)
-                .set_experiment(Experiment::SPEC_REWRITE, false)
+                // .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_experiment(Experiment::LAMBDA_FIELDS, true)
+                .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
+                .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
+                .set_experiment(Experiment::LAMBDA_VALUES, true)
                 .set_experiment(Experiment::LAMBDA_LIFTING, true),
-            stop_after: StopAfter::AstPipeline,
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::AllStages,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for simplifier in full mode, with code elimination
@@ -198,12 +196,26 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
         },
-        // Tests for front-end, diagnostics (inlining, simplifier, folding, etc.)
+        // Tests for more-v1 tests
+        TestConfig {
+            name: "more-v1",
+            runner: |p| run_test(p, get_config_by_name("more-v1")),
+            include: vec!["/more-v1/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None, // do not dump anything
+            dump_bytecode_filter: None,
+        },
+        // Tests for inlining, simplifier, and folding
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/"],
-            exclude: vec![],
+            include: vec!["/inlining/", "/folding/", "/simplifier/", "/lambda/"],
+            exclude: vec!["/more-v1/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
             // Run the entire compiler pipeline to double-check the result
@@ -268,37 +280,38 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "LiveVarAnalysisProcessor"]),
         },
+        // Reference safety tests, old version (with optimizations on)
+        TestConfig {
+            name: "reference-safety-old",
+            runner: |p| run_test(p, get_config_by_name("reference-safety-old")),
+            include: vec!["/reference-safety/"],
+            exclude: vec![],
+            exp_suffix: Some("old.exp"),
+            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
+            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false).
+                set_experiment(Experiment::REFERENCE_SAFETY_V3, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter:
+            // For debugging (dump_bytecode set DumpLevel::AllStages)
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
+            ]),
+        },
         // Reference safety tests (with optimizations on)
         TestConfig {
             name: "reference-safety",
             runner: |p| run_test(p, get_config_by_name("reference-safety")),
             include: vec!["/reference-safety/"],
             exclude: vec![],
-            exp_suffix: None,
-            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
-            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false),
-            stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter:
-            // For debugging:
-             Some(vec![
-               INITIAL_BYTECODE_STAGE,
-               "ReferenceSafetyProcessor",
-               "DeadStoreElimination",
-               FILE_FORMAT_STAGE,
-            ]),
-        },
-        // Reference safety tests (without optimizations on)
-        TestConfig {
-            name: "reference-safety-no-opt",
-            runner: |p| run_test(p, get_config_by_name("reference-safety-no-opt")),
-            include: vec!["/reference-safety/"],
-            exclude: vec![],
             // Some reference tests create different errors since variable names are
             // known without optimizations, so we need to have a different exp file
-            exp_suffix: Some("no-opt.exp"),
-            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
+            exp_suffix: None,
+            options: opts.clone().set_experiment(Experiment::REFERENCE_SAFETY_V3, true)
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
@@ -308,6 +321,31 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             Some(vec![
                 INITIAL_BYTECODE_STAGE,
                 "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
+            ]),
+        },
+        // Reference safety tests no-opt
+        TestConfig {
+            name: "reference-safety-no-opt",
+            runner: |p| run_test(p, get_config_by_name("reference-safety-no-opt")),
+            include: vec!["/reference-safety/"],
+            exclude: vec![],
+            // Some reference tests create different errors since variable names are
+            // known without optimizations, so we need to have a different exp file
+            exp_suffix: Some("no-opt.exp"),
+            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
+                .set_experiment(Experiment::ACQUIRES_CHECK, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter:
+            // For debugging:
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "AbilityProcessor",
                 "DeadStoreElimination",
                 FILE_FORMAT_STAGE,
             ]),
@@ -457,6 +495,35 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 FILE_FORMAT_STAGE,
             ]),
         },
+        // Flush writes processor tests
+        TestConfig {
+            name: "flush-writes-on",
+            runner: |p| run_test(p, get_config_by_name("flush-writes-on")),
+            include: vec!["/flush-writes/"],
+            exclude: vec![],
+            exp_suffix: Some("on.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::FLUSH_WRITES_OPTIMIZATION, true),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec!["FlushWritesProcessor", FILE_FORMAT_STAGE]),
+        },
+        TestConfig {
+            name: "flush-writes-off",
+            runner: |p| run_test(p, get_config_by_name("flush-writes-off")),
+            include: vec!["/flush-writes/"],
+            exclude: vec![],
+            exp_suffix: Some("off.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::FLUSH_WRITES_OPTIMIZATION, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+        },
         // Unreachable code remover
         TestConfig {
             name: "unreachable-code",
@@ -488,7 +555,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::BytecodePipeline(Some("uninitialized_use_checker")),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "uninitialized_use_checker"]),
         },
         // -- File Format Generation
         // Test without bytecode optimizations enabled
@@ -501,6 +568,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
                 .set_experiment(Experiment::AST_SIMPLIFY, true),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
@@ -602,6 +670,74 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
+        TestConfig {
+            name: "lint-checks",
+            runner: |p| run_test(p, get_config_by_name("lint-checks")),
+            include: vec![
+                "/lints/model_ast_lints/",
+                "/lints/stackless_bytecode_lints/",
+            ],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_experiment(Experiment::LINT_CHECKS, true),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "control-flow-simplification-on",
+            runner: |p| run_test(p, get_config_by_name("control-flow-simplification-on")),
+            include: vec!["/control-flow-simplification/"],
+            exclude: vec![],
+            exp_suffix: Some("on.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::CFG_SIMPLIFICATION, true),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec!["ControlFlowGraphSimplifier", FILE_FORMAT_STAGE]),
+        },
+        TestConfig {
+            name: "control-flow-simplification-off",
+            runner: |p| run_test(p, get_config_by_name("control-flow-simplification-off")),
+            include: vec!["/control-flow-simplification/"],
+            exclude: vec![],
+            exp_suffix: Some("off.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::CFG_SIMPLIFICATION, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+        },
+        TestConfig {
+            name: "op-equal",
+            runner: |p| run_test(p, get_config_by_name("op-equal")),
+            include: vec!["/op-equal/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "eager-pushes",
+            runner: |p| run_test(p, get_config_by_name("eager-pushes")),
+            include: vec!["/eager-pushes/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -637,7 +773,6 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         "A=0x42".to_string(),
         "B=0x42".to_string(),
         "K=0x19".to_string(),
-        "Async=0x20".to_string(),
     ];
 
     // Putting the generated test baseline into a Refcell to avoid problems with mut borrow
@@ -671,11 +806,21 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                     "// -- Model dump before bytecode pipeline\n{}\n",
                     env.dump_env()
                 ));
+                let sourcifier = Sourcifier::new(&env);
+                for module in env.get_modules() {
+                    if module.is_primary_target() {
+                        sourcifier.print_module(module.get_id())
+                    }
+                }
+                test_output.borrow_mut().push_str(&format!(
+                    "// -- Sourcified model before bytecode pipeline\n{}\n",
+                    sourcifier.result()
+                ));
             }
         }
     }
 
-    if options.compile_test_code {
+    if ok && options.compile_test_code {
         // Build the test plan here to parse and validate any test-related attributes in the AST.
         // In real use, this is run outside of the compilation process, but the needed info is
         // available in `env` once we finish the AST.
@@ -740,6 +885,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                         out.push_str(dump);
                         debug!("{}", dump);
                     }
+                    *ok.borrow()
                 },
             );
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {

@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // Useful constants for enabling consensus observer on different node types
-const ENABLE_ON_VALIDATORS: bool = false;
-const ENABLE_ON_VALIDATOR_FULLNODES: bool = false;
+const ENABLE_ON_VALIDATORS: bool = true;
+const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
 const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -18,7 +18,7 @@ const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
 pub struct ConsensusObserverConfig {
     /// Whether the consensus observer is enabled
     pub observer_enabled: bool,
-    /// Whether the consensus observer publisher is enabled
+    /// Whether the consensus publisher is enabled
     pub publisher_enabled: bool,
 
     /// Maximum number of pending network messages
@@ -32,15 +32,27 @@ pub struct ConsensusObserverConfig {
     pub garbage_collection_interval_ms: u64,
     /// Maximum number of blocks to keep in memory (e.g., pending blocks, ordered blocks, etc.)
     pub max_num_pending_blocks: u64,
-    /// Maximum timeout (in milliseconds) for active subscriptions
-    pub max_subscription_timeout_ms: u64,
-    /// Maximum timeout (in milliseconds) we'll wait for the synced version to
-    /// increase before terminating the active subscription.
-    pub max_synced_version_timeout_ms: u64,
-    /// Interval (in milliseconds) to check the optimality of the subscribed peers
-    pub peer_optimality_check_interval_ms: u64,
     /// Interval (in milliseconds) to check progress of the consensus observer
     pub progress_check_interval_ms: u64,
+
+    /// The maximum number of concurrent subscriptions
+    pub max_concurrent_subscriptions: u64,
+    /// Maximum timeout (in milliseconds) we'll wait for the synced version to
+    /// increase before terminating the active subscription.
+    pub max_subscription_sync_timeout_ms: u64,
+    /// Maximum message timeout (in milliseconds) for active subscriptions
+    pub max_subscription_timeout_ms: u64,
+    /// Interval (in milliseconds) to check for subscription related peer changes
+    pub subscription_peer_change_interval_ms: u64,
+    /// Interval (in milliseconds) to refresh the subscription
+    pub subscription_refresh_interval_ms: u64,
+
+    /// Duration (in milliseconds) to require state sync to synchronize when in fallback mode
+    pub observer_fallback_duration_ms: u64,
+    /// Duration (in milliseconds) we'll wait on startup before considering fallback mode
+    pub observer_fallback_startup_period_ms: u64,
+    /// Duration (in milliseconds) we'll wait for syncing progress before entering fallback mode
+    pub observer_fallback_sync_threshold_ms: u64,
 }
 
 impl Default for ConsensusObserverConfig {
@@ -50,13 +62,18 @@ impl Default for ConsensusObserverConfig {
             publisher_enabled: false,
             max_network_channel_size: 1000,
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
-            network_request_timeout_ms: 10_000,                // 10 seconds
+            network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
             max_num_pending_blocks: 100,                       // 100 blocks
-            max_subscription_timeout_ms: 30_000,               // 30 seconds
-            max_synced_version_timeout_ms: 60_000,             // 60 seconds
-            peer_optimality_check_interval_ms: 60_000,         // 60 seconds
             progress_check_interval_ms: 5_000,                 // 5 seconds
+            max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
+            max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
+            max_subscription_timeout_ms: 15_000,               // 15 seconds
+            subscription_peer_change_interval_ms: 60_000,      // 1 minute
+            subscription_refresh_interval_ms: 300_000,         // 5 minutes
+            observer_fallback_duration_ms: 600_000,            // 10 minutes
+            observer_fallback_startup_period_ms: 60_000,       // 60 seconds
+            observer_fallback_sync_threshold_ms: 30_000,       // 30 seconds
         }
     }
 }
@@ -105,7 +122,7 @@ impl ConfigOptimizer for ConsensusObserverConfig {
                 }
             },
             NodeType::PublicFullnode => {
-                if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set {
+                if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set && !publisher_manually_set {
                     // Enable both the observer and the publisher for PFNs
                     consensus_observer_config.observer_enabled = true;
                     consensus_observer_config.publisher_enabled = true;

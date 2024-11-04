@@ -171,7 +171,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
 
     let num_leaves_at_beginning = ctx
         .db
-        .get_state_leaf_count(ctx.db.get_latest_ledger_info_version().unwrap())
+        .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
         .unwrap();
 
     let transfer_to_owner_txn = creator.sign_multi_agent_with_transaction_builder(
@@ -188,7 +188,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
     ctx.commit_block(&vec![transfer_to_owner_txn]).await;
     let num_leaves_after_transfer_nft = ctx
         .db
-        .get_state_leaf_count(ctx.db.get_latest_ledger_info_version().unwrap())
+        .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
@@ -209,7 +209,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
     ctx.commit_block(&vec![transfer_to_creator_txn]).await;
     let num_leaves_after_return_nft = ctx
         .db
-        .get_state_leaf_count(ctx.db.get_latest_ledger_info_version().unwrap())
+        .get_state_item_count(ctx.db.get_latest_ledger_info_version().unwrap())
         .unwrap();
 
     assert_eq!(

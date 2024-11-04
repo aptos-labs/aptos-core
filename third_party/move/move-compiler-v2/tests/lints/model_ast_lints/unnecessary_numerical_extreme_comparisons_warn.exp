@@ -1,0 +1,172 @@
+
+Diagnostics:
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+  ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:9:13
+  │
+9 │         if (x + 1 > 255) { bar() };
+  │             ^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:13:13
+   │
+13 │         if ((*x + *y > 255) == true) { bar() };
+   │             ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:13:13
+   │
+13 │         if ((*x + *y > 255) == true) { bar() };
+   │             ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:17:13
+   │
+17 │         if (x < 0 || 0 > x) { bar() };
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:17:22
+   │
+17 │         if (x < 0 || 0 > x) { bar() };
+   │                      ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be simplified to use `==` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:18:13
+   │
+18 │         if (foo(x) <= 0) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be simplified to use `==` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:19:13
+   │
+19 │         if (0 >= foo(x)) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be clarified to use `!=` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:20:13
+   │
+20 │         if (foo(x) > 0) { bar() };
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be clarified to use `!=` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:21:13
+   │
+21 │         if (0 < foo(x)) { bar() };
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:22:13
+   │
+22 │         if (foo(x) >= 0) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:23:13
+   │
+23 │         if (0 <= foo(x)) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:36:13
+   │
+36 │         if (a > U8_MAX || f > (U8_MAX as u256)) { bar() };
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be simplified to use `==` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:37:13
+   │
+37 │         if (b >= U16_MAX) { bar() };
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:38:13
+   │
+38 │         if (U32_MAX < c) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be simplified to use `==` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:39:13
+   │
+39 │         if (U64_MAX <= d) { bar() };
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be clarified to use `!=` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:40:13
+   │
+40 │         if (e < U128_MAX) { bar() };
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:41:13
+   │
+41 │         if (f <= U256_MAX) { bar() };
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:42:13
+   │
+42 │         if (U256_MAX >= f) { bar() };
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison can be clarified to use `!=` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:43:13
+   │
+43 │         if (U128_MAX > e) { bar() };
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:45:20
+   │
+45 │             assert a <= U8_MAX;
+   │                    ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/lints/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:54:19
+   │
+54 │         apply(|x| x > U8_MAX, x)
+   │                   ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+
+============ bytecode verification succeeded ========

@@ -255,6 +255,7 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
         body,
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
+        insts_using_generic_type_reflection: Default::default(),
     };
     env.add_spec_function_def(fun_id.module_id, decl)
 }
@@ -376,7 +377,7 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                     .into_exp()
                 },
                 // Deal with removing various occurrences of Abort and spec blocks
-                Call(id, Abort, _) | SpecBlock(id, ..) => {
+                SpecBlock(id, ..) => {
                     // Replace direct call by unit
                     Call(*id, Tuple, vec![]).into_exp()
                 },

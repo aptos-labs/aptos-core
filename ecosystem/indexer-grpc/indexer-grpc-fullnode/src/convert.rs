@@ -56,6 +56,7 @@ pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct 
     transaction::MoveStruct {
         name: move_struct.name.0.to_string(),
         is_native: move_struct.is_native,
+        is_event: move_struct.is_event,
         abilities: move_struct
             .abilities
             .iter()
@@ -636,6 +637,10 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Keyless as i32,
             public_key: p.value.clone().into(),
         },
+        PublicKey::FederatedKeyless(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::FederatedKeyless as i32,
+            public_key: p.value.clone().into(),
+        },
     }
 }
 
@@ -665,6 +670,11 @@ pub fn convert_account_signature(
                 convert_multi_key_signature(s),
             ),
         ),
+        AccountSignature::NoAccountSignature(_) => {
+            unreachable!(
+                "[Indexer Fullnode] Indexer should never see transactions with NoAccountSignature"
+            )
+        },
     };
 
     transaction::AccountSignature {

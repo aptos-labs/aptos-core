@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/dotdot/dotdot_wrong_pos0.move:8:17
+  │
+8 │         let S { .., y } = x;
+  │                 ^^ `..` must be at the end in a named field list

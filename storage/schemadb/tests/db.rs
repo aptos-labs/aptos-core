@@ -10,7 +10,7 @@ use aptos_schemadb::{
 };
 use aptos_storage_interface::AptosDbError;
 use byteorder::{LittleEndian, ReadBytesExt};
-use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
+use rocksdb::{ColumnFamilyDescriptor, DEFAULT_COLUMN_FAMILY_NAME};
 
 // Creating two schemas that share exactly the same structure but are stored in different column
 // families. Also note that the key and value are of the same type `TestField`. By implementing
@@ -81,6 +81,13 @@ fn get_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+fn get_cfds() -> Vec<ColumnFamilyDescriptor> {
+    get_column_families()
+        .iter()
+        .map(|cf_name| ColumnFamilyDescriptor::new(*cf_name, rocksdb::Options::default()))
+        .collect()
+}
+
 fn open_db(dir: &aptos_temppath::TempPath) -> DB {
     let mut db_opts = rocksdb::Options::default();
     db_opts.create_if_missing(true);
@@ -89,13 +96,8 @@ fn open_db(dir: &aptos_temppath::TempPath) -> DB {
 }
 
 fn open_db_read_only(dir: &aptos_temppath::TempPath) -> DB {
-    DB::open_cf_readonly(
-        &rocksdb::Options::default(),
-        dir.path(),
-        "test",
-        get_column_families(),
-    )
-    .expect("Failed to open DB.")
+    DB::open_cf_readonly(&rocksdb::Options::default(), dir.path(), "test", get_cfds())
+        .expect("Failed to open DB.")
 }
 
 fn open_db_as_secondary(dir: &aptos_temppath::TempPath, dir_sec: &aptos_temppath::TempPath) -> DB {
@@ -104,7 +106,7 @@ fn open_db_as_secondary(dir: &aptos_temppath::TempPath, dir_sec: &aptos_temppath
         dir.path(),
         dir_sec.path(),
         "test",
-        get_column_families(),
+        get_cfds(),
     )
     .expect("Failed to open DB.")
 }

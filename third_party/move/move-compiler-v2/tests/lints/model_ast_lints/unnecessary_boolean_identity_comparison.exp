@@ -1,0 +1,124 @@
+
+Diagnostics:
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:13:13
+   │
+13 │         if (foo(x) == true) { bar() };
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `false`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:14:13
+   │
+14 │         if (foo(x) == false) { bar() };
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:15:13
+   │
+15 │         if (foo(x) != true) { bar() };
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `false`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:16:13
+   │
+16 │         if (foo(x) != false) { bar() };
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:17:21
+   │
+17 │         if (true == foo(x)) { bar() };
+   │                     ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `false`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:18:22
+   │
+18 │         if (false == foo(x)) { bar() };
+   │                      ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:19:21
+   │
+19 │         if (true != foo(x)) { bar() };
+   │                     ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `false`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:20:22
+   │
+20 │         if (false != foo(x)) { bar() };
+   │                      ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Comparison can be clarified to use `!=` instead
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:21:13
+   │
+21 │         if ((x + 1 > 0) == false) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `false`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:21:13
+   │
+21 │         if ((x + 1 > 0) == false) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:22:18
+   │
+22 │         let _y = foo(x) == true;
+   │                  ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:23:25
+   │
+23 │         assert!(true == !foo(x), 42);
+   │                         ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:24:14
+   │
+24 │         take(foo(x) == true);
+   │              ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:25:18
+   │
+25 │         let _z = foo(x) == TRUE;
+   │                  ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/lints/model_ast_lints/unnecessary_boolean_identity_comparison.move:29:13
+   │
+29 │         if ((*x && *y) == true) { bar() };
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+
+============ bytecode verification succeeded ========

@@ -8,16 +8,16 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
-    StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
-    transaction::{TransactionOutputListWithProof, TransactionToCommit, Version},
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::{TransactionOutputListWithProof, Version},
 };
 use either::Either;
 use std::sync::Arc;
+use tokio::sync::watch::Sender;
 
 pub const SECONDARY_DB_DIR: &str = "fast_sync_secondary";
 
@@ -40,12 +40,13 @@ pub struct FastSyncStorageWrapper {
 
 impl FastSyncStorageWrapper {
     /// If the db is empty and configured to do fast sync, we return a FastSyncStorageWrapper
-    /// Otherwise, we returns AptosDB directly and the FastSyncStorageWrapper is None
+    /// Otherwise, we return AptosDB directly and the FastSyncStorageWrapper is None
     pub fn initialize_dbs(
         config: &NodeConfig,
         internal_indexer_db: Option<InternalIndexerDB>,
+        update_sender: Option<Sender<Version>>,
     ) -> Result<Either<AptosDB, Self>> {
-        let db_main = AptosDB::open(
+        let mut db_main = AptosDB::open(
             config.storage.get_dir_paths(),
             /*readonly=*/ false,
             config.storage.storage_pruner_config,
@@ -56,6 +57,9 @@ impl FastSyncStorageWrapper {
             internal_indexer_db,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
+        if let Some(sender) = update_sender {
+            db_main.add_version_update_subscriber(sender)?;
+        }
 
         let mut db_dir = config.storage.dir();
         // when the db is empty and configured to do fast sync, we will create a second DB
@@ -67,7 +71,7 @@ impl FastSyncStorageWrapper {
             && (db_main
                 .ledger_db
                 .metadata_db()
-                .get_synced_version()
+                .get_synced_version()?
                 .map_or(0, |v| v)
                 == 0)
         {
@@ -164,27 +168,19 @@ impl DbWriter for FastSyncStorageWrapper {
         Ok(())
     }
 
-    fn save_transactions(
+    fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
+        self.get_aptos_db_write_ref()
+            .pre_commit_ledger(chunk, sync_commit)
+    }
+
+    fn commit_ledger(
         &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
+        version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: Option<&ShardedStateCache>,
+        chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
-        self.get_aptos_db_write_ref().save_transactions(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
-            sharded_state_cache,
-        )
+        self.get_aptos_db_write_ref()
+            .commit_ledger(version, ledger_info_with_sigs, chunk_opt)
     }
 }
 

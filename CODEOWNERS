@@ -38,6 +38,9 @@
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000 @sasha8 @ibalajiarun
 
+# Owners for consensus observer
+/consensus/src/consensus-observer/ @joshlind @zekun000
+
 # Owners for quorum store.
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
 
@@ -74,7 +77,7 @@
 /crates/aptos-telemetry-service @ibalajiarun @geekflyer
 
 # Owners for the inspection-service crate
-/crates/inspection-service/ @joshlind @brianolson
+/crates/inspection-service/ @joshlind
 
 # Owners for the `/dashboards` directory and all its subdirectories.
 /dashboards/ @aptos-labs/prod-eng
@@ -90,7 +93,7 @@
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
-/network/ @joshlind @brianolson
+/network/ @joshlind @zekun000
 
 # Owners for the scripts
 /scripts/ @aptos-labs/prod-eng

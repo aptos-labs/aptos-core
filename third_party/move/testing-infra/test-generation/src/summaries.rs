@@ -628,7 +628,7 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
         | Bytecode::ImmBorrowVariantField(_)
         | Bytecode::ImmBorrowVariantFieldGeneric(_) => {
             // TODO(#13806): consider implementing for struct variants
-            unimplemented!("Struct variant bytecode not supported yet")
+            unimplemented!("Enum types bytecode not supported yet")
         },
     }
 }

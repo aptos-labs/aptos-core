@@ -164,6 +164,7 @@ impl traits::Transcript for Transcript {
         }
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
+        // TODO: benchmark this
         let (f, extra) = fiat_shamir::fiat_shamir(
             self,
             sc,
@@ -199,6 +200,7 @@ impl traits::Transcript for Transcript {
 
         // TODO(Performance): Change the Fiat-Shamir transform to use 128-bit random exponents.
         // r_i = \tau^i, \forall i \in [n]
+        // TODO: benchmark this
         let taus = get_nonzero_powers_of_tau(&extra[1], sc.n);
 
         // Compute the multiexps from above.

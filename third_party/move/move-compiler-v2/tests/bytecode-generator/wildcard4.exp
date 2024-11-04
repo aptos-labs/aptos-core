@@ -18,6 +18,17 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    fun test() {
+        let x = 3;
+        let r = &mut x;
+        let y = &mut x;
+        let _ = /*freeze*/y;
+        *r = 4;
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
@@ -40,12 +51,13 @@ fun m::test() {
 
 
 Diagnostics:
-error: cannot freeze local `y`  since multiple mutable references exist
+error: cannot freeze value which is still mutably borrowed
   ┌─ tests/bytecode-generator/wildcard4.move:6:17
   │
 4 │         let r = &mut x;
-  │                 ------ conflicting mutable local borrow
+  │                 ------ previously mutably borrowed here
 5 │         let y = &mut x;
-  │                 ------ originating mutable local borrow
 6 │         let _ = freeze(y);
   │                 ^^^^^^^^^ frozen here
+7 │         *r = 4;
+  │         ------ conflicting reference `r` used here

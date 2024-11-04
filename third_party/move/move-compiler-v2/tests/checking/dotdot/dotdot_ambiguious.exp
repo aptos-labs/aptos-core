@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/dotdot/dotdot_ambiguious.move:5:22
+  │
+5 │         let S(.., x, ..) = x;
+  │                      ^^ there can be at most one `..` per struct or variant pattern

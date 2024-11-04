@@ -6,97 +6,20 @@ use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
     gas_feature_versions::RELEASE_V1_13, gas_params::txn::KEYLESS_BASE_COST, AptosGasParameters,
-    FromOnChainGasSchedule, VMGasParameters,
+    VMGasParameters,
 };
 use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_types::on_chain_config::{
-    ConfigStorage, Features, GasSchedule, GasScheduleV2, OnChainConfig,
-};
+use aptos_types::on_chain_config::Features;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
-use aptos_vm_types::storage::{
-    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+use aptos_vm_types::{
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    storage::{space_pricing::DiskSpacePricing, StorageGasParameters},
 };
-use move_core_types::{
-    gas_algebra::NumArgs,
-    vm_status::{StatusCode, VMStatus},
-};
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// This is used until gas version 18, which introduces a configurable entry for this.
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
-
-pub fn get_gas_config_from_storage(
-    config_storage: &impl ConfigStorage,
-) -> (Result<AptosGasParameters, String>, u64) {
-    match GasScheduleV2::fetch_config(config_storage) {
-        Some(gas_schedule) => {
-            let feature_version = gas_schedule.feature_version;
-            let map = gas_schedule.into_btree_map();
-            (
-                AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
-                feature_version,
-            )
-        },
-        None => match GasSchedule::fetch_config(config_storage) {
-            Some(gas_schedule) => {
-                let map = gas_schedule.into_btree_map();
-                (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
-            },
-            None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
-        },
-    }
-}
-
-pub fn get_gas_parameters(
-    features: &Features,
-    config_storage: &impl ConfigStorage,
-) -> (
-    Result<AptosGasParameters, String>,
-    Result<StorageGasParameters, String>,
-    u64,
-) {
-    let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(config_storage);
-
-    let storage_gas_params = match &mut gas_params {
-        Ok(gas_params) => {
-            let storage_gas_params =
-                StorageGasParameters::new(gas_feature_version, features, gas_params, config_storage);
-
-            // TODO(gas): Table extension utilizes IoPricing directly.
-            // Overwrite table io gas parameters with global io pricing.
-            let g = &mut gas_params.natives.table;
-            match gas_feature_version {
-                0..=1 => (),
-                2..=6 => {
-                    if let IoPricing::V2(pricing) = &storage_gas_params.io_pricing {
-                        g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
-                        g.common_load_base_new = 0.into();
-                        g.common_load_per_byte = pricing.per_byte_read;
-                        g.common_load_failure = 0.into();
-                    }
-                }
-                7..=9 => {
-                    if let IoPricing::V2(pricing) = &storage_gas_params.io_pricing {
-                        g.common_load_base_legacy = 0.into();
-                        g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
-                        g.common_load_per_byte = pricing.per_byte_read;
-                        g.common_load_failure = 0.into();
-                    }
-                }
-                10.. => {
-                    g.common_load_base_legacy = 0.into();
-                    g.common_load_base_new = gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1);
-                    g.common_load_per_byte = gas_params.vm.txn.storage_io_per_state_byte_read;
-                    g.common_load_failure = 0.into();
-                }
-            };
-            Ok(storage_gas_params)
-        },
-        Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),
-    };
-
-    (gas_params, storage_gas_params, gas_feature_version)
-}
 
 /// Gas meter used in the production (validator) setup.
 pub type ProdGasMeter = MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>;
@@ -124,6 +47,7 @@ pub(crate) fn check_gas(
     gas_params: &AptosGasParameters,
     gas_feature_version: u64,
     resolver: &impl AptosMoveResolver,
+    module_storage: &impl AptosModuleStorage,
     txn_metadata: &TransactionMetadata,
     features: &Features,
     is_approved_gov_script: bool,
@@ -243,7 +167,7 @@ pub(crate) fn check_gas(
         speculative_warn!(
             log_context,
             format!(
-                "[VM] Gas unit error; min {}, submitted {}",
+                "[VM] Gas unit error; max {}, submitted {}",
                 txn_gas_params.max_price_per_gas_unit,
                 txn_metadata.gas_unit_price()
             ),
@@ -258,8 +182,12 @@ pub(crate) fn check_gas(
     // gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features, resolver)?
-    {
+    if crate::aptos_vm::is_account_init_for_sponsored_transaction(
+        txn_metadata,
+        features,
+        resolver,
+        module_storage,
+    )? {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);

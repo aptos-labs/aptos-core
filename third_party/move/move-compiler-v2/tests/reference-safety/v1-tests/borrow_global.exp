@@ -1,14 +1,2 @@
 
-Diagnostics:
-error: cannot immutably borrow since mutable references exist
-  ┌─ tests/reference-safety/v1-tests/borrow_global.move:6:18
-  │
-5 │         let f = &borrow_global_mut<R>(addr).f;
-  │                 -----------------------------
-  │                 ││
-  │                 │previous mutable global borrow
-  │                 used by field borrow
-6 │         let r1 = borrow_global<R>(addr); // error in v2
-  │                  ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow attempted here
-7 │         f == &r1.f
-  │         ---------- requirement enforced here
+============ bytecode verification succeeded ========

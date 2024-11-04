@@ -3,7 +3,7 @@
 
 //! Represents the state machine managing resource access control in VM execution.
 
-use crate::{interpreter::ACCESS_STACK_SIZE_LIMIT, loader::Function};
+use crate::{interpreter::ACCESS_STACK_SIZE_LIMIT, LoadedFunction};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::loaded_data::runtime_access_specifier::{
@@ -36,14 +36,14 @@ impl AccessControlState {
     pub(crate) fn enter_function(
         &mut self,
         env: &impl AccessSpecifierEnv,
-        fun: &Function,
+        fun: &LoadedFunction,
     ) -> PartialVMResult<()> {
-        if matches!(fun.access_specifier, AccessSpecifier::Any) {
+        if matches!(fun.access_specifier(), AccessSpecifier::Any) {
             // Shortcut case that no access is specified
             return Ok(());
         }
         // Specialize the functions access specifier
-        let mut fun_specifier = fun.access_specifier.clone();
+        let mut fun_specifier = fun.access_specifier().clone();
         fun_specifier.specialize(env)?;
         // Join with top of stack
         let current = self.check_stack_and_peek()?;
@@ -51,8 +51,12 @@ impl AccessControlState {
         if let Some(false) = new_specifier.subsumes(&fun_specifier) {
             // We don't allow to call this function, even if in some code paths access would be ok.
             // This ensures that static analysis results are compatible.
-            return Err(PartialVMError::new(StatusCode::ACCESS_DENIED)
-                .with_message(format!("not allowed to call `{}`", fun.pretty_string())));
+            return Err(
+                PartialVMError::new(StatusCode::ACCESS_DENIED).with_message(format!(
+                    "not allowed to call `{}`",
+                    fun.name_as_pretty_string()
+                )),
+            );
         }
         if self.specifier_stack.len() >= ACCESS_STACK_SIZE_LIMIT {
             Err(
@@ -68,8 +72,8 @@ impl AccessControlState {
     }
 
     /// Exit function, restoring access state before entering.
-    pub(crate) fn exit_function(&mut self, fun: &Function) -> PartialVMResult<()> {
-        if !matches!(fun.access_specifier, AccessSpecifier::Any) {
+    pub(crate) fn exit_function(&mut self, fun: &LoadedFunction) -> PartialVMResult<()> {
+        if !matches!(fun.access_specifier(), AccessSpecifier::Any) {
             self.check_stack_and_peek()?;
             self.specifier_stack.pop();
         }

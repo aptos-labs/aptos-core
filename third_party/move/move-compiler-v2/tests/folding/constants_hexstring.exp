@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid hex string
+  ┌─ tests/folding/constants_hexstring.move:6:29
+  │
+6 │     const C12: vector<u8> = x"hello";
+  │                             ^^^^^^^^ Odd number of characters in hex string. Expected 2 hexadecimal digits for each byte
+
+error: invalid hex string
+  ┌─ tests/folding/constants_hexstring.move:7:31
+  │
+7 │     const C13: vector<u8> = x"hello!";
+  │                               ^ Invalid hexadecimal character: 'h'

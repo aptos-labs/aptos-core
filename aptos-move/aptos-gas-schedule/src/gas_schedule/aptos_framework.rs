@@ -6,7 +6,7 @@
 use crate::{
     gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13},
+    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23},
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -322,5 +322,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [object_exists_at_per_item_loaded: InternalGas, { 7.. => "object.exists_at.per_item_loaded" }, 1470],
         [string_utils_base: InternalGas, { 8.. => "string_utils.format.base" }, 1102],
         [string_utils_per_byte: InternalGasPerByte, { 8.. =>"string_utils.format.per_byte" }, 3],
+
+        [randomness_fetch_and_inc_counter: InternalGas, { RELEASE_V1_23.. => "randomness.fetch_and_inc_counter" }, 1],
     ]
 );

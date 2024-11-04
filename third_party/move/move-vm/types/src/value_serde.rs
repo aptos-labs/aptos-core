@@ -150,6 +150,28 @@ pub fn serialize_and_allow_delayed_values(
         .transpose()
 }
 
+/// Returns the serialized size in bytes of a Move value, with compatible layout.
+/// Note that the layout should match, as otherwise serialization fails. This
+/// method explicitly allows having delayed values inside the passed in Move value
+/// because their size is fixed and cannot change.
+pub fn serialized_size_allowing_delayed_values(
+    value: &Value,
+    layout: &MoveTypeLayout,
+) -> PartialVMResult<usize> {
+    let native_serializer = RelaxedCustomSerDe::new();
+    let value = SerializationReadyValue {
+        custom_serializer: Some(&native_serializer),
+        layout,
+        value: &value.0,
+    };
+    bcs::serialized_size(&value).map_err(|e| {
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+            "failed to compute serialized size of a value: {:?}",
+            e
+        ))
+    })
+}
+
 /// Allow conversion between values and identifiers (delayed values). For example,
 /// this trait can be implemented to fetch a concrete Move value from the global
 /// state based on the identifier stored inside a delayed value.

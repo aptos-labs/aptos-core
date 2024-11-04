@@ -570,8 +570,16 @@ impl<'a> Analyzer<'a> {
                 .entry(struct_.get_qualified_id())
                 .or_default()
                 .insert(targs.to_owned());
-            for field in struct_.get_fields() {
-                self.add_type(&field.get_type().instantiate(targs));
+            if struct_.has_variants() {
+                for variant in struct_.get_variants() {
+                    for field in struct_.get_fields_of_variant(variant) {
+                        self.add_type(&field.get_type().instantiate(targs));
+                    }
+                }
+            } else {
+                for field in struct_.get_fields() {
+                    self.add_type(&field.get_type().instantiate(targs));
+                }
             }
         }
     }

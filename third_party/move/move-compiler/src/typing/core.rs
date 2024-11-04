@@ -1664,7 +1664,7 @@ pub fn check_non_fun(context: &mut Context, ty: &Type) {
             TypeSafety::InvalidFunctionType,
             (
                 *loc,
-                "function type only allowed for inline function arguments"
+                "function-typed values only allowed for inline function arguments"
             )
         ))
     }

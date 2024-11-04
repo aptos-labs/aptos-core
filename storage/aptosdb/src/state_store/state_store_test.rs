@@ -23,6 +23,7 @@ use aptos_types::{
     account_config::{AccountResource, ChainIdResource, CoinInfoResource, CoinStoreResource},
     nibble::nibble_path::NibblePath,
     state_store::state_key::inner::StateKeyTag,
+    AptosCoinType,
 };
 use arr_macro::arr;
 use proptest::{collection::hash_map, prelude::*};
@@ -52,14 +53,13 @@ fn put_value_set(
     let state_kv_metadata_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
-            vec![&sharded_value_set],
+            &[sharded_value_set],
             version,
             StateStorageUsage::new_untracked(),
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
             /*put_state_value_indices=*/ false,
-            /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
         )
         .unwrap();
@@ -217,7 +217,7 @@ fn test_get_values_by_key_prefix() {
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
-    let key4 = StateKey::resource_typed::<CoinInfoResource>(&address).unwrap();
+    let key4 = StateKey::resource_typed::<CoinInfoResource<AptosCoinType>>(&address).unwrap();
 
     let value2_v1 = StateValue::from(String::from("value2_v1").into_bytes());
     let value4_v1 = StateValue::from(String::from("value4_v1").into_bytes());
@@ -247,7 +247,7 @@ fn test_get_values_by_key_prefix() {
 
     // Add values for one more account and verify the state
     let address1 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-    let key5 = StateKey::resource_typed::<CoinStoreResource>(&address1).unwrap();
+    let key5 = StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&address1).unwrap();
     let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
 
     let account1_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
@@ -465,6 +465,59 @@ proptest! {
     }
 
     #[test]
+    fn test_get_rightmost_leaf_with_sharding(
+        (input, batch1_size) in hash_map(any::<StateKey>(), any::<StateValue>(), 2..1000)
+        .prop_flat_map(|input| {
+            let len = input.len();
+            (Just(input), 2..len)
+        })
+    ) {
+        let tmp_dir1 = TempPath::new();
+        let db1 = AptosDB::new_for_test_with_sharding(&tmp_dir1, 1000);
+        let store1 = &db1.state_store;
+        init_sharded_store(store1, input.clone().into_iter());
+
+        let version = (input.len() - 1) as Version;
+        let expected_root_hash = store1.get_root_hash(version).unwrap();
+
+        let tmp_dir2 = TempPath::new();
+        let db2 = AptosDB::new_for_test_with_sharding(&tmp_dir2, 1000);
+
+
+        let store2 = &db2.state_store;
+        let mut restore =
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
+        let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
+        let dummy_state_key = StateKey::raw(&[]);
+        let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
+        store2.state_merkle_db.commit(version, top_levels_batch, sharded_batches).unwrap();
+        assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
+        let mut ordered_input: Vec<_> = input
+            .into_iter()
+            .collect();
+        ordered_input.sort_unstable_by_key(|(key, _value)| key.hash());
+
+        let batch1: Vec<_> = ordered_input
+            .into_iter()
+            .take(batch1_size)
+            .collect();
+        let rightmost_of_batch1 = batch1.last().map(|(key, _value)| key.hash()).unwrap();
+        let proof_of_batch1 = store1
+            .get_value_range_proof(rightmost_of_batch1, version)
+            .unwrap();
+
+        restore.add_chunk(batch1, proof_of_batch1).unwrap();
+        restore.wait_for_async_commit().unwrap();
+
+        let expected = store2.state_merkle_db.get_rightmost_leaf_naive(version).unwrap();
+        // When re-initializing the store, the rightmost leaf should exist indicating the progress
+        let actual = store2.state_merkle_db.get_rightmost_leaf(version).unwrap();
+        // ensure the rightmost leaf is not None
+        prop_assert!(actual.is_some());
+        prop_assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn test_get_rightmost_leaf(
         (input, batch1_size) in hash_map(any::<StateKey>(), any::<StateValue>(), 2..1000)
             .prop_flat_map(|input| {
@@ -483,15 +536,13 @@ proptest! {
         let tmp_dir2 = TempPath::new();
         let db2 = AptosDB::new_for_test(&tmp_dir2);
         let store2 = &db2.state_store;
-        let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let mut restore =
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
-
+        let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let dummy_state_key = StateKey::raw(&[]);
         let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
         store2.state_merkle_db.commit(version, top_levels_batch, sharded_batches).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
-
         let mut ordered_input: Vec<_> = input
             .into_iter()
             .collect();
@@ -511,6 +562,7 @@ proptest! {
 
         let expected = store2.state_merkle_db.get_rightmost_leaf_naive(version).unwrap();
         let actual = store2.state_merkle_db.get_rightmost_leaf(version).unwrap();
+
         prop_assert_eq!(actual, expected);
     }
 
@@ -525,7 +577,7 @@ proptest! {
         let mut version = 0;
         for batch in input {
             let next_version = version + batch.len() as Version;
-            let root_hash = update_store(store, batch.into_iter(), version);
+            let root_hash = update_store(store, batch.into_iter(), version, false);
 
             let last_version = next_version - 1;
             let snapshot = db
@@ -573,5 +625,14 @@ proptest! {
 
 // Initializes the state store by inserting one key at each version.
 fn init_store(store: &StateStore, input: impl Iterator<Item = (StateKey, StateValue)>) {
-    update_store(store, input.into_iter().map(|(k, v)| (k, Some(v))), 0);
+    update_store(
+        store,
+        input.into_iter().map(|(k, v)| (k, Some(v))),
+        0,
+        false,
+    );
+}
+
+fn init_sharded_store(store: &StateStore, input: impl Iterator<Item = (StateKey, StateValue)>) {
+    update_store(store, input.into_iter().map(|(k, v)| (k, Some(v))), 0, true);
 }

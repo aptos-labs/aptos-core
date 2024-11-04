@@ -1,0 +1,53 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
+- 
+- task 0 'publish'. lines 1-13:
+- Error: error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:15
+-   │
+- 9 │     let r = foo(|x: u64, _: u64, z: u64| x*z, |_: u64, y: u64, _: u64| y, 1, 10, 100, 1000);
+-   │                  ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:23
+-   │
+- 9 │     let r = foo(|x: u64, _: u64, z: u64| x*z, |_: u64, y: u64, _: u64| y, 1, 10, 100, 1000);
+-   │                          ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:31
+-   │
+- 9 │     let r = foo(|x: u64, _: u64, z: u64| x*z, |_: u64, y: u64, _: u64| y, 1, 10, 100, 1000);
+-   │                                  ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:45
+-   │
+- 9 │     let r = foo(|x: u64, _: u64, z: u64| x*z, |_: u64, y: u64, _: u64| y, 1, 10, 100, 1000);
+-   │                                                ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:53
+-   │
+- 9 │     let r = foo(|x: u64, _: u64, z: u64| x*z, |_: u64, y: u64, _: u64| y, 1, 10, 100, 1000);
+-   │                                                        ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:61
+-   │
+- 9 │     let r = foo(|x: u64, _: u64, z: u64| x*z, |_: u64, y: u64, _: u64| y, 1, 10, 100, 1000);
+-   │                                                                ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+- task 1 'run'. lines 15-15:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
+- 
++ processed 2 tasks
++ 

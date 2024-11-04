@@ -39,8 +39,7 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
-        UnsyncMap::new();
+    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()> = UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 
@@ -298,7 +297,7 @@ fn create_write_read_placeholder_struct() {
 fn materialize_delta_shortcut() {
     use MVDataOutput::*;
 
-    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
+    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::empty();
     let ap = KeyType(b"/foo/b".to_vec());
     let limit = 10000;
 
@@ -343,7 +342,7 @@ fn materialize_delta_shortcut() {
 #[test]
 #[should_panic]
 fn aggregator_base_mismatch() {
-    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
+    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::empty();
     let ap = KeyType(b"/foo/b".to_vec());
 
     vd.set_base_value(
@@ -361,7 +360,7 @@ fn aggregator_base_mismatch() {
 #[test]
 #[should_panic]
 fn commit_without_deltas() {
-    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
+    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::empty();
     let ap = KeyType(b"/foo/b".to_vec());
 
     // Must panic as there are no deltas at all.
@@ -371,7 +370,7 @@ fn commit_without_deltas() {
 #[test]
 #[should_panic]
 fn commit_without_entry() {
-    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
+    let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::empty();
     let ap = KeyType(b"/foo/b".to_vec());
 
     vd.add_delta(ap.clone(), 8, delta_add(20, 1000));

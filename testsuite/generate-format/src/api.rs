@@ -19,14 +19,14 @@ use aptos_types::{
         state_key::StateKey,
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
-    transaction,
     transaction::{
+        self,
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
         block_epilogue::BlockEpiloguePayload,
     },
     validator_txn::ValidatorTransaction,
     vm_status::AbortLocation,
-    write_set,
+    write_set, AptosCoinType,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -136,7 +136,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_api_types::TransactionOnChainData>(&samples)?;
 
     // output types
-    tracer.trace_type::<CoinStoreResource>(&samples)?;
+    tracer.trace_type::<CoinStoreResource<AptosCoinType>>(&samples)?;
 
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;

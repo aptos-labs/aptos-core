@@ -1,0 +1,10 @@
+
+Diagnostics:
+warning: invalid documentation comment
+  ┌─ tests/more-v1/parser/comments_nested_unbalanced.move:1:4
+  │
+1 │ /* /** /** * / */ /** */
+  │    ^^ Unclosed block comment
+
+
+============ bytecode verification succeeded ========

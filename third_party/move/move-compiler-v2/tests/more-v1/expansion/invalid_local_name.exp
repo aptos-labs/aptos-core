@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid name
+  ┌─ tests/more-v1/expansion/invalid_local_name.move:4:11
+  │
+4 │     fun t(No: u64) {
+  │           ^^ Invalid local variable name 'No'. Local variable names must start with 'a'..'z' (or '_')
+
+error: invalid use of reserved name
+   ┌─ tests/more-v1/expansion/invalid_local_name.move:23:13
+   │
+23 │         let vector;
+   │             ^^^^^^ Invalid variable name 'vector'. 'vector' is restricted and cannot be used to name a variable

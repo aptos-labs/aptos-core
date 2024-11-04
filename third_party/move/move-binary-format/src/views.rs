@@ -349,6 +349,10 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
         self.struct_handle_view.abilities()
     }
 
+    pub fn handle_idx(&self) -> StructHandleIndex {
+        self.struct_def.struct_handle
+    }
+
     pub fn is_native(&self) -> bool {
         match &self.struct_def.field_information {
             StructFieldInformation::Native => true,
@@ -382,6 +386,15 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
 
     pub fn name(&self) -> &'a IdentStr {
         self.struct_handle_view.name()
+    }
+
+    pub fn variant_count(&self) -> usize {
+        self.struct_def.field_information.variant_count()
+    }
+
+    pub fn variant_name(&self, idx: VariantIndex) -> &IdentStr {
+        self.module
+            .identifier_at(self.struct_def.field_information.variants()[idx as usize].name)
     }
 }
 
@@ -482,6 +495,10 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
         }
     }
 
+    pub fn handle_idx(&self) -> FunctionHandleIndex {
+        self.function_def.function
+    }
+
     pub fn visibility(&self) -> Visibility {
         self.function_def.visibility
     }
@@ -506,7 +523,7 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
         self.function_handle_view.parameters()
     }
 
-    pub fn return_(&self) -> &'a Signature {
+    pub fn return_type(&self) -> &'a Signature {
         self.function_handle_view.return_()
     }
 

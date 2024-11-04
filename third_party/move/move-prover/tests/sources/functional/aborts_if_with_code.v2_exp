@@ -2,22 +2,22 @@ Move prover returns: exiting with verification errors
 error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
    ┌─ tests/sources/functional/aborts_if_with_code.move:38:5
    │
-31 │               abort 2
-   │               ------- abort happened here with code 0x2
-   ·
-38 │ ╭     spec conditional_abort_invalid {
-39 │ │         aborts_if x == 1 with 1; // wrong code
-40 │ │         aborts_if y == 2 with 3;
-41 │ │         ensures result == x;
-42 │ │     }
-   │ ╰─────^
+30 │   ╭         if (x == 1) {
+31 │   │             abort 2
+32 │   │         };
+   │   ╰─────────' abort happened here with code 0x2
+   ·   │
+38 │ ╭       spec conditional_abort_invalid {
+39 │ │           aborts_if x == 1 with 1; // wrong code
+40 │ │           aborts_if y == 2 with 3;
+41 │ │           ensures result == x;
+42 │ │       }
+   │ ╰───────^
    │
    =     at tests/sources/functional/aborts_if_with_code.move:29: conditional_abort_invalid
    =         x = <redacted>
    =         y = <redacted>
    =     at tests/sources/functional/aborts_if_with_code.move:30: conditional_abort_invalid
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/aborts_if_with_code.move:31: conditional_abort_invalid
    =         ABORTED
 
 error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
@@ -40,8 +40,8 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
 error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
    ┌─ tests/sources/functional/aborts_if_with_code.move:77:5
    │
-74 │               abort(2)
-   │               -------- abort happened here with code 0x2
+73 │           if (x == 2) {
+   │               ------ abort happened here with code 0x2
    ·
 77 │ ╭     spec aborts_if_with_code_mixed_invalid {
 78 │ │         aborts_if x == 1;
@@ -52,17 +52,15 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
    =     at tests/sources/functional/aborts_if_with_code.move:69: aborts_if_with_code_mixed_invalid
    =         x = <redacted>
    =     at tests/sources/functional/aborts_if_with_code.move:70: aborts_if_with_code_mixed_invalid
-   =         <redacted> = <redacted>
+   =     at tests/sources/functional/aborts_if_with_code.move:71: aborts_if_with_code_mixed_invalid
    =     at tests/sources/functional/aborts_if_with_code.move:73: aborts_if_with_code_mixed_invalid
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/aborts_if_with_code.move:74: aborts_if_with_code_mixed_invalid
    =         ABORTED
 
 error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
     ┌─ tests/sources/functional/aborts_if_with_code.move:105:5
     │
-102 │               abort(2)
-    │               -------- abort happened here with code 0x2
+101 │           if (x == 2) {
+    │               ------ abort happened here with code 0x2
     ·
 105 │ ╭     spec aborts_with_invalid {
 106 │ │         aborts_with 1,3;
@@ -72,17 +70,15 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
     =     at tests/sources/functional/aborts_if_with_code.move:97: aborts_with_invalid
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if_with_code.move:98: aborts_with_invalid
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/aborts_if_with_code.move:99: aborts_with_invalid
     =     at tests/sources/functional/aborts_if_with_code.move:101: aborts_with_invalid
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/aborts_if_with_code.move:102: aborts_with_invalid
     =         ABORTED
 
 error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
     ┌─ tests/sources/functional/aborts_if_with_code.move:131:5
     │
-128 │               abort(1)
-    │               -------- abort happened here with code 0x1
+127 │           if (x == 2) {
+    │               ------ abort happened here with code 0x1
     ·
 131 │ ╭     spec aborts_with_mixed_invalid {
 132 │ │         pragma aborts_if_is_partial = true;
@@ -94,8 +90,6 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
     =     at tests/sources/functional/aborts_if_with_code.move:123: aborts_with_mixed_invalid
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if_with_code.move:124: aborts_with_mixed_invalid
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/aborts_if_with_code.move:125: aborts_with_mixed_invalid
     =     at tests/sources/functional/aborts_if_with_code.move:127: aborts_with_mixed_invalid
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/aborts_if_with_code.move:128: aborts_with_mixed_invalid
     =         ABORTED

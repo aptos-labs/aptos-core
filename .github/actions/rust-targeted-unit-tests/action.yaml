@@ -9,14 +9,6 @@ runs:
   using: composite
   steps:
     # The source code must be checked out by the workflow that invokes this action.
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
-    # Install nextest
-    - uses: taiki-e/install-action@v1.5.6
-      with:
-        tool: nextest
 
     # Run a postgres database
     - name: Run postgres database
@@ -25,18 +17,18 @@ runs:
 
     # Output the changed files
     - name: Output the changed files
-      run: cargo x changed-files -vv
+      run: cargo x changed-files -vvv
       shell: bash
 
     # Output the affected packages
     - name: Output the affected packages
-      run: cargo x affected-packages -vv
+      run: cargo x affected-packages -vvv
       shell: bash
 
     # Run only the targeted rust unit tests
     - name: Run only the targeted unit tests
       run: |
-        cargo x targeted-unit-tests -vv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+        cargo x targeted-unit-tests -vvv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres

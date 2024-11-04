@@ -33,3 +33,15 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    fun t0() {
+        while (true) ();
+        while (false) ()
+    }
+    fun t1() {
+        while (true) ();
+        while (false) ()
+    }
+}

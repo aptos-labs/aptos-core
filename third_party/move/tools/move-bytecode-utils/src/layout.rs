@@ -199,7 +199,7 @@ impl<'a, T: CompiledModuleView> SerdeLayoutBuilder<'a, T> {
                 )
             });
         #[allow(deprecated)]
-        let normalized_struct = Struct::new(declaring_module.borrow(), def).1;
+        let normalized_struct = Struct::new(declaring_module.borrow(), def)?.1;
         assert_eq!(
             normalized_struct.type_parameters.len(),
             type_arguments.len(),
@@ -534,7 +534,7 @@ impl StructLayoutBuilder {
                 })
             },
             StructFieldInformation::DeclaredVariants(..) => {
-                bail!("struct variants not yet supported by layouts")
+                bail!("enum variants not yet supported by layouts")
             },
         }
     }

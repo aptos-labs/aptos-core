@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: use of unassigned local `y`
+  ┌─ tests/reference-safety/unused_reference.move:6:9
+  │
+6 │         *y;
+  │         ^^

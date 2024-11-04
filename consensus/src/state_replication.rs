@@ -3,11 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::StateSyncError,
-    payload_manager::TPayloadManager,
-    state_computer::{PipelineExecutionResult, StateComputeResultFut},
-    transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    error::StateSyncError, payload_manager::TPayloadManager,
+    pipeline::pipeline_phase::CountedRequest, state_computer::StateComputeResultFut,
+    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
@@ -17,7 +15,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<PipelinedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
@@ -27,22 +25,6 @@ pub type StateComputerCommitCallBackType =
 /// StateComputer is using proposed block ids for identifying the transactions.
 #[async_trait::async_trait]
 pub trait StateComputer: Send + Sync {
-    /// How to execute a sequence of transactions and obtain the next state. While some of the
-    /// transactions succeed, some of them can fail.
-    /// In case all the transactions are failed, new_state_id is equal to the previous state id.
-    async fn compute(
-        &self,
-        // The block that will be computed.
-        block: &Block,
-        // The parent block root hash.
-        parent_block_id: HashValue,
-        randomness: Option<Randomness>,
-    ) -> ExecutorResult<PipelineExecutionResult> {
-        self.schedule_compute(block, parent_block_id, randomness)
-            .await
-            .await
-    }
-
     async fn schedule_compute(
         &self,
         // The block that will be computed.
@@ -50,8 +32,9 @@ pub trait StateComputer: Send + Sync {
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
+        _lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
-        unimplemented!("This state computer does not support scheduling");
+        unimplemented!();
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
@@ -62,11 +45,20 @@ pub trait StateComputer: Send + Sync {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;
 
+    /// Best effort state synchronization for the specified duration.
+    /// This function returns the latest synced ledger info after state syncing.
+    /// Note: it is possible that state sync may run longer than the specified
+    /// duration (e.g., if the node is very far behind).
+    async fn sync_for_duration(
+        &self,
+        duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError>;
+
     /// Best effort state synchronization to the given target LedgerInfo.
     /// In case of success (`Result::Ok`) the LI of storage is at the given target.
     /// In case of failure (`Result::Error`) the LI of storage remains unchanged, and the validator
     /// can assume there were no modifications to the storage made.
-    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+    async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
     fn new_epoch(

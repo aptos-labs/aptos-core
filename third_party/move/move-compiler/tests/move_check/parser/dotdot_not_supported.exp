@@ -1,0 +1,6 @@
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/dotdot_not_supported.move:8:11
+  │
+8 │         let S { .. } = x;
+  │                 ^^ Move 2 language construct is not enabled: `..` patterns
+

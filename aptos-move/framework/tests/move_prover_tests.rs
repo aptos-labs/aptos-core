@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_framework::{extended_checks, prover::ProverOptions};
+use move_binary_format::file_format_common::VERSION_DEFAULT;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use std::{collections::BTreeMap, path::PathBuf};
 
 const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
@@ -57,11 +59,12 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
                 false,
                 pkg_path.as_path(),
                 BTreeMap::default(),
-                None,
-                None,
-                None,
+                Some(VERSION_DEFAULT),
+                Some(CompilerVersion::latest_stable()),
+                Some(LanguageVersion::latest_stable()),
                 skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
+                &[],
             )
             .unwrap()
     }

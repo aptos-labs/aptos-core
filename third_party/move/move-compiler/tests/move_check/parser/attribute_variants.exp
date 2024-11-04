@@ -2,59 +2,59 @@ warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:2:3
   │
 2 │ #[attr0]
-  │   ^^^^^ Attribute name 'attr0' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │   ^^^^^ Attribute name 'attr0' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:3:3
   │
 3 │ #[attr1=0, attr2=b"hello", attr3=x"0f", attr4=0x42, attr5(attr0, attr1, attr2(attr0, attr1=0))]
-  │   ^^^^^ Attribute name 'attr1' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │   ^^^^^ Attribute name 'attr1' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:3:12
   │
 3 │ #[attr1=0, attr2=b"hello", attr3=x"0f", attr4=0x42, attr5(attr0, attr1, attr2(attr0, attr1=0))]
-  │            ^^^^^ Attribute name 'attr2' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │            ^^^^^ Attribute name 'attr2' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:3:28
   │
 3 │ #[attr1=0, attr2=b"hello", attr3=x"0f", attr4=0x42, attr5(attr0, attr1, attr2(attr0, attr1=0))]
-  │                            ^^^^^ Attribute name 'attr3' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │                            ^^^^^ Attribute name 'attr3' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:3:41
   │
 3 │ #[attr1=0, attr2=b"hello", attr3=x"0f", attr4=0x42, attr5(attr0, attr1, attr2(attr0, attr1=0))]
-  │                                         ^^^^^ Attribute name 'attr4' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │                                         ^^^^^ Attribute name 'attr4' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:3:53
   │
 3 │ #[attr1=0, attr2=b"hello", attr3=x"0f", attr4=0x42, attr5(attr0, attr1, attr2(attr0, attr1=0))]
-  │                                                     ^^^^^ Attribute name 'attr5' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │                                                     ^^^^^ Attribute name 'attr5' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:4:3
   │
 4 │ #[bttr0=false, bttr1=0u8, bttr2=0u64, bttr3=0u128]
-  │   ^^^^^ Attribute name 'bttr0' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │   ^^^^^ Attribute name 'bttr0' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:4:16
   │
 4 │ #[bttr0=false, bttr1=0u8, bttr2=0u64, bttr3=0u128]
-  │                ^^^^^ Attribute name 'bttr1' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │                ^^^^^ Attribute name 'bttr1' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:4:27
   │
 4 │ #[bttr0=false, bttr1=0u8, bttr2=0u64, bttr3=0u128]
-  │                           ^^^^^ Attribute name 'bttr2' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │                           ^^^^^ Attribute name 'bttr2' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/attribute_variants.move:4:39
   │
 4 │ #[bttr0=false, bttr1=0u8, bttr2=0u64, bttr3=0u128]
-  │                                       ^^^^^ Attribute name 'bttr3' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │                                       ^^^^^ Attribute name 'bttr3' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 

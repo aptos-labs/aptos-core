@@ -16,8 +16,8 @@ use crate::{
 use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{Exp, ExpData, TempIndex},
-    model::{FunId, GlobalEnv, ModuleId, Parameter},
+    ast::{Exp, ExpData, Operation as ASTOperation, TempIndex},
+    model::{FieldId, FunId, GlobalEnv, ModuleId, Parameter, StructId},
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -277,13 +277,16 @@ impl<'a> NumberOperationAnalysis<'a> {
                         // Update node for field operation
                         move_model::ast::Operation::Select(mid, sid, field_id)
                         | move_model::ast::Operation::UpdateField(mid, sid, field_id) => {
-                            let field_oper = global_state
-                                .struct_operation_map
-                                .get(&(*mid, *sid))
-                                .unwrap()
-                                .get(field_id)
-                                .unwrap();
+                            let field_oper =
+                                global_state.get_num_operation_field(mid, sid, field_id);
                             global_state.update_node_oper(*id, *field_oper, true);
+                        },
+                        move_model::ast::Operation::SelectVariants(mid, sid, field_ids) => {
+                            for field_id in field_ids {
+                                let field_oper =
+                                    global_state.get_num_operation_field(mid, sid, field_id);
+                                global_state.update_node_oper(*id, *field_oper, true);
+                            }
                         },
                         move_model::ast::Operation::Cast => {
                             // Obtained the updated num_oper of the expression
@@ -457,16 +460,42 @@ impl<'a> NumberOperationAnalysis<'a> {
 
                                 for (arg, arg_oper) in args.iter().zip(arg_oper.iter()) {
                                     if merged != *arg_oper {
-                                        // propagate to arg if necessary
-                                        global_state.update_node_oper(
-                                            arg.node_id(),
-                                            merged,
-                                            allow_merge,
-                                        );
-                                        update_temporary(arg, &merged, global_state, state);
+                                        // need to update the num_oper type to avoid insertion of int2bv conversion
+                                        // which is inefficient during SMT solving
+                                        let update_flag = match arg.clone().into() {
+                                            ExpData::Temporary(..)
+                                            | ExpData::LocalVar(..)
+                                            | ExpData::Value(..)
+                                            | ExpData::Call(_, ASTOperation::Cast, _) => true,
+                                            ExpData::Call(
+                                                _,
+                                                ASTOperation::SpecFunction(mid, sid, _),
+                                                _,
+                                            ) => {
+                                                // if the current argument is a call to a recursive spec function
+                                                // we need to update num_oper type, otherwise the boogie generator
+                                                // will incorrectly insert inv2bv conversion
+                                                let module_env =
+                                                    &self.func_target.global_env().get_module(mid);
+                                                let spec_f = module_env.get_spec_fun(sid);
+                                                !spec_f.is_move_fun
+                                                    && self
+                                                        .func_target
+                                                        .global_env()
+                                                        .is_spec_fun_recursive(mid.qualified(sid))
+                                            },
+                                            _ => false,
+                                        };
+                                        if update_flag {
+                                            global_state.update_node_oper(
+                                                arg.node_id(),
+                                                merged,
+                                                allow_merge,
+                                            );
+                                            update_temporary(arg, &merged, global_state, state);
+                                        }
                                     }
                                 }
-
                                 global_state.update_node_oper(*id, merged, allow_merge);
                             }
                         },
@@ -702,6 +731,41 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                 }
             },
             Call(id, dests, oper, srcs, _) => {
+                let handle_pack_unpack =
+                    |msid: &ModuleId,
+                     sid: &StructId,
+                     id: &AttrId,
+                     i: usize,
+                     field_id: FieldId,
+                     state: &mut NumberOperationState,
+                     global_state: &mut GlobalNumberOperationState,
+                     temps: &[TempIndex]| {
+                        let current_field_oper =
+                            global_state.get_num_operation_field(msid, sid, &field_id);
+                        let pack_oper = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, temps[i], baseline_flag)
+                            .unwrap();
+                        if self.check_conflict(current_field_oper, pack_oper) {
+                            self.func_target
+                                .func_env
+                                .module_env
+                                .env
+                                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                        } else {
+                            let merged = current_field_oper.merge(pack_oper);
+                            if merged != *current_field_oper || merged != *pack_oper {
+                                state.changed = true;
+                            }
+                            *global_state
+                                .get_mut_temp_index_oper(cur_mid, cur_fid, temps[i], baseline_flag)
+                                .unwrap() = merged;
+                            global_state
+                                .struct_operation_map
+                                .get_mut(&(*msid, *sid))
+                                .unwrap()
+                                .insert(field_id, merged);
+                        }
+                    };
                 match oper {
                     BorrowLoc | ReadRef | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
                     | CastU256 => {
@@ -812,38 +876,43 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             .get_module(*msid)
                             .into_struct(*sid);
                         for (i, field) in struct_env.get_fields().enumerate() {
-                            let current_field_oper = global_state
-                                .struct_operation_map
-                                .get(&(*msid, *sid))
-                                .unwrap()
-                                .get(&field.get_id())
-                                .unwrap();
-                            let pack_oper = global_state
-                                .get_temp_index_oper(cur_mid, cur_fid, srcs[i], baseline_flag)
-                                .unwrap();
-                            if self.check_conflict(current_field_oper, pack_oper) {
-                                self.func_target.func_env.module_env.env.error(
-                                    &self.func_target.get_bytecode_loc(*id),
-                                    CONFLICT_ERROR_MSG,
+                            handle_pack_unpack(
+                                msid,
+                                sid,
+                                id,
+                                i,
+                                field.get_id(),
+                                state,
+                                &mut global_state,
+                                srcs,
+                            );
+                        }
+                    },
+                    // Checking and operations in the struct_operation_map when packing an enum type
+                    PackVariant(msid, sid, variant, _) => {
+                        let struct_env = self
+                            .func_target
+                            .global_env()
+                            .get_module(*msid)
+                            .into_struct(*sid);
+                        for (i, field) in struct_env.get_fields_of_variant(*variant).enumerate() {
+                            let pool = struct_env.symbol_pool();
+                            let new_field_id =
+                                FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                                    pool.string(*variant).as_str(),
+                                    pool.string(field.get_name()).as_str(),
+                                )));
+                            if srcs.len() > i {
+                                handle_pack_unpack(
+                                    msid,
+                                    sid,
+                                    id,
+                                    i,
+                                    new_field_id,
+                                    state,
+                                    &mut global_state,
+                                    srcs,
                                 );
-                            } else {
-                                let merged = current_field_oper.merge(pack_oper);
-                                if merged != *current_field_oper || merged != *pack_oper {
-                                    state.changed = true;
-                                }
-                                *global_state
-                                    .get_mut_temp_index_oper(
-                                        cur_mid,
-                                        cur_fid,
-                                        srcs[i],
-                                        baseline_flag,
-                                    )
-                                    .unwrap() = merged;
-                                global_state
-                                    .struct_operation_map
-                                    .get_mut(&(*msid, *sid))
-                                    .unwrap()
-                                    .insert(field.get_id(), merged);
                             }
                         }
                     },
@@ -855,38 +924,43 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             .get_module(*msid)
                             .into_struct(*sid);
                         for (i, field) in struct_env.get_fields().enumerate() {
-                            let current_field_oper = global_state
-                                .struct_operation_map
-                                .get(&(*msid, *sid))
-                                .unwrap()
-                                .get(&field.get_id())
-                                .unwrap();
-                            let pack_oper = global_state
-                                .get_temp_index_oper(cur_mid, cur_fid, dests[i], baseline_flag)
-                                .unwrap();
-                            if self.check_conflict(current_field_oper, pack_oper) {
-                                self.func_target.func_env.module_env.env.error(
-                                    &self.func_target.get_bytecode_loc(*id),
-                                    CONFLICT_ERROR_MSG,
+                            handle_pack_unpack(
+                                msid,
+                                sid,
+                                id,
+                                i,
+                                field.get_id(),
+                                state,
+                                &mut global_state,
+                                dests,
+                            );
+                        }
+                    },
+                    // Checking and operations in the struct_operation_map when unpacking an enum
+                    UnpackVariant(msid, sid, variant, _) => {
+                        let struct_env = self
+                            .func_target
+                            .global_env()
+                            .get_module(*msid)
+                            .into_struct(*sid);
+                        for (i, field) in struct_env.get_fields_of_variant(*variant).enumerate() {
+                            let pool = struct_env.symbol_pool();
+                            let new_field_id =
+                                FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                                    pool.string(*variant).as_str(),
+                                    pool.string(field.get_name()).as_str(),
+                                )));
+                            if dests.len() > i {
+                                handle_pack_unpack(
+                                    msid,
+                                    sid,
+                                    id,
+                                    i,
+                                    new_field_id,
+                                    state,
+                                    &mut global_state,
+                                    dests,
                                 );
-                            } else {
-                                let merged = current_field_oper.merge(pack_oper);
-                                if merged != *current_field_oper || merged != *pack_oper {
-                                    state.changed = true;
-                                }
-                                *global_state
-                                    .get_mut_temp_index_oper(
-                                        cur_mid,
-                                        cur_fid,
-                                        dests[i],
-                                        baseline_flag,
-                                    )
-                                    .unwrap() = merged;
-                                global_state
-                                    .struct_operation_map
-                                    .get_mut(&(*msid, *sid))
-                                    .unwrap()
-                                    .insert(field.get_id(), merged);
                             }
                         }
                     },
@@ -894,20 +968,14 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                         let dests_oper = global_state
                             .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
                             .unwrap();
-                        let field_oper = global_state
-                            .struct_operation_map
-                            .get(&(*msid, *sid))
-                            .unwrap()
-                            .get(
-                                &self
-                                    .func_target
-                                    .func_env
-                                    .module_env
-                                    .get_struct(*sid)
-                                    .get_field_by_offset(*offset)
-                                    .get_id(),
-                            )
-                            .unwrap();
+                        let field_id = &self
+                            .func_target
+                            .func_env
+                            .module_env
+                            .get_struct(*sid)
+                            .get_field_by_offset(*offset)
+                            .get_id();
+                        let field_oper = global_state.get_num_operation_field(msid, sid, field_id);
 
                         if self.check_conflict(dests_oper, field_oper) {
                             self.func_target
@@ -936,6 +1004,67 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                         .get_id(),
                                     merged_oper,
                                 );
+                        }
+                    },
+                    GetVariantField(msid, sid, variants, _, offset)
+                    | BorrowVariantField(msid, sid, variants, _, offset) => {
+                        let struct_env = self
+                            .func_target
+                            .global_env()
+                            .get_module(*msid)
+                            .into_struct(*sid);
+                        let pool = struct_env.symbol_pool();
+                        let field_name = &self
+                            .func_target
+                            .func_env
+                            .module_env
+                            .get_struct(*sid)
+                            .get_field_by_offset_optional_variant(Some(variants[0]), *offset)
+                            .get_name();
+                        let new_field_id =
+                            FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                                pool.string(variants[0]).as_str(),
+                                pool.string(*field_name).as_str(),
+                            )));
+                        let dests_oper = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                            .unwrap();
+                        let field_oper =
+                            global_state.get_num_operation_field(msid, sid, &new_field_id);
+
+                        if self.check_conflict(dests_oper, field_oper) {
+                            self.func_target
+                                .func_env
+                                .module_env
+                                .env
+                                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                        } else {
+                            let merged_oper = dests_oper.merge(field_oper);
+                            if merged_oper != *field_oper || merged_oper != *dests_oper {
+                                state.changed = true;
+                            }
+                            *global_state
+                                .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                                .unwrap() = merged_oper;
+                            for variant in variants {
+                                let field_name = &self
+                                    .func_target
+                                    .func_env
+                                    .module_env
+                                    .get_struct(*sid)
+                                    .get_field_by_offset_optional_variant(Some(*variant), *offset)
+                                    .get_name();
+                                let new_field_id =
+                                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                                        pool.string(*variant).as_str(),
+                                        pool.string(*field_name).as_str(),
+                                    )));
+                                global_state
+                                    .struct_operation_map
+                                    .get_mut(&(*msid, *sid))
+                                    .unwrap()
+                                    .insert(new_field_id, merged_oper);
+                            }
                         }
                     },
                     Function(msid, fsid, _) => {
@@ -1097,6 +1226,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             } // empty, do nothing
                         }
                     },
+                    // TODO(#14349): add support for enum type related operation
                     _ => {},
                 }
             },

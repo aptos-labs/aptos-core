@@ -18,7 +18,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
-use utils::*;
+use utils::{publish_group, sort_by_deps, ExecVariant, RunnableState};
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());

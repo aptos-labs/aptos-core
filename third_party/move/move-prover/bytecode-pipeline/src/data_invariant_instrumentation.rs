@@ -16,9 +16,11 @@ use move_model::{
     ast,
     ast::{ConditionKind, Exp, ExpData, QuantKind, RewriteResult, TempIndex},
     exp_generator::ExpGenerator,
+    metadata::LanguageVersion,
     model::{FunctionEnv, Loc, NodeId, StructEnv},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
     ty::Type,
+    well_known,
 };
 use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
@@ -108,6 +110,20 @@ impl<'a> Instrumenter<'a> {
                 let struct_temp = dests[0];
                 self.builder
                     .emit(Call(id, dests, Pack(mid, sid, targs), srcs, aa));
+                // Emit a shallow assert of the data invariant.
+                self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
+            },
+            Call(id, dests, PackVariant(mid, sid, variant, targs), srcs, aa)
+                if self.for_verification =>
+            {
+                let struct_temp = dests[0];
+                self.builder.emit(Call(
+                    id,
+                    dests,
+                    PackVariant(mid, sid, variant, targs),
+                    srcs,
+                    aa,
+                ));
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
             },
@@ -242,6 +258,11 @@ impl<'a> Instrumenter<'a> {
         use ast::Operation::*;
         use ExpData::*;
 
+        let lang_ver_ge_2 = self
+            .builder
+            .global_env()
+            .language_version()
+            .is_at_least(LanguageVersion::V2_0);
         // First generate a conjunction for all invariants on this struct.
         let mut result = vec![];
         for cond in struct_env
@@ -253,6 +274,18 @@ impl<'a> Instrumenter<'a> {
             // an empty argument list. It is guaranteed that this uniquely identifies the
             // target, as any other `Select` will have exactly one argument.
             let exp_rewriter = &mut |e: Exp| match e.as_ref() {
+                LocalVar(_, var) => {
+                    if lang_ver_ge_2
+                        && var
+                            .display(self.builder.global_env().symbol_pool())
+                            .to_string()
+                            == well_known::RECEIVER_PARAM_NAME
+                    {
+                        RewriteResult::Rewritten(value.clone())
+                    } else {
+                        RewriteResult::Unchanged(e)
+                    }
+                },
                 Call(id, oper @ Select(..), args) if args.is_empty() => RewriteResult::Rewritten(
                     Call(*id, oper.to_owned(), vec![value.clone()]).into_exp(),
                 ),

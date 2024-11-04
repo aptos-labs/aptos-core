@@ -39,9 +39,6 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Architecture {
     Move,
-
-    AsyncMove,
-
     Ethereum,
 }
 
@@ -49,9 +46,6 @@ impl fmt::Display for Architecture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Move => write!(f, "move"),
-
-            Self::AsyncMove => write!(f, "async-move"),
-
             Self::Ethereum => write!(f, "ethereum"),
         }
     }
@@ -61,7 +55,6 @@ impl Architecture {
     fn all() -> impl Iterator<Item = Self> {
         IntoIterator::into_iter([
             Self::Move,
-            Self::AsyncMove,
             #[cfg(feature = "evm-backend")]
             Self::Ethereum,
         ])
@@ -70,11 +63,7 @@ impl Architecture {
     fn try_parse_from_str(s: &str) -> Result<Self> {
         Ok(match s {
             "move" => Self::Move,
-
-            "async-move" => Self::AsyncMove,
-
             "ethereum" => Self::Ethereum,
-
             _ => {
                 let supported_architectures = Self::all()
                     .map(|arch| format!("\"{}\"", arch))
@@ -159,7 +148,7 @@ pub struct BuildConfig {
 #[derive(Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default, Debug)]
 pub struct CompilerConfig {
     /// Bytecode version to compile move code
-    #[clap(long = "bytecode-version", global = true)]
+    #[clap(long, global = true)]
     pub bytecode_version: Option<u32>,
 
     // Known attribute names.  Depends on compilation context (Move variant)
@@ -171,14 +160,16 @@ pub struct CompilerConfig {
     pub skip_attribute_checks: bool,
 
     /// Compiler version to use
-    #[clap(long = "compiler-version", global = true,
-           value_parser = clap::value_parser!(CompilerVersion))]
+    #[clap(long, global = true, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Language version to support
-    #[clap(long = "language-version", global = true,
-           value_parser = clap::value_parser!(LanguageVersion))]
+    #[clap(long, global = true, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
+
+    /// Experiments for v2 compiler to set to true
+    #[clap(long, global = true)]
+    pub experiments: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]

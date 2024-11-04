@@ -404,7 +404,7 @@ impl TestHarness {
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
                         transactions,
-                        request_id: _request_id,
+                        message_id: _message_id,
                     } => self.handle_txns(
                         transactions,
                         sender_id,
@@ -418,11 +418,10 @@ impl TestHarness {
                         msg,
                     ),
                     MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
+                        message_id: _message_id,
                         transactions,
-                        request_id: _request_id,
-                        priority: _priority,
                     } => self.handle_txns(
-                        transactions.into_iter().map(|(txn, _)| txn).collect(),
+                        transactions.into_iter().map(|(txn, _, _)| txn).collect(),
                         sender_id,
                         network_id,
                         num_transactions_in_message,

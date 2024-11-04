@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: cannot implicitly freeze value  since multiple mutable references exist
+  ┌─ tests/reference-safety/v1-typing/mutable_eq_and_neq_invalid.move:7:20
+  │
+6 │         let f = &mut p.b1.f;
+  │                      ---- conflicting mutable field borrow
+7 │         let comp = (&mut p.b1) == (&mut p.b2);
+  │                    ^^^^^^^^^^^
+  │                    │
+  │                    implicitly frozen here
+  │                    originating mutable field borrow
+
+error: cannot immutably borrow since mutable references exist
+  ┌─ tests/reference-safety/v1-typing/mutable_eq_and_neq_invalid.move:7:20
+  │
+6 │         let f = &mut p.b1.f;
+  │                 ----------- previous mutable field borrow
+7 │         let comp = (&mut p.b1) == (&mut p.b2);
+  │                    ^^^^^^^^^^^---------------
+  │                    │
+  │                    requirement enforced here
+  │                    immutable borrow attempted here
+8 │         *f = comp
+  │         --------- conflicting reference `f` used here
+
+error: cannot implicitly freeze value  since multiple mutable references exist
+   ┌─ tests/reference-safety/v1-typing/mutable_eq_and_neq_invalid.move:13:20
+   │
+12 │         let f = &mut p.b1.f;
+   │                      ---- conflicting mutable field borrow
+13 │         let comp = (&mut p.b1) != (&mut p.b2);
+   │                    ^^^^^^^^^^^
+   │                    │
+   │                    implicitly frozen here
+   │                    originating mutable field borrow
+
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-typing/mutable_eq_and_neq_invalid.move:13:20
+   │
+12 │         let f = &mut p.b1.f;
+   │                 ----------- previous mutable field borrow
+13 │         let comp = (&mut p.b1) != (&mut p.b2);
+   │                    ^^^^^^^^^^^---------------
+   │                    │
+   │                    requirement enforced here
+   │                    immutable borrow attempted here
+14 │         *f = comp
+   │         --------- conflicting reference `f` used here

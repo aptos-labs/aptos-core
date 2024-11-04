@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{payload::TDataInfo, utils::PayloadTxnsSize};
 use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, PeerId,
+    aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use mini_moka::sync::Cache;
 use rand::{seq::SliceRandom, thread_rng};
@@ -130,18 +131,36 @@ impl BatchInfo {
         self.num_bytes
     }
 
-    pub fn gas_bucket_start(&self) -> u64 {
-        self.gas_bucket_start
+    pub fn size(&self) -> PayloadTxnsSize {
+        PayloadTxnsSize::new(self.num_txns, self.num_bytes)
     }
 
-    pub fn is_expired(&self) -> bool {
-        self.expiration() < aptos_infallible::duration_since_epoch().as_micros() as u64
+    pub fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
     }
 }
 
 impl Display for BatchInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "({}:{}:{})", self.author, self.batch_id, self.digest)
+    }
+}
+
+impl TDataInfo for BatchInfo {
+    fn num_txns(&self) -> u64 {
+        self.num_txns()
+    }
+
+    fn num_bytes(&self) -> u64 {
+        self.num_bytes()
+    }
+
+    fn info(&self) -> &BatchInfo {
+        self
+    }
+
+    fn signers(&self, _ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        vec![self.author()]
     }
 }
 
@@ -198,7 +217,7 @@ impl SignedBatchInfoMsg {
 pub struct SignedBatchInfo {
     info: BatchInfo,
     signer: PeerId,
-    signature: bls12381::Signature,
+    signature: SignatureWithStatus,
 }
 
 impl SignedBatchInfo {
@@ -211,8 +230,25 @@ impl SignedBatchInfo {
         Ok(Self {
             info: batch_info,
             signer: validator_signer.author(),
-            signature,
+            signature: SignatureWithStatus::from(signature),
         })
+    }
+
+    pub fn new_with_signature(
+        batch_info: BatchInfo,
+        signer: PeerId,
+        signature: bls12381::Signature,
+    ) -> Self {
+        Self {
+            info: batch_info,
+            signer,
+            signature: SignatureWithStatus::from(signature),
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy(batch_info: BatchInfo, signer: PeerId) -> Self {
+        Self::new_with_signature(batch_info, signer, bls12381::Signature::dummy_signature())
     }
 
     pub fn signer(&self) -> PeerId {
@@ -241,10 +277,14 @@ impl SignedBatchInfo {
             );
         }
 
-        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
+        Ok(validator.optimistic_verify(self.signer, &self.info, &self.signature)?)
     }
 
     pub fn signature(&self) -> &bls12381::Signature {
+        self.signature.signature()
+    }
+
+    pub fn signature_with_status(&self) -> &SignatureWithStatus {
         &self.signature
     }
 
@@ -270,6 +310,7 @@ pub enum SignedBatchInfoError {
     NotFound,
     AlreadyCommitted,
     NoTimeStamps,
+    UnableToAggregate,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -344,17 +385,18 @@ impl ProofOfStore {
         }
         let result = validator
             .verify_multi_signatures(&self.info, &self.multi_signature)
-            .context("Failed to verify ProofOfStore");
+            .context(format!(
+                "Failed to verify ProofOfStore for batch: {:?}",
+                self.info
+            ));
         if result.is_ok() {
             cache.insert(self.info.clone(), self.multi_signature.clone());
         }
         result
     }
 
-    pub fn shuffled_signers(&self, validator: &ValidatorVerifier) -> Vec<PeerId> {
-        let mut ret: Vec<PeerId> = self
-            .multi_signature
-            .get_signers_addresses(&validator.get_ordered_account_addresses());
+    pub fn shuffled_signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        let mut ret: Vec<PeerId> = self.multi_signature.get_signers_addresses(ordered_authors);
         ret.shuffle(&mut thread_rng());
         ret
     }
@@ -373,5 +415,23 @@ impl Deref for ProofOfStore {
 
     fn deref(&self) -> &Self::Target {
         &self.info
+    }
+}
+
+impl TDataInfo for ProofOfStore {
+    fn num_txns(&self) -> u64 {
+        self.num_txns
+    }
+
+    fn num_bytes(&self) -> u64 {
+        self.num_bytes
+    }
+
+    fn info(&self) -> &BatchInfo {
+        self.info()
+    }
+
+    fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        self.shuffled_signers(ordered_authors)
     }
 }

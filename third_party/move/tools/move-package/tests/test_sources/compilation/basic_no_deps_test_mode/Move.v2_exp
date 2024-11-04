@@ -28,6 +28,7 @@ CompiledPackageInfo {
                 "bytecode_instruction",
                 "deprecated",
                 "expected_failure",
+                "lint::skip",
                 "native_interface",
                 "test",
                 "test_only",
@@ -38,6 +39,7 @@ CompiledPackageInfo {
                 V2_0,
             ),
             language_version: None,
+            experiments: [],
         },
     },
 }

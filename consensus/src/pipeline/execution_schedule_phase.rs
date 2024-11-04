@@ -6,7 +6,6 @@ use crate::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
     },
-    state_computer::PipelineExecutionResult,
     state_replication::StateComputer,
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
@@ -26,8 +25,8 @@ use std::{
 
 pub struct ExecutionRequest {
     pub ordered_blocks: Vec<PipelinedBlock>,
-    // Hold a CountedRequest to guarantee the executor doesn't get reset with pending tasks
-    // stuck in the ExecutinoPipeline.
+    // Pass down a CountedRequest to the ExecutionPipeline stages in order to guarantee the executor
+    // doesn't get reset with pending tasks stuck in the pipeline.
     pub lifetime_guard: CountedRequest<()>,
 }
 
@@ -82,26 +81,23 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         for b in &ordered_blocks {
             let fut = self
                 .execution_proxy
-                .schedule_compute(b.block(), b.parent_id(), b.randomness().cloned())
+                .schedule_compute(
+                    b.block(),
+                    b.parent_id(),
+                    b.randomness().cloned(),
+                    lifetime_guard.spawn(()),
+                )
                 .await;
             futs.push(fut)
         }
 
         // In the future being returned, wait for the compute results in order.
-        // n.b. Must `spawn()` here to make sure lifetime_guard will be released even if
-        //      ExecutionWait phase is never kicked off.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
-                let PipelineExecutionResult {
-                    input_txns,
-                    result,
-                    execution_time,
-                } = fut.await?;
-                results.push(block.set_execution_result(input_txns, result, execution_time));
+                results.push(block.set_execution_result(fut.await?));
             }
-            drop(lifetime_guard);
             Ok(results)
         })
         .map_err(ExecutorError::internal_err)

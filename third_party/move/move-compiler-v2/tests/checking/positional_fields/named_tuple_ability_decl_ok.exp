@@ -1,0 +1,55 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct S {
+        dummy_field: bool,
+    }
+    struct S1 {
+        0: u8,
+    }
+    struct S2<T> {
+        0: T,
+        1: u8,
+    }
+    struct S3<T> {
+        0: T,
+        1: u8,
+    }
+    struct S4<T> {
+        x: u8,
+        y: T,
+    }
+    struct S5<T> {
+        0: T,
+        1: S3<T>,
+    }
+    struct S6<T> {
+        dummy_field: bool,
+    }
+} // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    struct S has copy, key {
+    }
+    struct S1 has drop {
+        0: u8,
+    }
+    struct S2<T> has key {
+        0: T,
+        1: u8,
+    }
+    struct S3<T: key> has store, key {
+        0: T,
+        1: u8,
+    }
+    struct S4<T: key> has drop {
+        x: u8,
+        y: T,
+    }
+    struct S5<T: copy + store + key> has key {
+        0: T,
+        1: S3<T>,
+    }
+    struct S6<phantom T: store> {
+    }
+}

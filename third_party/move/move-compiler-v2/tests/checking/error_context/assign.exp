@@ -7,10 +7,10 @@ error: cannot assign `R` to left-hand side of type `S`
    │          ^^^^^^^
 
 error: cannot assign `S` to left-hand side of type `R`
-   ┌─ tests/checking/error_context/assign.move:15:19
+   ┌─ tests/checking/error_context/assign.move:15:24
    │
 15 │         (S{x, y}, R{z, s}) = (r, s);
-   │                   ^^^^^^^
+   │                        ^
 
 error: the left-hand side has 2 items but the right-hand side provided 3
    ┌─ tests/checking/error_context/assign.move:20:9

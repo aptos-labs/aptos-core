@@ -2,5 +2,5 @@ warning[W02016]: unknown attribute
   ┌─ tests/move_check/parser/aptos_stdlib_attributes2.move:4:7
   │
 4 │     #[testonly]
-  │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 

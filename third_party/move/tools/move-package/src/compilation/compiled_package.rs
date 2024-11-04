@@ -11,19 +11,15 @@ use crate::{
     },
     Architecture, BuildConfig, CompilerConfig, CompilerVersion,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, ensure, Context, Result};
 use colored::Colorize;
 use itertools::{Either, Itertools};
 use move_abigen::{Abigen, AbigenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_bytecode_utils::Modules;
-use move_command_line_common::{
-    env::get_bytecode_version_from_env,
-    files::{
-        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
-        SOURCE_MAP_EXTENSION,
-    },
+use move_command_line_common::files::{
+    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_compiler::{
     attr_derivation,
@@ -85,6 +81,8 @@ pub struct CompiledPackage {
     pub root_compiled_units: Vec<CompiledUnitWithSource>,
     /// The output compiled bytecode for dependencies
     pub deps_compiled_units: Vec<(PackageName, CompiledUnitWithSource)>,
+    /// Bytecode dependencies of this compiled package
+    pub bytecode_deps: BTreeMap<PackageName, NumericalAddress>,
 
     // Optional artifacts from compilation
     //
@@ -104,6 +102,7 @@ pub struct OnDiskPackage {
     pub compiled_package_info: CompiledPackageInfo,
     /// Dependency names for this package.
     pub dependencies: Vec<PackageName>,
+    pub bytecode_deps: Vec<PackageName>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,6 +201,8 @@ impl OnDiskCompiledPackage {
             compiled_package_info: self.package.compiled_package_info.clone(),
             root_compiled_units,
             deps_compiled_units,
+            // TODO: support bytecode deps
+            bytecode_deps: BTreeMap::new(),
             compiled_docs,
             compiled_abis,
         })
@@ -327,7 +328,7 @@ impl OnDiskCompiledPackage {
         &self,
         package_name: Symbol,
         compiled_unit: &CompiledUnitWithSource,
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
     ) -> Result<()> {
         let root_package = self.package.compiled_package_info.package_name;
         assert!(self.root_path.ends_with(root_package.as_str()));
@@ -353,7 +354,7 @@ impl OnDiskCompiledPackage {
                 .with_extension(MOVE_COMPILED_EXTENSION),
             compiled_unit
                 .unit
-                .serialize(get_bytecode_version_from_env(bytecode_version))
+                .serialize(Some(bytecode_version))
                 .as_slice(),
         )?;
         self.save_under(
@@ -520,15 +521,15 @@ impl CompiledPackage {
         // TODO: add more tests for the different caching cases
         !(package.has_source_changed_since_last_compile(resolved_package) // recompile if source has changed
             // Recompile if the flags are different
-                || package.are_build_flags_different(&resolution_graph.build_options)
-                // Force root package recompilation in test mode
-                || resolution_graph.build_options.test_mode && is_root_package
-                // Recompile if force recompilation is set
-                || resolution_graph.build_options.force_recompilation) &&
-                // Dive deeper to make sure that instantiations haven't changed since that
-                // can be changed by other packages above us in the dependency graph possibly
-                package.package.compiled_package_info.address_alias_instantiation
-                    == resolved_package.resolution_table
+            || package.are_build_flags_different(&resolution_graph.build_options)
+            // Force root package recompilation in test mode
+            || resolution_graph.build_options.test_mode && is_root_package
+            // Recompile if force recompilation is set
+            || resolution_graph.build_options.force_recompilation) &&
+            // Dive deeper to make sure that instantiations haven't changed since that
+            // can be changed by other packages above us in the dependency graph possibly
+            package.package.compiled_package_info.address_alias_instantiation
+                == resolved_package.resolution_table
     }
 
     pub(crate) fn build_all<W: Write>(
@@ -602,9 +603,6 @@ impl CompiledPackage {
             Some(x) => {
                 match x {
                     Architecture::Move => (),
-                    Architecture::AsyncMove => {
-                        flags = flags.set_flavor("async");
-                    },
                     Architecture::Ethereum => {
                         flags = flags.set_flavor("evm");
                     },
@@ -622,7 +620,7 @@ impl CompiledPackage {
         // If bytecode dependency is not empty, do not allow renaming
         if !bytecode_deps.is_empty() {
             if let Some(pkg_name) = resolution_graph.contains_renaming() {
-                anyhow::bail!(
+                bail!(
                     "Found address renaming in package '{}' when \
                     building with bytecode dependencies -- this is currently not supported",
                     pkg_name
@@ -635,70 +633,75 @@ impl CompiledPackage {
         let effective_language_version = config.language_version.unwrap_or_default();
         effective_compiler_version.check_language_support(effective_language_version)?;
 
-        let (file_map, all_compiled_units, optional_global_env) = match config
-            .compiler_version
-            .unwrap_or_default()
-        {
-            CompilerVersion::V1 => {
-                let mut paths = src_deps;
-                paths.push(sources_package_paths.clone());
-                let compiler =
-                    Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
-                compiler_driver_v1(compiler)?
-            },
-            CompilerVersion::V2_0 => {
-                let to_str_vec = |ps: &[Symbol]| {
-                    ps.iter()
-                        .map(move |s| s.as_str().to_owned())
-                        .collect::<Vec<_>>()
-                };
-                let mut global_address_map = BTreeMap::new();
-                for pack in std::iter::once(&sources_package_paths)
-                    .chain(src_deps.iter())
-                    .chain(bytecode_deps.iter())
-                {
-                    for (name, val) in &pack.named_address_map {
-                        if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
-                        {
-                            if old != *val {
-                                let pack_name = pack
-                                    .name
-                                    .map(|s| s.as_str().to_owned())
-                                    .unwrap_or_else(|| "<unnamed>".to_owned());
-                                bail!(
+        let (file_map, all_compiled_units, optional_global_env) =
+            match config.compiler_version.unwrap_or_default() {
+                CompilerVersion::V1 => {
+                    let mut paths = src_deps;
+                    paths.push(sources_package_paths.clone());
+                    let compiler = Compiler::from_package_paths(
+                        paths,
+                        bytecode_deps.clone(),
+                        flags,
+                        &known_attributes,
+                    );
+                    compiler_driver_v1(compiler)?
+                },
+                version @ CompilerVersion::V2_0 | version @ CompilerVersion::V2_1 => {
+                    let to_str_vec = |ps: &[Symbol]| {
+                        ps.iter()
+                            .map(move |s| s.as_str().to_owned())
+                            .collect::<Vec<_>>()
+                    };
+                    let mut global_address_map = BTreeMap::new();
+                    for pack in std::iter::once(&sources_package_paths)
+                        .chain(src_deps.iter())
+                        .chain(bytecode_deps.iter())
+                    {
+                        for (name, val) in &pack.named_address_map {
+                            if let Some(old) =
+                                global_address_map.insert(name.as_str().to_owned(), *val)
+                            {
+                                if old != *val {
+                                    let pack_name = pack
+                                        .name
+                                        .map(|s| s.as_str().to_owned())
+                                        .unwrap_or_else(|| "<unnamed>".to_owned());
+                                    bail!(
                                     "found remapped address alias `{}` (`{} != {}`) in package `{}`\
                                     , please use unique address aliases across dependencies",
                                     name, old, val, pack_name
                                 )
+                                }
                             }
                         }
                     }
-                }
-                let mut options = move_compiler_v2::Options {
-                    sources: sources_package_paths
-                        .paths
-                        .iter()
-                        .map(|path| path.as_str().to_owned())
-                        .collect(),
-                    sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
-                    dependencies: bytecode_deps
-                        .iter()
-                        .flat_map(|x| to_str_vec(&x.paths))
-                        .collect(),
-                    named_address_mapping: global_address_map
-                        .into_iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect(),
-                    skip_attribute_checks,
-                    known_attributes: known_attributes.clone(),
-                    language_version: Some(effective_language_version),
-                    compile_test_code: flags.keep_testing_functions(),
-                    ..Default::default()
-                };
-                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-                compiler_driver_v2(options)?
-            },
-        };
+                    let mut options = move_compiler_v2::Options {
+                        sources: sources_package_paths
+                            .paths
+                            .iter()
+                            .map(|path| path.as_str().to_owned())
+                            .collect(),
+                        sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+                        dependencies: bytecode_deps
+                            .iter()
+                            .flat_map(|x| to_str_vec(&x.paths))
+                            .collect(),
+                        named_address_mapping: global_address_map
+                            .into_iter()
+                            .map(|(k, v)| format!("{}={}", k, v))
+                            .collect(),
+                        skip_attribute_checks,
+                        known_attributes: known_attributes.clone(),
+                        language_version: Some(effective_language_version),
+                        compiler_version: Some(version),
+                        compile_test_code: flags.keep_testing_functions(),
+                        experiments: config.experiments.clone(),
+                        ..Default::default()
+                    };
+                    options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+                    compiler_driver_v2(options)?
+                },
+            };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
         let obtain_package_name =
@@ -714,7 +717,7 @@ impl CompiledPackage {
         for annot_unit in all_compiled_units {
             let source_path_str = file_map
                 .get(&annot_unit.loc().file_hash())
-                .ok_or(anyhow::anyhow!("invalid transaction script bytecode"))?
+                .ok_or_else(|| anyhow::anyhow!("invalid transaction script bytecode"))?
                 .0
                 .as_str();
             let source_path = PathBuf::from(source_path_str);
@@ -736,8 +739,10 @@ impl CompiledPackage {
                 deps_compiled_units.push((package_name, unit))
             }
         }
-        let bytecode_version = get_bytecode_version_from_env(config.bytecode_version);
-
+        let bytecode_version = config
+            .language_version
+            .unwrap_or_default()
+            .infer_bytecode_version(config.bytecode_version);
         let mut compiled_docs = None;
         let mut compiled_abis = None;
         let mut move_model = None;
@@ -794,14 +799,24 @@ impl CompiledPackage {
         };
 
         let compiled_package = CompiledPackage {
+            root_compiled_units,
+            deps_compiled_units,
+            bytecode_deps: bytecode_deps
+                .iter()
+                .flat_map(|package| {
+                    let name = package.name.unwrap();
+                    package.paths.iter().map(move |pkg_path| {
+                        get_addr_from_module_in_package(name, pkg_path.as_str())
+                            .map(|addr| (name, addr))
+                    })
+                })
+                .try_collect()?,
             compiled_package_info: CompiledPackageInfo {
                 package_name: resolved_package.source_package.package.name,
                 address_alias_instantiation: resolved_package.resolution_table,
                 source_digest: Some(resolved_package.source_digest),
                 build_flags: resolution_graph.build_options.clone(),
             },
-            root_compiled_units,
-            deps_compiled_units,
             compiled_docs,
             compiled_abis,
         };
@@ -841,12 +856,12 @@ impl CompiledPackage {
                     let name_conflict_error_msg = occurence_infos
                         .into_iter()
                         .map(|(name, is_module, fpath)| {
-                                format!(
-                                    "\t{} '{}' at path '{}'",
-                                    if is_module { "Module" } else { "Script" },
-                                    name,
-                                    fpath
-                                )
+                            format!(
+                                "\t{} '{}' at path '{}'",
+                                if is_module { "Module" } else { "Script" },
+                                name,
+                                fpath
+                            )
                         })
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -872,7 +887,7 @@ impl CompiledPackage {
     pub(crate) fn save_to_disk(
         &self,
         under_path: PathBuf,
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
     ) -> Result<OnDiskCompiledPackage> {
         self.check_filepaths_ok()?;
         assert!(under_path.ends_with(CompiledPackageLayout::Root.path()));
@@ -885,6 +900,13 @@ impl CompiledPackage {
                     .deps_compiled_units
                     .iter()
                     .map(|(package_name, _)| *package_name)
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect(),
+                bytecode_deps: self
+                    .bytecode_deps
+                    .keys()
+                    .copied()
                     .collect::<BTreeSet<_>>()
                     .into_iter()
                     .collect(),
@@ -939,7 +961,7 @@ impl CompiledPackage {
     }
 
     fn build_abis(
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
         model: &GlobalEnv,
         compiled_units: &[CompiledUnitWithSource],
     ) -> Vec<(String, Vec<u8>)> {
@@ -948,11 +970,11 @@ impl CompiledPackage {
             .map(|unit| match &unit.unit {
                 CompiledUnit::Script(script) => (
                     script.name.to_string(),
-                    unit.unit.serialize(bytecode_version),
+                    unit.unit.serialize(Some(bytecode_version)),
                 ),
                 CompiledUnit::Module(module) => (
                     module.name.to_string(),
-                    unit.unit.serialize(bytecode_version),
+                    unit.unit.serialize(Some(bytecode_version)),
                 ),
             })
             .collect();
@@ -1058,7 +1080,8 @@ pub(crate) fn apply_named_address_renaming(
         .collect()
 }
 
-pub(crate) fn make_source_and_deps_for_compiler(
+/// Collects source and dependency files with their address mappings.
+pub fn make_source_and_deps_for_compiler(
     resolution_graph: &ResolvedGraph,
     root: &ResolvedPackage,
     deps: Vec<(
@@ -1136,4 +1159,24 @@ pub fn build_and_report_no_exit_v2_driver(
         units,
         Some(env),
     ))
+}
+
+/// Returns the address of the module
+fn get_addr_from_module_in_package(pkg_name: Symbol, pkg_path: &str) -> Result<NumericalAddress> {
+    // Read the bytecode file
+    let mut bytecode = Vec::new();
+    std::fs::File::open(pkg_path)
+        .context(format!("Failed to open bytecode file for {}", pkg_path))
+        .and_then(|mut file| {
+            // read contents of the file into bytecode
+            std::io::Read::read_to_end(&mut file, &mut bytecode)
+                .context(format!("Failed to read bytecode file {}", pkg_path))
+        })
+        .and_then(|_| {
+            CompiledModule::deserialize(&bytecode).context(format!(
+                "Failed to deserialize bytecode file for {}",
+                pkg_name
+            ))
+        })
+        .map(|module| NumericalAddress::from_account_address(*module.self_addr()))
 }

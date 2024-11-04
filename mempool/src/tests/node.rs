@@ -383,7 +383,7 @@ impl Node {
                 TimelineState::NotReady,
                 false,
                 None,
-                BroadcastPeerPriority::Primary,
+                Some(BroadcastPeerPriority::Primary),
             );
         }
     }

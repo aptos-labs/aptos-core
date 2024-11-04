@@ -683,6 +683,22 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                             ),
                         );
                     },
+                    BorrowVariantField(mid, sid, variants, inst, field)
+                        if livevar_annotation_at.after.contains(&dests[0]) =>
+                    {
+                        let dest_node = self.borrow_node(dests[0]);
+                        let src_node = self.borrow_node(srcs[0]);
+                        state.add_node(dest_node.clone());
+                        state.add_edge(
+                            src_node,
+                            dest_node,
+                            BorrowEdge::Field(
+                                mid.qualified_inst(*sid, inst.to_owned()),
+                                Some(variants.clone()),
+                                *field,
+                            ),
+                        );
+                    },
                     Function(mid, fid, targs) => {
                         let callee_env = &self
                             .func_target

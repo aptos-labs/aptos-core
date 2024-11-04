@@ -144,36 +144,36 @@ test_constans() /* def_idx: 0 */ {
 B0:
 	0: LdTrue
 	1: Call u<bool>(bool): bool
-	2: LdFalse
-	3: Call u<bool>(bool): bool
-	4: LdU8(1)
-	5: Call u<u8>(u8): u8
-	6: LdU16(7086)
-	7: Call u<u16>(u16): u16
-	8: LdU32(14593408)
-	9: Call u<u32>(u32): u32
-	10: LdU64(51966)
-	11: Call u<u64>(u64): u64
-	12: LdU128(3735928559)
-	13: Call u<u128>(u128): u128
-	14: LdU256(301490978409967)
-	15: Call u<u256>(u256): u256
-	16: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66])
-	17: Call u<address>(address): address
-	18: LdConst[1](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
-	19: Call u<vector<u64>>(vector<u64>): vector<u64>
-	20: LdConst[2](Vector(U8): [7, 72, 101, 108, 108, 111, 33, 10])
-	21: Call u<vector<u8>>(vector<u8>): vector<u8>
-	22: Pop
+	2: Pop
+	3: LdFalse
+	4: Call u<bool>(bool): bool
+	5: Pop
+	6: LdU8(1)
+	7: Call u<u8>(u8): u8
+	8: Pop
+	9: LdU16(7086)
+	10: Call u<u16>(u16): u16
+	11: Pop
+	12: LdU32(14593408)
+	13: Call u<u32>(u32): u32
+	14: Pop
+	15: LdU64(51966)
+	16: Call u<u64>(u64): u64
+	17: Pop
+	18: LdU128(3735928559)
+	19: Call u<u128>(u128): u128
+	20: Pop
+	21: LdU256(301490978409967)
+	22: Call u<u256>(u256): u256
 	23: Pop
-	24: Pop
-	25: Pop
+	24: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66])
+	25: Call u<address>(address): address
 	26: Pop
-	27: Pop
-	28: Pop
+	27: LdConst[1](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	28: Call u<vector<u64>>(vector<u64>): vector<u64>
 	29: Pop
-	30: Pop
-	31: Pop
+	30: LdConst[2](Vector(U8): [7, 72, 101, 108, 108, 111, 33, 10])
+	31: Call u<vector<u8>>(vector<u8>): vector<u8>
 	32: Pop
 	33: Ret
 }

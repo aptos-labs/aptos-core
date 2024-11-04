@@ -9,7 +9,7 @@ use crate::{
         types::{BatchRequest, BatchResponse, PersistedValue},
     },
 };
-use aptos_consensus_types::proof_of_store::{BatchInfo, ProofOfStore};
+use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_logger::prelude::*;
@@ -114,7 +114,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         retry_interval_ms: usize,
         rpc_timeout_ms: usize,
         network_sender: T,
-        validator_verifier: ValidatorVerifier,
+        validator_verifier: Arc<ValidatorVerifier>,
     ) -> Self {
         Self {
             epoch,
@@ -124,21 +124,20 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
             retry_interval_ms,
             rpc_timeout_ms,
             network_sender,
-            validator_verifier: Arc::new(validator_verifier),
+            validator_verifier,
         }
     }
 
     pub(crate) async fn request_batch(
         &self,
-        proof: ProofOfStore,
+        digest: HashValue,
+        expiration: u64,
+        responders: Vec<PeerId>,
         ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
         mut subscriber_rx: oneshot::Receiver<PersistedValue>,
     ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {
-        let digest = *proof.digest();
-        let expiration = proof.expiration();
-        let signers = proof.shuffled_signers(&self.validator_verifier);
         let validator_verifier = self.validator_verifier.clone();
-        let mut request_state = BatchRequesterState::new(signers, ret_tx, self.retry_limit);
+        let mut request_state = BatchRequesterState::new(responders, ret_tx, self.retry_limit);
         let network_sender = self.network_sender.clone();
         let request_num_peers = self.request_num_peers;
         let my_peer_id = self.my_peer_id;

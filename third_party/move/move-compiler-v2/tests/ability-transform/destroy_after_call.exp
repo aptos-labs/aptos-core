@@ -100,15 +100,19 @@ fun m::g() {
 fun m::f($t0: &mut u64): &mut u64 {
      var $t1: &mut u64
      # live vars: $t0
-     # graph: {@1000000=external[borrow_mut -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   0: $t1 := infer($t0)
      # live vars: $t1
-     # graph: {@1000000=external[borrow_mut -> @2000000],@2000000=derived[]}
-     # locals: {$t1=@2000000}
-     # globals: {}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   1: return $t1
 }
@@ -121,40 +125,35 @@ fun m::g() {
      var $t2: &mut u64
      var $t3: &u64
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t0 := 22
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t1 := borrow_local($t0)
      # live vars: $t0, $t1
-     # graph: {@100=local($t0)[borrow_mut -> @101],@101=derived[]}
-     # locals: {$t0=@100,$t1=@101}
-     # globals: {}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   => (mut) #1 via [local `v`] at line 7
      #
   2: $t2 := m::f($t1)
      # live vars: $t0, $t2
-     # graph: {@100=local($t0)[borrow_mut -> @101],@101=derived[call_mut@2 -> @200],@200=derived[]}
-     # locals: {$t0=@100,$t2=@200}
-     # globals: {}
-     # derived-from: @200=$t1
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [local `v`] at line 8
      #
   3: $t1 := infer($t2)
      # live vars: $t0
-     # graph: {@100=local($t0)[]}
-     # locals: {$t0=@100}
-     # globals: {}
+     # refs: []
      #
   4: $t3 := borrow_local($t0)
      # live vars:
-     # graph: {@100=local($t0)[]}
-     # locals: {$t0=@100}
-     # globals: {}
+     # refs: []
      #
   5: return ()
 }
@@ -166,16 +165,20 @@ fun m::f($t0: &mut u64): &mut u64 {
      var $t1: &mut u64
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@1000000=external[borrow_mut -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   0: $t1 := infer($t0)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {@1000000=external[borrow_mut -> @2000000],@2000000=derived[]}
-     # locals: {$t1=@2000000}
-     # globals: {}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   1: return $t1
 }
@@ -189,45 +192,40 @@ fun m::g() {
      var $t3: &u64
      # abort state: {returns,aborts}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t0 := 22
      # abort state: {returns,aborts}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t1 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@100=local($t0)[borrow_mut -> @101],@101=derived[]}
-     # locals: {$t0=@100,$t1=@101}
-     # globals: {}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   => (mut) #1 via [local `v`] at line 7
      #
   2: $t2 := m::f($t1)
      # abort state: {returns}
      # live vars: $t0, $t2
-     # graph: {@100=local($t0)[borrow_mut -> @101],@101=derived[call_mut@2 -> @200],@200=derived[]}
-     # locals: {$t0=@100,$t2=@200}
-     # globals: {}
-     # derived-from: @200=$t1
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [local `v`] at line 8
      #
   3: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@100=local($t0)[]}
-     # locals: {$t0=@100}
-     # globals: {}
+     # refs: []
      #
   4: $t3 := borrow_local($t0)
      # abort state: {returns}
      # live vars:
-     # graph: {@100=local($t0)[]}
-     # locals: {$t0=@100}
-     # globals: {}
+     # refs: []
      #
   5: return ()
 }

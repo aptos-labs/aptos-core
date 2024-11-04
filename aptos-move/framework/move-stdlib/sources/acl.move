@@ -22,25 +22,25 @@ module std::acl {
     }
 
     /// Add the address to the ACL.
-    public fun add(acl: &mut ACL, addr: address) {
-        assert!(!vector::contains(&mut acl.list, &addr), error::invalid_argument(ECONTAIN));
-        vector::push_back(&mut acl.list, addr);
+    public fun add(self: &mut ACL, addr: address) {
+        assert!(!vector::contains(&mut self.list, &addr), error::invalid_argument(ECONTAIN));
+        vector::push_back(&mut self.list, addr);
     }
 
     /// Remove the address from the ACL.
-    public fun remove(acl: &mut ACL, addr: address) {
-        let (found, index) = vector::index_of(&mut acl.list, &addr);
+    public fun remove(self: &mut ACL, addr: address) {
+        let (found, index) = vector::index_of(&mut self.list, &addr);
         assert!(found, error::invalid_argument(ENOT_CONTAIN));
-        vector::remove(&mut acl.list, index);
+        vector::remove(&mut self.list, index);
     }
 
     /// Return true iff the ACL contains the address.
-    public fun contains(acl: &ACL, addr: address): bool {
-        vector::contains(&acl.list, &addr)
+    public fun contains(self: &ACL, addr: address): bool {
+        vector::contains(&self.list, &addr)
     }
 
     /// assert! that the ACL has the address.
-    public fun assert_contains(acl: &ACL, addr: address) {
-        assert!(contains(acl, addr), error::invalid_argument(ENOT_CONTAIN));
+    public fun assert_contains(self: &ACL, addr: address) {
+        assert!(contains(self, addr), error::invalid_argument(ENOT_CONTAIN));
     }
 }

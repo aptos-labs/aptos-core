@@ -1,0 +1,23 @@
+comparison between v1 and v2 failed:
+- processed 3 tasks
++ processed 3 tasks
+= 
+- task 1 'publish'. lines 15-25:
+- Error: error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE1:21:34
+-    │
+- 21 │         let x = map_opt::map(t, |e: u64| e + 1);
+-    │                                  ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+= task 2 'run'. lines 27-27:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ return values: 2
+= 

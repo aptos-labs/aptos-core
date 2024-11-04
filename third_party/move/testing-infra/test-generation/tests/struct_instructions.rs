@@ -91,7 +91,7 @@ fn get_field_signature<'a>(module: &'a CompiledModule, handle: &FieldHandle) -> 
         StructFieldInformation::Declared(fields) => &fields[handle.field as usize].signature.0,
         StructFieldInformation::DeclaredVariants(..) => {
             // TODO(#13806): consider implementing for struct variants
-            panic!("struct variants not yet implemented")
+            panic!("enum types not yet implemented")
         },
     }
 }

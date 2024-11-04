@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-logger = { workspace = true }
@@ -27,6 +28,7 @@ ark-ff = { workspace = true }
 ark-serialize = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }
+firestore = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 jsonwebtoken = { workspace = true }

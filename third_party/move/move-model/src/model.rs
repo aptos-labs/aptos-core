@@ -31,11 +31,12 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
-        TypeDisplayContext, TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
+        TypeUnificationAdapter, Variance,
     },
     well_known,
 };
+use anyhow::bail;
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label, LabelStyle, Severity},
@@ -133,6 +134,11 @@ impl Loc {
         }
     }
 
+    /// Checks if `self` is an inlined location.
+    pub fn is_inlined(&self) -> bool {
+        self.inlined_from_loc.is_some()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
@@ -174,9 +180,9 @@ impl Loc {
 
     /// Creates a location which encloses all the locations in the provided slice,
     /// which must not be empty. All locations are expected to be in the same file.
-    pub fn enclosing(locs: &[&Loc]) -> Loc {
+    pub fn enclosing(locs: &[Loc]) -> Loc {
         assert!(!locs.is_empty());
-        let loc = locs[0];
+        let loc = &locs[0];
         let mut start = loc.span.start();
         let mut end = loc.span.end();
         for l in locs.iter().skip(1) {
@@ -371,6 +377,12 @@ impl NodeId {
 
     pub fn as_usize(self) -> usize {
         self.0
+    }
+}
+
+impl AsRef<NodeId> for NodeId {
+    fn as_ref(&self) -> &NodeId {
+        self
     }
 }
 
@@ -897,6 +909,11 @@ impl GlobalEnv {
         self.diag(Severity::Error, loc, msg)
     }
 
+    /// Adds a warning to this environment, without notes.
+    pub fn warning(&self, loc: &Loc, msg: &str) {
+        self.diag(Severity::Warning, loc, msg)
+    }
+
     /// Adds an error to this environment, with notes.
     pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
@@ -923,6 +940,12 @@ impl GlobalEnv {
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
+    }
+
+    /// Add a lint warning to this environment, with the `msg` and `notes`.
+    pub fn lint_diag_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        let lint_msg = format!("[lint] {}", msg);
+        self.diag_with_notes(Severity::Warning, loc, &lint_msg, notes)
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
@@ -1021,16 +1044,15 @@ impl GlobalEnv {
         self.internal_loc.clone()
     }
 
-    /// Converts a Loc as used by the move-compiler compiler to the one we are using here.
+    /// Converts a Loc as used by the move compiler to the one we are using here.
     pub fn to_loc(&self, loc: &MoveIrLoc) -> Loc {
-        let file_id = self.get_file_id(loc.file_hash()).unwrap_or_else(|| {
-            panic!(
-                "Unable to find source file '{}' in the environment",
-                loc.file_hash()
-            )
-        });
-        // Note that move-compiler doesn't use "inlined from"
-        Loc::new(file_id, Span::new(loc.start(), loc.end()))
+        if let Some(file_id) = self.get_file_id(loc.file_hash()) {
+            // Note that move-compiler doesn't use "inlined from"
+            Loc::new(file_id, Span::new(loc.start(), loc.end()))
+        } else {
+            // Cannot map this location, return unknown loc
+            self.unknown_loc.clone()
+        }
     }
 
     /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
@@ -1167,6 +1189,25 @@ impl GlobalEnv {
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
         self.report_diag_with_filter(writer, |d| d.severity >= severity)
+    }
+
+    /// Helper function to report diagnostics, check for errors, and fail with a message on
+    /// errors. This function is idempotent and will not report the same diagnostics again.
+    pub fn check_diag<W>(
+        &self,
+        error_writer: &mut W,
+        report_severity: Severity,
+        msg: &str,
+    ) -> anyhow::Result<()>
+    where
+        W: WriteColor + std::io::Write,
+    {
+        self.report_diag(error_writer, report_severity);
+        if self.has_errors() {
+            bail!("exiting with {}", msg);
+        } else {
+            Ok(())
+        }
     }
 
     // Comparison of Diagnostic values that tries to match program ordering so we
@@ -1368,6 +1409,81 @@ impl GlobalEnv {
         } else {
             let b = is_caller(self, &mut BTreeSet::new(), id, id);
             *module.get_spec_fun(id.id).is_recursive.borrow_mut() = Some(b);
+            b
+        }
+    }
+
+    /// Determines whether the given spec fun uses type reflection over type parameters.
+    pub fn spec_fun_uses_generic_type_reflection(
+        &self,
+        fun_id: &QualifiedInstId<SpecFunId>,
+    ) -> bool {
+        fn uses_generic_type_reflection(
+            env: &GlobalEnv,
+            visited: &mut BTreeSet<QualifiedInstId<SpecFunId>>,
+            fun: &QualifiedInstId<SpecFunId>,
+        ) -> bool {
+            if !visited.insert(fun.clone()) {
+                return false;
+            }
+            let module = env.get_module(fun.module_id);
+            let decl = module.get_spec_fun(fun.id);
+            if let Some(def) = &decl.body {
+                // Check called spec funs
+                def.called_spec_funs(env).into_iter().any(|qid| {
+                    let qid_inst = qid.instantiate(&fun.inst);
+                    is_generic_type_reflection(env, &qid_inst)
+                        || uses_generic_type_reflection(env, visited, &qid_inst)
+                })
+            } else {
+                false
+            }
+        }
+        fn is_generic_type_reflection(
+            env: &GlobalEnv,
+            fun_id: &QualifiedInstId<SpecFunId>,
+        ) -> bool {
+            static REFLECTION_FUNS: Lazy<BTreeSet<String>> = Lazy::new(|| {
+                [
+                    well_known::TYPE_INFO_SPEC.to_owned(),
+                    well_known::TYPE_NAME_SPEC.to_owned(),
+                    well_known::TYPE_NAME_GET_SPEC.to_owned(),
+                ]
+                .into_iter()
+                .collect()
+            });
+            // The function must be at `extlib` or `stdlib`.
+            let module = env.get_module(fun_id.module_id);
+            let addr = module.get_name().addr();
+            if addr == &env.get_extlib_address() || addr == &env.get_stdlib_address() {
+                let fun = module.get_spec_fun(fun_id.id);
+                let name = format!(
+                    "{}::{}",
+                    module.get_name().name().display(module.symbol_pool()),
+                    fun.name.display(module.symbol_pool())
+                );
+                REFLECTION_FUNS.contains(&name)
+                    && fun_id.inst.iter().any(|ty| ty.is_type_parameter())
+            } else {
+                false
+            }
+        }
+        let module = self.get_module(fun_id.module_id);
+        let decl = module.get_spec_fun(fun_id.id);
+        let uses = decl
+            .insts_using_generic_type_reflection
+            .borrow()
+            .get(&fun_id.inst)
+            .cloned();
+        if let Some(b) = uses {
+            b
+        } else {
+            let b = uses_generic_type_reflection(self, &mut BTreeSet::new(), fun_id);
+            module
+                .get_spec_fun(fun_id.id)
+                .insts_using_generic_type_reflection
+                .borrow_mut()
+                .insert(fun_id.inst.clone(), b);
             b
         }
     }
@@ -1628,7 +1744,6 @@ impl GlobalEnv {
             loc: loc.clone(),
             offset: 0,
             variant: None,
-            common_for_variants: false,
             ty,
         });
         StructData {
@@ -1779,8 +1894,11 @@ impl GlobalEnv {
         let called_funs = def.called_funs();
         let data = FunctionData {
             name,
-            loc: loc.clone(),
-            id_loc: loc,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
             def_idx: None,
             handle_idx: None,
             visibility,
@@ -2278,7 +2396,6 @@ impl GlobalEnv {
 
     pub fn internal_dump_env(&self, all: bool) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         for module in self.get_modules() {
             if !all && !module.is_target() {
@@ -2332,8 +2449,26 @@ impl GlobalEnv {
                 emitln!(writer, "{}", self.display(&*module_spec));
             }
             for str in module.get_structs() {
+                let tctx = str.get_type_display_ctx();
+                let type_params = str.get_type_parameters();
+                let type_params_str = if !type_params.is_empty() {
+                    format!(
+                        "<{}>",
+                        type_params
+                            .iter()
+                            .map(|p| p.0.display(spool).to_string())
+                            .join(",")
+                    )
+                } else {
+                    "".to_owned()
+                };
                 if str.has_variants() {
-                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "enum {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for variant in str.get_variants() {
                         emit!(writer, "{}", variant.display(spool));
@@ -2342,7 +2477,7 @@ impl GlobalEnv {
                             emitln!(writer, " {");
                             writer.indent();
                             for fld in fields {
-                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                                emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                             }
                             writer.unindent();
                             emitln!(writer, "}")
@@ -2351,10 +2486,15 @@ impl GlobalEnv {
                         }
                     }
                 } else {
-                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "struct {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for fld in str.get_fields() {
-                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                        emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                     }
                 }
                 writer.unindent();
@@ -2365,14 +2505,20 @@ impl GlobalEnv {
                 }
             }
             for fun in module.get_functions() {
-                self.dump_fun_internal(&writer, tctx, &fun);
+                let tctx = fun.get_type_display_ctx();
+                self.dump_fun_internal(&writer, &tctx, &fun);
             }
             for (_, fun) in module.get_spec_funs() {
                 emit!(
                     writer,
                     "spec fun {}{}",
                     fun.name.display(spool),
-                    self.get_fun_signature_string(&fun.type_params, &fun.params, &fun.result_type)
+                    self.get_fun_signature_string(
+                        &module.get_type_display_ctx(),
+                        &fun.type_params,
+                        &fun.params,
+                        &fun.result_type
+                    )
                 );
                 if let Some(exp) = &fun.body {
                     emitln!(writer, " {");
@@ -2402,7 +2548,7 @@ impl GlobalEnv {
     }
 
     pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
-        let tctx = &self.get_type_display_ctx();
+        let tctx = &fun.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         self.dump_fun_internal(&writer, tctx, fun);
         writer.extract_result()
@@ -2477,12 +2623,12 @@ impl GlobalEnv {
     /// Helper to create a string for a function signature.
     fn get_fun_signature_string(
         &self,
+        tctx: &TypeDisplayContext,
         type_params: &[TypeParameter],
         params: &[Parameter],
         result_type: &Type,
     ) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let type_params_str = if !type_params.is_empty() {
             format!(
                 "<{}>",
@@ -2501,7 +2647,7 @@ impl GlobalEnv {
         let result_str = if result_type.is_unit() {
             "".to_owned()
         } else {
-            format!(": {}", result_type.display(&self.get_type_display_ctx()))
+            format!(": {}", result_type.display(tctx))
         };
         format!("{}({}){}", type_params_str, params_str, result_str)
     }
@@ -2520,10 +2666,10 @@ pub struct ModuleData {
     pub(crate) id: ModuleId,
 
     /// Attributes attached to this module.
-    attributes: Vec<Attribute>,
+    pub(crate) attributes: Vec<Attribute>,
 
     /// Use declarations
-    use_decls: Vec<UseDecl>,
+    pub(crate) use_decls: Vec<UseDecl>,
 
     /// Friend declarations
     pub(crate) friend_decls: Vec<FriendDecl>,
@@ -2574,6 +2720,33 @@ pub struct ModuleData {
 
     /// Holds the set of modules declared as friend.
     pub(crate) friend_modules: BTreeSet<ModuleId>,
+}
+
+impl ModuleData {
+    pub fn new(name: ModuleName, id: ModuleId, loc: Loc) -> Self {
+        Self {
+            name,
+            id,
+            loc,
+            attributes: vec![],
+            use_decls: vec![],
+            friend_decls: vec![],
+            compiled_module: None,
+            source_map: None,
+            named_constants: Default::default(),
+            struct_data: Default::default(),
+            struct_idx_to_id: Default::default(),
+            function_data: Default::default(),
+            function_idx_to_id: Default::default(),
+            spec_vars: Default::default(),
+            spec_funs: Default::default(),
+            module_spec: RefCell::new(Default::default()),
+            spec_block_infos: vec![],
+            used_modules: Default::default(),
+            used_modules_including_specs: RefCell::new(None),
+            friend_modules: Default::default(),
+        }
+    }
 }
 
 /// Represents a module environment.
@@ -2815,9 +2988,23 @@ impl<'env> ModuleEnv<'env> {
         &self.env.symbol_pool
     }
 
+    /// Returns a context to display types for this module.
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+        TypeDisplayContext {
+            module_name: Some(self.get_name().clone()),
+            used_modules: self.get_used_modules(false),
+            ..TypeDisplayContext::new(self.env)
+        }
+    }
+
     /// Gets the underlying bytecode module, if one is attached.
     pub fn get_verified_module(&'env self) -> Option<&'env CompiledModule> {
         self.data.compiled_module.as_ref()
+    }
+
+    /// Gets the underlying source map, if one is attached.
+    pub fn get_source_map(&'env self) -> Option<&'env SourceMap> {
+        self.data.source_map.as_ref()
     }
 
     /// Gets a `NamedConstantEnv` in this module by name
@@ -2887,11 +3074,13 @@ impl<'env> ModuleEnv<'env> {
 
     /// Gets a FunctionEnv by id.
     pub fn into_function(self, id: FunId) -> FunctionEnv<'env> {
-        let data = self
-            .data
-            .function_data
-            .get(&id)
-            .unwrap_or_else(|| panic!("FunId {} undefined", id.0.display(self.symbol_pool())));
+        let data = self.data.function_data.get(&id).unwrap_or_else(|| {
+            panic!(
+                "FunId {}::{} undefined",
+                self.get_full_name_str(),
+                id.0.display(self.symbol_pool())
+            )
+        });
         FunctionEnv {
             module_env: self,
             data,
@@ -3031,80 +3220,27 @@ impl<'env> ModuleEnv<'env> {
     /// Globalizes a signature local to this module. This requires a compiled module to be
     /// attached.
     pub fn globalize_signature(&self, sig: &SignatureToken) -> Option<Type> {
-        Some(self.internal_globalize_signature(self.data.compiled_module.as_ref()?, sig))
-    }
-
-    pub(crate) fn internal_globalize_signature(
-        &self,
-        module: &CompiledModule,
-        sig: &SignatureToken,
-    ) -> Type {
-        match sig {
-            SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
-            SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
-            SignatureToken::U16 => Type::Primitive(PrimitiveType::U16),
-            SignatureToken::U32 => Type::Primitive(PrimitiveType::U32),
-            SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
-            SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
-            SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
-            SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
-            SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
-            SignatureToken::Reference(t) => Type::Reference(
-                ReferenceKind::Immutable,
-                Box::new(self.internal_globalize_signature(module, t)),
-            ),
-            SignatureToken::MutableReference(t) => Type::Reference(
-                ReferenceKind::Mutable,
-                Box::new(self.internal_globalize_signature(module, t)),
-            ),
-            SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
-            SignatureToken::Vector(bt) => {
-                Type::Vector(Box::new(self.internal_globalize_signature(module, bt)))
-            },
-            SignatureToken::Struct(handle_idx) => {
-                let struct_view =
-                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
-                let declaring_module_env = self
-                    .env
-                    .find_module(&self.env.to_module_name(&struct_view.module_id()))
-                    .expect("undefined module");
-                let struct_env = declaring_module_env
-                    .find_struct(self.env.symbol_pool.make(struct_view.name().as_str()))
-                    .expect("undefined struct");
-                Type::Struct(declaring_module_env.data.id, struct_env.get_id(), vec![])
-            },
-            SignatureToken::StructInstantiation(handle_idx, args) => {
-                let struct_view =
-                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
-                let declaring_module_env = self
-                    .env
-                    .find_module(&self.env.to_module_name(&struct_view.module_id()))
-                    .expect("undefined module");
-                let struct_env = declaring_module_env
-                    .find_struct(self.env.symbol_pool.make(struct_view.name().as_str()))
-                    .expect("undefined struct");
-                Type::Struct(
-                    declaring_module_env.data.id,
-                    struct_env.get_id(),
-                    self.internal_globalize_signatures(module, args),
-                )
-            },
-        }
+        let struct_resolver = |module_name: ModuleName, struct_name: Symbol| {
+            let declaring_module_env = self
+                .env
+                .find_module(&module_name)
+                .expect("expected defined module name");
+            let struct_env = declaring_module_env
+                .find_struct(struct_name)
+                .expect("expected defined struct name");
+            declaring_module_env.get_id().qualified(struct_env.get_id())
+        };
+        Some(Type::from_signature_token(
+            self.env,
+            self.data.compiled_module.as_ref()?,
+            &struct_resolver,
+            sig,
+        ))
     }
 
     /// Globalizes a list of signatures.
     pub fn globalize_signatures(&self, sigs: &[SignatureToken]) -> Option<Vec<Type>> {
-        Some(self.internal_globalize_signatures(self.data.compiled_module.as_ref()?, sigs))
-    }
-
-    pub(crate) fn internal_globalize_signatures(
-        &self,
-        module: &CompiledModule,
-        sigs: &[SignatureToken],
-    ) -> Vec<Type> {
-        sigs.iter()
-            .map(|sig| self.internal_globalize_signature(module, sig))
-            .collect()
+        sigs.iter().map(|s| self.globalize_signature(s)).collect()
     }
 
     /// Gets a list of type actuals associated with the index in the bytecode, if
@@ -3200,6 +3336,7 @@ impl<'env> ModuleEnv<'env> {
             print_code: true,
             print_basic_blocks: true,
             print_locals: true,
+            print_bytecode_stats: false,
         });
         Some(
             disas
@@ -3307,6 +3444,24 @@ pub struct StructData {
     pub is_native: bool,
 }
 
+impl StructData {
+    pub fn new(name: Symbol, loc: Loc) -> Self {
+        Self {
+            name,
+            loc,
+            def_idx: None,
+            attributes: vec![],
+            type_params: vec![],
+            abilities: AbilitySet::ALL,
+            spec_var_opt: None,
+            field_data: Default::default(),
+            variants: None,
+            spec: RefCell::new(Default::default()),
+            is_native: false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct StructVariant {
     pub(crate) loc: Loc,
@@ -3320,7 +3475,7 @@ pub struct StructEnv<'env> {
     pub module_env: ModuleEnv<'env>,
 
     /// Reference to the struct data.
-    data: &'env StructData,
+    pub data: &'env StructData,
 }
 
 impl<'env> StructEnv<'env> {
@@ -3494,6 +3649,11 @@ impl<'env> StructEnv<'env> {
             .map(|p| p as VariantIndex)
     }
 
+    /// Get the name of the variant in the struct by index.
+    pub fn get_variant_name_by_idx(&self, variant: VariantIndex) -> Option<Symbol> {
+        self.get_variants().nth(variant as usize)
+    }
+
     /// Returns the attributes of the variant.
     pub fn get_variant_attributes(&self, variant: Symbol) -> &[Attribute] {
         self.data
@@ -3525,7 +3685,7 @@ impl<'env> StructEnv<'env> {
         self.data
             .field_data
             .values()
-            .filter(|data| data.common_for_variants || variant.is_none() || data.variant == variant)
+            .filter(|data| variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
@@ -3621,13 +3781,16 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
         let type_param_names = self
             .get_type_parameters()
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            type_param_names: Some(type_param_names),
+            ..self.module_env.get_type_display_ctx()
+        }
     }
 }
 
@@ -3647,9 +3810,6 @@ pub struct FieldData {
 
     /// If the field is associated with a variant, the name of that variant.
     pub variant: Option<Symbol>,
-
-    /// Whether the field is common between all variants
-    pub common_for_variants: bool,
 
     /// The type of this field.
     pub ty: Type,
@@ -3672,7 +3832,28 @@ impl<'env> FieldEnv<'env> {
 
     /// Gets the id of this field.
     pub fn get_id(&self) -> FieldId {
-        FieldId(self.data.name)
+        if let Some(variant) = self.get_variant() {
+            // TODO: this is inefficient and we may want to cache it
+            let spool = self.struct_env.symbol_pool();
+            let id_str = FieldId::make_variant_field_id_str(
+                spool.string(variant).as_str(),
+                spool.string(self.data.name).as_str(),
+            );
+            FieldId(spool.make(&id_str))
+        } else {
+            FieldId(self.data.name)
+        }
+    }
+
+    /// Returns true if this is a positional field. Identified by that the name
+    /// of the field is a number.
+    pub fn is_positional(&self) -> bool {
+        self.data
+            .name
+            .display(self.struct_env.symbol_pool())
+            .to_string()
+            .parse::<u64>()
+            .is_ok()
     }
 
     /// Gets the location of the field declaration.
@@ -3719,11 +3900,6 @@ impl<'env> FieldEnv<'env> {
     /// Gets the variant this field is associated with
     pub fn get_variant(&self) -> Option<Symbol> {
         self.data.variant
-    }
-
-    /// Returns true if this field is common between variants
-    pub fn is_common_variant_field(&self) -> bool {
-        self.data.common_for_variants
     }
 }
 
@@ -3782,6 +3958,15 @@ impl<'env> NamedConstantEnv<'env> {
     /// Returns the value of this constant
     pub fn get_value(&self) -> Value {
         self.data.value.clone()
+    }
+
+    /// Returns a context to display types for this module.
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+        TypeDisplayContext {
+            module_name: Some(self.module_env.get_name().clone()),
+            used_modules: self.module_env.get_used_modules(false),
+            ..TypeDisplayContext::new(self.module_env.env)
+        }
     }
 }
 
@@ -3878,16 +4063,38 @@ impl EqIgnoringLoc for Parameter {
     }
 }
 
+/// Represents source code locations associated with a function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionLoc {
+    /// Location of this function.
+    pub(crate) full: Loc,
+
+    /// Location of the function identifier, suitable for error messages alluding to the function.
+    pub(crate) id_loc: Loc,
+
+    /// Location of the function result type, suitable for error messages alluding to the result type.
+    pub(crate) result_type_loc: Loc,
+}
+
+impl FunctionLoc {
+    pub fn from_single(loc: Loc) -> Self {
+        // TODO: consider making non-full locations optional, as we do not always have this
+        //   information.
+        Self {
+            full: loc.clone(),
+            id_loc: loc.clone(),
+            result_type_loc: loc,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FunctionData {
     /// Name of this function.
     pub(crate) name: Symbol,
 
-    /// Location of this function.
-    pub(crate) loc: Loc,
-
-    /// Location of the function identifier, suitable for error messages alluding to the function.
-    pub(crate) id_loc: Loc,
+    /// Locations of this function.
+    pub(crate) loc: FunctionLoc,
 
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
@@ -3940,6 +4147,31 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+}
+
+impl FunctionData {
+    pub fn new(name: Symbol, loc: Loc) -> Self {
+        Self {
+            name,
+            loc: FunctionLoc::from_single(loc),
+            def_idx: None,
+            handle_idx: None,
+            visibility: Default::default(),
+            has_package_visibility: false,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params: vec![],
+            params: vec![],
+            result_type: Type::unit(),
+            access_specifiers: None,
+            spec: RefCell::new(Default::default()),
+            def: None,
+            called_funs: None,
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+        }
+    }
 }
 
 /// Kind of a function,
@@ -4008,7 +4240,7 @@ impl<'env> FunctionEnv<'env> {
 
     /// Get documentation associated with this function.
     pub fn get_doc(&self) -> &str {
-        self.module_env.env.get_doc(&self.data.loc)
+        self.module_env.env.get_doc(&self.data.loc.full)
     }
 
     /// Gets the definition index of this function.
@@ -4023,12 +4255,17 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
-        self.data.loc.clone()
+        self.data.loc.full.clone()
     }
 
     /// Returns the location of the function identifier.
     pub fn get_id_loc(&self) -> Loc {
-        self.data.id_loc.clone()
+        self.data.loc.id_loc.clone()
+    }
+
+    /// Returns the location of the function identifier.
+    pub fn get_result_type_loc(&self) -> Loc {
+        self.data.loc.result_type_loc.clone()
     }
 
     /// Returns the attributes of this function.
@@ -4631,6 +4868,7 @@ impl<'env> FunctionEnv<'env> {
             " fun {}{}",
             self.get_name().display(self.symbol_pool()),
             self.module_env.env.get_fun_signature_string(
+                &self.get_type_display_ctx(),
                 &self.data.type_params,
                 &self.data.params,
                 &self.data.result_type
@@ -4655,10 +4893,9 @@ impl<'env> FunctionEnv<'env> {
     }
 
     fn definition_view(&'env self) -> Option<FunctionDefinitionView<'env, CompiledModule>> {
-        assert!(
-            !self.is_inline(),
-            "attempt to access bytecode info for inline function"
-        );
+        if self.is_inline() {
+            return None;
+        }
         let module = self.module_env.data.compiled_module.as_ref()?;
         Some(FunctionDefinitionView::new(
             module,
@@ -4667,13 +4904,16 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
         let type_param_names = self
             .get_type_parameters()
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            type_param_names: Some(type_param_names),
+            ..self.module_env.get_type_display_ctx()
+        }
     }
 }
 
@@ -4704,10 +4944,16 @@ impl ExpInfo {
 // =================================================================================================
 /// # Formatting
 
+enum Mode {
+    LineOnly,
+    FileAndLine,
+    Full,
+}
+
 pub struct LocDisplay<'env> {
     loc: &'env Loc,
     env: &'env GlobalEnv,
-    only_line: bool,
+    mode: Mode,
 }
 
 impl Loc {
@@ -4715,7 +4961,15 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: false,
+            mode: Mode::Full,
+        }
+    }
+
+    pub fn display_file_name_and_line<'env>(&'env self, env: &'env GlobalEnv) -> LocDisplay<'env> {
+        LocDisplay {
+            loc: self,
+            env,
+            mode: Mode::FileAndLine,
         }
     }
 
@@ -4723,7 +4977,7 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: true,
+            mode: Mode::LineOnly,
         }
     }
 }
@@ -4731,18 +4985,24 @@ impl Loc {
 impl<'env> fmt::Display for LocDisplay<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
-            if self.only_line {
-                write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
-            } else {
-                let offset = self.loc.span.end() - self.loc.span.start();
-                write!(
-                    f,
-                    "at {}:{}:{}+{}",
-                    fname,
-                    pos.line + LineOffset(1),
-                    pos.column + ColumnOffset(1),
-                    offset,
-                )
+            match &self.mode {
+                Mode::LineOnly => {
+                    write!(f, "at line {}", pos.line + LineOffset(1))
+                },
+                Mode::FileAndLine => {
+                    write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
+                },
+                Mode::Full => {
+                    let offset = self.loc.span.end() - self.loc.span.start();
+                    write!(
+                        f,
+                        "at {}:{}:{}+{}",
+                        fname,
+                        pos.line + LineOffset(1),
+                        pos.column + ColumnOffset(1),
+                        offset,
+                    )
+                },
             }
         } else {
             write!(f, "{:?}", self.loc)
@@ -4763,6 +5023,15 @@ impl GetNameString for QualifiedId<StructId> {
 impl GetNameString for QualifiedId<FunId> {
     fn get_name_for_display(&self, env: &GlobalEnv) -> String {
         env.get_function_qid(*self).get_full_name_str()
+    }
+}
+
+impl GetNameString for QualifiedId<SpecFunId> {
+    fn get_name_for_display(&self, env: &GlobalEnv) -> String {
+        env.get_spec_fun(*self)
+            .name
+            .display(env.symbol_pool())
+            .to_string()
     }
 }
 

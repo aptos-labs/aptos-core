@@ -18,14 +18,14 @@ error: expected `u64` but found a value of type `bool`
 18 │             f: false,
    │                ^^^^^
 
-error: expected `Nat<u64>` but found a value of type `Nat<bool>`
-   ┌─ tests/checking/typing/pack_invalid_argument.move:19:17
+error: expected `u64` but found a value of type `bool`
+   ┌─ tests/checking/typing/pack_invalid_argument.move:19:26
    │
 19 │             n1: Nat { f: false },
-   │                 ^^^^^^^^^^^^^^^^
+   │                          ^^^^^
 
-error: expected `Nat<S>` but found a value of type `Nat<R>`
-   ┌─ tests/checking/typing/pack_invalid_argument.move:20:17
+error: expected `S` but found a value of type `R`
+   ┌─ tests/checking/typing/pack_invalid_argument.move:20:25
    │
 20 │             n2: Nat{ f: r }
-   │                 ^^^^^^^^^^^
+   │                         ^

@@ -38,7 +38,7 @@ byteorder = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-ripemd160 = { workspace = true }
+ripemd = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
 # TODO: some tests will fail if this is set to 1.0.63

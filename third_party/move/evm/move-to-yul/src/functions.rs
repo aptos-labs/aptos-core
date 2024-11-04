@@ -558,6 +558,7 @@ impl<'a> FunctionGenerator<'a> {
                     // Specification or other operations which can be ignored here
                     Release
                     | GetField(_, _, _, _)
+                    | GetVariantField(_, _, _, _, _)
                     | GetGlobal(_, _, _)
                     | IsParent(_, _)
                     | WriteBack(_, _)

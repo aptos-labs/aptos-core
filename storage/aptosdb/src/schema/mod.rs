@@ -22,6 +22,7 @@ pub(crate) mod state_value;
 pub(crate) mod state_value_by_key_hash;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
+pub(crate) mod transaction_accumulator_root_hash;
 pub(crate) mod transaction_auxiliary_data;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
@@ -51,6 +52,8 @@ pub const STATE_VALUE_BY_KEY_HASH_CF_NAME: ColumnFamilyName = "state_value_by_ke
 pub const STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "state_value_index";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
+pub const TRANSACTION_ACCUMULATOR_HASH_CF_NAME: ColumnFamilyName =
+    "transaction_accumulator_root_hash";
 pub const TRANSACTION_AUXILIARY_DATA_CF_NAME: ColumnFamilyName = "transaction_auxiliary_data";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
@@ -113,6 +116,9 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
                 data,
             );
+            assert_no_panic_decoding::<
+                super::transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
+            >(data);
             assert_no_panic_decoding::<
                 super::transaction_auxiliary_data::TransactionAuxiliaryDataSchema,
             >(data);

@@ -41,7 +41,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M6,
-    indices: [(Signature, 2), (FunctionDefinition, 0)],
+    indices: [(Signature, 2), (StructDefInstantiation, 0), (FunctionDefinition, 0)],
     offsets: [],
 }
 
@@ -50,7 +50,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M7,
-    indices: [(Signature, 2), (FunctionDefinition, 0)],
+    indices: [(Signature, 2), (StructDefInstantiation, 0), (FunctionDefinition, 0)],
     offsets: [],
 }
 
@@ -59,7 +59,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M8,
-    indices: [(Signature, 2), (FunctionDefinition, 0)],
+    indices: [(Signature, 2), (StructDefInstantiation, 0), (FunctionDefinition, 0)],
     offsets: [],
 }
 

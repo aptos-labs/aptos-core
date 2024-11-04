@@ -3,6 +3,7 @@
 
 use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as AptosFeatures};
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
@@ -122,6 +123,15 @@ pub enum FeatureFlag {
     LimitVMTypeSize,
     AbortIfMultisigPayloadMismatch,
     DisallowUserNative,
+    AllowSerializedScriptArgs,
+    UseCompatibilityCheckerV2,
+    EnableEnumTypes,
+    EnableResourceAccessControl,
+    RejectUnstableBytecodeForScript,
+    FederatedKeyless,
+    TransactionSimulationEnhancement,
+    CollectionOwner,
+    EnableLoaderV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -145,7 +155,8 @@ fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
 pub fn generate_feature_upgrade_proposal(
     features: &Features,
     is_testnet: bool,
-    next_execution_hash: Vec<u8>,
+    next_execution_hash: Option<HashValue>,
+    is_multi_step: bool,
 ) -> Result<Vec<(String, String)>> {
     let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
@@ -174,7 +185,8 @@ pub fn generate_feature_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash.clone(),
+        next_execution_hash,
+        is_multi_step,
         &["std::features"],
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
@@ -203,7 +215,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
         match f {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::CollectAndDistributeGasFees => {
-                AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES
+                AptosFeatureFlag::_DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES
             },
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::Sha512AndRipeMd160Natives => {
@@ -318,6 +330,25 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
             FeatureFlag::DisallowUserNative => AptosFeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::AllowSerializedScriptArgs => {
+                AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS
+            },
+            FeatureFlag::UseCompatibilityCheckerV2 => {
+                AptosFeatureFlag::USE_COMPATIBILITY_CHECKER_V2
+            },
+            FeatureFlag::EnableEnumTypes => AptosFeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::EnableResourceAccessControl => {
+                AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL
+            },
+            FeatureFlag::RejectUnstableBytecodeForScript => {
+                AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
+            },
+            FeatureFlag::FederatedKeyless => AptosFeatureFlag::FEDERATED_KEYLESS,
+            FeatureFlag::TransactionSimulationEnhancement => {
+                AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
+            },
+            FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
         }
     }
 }
@@ -327,7 +358,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
     fn from(f: AptosFeatureFlag) -> Self {
         match f {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
-            AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES => {
+            AptosFeatureFlag::_DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES => {
                 FeatureFlag::CollectAndDistributeGasFees
             },
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
@@ -443,6 +474,25 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
             AptosFeatureFlag::DISALLOW_USER_NATIVES => FeatureFlag::DisallowUserNative,
+            AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => {
+                FeatureFlag::AllowSerializedScriptArgs
+            },
+            AptosFeatureFlag::USE_COMPATIBILITY_CHECKER_V2 => {
+                FeatureFlag::UseCompatibilityCheckerV2
+            },
+            AptosFeatureFlag::ENABLE_ENUM_TYPES => FeatureFlag::EnableEnumTypes,
+            AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL => {
+                FeatureFlag::EnableResourceAccessControl
+            },
+            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
+                FeatureFlag::RejectUnstableBytecodeForScript
+            },
+            AptosFeatureFlag::FEDERATED_KEYLESS => FeatureFlag::FederatedKeyless,
+            AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT => {
+                FeatureFlag::TransactionSimulationEnhancement
+            },
+            AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
+            AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
         }
     }
 }

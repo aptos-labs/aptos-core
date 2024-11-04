@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/enum_generic.move:27:13
+   │
+27 │             assert _common_vector_1.x != _common_vector_2.x; // this fails
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum_generic.move:15: test_enum_vector
+   =     at tests/sources/functional/enum_generic.move:14: test_enum_vector
+   =         _common_vector_1 = <redacted>
+   =     at tests/sources/functional/enum_generic.move:18: test_enum_vector
+   =     at tests/sources/functional/enum_generic.move:19: test_enum_vector
+   =     at tests/sources/functional/enum_generic.move:20: test_enum_vector
+   =     at tests/sources/functional/enum_generic.move:17: test_enum_vector
+   =         _common_fields = <redacted>
+   =     at tests/sources/functional/enum_generic.move:23: test_enum_vector
+   =     at tests/sources/functional/enum_generic.move:24: test_enum_vector
+   =     at tests/sources/functional/enum_generic.move:22: test_enum_vector
+   =         _common_vector_2 = <redacted>
+   =     at tests/sources/functional/enum_generic.move:27: test_enum_vector

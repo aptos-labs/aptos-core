@@ -1,19 +1,19 @@
 
 Diagnostics:
-error: mutable reference in local `f` requires exclusive access but is borrowed
+error: cannot transfer mutable local `f` since it is borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/factor_invalid_1.move:12:9
    │
  9 │         let f_g = &mut f.g;
-   │                   -------- previous mutable field borrow
+   │                   -------- field `g` previously mutably borrowed here
    ·
 12 │         foo(f_g, f);
-   │         ^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^ transfer attempted here
 
-error: mutable reference in local `f` requires exclusive access but is borrowed
+error: cannot transfer mutable local `f` since it is borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/factor_invalid_1.move:22:9
    │
 19 │         let f_g = &mut f.g;
-   │                   -------- previous mutable field borrow
+   │                   -------- field `g` previously mutably borrowed here
    ·
 22 │         bar(f, f_g);
-   │         ^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^ transfer attempted here

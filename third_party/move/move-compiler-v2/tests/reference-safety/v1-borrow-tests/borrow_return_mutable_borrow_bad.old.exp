@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: mutable reference in local `ref_x_f` requires exclusive access but is borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/borrow_return_mutable_borrow_bad.move:9:10
+  │
+7 │         let ref_x_f_g = &ref_x_f.g;
+  │                         ---------- previous field borrow
+8 │
+9 │         (ref_x_f, ref_x_f_g)
+  │          ^^^^^^^  --------- conflicting reference `ref_x_f_g` used here
+  │          │
+  │          requirement enforced here
+
+error: mutable reference in return value 1 requires exclusive access but is borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/borrow_return_mutable_borrow_bad.move:9:9
+  │
+7 │         let ref_x_f_g = &ref_x_f.g;
+  │                         ---------- previous field borrow
+8 │
+9 │         (ref_x_f, ref_x_f_g)
+  │         ^^^^^^^^^^^^^^^^^^^^ requirement enforced here

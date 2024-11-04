@@ -49,8 +49,8 @@ impl BinaryUpdater for AptosUpdateTool {
         self.check
     }
 
-    fn pretty_name(&self) -> &'static str {
-        "Aptos CLI"
+    fn pretty_name(&self) -> String {
+        "Aptos CLI".to_string()
     }
 
     /// Return information about whether an update is required.

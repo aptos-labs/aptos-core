@@ -30,7 +30,6 @@ spec aptos_std::type_info {
     }
 
     spec size_of_val<T>(val_ref: &T): u64 {
-        aborts_if false;
         ensures result == spec_size_of_val<T>(val_ref);
     }
 }

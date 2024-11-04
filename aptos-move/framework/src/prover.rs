@@ -123,6 +123,7 @@ impl ProverOptions {
         language_version: Option<LanguageVersion>,
         skip_attribute_checks: bool,
         known_attributes: &BTreeSet<String>,
+        experiments: &[String],
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
@@ -136,6 +137,7 @@ impl ProverOptions {
             language_version,
             skip_attribute_checks,
             known_attributes.clone(),
+            experiments.to_vec(),
         )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
@@ -159,11 +161,7 @@ impl ProverOptions {
         options.backend.custom_natives =
             Some(move_prover_boogie_backend::options::CustomNativeOptions {
                 template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
-                module_instance_names: vec![(
-                    "0x1::object".to_string(),
-                    "object_instances".to_string(),
-                    true,
-                )],
+                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
             });
         let mut writer = StandardStream::stderr(ColorChoice::Auto);
         if compiler_version.unwrap_or_default() == CompilerVersion::V1 {

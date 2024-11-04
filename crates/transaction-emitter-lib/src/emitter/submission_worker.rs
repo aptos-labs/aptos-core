@@ -249,7 +249,7 @@ impl SubmissionWorker {
         let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
             wait_for_accounts_sequence(
                 start_time,
-                &self.clients,
+                self.client(),
                 &account_to_start_and_end_seq_num,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,
@@ -469,9 +469,9 @@ pub async fn submit_transactions(
                             None
                         };
                     let balance = client
-                        .get_account_balance(sender)
+                        .view_apt_account_balance(sender)
                         .await
-                        .map_or(-1, |v| v.into_inner().get() as i64);
+                        .map_or(-1, |v| v.into_inner() as i64);
 
                     warn!(
                         "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",

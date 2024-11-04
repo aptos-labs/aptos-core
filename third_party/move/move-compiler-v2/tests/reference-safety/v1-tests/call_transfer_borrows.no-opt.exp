@@ -1,13 +1,2 @@
 
-Diagnostics:
-error: mutable reference in local `y_ref` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/call_transfer_borrows.move:29:9
-   │
-26 │         let r = take_imm_mut_give_imm(x_ref, y_ref);
-   │                 ----------------------------------- previous call result
-   ·
-29 │         *y_ref;
-   │         ^^^^^^ requirement enforced here
-30 │         *x_ref;
-31 │         *r;
-   │         -- conflicting reference `r` used here
+============ bytecode verification succeeded ========

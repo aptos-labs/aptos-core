@@ -18,6 +18,7 @@ use crate::{
         state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
         transaction_info::TransactionInfoSchema,
         version_data::VersionDataSchema,
         write_set::WriteSetSchema,
@@ -149,9 +150,11 @@ pub(crate) fn truncate_state_merkle_db(
             break;
         }
 
-        let version_before =
-            find_closest_node_version_at_or_before(state_merkle_db, current_version - 1)?
-                .expect("Must exist.");
+        let version_before = find_closest_node_version_at_or_before(
+            state_merkle_db.metadata_db(),
+            current_version - 1,
+        )?
+        .expect("Must exist.");
 
         let top_levels_batch = SchemaBatch::new();
 
@@ -194,19 +197,86 @@ pub(crate) fn truncate_state_merkle_db_single_shard(
     state_merkle_db.commit_single_shard(target_version, shard_id, batch)
 }
 
-pub(crate) fn get_current_version_in_state_merkle_db(
-    state_merkle_db: &StateMerkleDb,
-) -> Result<Option<Version>> {
-    find_closest_node_version_at_or_before(state_merkle_db, u64::max_value())
-}
-
-pub(crate) fn find_closest_node_version_at_or_before(
+pub(crate) fn find_tree_root_at_or_before(
+    ledger_metadata_db: &DB,
     state_merkle_db: &StateMerkleDb,
     version: Version,
 ) -> Result<Option<Version>> {
-    let mut iter = state_merkle_db
+    if let Some(closest_version) =
+        find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), version)?
+    {
+        if root_exists_at_version(state_merkle_db, closest_version)? {
+            return Ok(Some(closest_version));
+        }
+
+        // It's possible that it's a partial commit when sharding is not enabled,
+        // look again for the previous version:
+        if let Some(closest_version) =
+            find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), version)?
+        {
+            if root_exists_at_version(state_merkle_db, closest_version)? {
+                return Ok(Some(closest_version));
+            }
+
+            // Now we are probably looking at a pruned version in this epoch, look for the previous
+            // epoch ending:
+            let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>()?;
+            iter.seek_for_prev(&version)?;
+            if let Some((closest_epoch_version, _)) = iter.next().transpose()? {
+                if root_exists_at_version(state_merkle_db, closest_epoch_version)? {
+                    return Ok(Some(closest_epoch_version));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+pub(crate) fn root_exists_at_version(
+    state_merkle_db: &StateMerkleDb,
+    version: Version,
+) -> Result<bool> {
+    Ok(state_merkle_db
         .metadata_db()
-        .rev_iter::<JellyfishMerkleNodeSchema>()?;
+        .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
+        .is_some())
+}
+
+pub(crate) fn get_current_version_in_state_merkle_db(
+    state_merkle_db: &StateMerkleDb,
+) -> Result<Option<Version>> {
+    find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), Version::MAX)
+}
+
+pub(crate) fn get_max_version_in_state_merkle_db(
+    state_merkle_db: &StateMerkleDb,
+) -> Result<Option<Version>> {
+    let mut version = get_current_version_in_state_merkle_db(state_merkle_db)?;
+    let num_real_shards = state_merkle_db.hack_num_real_shards() as u8;
+    if num_real_shards > 1 {
+        for shard_id in 0..num_real_shards {
+            let shard_version = find_closest_node_version_at_or_before(
+                state_merkle_db.db_shard(shard_id),
+                Version::MAX,
+            )?;
+            if version.is_none() {
+                version = shard_version;
+            } else if let Some(shard_version) = shard_version {
+                if shard_version > version.unwrap() {
+                    version = Some(shard_version);
+                }
+            }
+        }
+    }
+    Ok(version)
+}
+
+pub(crate) fn find_closest_node_version_at_or_before(
+    db: &DB,
+    version: Version,
+) -> Result<Option<Version>> {
+    let mut iter = db.rev_iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek_for_prev(&NodeKey::new_empty_path(version))?;
     Ok(iter.next().transpose()?.map(|item| item.0.version()))
 }
@@ -346,6 +416,11 @@ fn delete_per_version_data(
     start_version: Version,
     batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
+    delete_per_version_data_impl::<TransactionAccumulatorRootHashSchema>(
+        ledger_db.transaction_accumulator_db_raw(),
+        start_version,
+        &batch.transaction_accumulator_db_batches,
+    )?;
     delete_per_version_data_impl::<TransactionInfoSchema>(
         ledger_db.transaction_info_db_raw(),
         start_version,
@@ -380,15 +455,15 @@ where
 {
     let mut iter = ledger_db.iter::<S>()?;
     iter.seek_to_last();
-    if let Some((lastest_version, _)) = iter.next().transpose()? {
-        if lastest_version >= start_version {
+    if let Some((latest_version, _)) = iter.next().transpose()? {
+        if latest_version >= start_version {
             info!(
                 start_version = start_version,
-                latest_version = lastest_version,
+                latest_version = latest_version,
                 cf_name = S::COLUMN_FAMILY_NAME,
                 "Truncate per version data."
             );
-            for version in start_version..=lastest_version {
+            for version in start_version..=latest_version {
                 batch.delete::<S>(&version)?;
             }
         }

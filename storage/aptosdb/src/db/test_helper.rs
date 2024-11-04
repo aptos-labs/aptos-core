@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides reusable helpers in tests.
-use super::gather_state_updates_until_last_checkpoint;
 #[cfg(test)]
 use crate::state_store::StateStore;
 #[cfg(test)]
@@ -19,7 +18,7 @@ use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 #[cfg(test)]
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order, Result};
+use aptos_storage_interface::{state_delta::StateDelta, DbReader, Order, Result};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -67,6 +66,7 @@ pub(crate) fn update_store(
     store: &StateStore,
     input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
     first_version: Version,
+    enable_sharding: bool,
 ) -> HashValue {
     use aptos_storage_interface::{jmt_update_refs, jmt_updates};
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
@@ -88,14 +88,13 @@ pub(crate) fn update_store(
         let schema_batch = SchemaBatch::new();
         store
             .put_value_sets(
-                vec![&sharded_value_state_set],
+                &[sharded_value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
                 None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
-                /*put_state_value_indices=*/ false,
-                /*skip_usage=*/ false,
+                /*put_state_value_indices=*/ enable_sharding,
                 /*last_checkpoint_index=*/ None,
             )
             .unwrap();
@@ -383,7 +382,7 @@ pub fn test_save_blocks_impl(
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
 
@@ -915,14 +914,8 @@ pub(crate) fn put_transaction_infos(
     version: Version,
     txn_infos: &[TransactionInfo],
 ) -> HashValue {
-    let txns_to_commit: Vec<_> = txn_infos
-        .iter()
-        .cloned()
-        .map(TransactionToCommit::dummy_with_transaction_info)
-        .collect();
-    db.commit_transaction_infos(&txns_to_commit, version)
-        .unwrap();
-    db.commit_transaction_accumulator(&txns_to_commit, version)
+    db.commit_transaction_infos(version, txn_infos).unwrap();
+    db.commit_transaction_accumulator(version, txn_infos)
         .unwrap()
 }
 
@@ -932,12 +925,7 @@ pub(crate) fn put_transaction_auxiliary_data(
     version: Version,
     auxiliary_data: &[TransactionAuxiliaryData],
 ) {
-    let txns_to_commit: Vec<_> = auxiliary_data
-        .iter()
-        .cloned()
-        .map(TransactionToCommit::dummy_with_transaction_auxiliary_data)
-        .collect();
-    db.commit_transaction_auxiliary_data(&txns_to_commit, version)
+    db.commit_transaction_auxiliary_data(version, auxiliary_data)
         .unwrap();
 }
 
@@ -968,7 +956,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.state_store
         .buffered_state()
         .lock()
-        .update(None, in_memory_state, true)
+        .update(None, &in_memory_state, true)
         .unwrap();
 }
 
@@ -998,34 +986,26 @@ pub fn test_sync_transactions_impl(
         if batch1_len > 0 {
             let txns_to_commit_batch = &txns_to_commit[..batch1_len];
             update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-            db.save_transactions(
+            db.save_transactions_for_test(
                 txns_to_commit_batch,
                 cur_ver, /* first_version */
                 base_state_version,
-                None,
+                None,  /* ledger_info_with_sigs */
                 false, /* sync_commit */
-                in_memory_state.clone(),
-                gather_state_updates_until_last_checkpoint(
-                    cur_ver,
-                    &in_memory_state,
-                    txns_to_commit_batch,
-                ),
-                None,
+                &in_memory_state,
             )
             .unwrap();
         }
         let ver = cur_ver + batch1_len as Version;
         let txns_to_commit_batch = &txns_to_commit[batch1_len..];
         update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-        db.save_transactions(
+        db.save_transactions_for_test(
             txns_to_commit_batch,
             ver,
             base_state_version,
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
-            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch),
-            None,
+            &in_memory_state,
         )
         .unwrap();
 

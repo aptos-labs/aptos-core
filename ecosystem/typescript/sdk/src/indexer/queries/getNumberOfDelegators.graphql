@@ -1,9 +1,0 @@
-query getNumberOfDelegators($poolAddress: String) {
-  num_active_delegator_per_pool(
-    where: { pool_address: { _eq: $poolAddress }, num_active_delegator: { _gt: "0" } }
-    distinct_on: pool_address
-  ) {
-    num_active_delegator
-    pool_address
-  }
-}

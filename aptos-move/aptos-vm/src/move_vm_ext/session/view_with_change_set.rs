@@ -6,12 +6,10 @@ use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     state_store::{
         errors::StateviewError,
         state_key::StateKey,

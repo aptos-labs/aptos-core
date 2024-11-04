@@ -92,7 +92,7 @@ Provides a framework for comparing two elements
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(result: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(self: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
 </code></pre>
 
 
@@ -101,8 +101,8 @@ Provides a framework for comparing two elements
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(result: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
-    result.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(self: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
+    self.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>
 }
 </code></pre>
 
@@ -116,7 +116,7 @@ Provides a framework for comparing two elements
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(self: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
 </code></pre>
 
 
@@ -125,8 +125,8 @@ Provides a framework for comparing two elements
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
-    result.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(self: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
+    self.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>
 }
 </code></pre>
 
@@ -140,7 +140,7 @@ Provides a framework for comparing two elements
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_greater_than">is_greater_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_greater_than">is_greater_than</a>(self: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
 </code></pre>
 
 
@@ -149,8 +149,8 @@ Provides a framework for comparing two elements
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_greater_than">is_greater_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
-    result.inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_greater_than">is_greater_than</a>(self: &<a href="comparator.md#0x1_comparator_Result">Result</a>): bool {
+    self.inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>
 }
 </code></pre>
 
@@ -268,14 +268,14 @@ Provides a framework for comparing two elements
 ### Function `is_equal`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(result: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_equal">is_equal</a>(self: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>let</b> res = result;
+<b>let</b> res = self;
 <b>ensures</b> result == (res.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>);
 </code></pre>
 
@@ -286,14 +286,14 @@ Provides a framework for comparing two elements
 ### Function `is_smaller_than`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_smaller_than">is_smaller_than</a>(self: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>let</b> res = result;
+<b>let</b> res = self;
 <b>ensures</b> result == (res.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>);
 </code></pre>
 
@@ -304,14 +304,14 @@ Provides a framework for comparing two elements
 ### Function `is_greater_than`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_greater_than">is_greater_than</a>(result: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_is_greater_than">is_greater_than</a>(self: &<a href="comparator.md#0x1_comparator_Result">comparator::Result</a>): bool
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>let</b> res = result;
+<b>let</b> res = self;
 <b>ensures</b> result == (res.inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>);
 </code></pre>
 

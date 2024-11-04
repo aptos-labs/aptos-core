@@ -8,6 +8,9 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V22
+///    - Gas parameters for enums
+///    - Gas parameters for new native function `bcs::serialized_size`
 /// - V21
 ///   - Fix type to type tag conversion in MoveVM
 /// - V20
@@ -66,7 +69,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_18;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_23;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -83,4 +86,7 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_19: u64 = 23;
     pub const RELEASE_V1_20: u64 = 24;
     pub const RELEASE_V1_21: u64 = 25;
+    pub const RELEASE_V1_22: u64 = 26;
+    pub const RELEASE_V1_23: u64 = 27;
+    pub const RELEASE_V1_24: u64 = 28;
 }

@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/more-v1/expansion/module_alias_as_type.move:6:14
+  │
+6 │     use 0x2::X;
+  │              ^ Unused 'use' of alias 'X'. Consider removing it
+
+error: undeclared `0x2::M::X`
+  ┌─ tests/more-v1/expansion/module_alias_as_type.move:7:16
+  │
+7 │     fun foo(x: X) {}
+  │                ^
