@@ -355,9 +355,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
-            FeatureFlag::TransactionContextHashFunctionUpdate => {
-                AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE
-            },
             FeatureFlag::FakeFeatureForComparisonTesting => {
                 AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING
             },
@@ -508,9 +505,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
-            AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE => {
-                FeatureFlag::TransactionContextHashFunctionUpdate
-            },
             AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING => {
                 FeatureFlag::FakeFeatureForComparisonTesting
             },
