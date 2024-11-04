@@ -10,36 +10,28 @@ use move_vm_types::{
 
 /// Additional data stored alongside deserialized or verified modules.
 pub struct AptosModuleExtension {
-    /// Serialized representation of the module.
-    bytes: Bytes,
     /// Module's hash.
     hash: [u8; 32],
-    /// The state value metadata associated with the module, when read from or
-    /// written to storage.
-    state_value_metadata: StateValueMetadata,
+    /// The original state value associated with the module, when read from or written to storage.
+    state_value: StateValue,
 }
 
 impl AptosModuleExtension {
     /// Creates new extension based on [StateValue].
     pub fn new(state_value: StateValue) -> Self {
-        let (state_value_metadata, bytes) = state_value.unpack();
-        let hash = sha3_256(&bytes);
-        Self {
-            bytes,
-            hash,
-            state_value_metadata,
-        }
+        let hash = sha3_256(state_value.bytes());
+        Self { hash, state_value }
     }
 
-    /// Returns the state value metadata stored in extension.
+    /// Returns state value metadata stored in extension.
     pub fn state_value_metadata(&self) -> &StateValueMetadata {
-        &self.state_value_metadata
+        self.state_value.metadata()
     }
 }
 
 impl WithBytes for AptosModuleExtension {
     fn bytes(&self) -> &Bytes {
-        &self.bytes
+        self.state_value.bytes()
     }
 }
 
@@ -48,3 +40,11 @@ impl WithHash for AptosModuleExtension {
         &self.hash
     }
 }
+
+impl PartialEq for AptosModuleExtension {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash.eq(&other.hash) && self.state_value_metadata().eq(other.state_value_metadata())
+    }
+}
+
+impl Eq for AptosModuleExtension {}

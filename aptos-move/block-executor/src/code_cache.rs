@@ -25,7 +25,7 @@ use move_core_types::{
 use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
-    WithBytes, WithHash,
+    WithBytes,
 };
 use std::sync::Arc;
 
@@ -154,11 +154,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
 
             // Otherwise, this is the first time this module gets accessed in this block. We need
             // to validate it is the same as in the state. We do it only once on the first access.
-            let is_valid = builder.build(key)?.is_some_and(|m| {
-                m.extension().hash() == module.extension().hash()
-                    && m.extension().state_value_metadata()
-                        == module.extension().state_value_metadata()
-            });
+            let is_valid = builder
+                .build(key)?
+                .is_some_and(|m| m.extension() == module.extension());
             if is_valid {
                 // This module is valid for this block, mark as so.
                 self.global_module_cache.set_generation(key);

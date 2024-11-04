@@ -268,6 +268,10 @@ impl StateValue {
         &self.inner.data
     }
 
+    pub fn metadata(&self) -> &StateValueMetadata {
+        &self.inner.metadata
+    }
+
     /// Applies a bytes-to-bytes transformation on the state value contents,
     /// leaving the state value metadata untouched.
     pub fn map_bytes<F: FnOnce(Bytes) -> anyhow::Result<Bytes>>(

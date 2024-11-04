@@ -303,6 +303,7 @@ mod test {
     fn test_insert_verified_for_global_module_cache() {
         let capacity = 10;
         let global_cache = ImmutableModuleCache::with_capacity(capacity);
+        assert_eq!(global_cache.generation(), 0);
 
         let mut new_modules = vec![];
         for i in 0..capacity {
@@ -314,10 +315,12 @@ mod test {
         assert_eq!(global_cache.size(), capacity);
         assert_eq!(global_cache.generation(), 1);
 
-        // Versions should be set to storage.
+        // Versions should be set to storage. The returned code needs validation because generation
+        // has been incremented.
         for key in 0..capacity {
-            let (code, _) = assert_some!(global_cache.get(&key));
-            assert!(code.version().is_none())
+            let (code, needs_validation) = assert_some!(global_cache.get(&key));
+            assert!(code.version().is_none());
+            assert!(needs_validation);
         }
 
         // Too many modules added, the cache should be flushed.

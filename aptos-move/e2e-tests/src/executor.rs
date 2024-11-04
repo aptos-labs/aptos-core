@@ -636,7 +636,12 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block_on_thread_pool_without_global_module_cache::<
+
+        // Note:
+        //   This uses a shared global module cache, but it is ok because we validate it against
+        //   the state for every block, ensuring consistency of cached data. This way all tests
+        //   implicitly test cache implementation.
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(

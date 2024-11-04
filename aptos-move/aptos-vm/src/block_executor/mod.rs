@@ -448,7 +448,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM;
 
 impl BlockAptosVM {
-    fn execute_block_on_thread_pool<
+    pub fn execute_block_on_thread_pool_with_module_cache<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
@@ -520,7 +520,8 @@ impl BlockAptosVM {
         }
     }
 
-    pub fn execute_block_on_thread_pool_without_global_module_cache<
+    /// Uses shared global module cache to execute blocks.
+    pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
@@ -530,11 +531,11 @@ impl BlockAptosVM {
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Self::execute_block_on_thread_pool::<S, L>(
+        Self::execute_block_on_thread_pool_with_module_cache::<S, L>(
             executor_thread_pool,
             signature_verified_block,
             state_view,
-            Arc::new(ImmutableModuleCache::empty()),
+            Arc::clone(&GLOBAL_MODULE_CACHE),
             config,
             transaction_commit_listener,
         )
@@ -550,7 +551,7 @@ impl BlockAptosVM {
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Self::execute_block_on_thread_pool::<S, L>(
+        Self::execute_block_on_thread_pool_with_module_cache::<S, L>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,
@@ -564,7 +565,9 @@ impl BlockAptosVM {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_block_executor::code_cache_global::ImmutableModuleCache;
+    use aptos_block_executor::{
+        code_cache_global::ImmutableModuleCache, txn_commit_hook::NoOpTransactionCommitHook,
+    };
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::on_chain_config::{FeatureFlag, Features};
     use aptos_vm_environment::environment::AptosEnvironment;
@@ -572,7 +575,7 @@ mod test {
     use move_vm_types::code::mock_verified_code;
 
     #[test]
-    fn test_cross_block_module_cache_flush() {
+    fn test_global_module_cache_flushed_when_features_change() {
         let global_module_cache = ImmutableModuleCache::empty();
 
         global_module_cache.insert(0, mock_verified_code(0, None));
@@ -602,5 +605,31 @@ mod test {
         ));
         assert!(env_old != env_new);
         assert_eq!(global_module_cache.size(), 0);
+    }
+
+    #[test]
+    fn global_module_cache_generation_is_incremented_per_block() {
+        let global_module_cache = Arc::new(ImmutableModuleCache::empty());
+        assert_eq!(global_module_cache.generation(), 0);
+
+        let concurrency_level = num_cpus::get();
+        let executor_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(concurrency_level)
+                .build()
+                .unwrap(),
+        );
+        let config = BlockExecutorConfig::new_no_block_limit(concurrency_level);
+
+        let result = BlockAptosVM::execute_block_on_thread_pool_with_module_cache(
+            executor_thread_pool,
+            &[],
+            &FakeDataStore::default(),
+            global_module_cache.clone(),
+            config,
+            None::<NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>,
+        );
+        assert_ok!(result);
+        assert_eq!(global_module_cache.generation(), 1);
     }
 }
