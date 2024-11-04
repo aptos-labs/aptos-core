@@ -267,6 +267,7 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                self.max_block_txns,
                 metadata.clone(),
                 parent_block_id,
                 transaction_generator,

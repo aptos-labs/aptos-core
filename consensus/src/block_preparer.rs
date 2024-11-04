@@ -65,10 +65,10 @@ impl BlockPreparer {
         loop {
             info!("get_transactions waiting for next: {}", idx);
             match futures.next().await {
-                // TODO: we are turning off the max txns from block to execute feature for now
-                Some(Ok((block_txns, _max_txns))) => {
+                Some(Ok((block_txns, max_txns))) => {
                     txns.extend(block_txns);
-                    max_txns_from_block_to_execute = None;
+                    // We only care about max_txns from the current block, which is the last future
+                    max_txns_from_block_to_execute = max_txns;
                 },
                 Some(Err(e)) => {
                     return Err(e);
@@ -89,7 +89,7 @@ impl BlockPreparer {
         &self,
         block: &Block,
         block_window: &OrderedBlockWindow,
-    ) -> ExecutorResult<Vec<SignedTransaction>> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
             use std::{thread, time::Duration};
@@ -149,7 +149,8 @@ impl BlockPreparer {
         let txn_deduper = self.txn_deduper.clone();
         let block_id = block.id();
         let block_timestamp_usecs = block.timestamp_usecs();
-        let max_prepared_block_txns = self.max_block_txns as usize * 2;
+        // Always use max_block_txns * 2 regardless of max_txns_from_block_to_execute for better shuffling
+        let max_prepared_block_txns = self.max_block_txns * 2;
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         let result = tokio::task::spawn_blocking(move || {
             // stable sort to ensure batches with same gas are in the same order
@@ -172,18 +173,20 @@ impl BlockPreparer {
                 batched_txns
                     .into_iter()
                     .flatten()
-                    .take(max_prepared_block_txns)
+                    .take(max_prepared_block_txns as usize)
                     .collect()
             );
             let filtered_txns = monitor!("filter_transactions", {
                 txn_filter.filter(block_id, block_timestamp_usecs, txns)
             });
-            let mut deduped_txns = monitor!("dedup_transactions", txn_deduper.dedup(filtered_txns));
+            let deduped_txns = monitor!("dedup_transactions", txn_deduper.dedup(filtered_txns));
+            // TODO: cannot truncate here, need to pass it to execution
+            let mut num_txns_to_execute = deduped_txns.len() as u64;
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
-                deduped_txns.truncate(max_txns_from_block_to_execute as usize);
+                num_txns_to_execute = num_txns_to_execute.min(max_txns_from_block_to_execute);
             }
-            MAX_TXNS_FROM_BLOCK_TO_EXECUTE.observe(deduped_txns.len() as f64);
-            Ok(deduped_txns)
+            MAX_TXNS_FROM_BLOCK_TO_EXECUTE.observe(num_txns_to_execute as f64);
+            Ok((deduped_txns, max_txns_from_block_to_execute))
         })
         .await
         .expect("Failed to spawn blocking task for transaction generation");
