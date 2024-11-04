@@ -26,7 +26,8 @@ use std::{
     thread,
 };
 use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::mpsc;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 use itertools::Itertools;
@@ -233,10 +234,6 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         Ok(res)
     }
 
-    fn get_shard_id_from_txn_id(shard_st_txn_idx_to_shard: &BTreeMap<usize, usize>, txn_id: usize) -> usize {
-        *shard_st_txn_idx_to_shard.range(..=txn_id).next_back().unwrap().1
-    }
-
     fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>, duration_since_epoch: u64,
                                        total_supply_base_val: u128) -> Result<Vec<TransactionOutput>, VMStatus> {
         #[derive(Copy, Clone)]
@@ -245,36 +242,48 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         unsafe impl Sync for Pointer {}
 
         let total_expected_outputs = expected_outputs.iter().sum::<u64>();
-        let mut shard_st_txn_idx_to_shard: BTreeMap<usize, usize> = BTreeMap::new();
-        let mut cumulative_txns = 0;
-        for (idx, num_outputs) in expected_outputs.iter().enumerate() {
-            shard_st_txn_idx_to_shard.insert(cumulative_txns as usize, idx);
-            cumulative_txns += *num_outputs;
-        }
-        assert_eq!(total_expected_outputs, cumulative_txns);
-
-        let total_supply_delta_by_shard: Arc<Vec<Mutex<DeltaU128>>> = Arc::new(
-            (0..self.num_shards()).map(|_| Mutex::new(DeltaU128::default())).collect()
-        );
-
-        let highest_output_idx_by_shard: Arc<Vec<Mutex<usize>>> = Arc::new(
-            (0..self.num_shards()).map(|_| Mutex::new(0)).collect()
-        );
+        let results_recvd: Vec<Arc<AtomicBool>> = (0..total_expected_outputs)
+            .map(|_| Arc::new(AtomicBool::new(false)))
+            .collect();
+        let shared_results_recvd = Arc::new(results_recvd);
+        let shared_results_recvd_clone = shared_results_recvd.clone();
 
         let mut results = vec![TransactionOutput::default(); total_expected_outputs as usize];
         let results_ptr = Pointer(results.as_mut_ptr());
         let num_deser_threads = self.num_shards();
 
+        let (aggr_tx, aggr_rx) = mpsc::channel();;
         let (deser_tx, deser_rx) = crossbeam_channel::unbounded();
         let (deser_finished_tx, deser_finished_rx) = crossbeam_channel::unbounded();
         let deser_finished_tx = Arc::new(deser_finished_tx);
+
+        self.cmd_tx_thread_pool.spawn(move || {
+            // loop to see if results are received; as results are received update the total supply
+            let mut curr_txn_idx = 0;
+            let mut aggr_total_supply_delta = total_supply_base_val;
+            loop {
+                if shared_results_recvd_clone[curr_txn_idx].load(std::sync::atomic::Ordering::Relaxed) == false {
+                    // probably busy wait is good for perf here
+                    continue;
+                }
+                let mut result = &mut results[curr_txn_idx];
+                if let Some(total_supply) = result.total_supply_delta {
+                    aggr_total_supply_delta = total_supply.add(aggr_total_supply_delta);
+                    result.update_total_supply(aggr_total_supply_delta);
+                }
+                curr_txn_idx += 1;
+                if curr_txn_idx == total_expected_outputs as usize {
+                    break;
+                }
+            }
+            aggr_tx.send(results).unwrap();
+        });
+
         for _ in 0..num_deser_threads {
             let results_clone = results_ptr.clone();
             let deser_rx_clone: Receiver<Message> = deser_rx.clone();
             let deser_finished_tx_clone = deser_finished_tx.clone();
-            let shard_st_txn_idx_to_shard_clone = shard_st_txn_idx_to_shard.clone();
-            let total_supply_delta_by_shard_clone = total_supply_delta_by_shard.clone();
-            let highest_output_idx_by_shard_clone = highest_output_idx_by_shard.clone();
+            let shared_results_recvd_clone = shared_results_recvd.clone();
             self.cmd_tx_thread_pool.spawn(move || {
                 while let Ok(msg) = deser_rx_clone.recv() {
                     let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
@@ -285,16 +294,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
 
                     for txn_output in result {
                         let txn_idx = txn_output.txn_idx as usize;
-                        let shard_id = Self::get_shard_id_from_txn_id(&shard_st_txn_idx_to_shard_clone, txn_idx);
-                        if txn_idx >= *highest_output_idx_by_shard_clone[shard_id].lock().unwrap() {
-                            if let Some(total_supply) = txn_output.txn_output.write_set().get_total_supply() {
-                                *total_supply_delta_by_shard_clone[shard_id].lock().unwrap() =
-                                    DeltaU128::get_delta(total_supply, TOTAL_SUPPLY_AGGR_BASE_VAL);
-                                *highest_output_idx_by_shard_clone[shard_id].lock().unwrap() = txn_idx;
-                            }
-                        }
                         // correctness guaranteed by disjointness of txn indices
                         unsafe { *{results_clone}.0.wrapping_add(txn_idx) = txn_output.txn_output; }
+                        shared_results_recvd_clone[txn_idx].store(true, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
                 deser_finished_tx_clone.send(()).unwrap();
@@ -327,26 +329,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["9_2_results_rx_all_shards"]).observe(delta as f64);
 
-        let ts_aggr_timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "aggr_total_supply"])
-            .start_timer();
-        let mut aggr_total_supply_delta_by_shard = vec![DeltaU128::default(); self.num_shards()];
-        aggr_total_supply_delta_by_shard[0] = *total_supply_delta_by_shard[0].lock().unwrap();
-        for shard_id in 1..self.num_shards() {
-            aggr_total_supply_delta_by_shard[shard_id] = aggr_total_supply_delta_by_shard[shard_id - 1]
-                + *total_supply_delta_by_shard[shard_id].lock().unwrap();
-        }
-
-        let base_val_delta = DeltaU128::get_delta(total_supply_base_val, TOTAL_SUPPLY_AGGR_BASE_VAL);
-        results.par_iter_mut().enumerate().for_each(|(index, result)| {
-            let shard_id = Self::get_shard_id_from_txn_id(&shard_st_txn_idx_to_shard, index);
-            let delta_for_shard = aggr_total_supply_delta_by_shard[shard_id] + base_val_delta;
-            if let Some(total_supply) = result.write_set().get_total_supply() {
-                result.update_total_supply(delta_for_shard.add_delta(total_supply));
-            }
-        });
-        drop(ts_aggr_timer);
-
+        let results = aggr_rx.recv().unwrap();
+        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+            .with_label_values(&["9_3_aggr_total_supply_done"]).observe(delta as f64);
         Ok(results)
     }
 }
@@ -375,7 +360,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         trace!("RemoteExecutorClient Sending block to shards");
         let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
         // dummy call
-        state_view.get_state_value(&(*TOTAL_SUPPLY_STATE_KEY)).expect("dummy read to total supply failed");
+        //state_view.get_state_value(&(*TOTAL_SUPPLY_STATE_KEY)).expect("dummy read to total supply failed");
         let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         info!("Executing block started at time {}", current_time);
         self.state_view_service.set_state_view(state_view);
