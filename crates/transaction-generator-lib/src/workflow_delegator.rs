@@ -165,7 +165,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         }
 
         sample!(
-            SampleRate::Duration(Duration::from_millis(250)),
+            SampleRate::Duration(Duration::from_secs(2)),
             info!("Cur stage: {}, stage switch conditions: {:?}", stage, self.stage_switch_conditions);
         );
 
