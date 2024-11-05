@@ -24,12 +24,11 @@ runs:
       run: cargo x affected-packages -vv
       shell: bash
 
-    # Run Aptos Move tests with compiler V2
-    - name: Run Aptos Move tests with compiler V2
-      run: cargo x targeted-compiler-v2-tests -vv --release --profile ci --locked --no-fail-fast
+    # Run move_pr.sh -i2
+    - name: Run move_pr.sh with V2 flag
       shell: bash
+      run: third_party/move/scripts/move_pr.sh -i2
       env:
-        MOVE_COMPILER_V2: true
         RUST_MIN_STACK: 4297152
         MVP_TEST_ON_CI: true
         SOLC_EXE: /home/runner/bin/solc
