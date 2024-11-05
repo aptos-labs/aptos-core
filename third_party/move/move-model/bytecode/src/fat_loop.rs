@@ -471,9 +471,8 @@ impl FatLoopBuilder {
             .collect();
         let mut results = vec![];
         for (i, (block_id, block)) in blocks.iter().enumerate() {
-            // if this block has one successor and the last bc of this block is not a branch
-            // we need to check whether the next block is the successor,
-            // if not, insert a jump to the correct block
+            // if this block is a fallthough block, we need to remove it by inserting a jump to the correct block
+            // because the fatloop algorithm doesn't support fallthrough
             if cfg.successors(*block_id).len() == 1 && !block[block.len() - 1].is_branching() {
                 let successor_id = cfg.successors(*block_id).first().unwrap();
                 let successor_label_opt = id_label_map.get(successor_id);
