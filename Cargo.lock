@@ -4348,6 +4348,7 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
+ "crossbeam",
  "dashmap",
  "derivative",
  "fixed",

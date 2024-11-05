@@ -5,7 +5,6 @@
 mod code_cache_tests;
 
 use crate::{
-    code_cache_global::ImmutableModuleCache,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
@@ -30,6 +29,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
+    read_only_module_cache::ReadOnlyModuleCache,
     state_store::state_value::StateValueMetadata,
     write_set::WriteOpKind,
 };
@@ -87,7 +87,7 @@ fn test_resource_group_deletion() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
+        Arc::new(ReadOnlyModuleCache::empty()),
         None,
     );
 
@@ -154,7 +154,7 @@ fn resource_group_bcs_fallback() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
+        Arc::new(ReadOnlyModuleCache::empty()),
         None,
     );
 
@@ -254,7 +254,7 @@ fn block_output_err_precedence() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
+        Arc::new(ReadOnlyModuleCache::empty()),
         None,
     );
 
@@ -294,7 +294,7 @@ fn skip_rest_gas_limit() {
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
+        Arc::new(ReadOnlyModuleCache::empty()),
         None,
     );
 
@@ -330,7 +330,7 @@ where
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
+        Arc::new(ReadOnlyModuleCache::empty()),
         None,
     )
     .execute_transactions_parallel(&env, &transactions, &data_view);

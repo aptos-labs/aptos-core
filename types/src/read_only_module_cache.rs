@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{error::PanicError, explicit_sync_wrapper::ExplicitSyncWrapper};
+use crate::{error::PanicError, explicit_sync_wrapper::ExplicitSyncWrapper};
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_vm_types::code::ModuleCode;
@@ -15,11 +14,8 @@ use std::{
     },
 };
 
-/// Module code stored in cross-block module cache.
-// TODO(loader_v2):
-//   We can move this to move-vm-types, but then we also need to have version generic or expose
-//   transaction index there, and define PanicError in Move (or convert from VMError).
-struct ImmutableModuleCode<DC, VC, E> {
+/// Entry stored in [ReadOnlyModuleCache].
+struct Entry<DC, VC, E> {
     /// True if this code is "valid" within the block execution context (i.e, there has been no
     /// republishing of this module so far). If false, executor needs to read the module from the
     /// sync/unsync module caches.
@@ -28,16 +24,16 @@ struct ImmutableModuleCode<DC, VC, E> {
     /// hold:
     ///    1. Module's version is [None] (storage version).
     ///    2. Module's code is always verified.
-    module: CachePadded<Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>>,
+    module: CachePadded<Arc<ModuleCode<DC, VC, E, Option<u32>>>>,
 }
 
-impl<DC, VC, E> ImmutableModuleCode<DC, VC, E>
+impl<DC, VC, E> Entry<DC, VC, E>
 where
     VC: Deref<Target = Arc<DC>>,
 {
     /// Returns a new valid module. Returns a (panic) error if the module is not verified or has
     /// non-storage version.
-    fn new(module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) -> Result<Self, PanicError> {
+    fn new(module: Arc<ModuleCode<DC, VC, E, Option<u32>>>) -> Result<Self, PanicError> {
         if !module.code().is_verified() || module.version().is_some() {
             let msg = format!(
                 "Invariant violated for immutable module code : verified ({}), version({:?})",
@@ -63,23 +59,23 @@ where
         self.valid.load(Ordering::Acquire)
     }
 
-    /// Returns the module code stored is this [ImmutableModuleCode].
-    fn inner(&self) -> &Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>> {
+    /// Returns the module code stored is this [Entry].
+    fn inner(&self) -> &Arc<ModuleCode<DC, VC, E, Option<u32>>> {
         self.module.deref()
     }
 }
 
-/// An immutable cache for verified code, that can be accessed concurrently thought the block, and
-/// only modified at block boundaries.
-pub struct ImmutableModuleCache<K, DC, VC, E> {
+/// A read-only module cache for verified code, that can be accessed concurrently within the block.
+/// It can only be modified at block boundaries.
+pub struct ReadOnlyModuleCache<K, DC, VC, E> {
     /// Module cache containing the verified code.
-    module_cache: ExplicitSyncWrapper<HashMap<K, ImmutableModuleCode<DC, VC, E>>>,
+    module_cache: ExplicitSyncWrapper<HashMap<K, Entry<DC, VC, E>>>,
     /// Maximum cache size. If the size is greater than this limit, the cache is flushed. Note that
     /// this can only be done at block boundaries.
     capacity: usize,
 }
 
-impl<K, DC, VC, E> ImmutableModuleCache<K, DC, VC, E>
+impl<K, DC, VC, E> ReadOnlyModuleCache<K, DC, VC, E>
 where
     K: Hash + Eq + Clone,
     VC: Deref<Target = Arc<DC>>,
@@ -99,7 +95,7 @@ where
     }
 
     /// Returns true if the key exists in immutable cache and the corresponding module is valid.
-    pub(crate) fn contains_valid(&self, key: &K) -> bool {
+    pub fn contains_valid(&self, key: &K) -> bool {
         self.module_cache
             .acquire()
             .get(key)
@@ -109,7 +105,7 @@ where
     /// Marks the cached module (if it exists) as invalid. As a result, all subsequent calls to the
     /// cache for the associated key  will result in a cache miss. Note that it is fine for an
     /// entry not to exist, in which case this is a no-op.
-    pub(crate) fn mark_invalid(&self, key: &K) {
+    pub fn mark_invalid(&self, key: &K) {
         if let Some(module) = self.module_cache.acquire().get(key) {
             module.mark_invalid();
         }
@@ -117,7 +113,7 @@ where
 
     /// Returns the module stored in cache. If the module has not been cached, or it exists but is
     /// not valid, [None] is returned.
-    pub(crate) fn get(&self, key: &K) -> Option<Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>> {
+    pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<DC, VC, E, Option<u32>>>> {
         self.module_cache.acquire().get(key).and_then(|module| {
             if module.is_valid() {
                 Some(module.inner().clone())
@@ -142,9 +138,9 @@ where
     ///      these constraints are violated, a panic error is returned.
     ///   4. If the cache size exceeds its capacity after all verified modules have been inserted,
     ///      the cache is flushed.
-    pub(crate) fn insert_verified_unchecked(
+    pub fn insert_verified_unchecked(
         &self,
-        modules: impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>)>,
+        modules: impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E, Option<u32>>>)>,
     ) -> Result<(), PanicError> {
         use hashbrown::hash_map::Entry::*;
 
@@ -166,8 +162,7 @@ where
             if module.code().is_verified() {
                 let mut module = module.as_ref().clone();
                 module.set_version(None);
-                let prev =
-                    module_cache.insert(key.clone(), ImmutableModuleCode::new(Arc::new(module))?);
+                let prev = module_cache.insert(key.clone(), Entry::new(Arc::new(module))?);
 
                 // At this point, we must have removed the entry, or returned a panic error.
                 assert!(prev.is_none())
@@ -183,10 +178,10 @@ where
 
     /// Insert the module to cache. Used for tests only.
     #[cfg(any(test, feature = "testing"))]
-    pub fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E, Option<TxnIndex>>>) {
+    pub fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E, Option<u32>>>) {
         self.module_cache
             .acquire()
-            .insert(key, ImmutableModuleCode::new(module).unwrap());
+            .insert(key, Entry::new(module).unwrap());
     }
 
     /// Removes the module from cache. Used for tests only.
@@ -209,16 +204,16 @@ mod test {
     use move_vm_types::code::{mock_deserialized_code, mock_verified_code};
 
     #[test]
-    fn test_immutable_module_code() {
-        assert!(ImmutableModuleCode::new(mock_deserialized_code(0, None)).is_err());
-        assert!(ImmutableModuleCode::new(mock_deserialized_code(0, Some(22))).is_err());
-        assert!(ImmutableModuleCode::new(mock_verified_code(0, Some(22))).is_err());
-        assert!(ImmutableModuleCode::new(mock_verified_code(0, None)).is_ok());
+    fn test_new_entry() {
+        assert!(Entry::new(mock_deserialized_code(0, None)).is_err());
+        assert!(Entry::new(mock_deserialized_code(0, Some(22))).is_err());
+        assert!(Entry::new(mock_verified_code(0, Some(22))).is_err());
+        assert!(Entry::new(mock_verified_code(0, None)).is_ok());
     }
 
     #[test]
-    fn test_immutable_module_code_validity() {
-        let module_code = assert_ok!(ImmutableModuleCode::new(mock_verified_code(0, None)));
+    fn test_mark_entry_invalid() {
+        let module_code = assert_ok!(Entry::new(mock_verified_code(0, None)));
         assert!(module_code.is_valid());
 
         module_code.mark_invalid();
@@ -226,8 +221,8 @@ mod test {
     }
 
     #[test]
-    fn test_global_module_cache() {
-        let global_cache = ImmutableModuleCache::empty();
+    fn test_get_entry() {
+        let global_cache = ReadOnlyModuleCache::empty();
 
         global_cache.insert(0, mock_verified_code(0, None));
         global_cache.insert(1, mock_verified_code(1, None));
@@ -245,13 +240,13 @@ mod test {
     }
 
     #[test]
-    fn test_insert_verified_for_global_module_cache() {
+    fn test_insert_verified_for_read_only_module_cache() {
         let capacity = 10;
-        let global_cache = ImmutableModuleCache::with_capacity(capacity);
+        let global_cache = ReadOnlyModuleCache::with_capacity(capacity);
 
         let mut new_modules = vec![];
         for i in 0..capacity {
-            new_modules.push((i, mock_verified_code(i, Some(i as TxnIndex))));
+            new_modules.push((i, mock_verified_code(i, Some(i as u32))));
         }
         let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
         assert!(result.is_ok());

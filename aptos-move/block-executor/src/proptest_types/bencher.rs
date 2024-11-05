@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache_global::ImmutableModuleCache,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -16,7 +15,7 @@ use crate::{
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType,
+    executable::ExecutableTestType, read_only_module_cache::ReadOnlyModuleCache,
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -128,7 +127,7 @@ where
                 .build()
                 .unwrap(),
         );
-        let global_module_cache = Arc::new(ImmutableModuleCache::empty());
+        let global_module_cache = Arc::new(ReadOnlyModuleCache::empty());
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let env = MockEnvironment::new();

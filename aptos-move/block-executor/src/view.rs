@@ -8,7 +8,6 @@ use crate::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
         UnsyncReadSet,
     },
-    code_cache_global::ImmutableModuleCache,
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
     value_exchange::{
@@ -36,6 +35,7 @@ use aptos_mvhashmap::{
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::{Executable, ModulePath},
+    read_only_module_cache::ReadOnlyModuleCache,
     state_store::{
         errors::StateviewError,
         state_storage_usage::StateStorageUsage,
@@ -991,7 +991,7 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
     pub(crate) global_module_cache:
-        &'a ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        &'a ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T, X>,
     pub(crate) txn_idx: TxnIndex,
@@ -1000,7 +1000,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
-        global_module_cache: &'a ImmutableModuleCache<
+        global_module_cache: &'a ReadOnlyModuleCache<
             ModuleId,
             CompiledModule,
             Module,
@@ -2521,7 +2521,7 @@ mod test {
         let base_view = MockStateView::new(HashMap::new());
         let start_counter = 5;
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let global_module_cache = ImmutableModuleCache::empty();
+        let global_module_cache = ReadOnlyModuleCache::empty();
 
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
@@ -2790,7 +2790,7 @@ mod test {
         counter: RefCell<u32>,
         base_view: MockStateView,
         empty_global_module_cache:
-            ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+            ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
     }
 
@@ -2804,7 +2804,7 @@ mod test {
                 unsync_map,
                 counter,
                 base_view,
-                empty_global_module_cache: ImmutableModuleCache::empty(),
+                empty_global_module_cache: ReadOnlyModuleCache::empty(),
                 runtime_environment,
             }
         }
