@@ -4,6 +4,7 @@
 use anyhow::{bail, format_err, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_global_cache_manager::GlobalCacheManager;
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -428,9 +429,15 @@ fn execute_block_no_limit(
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
-    BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
+    let global_cache_manager = GlobalCacheManager::new_with_default_config();
+    global_cache_manager.mark_block_execution_start(state_view, None)?;
+    let result = BlockAptosVM::execute_block::<
+        _,
+        NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+    >(
         sig_verified_txns,
         state_view,
+        &global_cache_manager,
         BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
@@ -441,5 +448,7 @@ fn execute_block_no_limit(
         },
         None,
     )
-    .map(BlockOutput::into_transaction_outputs_forced)
+    .map(BlockOutput::into_transaction_outputs_forced);
+    global_cache_manager.mark_block_execution_end(None)?;
+    result
 }

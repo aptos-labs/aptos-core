@@ -67,6 +67,7 @@ impl VMBlockExecutor for MockVM {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
+        _global_cache_manager: &GlobalCacheManager,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later

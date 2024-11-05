@@ -36,6 +36,7 @@ use aptos_framework::{
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
+use aptos_global_cache_manager::GlobalCacheManager;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -2795,6 +2796,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
+        global_cache_manager: &GlobalCacheManager,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
@@ -2817,6 +2819,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         >(
             transactions,
             state_view,
+            global_cache_manager,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: AptosVM::get_concurrency_level(),

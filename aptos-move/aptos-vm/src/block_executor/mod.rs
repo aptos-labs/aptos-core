@@ -16,6 +16,7 @@ use aptos_block_executor::{
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
+use aptos_global_cache_manager::GlobalCacheManager;
 use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
@@ -23,34 +24,27 @@ use aptos_types::{
     error::PanicError,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
-    read_only_module_cache::ReadOnlyModuleCache,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
-    vm::modules::AptosModuleExtension,
     write_set::WriteOp,
 };
-use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp, module_write_set::ModuleWrite, output::VMOutput,
     resolver::ResourceGroupSize,
 };
-use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
-    language_storage::{ModuleId, StructTag},
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{Module, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
     collections::{BTreeMap, HashSet},
-    hash::Hash,
-    ops::Deref,
     sync::Arc,
 };
 
@@ -63,60 +57,6 @@ static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
             .unwrap(),
     )
 });
-
-/// Immutable global module cache that can be shared across multiple block executions. The size of
-/// the cache is fixed within a single block (modules are not inserted or removed) and it is only
-/// mutated at the block boundaries. Do not use if multiple blocks are executed concurrently.
-static GLOBAL_MODULE_CACHE: Lazy<
-    Arc<ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
-> = Lazy::new(|| Arc::new(ReadOnlyModuleCache::empty()));
-
-/// The maximum size of struct name index map in runtime environment. Checked at block boundaries
-/// only.
-const MAX_STRUCT_NAME_INDEX_MAP_SIZE: usize = 100_000;
-
-/// A cached environment that can be persisted globally across blocks.
-static GLOBAL_ENVIRONMENT: Lazy<Mutex<Option<AptosEnvironment>>> = Lazy::new(|| Mutex::new(None));
-
-/// Returns the cached environment if it exists and has the same configuration as if it was
-/// created based on the current state, or creates a new one and caches it. Should only be
-/// called at the block boundaries.
-fn get_environment_with_delayed_field_optimization_enabled<K, DC, VC, E>(
-    state_view: &impl StateView,
-    global_module_cache: &ReadOnlyModuleCache<K, DC, VC, E>,
-) -> Result<AptosEnvironment, VMStatus>
-where
-    K: Hash + Eq + Clone,
-    VC: Deref<Target = Arc<DC>>,
-{
-    // Create a new environment.
-    let current_env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-
-    // Lock the cache, and check if the environment is the same.
-    let mut global_environment = GLOBAL_ENVIRONMENT.lock();
-    if let Some(previous_env) = global_environment.as_ref() {
-        if &current_env == previous_env {
-            let runtime_env = previous_env.runtime_environment();
-            let struct_name_index_map_size = runtime_env
-                .struct_name_index_map_size()
-                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-            if struct_name_index_map_size > MAX_STRUCT_NAME_INDEX_MAP_SIZE {
-                // Cache is too large, flush it. Also flush the module cache.
-                runtime_env.flush_struct_name_and_info_caches();
-                global_module_cache.flush_unchecked();
-            }
-            return Ok(previous_env.clone());
-        }
-    }
-
-    // It is not cached or has changed, so we have to reset it. As a result, we need to flush
-    // the cross-block cache because we need to reload all modules with new configs.
-    *global_environment = Some(current_env.clone());
-    drop(global_environment);
-    global_module_cache.flush_unchecked();
-
-    Ok(current_env)
-}
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -456,9 +396,7 @@ impl BlockAptosVM {
         executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        global_module_cache: Arc<
-            ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        >,
+        global_cache_manager: &GlobalCacheManager,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -472,11 +410,6 @@ impl BlockAptosVM {
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
-        let environment = get_environment_with_delayed_field_optimization_enabled(
-            state_view,
-            global_module_cache.as_ref(),
-        )?;
-
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
             AptosExecutorTask,
@@ -486,10 +419,11 @@ impl BlockAptosVM {
         >::new(
             config,
             executor_thread_pool,
-            global_module_cache,
+            global_cache_manager.module_cache(),
             transaction_commit_listener,
         );
 
+        let environment = global_cache_manager.environment()?;
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {
@@ -521,7 +455,7 @@ impl BlockAptosVM {
         }
     }
 
-    pub fn execute_block_on_thread_pool_without_global_module_cache<
+    pub fn execute_block_on_thread_pool_without_global_caches<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
@@ -531,23 +465,29 @@ impl BlockAptosVM {
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Self::execute_block_on_thread_pool::<S, L>(
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        global_cache_manager.mark_block_execution_start(state_view, None)?;
+
+        let result = Self::execute_block_on_thread_pool::<S, L>(
             executor_thread_pool,
             signature_verified_block,
             state_view,
-            Arc::new(ReadOnlyModuleCache::empty()),
+            &global_cache_manager,
             config,
             transaction_commit_listener,
-        )
+        );
+        global_cache_manager.mark_block_execution_end(None)?;
+        result
     }
 
-    /// Uses shared thread pool and shared global module cache to execute blocks.
+    /// Uses shared thread pool to execute blocks.
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
+        global_cache_manager: &GlobalCacheManager,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -555,52 +495,9 @@ impl BlockAptosVM {
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,
-            Arc::clone(&GLOBAL_MODULE_CACHE),
+            global_cache_manager,
             config,
             transaction_commit_listener,
         )
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::on_chain_config::{FeatureFlag, Features};
-    use aptos_vm_environment::environment::AptosEnvironment;
-    use claims::assert_ok;
-    use move_vm_types::code::mock_verified_code;
-
-    #[test]
-    fn test_cross_block_module_cache_flush() {
-        let global_module_cache = ReadOnlyModuleCache::empty();
-
-        global_module_cache.insert(0, mock_verified_code(0, None));
-        assert_eq!(global_module_cache.size(), 1);
-
-        global_module_cache.flush_unchecked();
-        assert_eq!(global_module_cache.size(), 0);
-
-        // Now check that cache is flushed when the environment is flushed.
-        let mut state_view = FakeDataStore::default();
-        let env_old = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
-
-        for i in 0..10 {
-            global_module_cache.insert(i, mock_verified_code(i, None));
-        }
-        assert_eq!(global_module_cache.size(), 10);
-
-        let mut features = Features::default();
-        features.disable(FeatureFlag::KEYLESS_ACCOUNTS);
-        state_view.set_features(features);
-
-        // New environment means we need to also flush global caches - to invalidate struct name
-        // indices.
-        let env_new = assert_ok!(get_environment_with_delayed_field_optimization_enabled(
-            &state_view,
-            &global_module_cache,
-        ));
-        assert!(env_old != env_new);
-        assert_eq!(global_module_cache.size(), 0);
     }
 }

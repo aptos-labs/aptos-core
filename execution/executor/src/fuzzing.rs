@@ -78,6 +78,7 @@ impl VMBlockExecutor for FakeVM {
         &self,
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
+        _global_cache_manager: &GlobalCacheManager,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         Ok(BlockOutput::new(vec![], None))
