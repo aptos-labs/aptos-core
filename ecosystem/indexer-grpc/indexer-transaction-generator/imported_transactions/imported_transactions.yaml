@@ -40,3 +40,10 @@ mainnet:
     155112189: 155112189_default_table_items
     145959468: 145959468_account_transaction
     423176063: 423176063_account_transaction_delete
+    83883373: 83883373_stake_withdraw
+    4827964: 4827964_stake_initialize
+    121508544: 121508544_stake_distribute
+    125600867: 125600867_stake_delegation_pool
+    126043288: 126043288_stake_delegration_withdraw
+    139442597: 139442597_stake_unlock
+    139449359: 139449359_stake_reactivate
