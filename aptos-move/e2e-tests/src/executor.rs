@@ -636,7 +636,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block_on_thread_pool_without_global_module_cache::<
+        BlockAptosVM::execute_block_on_thread_pool_without_global_caches::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(

@@ -167,12 +167,13 @@ pub trait VMBlockExecutor: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
 
-    /// Executes a block of transactions and returns output for each one of them,
-    /// Without applying any block limit
+    /// Executes a block of transactions and returns output for each one of them, without applying
+    /// any block limit.
     fn execute_block_no_limit(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
+        global_cache_manager: &GlobalCacheManager,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         self.execute_block(
             transactions,

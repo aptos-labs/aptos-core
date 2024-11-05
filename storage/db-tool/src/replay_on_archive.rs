@@ -29,6 +29,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
+
 // Replay Verify controller is responsible for providing legit range with start and end versions.
 #[derive(Parser)]
 pub struct Opt {
@@ -276,9 +277,7 @@ impl Verifier {
                 .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
                 .collect::<Vec<_>>()
                 .as_slice(),
-            &self
-                .arc_db
-                .state_view_at_version(start_version.checked_sub(1))?,
+            &state_view,
         )?;
 
         let mut failed_txns = Vec::new();

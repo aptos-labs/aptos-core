@@ -48,6 +48,7 @@ impl DoGetExecutionOutput {
         executor: &V,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
+        global_cache_manager: &GlobalCacheManager,
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
@@ -57,6 +58,7 @@ impl DoGetExecutionOutput {
                     executor,
                     txns,
                     state_view,
+                    global_cache_manager,
                     onchain_config,
                     append_state_checkpoint_to_block,
                 )?
@@ -88,6 +90,7 @@ impl DoGetExecutionOutput {
         executor: &V,
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
+        global_cache_manager: &GlobalCacheManager,
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
@@ -201,6 +204,7 @@ impl DoGetExecutionOutput {
         executor: &V,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
+        global_cache_manager: &GlobalCacheManager,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
@@ -216,6 +220,7 @@ impl DoGetExecutionOutput {
         executor: &V,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
+        global_cache_manager: &GlobalCacheManager,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_types::{
