@@ -12,7 +12,7 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
-    code_cache_global::ImmutableModuleCache, errors::BlockExecutionError, executor::BlockExecutor,
+    errors::BlockExecutionError, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
@@ -23,6 +23,7 @@ use aptos_types::{
     error::PanicError,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
+    read_only_module_cache::ReadOnlyModuleCache,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
@@ -67,8 +68,8 @@ static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 /// the cache is fixed within a single block (modules are not inserted or removed) and it is only
 /// mutated at the block boundaries. Do not use if multiple blocks are executed concurrently.
 static GLOBAL_MODULE_CACHE: Lazy<
-    Arc<ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
-> = Lazy::new(|| Arc::new(ImmutableModuleCache::empty()));
+    Arc<ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+> = Lazy::new(|| Arc::new(ReadOnlyModuleCache::empty()));
 
 /// The maximum size of struct name index map in runtime environment. Checked at block boundaries
 /// only.
@@ -82,7 +83,7 @@ static GLOBAL_ENVIRONMENT: Lazy<Mutex<Option<AptosEnvironment>>> = Lazy::new(|| 
 /// called at the block boundaries.
 fn get_environment_with_delayed_field_optimization_enabled<K, DC, VC, E>(
     state_view: &impl StateView,
-    global_module_cache: &ImmutableModuleCache<K, DC, VC, E>,
+    global_module_cache: &ReadOnlyModuleCache<K, DC, VC, E>,
 ) -> Result<AptosEnvironment, VMStatus>
 where
     K: Hash + Eq + Clone,
@@ -456,7 +457,7 @@ impl BlockAptosVM {
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
         global_module_cache: Arc<
-            ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+            ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         >,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
@@ -534,7 +535,7 @@ impl BlockAptosVM {
             executor_thread_pool,
             signature_verified_block,
             state_view,
-            Arc::new(ImmutableModuleCache::empty()),
+            Arc::new(ReadOnlyModuleCache::empty()),
             config,
             transaction_commit_listener,
         )
@@ -564,7 +565,6 @@ impl BlockAptosVM {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_block_executor::code_cache_global::ImmutableModuleCache;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::on_chain_config::{FeatureFlag, Features};
     use aptos_vm_environment::environment::AptosEnvironment;
@@ -573,7 +573,7 @@ mod test {
 
     #[test]
     fn test_cross_block_module_cache_flush() {
-        let global_module_cache = ImmutableModuleCache::empty();
+        let global_module_cache = ReadOnlyModuleCache::empty();
 
         global_module_cache.insert(0, mock_verified_code(0, None));
         assert_eq!(global_module_cache.size(), 1);

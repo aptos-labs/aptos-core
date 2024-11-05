@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache_global::ImmutableModuleCache,
     counters::{
         self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
         RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
@@ -37,6 +36,7 @@ use aptos_types::{
     executable::Executable,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     on_chain_config::BlockGasLimitType,
+    read_only_module_cache::ReadOnlyModuleCache,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
@@ -75,7 +75,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     global_module_cache:
-        Arc<ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+        Arc<ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -94,7 +94,7 @@ where
         config: BlockExecutorConfig,
         executor_thread_pool: Arc<ThreadPool>,
         global_module_cache: Arc<
-            ImmutableModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+            ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         >,
         transaction_commit_hook: Option<L>,
     ) -> Self {
@@ -120,7 +120,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &ReadOnlyModuleCache<
             ModuleId,
             CompiledModule,
             Module,
@@ -402,7 +402,7 @@ where
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &ReadOnlyModuleCache<
             ModuleId,
             CompiledModule,
             Module,
@@ -755,7 +755,7 @@ where
     fn publish_module_writes(
         txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &ReadOnlyModuleCache<
             ModuleId,
             CompiledModule,
             Module,
@@ -1198,7 +1198,7 @@ where
         write: ModuleWrite<T::Value>,
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &ReadOnlyModuleCache<
             ModuleId,
             CompiledModule,
             Module,
@@ -1252,7 +1252,7 @@ where
     fn apply_output_sequential(
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &ImmutableModuleCache<
+        global_module_cache: &ReadOnlyModuleCache<
             ModuleId,
             CompiledModule,
             Module,

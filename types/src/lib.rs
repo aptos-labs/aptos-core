@@ -36,6 +36,7 @@ pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 pub mod randomness;
+pub mod read_only_module_cache;
 pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;

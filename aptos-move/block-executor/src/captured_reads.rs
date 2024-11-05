@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    code_cache_global::ImmutableModuleCache, types::InputOutputKey,
-    value_exchange::filter_value_for_exchange,
-};
+use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -22,6 +19,7 @@ use aptos_mvhashmap::{
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
     executable::ModulePath,
+    read_only_module_cache::ReadOnlyModuleCache,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -652,7 +650,7 @@ where
     ///   3. Entries that were in per-block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
-        global_module_cache: &ImmutableModuleCache<K, DC, VC, S>,
+        global_module_cache: &ReadOnlyModuleCache<K, DC, VC, S>,
         per_block_module_cache: &SyncModuleCache<K, DC, VC, S, Option<TxnIndex>>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
@@ -1497,7 +1495,7 @@ mod test {
             MockVerifiedCode,
             (),
         >::new();
-        let global_module_cache = ImmutableModuleCache::empty();
+        let global_module_cache = ReadOnlyModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
@@ -1532,7 +1530,7 @@ mod test {
             MockVerifiedCode,
             (),
         >::new();
-        let global_module_cache = ImmutableModuleCache::empty();
+        let global_module_cache = ReadOnlyModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         global_module_cache.insert(0, mock_verified_code(0, None));
@@ -1609,7 +1607,7 @@ mod test {
             MockVerifiedCode,
             (),
         >::new();
-        let global_module_cache = ImmutableModuleCache::empty();
+        let global_module_cache = ReadOnlyModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         let a = mock_deserialized_code(0, Some(10));
@@ -1669,7 +1667,7 @@ mod test {
             MockVerifiedCode,
             (),
         >::new();
-        let global_module_cache = ImmutableModuleCache::empty();
+        let global_module_cache = ReadOnlyModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         // Module exists in global cache.
