@@ -11,7 +11,6 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use serde::{Deserialize, Serialize};
-use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 mod builder;
@@ -26,6 +25,7 @@ pub mod tests;
 pub static APTOS_SCRIPT_COMPOSER_KEY: &[u8] = "aptos::script_composer".as_bytes();
 
 /// Representing a returned value from a previous list of `MoveFunctionCall`s.
+#[wasm_bindgen]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreviousResult {
     /// Refering to the return value in the `call_idx`th call.
@@ -38,8 +38,7 @@ pub struct PreviousResult {
 }
 
 /// Arguments to the `MoveFunctionCall`.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CallArgument {
     /// Passing raw bytes to the function. The bytes must follows the existing constraints for
     /// transaction arguments.
@@ -92,7 +91,6 @@ impl MoveFunctionCall {
     }
 }
 
-#[wasm_bindgen]
 impl CallArgument {
     pub fn new_bytes(bytes: Vec<u8>) -> Self {
         CallArgument::Raw(bytes)
@@ -114,7 +112,10 @@ impl CallArgument {
         self.change_op_type(ArgumentOperation::Copy)
     }
 
-    fn change_op_type(&self, operation_type: ArgumentOperation) -> Result<CallArgument, String> {
+    pub(crate) fn change_op_type(
+        &self,
+        operation_type: ArgumentOperation,
+    ) -> Result<CallArgument, String> {
         match &self {
             CallArgument::PreviousResult(r) => {
                 let mut result = r.clone();
