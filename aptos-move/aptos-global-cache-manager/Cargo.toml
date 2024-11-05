@@ -1,0 +1,22 @@
+[package]
+name = "aptos-global-cache-manager"
+description = "Aptos global module and environement cache manager"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-environment = { workspace = true }
+parking_lot = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }

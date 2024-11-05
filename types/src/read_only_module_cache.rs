@@ -70,9 +70,6 @@ where
 pub struct ReadOnlyModuleCache<K, DC, VC, E> {
     /// Module cache containing the verified code.
     module_cache: ExplicitSyncWrapper<HashMap<K, Entry<DC, VC, E>>>,
-    /// Maximum cache size. If the size is greater than this limit, the cache is flushed. Note that
-    /// this can only be done at block boundaries.
-    capacity: usize,
 }
 
 impl<K, DC, VC, E> ReadOnlyModuleCache<K, DC, VC, E>
@@ -80,17 +77,10 @@ where
     K: Hash + Eq + Clone,
     VC: Deref<Target = Arc<DC>>,
 {
-    /// Returns new empty module cache with default capacity.
+    /// Returns new empty module cache.
     pub fn empty() -> Self {
-        let default_capacity = 100_000;
-        Self::with_capacity(default_capacity)
-    }
-
-    /// Returns new empty module cache with specified capacity.
-    fn with_capacity(capacity: usize) -> Self {
         Self {
             module_cache: ExplicitSyncWrapper::new(HashMap::new()),
-            capacity,
         }
     }
 
@@ -136,8 +126,6 @@ where
     ///   2. Versions of inserted modules are set to [None] (storage version).
     ///   3. Valid modules should not be removed, and new modules should have unique ownership. If
     ///      these constraints are violated, a panic error is returned.
-    ///   4. If the cache size exceeds its capacity after all verified modules have been inserted,
-    ///      the cache is flushed.
     pub fn insert_verified_unchecked(
         &self,
         modules: impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E, Option<u32>>>)>,
@@ -168,12 +156,12 @@ where
                 assert!(prev.is_none())
             }
         }
-
-        if module_cache.len() > self.capacity {
-            module_cache.clear();
-        }
-
         Ok(())
+    }
+
+    /// Returns the size of the cache.
+    pub fn size(&self) -> usize {
+        self.module_cache.acquire().len()
     }
 
     /// Insert the module to cache. Used for tests only.
@@ -188,12 +176,6 @@ where
     #[cfg(any(test, feature = "testing"))]
     pub fn remove(&self, key: &K) {
         self.module_cache.acquire().remove(key);
-    }
-
-    /// Returns the size of the cache. Used for tests only.
-    #[cfg(any(test, feature = "testing"))]
-    pub fn size(&self) -> usize {
-        self.module_cache.acquire().len()
     }
 }
 
@@ -241,27 +223,23 @@ mod test {
 
     #[test]
     fn test_insert_verified_for_read_only_module_cache() {
-        let capacity = 10;
-        let global_cache = ReadOnlyModuleCache::with_capacity(capacity);
+        let global_cache = ReadOnlyModuleCache::empty();
 
         let mut new_modules = vec![];
-        for i in 0..capacity {
+        for i in 0..10 {
             new_modules.push((i, mock_verified_code(i, Some(i as u32))));
         }
         let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
         assert!(result.is_ok());
-        assert_eq!(global_cache.size(), capacity);
+        assert_eq!(global_cache.size(), 10);
 
         // Versions should be set to storage.
-        for key in 0..capacity {
+        for key in 0..10 {
             let code = assert_some!(global_cache.get(&key));
             assert!(code.version().is_none())
         }
 
-        // Too many modules added, the cache should be flushed.
-        let new_modules = vec![(11, mock_verified_code(11, None))];
-        let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
-        assert!(result.is_ok());
+        global_cache.flush_unchecked();
         assert_eq!(global_cache.size(), 0);
 
         // Should not add deserialized code.

@@ -8,6 +8,7 @@ use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
 use aptos_crypto::HashValue;
+use aptos_global_cache_manager::GlobalCacheManager;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
@@ -211,6 +212,11 @@ where
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        global_cache_manager
+            .mark_block_execution_start(self.state_view.as_ref(), None)
+            .unwrap();
+
         let timer = Instant::now();
         let output = BlockAptosVM::execute_block::<
             _,
@@ -218,12 +224,14 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
+            &global_cache_manager,
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
         )
         .expect("VM should not fail to start")
         .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
+        global_cache_manager.mark_block_execution_end(None).unwrap();
 
         (output, block_size * 1000 / exec_time as usize)
     }
@@ -259,6 +267,11 @@ where
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        global_cache_manager
+            .mark_block_execution_start(self.state_view.as_ref(), None)
+            .unwrap();
+
         let timer = Instant::now();
         let output = BlockAptosVM::execute_block::<
             _,
@@ -266,6 +279,7 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
+            &global_cache_manager,
             BlockExecutorConfig::new_maybe_block_limit(
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
@@ -275,6 +289,8 @@ where
         .expect("VM should not fail to start")
         .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
+
+        global_cache_manager.mark_block_execution_end(None).unwrap();
 
         (output, block_size * 1000 / exec_time as usize)
     }

@@ -138,6 +138,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         None,
     )?;
+
     ensure!(
         execution_output.num_transactions_to_commit() != 0,
         "Genesis txn execution failed."

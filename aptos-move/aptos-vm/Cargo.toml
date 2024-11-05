@@ -24,6 +24,7 @@ aptos-framework =  { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-global-cache-manager = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-memory-usage-tracker = { workspace = true }

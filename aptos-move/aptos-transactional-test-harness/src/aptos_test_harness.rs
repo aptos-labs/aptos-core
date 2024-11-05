@@ -14,11 +14,9 @@ use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEA
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
-    block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::BlockGasLimitType,
     state_store::{state_key::StateKey, table::TableHandle, TStateView},
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
@@ -526,6 +524,16 @@ impl<'a> AptosTestAdapter<'a> {
             .execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
             .into_inner();
 
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        global_cache_manager.mark_block_execution_start(&state_view, None)?;
+        let result = AptosVM::execute_block_no_limit(
+            &sig_verified_block,
+            &state_view,
+            &global_cache_manager,
+        );
+        global_cache_manager.mark_block_execution_end(None)?;
+
+        let mut outputs = result?;
         assert_eq!(outputs.len(), 1);
 
         let output = outputs.pop().unwrap();
