@@ -18,6 +18,8 @@ use futures::{stream::FuturesOrdered, StreamExt};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{cmp::Reverse, collections::HashSet, sync::Arc, time::Instant};
 
+const SECS_TO_MICROSECS: u64 = 1_000_000;
+
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
     txn_filter: Arc<TransactionFilter>,
@@ -149,6 +151,7 @@ impl BlockPreparer {
         let txn_deduper = self.txn_deduper.clone();
         let block_id = block.id();
         let block_timestamp_usecs = block.timestamp_usecs();
+        let block_timestamp_secs = block.timestamp_usecs() / SECS_TO_MICROSECS;
         // Always use max_block_txns * 2 regardless of max_txns_from_block_to_execute for better shuffling
         let max_prepared_block_txns = self.max_block_txns * 2;
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
@@ -157,12 +160,16 @@ impl BlockPreparer {
             batched_txns.sort_by_key(|(_, gas)| Reverse(*gas));
 
             let batched_txns: Vec<Vec<_>> = monitor!(
-                "filter_committed_transactions",
+                "filter_committed_and_expired_transactions",
                 batched_txns
                     .into_par_iter()
                     .map(|(txns, _)| {
                         txns.iter()
-                            .filter(|txn| !committed_transactions.contains(&txn.committed_hash()))
+                            .filter(|txn| {
+                                !committed_transactions.contains(&txn.committed_hash())
+                                    && block_timestamp_secs < txn.expiration_timestamp_secs()
+                            })
+                            // TODO: avoid clone by using references?
                             .cloned()
                             .collect()
                     })
