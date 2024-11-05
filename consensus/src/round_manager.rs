@@ -1171,6 +1171,12 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
 
+        if !self.randomness_config.randomness_enabled() {
+            if let Some(tx) = block_arc.pipeline_tx().lock().as_mut() {
+                let _ = tx.rand_tx.take().map(|tx| tx.send(None));
+            }
+        }
+
         // Short circuit if already voted.
         ensure!(
             self.round_state.vote_sent().is_none(),
@@ -1328,6 +1334,17 @@ impl RoundManager {
                 self.new_log(LogEvent::BroadcastOrderVote),
                 "{}", order_vote_msg
             );
+            if proposed_block.pipeline_enabled() {
+                if let Some(tx) = proposed_block.pipeline_tx().lock().as_mut() {
+                    let _ = tx.order_vote_tx.take().map(|tx| tx.send(()));
+                }
+                let network = self.network.clone();
+                tokio::spawn(async move {
+                    if let Ok(commit_vote) = proposed_block.wait_for_commit_vote().await {
+                        network.broadcast_commit_vote(commit_vote).await;
+                    }
+                });
+            }
             self.network.broadcast_order_vote(order_vote_msg).await;
             ORDER_VOTE_BROADCASTED.inc();
         }
