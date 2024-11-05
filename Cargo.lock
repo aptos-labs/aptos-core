@@ -339,6 +339,7 @@ dependencies = [
  "move-coverage",
  "move-disassembler",
  "move-ir-types",
+ "move-linter",
  "move-model",
  "move-package",
  "move-prover-boogie-backend",
@@ -2565,48 +2566,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "rand 0.7.3",
-]
-
-[[package]]
-name = "aptos-keyless-circuit"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-keyless-common",
- "aptos-logger",
- "ark-bn254",
- "ark-ff",
- "base64 0.13.1",
- "hex",
- "itertools 0.13.0",
- "num-bigint 0.3.3",
- "num-modular",
- "num-traits",
- "rand 0.7.3",
- "rand_chacha 0.3.1",
- "rsa 0.9.6",
- "serde_json",
- "sha2 0.9.9",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "aptos-keyless-common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-types",
- "ark-bn254",
- "ark-ff",
- "base64 0.13.1",
- "hex",
- "num-bigint 0.3.3",
- "serde",
- "serde_json",
- "tempfile",
- "tracing",
 ]
 
 [[package]]
@@ -11191,8 +11150,6 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.6.5",
- "strum 0.24.1",
- "strum_macros 0.24.3",
  "walkdir",
 ]
 
@@ -11418,6 +11375,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-linter"
+version = "0.1.0"
+dependencies = [
+ "codespan-reporting",
+ "datatest-stable",
+ "move-binary-format",
+ "move-compiler",
+ "move-compiler-v2",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "num 0.4.1",
+]
+
+[[package]]
 name = "move-model"
 version = "0.1.0"
 dependencies = [
@@ -11604,6 +11576,7 @@ dependencies = [
  "paste",
  "petgraph 0.6.5",
  "topological-sort",
+ "try_match",
 ]
 
 [[package]]
@@ -12281,17 +12254,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d03e6c028c5dc5cac6e2dec0efda81fc887605bb3d884578bb6d6bf7514e252"
 dependencies = [
  "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-modular"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17bb261bf36fa7d83f4c294f834e91256769097b3cb505d44831e0a179ac647f"
-dependencies = [
- "num-bigint 0.4.4",
  "num-integer",
  "num-traits",
 ]
@@ -14637,7 +14599,6 @@ dependencies = [
  "pkcs1 0.7.5",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
- "sha2 0.10.8",
  "signature 2.2.0",
  "spki 0.7.3",
  "subtle",
@@ -17177,6 +17138,26 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "try_match"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b065c869a3f832418e279aa4c1d7088f9d5d323bde15a60a08e20c2cd4549082"
+dependencies = [
+ "try_match_inner",
+]
+
+[[package]]
+name = "try_match_inner"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9c81686f7ab4065ccac3df7a910c4249f8c0f3fb70421d6ddec19b9311f63f9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
 
 [[package]]
 name = "trybuild"

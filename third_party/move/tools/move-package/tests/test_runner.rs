@@ -82,7 +82,7 @@ fn run_test_impl(
                 .into())
             },
             (true, _) => match BuildPlan::create(resolved_package)
-                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), &mut Vec::new()))
+                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), vec![], &mut vec![]))
             {
                 Ok((mut pkg, _)) => {
                     pkg.compiled_package_info.source_digest =

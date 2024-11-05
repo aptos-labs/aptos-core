@@ -9,6 +9,7 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use async_trait::async_trait;
 use clap::Parser;
 use move_compiler_v2::Experiment;
+use move_linter::MoveLintChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::source_package::std_lib::StdVersion;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -112,7 +113,7 @@ impl CliCommand<&'static str> for LintPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let move_options = MovePackageDir {
-            compiler_version: Some(CompilerVersion::V2_0),
+            compiler_version: Some(CompilerVersion::latest_stable()),
             ..self.to_move_options()
         };
         let more_experiments = vec![
@@ -131,7 +132,9 @@ impl CliCommand<&'static str> for LintPackage {
                 true,
             )?
         };
-        BuiltPackage::build(package_path, build_options)?;
+        BuiltPackage::build_with_external_checks(package_path, build_options, vec![
+            MoveLintChecks::make(),
+        ])?;
         Ok("succeeded")
     }
 }

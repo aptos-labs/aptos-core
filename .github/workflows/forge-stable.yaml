@@ -8,10 +8,6 @@ permissions:
   id-token: write
   actions: write #required for workflow cancellation via check-aptos-core
 
-concurrency:
-  group: forge-stable-${{ github.ref_name }}
-  cancel-in-progress: true
-
 on:
   # Allow triggering manually
   workflow_dispatch:
@@ -62,6 +58,10 @@ on:
       - ".github/workflows/forge-stable.yaml"
       - "testsuite/find_latest_image.py"
 
+concurrency:
+  group: forge-stable-${{ format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
+  cancel-in-progress: true
+
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -70,10 +70,71 @@ env:
   AWS_REGION: us-west-2
 
 jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      imageVariants: ${{ steps.set-matrix.outputs.imageVariants }}
+    steps:
+      - name: Compute matrix
+        id: set-matrix
+        uses: actions/github-script@v7
+        env:
+          TEST_NAME: ${{ inputs.TEST_NAME }}
+        with:
+          result-encoding: string
+          script: |
+            const testName = process.env.TEST_NAME || 'all';
+            console.log(`Running job: ${testName}`);
+            const tests = [
+              { TEST_NAME: 'framework-upgrade-test', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'framework_upgrade' },
+              { TEST_NAME: 'realistic-env-load-sweep', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'realistic_env_load_sweep' },
+              { TEST_NAME: 'realistic-env-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_workload_sweep' },
+              { TEST_NAME: 'realistic-env-graceful-overload', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_env_graceful_overload' },
+              { TEST_NAME: 'realistic-env-graceful-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2100, FORGE_TEST_SUITE: 'realistic_env_graceful_workload_sweep' },
+              { TEST_NAME: 'realistic-env-fairness-workload-sweep', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_env_fairness_workload_sweep' },
+              { TEST_NAME: 'realistic-network-tuned-for-throughput', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_network_tuned_for_throughput', FORGE_ENABLE_PERFORMANCE: true },
+              { TEST_NAME: 'consensus-stress-test', FORGE_RUNNER_DURATION_SECS: 2400, FORGE_TEST_SUITE: 'consensus_stress_test' },
+              { TEST_NAME: 'workload-mix-test', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'workload_mix' },
+              { TEST_NAME: 'single-vfn-perf', FORGE_RUNNER_DURATION_SECS: 480, FORGE_TEST_SUITE: 'single_vfn_perf' },
+              { TEST_NAME: 'fullnode-reboot-stress-test', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'fullnode_reboot_stress_test' },
+              { TEST_NAME: 'compat', FORGE_RUNNER_DURATION_SECS: 300, FORGE_TEST_SUITE: 'compat' },
+              { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
+              { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
+              { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
+              { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' }
+            ];
+
+            const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
+            core.debug(`Matrix: ${JSON.stringify(matrix)}`);
+
+            core.summary.addHeading('Forge Stable Run');
+
+            const testsToRunNames = matrix.map(test => `${test.TEST_NAME} (Needs Failpoint: ${test.FORGE_ENABLE_FAILPOINTS || false}, Needs Performance: ${test.FORGE_ENABLE_PERFORMANCE || false})`);
+            core.summary.addRaw("The following tests will be run:", true);
+            core.summary.addList(testsToRunNames);
+
+            core.summary.write();
+
+            const needsFailpoints = matrix.some(test => test.FORGE_ENABLE_FAILPOINTS);
+            const needsPerformance = matrix.some(test => test.FORGE_ENABLE_PERFORMANCE);
+
+            let requiredImageVariants = [];
+            if (needsFailpoints) {
+              requiredImageVariants.push('failpoints');
+            }
+            if (needsPerformance) {
+              requiredImageVariants.push('performance');
+            }
+
+            core.setOutput('matrix', JSON.stringify({ include: matrix }));
+            core.setOutput('imageVariants', requiredImageVariants.join(' '));
+
   # This job determines the image tag and branch to test, and passes them to the other jobs
   # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
   determine-test-metadata:
     runs-on: ubuntu-latest
+    needs: ["generate-matrix"]
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
       IMAGE_TAG_FOR_COMPAT_TEST: ${{ steps.get-last-released-image-tag-for-compat-test.outputs.IMAGE_TAG }}
@@ -131,13 +192,13 @@ jobs:
         id: get-docker-image-tag
         with:
           branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
-          variants: "failpoints performance"
+          variants: ${{ needs.generate-matrix.outputs.imageVariants }}
 
       - uses: aptos-labs/aptos-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
         id: get-last-released-image-tag-for-compat-test
         with:
           base-branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
-          variants: "failpoints performance"
+          variants: ${{ needs.generate-matrix.outputs.imageVariants }}
 
       - name: Write summary
         run: |
@@ -151,60 +212,13 @@ jobs:
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
           echo "To cancel this job, do `pnpm infra ci cancel-workflow ${{ github.run_id }}` from internal-ops" >> $GITHUB_STEP_SUMMARY
 
-  generate-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.result }}
-    steps:
-      - name: Compute matrix
-        id: set-matrix
-        uses: actions/github-script@v7
-        env:
-          TEST_NAME: ${{ inputs.TEST_NAME }}
-        with:
-          result-encoding: string
-          script: |
-            const testName = process.env.TEST_NAME || 'all';
-            console.log(`Running job: ${testName}`);
-            const tests = [
-              { TEST_NAME: 'framework-upgrade-test', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'framework_upgrade' },
-              { TEST_NAME: 'realistic-env-load-sweep', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'realistic_env_load_sweep' },
-              { TEST_NAME: 'realistic-env-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_workload_sweep' },
-              { TEST_NAME: 'realistic-env-graceful-overload', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_env_graceful_overload' },
-              { TEST_NAME: 'realistic-env-graceful-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2100, FORGE_TEST_SUITE: 'realistic_env_graceful_workload_sweep' },
-              { TEST_NAME: 'realistic-env-fairness-workload-sweep', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_env_fairness_workload_sweep' },
-              { TEST_NAME: 'realistic-network-tuned-for-throughput', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_network_tuned_for_throughput', FORGE_ENABLE_PERFORMANCE: true },
-              { TEST_NAME: 'consensus-stress-test', FORGE_RUNNER_DURATION_SECS: 2400, FORGE_TEST_SUITE: 'consensus_stress_test' },
-              { TEST_NAME: 'workload-mix-test', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'workload_mix' },
-              { TEST_NAME: 'single-vfn-perf', FORGE_RUNNER_DURATION_SECS: 480, FORGE_TEST_SUITE: 'single_vfn_perf' },
-              { TEST_NAME: 'fullnode-reboot-stress-test', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'fullnode_reboot_stress_test' },
-              { TEST_NAME: 'compat', FORGE_RUNNER_DURATION_SECS: 300, FORGE_TEST_SUITE: 'compat' },
-              { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
-              { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
-              { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
-              { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' }
-            ];
-
-            const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
-            core.debug(`Matrix: ${JSON.stringify(matrix)}`);
-
-            core.summary.addHeading('Forge Stable Run');
-
-            const testsToRunNames = matrix.map(test => test.TEST_NAME);
-            core.summary.addRaw("The following tests will be run:", true);
-            core.summary.addList(testsToRunNames);
-
-            core.summary.write();
-
-            const matrix_output = { include: matrix };
-            return JSON.stringify(matrix_output);
-
   run:
+    name: forge-${{ matrix.TEST_NAME }}
     needs: [determine-test-metadata, generate-matrix]
     if: ${{ github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
-      max-parallel: ${{ fromJson(inputs.JOB_PARALLELISM) || 1 }}
+      max-parallel: ${{ inputs.JOB_PARALLELISM && fromJson(inputs.JOB_PARALLELISM) || 1 }}
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
