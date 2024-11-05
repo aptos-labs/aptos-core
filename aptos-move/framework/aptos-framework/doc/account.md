@@ -67,6 +67,7 @@
     -  [Function `exists_at`](#@Specification_1_exists_at)
     -  [Function `get_guid_next_creation_num`](#@Specification_1_get_guid_next_creation_num)
     -  [Function `get_sequence_number`](#@Specification_1_get_sequence_number)
+    -  [Function `originating_address`](#@Specification_1_originating_address)
     -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
     -  [Function `get_authentication_key`](#@Specification_1_get_authentication_key)
     -  [Function `rotate_authentication_key_internal`](#@Specification_1_rotate_authentication_key_internal)
@@ -74,6 +75,7 @@
     -  [Function `rotate_authentication_key`](#@Specification_1_rotate_authentication_key)
     -  [Function `rotate_authentication_key_with_rotation_capability`](#@Specification_1_rotate_authentication_key_with_rotation_capability)
     -  [Function `offer_rotation_capability`](#@Specification_1_offer_rotation_capability)
+    -  [Function `set_originating_address`](#@Specification_1_set_originating_address)
     -  [Function `is_rotation_capability_offered`](#@Specification_1_is_rotation_capability_offered)
     -  [Function `get_rotation_capability_offer_for`](#@Specification_1_get_rotation_capability_offer_for)
     -  [Function `revoke_rotation_capability`](#@Specification_1_revoke_rotation_capability)
@@ -2675,6 +2677,23 @@ The Account does not exist under the new address before creating the account.
 
 
 
+<a id="@Specification_1_originating_address"></a>
+
+### Function `originating_address`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_originating_address">originating_address</a>(auth_key: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_increment_sequence_number"></a>
 
 ### Function `increment_sequence_number`
@@ -2942,6 +2961,22 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address).rotation_capability_offer.for;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(offer_for) == recipient_address;
+</code></pre>
+
+
+
+<a id="@Specification_1_set_originating_address"></a>
+
+### Function `set_originating_address`
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_set_originating_address">set_originating_address</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 
@@ -3285,6 +3320,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(address_map, curr_auth_key) &&
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(address_map, curr_auth_key) != originating_addr;
     <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(new_auth_key_vector);
+    <b>aborts_if</b> curr_auth_key == new_auth_key;
     <b>aborts_if</b> curr_auth_key != new_auth_key && <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(address_map, new_auth_key);
     <b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(<b>global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map, <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(new_auth_key_vector));
 }
