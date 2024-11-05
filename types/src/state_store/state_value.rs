@@ -280,6 +280,23 @@ impl StateValue {
         ))
     }
 
+    pub fn into_bytes(self) -> Bytes {
+        self.inner.data
+    }
+
+    pub fn set_bytes(&mut self, data: Bytes) {
+        self.inner.data = data;
+        self.hash = OnceCell::new();
+    }
+
+    pub fn metadata(&self) -> &StateValueMetadata {
+        &self.inner.metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
+        &mut self.inner.metadata
+    }
+
     pub fn into_metadata(self) -> StateValueMetadata {
         self.inner.metadata
     }
