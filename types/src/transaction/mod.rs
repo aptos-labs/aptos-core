@@ -433,7 +433,7 @@ impl TransactionPayload {
 }
 
 /// Two different kinds of WriteSet transactions.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WriteSetPayload {
     /// Directly passing in the WriteSet.
     Direct(ChangeSet),
