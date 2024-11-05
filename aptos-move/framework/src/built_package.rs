@@ -19,7 +19,7 @@ use itertools::Itertools;
 use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_compiler_v2::{options::Options, Experiment};
+use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -38,6 +38,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     io::{stderr, Write},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
@@ -222,108 +223,123 @@ impl BuiltPackage {
     /// This function currently reports all Move compilation errors and warnings to stdout,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
-        let bytecode_version = Some(options.inferred_bytecode_version());
-        let compiler_version = options.compiler_version;
-        let language_version = options.language_version;
-        Self::check_versions(&compiler_version, &language_version)?;
-        let skip_attribute_checks = options.skip_attribute_checks;
-        let build_config = BuildConfig {
-            dev_mode: options.dev,
-            additional_named_addresses: options.named_addresses.clone(),
-            architecture: None,
-            generate_abis: options.with_abis,
-            generate_docs: false,
-            generate_move_model: true,
-            full_model_generation: options.check_test_code,
-            install_dir: options.install_dir.clone(),
-            test_mode: false,
-            override_std: options.override_std.clone(),
-            force_recompilation: false,
-            fetch_deps_only: false,
-            skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
-            compiler_config: CompilerConfig {
-                bytecode_version,
-                compiler_version,
-                language_version,
-                skip_attribute_checks,
-                known_attributes: options.known_attributes.clone(),
-                experiments: options.experiments.clone(),
-            },
-        };
+        BuiltPackage::build_with_external_checks(package_path, options, vec![])
+    }
 
-        eprintln!("Compiling, may take a little while to download git dependencies...");
-        let (mut package, model_opt) =
-            build_config.compile_package_no_exit(&package_path, &mut stderr())?;
-
-        // Run extended checks as well derive runtime metadata
-        let model = &model_opt.expect("move model");
-
-        if let Some(model_options) = model.get_extension::<Options>() {
-            if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
-                std::process::exit(0)
-            }
-        }
-
-        let runtime_metadata = extended_checks::run_extended_checks(model);
-        if model.diag_count(Severity::Warning) > 0 {
-            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-            model.report_diag(&mut error_writer, Severity::Warning);
-            if model.has_errors() {
-                bail!("extended checks failed")
-            }
-        }
-
-        if let Some(model_options) = model.get_extension::<Options>() {
-            if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                std::process::exit(0)
-            }
-        }
-
-        let compiled_pkg_path = package
-            .compiled_package_info
-            .build_flags
-            .install_dir
-            .as_ref()
-            .unwrap_or(&package_path)
-            .join(CompiledPackageLayout::Root.path())
-            .join(package.compiled_package_info.package_name.as_str());
-        inject_runtime_metadata(
-            compiled_pkg_path,
-            &mut package,
-            runtime_metadata,
-            bytecode_version,
-        )?;
-
-        // If enabled generate docs.
-        if options.with_docs {
-            let docgen = if let Some(opts) = options.docgen_options.clone() {
-                opts
-            } else {
-                DocgenOptions::default()
+    /// Same as `build` but allows to provide external checks to be made on Move code.
+    /// The `external_checks` are only run when compiler v2 is used.
+    pub fn build_with_external_checks(
+        package_path: PathBuf,
+        options: BuildOptions,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
+    ) -> anyhow::Result<Self> {
+        {
+            let bytecode_version = Some(options.inferred_bytecode_version());
+            let compiler_version = options.compiler_version;
+            let language_version = options.language_version;
+            Self::check_versions(&compiler_version, &language_version)?;
+            let skip_attribute_checks = options.skip_attribute_checks;
+            let build_config = BuildConfig {
+                dev_mode: options.dev,
+                additional_named_addresses: options.named_addresses.clone(),
+                architecture: None,
+                generate_abis: options.with_abis,
+                generate_docs: false,
+                generate_move_model: true,
+                full_model_generation: options.check_test_code,
+                install_dir: options.install_dir.clone(),
+                test_mode: false,
+                override_std: options.override_std.clone(),
+                force_recompilation: false,
+                fetch_deps_only: false,
+                skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+                compiler_config: CompilerConfig {
+                    bytecode_version,
+                    compiler_version,
+                    language_version,
+                    skip_attribute_checks,
+                    known_attributes: options.known_attributes.clone(),
+                    experiments: options.experiments.clone(),
+                },
             };
-            let dep_paths = package
-                .deps_compiled_units
-                .iter()
-                .map(|(_, u)| {
-                    u.source_path
-                        .parent()
-                        .unwrap()
-                        .parent()
-                        .unwrap()
-                        .join(get_docgen_output_dir())
-                        .display()
-                        .to_string()
-                })
-                .unique()
-                .collect::<Vec<_>>();
-            docgen.run(package_path.display().to_string(), dep_paths, model)?
-        }
 
-        Ok(Self {
-            options,
-            package_path,
-            package,
-        })
+            eprintln!("Compiling, may take a little while to download git dependencies...");
+            let (mut package, model_opt) = build_config.compile_package_no_exit(
+                &package_path,
+                external_checks,
+                &mut stderr(),
+            )?;
+
+            // Run extended checks as well derive runtime metadata
+            let model = &model_opt.expect("move model");
+
+            if let Some(model_options) = model.get_extension::<Options>() {
+                if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
+                    std::process::exit(0)
+                }
+            }
+
+            let runtime_metadata = extended_checks::run_extended_checks(model);
+            if model.diag_count(Severity::Warning) > 0 {
+                let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+                model.report_diag(&mut error_writer, Severity::Warning);
+                if model.has_errors() {
+                    bail!("extended checks failed")
+                }
+            }
+
+            if let Some(model_options) = model.get_extension::<Options>() {
+                if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                    std::process::exit(0)
+                }
+            }
+
+            let compiled_pkg_path = package
+                .compiled_package_info
+                .build_flags
+                .install_dir
+                .as_ref()
+                .unwrap_or(&package_path)
+                .join(CompiledPackageLayout::Root.path())
+                .join(package.compiled_package_info.package_name.as_str());
+            inject_runtime_metadata(
+                compiled_pkg_path,
+                &mut package,
+                runtime_metadata,
+                bytecode_version,
+            )?;
+
+            // If enabled generate docs.
+            if options.with_docs {
+                let docgen = if let Some(opts) = options.docgen_options.clone() {
+                    opts
+                } else {
+                    DocgenOptions::default()
+                };
+                let dep_paths = package
+                    .deps_compiled_units
+                    .iter()
+                    .map(|(_, u)| {
+                        u.source_path
+                            .parent()
+                            .unwrap()
+                            .parent()
+                            .unwrap()
+                            .join(get_docgen_output_dir())
+                            .display()
+                            .to_string()
+                    })
+                    .unique()
+                    .collect::<Vec<_>>();
+                docgen.run(package_path.display().to_string(), dep_paths, model)?
+            }
+
+            Ok(Self {
+                options,
+                package_path,
+                package,
+            })
+        }
     }
 
     // Check versions and warn user if using unstable ones.
