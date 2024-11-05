@@ -11,7 +11,6 @@ use crate::{
     },
     errors::*,
     executor_utilities::*,
-    explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
@@ -36,6 +35,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::Executable,
+    explicit_sync_wrapper::ExplicitSyncWrapper,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{

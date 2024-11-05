@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod access_path;
 pub mod account_address;
@@ -18,6 +18,7 @@ pub mod epoch_state;
 pub mod error;
 pub mod event;
 pub mod executable;
+pub mod explicit_sync_wrapper;
 pub mod fee_statement;
 pub mod governance;
 pub mod indexer;

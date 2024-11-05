@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::error::PanicError;
+use aptos_types::{error::PanicError, explicit_sync_wrapper::ExplicitSyncWrapper};
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_vm_types::code::ModuleCode;

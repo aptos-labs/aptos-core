@@ -146,7 +146,6 @@ pub mod counters;
 pub mod errors;
 pub mod executor;
 mod executor_utilities;
-pub mod explicit_sync_wrapper;
 mod limit_processor;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
