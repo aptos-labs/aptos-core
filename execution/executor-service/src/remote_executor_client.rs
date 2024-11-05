@@ -330,6 +330,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             .with_label_values(&["9_2_results_rx_all_shards"]).observe(delta as f64);
 
         let results = aggr_rx.recv().unwrap();
+        let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["9_3_aggr_total_supply_done"]).observe(delta as f64);
         Ok(results)
@@ -359,8 +360,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
         let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
-        // dummy call
-        //state_view.get_state_value(&(*TOTAL_SUPPLY_STATE_KEY)).expect("dummy read to total supply failed");
         let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         info!("Executing block started at time {}", current_time);
         self.state_view_service.set_state_view(state_view);
