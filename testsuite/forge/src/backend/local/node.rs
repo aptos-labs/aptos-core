@@ -24,6 +24,7 @@ use std::{
     path::PathBuf,
     process::{Child, Command},
     str::FromStr,
+    time::Duration,
 };
 use url::Url;
 
@@ -378,6 +379,10 @@ impl Node for LocalNode {
 
     fn service_name(&self) -> Option<String> {
         None
+    }
+
+    async fn stop_for_duration(&self, _duration: Duration) -> Result<()> {
+        todo!()
     }
 }
 

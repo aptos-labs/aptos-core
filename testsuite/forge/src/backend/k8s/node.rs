@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backend::k8s::stateful_set, get_free_port, scale_stateful_set_replicas, FullNode,
-    HealthCheckError, Node, NodeExt, Result, Validator, Version, KUBECTL_BIN, LOCALHOST,
+    backend::k8s::stateful_set, create_k8s_client, get_free_port, scale_stateful_set_replicas,
+    FullNode, HealthCheckError, Node, NodeExt, Result, Validator, Version, KUBECTL_BIN, LOCALHOST,
     NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, format_err};
@@ -14,6 +14,8 @@ use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use k8s_openapi::api::core::v1::Pod;
+use kube::{api::DeleteParams, Api};
 use reqwest::Url;
 use serde_json::Value;
 use std::{
@@ -108,6 +110,42 @@ impl K8sNode {
                 err
             )),
         }
+    }
+
+    pub async fn stop_for_duration(&self, duration: Duration) -> Result<()> {
+        info!(
+            "Stopping node {} for {} seconds",
+            self.stateful_set_name(),
+            duration.as_secs()
+        );
+
+        let kube_client = create_k8s_client().await?;
+        let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), self.namespace());
+        let pod_name = format!("{}-0", self.stateful_set_name());
+
+        let deadline = Instant::now() + duration;
+
+        // Initial pod delete
+        pod_api.delete(&pod_name, &DeleteParams::default()).await?;
+
+        // Keep deleting the pod if it recovers before the deadline
+        while Instant::now() < deadline {
+            match self.wait_until_healthy(deadline).await {
+                Ok(_) => {
+                    info!("Pod {} recovered, deleting again", pod_name);
+                    pod_api.delete(&pod_name, &DeleteParams::default()).await?;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                },
+                Err(e) => {
+                    info!("Pod {} still down", pod_name);
+                    break;
+                },
+            }
+        }
+
+        // Wait for the pod to recover
+        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
+            .await
     }
 
     pub fn port_forward_rest_api(&self) -> Result<()> {
@@ -272,6 +310,10 @@ impl Node for K8sNode {
 
     fn service_name(&self) -> Option<String> {
         Some(self.service_name.clone())
+    }
+
+    async fn stop_for_duration(&self, duration: Duration) -> Result<()> {
+        self.stop_for_duration(duration).await
     }
 }
 

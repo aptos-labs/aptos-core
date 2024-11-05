@@ -74,6 +74,11 @@ pub trait Node: Send + Sync {
     fn expose_metric(&self) -> Result<u64>;
 
     fn service_name(&self) -> Option<String>;
+
+    /// Stops the node by deleting its pod and ensures it stays down for the specified duration.
+    /// If the pod recovers early, it will be deleted again. After the duration completes,
+    /// waits for the pod to become healthy before returning.
+    async fn stop_for_duration(&self, duration: Duration) -> Result<()>;
 }
 
 /// Trait used to represent a running Validator

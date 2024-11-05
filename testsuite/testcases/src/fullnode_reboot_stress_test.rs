@@ -69,8 +69,9 @@ impl NetworkLoadTest for FullNodeRebootStressTest {
                         .full_node(*all_fullnodes.choose(&mut rng).unwrap())
                         .unwrap()
                 };
-                fullnode_to_reboot.stop().await?;
-                fullnode_to_reboot.start().await?;
+                fullnode_to_reboot
+                    .stop_for_duration(Duration::from_secs(0))
+                    .await?;
             }
             tokio::time::sleep(Duration::from_secs(WAIT_TIME_BETWEEN_REBOOTS_SECS)).await;
         }

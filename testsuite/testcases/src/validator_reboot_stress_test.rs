@@ -47,20 +47,22 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
                     .cloned()
                     .collect()
             };
-            for adr in &addresses {
-                let swarm = swarm.read().await;
-                let validator_to_reboot = swarm.validator(*adr).unwrap();
-                validator_to_reboot.stop().await?;
-            }
-            if self.down_time_secs > 0.0 {
-                tokio::time::sleep(Duration::from_secs_f32(self.down_time_secs)).await;
-            }
 
-            for adr in &addresses {
-                let swarm = swarm.read().await;
-                let validator_to_reboot = swarm.validator(*adr).unwrap();
-                validator_to_reboot.start().await?;
-            }
+            let stop_pod_futures: Vec<_> = addresses
+                .iter()
+                .map(|adr| {
+                    let swarm = Arc::clone(&swarm);
+                    let down_time = self.down_time_secs;
+                    async move {
+                        let swarm = swarm.read().await;
+                        let validator_to_reboot = swarm.validator(*adr).unwrap();
+                        validator_to_reboot
+                            .stop_for_duration(Duration::from_secs_f32(down_time))
+                            .await
+                    }
+                })
+                .collect();
+            futures::future::try_join_all(stop_pod_futures).await?;
 
             if self.pause_secs > 0.0 {
                 tokio::time::sleep(Duration::from_secs_f32(self.pause_secs)).await;
