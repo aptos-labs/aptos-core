@@ -1,1 +1,133 @@
 processed 3 tasks
+
+task 1 'publish'. lines 76-101:
+Error: error[E03002]: unbound module
+   ┌─ TEMPFILE1:78:9
+   │
+78 │     use 0x42::objects as obj;
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '0x42::objects'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:80:48
+   │
+80 │     public fun create(signer: &signer, owner: &obj::OwnerRef, val: u64) {
+   │                                                ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:81:9
+   │
+81 │         obj::create(signer, owner, Token{val})
+   │         ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:83:31
+   │
+83 │     public fun reader_ref(r: &obj::OwnerRef): obj::ReaderRef<Token> {
+   │                               ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:83:47
+   │
+83 │     public fun reader_ref(r: &obj::OwnerRef): obj::ReaderRef<Token> {
+   │                                               ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:84:9
+   │
+84 │         obj::reader_ref<Token>(r)
+   │         ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:86:31
+   │
+86 │     public fun writer_ref(r: &obj::OwnerRef): obj::WriterRef<Token> {
+   │                               ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:86:47
+   │
+86 │     public fun writer_ref(r: &obj::OwnerRef): obj::WriterRef<Token> {
+   │                                               ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:87:9
+   │
+87 │         obj::writer_ref<Token>(r)
+   │         ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:89:32
+   │
+89 │     public fun get_value(ref: &obj::ReaderRef<Token>): u64 acquires Token {
+   │                                ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:90:9
+   │
+90 │         obj::reader(ref).val
+   │         ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:92:32
+   │
+92 │     public fun set_value(ref: &obj::WriterRef<Token>, val: u64) acquires Token {
+   │                                ^^^ Unbound module or type alias 'obj'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE1:93:9
+   │
+93 │         obj::writer(ref).val = val
+   │         ^^^ Unbound module or type alias 'obj'
+
+
+
+task 2 'run'. lines 103-115:
+Error: error[E03002]: unbound module
+    ┌─ TEMPFILE2:105:9
+    │
+105 │     use 0x42::token;
+    │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '0x42::token'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:107:18
+    │
+107 │         let or = 0x42::objects::make_owner_ref(@0x42);
+    │                  ^^^^^^^^^^^^^ Unbound module '0x42::objects'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:108:9
+    │
+108 │         token::create(&s, &or, 22);
+    │         ^^^^^ Unbound module or type alias 'token'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:109:18
+    │
+109 │         let rr = token::reader_ref(&or);
+    │                  ^^^^^ Unbound module or type alias 'token'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:110:18
+    │
+110 │         let wr = token::writer_ref(&or);
+    │                  ^^^^^ Unbound module or type alias 'token'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:111:17
+    │
+111 │         assert!(token::get_value(&rr) == 22, 0);
+    │                 ^^^^^ Unbound module or type alias 'token'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:112:9
+    │
+112 │         token::set_value(&wr, 23);
+    │         ^^^^^ Unbound module or type alias 'token'
+
+error[E03002]: unbound module
+    ┌─ TEMPFILE2:113:17
+    │
+113 │         assert!(token::get_value(&rr) == 23, 1)
+    │                 ^^^^^ Unbound module or type alias 'token'
+
+
