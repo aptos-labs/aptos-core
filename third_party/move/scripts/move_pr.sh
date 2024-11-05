@@ -98,6 +98,7 @@ MOVE_CRATES="\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-ir-compiler-transactional-tests\
+  -p move-linter\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\

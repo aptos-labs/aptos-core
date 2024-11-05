@@ -244,6 +244,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     let (_compiled_package, model_opt) = build_plan.compile_with_driver(
         writer,
         &build_config.compiler_config,
+        vec![],
         |compiler| {
             let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
             let (_, compiler) =

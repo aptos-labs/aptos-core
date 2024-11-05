@@ -763,6 +763,16 @@ pub static PACKAGE_SIMPLE_METADATA: Lazy<Vec<u8>> = Lazy::new(|| {
 });
 
 #[rustfmt::skip]
+pub static SCRIPT_SIMPLE: Lazy<Vec<u8>> = Lazy::new(|| {
+	vec![
+		161, 28, 235, 11, 7, 0, 0, 10, 2, 5, 0, 4, 6, 4, 34, 1, 6, 12,
+		0, 5, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+		0, 1, 3, 11, 0, 1, 2,
+	]
+});
+
+#[rustfmt::skip]
 pub static MODULE_SIMPLE_SIMPLE: Lazy<Vec<u8>> = Lazy::new(|| {
 	vec![
 		161, 28, 235, 11, 7, 0, 0, 10, 12, 1, 0, 16, 2, 16, 46, 3, 62, 193,

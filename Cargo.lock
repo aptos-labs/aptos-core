@@ -339,6 +339,7 @@ dependencies = [
  "move-coverage",
  "move-disassembler",
  "move-ir-types",
+ "move-linter",
  "move-model",
  "move-package",
  "move-prover-boogie-backend",
@@ -11150,8 +11151,6 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.6.5",
- "strum 0.24.1",
- "strum_macros 0.24.3",
  "walkdir",
 ]
 
@@ -11374,6 +11373,21 @@ dependencies = [
  "move-symbol-pool",
  "once_cell",
  "serde",
+]
+
+[[package]]
+name = "move-linter"
+version = "0.1.0"
+dependencies = [
+ "codespan-reporting",
+ "datatest-stable",
+ "move-binary-format",
+ "move-compiler",
+ "move-compiler-v2",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "num 0.4.1",
 ]
 
 [[package]]

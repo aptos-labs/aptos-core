@@ -77,6 +77,7 @@ move-core-types = { workspace = true }
 move-coverage = { workspace = true }
 move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
+move-linter = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
