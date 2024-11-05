@@ -94,7 +94,7 @@ impl PersistedWriteOp {
     }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum WriteOp {
     Creation {
         data: Bytes,
@@ -442,9 +442,7 @@ impl std::fmt::Debug for WriteOp {
     }
 }
 
-#[derive(
-    BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, Hash, PartialEq, Serialize, Deserialize,
-)]
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WriteSet {
     V0(WriteSetV0),
 }
@@ -485,7 +483,7 @@ impl DerefMut for WriteSet {
 /// where `Value(val)` means that serialized representation should be updated to `val`, and
 /// `Deletion` means that we are going to delete this access path.
 #[derive(
-    BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize,
+    BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq, Serialize, Deserialize,
 )]
 pub struct WriteSetV0(WriteSetMut);
 
@@ -532,7 +530,7 @@ impl WriteSetV0 {
 /// A mutable version of `WriteSet`.
 ///
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
     // TODO: Change to HashMap with a stable iterator for serialization.
     write_set: BTreeMap<StateKey, WriteOp>,
