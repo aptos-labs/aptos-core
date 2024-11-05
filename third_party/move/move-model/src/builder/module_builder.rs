@@ -767,6 +767,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let name = self.symbol_pool().make(&name.0.value);
         let (type_params, params, result_type) = self.decl_ana_signature(signature, false);
+        // Eliminate references in parameters and result type for spec functions
+        // `derive_spec_fun` does the same when generating spec functions from general move functions
         let params = params
             .into_iter()
             .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
