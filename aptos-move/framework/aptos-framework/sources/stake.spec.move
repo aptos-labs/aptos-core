@@ -168,7 +168,7 @@ spec aptos_framework::stake {
     )
     {
         // This function casue timeout (property proved)
-        // pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 60;
         pragma disable_invariants_in_body;
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
         aborts_if !exists<StakePool>(pool_address);

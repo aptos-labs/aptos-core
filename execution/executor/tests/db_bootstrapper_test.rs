@@ -21,6 +21,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{
         aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     },
     contract_event::ContractEvent,
     event::EventHandle,
@@ -89,7 +90,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
-    assert_eq!(output.num_leaves(), target_version + 1);
+    assert_eq!(output.next_version(), target_version + 1);
     let ledger_info_with_sigs =
         gen_ledger_info_with_sigs(epoch, &output, block_id, &[signer.clone()]);
     executor
@@ -244,14 +245,7 @@ fn test_new_genesis() {
         .freeze()
         .unwrap(),
         vec![
-            ContractEvent::new_v1(
-                *configuration.events().key(),
-                0,
-                TypeTag::Struct(Box::new(
-                    <ConfigurationResource as MoveStructType>::struct_tag(),
-                )),
-                vec![],
-            ),
+            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]),
             ContractEvent::new_v1(
                 new_block_event_key(),
                 0,

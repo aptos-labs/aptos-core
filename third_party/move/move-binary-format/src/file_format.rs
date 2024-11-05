@@ -48,7 +48,10 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{fmt, fmt::Formatter, ops::BitOr};
+use std::{
+    fmt::{self, Formatter},
+    ops::BitOr,
+};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -1425,6 +1428,33 @@ impl SignatureToken {
 
     pub fn num_nodes(&self) -> usize {
         self.preorder_traversal().count()
+    }
+
+    pub fn instantiate(&self, subst_mapping: &[SignatureToken]) -> SignatureToken {
+        use SignatureToken::*;
+        match self {
+            Bool => Bool,
+            U8 => U8,
+            U16 => U16,
+            U32 => U32,
+            U64 => U64,
+            U128 => U128,
+            U256 => U256,
+            Address => Address,
+            Signer => Signer,
+            Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
+            Struct(idx) => Struct(*idx),
+            StructInstantiation(idx, struct_type_args) => StructInstantiation(
+                *idx,
+                struct_type_args
+                    .iter()
+                    .map(|ty| ty.instantiate(subst_mapping))
+                    .collect(),
+            ),
+            Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
+            MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
+            TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
+        }
     }
 }
 
@@ -3358,7 +3388,7 @@ impl CompiledModule {
     }
 }
 
-/// Return the simplest module that will pass the bounds checker
+/// Return the simplest empty module stored at 0x0 that will pass the bounds checker.
 pub fn empty_module() -> CompiledModule {
     CompiledModule {
         version: file_format_common::VERSION_MAX,
@@ -3444,6 +3474,36 @@ pub fn basic_test_module() -> CompiledModule {
     m
 }
 
+/// Creates an empty compiled module with specified dependencies and friends. All
+/// modules (including itself) are assumed to be stored at 0x0.
+pub fn empty_module_with_dependencies_and_friends<'a>(
+    module_name: &'a str,
+    dependencies: impl IntoIterator<Item = &'a str>,
+    friends: impl IntoIterator<Item = &'a str>,
+) -> CompiledModule {
+    // Rename this empty module.
+    let mut module = empty_module();
+    module.identifiers[0] = Identifier::new(module_name).unwrap();
+
+    for name in dependencies {
+        module.identifiers.push(Identifier::new(name).unwrap());
+        module.module_handles.push(ModuleHandle {
+            // Empty module sets up this index to 0x0.
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
+        });
+    }
+    for name in friends {
+        module.identifiers.push(Identifier::new(name).unwrap());
+        module.friend_decls.push(ModuleHandle {
+            // Empty module sets up this index to 0x0.
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
+        });
+    }
+    module
+}
+
 /// Return a simple script that contains only a return in the main()
 pub fn empty_script() -> CompiledScript {
     CompiledScript {
@@ -3468,6 +3528,25 @@ pub fn empty_script() -> CompiledScript {
             code: vec![Bytecode::Ret],
         },
     }
+}
+
+/// Creates an empty compiled script with specified dependencies. All dependency
+/// modules are assumed to be stored at 0x0.
+pub fn empty_script_with_dependencies<'a>(
+    dependencies: impl IntoIterator<Item = &'a str>,
+) -> CompiledScript {
+    let mut script = empty_script();
+
+    script.address_identifiers.push(AccountAddress::ZERO);
+    for name in dependencies {
+        script.identifiers.push(Identifier::new(name).unwrap());
+        script.module_handles.push(ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex((script.identifiers.len() - 1) as TableIndex),
+        });
+    }
+
+    script
 }
 
 pub fn basic_test_script() -> CompiledScript {

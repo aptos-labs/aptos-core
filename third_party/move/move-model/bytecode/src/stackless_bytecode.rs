@@ -541,6 +541,13 @@ impl Bytecode {
         self.is_possibly_branching() || self.is_always_branching()
     }
 
+    pub fn get_label_inner_opt(&self) -> Option<u16> {
+        match self {
+            Bytecode::Label(_, l) => Some(l.0),
+            _ => None,
+        }
+    }
+
     /// Returns true if the bytecode is spec-only.
     pub fn is_spec_only(&self) -> bool {
         use Bytecode::*;

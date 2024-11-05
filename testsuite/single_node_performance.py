@@ -159,46 +159,46 @@ CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
 CALIBRATION = """
-no-op	1	VM	57	0.758	1.079	40390.5
-no-op	1000	VM	57	0.740	1.040	22473.1
-apt-fa-transfer	1	VM	57	0.762	1.070	28769.8
-account-generation	1	VM	57	0.774	1.055	23332.3
-account-resource32-b	1	VM	57	0.799	1.084	35822.6
-modify-global-resource	1	VM	57	0.810	1.022	2789.1
-modify-global-resource	100	VM	57	0.757	1.040	35206.7
-publish-package	1	VM	57	0.899	1.055	144.8
-mix_publish_transfer	1	VM	57	0.921	1.094	2141.3
-batch100-transfer	1	VM	58	0.727	1.022	740.9
-vector-picture30k	1	VM	58	0.858	1.030	111.0
-vector-picture30k	100	VM	58	0.546	1.041	2021.7
-smart-table-picture30-k-with200-change	1	VM	58	0.944	1.056	21.3
-smart-table-picture30-k-with200-change	100	VM	58	0.895	1.039	402.8
-modify-global-resource-agg-v2	1	VM	58	0.773	1.085	37354.2
-modify-global-flag-agg-v2	1	VM	58	0.866	1.022	5508.5
-modify-global-bounded-agg-v2	1	VM	58	0.872	1.091	9731.3
-modify-global-milestone-agg-v2	1	VM	58	0.813	1.037	28612.4
-resource-groups-global-write-tag1-kb	1	VM	58	0.800	1.048	9180.8
-resource-groups-global-write-and-read-tag1-kb	1	VM	58	0.849	1.025	6196.8
-resource-groups-sender-write-tag1-kb	1	VM	58	0.886	1.180	19936.8
-resource-groups-sender-multi-change1-kb	1	VM	58	0.819	1.088	16466.1
-token-v1ft-mint-and-transfer	1	VM	58	0.810	1.039	1262.2
-token-v1ft-mint-and-transfer	100	VM	58	0.772	1.032	18083.7
-token-v1nft-mint-and-transfer-sequential	1	VM	58	0.809	1.023	795.5
-token-v1nft-mint-and-transfer-sequential	100	VM	58	0.759	1.035	12888.4
-coin-init-and-mint	1	VM	58	0.814	1.083	29357.5
-coin-init-and-mint	100	VM	58	0.777	1.064	24307.2
-fungible-asset-mint	1	VM	58	0.799	1.037	26666.4
-fungible-asset-mint	100	VM	58	0.810	1.045	21562.8
-no-op5-signers	1	VM	58	0.811	1.085	40094.5
-token-v2-ambassador-mint	1	VM	58	0.784	1.050	17603.3
-token-v2-ambassador-mint	100	VM	58	0.796	1.042	16110.4
-liquidity-pool-swap	1	VM	58	0.810	1.027	961.3
-liquidity-pool-swap	100	VM	58	0.770	1.029	11256.7
-liquidity-pool-swap-stable	1	VM	58	0.794	1.026	936.3
-liquidity-pool-swap-stable	100	VM	58	0.783	1.031	10977.4
-deserialize-u256	1	VM	58	0.775	1.071	39288.2
-no-op-fee-payer	1	VM	58	0.823	1.038	2095.4
-no-op-fee-payer	100	VM	58	0.799	1.038	27842.9
+no-op	1	VM	34	0.841	1.086	42046.2
+no-op	1000	VM	33	0.857	1.026	23125.1
+apt-fa-transfer	1	VM	34	0.843	1.057	29851.6
+account-generation	1	VM	34	0.843	1.046	24134.9
+account-resource32-b	1	VM	34	0.803	1.089	37283.8
+modify-global-resource	1	VM	34	0.841	1.017	2854.7
+modify-global-resource	100	VM	34	0.844	1.035	36514.1
+publish-package	1	VM	34	0.915	1.049	143.4
+mix_publish_transfer	1	VM	34	0.912	1.131	2149.7
+batch100-transfer	1	VM	33	0.823	1.037	754.2
+vector-picture30k	1	VM	33	0.892	1.018	112.4
+vector-picture30k	100	VM	34	0.706	1.03	2050.1
+smart-table-picture30-k-with200-change	1	VM	34	0.959	1.057	21.5
+smart-table-picture30-k-with200-change	100	VM	34	0.9	1.021	412.2
+modify-global-resource-agg-v2	1	VM	34	0.729	1.076	39288.2
+modify-global-flag-agg-v2	1	VM	34	0.948	1.016	5598.2
+modify-global-bounded-agg-v2	1	VM	34	0.881	1.06	9968.4
+modify-global-milestone-agg-v2	1	VM	34	0.831	1.029	29575.5
+resource-groups-global-write-tag1-kb	1	VM	34	0.933	1.051	9285.8
+resource-groups-global-write-and-read-tag1-kb	1	VM	34	0.9	1.016	6353
+resource-groups-sender-write-tag1-kb	1	VM	34	0.845	1.163	20568.6
+resource-groups-sender-multi-change1-kb	1	VM	34	0.888	1.116	17029.7
+token-v1ft-mint-and-transfer	1	VM	34	0.853	1.029	1455.7
+token-v1ft-mint-and-transfer	100	VM	34	0.801	1.021	20418.7
+token-v1nft-mint-and-transfer-sequential	1	VM	34	0.881	1.023	884.4
+token-v1nft-mint-and-transfer-sequential	100	VM	34	0.85	1.021	14733.1
+coin-init-and-mint	1	VM	35	0.839	1.056	31116.2
+coin-init-and-mint	100	VM	35	0.788	1.04	25367
+fungible-asset-mint	1	VM	35	0.861	1.043	27493.2
+fungible-asset-mint	100	VM	35	0.865	1.033	22113.3
+no-op5-signers	1	VM	34	0.825	1.104	41817.6
+token-v2-ambassador-mint	1	VM	35	0.864	1.026	18187.6
+token-v2-ambassador-mint	100	VM	35	0.894	1.033	16597.8
+liquidity-pool-swap	1	VM	34	0.894	1.026	965
+liquidity-pool-swap	100	VM	35	0.893	1.026	11439.4
+liquidity-pool-swap-stable	1	VM	36	0.897	1.018	945.1
+liquidity-pool-swap-stable	100	VM	36	0.824	1.031	11196.4
+deserialize-u256	1	VM	36	0.881	1.06	41062.1
+no-op-fee-payer	1	VM	36	0.863	1.031	2141.3
+no-op-fee-payer	100	VM	36	0.898	1.02	28717.2
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
@@ -825,7 +825,7 @@ if errors:
     print(
         """If you expect your PR to change the performance, you need to recalibrate the values.
 To do so, you should run the test on your branch 6 times
-(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml).
+(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS).
 Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
 update it to your branch, and export values as CSV, and then open and copy values inside
 testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.

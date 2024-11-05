@@ -50,6 +50,12 @@ module aptos_framework::account {
         type_info: TypeInfo,
     }
 
+    #[event]
+    struct CoinRegister has drop, store {
+        account: address,
+        type_info: TypeInfo,
+    }
+
     struct CapabilityOffer<phantom T> has store { for: Option<address> }
 
     struct RotationCapability has drop, store { account: address }
@@ -686,14 +692,15 @@ module aptos_framework::account {
                 old_authentication_key: account_resource.authentication_key,
                 new_authentication_key: new_auth_key_vector,
             });
+        } else {
+            event::emit_event<KeyRotationEvent>(
+                &mut account_resource.key_rotation_events,
+                KeyRotationEvent {
+                    old_authentication_key: account_resource.authentication_key,
+                    new_authentication_key: new_auth_key_vector,
+                }
+            );
         };
-        event::emit_event<KeyRotationEvent>(
-            &mut account_resource.key_rotation_events,
-            KeyRotationEvent {
-                old_authentication_key: account_resource.authentication_key,
-                new_authentication_key: new_auth_key_vector,
-            }
-        );
 
         // Update the account resource's authentication key.
         account_resource.authentication_key = new_auth_key_vector;
@@ -798,12 +805,21 @@ module aptos_framework::account {
 
     public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
         let account = borrow_global_mut<Account>(account_addr);
-        event::emit_event<CoinRegisterEvent>(
-            &mut account.coin_register_events,
-            CoinRegisterEvent {
-                type_info: type_info::type_of<CoinType>(),
-            },
-        );
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                CoinRegister {
+                    account: account_addr,
+                    type_info: type_info::type_of<CoinType>(),
+                },
+            );
+        } else {
+            event::emit_event<CoinRegisterEvent>(
+                &mut account.coin_register_events,
+                CoinRegisterEvent {
+                    type_info: type_info::type_of<CoinType>(),
+                },
+            );
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1520,14 +1536,14 @@ module aptos_framework::account {
         register_coin<FakeCoin>(addr);
 
         let eventhandle = &borrow_global<Account>(addr).coin_register_events;
-        let event = CoinRegisterEvent { type_info: type_info::type_of<FakeCoin>() };
+        let event = CoinRegister { account: addr, type_info: type_info::type_of<FakeCoin>() };
 
-        let events = event::emitted_events_by_handle(eventhandle);
+        let events = event::emitted_events<CoinRegister>();
         assert!(vector::length(&events) == 1, 0);
         assert!(vector::borrow(&events, 0) == &event, 1);
-        assert!(event::was_event_emitted_by_handle(eventhandle, &event), 2);
+        assert!(event::was_event_emitted(&event), 2);
 
-        let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
-        assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+        let event = CoinRegister { account: addr, type_info: type_info::type_of<SadFakeCoin>() };
+        assert!(!event::was_event_emitted(&event), 3);
     }
 }

@@ -362,27 +362,23 @@ impl<
             metrics::DRIVER_CONSENSUS_COMMIT_NOTIFICATION,
         );
 
-        // Update the synced versions
-        let operations = [
-            metrics::StorageSynchronizerOperations::ExecutedTransactions,
-            metrics::StorageSynchronizerOperations::Synced,
-        ];
-        for operation in operations {
-            metrics::increment_gauge(
-                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                operation.get_label(),
-                consensus_commit_notification.get_transactions().len() as u64,
-            );
-        }
+        // Update the number of executed transactions
+        let num_synced_transactions = consensus_commit_notification.get_transactions().len();
+        metrics::increment_gauge(
+            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+            metrics::StorageSynchronizerOperations::ExecutedTransactions.get_label(),
+            num_synced_transactions as u64,
+        );
 
-        // Update the synced epoch
-        if consensus_commit_notification
+        // Update the synced version metrics
+        utils::update_new_synced_metrics(self.storage.clone(), num_synced_transactions);
+
+        // Update the synced epoch metrics
+        let reconfiguration_occurred = consensus_commit_notification
             .get_subscribable_events()
             .iter()
-            .any(ContractEvent::is_new_epoch_event)
-        {
-            utils::update_new_epoch_metrics();
-        }
+            .any(ContractEvent::is_new_epoch_event);
+        utils::update_new_epoch_metrics(self.storage.clone(), reconfiguration_occurred);
     }
 
     /// Handles a consensus or consensus observer request to sync for a specified duration

@@ -98,6 +98,7 @@ MOVE_CRATES="\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-ir-compiler-transactional-tests\
+  -p move-linter\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\
@@ -112,7 +113,6 @@ MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p aptos-transactional-test-harness \
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
-  -p move-async-vm \
   -p move-cli \
   -p move-model \
   -p move-package \
@@ -147,6 +147,7 @@ if [ ! -z "$CHECK" ]; then
     cargo xclippy
     cargo +nightly fmt
     cargo sort --grouped --workspace
+    cargo machete
   )
 fi
 

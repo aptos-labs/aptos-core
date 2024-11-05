@@ -87,6 +87,10 @@ on:
         required: false
         type: string
         description: The deployer profile used to spin up and configure forge infrastructure
+      SEND_RESULTS_TO_TRUNK:
+        required: false
+        type: boolean
+        description: Send forge results to trunk.io
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -118,6 +122,7 @@ env:
   VERBOSE: true
   FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}
   FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
+  FORGE_JUNIT_XML_PATH: ${{ inputs.SEND_RESULTS_TO_TRUNK && '/tmp/test.xml' || '' }}
 
 # TODO: should we migrate this to a composite action, so that we can skip it
 # at the call site, and don't need to wrap each step in an if statement?
@@ -228,3 +233,14 @@ jobs:
       # Print out whether the job was skipped.
       - run: echo "Skipping forge test!"
         if: ${{ inputs.SKIP_JOB }}
+
+      - name: Upload results
+        # Run this step even if the test step ahead fails
+        if: ${{ !inputs.SKIP_JOB && inputs.SEND_RESULTS_TO_TRUNK && !cancelled() }}
+        uses: trunk-io/analytics-uploader@main
+        with:
+          # Configured in the nextest.toml file
+          junit-paths: ${{ env.FORGE_JUNIT_XML_PATH }}
+          org-slug: aptoslabs
+          token: ${{ secrets.TRUNK_API_TOKEN }}
+        continue-on-error: true

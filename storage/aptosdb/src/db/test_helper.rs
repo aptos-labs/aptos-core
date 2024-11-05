@@ -95,7 +95,6 @@ pub(crate) fn update_store(
                 &ledger_batch,
                 &sharded_state_kv_batches,
                 /*put_state_value_indices=*/ enable_sharding,
-                /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
             )
             .unwrap();

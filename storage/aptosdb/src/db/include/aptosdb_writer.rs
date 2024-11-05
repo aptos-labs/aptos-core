@@ -352,7 +352,6 @@ impl AptosDB {
             // Always put in state value index for now.
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),
-            skip_index_and_usage,
             chunk.transaction_infos
                 .iter()
                 .rposition(|t| t.state_checkpoint_hash().is_some()),
@@ -661,7 +660,7 @@ impl AptosDB {
                 // n.b. txns_to_commit can be partial, when the control was handed over from consensus to state sync
                 // where state sync won't send the pre-committed part to the DB again.
                 if chunk_opt.is_some() && chunk_opt.as_ref().unwrap().len() == num_txns as usize {
-                    let write_sets = chunk_opt.unwrap().transaction_outputs.iter().map(|t| t.write_set()).collect_vec();
+                    let write_sets = chunk_opt.as_ref().unwrap().transaction_outputs.iter().map(|t| t.write_set()).collect_vec();
                     indexer.index(self.state_store.clone(), first_version, &write_sets)?;
                 } else {
                     let write_sets: Vec<_> = self.ledger_db.write_set_db().get_write_set_iter(first_version, num_txns as usize)?.try_collect()?;

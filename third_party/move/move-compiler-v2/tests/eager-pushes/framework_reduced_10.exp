@@ -1,0 +1,194 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::bar($t0: &mut u64, $t1: u64) {
+  0: write_ref($t0, $t1)
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::foo($t0: &u64): u64 {
+     var $t1: u64
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &u64
+     var $t7: bool
+     var $t8: &mut u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+  0: $t4 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: $t3 := read_ref($t4)
+  2: $t2 := /($t1, $t3)
+  3: $t6 := borrow_field<0xc0ffee::m::S>.y($t0)
+  4: $t5 := m::foo($t6)
+  5: label L0
+  6: $t7 := <($t2, $t5)
+  7: if ($t7) goto 8 else goto 17
+  8: label L2
+  9: $t8 := borrow_field<0xc0ffee::m::S>.z($t0)
+ 10: $t10 := 1
+ 11: $t9 := -($t2, $t10)
+ 12: m::bar($t8, $t9)
+ 13: $t12 := 1
+ 14: $t11 := +($t2, $t12)
+ 15: $t2 := infer($t11)
+ 16: goto 19
+ 17: label L3
+ 18: goto 21
+ 19: label L4
+ 20: goto 5
+ 21: label L1
+ 22: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &mut u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: write_ref($t0, $t1)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::foo($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: &u64
+     var $t5: u64 [unused]
+     var $t6: &u64 [unused]
+     var $t7: bool
+     var $t8: &mut u64
+     var $t9: u64 [unused]
+     var $t10: u64
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_field<0xc0ffee::m::S>.x($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  2: $t1 := /($t1, $t3)
+     # live vars: $t0, $t1
+  3: $t4 := borrow_field<0xc0ffee::m::S>.y($t0)
+     # live vars: $t0, $t1, $t4
+  4: $t3 := m::foo($t4)
+     # live vars: $t0, $t1, $t3
+  5: label L0
+     # live vars: $t0, $t1, $t3
+  6: $t7 := <($t1, $t3)
+     # live vars: $t0, $t1, $t3, $t7
+  7: if ($t7) goto 8 else goto 17
+     # live vars: $t0, $t1, $t3
+  8: label L2
+     # live vars: $t0, $t1, $t3
+  9: $t8 := borrow_field<0xc0ffee::m::S>.z($t0)
+     # live vars: $t0, $t1, $t3, $t8
+ 10: $t10 := 1
+     # live vars: $t0, $t1, $t3, $t8, $t10
+ 11: $t10 := -($t1, $t10)
+     # live vars: $t0, $t1, $t3, $t8, $t10
+ 12: m::bar($t8, $t10)
+     # live vars: $t0, $t1, $t3
+ 13: $t10 := 1
+     # live vars: $t0, $t1, $t3, $t10
+ 14: $t10 := +($t1, $t10)
+     # live vars: $t0, $t3, $t10
+ 15: $t1 := move($t10)
+     # live vars: $t0, $t1, $t3
+ 16: goto 5
+     # live vars: $t0, $t1, $t3
+ 17: label L3
+     # live vars: $t0
+ 18: drop($t0)
+     # live vars:
+ 19: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+struct S {
+	x: u64,
+	y: u64,
+	z: u64
+}
+
+bar(Arg0: &mut u64, Arg1: u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[1](Arg1: u64)
+	1: MoveLoc[0](Arg0: &mut u64)
+	2: WriteRef
+	3: Ret
+}
+foo(Arg0: &u64): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: ReadRef
+	2: Ret
+}
+public test(Arg0: &mut S, Arg1: u64) /* def_idx: 2 */ {
+L2:	loc0: u64
+L3:	loc1: u64
+B0:
+	0: CopyLoc[0](Arg0: &mut S)
+	1: ImmBorrowField[0](S.x: u64)
+	2: ReadRef
+	3: StLoc[2](loc0: u64)
+	4: MoveLoc[1](Arg1: u64)
+	5: MoveLoc[2](loc0: u64)
+	6: Div
+	7: StLoc[1](Arg1: u64)
+	8: CopyLoc[0](Arg0: &mut S)
+	9: ImmBorrowField[1](S.y: u64)
+	10: Call foo(&u64): u64
+	11: StLoc[2](loc0: u64)
+B1:
+	12: CopyLoc[1](Arg1: u64)
+	13: CopyLoc[2](loc0: u64)
+	14: Lt
+	15: BrFalse(27)
+B2:
+	16: CopyLoc[0](Arg0: &mut S)
+	17: MutBorrowField[2](S.z: u64)
+	18: CopyLoc[1](Arg1: u64)
+	19: LdU64(1)
+	20: Sub
+	21: Call bar(&mut u64, u64)
+	22: MoveLoc[1](Arg1: u64)
+	23: LdU64(1)
+	24: Add
+	25: StLoc[1](Arg1: u64)
+	26: Branch(12)
+B3:
+	27: MoveLoc[0](Arg0: &mut S)
+	28: Pop
+	29: Ret
+}
+}
+============ bytecode verification succeeded ========
