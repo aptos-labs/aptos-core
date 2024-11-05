@@ -210,7 +210,6 @@ impl<'r> WriteOpConverter<'r> {
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<WriteOp> {
         use MoveStorageOp::*;
-        use WriteOp::*;
         let write_op = match (state_value_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
                 // Possible under speculative execution, returning speculative error waiting for re-execution.
@@ -238,18 +237,12 @@ impl<'r> WriteOpConverter<'r> {
                         WriteOp::legacy_creation(data)
                     }
                 },
-                Some(metadata) => Creation {
-                    data,
-                    metadata: metadata.clone(),
-                },
+                Some(metadata) => WriteOp::creation(data, metadata.clone()),
             },
-            (Some(metadata), Modify(data)) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Modification { data, metadata }
-            },
+            (Some(metadata), Modify(data)) => WriteOp::modification(data, metadata),
             (Some(metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Deletion { metadata }
+                WriteOp::deletion(metadata)
             },
         };
         Ok(write_op)
@@ -270,13 +263,10 @@ impl<'r> WriteOpConverter<'r> {
                 match &self.new_slot_metadata {
                     // n.b. Aggregator writes historically did not distinguish Create vs Modify.
                     None => WriteOp::legacy_modification(data),
-                    Some(metadata) => WriteOp::Creation {
-                        data,
-                        metadata: metadata.clone(),
-                    },
+                    Some(metadata) => WriteOp::creation(data, metadata.clone()),
                 }
             },
-            Some(metadata) => WriteOp::Modification { data, metadata },
+            Some(metadata) => WriteOp::modification(data, metadata),
         };
 
         Ok(op)
@@ -623,7 +613,7 @@ mod tests {
 
         // Deletion should still contain the metadata - for storage refunds.
         assert_eq!(group_write.metadata_op().metadata(), &metadata);
-        assert_eq!(group_write.metadata_op(), &WriteOp::Deletion { metadata });
+        assert_eq!(group_write.metadata_op(), &WriteOp::deletion(metadata));
         assert_none!(group_write.metadata_op().bytes());
     }
 }

@@ -95,9 +95,7 @@ pub fn get_registry() -> Result<Registry> {
     // 1. Record samples for types with custom deserializers.
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
-    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
-        metadata: StateValueMetadata::none(),
-    })?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     // stdlib types

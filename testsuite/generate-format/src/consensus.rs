@@ -14,10 +14,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
-    state_store::{
-        state_key::StateKey,
-        state_value::{PersistedStateValueMetadata, StateValueMetadata},
-    },
+    state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
     transaction,
     transaction::block_epilogue::BlockEpiloguePayload,
     validator_txn::ValidatorTransaction,
@@ -89,9 +86,7 @@ pub fn get_registry() -> Result<Registry> {
         &aptos_consensus_types::block::Block::make_genesis_block(),
     )?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
-    tracer.trace_value(&mut samples, &write_set::WriteOp::Deletion {
-        metadata: StateValueMetadata::none(),
-    })?;
+    tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
 
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
