@@ -392,13 +392,3 @@ pub async fn lookup_address(
         .await?
         .into_inner())
 }
-
-#[derive(Deserialize)]
-pub struct OriginatingResource {
-    pub address_map: Table,
-}
-
-#[derive(Deserialize)]
-pub struct Table {
-    pub handle: AccountAddress,
-}
