@@ -25,6 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -1153,7 +1154,7 @@ pub struct MovePackageDir {
     /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
     /// Defaults to `6`, or `7` if language version 2 is selected
-    /// (through `--move-2` or `--language_version=2`), .
+    /// (through `--move-2` or `--language-version=2`), .
     #[clap(
         long,
         default_value_if("move_2", "true", "7"),
@@ -1181,7 +1182,7 @@ pub struct MovePackageDir {
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.1 --compiler_version=2.0`
+    /// Same as `--bytecode-version=7 --language-version=2.1 --compiler-version=2.0`
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }
@@ -2350,4 +2351,12 @@ pub struct ChunkedPublishOption {
     /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
     #[clap(long)]
     pub(crate) chunked_publish: bool,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    ///
+    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet.  On any other network, you will need to first publish it from the framework
+    /// under move-examples/large_packages.
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: AccountAddress,
 }

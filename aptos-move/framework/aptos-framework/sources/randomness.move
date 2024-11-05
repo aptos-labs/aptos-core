@@ -81,7 +81,7 @@ module aptos_framework::randomness {
         let seed = *option::borrow(&randomness.seed);
 
         vector::append(&mut input, seed);
-        vector::append(&mut input, transaction_context::unique_session_hash());
+        vector::append(&mut input, transaction_context::get_transaction_hash());
         vector::append(&mut input, fetch_and_increment_txn_counter());
         hash::sha3_256(input)
     }

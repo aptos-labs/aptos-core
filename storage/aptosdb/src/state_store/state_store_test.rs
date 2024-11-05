@@ -60,7 +60,6 @@ fn put_value_set(
             &ledger_batch,
             &sharded_state_kv_batches,
             /*put_state_value_indices=*/ false,
-            /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
         )
         .unwrap();

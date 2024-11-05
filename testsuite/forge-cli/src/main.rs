@@ -5,13 +5,14 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use anyhow::{bail, format_err, Context, Result};
-use aptos_forge::{ForgeConfig, Options, *};
+use aptos_forge::{config::ForgeConfig, Options, *};
 use aptos_logger::Level;
 use clap::{Parser, Subcommand};
 use futures::{future, FutureExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
 use std::{self, env, num::NonZeroUsize, process, time::Duration};
+use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
     indexer::get_indexer_test,
@@ -277,13 +278,13 @@ fn main() -> Result<()> {
                             mempool_backlog: 5000,
                         }));
                     let swarm_dir = local_cfg.swarmdir.clone();
-                    run_forge(
-                        duration,
-                        test_suite,
-                        LocalFactory::from_workspace(swarm_dir)?,
+                    let forge = Forge::new(
                         &args.options,
-                        args.changelog.clone(),
-                    )
+                        test_suite,
+                        duration,
+                        LocalFactory::from_workspace(swarm_dir)?,
+                    );
+                    run_forge_with_changelog(forge, &args.options, args.changelog.clone())
                 },
                 TestCommand::K8sSwarm(k8s) => {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
@@ -308,9 +309,10 @@ fn main() -> Result<()> {
                     };
                     let forge_runner_mode =
                         ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
-                    run_forge(
-                        duration,
+                    let forge = Forge::new(
+                        &args.options,
                         test_suite,
+                        duration,
                         K8sFactory::new(
                             namespace,
                             k8s.image_tag.clone(),
@@ -322,12 +324,9 @@ fn main() -> Result<()> {
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
                             k8s.deployer_profile.clone(),
-                        )
-                        .unwrap(),
-                        &args.options,
-                        args.changelog,
-                    )?;
-                    Ok(())
+                        )?,
+                    );
+                    run_forge_with_changelog(forge, &args.options, args.changelog)
                 },
             }
         },
@@ -413,39 +412,33 @@ fn main() -> Result<()> {
     }
 }
 
-pub fn run_forge<F: Factory>(
-    global_duration: Duration,
-    tests: ForgeConfig,
-    factory: F,
+pub fn run_forge_with_changelog<F: Factory>(
+    forge: Forge<F>,
     options: &Options,
-    logs: Option<Vec<String>>,
+    optional_changelog: Option<Vec<String>>,
 ) -> Result<()> {
-    let forge = Forge::new(options, tests, global_duration, factory);
-
     if options.list {
         forge.list()?;
 
         return Ok(());
     }
 
-    match forge.run() {
-        Ok(report) => {
-            if let Some(mut changelog) = logs {
-                if changelog.len() != 2 {
-                    println!("Use: changelog <from> <to>");
-                    process::exit(1);
-                }
-                let to_commit = changelog.remove(1);
-                let from_commit = Some(changelog.remove(0));
-                send_changelog_message(&report.to_string(), &from_commit, &to_commit);
-            }
-            Ok(())
-        },
-        Err(e) => {
-            eprintln!("Failed to run tests:\n{}", e);
-            Err(e)
-        },
+    let forge_result = forge.run();
+    let report = forge_result.map_err(|e| {
+        eprintln!("Failed to run tests:\n{}", e);
+        anyhow::anyhow!(e)
+    })?;
+
+    if let Some(changelog) = optional_changelog {
+        if changelog.len() != 2 {
+            println!("Use: changelog <from> <to>");
+            process::exit(1);
+        }
+        let to_commit = changelog[1].clone();
+        let from_commit = Some(changelog[0].clone());
+        send_changelog_message(&report.to_string(), &from_commit, &to_commit);
     }
+    Ok(())
 }
 
 pub fn send_changelog_message(perf_msg: &str, from_commit: &Option<String>, to_commit: &str) {
@@ -503,39 +496,42 @@ fn get_test_suite(
     duration: Duration,
     test_cmd: &TestCommand,
 ) -> Result<ForgeConfig> {
-    // Check the test name against the multi-test suites
-    match test_name {
-        "local_test_suite" => return Ok(local_test_suite()),
-        "pre_release" => return Ok(pre_release_suite()),
-        "run_forever" => return Ok(run_forever()),
-        // TODO(rustielin): verify each test suite
-        "k8s_suite" => return Ok(k8s_test_suite()),
-        "chaos" => return Ok(chaos_test_suite(duration)),
-        _ => {}, // No multi-test suite matches!
+    // These are high level suite aliases that express an intent
+    let suite_aliases = hmap! {
+        "local_test_suite" => boxed!(local_test_suite) as Box<dyn Fn() -> ForgeConfig>,
+        "pre_release" => boxed!(pre_release_suite),
+        "run_forever" => boxed!(run_forever),
+        "k8s_suite" => boxed!(k8s_test_suite),
+        "chaos" => boxed!(|| chaos_test_suite(duration)),
     };
 
-    // Otherwise, check the test name against the grouped test suites
-    if let Some(test_suite) = get_land_blocking_test(test_name, duration, test_cmd) {
-        Ok(test_suite)
-    } else if let Some(test_suite) = get_multi_region_test(test_name) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_netbench_test(test_name) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_pfn_test(test_name, duration) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_realistic_env_test(test_name, duration, test_cmd) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_state_sync_test(test_name) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_dag_test(test_name, duration, test_cmd) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_indexer_test(test_name) {
-        return Ok(test_suite);
-    } else if let Some(test_suite) = get_ungrouped_test(test_name) {
-        return Ok(test_suite);
-    } else {
-        bail!(format_err!("Invalid --suite given: {:?}", test_name))
+    if let Some(test_suite) = suite_aliases.get(test_name) {
+        return Ok(test_suite());
     }
+
+    // Otherwise, check the test name against the grouped test suites
+    // This is done in order of priority
+    // A match higher up in the list will take precedence
+    let named_test_suites = [
+        boxed!(|| get_land_blocking_test(test_name, duration, test_cmd))
+            as Box<dyn Fn() -> Option<ForgeConfig>>,
+        boxed!(|| get_multi_region_test(test_name)),
+        boxed!(|| get_netbench_test(test_name)),
+        boxed!(|| get_pfn_test(test_name, duration)),
+        boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
+        boxed!(|| get_state_sync_test(test_name)),
+        boxed!(|| get_dag_test(test_name, duration, test_cmd)),
+        boxed!(|| get_indexer_test(test_name)),
+        boxed!(|| get_ungrouped_test(test_name)),
+    ];
+
+    for named_suite in named_test_suites.iter() {
+        if let Some(suite) = named_suite() {
+            return Ok(suite);
+        }
+    }
+
+    bail!(format_err!("Invalid --suite given: {:?}", test_name))
 }
 #[cfg(test)]
 mod test {

@@ -352,7 +352,6 @@ impl AptosDB {
             // Always put in state value index for now.
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),
-            skip_index_and_usage,
             chunk.transaction_infos
                 .iter()
                 .rposition(|t| t.state_checkpoint_hash().is_some()),

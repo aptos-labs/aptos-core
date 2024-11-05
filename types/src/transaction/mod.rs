@@ -1287,10 +1287,11 @@ impl TransactionOutput {
         let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
         ensure!(
             self.status() == &expected_txn_status,
-            "{}: version:{}, status:{:?}, expected:{:?}",
+            "{}: version:{}, status:{:?}, auxiliary data:{:?}, expected:{:?}",
             ERR_MSG,
             version,
             self.status(),
+            self.auxiliary_data(),
             expected_txn_status,
         );
 

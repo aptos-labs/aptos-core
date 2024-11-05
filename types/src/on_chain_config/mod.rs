@@ -178,9 +178,19 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage + ?Sized,
     {
+        Some(Self::fetch_config_and_bytes(storage)?.0)
+    }
+
+    /// Same as [Self::fetch_config], but also returns the underlying bytes that were used to
+    /// deserialize into config.
+    fn fetch_config_and_bytes<T>(storage: &T) -> Option<(Self, Bytes)>
+    where
+        T: ConfigStorage + ?Sized,
+    {
         let state_key = StateKey::on_chain_config::<Self>().ok()?;
         let bytes = storage.fetch_config_bytes(&state_key)?;
-        Self::deserialize_into_config(&bytes).ok()
+        let config = Self::deserialize_into_config(&bytes).ok()?;
+        Some((config, bytes))
     }
 
     fn address() -> &'static AccountAddress {
