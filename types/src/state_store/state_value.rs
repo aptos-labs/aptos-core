@@ -5,13 +5,9 @@ use crate::{
     on_chain_config::CurrentTimeMicroseconds, proof::SparseMerkleRangeProof,
     state_store::state_key::StateKey, transaction::Version,
 };
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
-use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -161,20 +157,6 @@ impl StateValueMetadata {
     }
 }
 
-#[derive(Clone, Debug, CryptoHasher)]
-pub struct StateValue {
-    inner: StateValueInner,
-    hash: OnceCell<HashValue>,
-}
-
-impl PartialEq for StateValue {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
-    }
-}
-
-impl Eq for StateValue {}
-
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 #[serde(rename = "StateValue")]
 enum PersistedStateValue {
@@ -186,27 +168,23 @@ enum PersistedStateValue {
 }
 
 impl PersistedStateValue {
-    fn into_in_mem_form(self) -> StateValueInner {
+    fn into_in_mem_form(self) -> StateValue {
         match self {
-            PersistedStateValue::V0(data) => StateValueInner {
-                data,
-                metadata: StateValueMetadata::none(),
-            },
-            PersistedStateValue::WithMetadata { data, metadata } => StateValueInner {
-                data,
-                metadata: metadata.into_in_mem_form(),
+            PersistedStateValue::V0(data) => StateValue::new_legacy(data),
+            PersistedStateValue::WithMetadata { data, metadata } => {
+                StateValue::new_with_metadata(data, metadata.into_in_mem_form())
             },
         }
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct StateValueInner {
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
+pub struct StateValue {
     data: Bytes,
     metadata: StateValueMetadata,
 }
 
-impl StateValueInner {
+impl StateValue {
     fn to_persistable_form(&self) -> PersistedStateValue {
         let Self { data, metadata } = self.clone();
         let metadata = metadata.into_persistable();
@@ -234,9 +212,7 @@ impl<'de> Deserialize<'de> for StateValue {
     where
         D: Deserializer<'de>,
     {
-        let inner = PersistedStateValue::deserialize(deserializer)?.into_in_mem_form();
-        let hash = OnceCell::new();
-        Ok(Self { inner, hash })
+        Ok(PersistedStateValue::deserialize(deserializer)?.into_in_mem_form())
     }
 }
 
@@ -245,7 +221,7 @@ impl Serialize for StateValue {
     where
         S: Serializer,
     {
-        self.inner.to_persistable_form().serialize(serializer)
+        self.to_persistable_form().serialize(serializer)
     }
 }
 
@@ -255,9 +231,7 @@ impl StateValue {
     }
 
     pub fn new_with_metadata(data: Bytes, metadata: StateValueMetadata) -> Self {
-        let inner = StateValueInner { data, metadata };
-        let hash = OnceCell::new();
-        Self { inner, hash }
+        Self { data, metadata }
     }
 
     pub fn size(&self) -> usize {
@@ -265,7 +239,7 @@ impl StateValue {
     }
 
     pub fn bytes(&self) -> &Bytes {
-        &self.inner.data
+        &self.data
     }
 
     /// Applies a bytes-to-bytes transformation on the state value contents,
@@ -274,35 +248,31 @@ impl StateValue {
         self,
         f: F,
     ) -> anyhow::Result<StateValue> {
-        Ok(Self::new_with_metadata(
-            f(self.inner.data)?,
-            self.inner.metadata,
-        ))
+        Ok(Self::new_with_metadata(f(self.data)?, self.metadata))
     }
 
     pub fn into_bytes(self) -> Bytes {
-        self.inner.data
+        self.data
     }
 
     pub fn set_bytes(&mut self, data: Bytes) {
-        self.inner.data = data;
-        self.hash = OnceCell::new();
+        self.data = data;
     }
 
     pub fn metadata(&self) -> &StateValueMetadata {
-        &self.inner.metadata
+        &self.metadata
     }
 
     pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
-        &mut self.inner.metadata
+        &mut self.metadata
     }
 
     pub fn into_metadata(self) -> StateValueMetadata {
-        self.inner.metadata
+        self.metadata
     }
 
     pub fn unpack(self) -> (StateValueMetadata, Bytes) {
-        let StateValueInner { data, metadata } = self.inner;
+        let Self { data, metadata } = self;
         (metadata, data)
     }
 }
@@ -318,16 +288,6 @@ impl From<Vec<u8>> for StateValue {
 impl From<Bytes> for StateValue {
     fn from(bytes: Bytes) -> Self {
         StateValue::new_legacy(bytes)
-    }
-}
-
-impl CryptoHash for StateValue {
-    type Hasher = StateValueHasher;
-
-    fn hash(&self) -> HashValue {
-        *self
-            .hash
-            .get_or_init(|| CryptoHash::hash(&self.inner.to_persistable_form()))
     }
 }
 

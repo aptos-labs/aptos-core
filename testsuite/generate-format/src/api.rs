@@ -15,10 +15,7 @@ use aptos_types::{
     account_config::{CoinStoreResource, DepositEvent, WithdrawEvent},
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
-    state_store::{
-        state_key::StateKey,
-        state_value::{PersistedStateValueMetadata, StateValueMetadata},
-    },
+    state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
     transaction::{
         self,
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
