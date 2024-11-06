@@ -167,6 +167,18 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
         &self.0.base_storage
     }
 
+    pub fn into_verified_modules_iter(self) -> impl Iterator<Item = (ModuleId, Arc<Module>)> {
+        self.0
+            .module_cache
+            .into_modules_iter()
+            .flat_map(|(key, module)| {
+                module
+                    .code()
+                    .is_verified()
+                    .then(|| (key, module.code().verified().clone()))
+            })
+    }
+
     /// Test-only method that checks the state of the module cache.
     #[cfg(test)]
     pub(crate) fn assert_cached_state<'b>(

@@ -61,6 +61,11 @@ where
         Self::Verified(Arc::new(verified_code))
     }
 
+    /// Returns new verified code from [Arc]ed instance.
+    pub fn from_verified_ref(verified_code: Arc<V>) -> Self {
+        Self::Verified(verified_code)
+    }
+
     /// Returns true if the code is verified.
     pub fn is_verified(&self) -> bool {
         match self {

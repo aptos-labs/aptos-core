@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
+aptos-vm-types = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }

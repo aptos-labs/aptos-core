@@ -34,6 +34,10 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
         &self.0.module_storage
     }
 
+    pub fn into_module_storage(self) -> M {
+        self.0.module_storage
+    }
+
     /// Test-only method that checks the state of the script cache.
     #[cfg(test)]
     pub(crate) fn assert_cached_state<'b>(
