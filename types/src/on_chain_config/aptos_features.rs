@@ -196,6 +196,7 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
+        features.enable(FeatureFlag::ENABLE_LOADER_V2);
         features
     }
 }

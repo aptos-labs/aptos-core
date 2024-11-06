@@ -23,6 +23,7 @@ use aptos_vm_types::storage::StorageGasParameters;
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
+use aptos_types::on_chain_config::FeatureFlag;
 
 /// A runtime environment which can be used for VM initialization and more. Contains features
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
@@ -175,8 +176,9 @@ impl Environment {
     ) -> Self {
         // We compute and store a hash of configs in order to distinguish different environments.
         let mut sha3_256 = Sha3_256::new();
-        let features =
+        let mut features =
             fetch_config_and_update_hash::<Features>(&mut sha3_256, state_view).unwrap_or_default();
+        features.enable(FeatureFlag::ENABLE_LOADER_V2);
 
         // If no chain ID is in storage, we assume we are in a testing environment.
         let chain_id = fetch_config_and_update_hash::<ChainId>(&mut sha3_256, state_view)
