@@ -7,8 +7,8 @@ use crate::{
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            EmptyDataView, KeyType, MockEnvironment, MockOutput, MockTask, MockTransaction,
-            TransactionGen, TransactionGenParams,
+            KeyType, MockEnvironment, MockOutput, MockTask, MockTransaction, TransactionGen,
+            TransactionGenParams,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -16,6 +16,7 @@ use crate::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     executable::ExecutableTestType, read_only_module_cache::ReadOnlyModuleCache,
+    state_store::MockStateView,
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -117,9 +118,7 @@ where
     }
 
     pub(crate) fn run(self) {
-        let data_view = EmptyDataView::<KeyType<K>> {
-            phantom: PhantomData,
-        };
+        let state_view = MockStateView::empty();
 
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -134,11 +133,11 @@ where
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
-            EmptyDataView<KeyType<K>>,
+            MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(config, executor_thread_pool, global_module_cache, None)
-        .execute_transactions_parallel(&env, &self.transactions, &data_view);
+        .execute_transactions_parallel(&env, &self.transactions, &state_view);
 
         self.baseline_output.assert_parallel_output(&output);
     }

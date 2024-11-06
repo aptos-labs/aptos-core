@@ -1824,10 +1824,7 @@ mod test {
     use aptos_types::{
         error::PanicOr,
         executable::Executable,
-        state_store::{
-            errors::StateviewError, state_storage_usage::StateStorageUsage,
-            state_value::StateValue, TStateView,
-        },
+        state_store::{state_value::StateValue, MockStateView},
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
     };
@@ -2478,33 +2475,6 @@ mod test {
         StateValue::new_legacy(value.simple_serialize(layout).unwrap().into())
     }
 
-    // TODO: Check how to import MockStateView from other tests
-    // rather than rewriting it here again
-    struct MockStateView {
-        data: HashMap<KeyType<u32>, StateValue>,
-    }
-
-    impl MockStateView {
-        fn new(data: HashMap<KeyType<u32>, StateValue>) -> Self {
-            Self { data }
-        }
-    }
-
-    impl TStateView for MockStateView {
-        type Key = KeyType<u32>;
-
-        fn get_state_value(
-            &self,
-            state_key: &Self::Key,
-        ) -> Result<Option<StateValue>, StateviewError> {
-            Ok(self.data.get(state_key).cloned())
-        }
-
-        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-            unimplemented!();
-        }
-    }
-
     #[derive(Clone)]
     struct MockExecutable {}
 
@@ -2518,18 +2488,19 @@ mod test {
     fn test_id_value_exchange() {
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
-        let base_view = MockStateView::new(HashMap::new());
+        let base_view = MockStateView::empty();
         let start_counter = 5;
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let global_module_cache = ReadOnlyModuleCache::empty();
 
-        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
-            &base_view,
-            &global_module_cache,
-            &runtime_environment,
-            ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
-            1,
-        );
+        let latest_view =
+            LatestView::<TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>::new(
+                &base_view,
+                &global_module_cache,
+                &runtime_environment,
+                ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
+                1,
+            );
 
         // Test id -- value exchange for a value that does not contain delayed fields
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
@@ -2788,7 +2759,7 @@ mod test {
     struct Holder {
         unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
         counter: RefCell<u32>,
-        base_view: MockStateView,
+        base_view: MockStateView<KeyType<u32>>,
         empty_global_module_cache:
             ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
@@ -2812,11 +2783,11 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-    ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable> {
+    ) -> LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable> {
         let sequential_state: SequentialState<'a, TestTransactionType> =
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
-        LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
+        LatestView::<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>::new(
             &h.base_view,
             &h.empty_global_module_cache,
             &h.runtime_environment,
@@ -2829,7 +2800,7 @@ mod test {
         start_counter: u32,
         holder: Holder,
         counter: AtomicU32,
-        base_view: MockStateView,
+        base_view: MockStateView<KeyType<u32>>,
         runtime_environment: RuntimeEnvironment,
         versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
         scheduler: Scheduler,
@@ -2857,19 +2828,22 @@ mod test {
 
         fn new_view(&self) -> ViewsComparison<'_> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
-            let latest_view_par =
-                LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
-                    &self.base_view,
-                    &self.holder.empty_global_module_cache,
-                    &self.runtime_environment,
-                    ViewState::Sync(ParallelState::new(
-                        &self.versioned_map,
-                        &self.scheduler,
-                        self.start_counter,
-                        &self.counter,
-                    )),
-                    1,
-                );
+            let latest_view_par = LatestView::<
+                TestTransactionType,
+                MockStateView<KeyType<u32>>,
+                MockExecutable,
+            >::new(
+                &self.base_view,
+                &self.holder.empty_global_module_cache,
+                &self.runtime_environment,
+                ViewState::Sync(ParallelState::new(
+                    &self.versioned_map,
+                    &self.scheduler,
+                    self.start_counter,
+                    &self.counter,
+                )),
+                1,
+            );
 
             ViewsComparison {
                 latest_view_seq,
@@ -2879,8 +2853,10 @@ mod test {
     }
 
     struct ViewsComparison<'a> {
-        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
-        latest_view_par: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
+        latest_view_seq:
+            LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
+        latest_view_par:
+            LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
     }
 
     impl<'a> ViewsComparison<'a> {

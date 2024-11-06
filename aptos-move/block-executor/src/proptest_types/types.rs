@@ -122,30 +122,6 @@ where
     }
 }
 
-pub(crate) struct EmptyDataView<K> {
-    pub(crate) phantom: PhantomData<K>,
-}
-
-impl<K> TStateView for EmptyDataView<K>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-{
-    type Key = K;
-
-    /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
-        Ok(None)
-    }
-
-    fn id(&self) -> StateViewId {
-        StateViewId::Miscellaneous
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-        unreachable!("Not used in tests");
-    }
-}
-
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
 ///////////////////////////////////////////////////////////////////////////
