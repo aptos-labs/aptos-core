@@ -167,6 +167,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
         &self.0.base_storage
     }
 
+    /// Returns an iterator of all modules that have been cached and verified.
     pub fn into_verified_modules_iter(self) -> impl Iterator<Item = (ModuleId, Arc<Module>)> {
         self.0
             .module_cache

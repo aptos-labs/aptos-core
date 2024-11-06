@@ -4,6 +4,7 @@
 use crate::module_and_script_storage::module_storage::AptosModuleStorage;
 use ambassador::Delegate;
 use aptos_types::{
+    error::PanicError,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     vm::modules::AptosModuleExtension,
 };
@@ -82,17 +83,27 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
         Self { storage }
     }
 
+    /// Drains cached verified modules from the code storage, transforming them into format used by
+    /// global caches (i.e., with extension and no versioning). Should only be called when the code
+    /// storage borrows [StateView].
     pub fn into_verified_module_code_iter(
         self,
-    ) -> impl Iterator<
-        Item = (
-            ModuleId,
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<u32>>>,
-        ),
+    ) -> Result<
+        impl Iterator<
+            Item = (
+                ModuleId,
+                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<u32>>>,
+            ),
+        >,
+        PanicError,
     > {
         let state_view = match self.storage.module_storage().byte_storage().state_view {
             BorrowedOrOwned::Borrowed(state_view) => state_view,
-            BorrowedOrOwned::Owned(_) => unreachable!(),
+            BorrowedOrOwned::Owned(_) => {
+                return Err(PanicError::CodeInvariantError(
+                    "Verified modules should only be extracted from borrowed state".to_string(),
+                ))
+            },
         };
 
         let mut modules_to_add = vec![];
@@ -101,14 +112,33 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
             .into_module_storage()
             .into_verified_modules_iter()
         {
-            let state_key = StateKey::module_id(&key);
-            // TODO(loader_v2): Replace with invariant violations!
-            let state_value = state_view.get_state_value(&state_key).unwrap().unwrap();
-            let extension = AptosModuleExtension::new(state_value);
+            // We have cached the module previously, so we must be able to find it in storage.
+            let extension = state_view
+                .get_state_value(&StateKey::module_id(&key))
+                .map_err(|err| {
+                    let msg = format!(
+                        "Failed to retrieve module {}::{} from storage {:?}",
+                        key.address(),
+                        key.name(),
+                        err
+                    );
+                    PanicError::CodeInvariantError(msg)
+                })?
+                .map(AptosModuleExtension::new)
+                .ok_or_else(|| {
+                    let msg = format!(
+                        "Module {}::{} should exist, but it does not anymore",
+                        key.address(),
+                        key.name()
+                    );
+                    PanicError::CodeInvariantError(msg)
+                })?;
+
+            // We are using storage version here.
             let module = ModuleCode::from_verified_ref(verified_code, Arc::new(extension), None);
             modules_to_add.push((key, Arc::new(module)))
         }
-        modules_to_add.into_iter()
+        Ok(modules_to_add.into_iter())
     }
 }
 
