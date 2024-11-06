@@ -28,7 +28,7 @@ runs:
     # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
     - name: Upload smoke test logs for failed and flaky tests
       if: ${{ failure() || success() }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: failed-smoke-test-logs
         # Retain all smoke test data except for the db (which may be large).

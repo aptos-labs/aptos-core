@@ -834,7 +834,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|param| {
                 let Parameter(sym, ty, loc) = *param;
                 let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
-                if env.language_version().is_at_least(LanguageVersion::V2_0)
+                if env.language_version().is_at_least(LanguageVersion::V2_1)
                     && env.symbol_pool().string(*sym).as_ref() == "_"
                 {
                     Pattern::Wildcard(id)
