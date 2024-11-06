@@ -1646,7 +1646,12 @@ impl AptosVM {
         let check_friend_linking = !self
             .features()
             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
-        let compatability_checks = Compatibility::new(check_struct_layout, check_friend_linking);
+        let compatability_checks = Compatibility::new(
+            check_struct_layout,
+            check_friend_linking,
+            self.timed_features()
+                .is_enabled(TimedFeatureFlag::EntryCompatibility),    
+        );
 
         if self.features().is_loader_v2_enabled() {
             session.finish_with_module_publishing_and_initialization(
