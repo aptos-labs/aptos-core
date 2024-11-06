@@ -1,24 +1,24 @@
-testnet:
-  # Transaction Stream endpoint addresss.
-  transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-  # (Optional) The key to use with developers.aptoslabs.com
-  api_key: TESTNET_API_KEY
-  # A map from versions to dump and their output names.
-  versions_to_import:
-    # naming: <version_descriptive_name>
-    1: 1_genesis
-    2: 2_new_block_event
-    3: 3_empty_txn
-    278556781: 278556781_v1_coin_register_fa_metadata
-    1255836496: 1255836496_v2_fa_metadata_
-    5979639459: 5979639459_coin_register
-    5992795934: 5992795934_fa_activities
-    5523474016: 5523474016_validator_txn
+# testnet:
+#   # Transaction Stream endpoint addresss.
+#   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
+#   # (Optional) The key to use with developers.aptoslabs.com
+#   api_key: TESTNET_API_KEY
+#   # A map from versions to dump and their output names.
+#   versions_to_import:
+#     # naming: <version_descriptive_name>
+#     1: 1_genesis
+#     2: 2_new_block_event
+#     3: 3_empty_txn
+#     278556781: 278556781_v1_coin_register_fa_metadata
+#     1255836496: 1255836496_v2_fa_metadata_
+#     5979639459: 5979639459_coin_register
+#     5992795934: 5992795934_fa_activities
+#     5523474016: 5523474016_validator_txn
 
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  api_key: MAINNET_API_KEY
+  api_key: aptoslabs_hxr2RZXYUSR_GH15n92wXVvCh4rxZYMKuWJ35wgMhHkMS
   versions_to_import:
     308783012: 308783012_fa_transfer
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
@@ -45,5 +45,8 @@ mainnet:
     121508544: 121508544_stake_distribute
     125600867: 125600867_stake_delegation_pool
     126043288: 126043288_stake_delegration_withdraw
-    139442597: 139442597_stake_unlock
     139449359: 139449359_stake_reactivate
+    1831971037: 1831971037_stake_pool_unlock
+    1837008146: 1837008146_stake_add
+    1830706009: 1830706009_staker_governance_record
+    1831971037: 1831971037_stake_delegation_pool
