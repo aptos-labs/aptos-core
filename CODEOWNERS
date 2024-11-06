@@ -61,7 +61,7 @@
 /crates/aptos-open-api @banool @gregnazario
 
 # Owners for the aptos-protos crate
-/crates/aptos-protos @banool @bowenyang007 @jillxuu @larry-aptos @rtso
+/crates/aptos-protos @banool @bowenyang007 @jillxuu @larry-aptos @rtso  @aptos-labs/ecosystem-infra
 
 /crates/aptos-rest-client @banool @gregnazario
 

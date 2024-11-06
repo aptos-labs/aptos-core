@@ -15,7 +15,7 @@ use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
+    account_config::{DepositEvent, WithdrawEvent},
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},

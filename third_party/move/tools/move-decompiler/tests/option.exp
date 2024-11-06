@@ -33,20 +33,20 @@ module 0x1::option {
         _t3
     }
     public fun destroy_none<Element>(self: Option<Element>) {
-        let _t5;
+        let _t4;
         if (!is_none<Element>(&self)) abort 262144;
-        Option<Element>{vec: _t5} = self;
-        vector::destroy_empty<Element>(_t5);
+        Option<Element>{vec: _t4} = self;
+        vector::destroy_empty<Element>(_t4);
     }
     public fun is_none<Element>(self: &Option<Element>): bool {
         vector::is_empty<Element>(&self.vec)
     }
     public fun destroy_some<Element>(self: Option<Element>): Element {
         let _t1;
-        let _t6;
+        let _t5;
         if (!is_some<Element>(&self)) abort 262145;
-        Option<Element>{vec: _t6} = self;
-        _t1 = _t6;
+        Option<Element>{vec: _t5} = self;
+        _t1 = _t5;
         vector::destroy_empty<Element>(_t1);
         vector::pop_back<Element>(&mut _t1)
     }
