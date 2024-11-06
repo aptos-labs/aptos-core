@@ -42,6 +42,15 @@ where
         }
     }
 
+    /// Creates new [ModuleCode] from [Arc]ed verified code.
+    pub fn from_verified_ref(verified_code: Arc<VC>, extension: Arc<E>, version: V) -> Self {
+        Self {
+            code: Code::from_verified_ref(verified_code),
+            extension,
+            version,
+        }
+    }
+
     /// Returns module's code.
     pub fn code(&self) -> &Code<DC, VC> {
         &self.code

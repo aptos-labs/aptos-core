@@ -2062,6 +2062,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "aptos-vm-environment",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "claims",
  "move-binary-format",
