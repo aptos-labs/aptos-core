@@ -57,13 +57,8 @@ mainnet:
     578318306: 578318306_objects_write_resource
 
     # stake processor
-    83883373: 83883373_stake_withdraw
-    4827964: 4827964_stake_initialize
     121508544: 121508544_stake_distribute
-    125600867: 125600867_stake_delegation_pool
-    126043288: 126043288_stake_delegration_withdraw
     139449359: 139449359_stake_reactivate
-    1831971037: 1831971037_stake_pool_unlock
-    1837008146: 1837008146_stake_add
     1830706009: 1830706009_staker_governance_record
-    1831971037: 1831971037_stake_delegation_pool
+    125600867: 125600867_stake_delegation_pool
+    4827964: 4827964_stake_initialize
