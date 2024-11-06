@@ -12,7 +12,10 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh add <fuzz_target_name>
     ```
-
+- `block-builder`: Run rust utility to build fuzzers.
+    ```bash
+    ./fuzz.sh block-builder <utility> [args]
+    ```
 - `build`: Build specified fuzz targets or all targets.
     ```bash
     ./fuzz.sh build <fuzz_target|all> [target_dir]
@@ -111,11 +114,6 @@ When building in the OSS-Fuzz environment, `fuzz.sh` will place the corpus archi
 - **Handle Diverse Inputs:** Ensure that the harness can handle a wide range of input formats and sizes.
 - **Error Handling:** Implement robust error handling to intercept crashes or unwanted/unexpected behavior.
 - **Performance Optimization:** Optimize for performance to enable more iterations and deeper fuzzing.
-
-## fuzzer CLI
-`cargo run fuzzer <command>`
-
-A CLI that introduces helpful commands to build fuzzers, focusing on static code generation and corpus preparation.
 
 ## References
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)
