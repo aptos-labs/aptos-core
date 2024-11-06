@@ -618,9 +618,9 @@ where
                 // Publish modules before we decrease validation index so that validations observe
                 // the new module writes as well.
                 if runtime_environment.vm_config().use_loader_v2 {
+                    executed_at_commit = true;
                     let module_write_set = last_input_output.module_write_set(txn_idx);
                     if !module_write_set.is_empty() {
-                        executed_at_commit = true;
                         Self::publish_module_writes(
                             txn_idx,
                             module_write_set,
