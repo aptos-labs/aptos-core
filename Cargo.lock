@@ -2062,10 +2062,14 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "aptos-vm-environment",
+ "bcs 0.1.4",
+ "claims",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
+ "move-vm-types",
  "parking_lot 0.12.1",
+ "test-case",
 ]
 
 [[package]]
