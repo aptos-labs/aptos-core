@@ -3,6 +3,8 @@
 
 /// Configuration used for global caches.
 pub struct GlobalCacheConfig {
+    /// If true, when global caches are empty, Aptos framework is prefetched into module cache.
+    pub prefetch_framework_code: bool,
     /// The maximum size of module cache. If module cache exceeds this capacity, it should be
     /// flushed.
     pub module_cache_capacity: usize,
@@ -17,6 +19,7 @@ impl Default for GlobalCacheConfig {
         //   module or identifier sizes, or keep track in read-only module cache how many bytes we
         //   are using.
         Self {
+            prefetch_framework_code: true,
             module_cache_capacity: 100_000,
             struct_name_index_map_capacity: 100_000,
         }

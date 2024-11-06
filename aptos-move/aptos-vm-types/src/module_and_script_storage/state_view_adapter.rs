@@ -3,21 +3,30 @@
 
 use crate::module_and_script_storage::module_storage::AptosModuleStorage;
 use ambassador::Delegate;
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
+    vm::modules::AptosModuleExtension,
+};
 use bytes::Bytes;
 use move_binary_format::{
     errors::{PartialVMResult, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    metadata::Metadata,
+};
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
     ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, BorrowedOrOwned, CodeStorage,
     Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
     WithRuntimeEnvironment,
 };
-use move_vm_types::{code::ModuleBytesStorage, module_storage_error};
+use move_vm_types::{
+    code::{ModuleBytesStorage, ModuleCode},
+    module_storage_error,
+};
 use std::sync::Arc;
 
 /// Avoids orphan rule to implement [ModuleBytesStorage] for [StateView].
@@ -71,6 +80,35 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
         };
         let storage = adapter.into_unsync_code_storage(runtime_environment);
         Self { storage }
+    }
+
+    pub fn into_verified_module_code_iter(
+        self,
+    ) -> impl Iterator<
+        Item = (
+            ModuleId,
+            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<u32>>>,
+        ),
+    > {
+        let state_view = match self.storage.module_storage().byte_storage().state_view {
+            BorrowedOrOwned::Borrowed(state_view) => state_view,
+            BorrowedOrOwned::Owned(_) => unreachable!(),
+        };
+
+        let mut modules_to_add = vec![];
+        for (key, verified_code) in self
+            .storage
+            .into_module_storage()
+            .into_verified_modules_iter()
+        {
+            let state_key = StateKey::module_id(&key);
+            // TODO(loader_v2): Replace with invariant violations!
+            let state_value = state_view.get_state_value(&state_key).unwrap().unwrap();
+            let extension = AptosModuleExtension::new(state_value);
+            let module = ModuleCode::from_verified_ref(verified_code, Arc::new(extension), None);
+            modules_to_add.push((key, Arc::new(module)))
+        }
+        modules_to_add.into_iter()
     }
 }
 

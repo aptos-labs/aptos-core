@@ -8,12 +8,15 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
     language_storage::ModuleId,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{Module, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
 use parking_lot::Mutex;
 use std::{
     hash::Hash,
@@ -50,7 +53,7 @@ impl BlockId {
 }
 
 /// Manages global caches, e.g., modules or execution environment. Should not be used concurrently.
-pub struct GlobalCacheManagerInner<K, DC, VC, E> {
+struct GlobalCacheManagerInner<K, DC, VC, E> {
     /// Different configurations used for handling global caches.
     config: GlobalCacheConfig,
     /// Cache for modules. It is read-only for any concurrent execution, and can only be mutated
@@ -90,19 +93,9 @@ where
         }
     }
 
-    /// Sets the state of global caches prior to block execution on top of the provided state (with
-    /// the block ID). Should always sbe called prior to block execution.
-    ///
-    /// The caches stored globally (modules, struct name re-indexing map and type caches) are all
-    /// flushed if:
-    ///   1. Previously executed block ID does not match the provided value.
-    ///   2. The environment has changed for this state.
-    ///   3. The size of the struct name re-indexing map is too large.
-    ///   4. The size of the module cache is too large.
-    ///
-    /// Marks [GlobalCacheManagerInner] as not ready for next block execution. If called
-    /// concurrently, only a single invocation ever succeeds and other calls return an error.
-    pub fn mark_block_execution_start(
+    /// See the documentation for [GlobalCacheManager::mark_block_execution_start]. The only
+    /// difference here is that there is no framework prefetching.
+    fn mark_block_execution_start(
         &self,
         state_view: &impl StateView,
         previous_block_id: Option<HashValue>,
@@ -169,9 +162,15 @@ where
             .as_ref()
             .expect("Environment has to be set")
             .runtime_environment();
-        let struct_name_index_map_size = runtime_environment
-            .struct_name_index_map_size()
-            .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
+        let struct_name_index_map_size =
+            runtime_environment
+                .struct_name_index_map_size()
+                .map_err(|err| {
+                    // TODO(loader_v2):
+                    //   Is this fine to fail here? We leave the state as not ready forever?
+                    //   Seems like it is better to reset the state and reset everything.
+                    err.finish(Location::Undefined).into_vm_status()
+                })?;
         if struct_name_index_map_size > self.config.struct_name_index_map_capacity {
             flush_all_caches = true;
         }
@@ -190,10 +189,8 @@ where
         Ok(())
     }
 
-    /// Should always be called after block execution. Sets the [GlobalCacheManagerInner] to be
-    /// execution-ready (and if it is already execution-ready, returns an error). Sets the ID for
-    /// the executed block so that the next execution can check it.
-    pub fn mark_block_execution_end(
+    /// See the documentation for [GlobalCacheManager::mark_block_execution_end].
+    fn mark_block_execution_end(
         &self,
         executed_block_id: Option<HashValue>,
     ) -> Result<(), VMStatus> {
@@ -211,19 +208,6 @@ where
         self.mark_ready_for_next_block();
 
         Ok(())
-    }
-
-    /// Returns the cached environment that [GlobalCacheManagerInner::mark_block_execution_start]
-    /// must set. If it has not been set, an invariant violation error is returned.
-    pub fn environment(&self) -> Result<AptosEnvironment, VMStatus> {
-        self.previous_environment.lock().clone().ok_or_else(|| {
-            invariant_violation("Environment must always be set at block execution start")
-        })
-    }
-
-    /// Returns the global module cache.
-    pub fn module_cache(&self) -> Arc<ReadOnlyModuleCache<K, DC, VC, E>> {
-        self.module_cache.clone()
     }
 
     /// Returns true of a next block is ready be executed. This is the case only when:
@@ -259,13 +243,73 @@ impl GlobalCacheManager {
             inner: GlobalCacheManagerInner::new_with_default_config(),
         }
     }
-}
 
-impl Deref for GlobalCacheManager {
-    type Target = GlobalCacheManagerInner<ModuleId, CompiledModule, Module, AptosModuleExtension>;
+    /// Sets the state of global caches prior to block execution on top of the provided state (with
+    /// the block ID). Should always sbe called prior to block execution.
+    ///
+    /// The caches stored globally (modules, struct name re-indexing map and type caches) are all
+    /// flushed if:
+    ///   1. Previously executed block ID does not match the provided value.
+    ///   2. The environment has changed for this state.
+    ///   3. The size of the struct name re-indexing map is too large.
+    ///   4. The size of the module cache is too large.
+    ///
+    /// Marks [GlobalCacheManager] as not ready for next block execution. If called concurrently,
+    /// only a single invocation ever succeeds and other calls return an error.
+    pub fn mark_block_execution_start(
+        &self,
+        state_view: &impl StateView,
+        previous_block_id: Option<HashValue>,
+    ) -> Result<(), VMStatus> {
+        self.inner
+            .mark_block_execution_start(state_view, previous_block_id)?;
 
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+        if self.inner.config.prefetch_framework_code && self.module_cache().size() == 0 {
+            let runtime_environment = self.environment()?;
+
+            let code_storage = state_view.as_aptos_code_storage(runtime_environment);
+            let result = code_storage
+                .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
+            // Framework must exist, prefetch.
+            if let Ok(Some(_)) = result {
+                // TODO(loader_v2): Replace with invariant violations!
+                self.inner
+                    .module_cache
+                    .insert_verified_unchecked(code_storage.into_verified_module_code_iter())
+                    .unwrap();
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Should always be called after block execution. Sets the [GlobalCacheManager] to be ready
+    /// for execution (and if it is already execution-ready, returns an error). Sets the ID for the
+    /// executed block so that the next execution can check it.
+    pub fn mark_block_execution_end(
+        &self,
+        executed_block_id: Option<HashValue>,
+    ) -> Result<(), VMStatus> {
+        self.inner.mark_block_execution_end(executed_block_id)
+    }
+
+    /// Returns the cached environment set by [GlobalCacheManager::mark_block_execution_start]. If
+    /// it has not been set, an invariant violation error is returned.
+    pub fn environment(&self) -> Result<AptosEnvironment, VMStatus> {
+        self.inner
+            .previous_environment
+            .lock()
+            .clone()
+            .ok_or_else(|| {
+                invariant_violation("Environment must always be set at block execution start")
+            })
+    }
+
+    /// Returns the global module cache.
+    pub fn module_cache(
+        &self,
+    ) -> Arc<ReadOnlyModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>> {
+        self.inner.module_cache.clone()
     }
 }
 
@@ -277,7 +321,7 @@ mod test {
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
     use claims::{assert_err, assert_ok};
-    use move_vm_types::code::mock_verified_code;
+    use move_vm_types::code::{mock_verified_code, MockDeserializedCode, MockVerifiedCode};
     use std::{collections::HashMap, thread, thread::JoinHandle};
     use test_case::test_case;
 
@@ -300,18 +344,6 @@ mod test {
     }
 
     #[test]
-    fn mark_ready() {
-        let global_cache_manager = GlobalCacheManager::new_with_default_config();
-        assert!(global_cache_manager.ready_for_next_block());
-
-        global_cache_manager.mark_not_ready_for_next_block();
-        assert!(!global_cache_manager.ready_for_next_block());
-
-        global_cache_manager.mark_ready_for_next_block();
-        assert!(global_cache_manager.ready_for_next_block());
-    }
-
-    #[test]
     fn environment_should_always_be_set() {
         let global_cache_manager = GlobalCacheManager::new_with_default_config();
         assert!(global_cache_manager.environment().is_err());
@@ -322,29 +354,46 @@ mod test {
     }
 
     #[test]
+    fn mark_ready() {
+        let global_cache_manager = GlobalCacheManagerInner::<
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new_with_default_config();
+        assert!(global_cache_manager.ready_for_next_block());
+
+        global_cache_manager.mark_not_ready_for_next_block();
+        assert!(!global_cache_manager.ready_for_next_block());
+
+        global_cache_manager.mark_ready_for_next_block();
+        assert!(global_cache_manager.ready_for_next_block());
+    }
+
+    #[test]
     fn mark_execution_start_when_different_environment() {
         let state_view = MockStateView::empty();
         let global_cache_manager = GlobalCacheManagerInner::new_with_default_config();
 
         global_cache_manager
-            .module_cache()
+            .module_cache
             .insert(0, mock_verified_code(0, None));
         global_cache_manager
-            .module_cache()
+            .module_cache
             .insert(1, mock_verified_code(1, None));
-        assert_eq!(global_cache_manager.module_cache().size(), 2);
+        assert_eq!(global_cache_manager.module_cache.size(), 2);
 
         assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, None));
-        let old_environment = assert_ok!(global_cache_manager.environment());
+        let old_environment = global_cache_manager
+            .previous_environment
+            .lock()
+            .clone()
+            .unwrap();
         assert_ok!(global_cache_manager.mark_block_execution_end(Some(HashValue::zero())));
-        assert_eq!(global_cache_manager.module_cache().size(), 2);
+        assert_eq!(global_cache_manager.module_cache.size(), 2);
 
         // Tweak feature flags to force a different config.
-        let mut features = global_cache_manager
-            .environment()
-            .unwrap()
-            .features()
-            .clone();
+        let mut features = old_environment.features().clone();
         assert!(features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
         features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
         let bytes = bcs::to_bytes(&features).unwrap();
@@ -359,9 +408,13 @@ mod test {
         assert_ok!(
             global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::zero()))
         );
-        assert_eq!(global_cache_manager.module_cache().size(), 0);
+        assert_eq!(global_cache_manager.module_cache.size(), 0);
 
-        let new_environment = assert_ok!(global_cache_manager.environment());
+        let new_environment = global_cache_manager
+            .previous_environment
+            .lock()
+            .clone()
+            .unwrap();
         assert!(old_environment != new_environment);
     }
 
@@ -382,18 +435,18 @@ mod test {
         let global_cache_manager = GlobalCacheManagerInner::new_with_config(config);
 
         global_cache_manager
-            .module_cache()
+            .module_cache
             .insert(0, mock_verified_code(0, None));
         global_cache_manager
-            .module_cache()
+            .module_cache
             .insert(1, mock_verified_code(1, None));
-        assert_eq!(global_cache_manager.module_cache().size(), 2);
+        assert_eq!(global_cache_manager.module_cache.size(), 2);
 
         // Cache is too large, should be flushed for next block.
         assert_ok!(
             global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::random()))
         );
-        assert_eq!(global_cache_manager.module_cache().size(), 0);
+        assert_eq!(global_cache_manager.module_cache.size(), 0);
     }
 
     #[test_case(None)]
@@ -403,14 +456,14 @@ mod test {
         let global_cache_manager = GlobalCacheManagerInner::new_with_default_config();
 
         global_cache_manager
-            .module_cache()
+            .module_cache
             .insert(0, mock_verified_code(0, None));
-        assert_eq!(global_cache_manager.module_cache().size(), 1);
+        assert_eq!(global_cache_manager.module_cache.size(), 1);
 
         // If executed on top of unset state, or the state with matching previous hash, the cache
         // is not flushed.
         assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, previous_block_id));
-        assert_eq!(global_cache_manager.module_cache().size(), 1);
+        assert_eq!(global_cache_manager.module_cache.size(), 1);
         assert!(!global_cache_manager.ready_for_next_block());
     }
 
@@ -432,19 +485,19 @@ mod test {
         assert_ok!(global_cache_manager.mark_block_execution_end(recorded_previous_block_id));
 
         global_cache_manager
-            .module_cache()
+            .module_cache
             .insert(0, mock_verified_code(0, None));
-        assert_eq!(global_cache_manager.module_cache().size(), 1);
+        assert_eq!(global_cache_manager.module_cache.size(), 1);
 
         assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, previous_block_id));
         assert!(!global_cache_manager.ready_for_next_block());
 
         if recorded_previous_block_id.is_some() && recorded_previous_block_id == previous_block_id {
             // In this case both IDs match, no cache flushing.
-            assert_eq!(global_cache_manager.module_cache().size(), 1);
+            assert_eq!(global_cache_manager.module_cache.size(), 1);
         } else {
             // If previous block IDs do not match, or are unknown, caches must be flushed!
-            assert_eq!(global_cache_manager.module_cache().size(), 0);
+            assert_eq!(global_cache_manager.module_cache.size(), 0);
         }
     }
 
@@ -453,7 +506,12 @@ mod test {
         let state_view = Box::new(MockStateView::empty());
         let state_view: &'static _ = Box::leak(state_view);
 
-        let global_cache_manager = Arc::new(GlobalCacheManager::new_with_default_config());
+        let global_cache_manager = Arc::new(GlobalCacheManagerInner::<
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new_with_default_config());
         assert!(global_cache_manager.ready_for_next_block());
 
         let mut handles = vec![];
@@ -470,7 +528,12 @@ mod test {
     #[test_case(None)]
     #[test_case(Some(HashValue::from_u64(0)))]
     fn mark_block_execution_end(block_id: Option<HashValue>) {
-        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        let global_cache_manager = GlobalCacheManagerInner::<
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new_with_default_config();
         assert!(global_cache_manager.previous_block_id.lock().is_unset());
 
         // The global cache is ready, so we cannot mark execution end.
@@ -497,7 +560,12 @@ mod test {
 
     #[test]
     fn mark_block_execution_end_concurrent() {
-        let global_cache_manager = Arc::new(GlobalCacheManager::new_with_default_config());
+        let global_cache_manager = Arc::new(GlobalCacheManagerInner::<
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            (),
+        >::new_with_default_config());
         global_cache_manager.mark_not_ready_for_next_block();
 
         let mut handles = vec![];
