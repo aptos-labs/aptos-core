@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
-use move_binary_format::{errors::Location, CompiledModule};
+use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -162,15 +162,19 @@ where
             .as_ref()
             .expect("Environment has to be set")
             .runtime_environment();
-        let struct_name_index_map_size =
-            runtime_environment
-                .struct_name_index_map_size()
-                .map_err(|err| {
-                    // TODO(loader_v2):
-                    //   Is this fine to fail here? We leave the state as not ready forever?
-                    //   Seems like it is better to reset the state and reset everything.
-                    err.finish(Location::Undefined).into_vm_status()
-                })?;
+        let struct_name_index_map_size = match runtime_environment.struct_name_index_map_size() {
+            Err(err) => {
+                // Unlock the cache, reset all states, and return.
+                drop(previous_environment);
+                let err = self.reset_and_return_invariant_violation(&format!(
+                    "Error when getting struct name index map size: {:?}",
+                    err
+                ));
+                return Err(err);
+            },
+            Ok(size) => size,
+        };
+
         if struct_name_index_map_size > self.config.struct_name_index_map_capacity {
             flush_all_caches = true;
         }
@@ -198,6 +202,8 @@ where
         // ensure it is not possible to execute blocks concurrently.
         let mut previous_block_id = self.previous_block_id.lock();
         if self.ready_for_next_block() {
+            // This means we are executing concurrently. If so, all-but-one thread will return an
+            // error. Note that the caches are still consistent for that one thread.
             let msg = "Should not be possible to mark block execution end for execution-ready \
                              global cache, check if blocks are executed concurrently";
             return Err(invariant_violation(msg));
@@ -227,6 +233,27 @@ where
     fn mark_not_ready_for_next_block(&self) {
         self.ready_for_next_block.store(false, Ordering::SeqCst);
     }
+
+    /// Resets all states (under a lock) as if global caches are empty and no blocks have been
+    /// executed so far. Reruns an invariant violation error.
+    fn reset_and_return_invariant_violation(&self, msg: &str) -> VMStatus {
+        // Lock to reset the state under lock.
+        let mut previous_block_id = self.previous_block_id.lock();
+
+        // 1. Should be ready for next execution.
+        self.mark_not_ready_for_next_block();
+        // 2. Should contain no environment.
+        *self.previous_environment.lock() = None;
+        // 3. Module cache is empty.
+        self.module_cache.flush_unchecked();
+        // 4. Block ID is unset.
+        *previous_block_id = BlockId::Unset;
+
+        // State reset, unlock.
+        drop(previous_block_id);
+
+        invariant_violation(msg)
+    }
 }
 
 /// Same as [GlobalCacheManagerInner], but uses concrete types used by execution on Aptos instead
@@ -254,6 +281,8 @@ impl GlobalCacheManager {
     ///   3. The size of the struct name re-indexing map is too large.
     ///   4. The size of the module cache is too large.
     ///
+    /// Additionally, if cache is empty, prefetches the framework code into it.
+    ///
     /// Marks [GlobalCacheManager] as not ready for next block execution. If called concurrently,
     /// only a single invocation ever succeeds and other calls return an error.
     pub fn mark_block_execution_start(
@@ -265,21 +294,45 @@ impl GlobalCacheManager {
             .mark_block_execution_start(state_view, previous_block_id)?;
 
         if self.inner.config.prefetch_framework_code && self.module_cache().size() == 0 {
-            let runtime_environment = self.environment()?;
+            let code_storage = state_view.as_aptos_code_storage(self.environment()?);
 
-            let code_storage = state_view.as_aptos_code_storage(runtime_environment);
+            // If framework code exists in storage, the transitive closure will be verified and
+            // cached.
             let result = code_storage
                 .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
-            // Framework must exist, prefetch.
-            if let Ok(Some(_)) = result {
-                // TODO(loader_v2): Replace with invariant violations!
-                self.inner
-                    .module_cache
-                    .insert_verified_unchecked(code_storage.into_verified_module_code_iter())
-                    .unwrap();
+
+            match result {
+                Ok(Some(_)) => {
+                    // Framework must have been loaded. Drain verified modules from local cache
+                    // into global cache.
+                    let verified_module_code_iter = code_storage
+                        .into_verified_module_code_iter()
+                        .map_err(|err| {
+                        let msg = format!(
+                            "Unable to convert cached modules into verified code: {:?}",
+                            err
+                        );
+                        self.inner.reset_and_return_invariant_violation(&msg)
+                    })?;
+                    self.inner
+                        .module_cache
+                        .insert_verified_unchecked(verified_module_code_iter)
+                        .map_err(|err| {
+                            let msg = format!("Unable to cache verified framework: {:?}", err);
+                            self.inner.reset_and_return_invariant_violation(&msg)
+                        })?;
+                },
+                Ok(None) => {
+                    // No framework in the state, do nothing.
+                },
+                Err(err) => {
+                    // There should be no errors when pre-fetching the framework, if there are, we
+                    // better return an error here.
+                    let msg = format!("Error when pre-fetching the framework: {:?}", err);
+                    return Err(self.inner.reset_and_return_invariant_violation(&msg));
+                },
             }
         }
-
         Ok(())
     }
 
@@ -301,6 +354,7 @@ impl GlobalCacheManager {
             .lock()
             .clone()
             .ok_or_else(|| {
+                // Note: we do not expect this to happen (this is really more of an unreachable).
                 invariant_violation("Environment must always be set at block execution start")
             })
     }
