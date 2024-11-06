@@ -72,7 +72,7 @@ pub struct Table {
 }
 
 #[derive(Deserialize)]
-pub struct OriginatingResource {
+pub struct OriginatingAddress {
     pub address_map: Table,
 }
 
@@ -83,6 +83,7 @@ pub struct Client {
     version_path_base: String,
 }
 
+// TODO: Dedupe the pepper/prover request/response types with the ones defined in the service.
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct PepperRequest {
     pub jwt_b64: String,
@@ -270,11 +271,11 @@ impl Client {
         address_key: AccountAddress,
         must_exist: bool,
     ) -> AptosResult<Response<AccountAddress>> {
-        let originating_resource: Response<OriginatingResource> = self
+        let originating_address_table: Response<OriginatingAddress> = self
             .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::account::OriginatingAddress")
             .await?;
 
-        let table_handle = originating_resource.inner().address_map.handle;
+        let table_handle = originating_address_table.inner().address_map.handle;
 
         // The derived address that can be used to look up the original address
         match self
