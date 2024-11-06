@@ -1539,10 +1539,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
-            let is_lang_version_2 = et.env().language_version.is_at_least(LanguageVersion::V2_0);
+            let is_lang_version_2_1 = et.env().language_version.is_at_least(LanguageVersion::V2_1);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
                 let symbol_pool = et.parent.parent.env.symbol_pool();
-                if !is_lang_version_2 || symbol_pool.string(*n).as_ref() != "_" {
+                if !is_lang_version_2_1 || symbol_pool.string(*n).as_ref() != "_" {
                     et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
             }
