@@ -206,8 +206,8 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
-        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-framework.git";
+        const SUBDIR_PATH: &str = "aptos-framework";
         const DEFAULT_BRANCH: &str = "mainnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());

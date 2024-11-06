@@ -55,3 +55,10 @@ mainnet:
 
     # objects processor
     578318306: 578318306_objects_write_resource
+
+    # stake processor
+    121508544: 121508544_stake_distribute
+    139449359: 139449359_stake_reactivate
+    1830706009: 1830706009_staker_governance_record
+    125600867: 125600867_stake_delegation_pool
+    4827964: 4827964_stake_initialize
