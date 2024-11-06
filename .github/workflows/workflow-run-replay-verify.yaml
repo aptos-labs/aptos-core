@@ -248,6 +248,7 @@ jobs:
                 ./aptos-debugger aptos-db replay-verify \
                   --metadata-cache-dir $MC \
                   --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+                  --txns-to-skip ${{ inputs.TXNS_TO_SKIP }} \
                   --start-version $begin \
                   --end-version $end \
                   \
