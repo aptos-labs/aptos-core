@@ -33,7 +33,7 @@ fn invariant_violation(msg: &str) -> VMStatus {
 }
 
 /// Represents previously executed block, recorded by [GlobalCacheManager].
-#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 enum BlockId {
     /// No block has been executed yet.
     Unset,
@@ -54,8 +54,8 @@ pub struct GlobalCacheManagerInner<K, DC, VC, E> {
     /// Different configurations used for handling global caches.
     config: GlobalCacheConfig,
     /// Cache for modules. It is read-only for any concurrent execution, and can only be mutated
-    /// when it is known that there are no concurrent accesses, e.g., at blok boundaries.
-    /// [GlobalCacheManager] tries to ensure that these invariants always hold.
+    /// when it is known that there are no concurrent accesses, e.g., at block boundaries.
+    /// [GlobalCacheManagerInner] tries to ensure that these invariants always hold.
     module_cache: Arc<ReadOnlyModuleCache<K, DC, VC, E>>,
 
     /// Identifies previously executed block, initially [BlockId::Unset].
@@ -75,12 +75,12 @@ where
     VC: Deref<Target = Arc<DC>>,
 {
     /// Returns a new instance of [GlobalCacheManagerInner] with default [GlobalCacheConfig].
-    pub fn new_with_default_config() -> Self {
+    fn new_with_default_config() -> Self {
         Self::new_with_config(GlobalCacheConfig::default())
     }
 
     /// Returns a new instance of [GlobalCacheManagerInner] with the provided [GlobalCacheConfig].
-    pub fn new_with_config(config: GlobalCacheConfig) -> Self {
+    fn new_with_config(config: GlobalCacheConfig) -> Self {
         Self {
             config,
             module_cache: Arc::new(ReadOnlyModuleCache::empty()),
@@ -110,14 +110,14 @@ where
         let recorded_previous_block_id = {
             // Acquire a lock, and check if we are ready to execute the next block.
             let previous_block_id = self.previous_block_id.lock();
-            if !self.ready_for_next_block.load(Ordering::SeqCst) {
+            if !self.ready_for_next_block() {
                 let msg = "Trying to execute blocks concurrently over shared global state";
                 return Err(invariant_violation(msg));
             }
 
             // Prepare for execution. Set the flag as not ready to ensure that blocks are not
             // executed concurrently using the same cache.
-            self.ready_for_next_block.store(false, Ordering::SeqCst);
+            self.mark_not_ready_for_next_block();
             *previous_block_id
         };
 
@@ -176,6 +176,8 @@ where
             flush_all_caches = true;
         }
         if self.module_cache.size() > self.config.module_cache_capacity {
+            // Technically, if we flush modules we do not need to flush type caches, but we unify
+            // flushing logic for easier reasoning.
             flush_all_caches = true;
         }
 
@@ -198,7 +200,7 @@ where
         // We are done executing a block, reset the previous block id. Do everything under lock to
         // ensure it is not possible to execute blocks concurrently.
         let mut previous_block_id = self.previous_block_id.lock();
-        if self.ready_for_next_block.load(Ordering::SeqCst) {
+        if self.ready_for_next_block() {
             let msg = "Should not be possible to mark block execution end for execution-ready \
                              global cache, check if blocks are executed concurrently";
             return Err(invariant_violation(msg));
@@ -206,7 +208,7 @@ where
         *previous_block_id = BlockId::Set(executed_block_id);
 
         // Set the flag that the global cache is ready for next execution.
-        self.ready_for_next_block.store(true, Ordering::SeqCst);
+        self.mark_ready_for_next_block();
 
         Ok(())
     }
@@ -222,6 +224,24 @@ where
     /// Returns the global module cache.
     pub fn module_cache(&self) -> Arc<ReadOnlyModuleCache<K, DC, VC, E>> {
         self.module_cache.clone()
+    }
+
+    /// Returns true of a next block is ready be executed. This is the case only when:
+    ///   1. the global caches have just been created, or
+    ///   2. [GlobalCacheManagerInner::mark_block_execution_end] was called indicating that
+    ///      previous block execution has finished.
+    fn ready_for_next_block(&self) -> bool {
+        self.ready_for_next_block.load(Ordering::SeqCst)
+    }
+
+    /// Marks caches as ready for next block execution.
+    fn mark_ready_for_next_block(&self) {
+        self.ready_for_next_block.store(true, Ordering::SeqCst);
+    }
+
+    /// Marks caches as not ready for next block execution.
+    fn mark_not_ready_for_next_block(&self) {
+        self.ready_for_next_block.store(false, Ordering::SeqCst);
     }
 }
 
@@ -251,43 +271,243 @@ impl Deref for GlobalCacheManager {
 
 #[cfg(test)]
 mod test {
-    // use super::*;
-    // use aptos_language_e2e_tests::data_store::FakeDataStore;
-    // use aptos_types::on_chain_config::{FeatureFlag, Features};
-    // use aptos_vm_environment::environment::AptosEnvironment;
-    // use claims::assert_ok;
-    // use move_vm_types::code::mock_verified_code;
-    //
-    // #[test]
-    // fn test_cross_block_module_cache_flush() {
-    //     let global_module_cache = ReadOnlyModuleCache::empty();
-    //
-    //     global_module_cache.insert(0, mock_verified_code(0, None));
-    //     assert_eq!(global_module_cache.size(), 1);
-    //
-    //     global_module_cache.flush_unchecked();
-    //     assert_eq!(global_module_cache.size(), 0);
-    //
-    //     // Now check that cache is flushed when the environment is flushed.
-    //     let mut state_view = FakeDataStore::default();
-    //     let env_old = AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
-    //
-    //     for i in 0..10 {
-    //         global_module_cache.insert(i, mock_verified_code(i, None));
-    //     }
-    //     assert_eq!(global_module_cache.size(), 10);
-    //
-    //     let mut features = Features::default();
-    //     features.disable(FeatureFlag::KEYLESS_ACCOUNTS);
-    //     state_view.set_features(features);
-    //
-    //     // New environment means we need to also flush global caches - to invalidate struct name
-    //     // indices.
-    //     let env_new = assert_ok!(get_environment_with_delayed_field_optimization_enabled(
-    //         &state_view,
-    //         &global_module_cache,
-    //     ));
-    //     assert!(env_old != env_new);
-    //     assert_eq!(global_module_cache.size(), 0);
-    // }
+    use super::*;
+    use aptos_types::{
+        on_chain_config::{FeatureFlag, Features, OnChainConfig},
+        state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
+    };
+    use claims::{assert_err, assert_ok};
+    use move_vm_types::code::mock_verified_code;
+    use std::{collections::HashMap, thread, thread::JoinHandle};
+    use test_case::test_case;
+
+    /// Joins threads. Succeeds only if a single handle evaluates to [Ok] and the rest are [Err]s.
+    fn join_and_assert_single_ok(handles: Vec<JoinHandle<Result<(), VMStatus>>>) {
+        let mut num_oks = 0;
+        let mut num_errs = 0;
+
+        let num_handles = handles.len();
+        for handle in handles {
+            let result = handle.join().unwrap();
+            if result.is_ok() {
+                num_oks += 1;
+            } else {
+                num_errs += 1;
+            }
+        }
+        assert_eq!(num_oks, 1);
+        assert_eq!(num_errs, num_handles - 1);
+    }
+
+    #[test]
+    fn mark_ready() {
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        assert!(global_cache_manager.ready_for_next_block());
+
+        global_cache_manager.mark_not_ready_for_next_block();
+        assert!(!global_cache_manager.ready_for_next_block());
+
+        global_cache_manager.mark_ready_for_next_block();
+        assert!(global_cache_manager.ready_for_next_block());
+    }
+
+    #[test]
+    fn environment_should_always_be_set() {
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        assert!(global_cache_manager.environment().is_err());
+
+        let state_view = MockStateView::empty();
+        assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, None));
+        assert_ok!(global_cache_manager.environment());
+    }
+
+    #[test]
+    fn mark_execution_start_when_different_environment() {
+        let state_view = MockStateView::empty();
+        let global_cache_manager = GlobalCacheManagerInner::new_with_default_config();
+
+        global_cache_manager
+            .module_cache()
+            .insert(0, mock_verified_code(0, None));
+        global_cache_manager
+            .module_cache()
+            .insert(1, mock_verified_code(1, None));
+        assert_eq!(global_cache_manager.module_cache().size(), 2);
+
+        assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, None));
+        let old_environment = assert_ok!(global_cache_manager.environment());
+        assert_ok!(global_cache_manager.mark_block_execution_end(Some(HashValue::zero())));
+        assert_eq!(global_cache_manager.module_cache().size(), 2);
+
+        // Tweak feature flags to force a different config.
+        let mut features = global_cache_manager
+            .environment()
+            .unwrap()
+            .features()
+            .clone();
+        assert!(features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
+        features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
+        let bytes = bcs::to_bytes(&features).unwrap();
+        let state_key = StateKey::resource(Features::address(), &Features::struct_tag()).unwrap();
+
+        let state_view = MockStateView::new(HashMap::from([(
+            state_key,
+            StateValue::new_legacy(bytes.into()),
+        )]));
+
+        // We use the same previous ID, but the cache is still flushed: the environment changed.
+        assert_ok!(
+            global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::zero()))
+        );
+        assert_eq!(global_cache_manager.module_cache().size(), 0);
+
+        let new_environment = assert_ok!(global_cache_manager.environment());
+        assert!(old_environment != new_environment);
+    }
+
+    #[test]
+    fn mark_execution_start_when_too_many_types() {
+        // TODO(loader_v2):
+        //   Propagate type caches/struct name index map APIs to here so we can mock & test.
+    }
+
+    #[test]
+    fn mark_execution_start_when_too_many_modules() {
+        let state_view = MockStateView::empty();
+
+        let config = GlobalCacheConfig {
+            module_cache_capacity: 1,
+            ..Default::default()
+        };
+        let global_cache_manager = GlobalCacheManagerInner::new_with_config(config);
+
+        global_cache_manager
+            .module_cache()
+            .insert(0, mock_verified_code(0, None));
+        global_cache_manager
+            .module_cache()
+            .insert(1, mock_verified_code(1, None));
+        assert_eq!(global_cache_manager.module_cache().size(), 2);
+
+        // Cache is too large, should be flushed for next block.
+        assert_ok!(
+            global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::random()))
+        );
+        assert_eq!(global_cache_manager.module_cache().size(), 0);
+    }
+
+    #[test_case(None)]
+    #[test_case(Some(HashValue::zero()))]
+    fn mark_execution_start_when_unset(previous_block_id: Option<HashValue>) {
+        let state_view = MockStateView::empty();
+        let global_cache_manager = GlobalCacheManagerInner::new_with_default_config();
+
+        global_cache_manager
+            .module_cache()
+            .insert(0, mock_verified_code(0, None));
+        assert_eq!(global_cache_manager.module_cache().size(), 1);
+
+        // If executed on top of unset state, or the state with matching previous hash, the cache
+        // is not flushed.
+        assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, previous_block_id));
+        assert_eq!(global_cache_manager.module_cache().size(), 1);
+        assert!(!global_cache_manager.ready_for_next_block());
+    }
+
+    #[test_case(None, None)]
+    #[test_case(None, Some(HashValue::zero()))]
+    #[test_case(Some(HashValue::zero()), None)]
+    #[test_case(Some(HashValue::zero()), Some(HashValue::zero()))]
+    #[test_case(Some(HashValue::from_u64(0)), Some(HashValue::from_u64(1)))]
+    fn mark_execution_start_when_set(
+        recorded_previous_block_id: Option<HashValue>,
+        previous_block_id: Option<HashValue>,
+    ) {
+        let state_view = MockStateView::empty();
+        let global_cache_manager = GlobalCacheManagerInner::new_with_default_config();
+
+        assert_ok!(
+            global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::random()))
+        );
+        assert_ok!(global_cache_manager.mark_block_execution_end(recorded_previous_block_id));
+
+        global_cache_manager
+            .module_cache()
+            .insert(0, mock_verified_code(0, None));
+        assert_eq!(global_cache_manager.module_cache().size(), 1);
+
+        assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, previous_block_id));
+        assert!(!global_cache_manager.ready_for_next_block());
+
+        if recorded_previous_block_id.is_some() && recorded_previous_block_id == previous_block_id {
+            // In this case both IDs match, no cache flushing.
+            assert_eq!(global_cache_manager.module_cache().size(), 1);
+        } else {
+            // If previous block IDs do not match, or are unknown, caches must be flushed!
+            assert_eq!(global_cache_manager.module_cache().size(), 0);
+        }
+    }
+
+    #[test]
+    fn mark_execution_start_concurrent() {
+        let state_view = Box::new(MockStateView::empty());
+        let state_view: &'static _ = Box::leak(state_view);
+
+        let global_cache_manager = Arc::new(GlobalCacheManager::new_with_default_config());
+        assert!(global_cache_manager.ready_for_next_block());
+
+        let mut handles = vec![];
+        for _ in 0..32 {
+            let handle = thread::spawn({
+                let global_cache_manager = global_cache_manager.clone();
+                move || global_cache_manager.mark_block_execution_start(state_view, None)
+            });
+            handles.push(handle);
+        }
+        join_and_assert_single_ok(handles);
+    }
+
+    #[test_case(None)]
+    #[test_case(Some(HashValue::from_u64(0)))]
+    fn mark_block_execution_end(block_id: Option<HashValue>) {
+        let global_cache_manager = GlobalCacheManager::new_with_default_config();
+        assert!(global_cache_manager.previous_block_id.lock().is_unset());
+
+        // The global cache is ready, so we cannot mark execution end.
+        assert_err!(global_cache_manager.mark_block_execution_end(block_id));
+
+        global_cache_manager.mark_not_ready_for_next_block();
+        let previous_block_id = *global_cache_manager.previous_block_id.lock();
+        assert!(previous_block_id.is_unset());
+        assert_ok!(global_cache_manager.mark_block_execution_end(block_id));
+
+        // The previous block ID should be set now, and the state is ready.
+        let new_block_id = *global_cache_manager.previous_block_id.lock();
+        assert_eq!(new_block_id, BlockId::Set(block_id));
+        assert!(global_cache_manager.ready_for_next_block());
+
+        global_cache_manager.mark_not_ready_for_next_block();
+        let next_block_id = Some(HashValue::from_u64(1));
+        assert_ok!(global_cache_manager.mark_block_execution_end(next_block_id));
+
+        // Previous block ID is again reset.
+        let new_block_id = *global_cache_manager.previous_block_id.lock();
+        assert_eq!(new_block_id, BlockId::Set(next_block_id));
+    }
+
+    #[test]
+    fn mark_block_execution_end_concurrent() {
+        let global_cache_manager = Arc::new(GlobalCacheManager::new_with_default_config());
+        global_cache_manager.mark_not_ready_for_next_block();
+
+        let mut handles = vec![];
+        for _ in 0..32 {
+            let handle = thread::spawn({
+                let global_cache_manager = global_cache_manager.clone();
+                move || global_cache_manager.mark_block_execution_end(None)
+            });
+            handles.push(handle);
+        }
+        join_and_assert_single_ok(handles);
+    }
 }

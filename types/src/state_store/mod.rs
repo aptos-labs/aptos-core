@@ -14,6 +14,8 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use arr_macro::arr;
 use bytes::Bytes;
 use move_core_types::move_resource::MoveResource;
+#[cfg(any(test, feature = "testing"))]
+use std::hash::Hash;
 use std::{collections::HashMap, ops::Deref};
 
 pub mod errors;
@@ -25,9 +27,8 @@ pub mod table;
 
 pub type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
-/// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
-/// the VM for transaction execution, during which the VM is guaranteed to read anything at the
-/// given state.
+/// A trait that defines a read-only snapshot of the global state. It is passed to the VM for
+/// transaction execution, during which the VM is guaranteed to read anything at the given state.
 pub trait TStateView {
     type Key;
 
@@ -93,6 +94,38 @@ where
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.deref().get_usage()
+    }
+}
+
+/// Test-only basic [StateView] implementation with generic keys.
+#[cfg(any(test, feature = "testing"))]
+pub struct MockStateView<K> {
+    data: HashMap<K, StateValue>,
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl<K> MockStateView<K> {
+    pub fn empty() -> Self {
+        Self {
+            data: HashMap::new(),
+        }
+    }
+
+    pub fn new(data: HashMap<K, StateValue>) -> Self {
+        Self { data }
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
+    type Key = K;
+
+    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>, StateviewError> {
+        Ok(self.data.get(state_key).cloned())
+    }
+
+    fn get_usage(&self) -> std::result::Result<StateStorageUsage, StateviewError> {
+        unimplemented!("Irrelevant for tests");
     }
 }
 

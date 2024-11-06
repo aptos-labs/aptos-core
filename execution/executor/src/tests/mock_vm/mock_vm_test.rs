@@ -6,10 +6,7 @@ use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, se
 use aptos_types::{
     account_address::AccountAddress,
     bytes::NumToBytes,
-    state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        Result, TStateView,
-    },
+    state_store::{state_key::StateKey, MockStateView},
     transaction::signature_verified_transaction::into_signature_verified_block,
     write_set::WriteOp,
 };
@@ -18,20 +15,6 @@ use std::collections::BTreeMap;
 
 fn gen_address(index: u8) -> AccountAddress {
     AccountAddress::new([index; AccountAddress::LENGTH])
-}
-
-struct MockStateView;
-
-impl TStateView for MockStateView {
-    type Key = StateKey;
-
-    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<StateValue>> {
-        Ok(None)
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage> {
-        Ok(StateStorageUsage::new_untracked())
-    }
 }
 
 #[test]
@@ -43,7 +26,7 @@ fn test_mock_vm_different_senders() {
     }
 
     let outputs = MockVM
-        .execute_block_no_limit(&into_signature_verified_block(txns.clone()), &MockStateView)
+        .execute_block_no_limit(&into_signature_verified_block(txns.clone()), &MockStateView::empty())
         .expect("MockVM should not fail to start");
 
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
@@ -80,7 +63,7 @@ fn test_mock_vm_same_sender() {
     }
 
     let outputs = MockVM
-        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView::empty())
         .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
@@ -115,7 +98,7 @@ fn test_mock_vm_payment() {
     ];
 
     let output = MockVM
-        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView::empty())
         .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();

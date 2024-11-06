@@ -8,8 +8,8 @@ use crate::{
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            DeltaDataView, EmptyDataView, KeyType, MockEnvironment, MockEvent, MockOutput,
-            MockTask, MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
+            DeltaDataView, KeyType, MockEnvironment, MockEvent, MockOutput, MockTask,
+            MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
             MAX_GAS_PER_TXN,
         },
     },
@@ -18,6 +18,7 @@ use crate::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     executable::ExecutableTestType, read_only_module_cache::ReadOnlyModuleCache,
+    state_store::MockStateView,
 };
 use claims::{assert_matches, assert_ok};
 use num_cpus;
@@ -59,9 +60,7 @@ fn run_transactions<K, V, E>(
         *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest(0);
     }
 
-    let data_view = EmptyDataView::<KeyType<K>> {
-        phantom: PhantomData,
-    };
+    let state_view = MockStateView::empty();
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -75,7 +74,7 @@ fn run_transactions<K, V, E>(
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
-            EmptyDataView<KeyType<K>>,
+            MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(
@@ -84,7 +83,7 @@ fn run_transactions<K, V, E>(
             Arc::new(ReadOnlyModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(&env, &transactions, &state_view);
 
         if module_access.0 && module_access.1 {
             assert_matches!(output, Err(()));
