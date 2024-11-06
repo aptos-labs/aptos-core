@@ -7,5 +7,5 @@ aptos_framework = "0x1"
 example_addr = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
 ManagedFungibleAsset = { local = "../managed_fungible_asset" }
