@@ -28,7 +28,7 @@ use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
     metrics::{
-        BLOCK_EXECUTOR_EXECUTE_BLOCK, COMMIT_BLOCKS, EXECUTE_BLOCK, OTHER_TIMERS,
+        COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
         PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
     },
 };
@@ -251,7 +251,7 @@ pub fn run_benchmark<V>(
             (num_blocks_created, "raw transfer".to_string())
         },
     };
-    if pipeline_config.delay_pipeline_start {
+    if pipeline_config.generate_then_execute {
         overall_measuring.start_time = Instant::now();
     }
     generator.drop_sender();
@@ -575,8 +575,8 @@ impl ExecutionTimeMeasurement {
 
         let sig_verify_total = TIMER.with_label_values(&["sig_verify"]).get_sample_sum();
         let partitioning_total = TIMER.with_label_values(&["partition"]).get_sample_sum();
-        let execution_total = EXECUTE_BLOCK.get_sample_sum();
-        let block_executor_total = BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum();
+        let execution_total = TIMER.with_label_values(&["execute"]).get_sample_sum();
+        let block_executor_total = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum();
         let block_executor_inner_total = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.get_sample_sum();
 
         let by_other = OTHER_LABELS
@@ -719,7 +719,7 @@ impl OverallMeasuring {
             num_txns / delta_execution.execution_total_time
         );
         info!(
-            "{} fraction of execution {:.4} in block executor (component TPS: {:.1})",
+            "{} fraction of execution {:.4} in get execution output by executing (component TPS: {:.1})",
             prefix,
             delta_execution.block_executor_total_time / delta_execution.execution_total_time,
             num_txns / delta_execution.block_executor_total_time

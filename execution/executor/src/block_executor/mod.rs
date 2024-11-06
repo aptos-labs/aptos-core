@@ -7,8 +7,9 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
-        BLOCK_EXECUTOR_EXECUTE_BLOCK, COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK,
-        OTHER_TIMERS, SAVE_TRANSACTIONS, TRANSACTIONS_SAVED, UPDATE_LEDGER,
+        BLOCK_EXECUTION_WORKFLOW_WHOLE, COMMIT_BLOCKS, CONCURRENCY_GAUGE,
+        GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS, SAVE_TRANSACTIONS,
+        TRANSACTIONS_SAVED, UPDATE_LEDGER,
     },
     types::partial_state_compute_result::PartialStateComputeResult,
     workflow::{
@@ -56,6 +57,11 @@ pub trait TransactionBlockExecutor: Send + Sync {
     ) -> Result<ExecutionOutput>;
 }
 
+/// Production implementation of TransactionBlockExecutor.
+///
+/// Transaction execution: AptosVM
+/// Executing conflicts: in the input order, via BlockSTM,
+/// State: BlockSTM-provided MVHashMap-based view with caching
 pub struct AptosVMBlockExecutor;
 
 impl TransactionBlockExecutor for AptosVMBlockExecutor {
@@ -217,7 +223,7 @@ where
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<()> {
-        let _timer = EXECUTE_BLOCK.start_timer();
+        let _timer = BLOCK_EXECUTION_WORKFLOW_WHOLE.start_timer();
         let ExecutableBlock {
             block_id,
             transactions,
@@ -263,7 +269,7 @@ where
                 };
 
                 let execution_output = {
-                    let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK.start_timer();
+                    let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
                     fail_point!("executor::block_executor_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
                             "Injected error in block_executor_execute_block"

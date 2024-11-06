@@ -87,12 +87,12 @@ if os.environ.get("DETAILED"):
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
-if os.environ.get("RELEASE_BUILD"):
-    BUILD_FLAG = "--release"
-    BUILD_FOLDER = "target/release"
-else:
+if os.environ.get("PERFORMANCE_BUILD"):
     BUILD_FLAG = "--profile performance"
     BUILD_FOLDER = "target/performance"
+else:
+    BUILD_FLAG = "--release"
+    BUILD_FOLDER = "target/release"
 
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
@@ -455,9 +455,10 @@ def extract_run_results(
                 prefix + r" fraction of total: (\d+\.?\d*) in execution", output
             )[-1]
         )
+        # see if useful or to remove
         fraction_of_execution_in_block_executor = float(
             re.findall(
-                prefix + r" fraction of execution (\d+\.?\d*) in block executor", output
+                prefix + r" fraction of execution (\d+\.?\d*) in get execution output by executing", output
             )[-1]
         )
         fraction_of_execution_in_inner_block_executor = float(
@@ -710,7 +711,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         if test.key_extra.sig_verify_num_threads_override:
             pipeline_extra_args.extend(
                 [
-                    "--sig-verify-num-threads",
+                    "--num-sig-verify-threads",
                     str(test.key_extra.sig_verify_num_threads_override),
                 ]
             )

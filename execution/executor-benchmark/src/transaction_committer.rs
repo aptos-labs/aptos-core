@@ -7,7 +7,9 @@ use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
-    metrics::{BLOCK_EXECUTOR_EXECUTE_BLOCK, COMMIT_BLOCKS, EXECUTE_BLOCK},
+    metrics::{
+        BLOCK_EXECUTION_WORKFLOW_WHOLE, COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING,
+    },
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
@@ -133,17 +135,17 @@ fn report_block(
     );
     info!(
             "Accumulative total: BlockSTM+VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
-            BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum(),
-            EXECUTE_BLOCK.get_sample_sum() - BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum(),
+            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
+            BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
             COMMIT_BLOCKS.get_sample_sum(),
             API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
             "Accumulative per transaction: BlockSTM+VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
-            BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum() * NANOS_PER_SEC
+            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            (EXECUTE_BLOCK.get_sample_sum() - BLOCK_EXECUTOR_EXECUTE_BLOCK.get_sample_sum()) * NANOS_PER_SEC
+            (BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum()) * NANOS_PER_SEC
                 / total_versions,
             COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,

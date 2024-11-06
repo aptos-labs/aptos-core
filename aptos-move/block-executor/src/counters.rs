@@ -54,7 +54,8 @@ pub static BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
         // metric name
         "aptos_executor_block_executor_inner_execute_block_seconds",
         // metric description
-        "The time spent in seconds of BlockExecutor inner block execution in Aptos executor",
+        "The time spent in the most-inner part of executing a block of transactions, \
+        i.e. for BlockSTM that is how long parallel or sequential execution took.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()

@@ -16,16 +16,27 @@ use aptos_types::{
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::time::Instant;
 
+/// Smallest number of transactions Rayon should put into a single worker task.
+/// Same as in consensus/src/execution_pipeline.rs
+pub const SIG_VERIFY_RAYON_MIN_THRESHOLD: usize = 32;
+
+/// Executes preparation stage - set of operations that are
+/// executed in a separate stage of the pipeline from execution,
+/// like signature verificaiton or block partitioning
 pub(crate) struct BlockPreparationStage {
-    num_executor_shards: usize,
+    /// Number of blocks processed
     num_blocks_processed: usize,
-    maybe_partitioner: Option<Box<dyn BlockPartitioner>>,
+    /// Pool of theads for signature verification
     sig_verify_pool: rayon::ThreadPool,
+    /// When execution sharding is enabled, number of executor shards
+    num_executor_shards: usize,
+    /// When execution sharding is enabled, partitioner that splits block into shards
+    maybe_partitioner: Option<Box<dyn BlockPartitioner>>,
 }
 
 impl BlockPreparationStage {
     pub fn new(
-        sig_verify_num_threads: usize,
+        num_sig_verify_threads: usize,
         num_shards: usize,
         partitioner_config: &dyn PartitionerConfig,
     ) -> Self {
@@ -37,10 +48,10 @@ impl BlockPreparationStage {
         };
 
         let sig_verify_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(sig_verify_num_threads) // More than 8 threads doesn't seem to help much
+            .num_threads(num_sig_verify_threads)
             .thread_name(|index| format!("signature-checker-{}", index))
             .build()
-            .unwrap();
+            .expect("couldn't create sig_verify thread pool");
         Self {
             num_executor_shards: num_shards,
             num_blocks_processed: 0,
@@ -67,7 +78,7 @@ impl BlockPreparationStage {
                     .inc_by(num_txns as u64);
 
                 txns.into_par_iter()
-                    .with_min_len(optimal_min_len(num_txns, 32))
+                    .with_min_len(optimal_min_len(num_txns, SIG_VERIFY_RAYON_MIN_THRESHOLD))
                     .map(|t| t.into())
                     .collect::<Vec<_>>()
             });

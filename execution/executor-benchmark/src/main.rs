@@ -101,22 +101,43 @@ impl PrunerOpt {
 
 #[derive(Debug, Parser)]
 pub struct PipelineOpt {
+    /// First generate all transactions for all blocks (and keep them in memory),
+    /// and only then start the pipeline.
+    /// Useful when not running large number of blocks (so it can fit in memory),
+    /// as generation of blocks takes not-insignificant amount of CPU.
     #[clap(long)]
     generate_then_execute: bool,
+    /// Run each stage separately, i.e. each stage wait for previous stage to finish
+    /// processing all blocks, before starting.
+    /// Allows to see individual throughput of each stage, avoiding resource contention.
     #[clap(long)]
     split_stages: bool,
+    /// Skip commit stage - i.e. create executed blocks in memory, but never commit them.
+    /// Useful when commit is the bottleneck, to see throughput of the rest of the pipeline.
     #[clap(long)]
     skip_commit: bool,
+    /// Whether transactions are allowed to abort.
+    /// By default, workload generates transactions that are all expected to succeeded,
+    /// so aborts are not allowed - to catch any correctness/configuration issues.
     #[clap(long)]
     allow_aborts: bool,
+    /// Whether transactions are allowed to be discarded.
+    /// By default, workload generates transactions that are all expected to succeeded,
+    /// so discards are not allowed - to catch any correctness/configuration issues.
     #[clap(long)]
     allow_discards: bool,
+    /// Whether transactions are allowed to be retried.
+    /// By default, workload generates transactions that are all expected to succeeded,
+    /// so retries are not allowed - to catch any correctness/configuration issues.
     #[clap(long)]
     allow_retries: bool,
+    /// Number of worker threads transaction generation will use.
     #[clap(long, default_value = "4")]
     num_generator_workers: usize,
+    /// Number of worker threads signature verification will use.
     #[clap(long, default_value = "8")]
-    sig_verify_num_threads: usize,
+    num_sig_verify_threads: usize,
+    /// Sharding configuration.
     #[clap(flatten)]
     sharding_opt: ShardingOpt,
 }
@@ -124,7 +145,7 @@ pub struct PipelineOpt {
 impl PipelineOpt {
     fn pipeline_config(&self) -> PipelineConfig {
         PipelineConfig {
-            delay_pipeline_start: self.generate_then_execute,
+            generate_then_execute: self.generate_then_execute,
             split_stages: self.split_stages,
             skip_commit: self.skip_commit,
             allow_aborts: self.allow_aborts,
@@ -133,7 +154,7 @@ impl PipelineOpt {
             num_executor_shards: self.sharding_opt.num_executor_shards,
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
-            sig_verify_num_threads: self.sig_verify_num_threads,
+            num_sig_verify_threads: self.num_sig_verify_threads,
         }
     }
 }
@@ -209,8 +230,14 @@ struct ProfilerOpt {
 
 #[derive(Parser, Debug, ValueEnum, Clone, Default)]
 enum BlockExecutorTypeOpt {
+    /// Transaction execution: AptosVM
+    /// Executing conflicts: in the input order, via BlockSTM,
+    /// State: BlockSTM-provided MVHashMap-based view with caching
     #[default]
     AptosVMWithBlockSTM,
+    /// Transaction execution: Native rust code producing WriteSet
+    /// Executing conflicts: All transactions execute on the state at the beginning of the block
+    /// State: Raw CachedStateView
     NativeLooseSpeculative,
     PtxExecutor,
 }

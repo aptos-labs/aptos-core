@@ -30,7 +30,7 @@ use std::{
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
 pub struct PipelineConfig {
-    pub delay_pipeline_start: bool,
+    pub generate_then_execute: bool,
     pub split_stages: bool,
     pub skip_commit: bool,
     pub allow_aborts: bool,
@@ -41,7 +41,7 @@ pub struct PipelineConfig {
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
     pub partitioner_config: PartitionerV2Config,
-    pub sig_verify_num_threads: usize,
+    pub num_sig_verify_threads: usize,
 }
 
 pub struct Pipeline<V> {
@@ -67,7 +67,7 @@ where
         let executor_3 = executor_1.clone();
 
         let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
-            if config.delay_pipeline_start {
+            if config.generate_then_execute {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
                 10
@@ -101,7 +101,7 @@ where
         );
 
         let (start_pipeline_tx, start_pipeline_rx) =
-            create_start_tx_rx(config.delay_pipeline_start);
+            create_start_tx_rx(config.generate_then_execute);
         let (start_execution_tx, start_execution_rx) = create_start_tx_rx(config.split_stages);
         let (start_ledger_update_tx, start_ledger_update_rx) =
             create_start_tx_rx(config.split_stages);
@@ -111,7 +111,7 @@ where
 
         // signature verification and partitioning
         let mut preparation_stage = BlockPreparationStage::new(
-            config.sig_verify_num_threads,
+            config.num_sig_verify_threads,
             // Assume the distributed executor and the distributed partitioner share the same worker set.
             config.num_executor_shards,
             &config.partitioner_config,

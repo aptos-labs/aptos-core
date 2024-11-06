@@ -13,7 +13,6 @@ const BLOCK_EXECUTION_TIME_BUCKETS: [f64; 16] = [
     0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0, 4.0, 5.0,
 ];
 
-// TODO - disambiguate against BLOCK_EXECUTOR_EXECUTE_BLOCK
 pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name

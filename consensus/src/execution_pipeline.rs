@@ -34,6 +34,10 @@ use std::{
 };
 use tokio::sync::{mpsc, oneshot};
 
+/// Smallest number of transactions Rayon should put into a single worker task.
+/// Same as in execution/executor-benchmark/src/block_preparation.rs
+pub const SIG_VERIFY_RAYON_MIN_THRESHOLD: usize = 32;
+
 pub type PreCommitHook =
     Box<dyn 'static + FnOnce(&StateComputeResult) -> BoxFuture<'static, ()> + Send>;
 
@@ -156,7 +160,7 @@ impl ExecutionPipeline {
                     let num_txns = txns_to_execute.len();
                     txns_to_execute
                         .into_par_iter()
-                        .with_min_len(optimal_min_len(num_txns, 32))
+                        .with_min_len(optimal_min_len(num_txns, SIG_VERIFY_RAYON_MIN_THRESHOLD))
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
