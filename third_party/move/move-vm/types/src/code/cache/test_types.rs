@@ -4,7 +4,7 @@
 use crate::code::ModuleCode;
 use std::{ops::Deref, sync::Arc};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MockDeserializedCode(usize);
 
 impl MockDeserializedCode {
@@ -17,6 +17,7 @@ impl MockDeserializedCode {
     }
 }
 
+#[derive(Debug)]
 pub struct MockVerifiedCode(Arc<MockDeserializedCode>);
 
 impl MockVerifiedCode {
@@ -33,24 +34,38 @@ impl Deref for MockVerifiedCode {
     }
 }
 
-pub fn mock_deserialized_code<V: Clone + Ord>(
+pub fn mock_deserialized_code<E>(
     value: usize,
-    version: V,
-) -> Arc<ModuleCode<MockDeserializedCode, MockVerifiedCode, (), V>> {
+    extension: E,
+) -> Arc<ModuleCode<MockDeserializedCode, MockVerifiedCode, E>> {
     Arc::new(ModuleCode::from_deserialized(
         MockDeserializedCode::new(value),
-        Arc::new(()),
-        version,
+        Arc::new(extension),
     ))
 }
 
-pub fn mock_verified_code<V: Clone + Ord>(
+pub fn mock_verified_code<E>(
     value: usize,
-    version: V,
-) -> Arc<ModuleCode<MockDeserializedCode, MockVerifiedCode, (), V>> {
+    extension: E,
+) -> Arc<ModuleCode<MockDeserializedCode, MockVerifiedCode, E>> {
     Arc::new(ModuleCode::from_verified(
         MockVerifiedCode::new(value),
-        Arc::new(()),
-        version,
+        Arc::new(extension),
     ))
+}
+
+#[derive(Clone, Debug)]
+pub struct MockExtension {
+    #[allow(dead_code)]
+    size: usize,
+}
+
+impl MockExtension {
+    pub fn new(size: usize) -> Self {
+        Self { size }
+    }
+}
+
+pub fn mock_extension(size: usize) -> Arc<MockExtension> {
+    Arc::new(MockExtension::new(size))
 }

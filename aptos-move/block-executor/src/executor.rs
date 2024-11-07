@@ -1226,16 +1226,11 @@ where
                 let msg = format!("Failed to construct the module from state value: {:?}", err);
                 PanicError::CodeInvariantError(msg)
             })?;
-        let extension = AptosModuleExtension::new(state_value);
+        let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_invalid(&id);
+        global_module_cache.mark_invalid_if_contains(&id);
         per_block_module_cache
-            .insert_deserialized_module(
-                id.clone(),
-                compiled_module,
-                Arc::new(extension),
-                Some(txn_idx),
-            )
+            .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
                 let msg = format!(
                     "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
