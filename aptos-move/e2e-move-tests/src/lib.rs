@@ -47,7 +47,7 @@ pub(crate) fn build_package(
 ) -> anyhow::Result<BuiltPackage> {
     let mut options = options;
     if get_move_compiler_v2_from_env() {
-        options.compiler_version = Some(CompilerVersion::V2_0);
+        options.compiler_version = Some(CompilerVersion::latest_stable());
     }
     BuiltPackage::build(package_path.to_owned(), options)
 }
