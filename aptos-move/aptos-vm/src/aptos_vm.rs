@@ -59,7 +59,8 @@ use aptos_types::{
     randomness::Randomness,
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
+        authenticator::{AnySignature, AuthenticationProof},
+        signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
@@ -122,6 +123,9 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
+use aptos_types::function_info::FunctionInfo;
+use aptos_types::transaction::authenticator::AbstractionAuthData;
+use move_core_types::vm_status::StatusCode::{ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED, OUT_OF_GAS};
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -151,6 +155,12 @@ macro_rules! unwrap_or_discard {
             },
         }
     };
+}
+
+fn serialized_signer(account_address: &AccountAddress) -> Vec<u8> {
+    MoveValue::Signer(*account_address)
+        .simple_serialize()
+        .unwrap()
 }
 
 pub(crate) fn get_system_transaction_output(
@@ -747,7 +757,7 @@ impl AptosVM {
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        senders: Vec<AccountAddress>,
+        serialized_signers: Vec<Vec<u8>>,
         script: &Script,
     ) -> Result<(), VMStatus> {
         if !self
@@ -805,7 +815,7 @@ impl AptosVM {
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             code_storage,
-            senders,
+            serialized_signers,
             convert_txn_args(script.args()),
             &func,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
@@ -829,7 +839,7 @@ impl AptosVM {
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
-        senders: Vec<AccountAddress>,
+        serialized_signers: Vec<Vec<u8>>,
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
@@ -886,7 +896,7 @@ impl AptosVM {
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             module_storage,
-            senders,
+            serialized_signers,
             entry_fn.args().to_vec(),
             &function,
             struct_constructors_enabled,
@@ -909,6 +919,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
         txn_data: &TransactionMetadata,
+        serialized_signers: Vec<Vec<u8>>,
         payload: &'a TransactionPayload,
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
@@ -935,7 +946,7 @@ impl AptosVM {
                         code_storage,
                         gas_meter,
                         traversal_context,
-                        txn_data.senders(),
+                        serialized_signers,
                         script,
                     )
                 })?;
@@ -948,7 +959,7 @@ impl AptosVM {
                         session,
                         gas_meter,
                         traversal_context,
-                        txn_data.senders(),
+                        serialized_signers,
                         entry_fn,
                         txn_data,
                     )
@@ -979,6 +990,8 @@ impl AptosVM {
             gas_meter,
             txn_data,
         )?;
+
+        // ============= Gas fee cannot change after this line =============
 
         self.success_transaction_cleanup(
             epilogue_session,
@@ -1372,7 +1385,7 @@ impl AptosVM {
                 session,
                 gas_meter,
                 traversal_context,
-                vec![multisig_address],
+                vec![serialized_signer(&multisig_address)],
                 payload,
                 txn_data,
             )
@@ -1461,10 +1474,7 @@ impl AptosVM {
             // with the general verify_module above.
             if init_function.is_ok() {
                 if verifier::module_init::verify_module_init_function(module).is_ok() {
-                    let args: Vec<Vec<u8>> = senders
-                        .iter()
-                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                        .collect();
+                    let args: Vec<Vec<u8>> = senders.iter().map(serialized_signer).collect();
                     session.execute_function_bypass_visibility(
                         &module.self_id(),
                         init_func_name,
@@ -1813,7 +1823,7 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    fn validate_signed_transaction(
+    fn validate_signed_transaction<G, F>(
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
@@ -1823,7 +1833,12 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
-    ) -> Result<(), VMStatus> {
+        make_gas_meter: F,
+    ) -> Result<Vec<Vec<u8>>, VMStatus>
+    where
+        G: AptosGasMeter,
+        F: Fn(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
+    {
         // Check transaction format.
         if transaction.contains_duplicate_signers() {
             return Err(VMStatus::error(
@@ -1846,6 +1861,64 @@ impl AptosVM {
             )?;
         }
 
+        // Account Abstraction dispatchable authentication.
+        let senders = transaction_data.senders();
+        let proofs = transaction_data.authentication_proofs();
+
+        let vm_gas_params = self.gas_params(log_context)?.vm.clone();
+        let storage_gas_params = self.storage_gas_params(log_context)?.clone();
+        let gen_gas_meter = || {
+            let max_aa_gas = vm_gas_params.txn.max_aa_gas;
+            make_gas_meter(
+                self.gas_feature_version(),
+                vm_gas_params.clone(),
+                storage_gas_params.clone(),
+                false,
+                max_aa_gas,
+            )
+        };
+        // Add fee payer.
+        if let (Some(fee_payer), Some(AuthenticationProof::Abstraction { function_info, auth_data })) =
+            (transaction_data.fee_payer, &transaction_data.fee_payer_authentication_proof)
+        {
+            if self.features().is_account_abstraction_enabled() {
+                dispatchable_authenticate(
+                    session,
+                    &mut gen_gas_meter(),
+                    fee_payer,
+                    function_info.clone(),
+                    auth_data,
+                    traversal_context,
+                    module_storage
+                ).map_err(|mut vm_error| {
+                    if vm_error.major_status() == OUT_OF_GAS {
+                        vm_error.set_major_status(ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED);
+                    }
+                    vm_error
+                })?;
+            }
+        }
+        let serialized_signers = itertools::zip_eq(senders, proofs)
+            .map(|(sender, proof)| match proof {
+                AuthenticationProof::Abstraction { function_info, auth_data } if self.features().is_account_abstraction_enabled() =>
+                    dispatchable_authenticate(
+                        session,
+                        &mut gen_gas_meter(),
+                        sender,
+                        function_info.clone(),
+                        auth_data,
+                        traversal_context,
+                        module_storage
+                    ).map_err(|mut vm_error| {
+                        if vm_error.major_status() == OUT_OF_GAS {
+                            vm_error.set_major_status(ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED);
+                        }
+                        vm_error
+                    }),
+                _ => Ok(serialized_signer(&sender)),
+            })
+            .collect::<Result<_, _>>()?;
+
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
         // end up skipping validation.
@@ -1858,7 +1931,8 @@ impl AptosVM {
             log_context,
             is_approved_gov_script,
             traversal_context,
-        )
+        )?;
+        Ok(serialized_signers)
     }
 
     // Called when the execution of the user transaction fails, in order to discard the
@@ -1899,7 +1973,7 @@ impl AptosVM {
         )
     }
 
-    fn execute_user_transaction_impl(
+    fn execute_user_transaction_impl<G, F>(
         &self,
         resolver: &impl AptosMoveResolver,
         code_storage: &impl AptosCodeStorage,
@@ -1908,7 +1982,12 @@ impl AptosVM {
         is_approved_gov_script: bool,
         gas_meter: &mut impl AptosGasMeter,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, VMOutput) {
+        make_gas_meter: F,
+    ) -> (VMStatus, VMOutput)
+    where
+        G: AptosGasMeter,
+        F: Fn(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
+    {
         let _timer = VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl");
 
         let traversal_storage = TraversalStorage::new();
@@ -1916,7 +1995,7 @@ impl AptosVM {
 
         // Revalidate the transaction.
         let mut prologue_session = PrologueSession::new(self, &txn_data, resolver);
-        let exec_result = prologue_session.execute(|session| {
+        let serialized_signers = unwrap_or_discard!(prologue_session.execute(|session| {
             self.validate_signed_transaction(
                 session,
                 resolver,
@@ -1926,9 +2005,9 @@ impl AptosVM {
                 log_context,
                 is_approved_gov_script,
                 &mut traversal_context,
+                make_gas_meter
             )
-        });
-        unwrap_or_discard!(exec_result);
+        }));
         let storage_gas_params = unwrap_or_discard!(self.storage_gas_params(log_context));
         let change_set_configs = &storage_gas_params.change_set_configs;
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
@@ -1980,6 +2059,7 @@ impl AptosVM {
                     gas_meter,
                     &mut traversal_context,
                     &txn_data,
+                    serialized_signers,
                     payload,
                     log_context,
                     &mut new_published_modules_loaded,
@@ -2041,7 +2121,7 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         G: AptosGasMeter,
-        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
+        F: Fn(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
     {
         let txn_metadata = TransactionMetadata::new(txn);
 
@@ -2055,6 +2135,7 @@ impl AptosVM {
             is_approved_gov_script,
             balance,
         );
+
         let (status, output) = self.execute_user_transaction_impl(
             resolver,
             code_storage,
@@ -2063,6 +2144,7 @@ impl AptosVM {
             is_approved_gov_script,
             &mut gas_meter,
             log_context,
+            make_gas_meter
         );
 
         Ok((status, output, gas_meter))
@@ -2082,7 +2164,7 @@ impl AptosVM {
         modify_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
-        F: FnOnce(ProdGasMeter) -> G,
+        F: Fn(ProdGasMeter) -> G,
         G: AptosGasMeter,
     {
         self.execute_user_transaction_with_custom_gas_meter(
@@ -2163,8 +2245,8 @@ impl AptosVM {
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id, None);
                 let senders = match txn_sender {
-                    None => vec![*execute_as],
-                    Some(sender) => vec![sender, *execute_as],
+                    None => vec![serialized_signer(execute_as)],
+                    Some(sender) => vec![serialized_signer(&sender), serialized_signer(execute_as)],
                 };
 
                 let traversal_storage = TraversalStorage::new();
@@ -2930,6 +3012,7 @@ impl VMValidator for AptosVM {
             &log_context,
             is_approved_gov_script,
             &mut TraversalContext::new(&storage),
+            make_prod_gas_meter
         ) {
             Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
                 "failure",
@@ -3005,6 +3088,48 @@ fn create_account_if_does_not_exist(
             module_storage,
         )
         .map(|_return_vals| ())
+}
+
+fn dispatchable_authenticate(
+    session: &mut SessionExt,
+    gas_meter: &mut impl GasMeter,
+    account: AccountAddress,
+    function_info: FunctionInfo,
+    auth_data: &AbstractionAuthData,
+    traversal_context: &mut TraversalContext,
+    module_storage: &impl AptosModuleStorage,
+) -> VMResult<Vec<u8>> {
+    let auth_data = bcs::to_bytes(auth_data).expect("from rust succeeds");
+    let mut params =
+        serialize_values(&vec![
+            MoveValue::Signer(account),
+            function_info.as_move_value(),
+        ]);
+    params.push(auth_data);
+    session
+        .execute_function_bypass_visibility(
+            &LITE_ACCOUNT_MODULE,
+            AUTHENTICATE,
+            vec![],
+            params,
+            gas_meter,
+            traversal_context,
+            module_storage,
+        )
+        .map(|mut return_vals| {
+            assert!(
+                return_vals.mutable_reference_outputs.is_empty()
+                    && return_vals.return_values.len() == 1,
+                "Abstraction authentication function must only have 1 return value"
+            );
+            let (signer_data, signer_layout) = return_vals.return_values.pop().expect("Must exist");
+            assert_eq!(
+                signer_layout,
+                MoveTypeLayout::Signer,
+                "Abstraction authentication function returned non-signer."
+            );
+            signer_data
+        })
 }
 
 /// Signals that the transaction should trigger the flow for creating an account as part of a

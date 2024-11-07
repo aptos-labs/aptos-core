@@ -132,6 +132,7 @@ pub enum FeatureFlag {
     TransactionSimulationEnhancement,
     CollectionOwner,
     EnableLoaderV2,
+    AccountAbstraction,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -349,6 +350,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
         }
     }
 }
@@ -493,6 +495,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
+            AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
         }
     }
 }

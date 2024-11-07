@@ -21,12 +21,15 @@ impl serde::Serialize for GetTransactionsRequest {
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.GetTransactionsRequest", len)?;
         if let Some(v) = self.starting_version.as_ref() {
+            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("startingVersion", ToString::to_string(&v).as_str())?;
         }
         if let Some(v) = self.transactions_count.as_ref() {
+            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("transactionsCount", ToString::to_string(&v).as_str())?;
         }
         if let Some(v) = self.batch_size.as_ref() {
+            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("batchSize", ToString::to_string(&v).as_str())?;
         }
         struct_ser.end()
@@ -91,21 +94,21 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                 formatter.write_str("struct aptos.indexer.v1.GetTransactionsRequest")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<GetTransactionsRequest, V::Error>
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GetTransactionsRequest, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut starting_version__ = None;
                 let mut transactions_count__ = None;
                 let mut batch_size__ = None;
-                while let Some(k) = map.next_key()? {
+                while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::StartingVersion => {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
                             starting_version__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                         GeneratedField::TransactionsCount => {
@@ -113,7 +116,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
                             }
                             transactions_count__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                         GeneratedField::BatchSize => {
@@ -121,7 +124,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                                 return Err(serde::de::Error::duplicate_field("batchSize"));
                             }
                             batch_size__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                     }
@@ -155,6 +158,7 @@ impl serde::Serialize for TransactionsInStorage {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
         if let Some(v) = self.starting_version.as_ref() {
+            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("startingVersion", ToString::to_string(&v).as_str())?;
         }
         struct_ser.end()
@@ -214,26 +218,26 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                 formatter.write_str("struct aptos.indexer.v1.TransactionsInStorage")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsInStorage, V::Error>
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<TransactionsInStorage, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
                 let mut starting_version__ = None;
-                while let Some(k) = map.next_key()? {
+                while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
                             if transactions__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactions"));
                             }
-                            transactions__ = Some(map.next_value()?);
+                            transactions__ = Some(map_.next_value()?);
                         }
                         GeneratedField::StartingVersion => {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
                             starting_version__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                     }
@@ -266,6 +270,7 @@ impl serde::Serialize for TransactionsResponse {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
         if let Some(v) = self.chain_id.as_ref() {
+            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("chainId", ToString::to_string(&v).as_str())?;
         }
         struct_ser.end()
@@ -325,26 +330,26 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                 formatter.write_str("struct aptos.indexer.v1.TransactionsResponse")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsResponse, V::Error>
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<TransactionsResponse, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
                 let mut chain_id__ = None;
-                while let Some(k) = map.next_key()? {
+                while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
                             if transactions__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactions"));
                             }
-                            transactions__ = Some(map.next_value()?);
+                            transactions__ = Some(map_.next_value()?);
                         }
                         GeneratedField::ChainId => {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
                             chain_id__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                     }

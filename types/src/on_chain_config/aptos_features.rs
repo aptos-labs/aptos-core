@@ -97,6 +97,7 @@ pub enum FeatureFlag {
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
     ENABLE_LOADER_V2 = 81,
+    ACCOUNT_ABSTRACTION = 82,
 }
 
 impl FeatureFlag {
@@ -176,6 +177,7 @@ impl FeatureFlag {
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             // TODO(loader_v2): Enable V2 loader.
             // FeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -249,6 +251,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {

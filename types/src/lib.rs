@@ -19,6 +19,7 @@ pub mod error;
 pub mod event;
 pub mod executable;
 pub mod fee_statement;
+pub mod function_info;
 pub mod governance;
 pub mod indexer;
 pub mod jwks;
