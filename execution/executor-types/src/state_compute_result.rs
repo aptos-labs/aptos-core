@@ -165,7 +165,7 @@ impl StateComputeResult {
                 .state_updates_before_last_checkpoint
                 .as_ref(),
             sharded_state_cache: Some(&self.execution_output.state_cache.sharded_state_cache),
-            is_reconfig: self.execution_output.block_end_info.is_some(),
+            is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
     }
 }
