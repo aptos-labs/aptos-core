@@ -34,7 +34,7 @@ use crate::{
     errors::{PartialVMError, PartialVMResult},
     file_format_common,
     internals::ModuleIndex,
-    IndexKind, SignatureTokenKind,
+    IndexKind,
 };
 use move_bytecode_spec::bytecode_spec;
 use move_core_types::{
@@ -1315,35 +1315,7 @@ impl std::fmt::Debug for SignatureToken {
 }
 
 impl SignatureToken {
-    /// Returns the "value kind" for the `SignatureToken`
-    #[inline]
-    pub fn signature_token_kind(&self) -> SignatureTokenKind {
-        // TODO: SignatureTokenKind is out-dated. fix/update/remove SignatureTokenKind and see if
-        // this function needs to be cleaned up
-        use SignatureToken::*;
-
-        match self {
-            Reference(_) => SignatureTokenKind::Reference,
-            MutableReference(_) => SignatureTokenKind::MutableReference,
-            Bool
-            | U8
-            | U16
-            | U32
-            | U64
-            | U128
-            | U256
-            | Address
-            | Signer
-            | Struct(_)
-            | StructInstantiation(_, _)
-            | Vector(_) => SignatureTokenKind::Value,
-            // TODO: This is a temporary hack to please the verifier. SignatureTokenKind will soon
-            // be completely removed. `SignatureTokenView::kind()` should be used instead.
-            TypeParameter(_) => SignatureTokenKind::Value,
-        }
-    }
-
-    // Returns `true` if the `SignatureToken` is an integer type.
+    /// Returns true if the token is an integer type.
     pub fn is_integer(&self) -> bool {
         use SignatureToken::*;
         match self {
