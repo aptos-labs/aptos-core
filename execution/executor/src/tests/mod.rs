@@ -4,18 +4,13 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk},
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{
-        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-        MockVM, DISCARD_STATUS, KEEP_STATUS,
-    },
+    workflow::{do_get_execution_output::DoGetExecutionOutput, ApplyExecutionOutput},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ChunkExecutorTrait, LedgerUpdateOutput, TransactionReplayer,
-    VerifyExecutionMode,
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
@@ -39,10 +34,16 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use itertools::Itertools;
+use mock_vm::{
+    encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
+    MockVM, DISCARD_STATUS, KEEP_STATUS,
+};
 use proptest::prelude::*;
 use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
+#[cfg(test)]
+mod mock_vm;
 
 fn execute_and_commit_block(
     executor: &TestExecutor,
@@ -60,7 +61,7 @@ fn execute_and_commit_block(
         )
         .unwrap();
     let version = 2 * (txn_index + 1);
-    assert_eq!(output.version(), version);
+    assert_eq!(output.expect_last_version(), version);
 
     let ledger_info = gen_ledger_info(version, output.root_hash(), id, txn_index + 1);
     executor.commit_blocks(vec![id], ledger_info).unwrap();
@@ -217,7 +218,7 @@ fn test_executor_one_block() {
         )
         .unwrap();
     let version = num_user_txns + 1;
-    assert_eq!(output.version(), version);
+    assert_eq!(output.expect_last_version(), version);
     let block_root_hash = output.root_hash();
 
     let ledger_info = gen_ledger_info(version, block_root_hash, block_id, 1);
@@ -292,9 +293,7 @@ fn test_executor_commit_twice() {
         )
         .unwrap();
     let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
-    executor
-        .pre_commit_block(block1_id, executor.committed_block_id())
-        .unwrap();
+    executor.pre_commit_block(block1_id).unwrap();
     executor.commit_ledger(ledger_info.clone()).unwrap();
     executor.commit_ledger(ledger_info).unwrap();
 }
@@ -311,7 +310,7 @@ fn test_executor_execute_same_block_multiple_times() {
         .collect();
 
     let mut responses = vec![];
-    for _i in 0..100 {
+    for _i in 0..10 {
         let output = executor
             .execute_block(
                 (block_id, block(txns.clone())).into(),
@@ -321,8 +320,14 @@ fn test_executor_execute_same_block_multiple_times() {
             .unwrap();
         responses.push(output);
     }
-    responses.dedup();
-    assert_eq!(responses.len(), 1);
+    assert_eq!(
+        responses
+            .iter()
+            .map(|output| output.root_hash())
+            .dedup()
+            .count(),
+        1,
+    );
 }
 
 fn create_blocks_and_chunks(
@@ -382,10 +387,8 @@ fn create_blocks_and_chunks(
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
             .unwrap();
-        assert_eq!(output.version(), version);
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
+        assert_eq!(output.expect_last_version(), version);
+        block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
         out_blocks.push((txns, ledger_info));
         parent_block_id = block_id;
@@ -485,36 +488,16 @@ fn apply_transaction_by_writeset(
         )
         .unwrap();
 
-    let chunk_output = ChunkOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
+    let chunk_output =
+        DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
-    let ExecutedChunk {
-        result_state,
-        ledger_info,
-        next_epoch_state: _,
-        ledger_update_output,
-    } = executed;
-    let LedgerUpdateOutput {
-        statuses_for_input_txns: _,
-        to_commit,
-        subscribable_events: _,
-        transaction_info_hashes: _,
-        state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-        sharded_state_cache,
-        transaction_accumulator: _,
-        block_end_info: _,
-    } = ledger_update_output;
+    let output = ApplyExecutionOutput::run(chunk_output, &ledger_view).unwrap();
 
     db.writer
         .save_transactions(
-            &to_commit,
-            ledger_view.txn_accumulator().num_leaves(),
-            ledger_view.state().base_version,
-            ledger_info.as_ref(),
+            output.expect_complete_result().as_chunk_to_commit(),
+            None,
             true, /* sync_commit */
-            result_state,
-            state_updates_before_last_checkpoint,
-            Some(&sharded_state_cache),
         )
         .unwrap();
 }
@@ -691,10 +674,10 @@ fn run_transactions_naive(
 ) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
-        let out = ChunkOutput::by_transaction_execution::<MockVM>(
+        let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
+        let out = DoGetExecutionOutput::by_transaction_execution::<MockVM>(
             vec![txn].into(),
             ledger_view
                 .verified_state_view(
@@ -704,41 +687,23 @@ fn run_transactions_naive(
                 )
                 .unwrap(),
             block_executor_onchain_config.clone(),
+            None,
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
-        let next_ledger_view = executed.result_view();
-        let ExecutedChunk {
-            result_state,
-            ledger_info,
-            next_epoch_state: _,
-            ledger_update_output,
-        } = executed;
-        let LedgerUpdateOutput {
-            statuses_for_input_txns: _,
-            to_commit,
-            subscribable_events: _,
-            transaction_info_hashes: _,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator: _,
-            block_end_info: _,
-        } = ledger_update_output;
+        let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();
         db.writer
             .save_transactions(
-                &to_commit,
-                ledger_view.txn_accumulator().num_leaves(),
-                ledger_view.state().base_version,
-                ledger_info.as_ref(),
+                output.expect_complete_result().as_chunk_to_commit(),
+                None,
                 true, /* sync_commit */
-                result_state,
-                state_updates_before_last_checkpoint,
-                Some(&sharded_state_cache),
             )
             .unwrap();
-        ledger_view = next_ledger_view;
     }
-    ledger_view.txn_accumulator().root_hash()
+    db.reader
+        .get_latest_executed_trees()
+        .unwrap()
+        .transaction_accumulator
+        .root_hash()
 }
 
 proptest! {

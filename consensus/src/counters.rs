@@ -592,6 +592,26 @@ pub static TIMEOUT_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the round timeout by reason and by whether the aggregator is the next proposer.
+pub static AGGREGATED_ROUND_TIMEOUT_REASON: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_agg_round_timeout_reason",
+        "Count of round timeouts by reason",
+        &["reason", "author", "is_next_proposer"],
+    )
+    .unwrap()
+});
+
+/// Count of the missing authors if any reported in the round timeout reason
+pub static AGGREGATED_ROUND_TIMEOUT_REASON_MISSING_AUTHORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_agg_round_timeout_reason_missing_authors",
+        "Count of missing authors in round timeout reason",
+        &["author"],
+    )
+    .unwrap()
+});
+
 /// Count the number of timeouts a node experienced since last restart (close to 0 in happy path).
 /// This count is different from `TIMEOUT_ROUNDS_COUNT`, because not every time a node has
 /// a timeout there is an ultimate decision to move to the next round (it might take multiple
@@ -1229,7 +1249,7 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
             .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);
-        LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
+        LAST_COMMITTED_VERSION.set(block.compute_result().last_version_or_0() as i64);
 
         let failed_rounds = block
             .block()

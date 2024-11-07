@@ -12,10 +12,7 @@ use crate::{
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
-use aptos_types::{
-    transaction::{TransactionToCommit, Version},
-    write_set::WriteSet,
-};
+use aptos_types::{transaction::Version, write_set::WriteSet};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -107,22 +104,22 @@ impl WriteSetDb {
     }
 
     /// Commits write sets starting from `first_version` to the database.
-    pub(crate) fn commit_write_sets(
+    pub(crate) fn commit_write_sets<'a>(
         &self,
-        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
+        write_sets: impl IndexedParallelIterator<Item = &'a WriteSet>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_write_sets"])
             .start_timer();
         let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
-        txns_to_commit
-            .par_iter()
+        let num_txns = write_sets.len();
+
+        write_sets
             .with_min_len(optimal_min_len(num_txns, 128))
             .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
-                Self::put_write_set(first_version + i as u64, txn_to_commit.write_set(), &batch)?;
+            .try_for_each(|(i, write_set)| -> Result<()> {
+                Self::put_write_set(first_version + i as Version, write_set, &batch)?;
 
                 Ok(())
             })?;

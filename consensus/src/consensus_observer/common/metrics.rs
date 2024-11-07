@@ -5,12 +5,12 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
-// Useful metric labels
+// Useful observer metric labels
 pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
 pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
@@ -20,6 +20,10 @@ pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
+
+// Useful state sync metric labels
+pub const STATE_SYNCING_FOR_FALLBACK: &str = "sync_for_fallback";
+pub const STATE_SYNCING_TO_COMMIT: &str = "sync_to_commit";
 
 /// Counter for tracking created subscriptions for the consensus observer
 pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -119,6 +123,17 @@ pub static OBSERVER_RECEIVED_MESSAGE_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking observer message processing latencies
+pub static OBSERVER_MESSAGE_PROCESSING_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "consensus_observer_message_processing_latency",
+        "Counters related to observer message processing latencies",
+        &["message_type", "network_id"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Counter for tracking RPC request latencies sent by the consensus observer
 pub static OBSERVER_REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -145,6 +160,16 @@ pub static OBSERVER_SENT_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         "consensus_observer_sent_requests",
         "Counters related to sent RPC requests by the consensus observer",
         &["request_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking when consensus observer has invoked state sync
+pub static OBSERVER_STATE_SYNC_EXECUTING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_state_sync_executing",
+        "Gauge for tracking when consensus observer has invoked state sync",
+        &["syncing_mode"]
     )
     .unwrap()
 });
@@ -229,13 +254,13 @@ pub fn increment_counter_without_labels(counter: &Lazy<IntCounter>) {
 /// Observes the value for the provided histogram and label
 pub fn observe_value_with_label(
     histogram: &Lazy<HistogramVec>,
-    request_label: &str,
+    label: &str,
     peer_network_id: &PeerNetworkId,
     value: f64,
 ) {
     let network_id = peer_network_id.network_id();
     histogram
-        .with_label_values(&[request_label, network_id.as_str()])
+        .with_label_values(&[label, network_id.as_str()])
         .observe(value)
 }
 

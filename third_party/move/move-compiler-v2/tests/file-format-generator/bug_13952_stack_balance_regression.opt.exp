@@ -30,6 +30,8 @@ L0:	loc0: Data
 L1:	loc1: &Data
 L2:	loc2: bool
 L3:	loc3: Data
+L4:	loc4: &Data
+L5:	loc5: bool
 B0:
 	0: LdU64(43)
 	1: PackVariant[0](Data/V1)
@@ -40,35 +42,43 @@ B0:
 	6: TestVariant[0](Data/V1)
 	7: StLoc[2](loc2: bool)
 	8: CopyLoc[2](loc2: bool)
-	9: BrTrue(13)
+	9: BrFalse(34)
 B1:
 	10: MoveLoc[1](loc1: &Data)
-	11: TestVariant[1](Data/V3)
-	12: StLoc[2](loc2: bool)
+	11: Pop
 B2:
-	13: PackVariant[1](Data/V3)
-	14: StLoc[3](loc3: Data)
-	15: MoveLoc[2](loc2: bool)
-	16: BrFalse(29)
+	12: PackVariant[1](Data/V3)
+	13: StLoc[3](loc3: Data)
+	14: MoveLoc[2](loc2: bool)
+	15: BrFalse(31)
 B3:
-	17: ImmBorrowLoc[3](loc3: Data)
-	18: StLoc[1](loc1: &Data)
-	19: CopyLoc[1](loc1: &Data)
-	20: TestVariant[0](Data/V1)
-	21: StLoc[2](loc2: bool)
-	22: CopyLoc[2](loc2: bool)
-	23: BrTrue(27)
+	16: ImmBorrowLoc[3](loc3: Data)
+	17: StLoc[4](loc4: &Data)
+	18: CopyLoc[4](loc4: &Data)
+	19: TestVariant[0](Data/V1)
+	20: StLoc[5](loc5: bool)
+	21: CopyLoc[5](loc5: bool)
+	22: BrFalse(27)
 B4:
-	24: MoveLoc[1](loc1: &Data)
-	25: TestVariant[1](Data/V3)
-	26: StLoc[2](loc2: bool)
+	23: MoveLoc[4](loc4: &Data)
+	24: Pop
 B5:
-	27: MoveLoc[2](loc2: bool)
-	28: Ret
+	25: MoveLoc[5](loc5: bool)
+	26: Ret
 B6:
-	29: LdFalse
-	30: StLoc[2](loc2: bool)
-	31: Branch(27)
+	27: MoveLoc[4](loc4: &Data)
+	28: TestVariant[1](Data/V3)
+	29: StLoc[5](loc5: bool)
+	30: Branch(25)
+B7:
+	31: LdFalse
+	32: StLoc[5](loc5: bool)
+	33: Branch(25)
+B8:
+	34: MoveLoc[1](loc1: &Data)
+	35: TestVariant[1](Data/V3)
+	36: StLoc[2](loc2: bool)
+	37: Branch(12)
 }
 }
 ============ bytecode verification succeeded ========

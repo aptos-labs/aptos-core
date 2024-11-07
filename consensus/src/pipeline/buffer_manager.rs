@@ -31,7 +31,7 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
@@ -472,7 +472,7 @@ impl BufferManager {
             let executed_item = item.unwrap_executed_ref();
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
-                commit_ledger_info: executed_item.partial_commit_proof.ledger_info().clone(),
+                commit_ledger_info: executed_item.partial_commit_proof.data().clone(),
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();
@@ -703,7 +703,7 @@ impl BufferManager {
             CommitMessage::Vote(CommitVote::new_with_signature(
                 commit_vote.author(),
                 commit_vote.ledger_info().clone(),
-                bls12381::Signature::dummy_signature(),
+                aptos_crypto::bls12381::Signature::dummy_signature(),
             ))
         });
         CommitMessage::Vote(commit_vote)

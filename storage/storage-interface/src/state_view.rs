@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
+#[derive(Clone)]
 pub struct DbStateView {
     db: Arc<dyn DbReader>,
     version: Option<Version>,

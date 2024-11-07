@@ -130,6 +130,7 @@ impl ForgeDeployerManager {
                         containers: vec![k8s_openapi::api::core::v1::Container {
                             name: "forge-deployer".to_string(),
                             image: Some(format!("{}:{}", image_repo, image_tag)),
+                            image_pull_policy: Some("Always".to_string()),
                             env: Some(vec![k8s_openapi::api::core::v1::EnvVar {
                                 name: FORGE_DEPLOYER_VALUES_ENV_VAR_NAME.to_string(),
                                 value_from: Some(k8s_openapi::api::core::v1::EnvVarSource {

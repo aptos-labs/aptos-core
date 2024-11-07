@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::vm_status::StatusCode;
 use std::fmt::Display;
 use tracing::error;
@@ -51,6 +51,12 @@ impl From<PanicError> for PartialVMError {
                     .with_message(msg)
             },
         }
+    }
+}
+
+impl From<PanicError> for VMError {
+    fn from(err: PanicError) -> Self {
+        PartialVMError::from(err).finish(Location::Undefined)
     }
 }
 

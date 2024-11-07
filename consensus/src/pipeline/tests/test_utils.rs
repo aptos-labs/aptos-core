@@ -11,7 +11,7 @@ use aptos_consensus_types::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
@@ -96,23 +96,12 @@ pub fn prepare_executed_blocks_with_ledger_info(
         proposals.push(proposal);
     }
 
-    let compute_result = StateComputeResult::new(
-        executed_hash,
-        vec![], // dummy subtree
-        0,
-        vec![],
-        0,
-        None,
-        vec![],
-        vec![],
-        vec![],
-        None, // block end info
-    );
+    let compute_result = StateComputeResult::new_dummy_with_root_hash(executed_hash);
 
     let li = LedgerInfo::new(
         proposals.last().unwrap().block().gen_block_info(
             compute_result.root_hash(),
-            compute_result.version(),
+            compute_result.last_version_or_0(),
             compute_result.epoch_state().clone(),
         ),
         consensus_hash,

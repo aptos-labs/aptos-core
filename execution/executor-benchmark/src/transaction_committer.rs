@@ -46,7 +46,7 @@ pub(crate) fn gen_li_with_sigs(
 
 pub struct TransactionCommitter<V> {
     executor: Arc<BlockExecutor<V>>,
-    version: Version,
+    start_version: Version,
     block_receiver: mpsc::Receiver<CommitBlockMessage>,
 }
 
@@ -56,52 +56,52 @@ where
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,
-        version: Version,
+        start_version: Version,
         block_receiver: mpsc::Receiver<CommitBlockMessage>,
     ) -> Self {
         Self {
-            version,
             executor,
+            start_version,
             block_receiver,
         }
     }
 
     pub fn run(&mut self) {
-        let start_version = self.version;
-        info!("Start with version: {}", start_version);
+        info!("Start with version: {}", self.start_version);
 
         while let Ok(msg) = self.block_receiver.recv() {
             let CommitBlockMessage {
                 block_id,
-                root_hash,
                 first_block_start_time,
                 current_block_start_time,
                 partition_time,
                 execution_time,
-                num_txns,
+                output,
             } = msg;
+            let root_hash = output
+                .ledger_update_output
+                .transaction_accumulator
+                .root_hash();
+            let num_input_txns = output.num_input_transactions();
             NUM_TXNS
                 .with_label_values(&["commit"])
-                .inc_by(num_txns as u64);
+                .inc_by(num_input_txns as u64);
 
-            self.version += num_txns as u64;
-            let commit_start = std::time::Instant::now();
-            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
-            let parent_block_id = self.executor.committed_block_id();
-            self.executor
-                .pre_commit_block(block_id, parent_block_id)
-                .unwrap();
+            let version = output.expect_last_version();
+            let commit_start = Instant::now();
+            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
+            self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
 
             report_block(
-                start_version,
-                self.version,
+                self.start_version,
+                version,
                 first_block_start_time,
                 current_block_start_time,
                 partition_time,
                 execution_time,
                 Instant::now().duration_since(commit_start),
-                num_txns,
+                num_input_txns,
             );
         }
     }

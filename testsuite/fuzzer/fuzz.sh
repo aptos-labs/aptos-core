@@ -66,6 +66,7 @@ function usage() {
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
             echo "    coverage          generates coverage for a fuzz target"
+            echo "    clean-coverage    clean coverage for a fuzz target"
             echo "    debug             debugs a fuzz target with a testcase"
             echo "    flamegraph        generates a flamegraph for a fuzz target with a testcase"
             echo "    list              lists existing fuzz targets"
@@ -120,10 +121,18 @@ function build-oss-fuzz() {
     ld.lld --version
     clang --version
 
-    if ! build all ./target; then
-        env
-        error "Build failed. Exiting."
-    fi
+    # Limit the number of parallel jobs to avoid OOM
+    # export CARGO_BUILD_JOBS = 3
+
+    # Build the fuzz targets
+    # Doing one target at the time should prevent OOM, but use all thread while bulding dependecies
+    for fuzz_target in $(list); do
+        if ! build $fuzz_target ./target ; then
+            env
+            error "Build failed. Exiting."
+        fi
+    done
+
     find ./target/*/release/ -maxdepth 1 -type f -perm /111 -exec cp {} $oss_fuzz_out \;
 
     # Download corpus zip
@@ -141,13 +150,13 @@ function coverage() {
     local coverage_dir="./fuzz/coverage/$fuzz_target/report"
     mkdir -p $coverage_dir
     
-    if [ ! -d "fuzz/coverage/$fuzz_target" ]; then
+    if [ ! -d "fuzz/coverage/$fuzz_target/raw" ]; then
         cargo_fuzz coverage $fuzz_target $corpus_dir
     fi
     
     info "Generating coverage for $fuzz_target"
 
-    fuzz_target_bin=$(find ./target -name $fuzz_target -type f -perm /111) #$(find target/*/coverage -name $fuzz_target -type f)
+    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm /111) #$(find target/*/coverage -name $fuzz_target -type f)
     echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
     cargo +nightly cov -- show $fuzz_target_bin \
@@ -166,7 +175,7 @@ function clean-coverage() {
     fi
 
     local fuzz_target="$1"
-    local target_dir="coverage/$fuzz_target"
+    local coverage_dir="./fuzz/coverage/$fuzz_target/"
 
     if [ "$fuzz_target" == "all" ]; then
         rm -rf coverage

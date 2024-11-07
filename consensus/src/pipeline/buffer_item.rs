@@ -17,7 +17,7 @@ use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
     block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::ValidatorVerifier,
 };
 use futures::future::BoxFuture;
@@ -40,18 +40,18 @@ fn generate_commit_ledger_info(
     )
 }
 
-fn ledger_info_with_unverified_signatures(
+fn create_signature_aggregator(
     unverified_votes: HashMap<Author, CommitVote>,
     commit_ledger_info: &LedgerInfo,
-) -> LedgerInfoWithUnverifiedSignatures {
-    let mut li_with_sig = LedgerInfoWithUnverifiedSignatures::new(commit_ledger_info.clone());
+) -> SignatureAggregator<LedgerInfo> {
+    let mut sig_aggregator = SignatureAggregator::new(commit_ledger_info.clone());
     for vote in unverified_votes.values() {
         let sig = vote.signature_with_status();
         if vote.ledger_info() == commit_ledger_info {
-            li_with_sig.add_signature(vote.author(), sig);
+            sig_aggregator.add_signature(vote.author(), sig);
         }
     }
-    li_with_sig
+    sig_aggregator
 }
 
 // we differentiate buffer items at different stages
@@ -68,7 +68,7 @@ pub struct OrderedItem {
 
 pub struct ExecutedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithUnverifiedSignatures,
+    pub partial_commit_proof: SignatureAggregator<LedgerInfo>,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
@@ -76,7 +76,7 @@ pub struct ExecutedItem {
 
 pub struct SignedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithUnverifiedSignatures,
+    pub partial_commit_proof: SignatureAggregator<LedgerInfo>,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
     pub rb_handle: Option<(Instant, DropGuard)>,
@@ -173,11 +173,14 @@ impl BufferItem {
                         order_vote_enabled,
                     );
 
-                    let mut partial_commit_proof = ledger_info_with_unverified_signatures(
-                        unverified_votes,
-                        &commit_ledger_info,
-                    );
-                    if let Ok(commit_proof) = partial_commit_proof.aggregate_and_verify(validator) {
+                    let mut partial_commit_proof =
+                        create_signature_aggregator(unverified_votes, &commit_ledger_info);
+                    if let Ok(commit_proof) = partial_commit_proof
+                        .aggregate_and_verify(validator)
+                        .map(|(ledger_info, aggregated_sig)| {
+                            LedgerInfoWithSignatures::new(ledger_info, aggregated_sig)
+                        })
+                    {
                         debug!(
                             "{} advance to aggregated from ordered",
                             commit_proof.commit_info()
@@ -217,10 +220,13 @@ impl BufferItem {
                 // we don't add the signature here, it'll be added when receiving the commit vote from self
                 let commit_vote = CommitVote::new_with_signature(
                     author,
-                    partial_commit_proof.ledger_info().clone(),
+                    partial_commit_proof.data().clone(),
                     signature,
                 );
-                debug!("{} advance to signed", partial_commit_proof.commit_info());
+                debug!(
+                    "{} advance to signed",
+                    partial_commit_proof.data().commit_info()
+                );
 
                 Self::Signed(Box::new(SignedItem {
                     executed_blocks,
@@ -250,7 +256,10 @@ impl BufferItem {
                     partial_commit_proof: local_commit_proof,
                     ..
                 } = *signed_item;
-                assert_eq!(local_commit_proof.commit_info(), commit_proof.commit_info());
+                assert_eq!(
+                    local_commit_proof.data().commit_info(),
+                    commit_proof.commit_info()
+                );
                 debug!(
                     "{} advance to aggregated with commit decision",
                     commit_proof.commit_info()
@@ -316,6 +325,9 @@ impl BufferItem {
                         .partial_commit_proof
                         .clone()
                         .aggregate_and_verify(validator)
+                        .map(|(ledger_info, aggregated_sig)| {
+                            LedgerInfoWithSignatures::new(ledger_info, aggregated_sig)
+                        })
                     {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: signed_item.executed_blocks,
@@ -339,6 +351,9 @@ impl BufferItem {
                     if let Ok(commit_proof) = executed_item
                         .partial_commit_proof
                         .aggregate_and_verify(validator)
+                        .map(|(ledger_info, aggregated_sig)| {
+                            LedgerInfoWithSignatures::new(ledger_info, aggregated_sig)
+                        })
                     {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: executed_item.executed_blocks,
@@ -405,7 +420,7 @@ impl BufferItem {
                 }
             },
             Self::Signed(signed) => {
-                if signed.partial_commit_proof.commit_info() == target_commit_info {
+                if signed.partial_commit_proof.data().commit_info() == target_commit_info {
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
@@ -464,7 +479,7 @@ mod test {
     use super::*;
     use aptos_consensus_types::{block::Block, block_data::BlockData};
     use aptos_crypto::HashValue;
-    use aptos_executor_types::StateComputeResult;
+    use aptos_executor_types::state_compute_result::StateComputeResult;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         ledger_info::LedgerInfo,

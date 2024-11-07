@@ -12,8 +12,7 @@ use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
 use aptos_consensus_types::{block::Block, block_data::BlockData};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorResult,
-    StateComputeResult,
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -21,10 +20,13 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
+    transaction::{SignedTransaction, Transaction, TransactionStatus},
     validator_txn::ValidatorTransaction,
 };
-use std::sync::{atomic::AtomicU64, Arc};
+use std::{
+    sync::{atomic::AtomicU64, Arc},
+    time::Duration,
+};
 use tokio::{runtime::Handle, sync::Mutex as AsyncMutex};
 
 struct DummyStateSyncNotifier {
@@ -60,6 +62,15 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
             .push((transactions, subscribable_events));
         self.tx.send(()).await.unwrap();
         Ok(())
+    }
+
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, Error> {
+        Err(Error::UnexpectedErrorEncountered(
+            "sync_for_duration() is not supported by the DummyStateSyncNotifier!".into(),
+        ))
     }
 
     async fn sync_to_target(&self, _target: LedgerInfoWithSignatures) -> Result<(), Error> {
@@ -106,36 +117,32 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         block: ExecutableBlock,
         _parent_block_id: HashValue,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput> {
+    ) -> ExecutorResult<()> {
         self.blocks_received.lock().push(block);
-        Ok(StateCheckpointOutput::default())
+        Ok(())
     }
 
     fn ledger_update(
         &self,
         _block_id: HashValue,
         _parent_block_id: HashValue,
-        _state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
-        let num_txns = self
+        let txns = self
             .blocks_received
             .lock()
             .last()
             .unwrap()
             .transactions
-            .num_transactions();
+            .clone()
+            .into_txns()
+            .into_iter()
+            .map(|t| t.into_inner())
+            .collect();
 
-        Ok(StateComputeResult::new_dummy_with_compute_status(vec![
-            TransactionStatus::Keep(ExecutionStatus::Success);
-            num_txns
-        ]))
+        Ok(StateComputeResult::new_dummy_with_input_txns(txns))
     }
 
-    fn pre_commit_block(
-        &self,
-        _block_id: HashValue,
-        _parent_block_id: HashValue,
-    ) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
         Ok(())
     }
 

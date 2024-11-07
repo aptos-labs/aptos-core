@@ -60,6 +60,7 @@ use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
@@ -354,14 +355,42 @@ impl RoundManager {
         &mut self,
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<()> {
+        let new_round = new_round_event.round;
+        let is_current_proposer = self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), new_round);
+        let prev_proposer = self
+            .proposer_election
+            .get_valid_proposer(new_round.saturating_sub(1));
+
         counters::CURRENT_ROUND.set(new_round_event.round as i64);
         counters::ROUND_TIMEOUT_MS.set(new_round_event.timeout.as_millis() as i64);
         match new_round_event.reason {
             NewRoundReason::QCReady => {
                 counters::QC_ROUNDS_COUNT.inc();
             },
-            NewRoundReason::Timeout(_) => {
+            NewRoundReason::Timeout(ref reason) => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
+                counters::AGGREGATED_ROUND_TIMEOUT_REASON
+                    .with_label_values(&[
+                        &reason.to_string(),
+                        prev_proposer.short_str().as_str(),
+                        &is_current_proposer.to_string(),
+                    ])
+                    .inc();
+                if is_current_proposer {
+                    if let RoundTimeoutReason::PayloadUnavailable { missing_authors } = reason {
+                        let ordered_peers =
+                            self.epoch_state.verifier.get_ordered_account_addresses();
+                        for idx in missing_authors.iter_ones() {
+                            if let Some(author) = ordered_peers.get(idx) {
+                                counters::AGGREGATED_ROUND_TIMEOUT_REASON_MISSING_AUTHORS
+                                    .with_label_values(&[author.short_str().as_str()])
+                                    .inc();
+                            }
+                        }
+                    }
+                }
             },
         };
         info!(
@@ -374,10 +403,7 @@ impl RoundManager {
         self.proposal_status_tracker
             .push(new_round_event.reason.clone());
 
-        if self
-            .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
-        {
+        if is_current_proposer {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
             let sync_info = self.block_store.sync_info();
@@ -385,17 +411,19 @@ impl RoundManager {
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
-                if let Err(e) = Self::generate_and_send_proposal(
-                    epoch_state,
-                    new_round_event,
-                    network,
-                    sync_info,
-                    proposal_generator,
-                    safety_rules,
-                    proposer_election,
-                )
-                .await
-                {
+                if let Err(e) = monitor!(
+                    "generate_and_send_proposal",
+                    Self::generate_and_send_proposal(
+                        epoch_state,
+                        new_round_event,
+                        network,
+                        sync_info,
+                        proposal_generator,
+                        safety_rules,
+                        proposer_election,
+                    )
+                    .await
+                ) {
                     warn!("Error generating and sending proposal: {}", e);
                 }
             });

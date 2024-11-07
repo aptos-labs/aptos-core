@@ -24,18 +24,23 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
-    block_metadata_ext::BlockMetadataExt, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::SignedTransaction,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc, time::Instant};
+use std::{
+    boxed::Box,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -128,44 +133,38 @@ impl ExecutionProxy {
     fn pre_commit_hook(
         &self,
         block: &Block,
-        metadata: BlockMetadataExt,
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> PreCommitHook {
         let mut pre_commit_notifier = self.pre_commit_notifier.clone();
         let state_sync_notifier = self.state_sync_notifier.clone();
         let payload = block.payload().cloned();
         let timestamp = block.timestamp_usecs();
-        let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let block_id = block.id();
-        Box::new(
-            move |user_txns: &[SignedTransaction], state_compute_result: &StateComputeResult| {
-                let input_txns = Block::combine_to_input_transactions(
-                    validator_txns,
-                    user_txns.to_vec(),
-                    metadata,
-                );
-                let txns = state_compute_result.transactions_to_commit(input_txns, block_id);
-                let subscribable_events = state_compute_result.subscribable_events().to_vec();
-                Box::pin(async move {
-                    pre_commit_notifier
-                        .send(Box::pin(async move {
-                            if let Err(e) = monitor!(
-                                "notify_state_sync",
-                                state_sync_notifier
-                                    .notify_new_commit(txns, subscribable_events)
-                                    .await
-                            ) {
-                                error!(error = ?e, "Failed to notify state synchronizer");
-                            }
+        Box::new(move |state_compute_result: &StateComputeResult| {
+            let state_compute_result = state_compute_result.clone();
+            Box::pin(async move {
+                pre_commit_notifier
+                    .send(Box::pin(async move {
+                        let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
 
-                            let payload_vec = payload.into_iter().collect();
-                            payload_manager.notify_commit(timestamp, payload_vec);
-                        }))
-                        .await
-                        .expect("Failed to send pre-commit notification");
-                })
-            },
-        )
+                        let txns = state_compute_result.transactions_to_commit().to_vec();
+                        let subscribable_events =
+                            state_compute_result.subscribable_events().to_vec();
+                        if let Err(e) = monitor!(
+                            "notify_state_sync",
+                            state_sync_notifier
+                                .notify_new_commit(txns, subscribable_events)
+                                .await
+                        ) {
+                            error!(error = ?e, "Failed to notify state synchronizer");
+                        }
+
+                        let payload_vec = payload.into_iter().collect();
+                        payload_manager.notify_commit(timestamp, payload_vec);
+                    }))
+                    .await
+                    .expect("Failed to send pre-commit notification");
+            })
+        })
     }
 }
 
@@ -226,7 +225,7 @@ impl StateComputer for ExecutionProxy {
                 parent_block_id,
                 transaction_generator,
                 block_executor_onchain_config,
-                self.pre_commit_hook(block, metadata, payload_manager),
+                self.pre_commit_hook(block, payload_manager),
                 lifetime_guard,
             )
             .await;
@@ -324,22 +323,67 @@ impl StateComputer for ExecutionProxy {
         Ok(())
     }
 
-    /// Synchronize to a commit that not present locally.
-    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    /// Best effort state synchronization for the specified duration
+    async fn sync_for_duration(
+        &self,
+        duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        // Grab the logical time lock
         let mut latest_logical_time = self.write_mutex.lock().await;
-        let logical_time =
-            LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round());
-        let block_timestamp = target.commit_info().timestamp_usecs();
 
-        // Before the state synchronization, we have to call finish() to free the in-memory SMT
-        // held by BlockExecutor to prevent memory leak.
+        // Before state synchronization, we have to call finish() to free the
+        // in-memory SMT held by the BlockExecutor to prevent a memory leak.
+        self.executor.finish();
+
+        // Inject an error for fail point testing
+        fail_point!("consensus::sync_for_duration", |_| {
+            Err(anyhow::anyhow!("Injected error in sync_for_duration").into())
+        });
+
+        // Invoke state sync to synchronize for the specified duration. Here, the
+        // ChunkExecutor will process chunks and commit to storage. However, after
+        // block execution and commits, the internal state of the ChunkExecutor may
+        // not be up to date. So, it is required to reset the cache of the
+        // ChunkExecutor in state sync when requested to sync.
+        let result = monitor!(
+            "sync_for_duration",
+            self.state_sync_notifier.sync_for_duration(duration).await
+        );
+
+        // Update the latest logical time
+        if let Ok(latest_synced_ledger_info) = &result {
+            let ledger_info = latest_synced_ledger_info.ledger_info();
+            let synced_logical_time = LogicalTime::new(ledger_info.epoch(), ledger_info.round());
+            *latest_logical_time = synced_logical_time;
+        }
+
+        // Similarly, after state synchronization, we have to reset the cache of
+        // the BlockExecutor to guarantee the latest committed state is up to date.
+        self.executor.reset()?;
+
+        // Return the result
+        result.map_err(|error| {
+            let anyhow_error: anyhow::Error = error.into();
+            anyhow_error.into()
+        })
+    }
+
+    /// Synchronize to a commit that is not present locally.
+    async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        // Grab the logical time lock and calculate the target logical time
+        let mut latest_logical_time = self.write_mutex.lock().await;
+        let target_logical_time =
+            LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round());
+
+        // Before state synchronization, we have to call finish() to free the
+        // in-memory SMT held by BlockExecutor to prevent a memory leak.
         self.executor.finish();
 
         // The pipeline phase already committed beyond the target block timestamp, just return.
-        if *latest_logical_time >= logical_time {
+        if *latest_logical_time >= target_logical_time {
             warn!(
                 "State sync target {:?} is lower than already committed logical time {:?}",
-                logical_time, *latest_logical_time
+                target_logical_time, *latest_logical_time
             );
             return Ok(());
         }
@@ -348,30 +392,36 @@ impl StateComputer for ExecutionProxy {
         // so it can set batches expiration accordingly.
         // Might be none if called in the recovery path, or between epoch stop and start.
         if let Some(inner) = self.state.read().as_ref() {
+            let block_timestamp = target.commit_info().timestamp_usecs();
             inner
                 .payload_manager
                 .notify_commit(block_timestamp, Vec::new());
         }
 
-        fail_point!("consensus::sync_to", |_| {
-            Err(anyhow::anyhow!("Injected error in sync_to").into())
+        // Inject an error for fail point testing
+        fail_point!("consensus::sync_to_target", |_| {
+            Err(anyhow::anyhow!("Injected error in sync_to_target").into())
         });
-        // Here to start to do state synchronization where ChunkExecutor inside will
-        // process chunks and commit to Storage. However, after block execution and
-        // commitments, the sync state of ChunkExecutor may be not up to date so
-        // it is required to reset the cache of ChunkExecutor in State Sync
-        // when requested to sync.
-        let res = monitor!(
-            "sync_to",
+
+        // Invoke state sync to synchronize to the specified target. Here, the
+        // ChunkExecutor will process chunks and commit to storage. However, after
+        // block execution and commits, the internal state of the ChunkExecutor may
+        // not be up to date. So, it is required to reset the cache of the
+        // ChunkExecutor in state sync when requested to sync.
+        let result = monitor!(
+            "sync_to_target",
             self.state_sync_notifier.sync_to_target(target).await
         );
-        *latest_logical_time = logical_time;
 
-        // Similarly, after the state synchronization, we have to reset the cache
-        // of BlockExecutor to guarantee the latest committed state is up to date.
+        // Update the latest logical time
+        *latest_logical_time = target_logical_time;
+
+        // Similarly, after state synchronization, we have to reset the cache of
+        // the BlockExecutor to guarantee the latest committed state is up to date.
         self.executor.reset()?;
 
-        res.map_err(|error| {
+        // Return the result
+        result.map_err(|error| {
             let anyhow_error: anyhow::Error = error.into();
             anyhow_error.into()
         })
@@ -416,9 +466,6 @@ async fn test_commit_sync_race() {
     };
     use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
-    use aptos_executor_types::{
-        state_checkpoint_output::StateCheckpointOutput, StateComputeResult,
-    };
     use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
@@ -457,7 +504,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _onchain_config: BlockExecutorConfigFromOnchain,
-        ) -> ExecutorResult<StateCheckpointOutput> {
+        ) -> ExecutorResult<()> {
             todo!()
         }
 
@@ -465,16 +512,11 @@ async fn test_commit_sync_race() {
             &self,
             _block_id: HashValue,
             _parent_block_id: HashValue,
-            _state_checkpoint_output: StateCheckpointOutput,
         ) -> ExecutorResult<StateComputeResult> {
             todo!()
         }
 
-        fn pre_commit_block(
-            &self,
-            _block_id: HashValue,
-            _parent_block_id: HashValue,
-        ) -> ExecutorResult<()> {
+        fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
             todo!()
         }
 
@@ -511,6 +553,15 @@ async fn test_commit_sync_race() {
             _subscribable_events: Vec<ContractEvent>,
         ) -> std::result::Result<(), Error> {
             Ok(())
+        }
+
+        async fn sync_for_duration(
+            &self,
+            _duration: std::time::Duration,
+        ) -> std::result::Result<LedgerInfoWithSignatures, Error> {
+            Err(Error::UnexpectedErrorEncountered(
+                "sync_for_duration() is not supported by the RecordedCommit!".into(),
+            ))
         }
 
         async fn sync_to_target(
@@ -567,8 +618,8 @@ async fn test_commit_sync_race() {
         .commit(&[], generate_li(1, 10), callback)
         .await
         .unwrap();
-    assert!(executor.sync_to(generate_li(1, 8)).await.is_ok());
+    assert!(executor.sync_to_target(generate_li(1, 8)).await.is_ok());
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(1, 10));
-    assert!(executor.sync_to(generate_li(2, 8)).await.is_ok());
+    assert!(executor.sync_to_target(generate_li(2, 8)).await.is_ok());
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(2, 8));
 }

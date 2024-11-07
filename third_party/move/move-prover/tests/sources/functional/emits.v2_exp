@@ -76,8 +76,8 @@ error: function does not emit the expected event
     =         x = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:106: conditional_wrong_condition_incorrect
+    =     at tests/sources/functional/emits.move:107: conditional_wrong_condition_incorrect
     =         handle = <redacted>
-    =     at tests/sources/functional/emits.move:109: conditional_wrong_condition_incorrect
     =     at tests/sources/functional/emits.move:111: conditional_wrong_condition_incorrect (spec)
 
 error: function does not emit the expected event
@@ -90,8 +90,8 @@ error: function does not emit the expected event
     =         x = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:115: conditional_missing_condition_incorrect
+    =     at tests/sources/functional/emits.move:116: conditional_missing_condition_incorrect
     =         handle = <redacted>
-    =     at tests/sources/functional/emits.move:118: conditional_missing_condition_incorrect
     =     at tests/sources/functional/emits.move:120: conditional_missing_condition_incorrect (spec)
 
 error: function does not emit the expected event
@@ -110,7 +110,6 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:152: conditional_multiple_incorrect
     =     at tests/sources/functional/emits.move:149: conditional_multiple_incorrect
     =         handle = <redacted>
-    =     at tests/sources/functional/emits.move:155: conditional_multiple_incorrect
     =     at tests/sources/functional/emits.move:157: conditional_multiple_incorrect (spec)
     =     at tests/sources/functional/emits.move:158: conditional_multiple_incorrect (spec)
     =     at tests/sources/functional/emits.move:159: conditional_multiple_incorrect (spec)
@@ -131,7 +130,6 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:182: conditional_multiple_same_incorrect
     =     at tests/sources/functional/emits.move:179: conditional_multiple_same_incorrect
     =         handle = <redacted>
-    =     at tests/sources/functional/emits.move:185: conditional_multiple_same_incorrect
     =     at tests/sources/functional/emits.move:187: conditional_multiple_same_incorrect (spec)
     =     at tests/sources/functional/emits.move:188: conditional_multiple_same_incorrect (spec)
     =     at tests/sources/functional/emits.move:189: conditional_multiple_same_incorrect (spec)
