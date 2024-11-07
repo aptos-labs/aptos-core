@@ -726,7 +726,7 @@ redis = { version = "0.22.3", features = [
 redis-test = { version = "0.1.1", features = ["aio"] }
 ref-cast = "1.0.6"
 regex = "1.9.3"
-reqwest = { version = "0.11.11", features = [
+reqwest = { version = "0.12.5", features = [
     "blocking",
     "cookies",
     "json",
