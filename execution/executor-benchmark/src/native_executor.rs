@@ -76,7 +76,7 @@ impl IncrementalOutput {
     }
 }
 
-pub struct NativeExecutor {}
+pub struct NativeExecutor;
 
 static NATIVE_EXECUTOR_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NATIVE_EXECUTOR_POOL: Lazy<ThreadPool> = Lazy::new(|| {
@@ -449,7 +449,12 @@ impl VMExecutor for NativeExecutor {
 }
 
 impl TransactionBlockExecutor for NativeExecutor {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_transaction_block(
+        &self,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,

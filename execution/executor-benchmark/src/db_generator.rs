@@ -62,7 +62,7 @@ pub fn create_db_with_accounts<V>(
     );
 }
 
-fn bootstrap_with_genesis(
+pub(crate) fn bootstrap_with_genesis(
     db_dir: impl AsRef<Path>,
     enable_storage_sharding: bool,
     init_features: Features,

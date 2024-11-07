@@ -8,7 +8,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_consensus_types::block::Block;
 use aptos_db::AptosDB;
-use aptos_executor::block_executor::BlockExecutor;
+use aptos_executor::block_executor::{AptosVMBlockExecutor, BlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -382,7 +382,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
-    BlockExecutor<AptosVM>,
+    BlockExecutor<AptosVMBlockExecutor>,
     Waypoint,
 ) {
     let (db, dbrw) = force_sharding

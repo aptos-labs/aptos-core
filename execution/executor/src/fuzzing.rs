@@ -68,7 +68,12 @@ pub fn fuzz_execute_and_commit_blocks(
 pub struct FakeVM;
 
 impl TransactionBlockExecutor for FakeVM {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_transaction_block(
+        &self,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,

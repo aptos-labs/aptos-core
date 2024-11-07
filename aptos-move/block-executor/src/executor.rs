@@ -4,10 +4,10 @@
 
 use crate::{
     code_cache_global::ImmutableModuleCache,
-    counters,
     counters::{
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
+        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
+        WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -1692,6 +1692,8 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+        let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
+
         if self.config.local.concurrency_level > 1 {
             let parallel_result =
                 self.execute_transactions_parallel(&env, signature_verified_block, base_view);

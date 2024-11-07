@@ -8,7 +8,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor::{
-    block_executor::BlockExecutor,
+    block_executor::{AptosVMBlockExecutor, BlockExecutor},
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use aptos_executor_test_helpers::{
@@ -82,7 +82,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64 + 1; // Due to StateCheckpoint txn
-    let executor = BlockExecutor::<AptosVM>::new(db.clone());
+    let executor = BlockExecutor::<AptosVMBlockExecutor>::new(db.clone());
     let output = executor
         .execute_block(
             (block_id, block(txns)).into(),

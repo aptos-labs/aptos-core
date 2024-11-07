@@ -17,7 +17,10 @@ use aptos_config::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
-use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
+use aptos_executor::{
+    block_executor::{AptosVMBlockExecutor, BlockExecutor},
+    db_bootstrapper,
+};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_framework::BuiltPackage;
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
@@ -204,7 +207,7 @@ pub fn new_test_context_inner(
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
+        Box::new(BlockExecutor::<AptosVMBlockExecutor>::new(db_rw)),
         mempool,
         db,
         test_name,

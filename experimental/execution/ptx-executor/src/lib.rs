@@ -118,7 +118,12 @@ impl VMExecutor for PtxBlockExecutor {
 }
 
 impl TransactionBlockExecutor for PtxBlockExecutor {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_transaction_block(
+        &self,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
