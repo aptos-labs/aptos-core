@@ -2795,11 +2795,7 @@ module supra_framework::stake {
             let vci: &ValidatorConsensusInfo = obj;
             validator_consensus_info::get_addr(vci)
         });
-        let vci_pks = vector::map_ref(&vci_vec_0, |obj|{
-            let vci: &ValidatorConsensusInfo = obj;
-            validator_consensus_info::get_pk_bytes(vci)
-        });
-        let vci_voting_powers = vector::map_ref(&vci_vec_0, |obj|{
+            let vci_voting_powers = vector::map_ref(&vci_vec_0, |obj|{
             let vci: &ValidatorConsensusInfo = obj;
             validator_consensus_info::get_voting_power(vci)
         });

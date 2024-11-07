@@ -538,6 +538,18 @@ pub enum EntryFunctionCall {
         pool_address: AccountAddress,
     },
 
+    PboDelegationPoolFundDelegatorsWithLockedStake {
+        pool_address: AccountAddress,
+        delegators: Vec<AccountAddress>,
+        stakes: Vec<u64>,
+    },
+
+    PboDelegationPoolFundDelegatorsWithStake {
+        pool_address: AccountAddress,
+        delegators: Vec<AccountAddress>,
+        stakes: Vec<u64>,
+    },
+
     /// Move `amount` of coins from pending_inactive to active.
     PboDelegationPoolReactivateStake {
         pool_address: AccountAddress,
@@ -1484,6 +1496,20 @@ impl EntryFunctionCall {
             PboDelegationPoolEnablePartialGovernanceVoting { pool_address } => {
                 pbo_delegation_pool_enable_partial_governance_voting(pool_address)
             },
+            PboDelegationPoolFundDelegatorsWithLockedStake {
+                pool_address,
+                delegators,
+                stakes,
+            } => pbo_delegation_pool_fund_delegators_with_locked_stake(
+                pool_address,
+                delegators,
+                stakes,
+            ),
+            PboDelegationPoolFundDelegatorsWithStake {
+                pool_address,
+                delegators,
+                stakes,
+            } => pbo_delegation_pool_fund_delegators_with_stake(pool_address, delegators, stakes),
             PboDelegationPoolReactivateStake {
                 pool_address,
                 amount,
@@ -3232,6 +3258,52 @@ pub fn pbo_delegation_pool_enable_partial_governance_voting(
         ident_str!("enable_partial_governance_voting").to_owned(),
         vec![],
         vec![bcs::to_bytes(&pool_address).unwrap()],
+    ))
+}
+
+pub fn pbo_delegation_pool_fund_delegators_with_locked_stake(
+    pool_address: AccountAddress,
+    delegators: Vec<AccountAddress>,
+    stakes: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("pbo_delegation_pool").to_owned(),
+        ),
+        ident_str!("fund_delegators_with_locked_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&delegators).unwrap(),
+            bcs::to_bytes(&stakes).unwrap(),
+        ],
+    ))
+}
+
+pub fn pbo_delegation_pool_fund_delegators_with_stake(
+    pool_address: AccountAddress,
+    delegators: Vec<AccountAddress>,
+    stakes: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("pbo_delegation_pool").to_owned(),
+        ),
+        ident_str!("fund_delegators_with_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&delegators).unwrap(),
+            bcs::to_bytes(&stakes).unwrap(),
+        ],
     ))
 }
 
@@ -5870,6 +5942,38 @@ mod decoder {
         }
     }
 
+    pub fn pbo_delegation_pool_fund_delegators_with_locked_stake(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::PboDelegationPoolFundDelegatorsWithLockedStake {
+                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    delegators: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    stakes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn pbo_delegation_pool_fund_delegators_with_stake(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::PboDelegationPoolFundDelegatorsWithStake {
+                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    delegators: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    stakes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn pbo_delegation_pool_reactivate_stake(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7217,6 +7321,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "pbo_delegation_pool_enable_partial_governance_voting".to_string(),
             Box::new(decoder::pbo_delegation_pool_enable_partial_governance_voting),
+        );
+        map.insert(
+            "pbo_delegation_pool_fund_delegators_with_locked_stake".to_string(),
+            Box::new(decoder::pbo_delegation_pool_fund_delegators_with_locked_stake),
+        );
+        map.insert(
+            "pbo_delegation_pool_fund_delegators_with_stake".to_string(),
+            Box::new(decoder::pbo_delegation_pool_fund_delegators_with_stake),
         );
         map.insert(
             "pbo_delegation_pool_reactivate_stake".to_string(),

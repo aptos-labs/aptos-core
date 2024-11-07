@@ -1,6 +1,5 @@
 #[test_only]
 module supra_framework::supra_coin_tests {
-    use std::features;
     use supra_framework::supra_coin;
     use supra_framework::coin;
     use supra_framework::fungible_asset::{Self, FungibleStore, Metadata};

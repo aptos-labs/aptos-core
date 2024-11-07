@@ -102,8 +102,8 @@ module supra_framework::delegation_pool_integration_tests {
 
     #[test_only]
     public fun initialize_test_validator(
-        public_key: &bls12381::PublicKey,
-        proof_of_possession: &bls12381::ProofOfPossession,
+        _public_key: &bls12381::PublicKey,
+        _proof_of_possession: &bls12381::ProofOfPossession,
         validator: &signer,
         amount: u64,
         should_join_validator_set: bool,
