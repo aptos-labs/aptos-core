@@ -300,7 +300,7 @@ impl Client {
                 if !must_exist {
                     Ok(Response::new(
                         address_key,
-                        originating_resource.state().clone(),
+                        originating_address_table.state().clone(),
                     ))
                 } else {
                     self.get_account_bcs(address_key)
