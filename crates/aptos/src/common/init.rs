@@ -221,10 +221,10 @@ impl CliCommand<()> for InitTool {
                             .generate_ed25519_private_key()
                     }
                 } else {
-                    Ed25519PrivateKey::from_encoded_string(&strip_private_key_prefix(
-                        &input.to_string(),
-                    ))
-                    .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
+                    let stripped = strip_private_key_prefix(&input.to_string())?;
+                    Ed25519PrivateKey::from_encoded_string(&stripped).map_err(|err| {
+                        CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
+                    })?
                 }
             };
 

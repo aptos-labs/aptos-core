@@ -601,10 +601,29 @@ pub fn explorer_transaction_link(
 /// Strips the private key prefix for a given key string if it is AIP-80 compliant.
 ///
 /// [Read about AIP-80](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-80.md)
-pub fn strip_private_key_prefix(key: &String) -> String {
-    key.strip_prefix("ed25519-priv-")
-        .unwrap_or(key) // If the prefix is not found, return the original key
-        .to_string()
+pub fn strip_private_key_prefix(key: &String) -> CliTypedResult<String> {
+    let disabled_prefixes = ["secp256k1-priv-"];
+    let enabled_prefixes = ["ed25519-priv-"];
+
+    // Check for disabled prefixes first
+    for prefix in disabled_prefixes {
+        if key.starts_with(prefix) {
+            return Err(CliError::UnexpectedError(format!(
+                "Private key not supported. Cannot parse private key with '{}' prefix.",
+                prefix
+            )));
+        }
+    }
+
+    // Try to strip enabled prefixes
+    for prefix in enabled_prefixes {
+        if key.starts_with(prefix) {
+            return Ok(key.strip_prefix(prefix).unwrap().to_string());
+        }
+    }
+
+    // If no prefix is found, return the original key
+    Ok(key.to_string())
 }
 
 /// Deserializes an Ed25519 private key with a prefix AIP-80 prefix if present.
@@ -623,18 +642,14 @@ where
 
     // Transform Option<String> into Option<Ed25519PrivateKey>
     opt.map_or(Ok(None), |s| {
-        if let Some(stripped) = s.strip_prefix("ed25519-priv-") {
-            // Deserialize using Ed25519PrivateKey's DeserializeKey implementation
-            Ed25519PrivateKey::deserialize(serde::de::value::StrDeserializer::<D::Error>::new(
-                stripped,
-            ))
-            .map(Some)
-            .map_err(D::Error::custom)
-        } else {
-            // Attempt normal deserialization
-            Ed25519PrivateKey::deserialize(serde::de::value::StrDeserializer::<D::Error>::new(&s))
-                .map(Some)
-                .map_err(D::Error::custom)
-        }
+        // Use strip_private_key_prefix to handle the AIP-80 prefix
+        let stripped = strip_private_key_prefix(&s).map_err(D::Error::custom)?;
+
+        // Attempt deserialization with the stripped key
+        Ed25519PrivateKey::deserialize(serde::de::value::StrDeserializer::<D::Error>::new(
+            &stripped,
+        ))
+        .map(Some)
+        .map_err(D::Error::custom)
     })
 }
