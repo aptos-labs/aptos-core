@@ -6,7 +6,7 @@ use aptos_sdk::types::{
     AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
 };
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
-use aptos_types::keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig};
+use aptos_types::keyless::{Claims, Configuration, OpenIdSig, Pepper, ZeroKnowledgeSig};
 use async_trait::async_trait;
 use futures::StreamExt;
 use rand::rngs::StdRng;
@@ -136,6 +136,7 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
             },
         };
 
+        let config = Configuration::new_for_devnet();
         for line in lines {
             let serialized_proof = line?;
             let zk_sig_bytes = hex::decode(serialized_proof)?;
@@ -154,6 +155,7 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
                 &self.uid_val,
                 &self.jwt_header_json,
                 EphemeralKeyPair::new(
+                    &config,
                     esk,
                     self.epk_expiry_date_secs,
                     vec![0; OpenIdSig::EPK_BLINDER_NUM_BYTES],

@@ -13,9 +13,18 @@ use aptos_config::{
 use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::on_chain_config::Features;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
-use std::{fs, path::Path};
+use aptos_types::{
+    jwks::{jwk::JWK, patch::IssuerJWK},
+    keyless::{
+        circuit_constants::TEST_GROTH16_KEYS,
+        test_utils::{get_sample_iss, get_sample_jwk},
+        Groth16VerificationKey,
+    },
+    on_chain_config::Features,
+};
+use aptos_vm::AptosVM;
+use std::{fs, path::Path, sync::Arc};
 
 pub fn create_db_with_accounts<V>(
     num_accounts: usize,
@@ -27,6 +36,7 @@ pub fn create_db_with_accounts<V>(
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
+    is_keyless: bool,
 ) where
     V: VMBlockExecutor + 'static,
 {
@@ -56,6 +66,7 @@ pub fn create_db_with_accounts<V>(
         enable_storage_sharding,
         pipeline_config,
         init_features,
+        is_keyless,
     );
 }
 
@@ -65,7 +76,15 @@ pub(crate) fn bootstrap_with_genesis(
     init_features: Features,
 ) {
     let (config, _genesis_key) =
-        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
+        aptos_genesis::test_utils::test_config_with_custom_onchain(Some(Arc::new(move |config| {
+            config.initial_features_override = Some(init_features.clone());
+            config.initial_jwks = vec![IssuerJWK {
+                issuer: get_sample_iss(),
+                jwk: JWK::RSA(get_sample_jwk()),
+            }];
+            config.keyless_groth16_vk_override =
+                Some(Groth16VerificationKey::from(&TEST_GROTH16_KEYS.prepared_vk));
+        })));
 
     let mut rocksdb_configs = RocksdbConfigs::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::{smoke_test_environment::SwarmBuilder, utils::get_on_chain_resource};
 use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -324,8 +324,15 @@ script {{
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair =
-        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let config = get_on_chain_resource(&rest_cli).await;
+    let ephemeral_key_pair = EphemeralKeyPair::new(
+        &config,
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
     let federated_keyless_account = FederatedKeylessAccount::new_from_jwt(
         &get_sample_jwt_token(),
         ephemeral_key_pair,
@@ -430,11 +437,19 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
 
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let config = get_on_chain_resource(&rest_cli).await;
+
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair =
-        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+    let ephemeral_key_pair = EphemeralKeyPair::new(
+        &config,
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
 
     let mut info = swarm.aptos_public_info();
     let keyless_account = KeylessAccount::new(
@@ -489,12 +504,20 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
 #[tokio::test]
 async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let config = get_on_chain_resource(&rest_cli).await;
 
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair =
-        EphemeralKeyPair::new(esk, get_sample_exp_date(), get_sample_epk_blinder()).unwrap();
+
+    let ephemeral_key_pair = EphemeralKeyPair::new(
+        &config,
+        esk,
+        get_sample_exp_date(),
+        get_sample_epk_blinder(),
+    )
+    .unwrap();
 
     let mut info = swarm.aptos_public_info();
     let keyless_account = KeylessAccount::new_from_jwt(

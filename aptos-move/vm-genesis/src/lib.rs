@@ -22,7 +22,8 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     executable::ModulePath,
     jwks::{
-        patch::{PatchJWKMoveStruct, PatchUpsertJWK},
+        jwk::{JWKMoveStruct, JWK},
+        patch::{IssuerJWK, PatchJWKMoveStruct, PatchUpsertJWK},
         secure_test_rsa_jwk,
     },
     keyless::{
@@ -109,6 +110,8 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    pub initial_jwks: Vec<IssuerJWK>,
+    pub keyless_groth16_vk_override: Option<Groth16VerificationKey>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -304,7 +307,13 @@ pub fn encode_genesis_change_set(
         .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
     initialize_jwk_consensus_config(&mut session, &module_storage, &jwk_consensus_config);
     initialize_jwks_resources(&mut session, &module_storage);
-    initialize_keyless_accounts(&mut session, &module_storage, chain_id);
+    initialize_keyless_accounts(
+        &mut session,
+        &module_storage,
+        chain_id,
+        genesis_config.initial_jwks.clone(),
+        genesis_config.keyless_groth16_vk_override.clone(),
+    );
     set_genesis_end(&mut session, &module_storage);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -676,6 +685,8 @@ fn initialize_keyless_accounts(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
     chain_id: ChainId,
+    mut initial_jwks: Vec<IssuerJWK>,
+    vk_override: Option<Groth16VerificationKey>,
 ) {
     let config = keyless::Configuration::new_for_devnet();
     exec_function(
@@ -690,7 +701,8 @@ fn initialize_keyless_accounts(
         ]),
     );
     if !chain_id.is_mainnet() {
-        let vk = Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY);
+        let vk =
+            vk_override.unwrap_or_else(|| Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY));
         exec_function(
             session,
             module_storage,
@@ -703,11 +715,24 @@ fn initialize_keyless_accounts(
             ]),
         );
 
-        let patch: PatchJWKMoveStruct = PatchUpsertJWK {
+        let additional_jwk_patch = IssuerJWK {
             issuer: get_sample_iss(),
-            jwk: secure_test_rsa_jwk().into(),
-        }
-        .into();
+            jwk: JWK::RSA(secure_test_rsa_jwk()),
+        };
+        initial_jwks.push(additional_jwk_patch);
+
+        let jwk_patches: Vec<PatchJWKMoveStruct> = initial_jwks
+            .into_iter()
+            .map(|issuer_jwk| {
+                let IssuerJWK { issuer, jwk } = issuer_jwk;
+                let upsert_patch = PatchUpsertJWK {
+                    issuer,
+                    jwk: JWKMoveStruct::from(jwk),
+                };
+                PatchJWKMoveStruct::from(upsert_patch)
+            })
+            .collect();
+
         exec_function(
             session,
             module_storage,
@@ -716,7 +741,7 @@ fn initialize_keyless_accounts(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                MoveValue::Vector(vec![patch.as_move_value()]),
+                jwk_patches.as_move_value(),
             ]),
         );
     }
@@ -1229,6 +1254,8 @@ pub fn generate_test_genesis(
             initial_features_override: None,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
+            initial_jwks: vec![],
+            keyless_groth16_vk_override: None,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1279,6 +1306,8 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         initial_features_override: None,
         randomness_config_override: None,
         jwk_consensus_config_override: None,
+        initial_jwks: vec![],
+        keyless_groth16_vk_override: None,
     }
 }
 

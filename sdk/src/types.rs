@@ -24,13 +24,14 @@ use aptos_types::{
     event::EventKey,
     keyless::{
         Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
-        KeylessSignature, OpenIdSig, Pepper, TransactionAndProof, ZeroKnowledgeSig,
+        KeylessSignature, OpenIdSig, Pepper, ZeroKnowledgeSig,
     },
     transaction::authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
 };
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use keyless::FederatedKeylessPublicKey;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
     str::FromStr,
@@ -73,7 +74,7 @@ impl LocalAccountAuthenticator {
         account: &impl CommonKeylessAccount,
     ) -> KeylessSignature {
         let proof = account.zk_sig().proof;
-        let txn_and_zkp = TransactionAndProof {
+        let txn_and_zkp = keyless::TransactionAndProof {
             message: txn,
             proof: Some(proof),
         };
@@ -180,6 +181,91 @@ impl LocalAccount {
         let address = key.authentication_key().account_address();
 
         Ok(Self::new(address, key, sequence_number))
+    }
+
+    pub fn generate_for_testing<R1>(rng: &mut R1, keyless_mode: bool) -> Self
+    where
+        R1: Rng + rand_core::CryptoRng,
+    {
+        if keyless_mode {
+            let config = keyless::Configuration::new_for_testing();
+            let now_secs = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let esk = EphemeralPrivateKey::Ed25519 {
+                inner_private_key: Ed25519PrivateKey::generate(rng),
+            };
+            let exp_timestamp_secs = now_secs + 7 * 86400; // + 7 days
+            let exp_horizon_secs = 100 * 86400; // 100 days
+            let blinder = vec![0x01; 31];
+            let eph_key_pair =
+                EphemeralKeyPair::new(&config, esk, exp_timestamp_secs, blinder).unwrap();
+
+            // Simulation of OIDC provider processing.
+            let iss = keyless::test_utils::get_sample_iss();
+            let jwk = keyless::test_utils::get_sample_jwk();
+            let aud = format!("aud_{}", hex::encode(rng.gen::<[u8; 4]>()));
+            let uid_key = "sub".to_string();
+            let uid_val = format!("uid_{}", hex::encode(rng.gen::<[u8; 4]>()));
+            let jwt_header = keyless::test_utils::get_sample_jwt_header_json();
+            let jwt_header_b64 = keyless::base64url_encode_str(&jwt_header);
+            let jwt_payload = keyless::circuit_testcases::render_jwt_payload_json(
+                &iss,
+                &aud,
+                &uid_key,
+                &uid_val,
+                "",
+                now_secs,
+                &eph_key_pair.nonce,
+                now_secs + 86400,
+            );
+            let jwt_payload_b64 = keyless::base64url_encode_str(&jwt_payload);
+            let jwt_msg = format!("{}.{}", jwt_header_b64, jwt_payload_b64);
+            let jwt_sig = keyless::test_utils::oidc_provider_sign(
+                *keyless::circuit_testcases::SAMPLE_JWK_SK,
+                jwt_msg.as_bytes(),
+            );
+            let jwt_sig_b64 = base64::encode_config(jwt_sig, base64::URL_SAFE_NO_PAD);
+            let jwt = format!("{}.{}", jwt_msg, jwt_sig_b64);
+
+            let pepper = keyless::test_utils::get_sample_pepper();
+            let idc = keyless::IdCommitment::new_from_preimage(&pepper, &aud, &uid_key, &uid_val)
+                .unwrap();
+            let public_inputs = keyless::bn254_circom::hash_public_inputs(
+                &eph_key_pair.public_key,
+                &idc,
+                exp_timestamp_secs,
+                exp_horizon_secs,
+                &iss,
+                None,
+                &jwt_header,
+                &jwk,
+                None,
+                &config,
+            )
+            .unwrap();
+            let groth16_proof = keyless::proof_simulation::Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[public_inputs], &keyless::circuit_constants::TEST_GROTH16_KEYS.pk, rng).unwrap();
+            let zk_sig = ZeroKnowledgeSig {
+                proof: keyless::ZKP::Groth16(groth16_proof),
+                exp_horizon_secs,
+                extra_field: None,
+                override_aud_val: None,
+                training_wheels_signature: None,
+            };
+            // zk_sig.verify_groth16_proof(public_inputs, &TEST_GROTH16_KEYS.prepared_vk).unwrap();
+            let keyless_account =
+                KeylessAccount::new_from_jwt(&jwt, eph_key_pair, Some(&uid_key), pepper, zk_sig)
+                    .unwrap();
+
+            Self::new_keyless(
+                keyless_account.authentication_key().account_address(),
+                keyless_account,
+                0,
+            )
+        } else {
+            Self::generate(rng)
+        }
     }
 
     /// Generate a new account locally. Note: This function does not actually
@@ -468,7 +554,7 @@ pub struct AccountKey {
 impl AccountKey {
     pub fn generate<R>(rng: &mut R) -> Self
     where
-        R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+        R: rand_core::RngCore + rand_core::CryptoRng,
     {
         let private_key = Ed25519PrivateKey::generate(rng);
         Self::from_private_key(private_key)
@@ -555,7 +641,6 @@ impl EphemeralPrivateKey {
 pub struct EphemeralKeyPair {
     private_key: EphemeralPrivateKey,
     public_key: EphemeralPublicKey,
-    #[allow(dead_code)]
     nonce: String,
     expiry_date_secs: u64,
     blinder: Vec<u8>,
@@ -563,17 +648,13 @@ pub struct EphemeralKeyPair {
 
 impl EphemeralKeyPair {
     pub fn new(
+        config: &Configuration,
         private_key: EphemeralPrivateKey,
         expiry_date_secs: u64,
         blinder: Vec<u8>,
     ) -> Result<Self> {
         let epk = private_key.public_key();
-        let nonce = OpenIdSig::reconstruct_oauth_nonce(
-            &blinder,
-            expiry_date_secs,
-            &epk,
-            &Configuration::new_for_devnet(),
-        )?;
+        let nonce = OpenIdSig::reconstruct_oauth_nonce(&blinder, expiry_date_secs, &epk, config)?;
 
         Ok(Self {
             private_key,
@@ -585,6 +666,7 @@ impl EphemeralKeyPair {
     }
 
     pub fn new_ed25519(
+        config: &keyless::Configuration,
         private_key: Ed25519PrivateKey,
         expiry_date_secs: u64,
         blinder: Vec<u8>,
@@ -592,7 +674,7 @@ impl EphemeralKeyPair {
         let esk = EphemeralPrivateKey::Ed25519 {
             inner_private_key: private_key,
         };
-        Self::new(esk, expiry_date_secs, blinder)
+        Self::new(config, esk, expiry_date_secs, blinder)
     }
 }
 
@@ -984,6 +1066,7 @@ mod tests {
     #[ignore]
     #[tokio::test]
     async fn test_derive_keyless_account() {
+        let config = Configuration::new_for_testing();
         let aptos_rest_client = Client::builder(AptosBaseUrl::Devnet).build();
         // This JWT is taken from https://github.com/aptos-labs/aptos-ts-sdk/blob/f644e61beb70e69dfd489e75287c67b527385135/tests/e2e/api/keyless.test.ts#L11
         // As is the ephemeralKeyPair
@@ -994,7 +1077,7 @@ mod tests {
                 .unwrap();
         let esk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
         let ephemeral_key_pair =
-            EphemeralKeyPair::new_ed25519(esk, 1735475012, vec![0; 31]).unwrap();
+            EphemeralKeyPair::new_ed25519(&config, esk, 1735475012, vec![0; 31]).unwrap();
         let mut account = derive_keyless_account(&aptos_rest_client, jwt, ephemeral_key_pair, None)
             .await
             .unwrap();
