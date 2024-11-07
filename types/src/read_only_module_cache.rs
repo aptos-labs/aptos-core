@@ -4,12 +4,12 @@
 use crate::{error::PanicError, explicit_sync_wrapper::ExplicitSyncWrapper};
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
-use move_vm_types::code::ModuleCode;
+use move_vm_types::code::{ModuleCode, WithSize};
 use std::{
     hash::Hash,
     ops::Deref,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -27,6 +27,7 @@ struct Entry<DC, VC, E> {
 impl<DC, VC, E> Entry<DC, VC, E>
 where
     VC: Deref<Target = Arc<DC>>,
+    E: WithSize,
 {
     /// Returns a new valid module. Returns a (panic) error if the module is not verified.
     fn new(module: Arc<ModuleCode<DC, VC, E>>) -> Result<Self, PanicError> {
@@ -63,17 +64,21 @@ where
 pub struct ReadOnlyModuleCache<K, DC, VC, E> {
     /// Module cache containing the verified code.
     module_cache: ExplicitSyncWrapper<HashMap<K, Entry<DC, VC, E>>>,
+    /// Sum of serialized sizes (in bytes) of all cached modules.
+    size: AtomicUsize,
 }
 
 impl<K, DC, VC, E> ReadOnlyModuleCache<K, DC, VC, E>
 where
     K: Hash + Eq + Clone,
     VC: Deref<Target = Arc<DC>>,
+    E: WithSize,
 {
     /// Returns new empty module cache.
     pub fn empty() -> Self {
         Self {
             module_cache: ExplicitSyncWrapper::new(HashMap::new()),
+            size: AtomicUsize::new(0),
         }
     }
 
@@ -106,11 +111,17 @@ where
     /// Flushes the cache. Should never be called throughout block-execution. Use with caution.
     pub fn flush_unchecked(&self) {
         self.module_cache.acquire().clear();
+        self.size.store(0, Ordering::Relaxed);
     }
 
     /// Returns the number of entries in the cache.
     pub fn num_modules(&self) -> usize {
         self.module_cache.acquire().len()
+    }
+
+    /// Returns the sum of serialized sizes of modules stored in cache.
+    pub fn size_in_bytes(&self) -> usize {
+        self.size.load(Ordering::Relaxed)
     }
 
     /// Inserts modules into the cache. Should never be called throughout block-execution. Use with
@@ -137,11 +148,15 @@ where
                     ));
                 } else {
                     // Otherwise, remove the invalid entry.
+                    let size = entry.get().module_code().extension().size_in_bytes();
+                    self.size.fetch_sub(size, Ordering::Relaxed);
                     entry.remove();
                 }
             }
 
             if module.code().is_verified() {
+                self.size
+                    .fetch_add(module.extension().size_in_bytes(), Ordering::Relaxed);
                 let entry =
                     Entry::new(module).expect("Module has been checked and must be verified");
                 let prev = module_cache.insert(key.clone(), entry);
@@ -156,6 +171,8 @@ where
     /// Insert the module to cache. Used for tests only.
     #[cfg(any(test, feature = "testing"))]
     pub fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E>>) {
+        self.size
+            .fetch_add(module.extension().size_in_bytes(), Ordering::Relaxed);
         self.module_cache.acquire().insert(
             key,
             Entry::new(module).expect("Module code should be verified"),
@@ -165,7 +182,12 @@ where
     /// Removes the module from cache. Used for tests only.
     #[cfg(any(test, feature = "testing"))]
     pub fn remove(&self, key: &K) {
-        self.module_cache.acquire().remove(key);
+        if let Some(entry) = self.module_cache.acquire().remove(key) {
+            self.size.fetch_sub(
+                entry.module_code().extension().size_in_bytes(),
+                Ordering::Relaxed,
+            );
+        }
     }
 }
 
@@ -173,17 +195,17 @@ where
 mod test {
     use super::*;
     use claims::{assert_err, assert_ok};
-    use move_vm_types::code::{mock_deserialized_code, mock_extension, mock_verified_code};
+    use move_vm_types::code::{mock_deserialized_code, mock_verified_code, MockExtension};
 
     #[test]
     fn test_entry_new() {
-        assert!(Entry::new(mock_deserialized_code(0, mock_extension(8))).is_err());
-        assert!(Entry::new(mock_verified_code(0, mock_extension(8))).is_ok());
+        assert!(Entry::new(mock_deserialized_code(0, MockExtension::new(8))).is_err());
+        assert!(Entry::new(mock_verified_code(0, MockExtension::new(8))).is_ok());
     }
 
     #[test]
     fn test_entry_mark_invalid() {
-        let entry = assert_ok!(Entry::new(mock_verified_code(0, mock_extension(8))));
+        let entry = assert_ok!(Entry::new(mock_verified_code(0, MockExtension::new(8))));
         assert!(entry.is_valid());
 
         entry.mark_invalid();
@@ -195,8 +217,8 @@ mod test {
         let cache = ReadOnlyModuleCache::empty();
 
         // Set the state.
-        cache.insert(0, mock_verified_code(0, mock_extension(8)));
-        cache.insert(1, mock_verified_code(1, mock_extension(8)));
+        cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
+        cache.insert(1, mock_verified_code(1, MockExtension::new(8)));
         cache.mark_invalid_if_contains(&1);
 
         assert_eq!(cache.num_modules(), 2);
@@ -214,45 +236,75 @@ mod test {
     fn test_num_modules_and_flush_unchecked() {
         let cache = ReadOnlyModuleCache::empty();
         assert_eq!(cache.num_modules(), 0);
+        assert_eq!(cache.size_in_bytes(), 0);
 
-        cache.insert(0, mock_verified_code(0, mock_extension(8)));
-        cache.insert(1, mock_verified_code(1, mock_extension(8)));
+        cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
+        cache.insert(1, mock_verified_code(1, MockExtension::new(16)));
+        cache.insert(2, mock_verified_code(2, MockExtension::new(8)));
+        assert_eq!(cache.num_modules(), 3);
+        assert_eq!(cache.size_in_bytes(), 32);
+
+        cache.remove(&2);
         assert_eq!(cache.num_modules(), 2);
+        assert_eq!(cache.size_in_bytes(), 24);
 
         cache.flush_unchecked();
         assert_eq!(cache.num_modules(), 0);
+        assert_eq!(cache.size_in_bytes(), 0);
     }
 
     #[test]
     fn test_cache_insert_verified_unchecked() {
-        let global_cache = ReadOnlyModuleCache::empty();
+        let cache = ReadOnlyModuleCache::empty();
 
         let mut new_modules = vec![];
         for i in 0..10 {
-            new_modules.push((i, mock_verified_code(i, mock_extension(8))));
+            new_modules.push((i, mock_verified_code(i, MockExtension::new(8))));
         }
-        let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
-        assert!(result.is_ok());
-        assert_eq!(global_cache.num_modules(), 10);
+        assert!(cache
+            .insert_verified_unchecked(new_modules.into_iter())
+            .is_ok());
 
-        global_cache.flush_unchecked();
-        assert_eq!(global_cache.num_modules(), 0);
+        assert_eq!(cache.num_modules(), 10);
+        assert_eq!(cache.size_in_bytes(), 80);
+    }
 
-        // Should not add deserialized code.
-        let deserialized_modules = vec![(0, mock_deserialized_code(0, mock_extension(8)))];
-        assert_ok!(global_cache.insert_verified_unchecked(deserialized_modules.into_iter()));
-        assert_eq!(global_cache.num_modules(), 0);
+    #[test]
+    fn test_cache_insert_verified_unchecked_does_not_add_deserialized_code() {
+        let cache = ReadOnlyModuleCache::empty();
 
-        // Should not override valid modules.
-        global_cache.insert(0, mock_verified_code(0, mock_extension(8)));
-        let new_modules = vec![(0, mock_verified_code(100, mock_extension(8)))];
-        assert_err!(global_cache.insert_verified_unchecked(new_modules.into_iter()));
+        let deserialized_modules = vec![(0, mock_deserialized_code(0, MockExtension::new(8)))];
+        assert_ok!(cache.insert_verified_unchecked(deserialized_modules.into_iter()));
 
-        // Can override invalid modules.
-        global_cache.mark_invalid_if_contains(&0);
-        let new_modules = vec![(0, mock_verified_code(100, mock_extension(8)))];
-        let result = global_cache.insert_verified_unchecked(new_modules.into_iter());
-        assert!(result.is_ok());
-        assert_eq!(global_cache.num_modules(), 1);
+        assert_eq!(cache.num_modules(), 0);
+        assert_eq!(cache.size_in_bytes(), 0);
+    }
+
+    #[test]
+    fn test_cache_insert_verified_unchecked_does_not_override_valid_modules() {
+        let cache = ReadOnlyModuleCache::empty();
+
+        cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
+        assert_eq!(cache.num_modules(), 1);
+        assert_eq!(cache.size_in_bytes(), 8);
+
+        let new_modules = vec![(0, mock_verified_code(100, MockExtension::new(32)))];
+        assert_err!(cache.insert_verified_unchecked(new_modules.into_iter()));
+    }
+
+    #[test]
+    fn test_cache_insert_verified_unchecked_overrides_invalid_modules() {
+        let cache = ReadOnlyModuleCache::empty();
+
+        cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
+        cache.mark_invalid_if_contains(&0);
+        assert_eq!(cache.num_modules(), 1);
+        assert_eq!(cache.size_in_bytes(), 8);
+
+        let new_modules = vec![(0, mock_verified_code(100, MockExtension::new(32)))];
+        assert_ok!(cache.insert_verified_unchecked(new_modules.into_iter()));
+
+        assert_eq!(cache.num_modules(), 1);
+        assert_eq!(cache.size_in_bytes(), 32);
     }
 }

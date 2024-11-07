@@ -20,6 +20,7 @@ aptos-vm-types = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]

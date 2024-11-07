@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::code::ModuleCode;
+use crate::code::{ModuleCode, WithSize};
 use std::{ops::Deref, sync::Arc};
 
 #[derive(Clone, Debug)]
@@ -56,13 +56,18 @@ pub fn mock_verified_code<E>(
 
 #[derive(Clone, Debug)]
 pub struct MockExtension {
-    #[allow(dead_code)]
     size: usize,
 }
 
 impl MockExtension {
     pub fn new(size: usize) -> Self {
         Self { size }
+    }
+}
+
+impl WithSize for MockExtension {
+    fn size_in_bytes(&self) -> usize {
+        self.size
     }
 }
 
