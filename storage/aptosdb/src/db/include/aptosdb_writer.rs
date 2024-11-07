@@ -616,6 +616,17 @@ impl AptosDB {
             current_epoch,
         );
 
+        // Ensure that state tree at the end of the epoch is persisted.
+        if ledger_info_with_sig.ledger_info().ends_epoch() {
+            let state_snapshot = self.state_store.get_state_snapshot_before(version + 1)?;
+            ensure!(
+                state_snapshot.is_some() && state_snapshot.unwrap().0 == version,
+                "State checkpoint not persisted at the end of the epoch, version {}, epoch {}",
+                version,
+                ledger_info_with_sig.ledger_info().epoch(),
+            );
+        }
+
         // Put write to batch.
         self.ledger_db
             .metadata_db()
