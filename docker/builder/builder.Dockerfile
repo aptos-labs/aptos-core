@@ -3,6 +3,10 @@
 FROM rust as rust-base
 WORKDIR /aptos
 
+# Current debian base is bookworm, pin to prevent unexpected changes
+RUN echo "deb https://cloudfront.debian.net/debian/ bookworm main" > /etc/apt/sources.list.d/bookworm.list && \
+    echo "Package: *\nPin: release n=bookworm\nPin-Priority: 50" > /etc/apt/preferences.d/bookworm
+
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \

@@ -1,6 +1,10 @@
 ### Faucet Image ###
 FROM debian-base AS faucet
 
+# Current debian base is bookworm, pin to prevent unexpected changes
+RUN echo "deb https://cloudfront.debian.net/debian/ bookworm main" > /etc/apt/sources.list.d/bookworm.list && \
+    echo "Package: *\nPin: release n=bookworm\nPin-Priority: 50" > /etc/apt/preferences.d/bookworm
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get --no-install-recommends install -y \
