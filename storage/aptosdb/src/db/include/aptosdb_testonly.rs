@@ -155,6 +155,12 @@ impl ChunkToCommitOwned {
             &transaction_infos,
         );
 
+        let is_reconfig = transaction_outputs
+            .iter()
+            .rev()
+            .flat_map(TransactionOutput::events)
+            .any(ContractEvent::is_new_epoch_event);
+
         Self {
             first_version,
             transactions,
@@ -165,7 +171,7 @@ impl ChunkToCommitOwned {
             per_version_state_updates,
             state_updates_until_last_checkpoint,
             sharded_state_cache: None,
-            is_reconfig: false,
+            is_reconfig,
         }
     }
 
