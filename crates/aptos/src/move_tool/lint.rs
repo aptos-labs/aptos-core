@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use move_compiler_v2::Experiment;
 use move_linter::MoveLintChecks;
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{CompilerVersion, LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION};
 use move_package::source_package::std_lib::StdVersion;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -30,10 +30,10 @@ pub struct LintPackage {
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Currently, defaults to `2.0`.
+    /// Defaults to the latest stable language version.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value = "2.0",
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 

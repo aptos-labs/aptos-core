@@ -410,7 +410,7 @@ fn compile_aptos_packages(
     for package in APTOS_PACKAGES {
         let root_package_dir = aptos_commons_path.join(get_aptos_dir(package).unwrap());
         let compiler_version = if v2_flag {
-            Some(CompilerVersion::V2_0)
+            Some(CompilerVersion::latest_stable())
         } else {
             Some(CompilerVersion::V1)
         };
@@ -575,8 +575,11 @@ fn dump_and_compile_from_package_metadata(
             return Err(anyhow::Error::msg("compilation failed at v1"));
         }
         if execution_mode.is_some_and(|mode| mode.is_v2_or_compare()) {
-            let package_v2 =
-                compile_package(root_package_dir, &package_info, Some(CompilerVersion::V2_0));
+            let package_v2 = compile_package(
+                root_package_dir,
+                &package_info,
+                Some(CompilerVersion::latest_stable()),
+            );
             if let Ok(built_package) = package_v2 {
                 generate_compiled_blob(
                     &package_info,
