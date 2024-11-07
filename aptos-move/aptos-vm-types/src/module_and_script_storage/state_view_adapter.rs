@@ -92,7 +92,7 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
         impl Iterator<
             Item = (
                 ModuleId,
-                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<u32>>>,
+                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
             ),
         >,
         PanicError,
@@ -135,7 +135,7 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
                 })?;
 
             // We are using storage version here.
-            let module = ModuleCode::from_verified_ref(verified_code, Arc::new(extension), None);
+            let module = ModuleCode::from_verified_ref(verified_code, Arc::new(extension));
             modules_to_add.push((key, Arc::new(module)))
         }
         Ok(modules_to_add.into_iter())
