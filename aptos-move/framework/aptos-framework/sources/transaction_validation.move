@@ -10,6 +10,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
+    use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -27,6 +28,8 @@ module aptos_framework::transaction_validation {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
     }
+
+    struct GasPermission has copy, drop, store {}
 
     /// MSB is used to indicate a gas payer tx
     const MAX_U64: u128 = 18446744073709551615;
@@ -47,6 +50,28 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
     const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
+    const PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT: u64 = 1011;
+
+    /// Permission management
+    ///
+    /// Master signer grant permissioned signer ability to consume a given amount of gas in octas.
+    public fun grant_gas_permission(
+        master: &signer,
+        permissioned: &signer,
+        gas_amount: u64
+    ) {
+        permissioned_signer::authorize(
+            master,
+            permissioned,
+            (gas_amount as u256),
+            GasPermission {}
+        )
+    }
+
+    /// Removing permissions from permissioned signer.
+    public fun revoke_gas_permission(permissioned: &signer) {
+        permissioned_signer::revoke_permission(permissioned, GasPermission {})
+    }
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -139,6 +164,11 @@ module aptos_framework::transaction_validation {
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
 
         if (!features::transaction_simulation_enhancement_enabled() || !skip_gas_payment(is_simulation, gas_payer)) {
+            assert!(
+                permissioned_signer::check_permission_capacity_above(&sender,
+                    (max_transaction_fee as u256), GasPermission {}),
+                error::permission_denied(PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT)
+            );
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 assert!(
                     aptos_account::is_fungible_balance_at_least(gas_payer, max_transaction_fee),
@@ -480,6 +510,10 @@ module aptos_framework::transaction_validation {
             if (amount_to_burn > storage_fee_refunded) {
                 let burn_amount = amount_to_burn - storage_fee_refunded;
                 transaction_fee::burn_fee(gas_payer, burn_amount);
+                assert!(
+                    permissioned_signer::check_permission_consume(&account, (burn_amount as u256), GasPermission {}),
+                    error::permission_denied(PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT)
+                );
             } else if (amount_to_burn < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - amount_to_burn;
                 transaction_fee::mint_and_refund(gas_payer, mint_amount)
