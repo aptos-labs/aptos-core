@@ -3,7 +3,7 @@ name = "MessageBoard"
 version = "0.0.1"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
 
 [addresses]
 std = "0x1"

@@ -35,7 +35,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         named_address_mapping: vec!["std=0x1".to_string()],
         ..Options::default()
     };
-    options = options.set_language_version(LanguageVersion::V2_1);
+    options = options.set_language_version(LanguageVersion::latest_stable());
     let mut test_output = String::new();
     let mut error_writer = Buffer::no_color();
     match run_move_compiler_for_analysis(&mut error_writer, options) {

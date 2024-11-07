@@ -3,7 +3,7 @@
     "seconds": "1730853896",
     "nanos": 763515000
   },
-  "version": "79",
+  "version": "71",
   "info": {
     "hash": "4LZSOyfF9ztuKYOO3IxOU16DGbNCH11jfiEoVe+xSr4=",
     "stateChangeHash": "WXsOc8/IlIyFwM8GminVlEKL/awZVkZedw1/Pbbbb98=",
@@ -68,7 +68,7 @@
     ]
   },
   "epoch": "2",
-  "blockHeight": "36",
+  "blockHeight": "32",
   "type": "TRANSACTION_TYPE_USER",
   "sizeInfo": {
     "transactionBytes": 190,
