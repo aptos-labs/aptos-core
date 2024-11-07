@@ -42,7 +42,7 @@ impl TransactionsByStatus {
         self.statuses_for_input_txns.len()
     }
 
-    pub fn to_commit(&self) -> &TransactionsWithParsedOutput {
+    pub fn to_commit(&self) -> &TransactionsWithOutput {
         &self.to_commit
     }
 

@@ -215,6 +215,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
 #[derive(Clone)]
 enum StageSwitchCondition {
     WhenPoolBecomesEmpty(Arc<ObjectPool<LocalAccount>>),
+    WhenPoolWithHistoryBecomesEmpty(Arc<ObjectPool<(LocalAccount, Vec<String>)>>),
     MaxTransactions(Arc<AtomicUsize>),
 }
 
@@ -222,6 +223,7 @@ impl StageSwitchCondition {
     fn should_switch(&self) -> bool {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(pool) => pool.len() == 0,
+            StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(pool) => pool.len() == 0,
             StageSwitchCondition::MaxTransactions(max) => max.load(Ordering::Relaxed) == 0,
         }
     }
@@ -229,6 +231,7 @@ impl StageSwitchCondition {
     fn reduce_txn_count(&mut self, count: usize) {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(_) => {},
+            StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(_) => {},
             StageSwitchCondition::MaxTransactions(max) => {
                 let current = max.load(Ordering::Relaxed);
                 if count > current {
@@ -245,6 +248,9 @@ impl Debug for StageSwitchCondition {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(pool) => {
                 write!(f, "WhenPoolBecomesEmpty({})", pool.len())
+            },
+            StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(pool) => {
+                write!(f, "WhenPoolWithHistoryBecomesEmpty({})", pool.len())
             },
             StageSwitchCondition::MaxTransactions(max) => {
                 write!(f, "MaxTransactions({})", max.load(Ordering::Relaxed))
@@ -522,6 +528,7 @@ impl WorkflowTxnGeneratorCreator {
                 let packages = Arc::new(packages);
 
                 let mut creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![];
+                let mut stage_switch_conditions = vec![];
                 if create_accounts {
                     creators.push(Box::new(AccountGeneratorCreator::new(
                         txn_factory.clone(),
@@ -530,6 +537,9 @@ impl WorkflowTxnGeneratorCreator {
                         num_users,
                         400_000_000,
                     )));
+                    stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
+                        Arc::new(AtomicUsize::new(num_users)),
+                    ));
                 }
 
                 creators.push(Box::new(AccountsPoolWrapperCreator::new(
@@ -541,6 +551,9 @@ impl WorkflowTxnGeneratorCreator {
                     created_pool.clone(),
                     Some(register_market_accounts_pool.clone()),
                 )));
+                stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
+                    created_pool.clone(),
+                ));
 
                 creators.push(Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -551,12 +564,18 @@ impl WorkflowTxnGeneratorCreator {
                     register_market_accounts_pool.clone(),
                     Some(deposit_coins_pool.clone()),
                 )));
+                stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
+                    register_market_accounts_pool.clone(),
+                ));
 
                 if flow_type == EconiaFlowType::Real {
                     creators.push(Box::new(AddHistoryWrapperCreator::new(
                         deposit_coins_pool.clone(),
                         deposit_coins_pool_with_added_history.clone(),
                     )));
+                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
+                        deposit_coins_pool.clone(),
+                    ));
                     creators.push(Box::new(MarketMakerPoolWrapperCreator::new(
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                             txn_factory.clone(),
@@ -565,6 +584,9 @@ impl WorkflowTxnGeneratorCreator {
                         )),
                         deposit_coins_pool_with_added_history.clone(),
                     )));
+                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(
+                        deposit_coins_pool_with_added_history.clone(),
+                    ));
                 } else if reuse_accounts_for_orders {
                     creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -574,6 +596,9 @@ impl WorkflowTxnGeneratorCreator {
                         )),
                         deposit_coins_pool.clone(),
                     )));
+                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
+                        deposit_coins_pool.clone(),
+                    ));
                 } else {
                     creators.push(Box::new(AccountsPoolWrapperCreator::new(
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -584,20 +609,23 @@ impl WorkflowTxnGeneratorCreator {
                         deposit_coins_pool.clone(),
                         Some(place_orders_pool.clone()),
                     )));
-                }
-
-                let mut pool_per_stage = Vec::new();
-                if create_accounts {
-                    pool_per_stage.push(Pool::AccountPool(created_pool));
-                }
-                pool_per_stage.push(Pool::AccountPool(register_market_accounts_pool));
-                pool_per_stage.push(Pool::AccountPool(deposit_coins_pool));
-                if flow_type == EconiaFlowType::Real {
-                    pool_per_stage.push(Pool::AccountWithHistoryPool(
-                        deposit_coins_pool_with_added_history,
+                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
+                        deposit_coins_pool.clone(),
                     ));
                 }
-                pool_per_stage.push(Pool::AccountPool(place_orders_pool));
+
+                // let mut pool_per_stage = Vec::new();
+                // if create_accounts {
+                //     pool_per_stage.push(Pool::AccountPool(created_pool));
+                // }
+                // pool_per_stage.push(Pool::AccountPool(register_market_accounts_pool));
+                // pool_per_stage.push(Pool::AccountPool(deposit_coins_pool));
+                // if flow_type == EconiaFlowType::Real {
+                //     pool_per_stage.push(Pool::AccountWithHistoryPool(
+                //         deposit_coins_pool_with_added_history,
+                //     ));
+                // }
+                // pool_per_stage.push(Pool::AccountPool(place_orders_pool));
                 // let pool_per_stage = if create_accounts {
                 //     vec![
                 //         created_pool,
@@ -612,7 +640,7 @@ impl WorkflowTxnGeneratorCreator {
                 //         place_orders_pool,
                 //     ]
                 // };
-                Self::new(stage_tracking, creators, pool_per_stage, num_users)
+                Self::new(stage_tracking, creators, stage_switch_conditions)
             },
         }
     }
