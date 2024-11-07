@@ -3,18 +3,17 @@ description: Sets up buildx for docker builds
 
 runs:
   using: composite
-  steps: 
+  steps:
     - name: setup docker context for buildx
       id: buildx-context
       shell: bash
       run: docker context create builders
 
     - name: setup docker buildx
-      uses: aptos-labs/setup-buildx-action@7952e9cf0debaf1f3f3e5dc7d9c5ea6ececb127e # pin v2.4.0
+      uses: aptos-labs/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # pin v3.7.1
       with:
         endpoint: builders
-        version: v0.11.0
-        custom-name: "core-builder"
+        version: v0.17.1
         keep-state: true
         config-inline: |
           [worker.oci]
