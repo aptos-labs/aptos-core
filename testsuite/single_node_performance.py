@@ -54,7 +54,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=45))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=200))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [

@@ -7,10 +7,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::{
-    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
-    transaction::TransactionOutputProvider,
-};
+use aptos_types::block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock};
 use std::{
     collections::HashMap,
     sync::{mpsc, Arc},

@@ -394,7 +394,9 @@ impl WorkflowTxnGeneratorCreator {
                 reuse_accounts_for_orders,
                 publish_packages,
             } => {
-                let create_accounts = initial_account_pool.is_none();
+                // let create_accounts = initial_account_pool.is_none();
+                let create_accounts = false;
+                // info!("Create_accounts {:?}", create_accounts);
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
                 let deposit_coins_pool = Arc::new(ObjectPool::new());
@@ -584,8 +586,8 @@ impl WorkflowTxnGeneratorCreator {
                         )),
                         deposit_coins_pool_with_added_history.clone(),
                     )));
-                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(
-                        deposit_coins_pool_with_added_history.clone(),
+                    stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
+                        Arc::new(AtomicUsize::new(2_000_000)),
                     ));
                 } else if reuse_accounts_for_orders {
                     creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
@@ -596,8 +598,8 @@ impl WorkflowTxnGeneratorCreator {
                         )),
                         deposit_coins_pool.clone(),
                     )));
-                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
-                        deposit_coins_pool.clone(),
+                    stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
+                        Arc::new(AtomicUsize::new(2_000_000)),
                     ));
                 } else {
                     creators.push(Box::new(AccountsPoolWrapperCreator::new(
