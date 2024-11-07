@@ -27,7 +27,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
-use move_vm_types::code::{ModuleCode, SyncModuleCache, WithAddress, WithName};
+use move_vm_types::code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize};
 use std::{
     collections::{
         hash_map::{
@@ -351,6 +351,7 @@ where
     T: Transaction,
     K: Hash + Eq + Ord + Clone,
     VC: Deref<Target = Arc<DC>>,
+    S: WithSize,
 {
     // Return an iterator over the captured reads.
     pub(crate) fn get_read_values_with_delayed_fields(

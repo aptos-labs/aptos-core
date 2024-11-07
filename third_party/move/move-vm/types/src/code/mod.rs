@@ -16,6 +16,6 @@ pub use cache::{
         UnsyncModuleCache,
     },
     script_cache::{ambassador_impl_ScriptCache, ScriptCache, SyncScriptCache, UnsyncScriptCache},
-    types::{Code, WithAddress, WithBytes, WithHash, WithName},
+    types::{Code, WithAddress, WithBytes, WithHash, WithName, WithSize},
 };
 pub use storage::ModuleBytesStorage;

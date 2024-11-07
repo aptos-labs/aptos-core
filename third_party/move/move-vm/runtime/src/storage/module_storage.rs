@@ -11,7 +11,7 @@ use move_core_types::{
     metadata::Metadata,
 };
 use move_vm_types::{
-    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash},
+    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
     module_cyclic_dependency_error, module_linker_error,
 };
 use std::sync::Arc;
@@ -117,7 +117,7 @@ where
             Verified = Module,
             Extension = E,
         >,
-    E: WithBytes + WithHash,
+    E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
     fn check_module_exists(
@@ -237,7 +237,7 @@ where
             Verified = Module,
             Extension = E,
         >,
-    E: WithBytes + WithHash,
+    E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
     let runtime_environment = module_cache_with_context.runtime_environment();

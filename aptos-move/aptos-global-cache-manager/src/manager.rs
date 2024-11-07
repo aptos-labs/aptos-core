@@ -17,6 +17,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
+use move_vm_types::code::WithSize;
 use parking_lot::Mutex;
 use std::{
     hash::Hash,
@@ -54,11 +55,11 @@ impl BlockId {
 
 /// Manages global caches, e.g., modules or execution environment. Should not be used concurrently.
 struct GlobalCacheManagerInner<K, DC, VC, E> {
-    /// Different configurations used for handling global caches.
     config: GlobalCacheConfig,
+
     /// Cache for modules. It is read-only for any concurrent execution, and can only be mutated
     /// when it is known that there are no concurrent accesses, e.g., at block boundaries.
-    /// [GlobalCacheManagerInner] tries to ensure that these invariants always hold.
+    /// [GlobalCacheManagerInner] must ensure that these invariants always hold.
     module_cache: Arc<ReadOnlyModuleCache<K, DC, VC, E>>,
     /// Identifies previously executed block, initially [BlockId::Unset].
     previous_block_id: Mutex<BlockId>,
@@ -75,6 +76,7 @@ impl<K, DC, VC, E> GlobalCacheManagerInner<K, DC, VC, E>
 where
     K: Hash + Eq + Clone,
     VC: Deref<Target = Arc<DC>>,
+    E: WithSize,
 {
     /// Returns a new instance of [GlobalCacheManagerInner] with default [GlobalCacheConfig].
     fn new_with_default_config() -> Self {
@@ -174,10 +176,10 @@ where
             Ok(size) => size,
         };
 
-        if struct_name_index_map_size > self.config.struct_name_index_map_capacity {
+        if struct_name_index_map_size > self.config.max_struct_name_index_map_size {
             flush_all_caches = true;
         }
-        if self.module_cache.num_modules() > self.config.module_cache_capacity {
+        if self.module_cache.size_in_bytes() > self.config.max_module_cache_size_in_bytes {
             // Technically, if we flush modules we do not need to flush type caches, but we unify
             // flushing logic for easier reasoning.
             flush_all_caches = true;
@@ -234,7 +236,7 @@ where
     }
 
     /// Resets all states (under a lock) as if global caches are empty and no blocks have been
-    /// executed so far. Reruns an invariant violation error.
+    /// executed so far. Returns an invariant violation error.
     fn reset_and_return_invariant_violation(&self, msg: &str) -> VMStatus {
         // Lock to reset the state under lock.
         let mut previous_block_id = self.previous_block_id.lock();
@@ -278,7 +280,7 @@ impl GlobalCacheManager {
     ///   1. Previously executed block ID does not match the provided value.
     ///   2. The environment has changed for this state.
     ///   3. The size of the struct name re-indexing map is too large.
-    ///   4. The size of the module cache is too large.
+    ///   4. The size (in bytes) of the module cache is too large.
     ///
     /// Additionally, if cache is empty, prefetches the framework code into it.
     ///
@@ -480,11 +482,11 @@ mod test {
     }
 
     #[test]
-    fn mark_execution_start_when_too_many_modules() {
+    fn mark_execution_start_when_module_cache_is_too_large() {
         let state_view = MockStateView::empty();
 
         let config = GlobalCacheConfig {
-            module_cache_capacity: 1,
+            max_module_cache_size_in_bytes: 8,
             ..Default::default()
         };
         let global_cache_manager = GlobalCacheManagerInner::new_with_config(config);
@@ -494,14 +496,16 @@ mod test {
             .insert(0, mock_verified_code(0, MockExtension::new(8)));
         global_cache_manager
             .module_cache
-            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+            .insert(1, mock_verified_code(1, MockExtension::new(24)));
         assert_eq!(global_cache_manager.module_cache.num_modules(), 2);
+        assert_eq!(global_cache_manager.module_cache.size_in_bytes(), 32);
 
         // Cache is too large, should be flushed for next block.
         assert_ok!(
             global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::random()))
         );
         assert_eq!(global_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(global_cache_manager.module_cache.size_in_bytes(), 0);
     }
 
     #[test_case(None)]
@@ -565,7 +569,7 @@ mod test {
             u32,
             MockDeserializedCode,
             MockVerifiedCode,
-            (),
+            MockExtension,
         >::new_with_default_config());
         assert!(global_cache_manager.ready_for_next_block());
 
@@ -587,7 +591,7 @@ mod test {
             u32,
             MockDeserializedCode,
             MockVerifiedCode,
-            (),
+            MockExtension,
         >::new_with_default_config();
         assert!(global_cache_manager.previous_block_id.lock().is_unset());
 
@@ -619,7 +623,7 @@ mod test {
             u32,
             MockDeserializedCode,
             MockVerifiedCode,
-            (),
+            MockExtension,
         >::new_with_default_config());
         global_cache_manager.mark_not_ready_for_next_block();
 

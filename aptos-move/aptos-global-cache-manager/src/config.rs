@@ -5,23 +5,23 @@
 pub struct GlobalCacheConfig {
     /// If true, when global caches are empty, Aptos framework is prefetched into module cache.
     pub prefetch_framework_code: bool,
-    /// The maximum number of entries stored in module cache. If module cache exceeds this value,
-    /// all its entries should be flushed.
-    pub module_cache_capacity: usize,
-    /// The maximum size of struct name re-indexing map stored in runtime environment.
-    pub struct_name_index_map_capacity: usize,
+    /// The maximum size serialized modules can take in module cache.
+    pub max_module_cache_size_in_bytes: usize,
+    /// The maximum size (in terms of entries) of struct name re-indexing map stored in runtime
+    /// environment.
+    pub max_struct_name_index_map_size: usize,
 }
 
 impl Default for GlobalCacheConfig {
     fn default() -> Self {
         // TODO(loader_v2):
-        //   Right now these are just some numbers, we can set them based on the upper bounds of
-        //   module or identifier sizes, or keep track in read-only module cache how many bytes we
-        //   are using.
+        //   Right now these are hardcoded here, we probably want to add them to gas schedule or
+        //   some on-chain config.
         Self {
             prefetch_framework_code: true,
-            module_cache_capacity: 10_000,
-            struct_name_index_map_capacity: 10_000,
+            // Use 50 Mb for now, should be large enough to cache many modules.
+            max_module_cache_size_in_bytes: 50 * 1024 * 1024,
+            max_struct_name_index_map_size: 100_000,
         }
     }
 }
