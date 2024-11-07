@@ -133,7 +133,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
-        mut num_to_create: usize,
+        num_to_create: usize,
         _history: &[String],
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
@@ -215,7 +215,6 @@ impl TransactionGenerator for WorkflowTxnGenerator {
 #[derive(Clone)]
 enum StageSwitchCondition {
     WhenPoolBecomesEmpty(Arc<ObjectPool<LocalAccount>>),
-    WhenPoolWithHistoryBecomesEmpty(Arc<ObjectPool<(LocalAccount, Vec<String>)>>),
     MaxTransactions(Arc<AtomicUsize>),
 }
 
@@ -223,7 +222,6 @@ impl StageSwitchCondition {
     fn should_switch(&self) -> bool {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(pool) => pool.len() == 0,
-            StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(pool) => pool.len() == 0,
             StageSwitchCondition::MaxTransactions(max) => max.load(Ordering::Relaxed) == 0,
         }
     }
@@ -231,7 +229,6 @@ impl StageSwitchCondition {
     fn reduce_txn_count(&mut self, count: usize) {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(_) => {},
-            StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(_) => {},
             StageSwitchCondition::MaxTransactions(max) => {
                 let current = max.load(Ordering::Relaxed);
                 if count > current {
@@ -248,9 +245,6 @@ impl Debug for StageSwitchCondition {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(pool) => {
                 write!(f, "WhenPoolBecomesEmpty({})", pool.len())
-            },
-            StageSwitchCondition::WhenPoolWithHistoryBecomesEmpty(pool) => {
-                write!(f, "WhenPoolWithHistoryBecomesEmpty({})", pool.len())
             },
             StageSwitchCondition::MaxTransactions(max) => {
                 write!(f, "MaxTransactions({})", max.load(Ordering::Relaxed))
@@ -395,7 +389,7 @@ impl WorkflowTxnGeneratorCreator {
                 publish_packages,
             } => {
                 // let create_accounts = initial_account_pool.is_none();
-                let create_accounts = false;
+                let create_accounts = true;
                 // info!("Create_accounts {:?}", create_accounts);
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());

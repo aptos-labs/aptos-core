@@ -56,13 +56,14 @@ DEFAULT_MAX_BLOCK_SIZE = "10000"
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=200))
 NUM_BLOCKS_DETAILED = 10
-NUM_ACCOUNTS = max(
-    [
-        int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
-        (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
-    ]
-)
-NUM_ACCOUNTS = (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE
+# NUM_ACCOUNTS = max(
+#     [
+#         int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
+#         (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
+#     ]
+# )
+# NUM_ACCOUNTS = (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE
+NUM_ACCOUNTS = 10000
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
