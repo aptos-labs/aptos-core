@@ -40,7 +40,7 @@ module dispatching_check_signature::storage {
     /// This function only call by the dispatcher.
     public(friend) fun insert(module_address: address, data: vector<u8>) acquires Dispatcher {
         let dispatcher = borrow_global_mut<Dispatcher>(@dispatching_check_signature);
-        table::add(&mut dispatcher.data, module_address, data);
+        table::upsert(&mut dispatcher.data, module_address, data);
     }
 
     /// Sets the metadata of the dispatcher.
