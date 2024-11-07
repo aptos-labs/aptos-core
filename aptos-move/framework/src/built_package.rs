@@ -22,7 +22,10 @@ use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
-    metadata::{CompilerVersion, LanguageVersion},
+    metadata::{
+        CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+        LATEST_STABLE_LANGUAGE_VERSION,
+    },
     model::GlobalEnv,
 };
 use move_package::{
@@ -88,10 +91,10 @@ pub struct BuildOptions {
     #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION))]
     pub compiler_version: Option<CompilerVersion>,
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.1"))]
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,

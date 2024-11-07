@@ -124,7 +124,7 @@ fn check_or_update(
     update_baseline: bool,
     compiler_version: CompilerVersion,
 ) -> datatest_stable::Result<()> {
-    let exp_ext = if compiler_version == CompilerVersion::V2_0 {
+    let exp_ext = if compiler_version != CompilerVersion::V1 {
         EXP_EXT_V2
     } else {
         EXP_EXT
