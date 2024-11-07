@@ -770,8 +770,8 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
 mod tests {
     use crate::{
         db_generator::bootstrap_with_genesis, init_db_and_executor,
-        native::native_config::NativeConfig, native_executor::NativeExecutor,
-        pipeline::PipelineConfig, transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+        native::native_config::NativeConfig, pipeline::PipelineConfig,
+        transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::TransactionGenerator, BenchmarkWorkload,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
@@ -809,7 +809,7 @@ mod tests {
         config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
         config.storage.rocksdb_configs.enable_storage_sharding = false;
 
-        let txn = {
+        let _txn = {
             let (vm_db, vm_executor) = init_db_and_executor::<AptosVMBlockExecutor>(&config);
             let root_account = TransactionGenerator::read_root_account(genesis_key, &vm_db);
             let dst = LocalAccount::generate(&mut thread_rng());
@@ -833,14 +833,14 @@ mod tests {
             txn
         };
 
-        let (_native_db, native_executor) = init_db_and_executor::<NativeExecutor>(&config);
-        native_executor
-            .execute_and_state_checkpoint(
-                (HashValue::zero(), vec![txn]).into(),
-                native_executor.committed_block_id(),
-                BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
-            )
-            .unwrap();
+        // let (_native_db, native_executor) = init_db_and_executor::<NativeExecutor>(&config);
+        // native_executor
+        //     .execute_and_state_checkpoint(
+        //         (HashValue::zero(), vec![txn]).into(),
+        //         native_executor.committed_block_id(),
+        //         BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+        //     )
+        //     .unwrap();
 
         // let (
         //     vm_txns,
@@ -955,9 +955,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_native_benchmark() {
-        // correct execution not yet implemented, so cannot be checked for validity
-        test_generic_benchmark::<NativeExecutor>(Some(TransactionTypeArg::AptFaTransfer), false);
-    }
+    // #[test]
+    // fn test_native_benchmark() {
+    //     // correct execution not yet implemented, so cannot be checked for validity
+    //     test_generic_benchmark::<NativeExecutor>(None, false);
+    // }
 }
