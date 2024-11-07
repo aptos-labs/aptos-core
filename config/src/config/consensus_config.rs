@@ -197,7 +197,7 @@ impl Default for ConsensusConfig {
                 num_blocks_to_look_at: 12,
                 min_blocks_to_activate: 4,
                 percentile: 0.5,
-                target_block_time_ms: 250,
+                target_block_time_ms: 200,
                 min_block_time_ms_to_activate: 100,
                 // allow at least two spreading group from reordering in a single block, to utilize paralellism
                 min_calibrated_txns_per_block: 8,
