@@ -2,9 +2,14 @@ module aptos_framework::permissioned_delegation {
     use std::error;
     use std::option::Option;
     use std::signer;
-    use aptos_std::ed25519;
-    use aptos_std::ed25519::{new_signature_from_bytes, new_unvalidated_public_key_from_bytes, UnvalidatedPublicKey};
-    use aptos_std::table::{Self, Table};
+    use aptos_std::ed25519::{
+        Self,
+        new_signature_from_bytes,
+        new_unvalidated_public_key_from_bytes,
+        UnvalidatedPublicKey
+    };
+    use aptos_std::table;
+    use aptos_std::table::Table;
     use aptos_framework::auth_data::{Self, AbstractionAuthData};
     use aptos_framework::bcs_stream::{Self, deserialize_u8};
     use aptos_framework::permissioned_signer::{Self, is_permissioned_signer, StorablePermissionedHandle};
@@ -26,12 +31,16 @@ module aptos_framework::permissioned_delegation {
         V1 { handle: StorablePermissionedHandle, rate_limiter: Option<rate_limiter::RateLimiter> }
     }
 
-    enum DelegationKey has copy, drop {
+    enum DelegationKey has copy, store, drop {
         Ed25519PublicKey(UnvalidatedPublicKey)
     }
 
+    public fun gen_ed25519_key(key: UnvalidatedPublicKey): DelegationKey {
+        DelegationKey::Ed25519PublicKey(key)
+    }
+
     struct RegisteredDelegations has key {
-        handle_bundles: Table<DelegationKey, AccountDelegation>
+        delegations: Table<DelegationKey, AccountDelegation>
     }
 
     inline fun fetch_handle(bundle: &mut AccountDelegation, check_rate_limit: bool): &StorablePermissionedHandle {
@@ -52,10 +61,10 @@ module aptos_framework::permissioned_delegation {
         let addr = signer::address_of(master);
         if (!exists<RegisteredDelegations>(addr)) {
             move_to(master, RegisteredDelegations {
-                handle_bundles: table::new()
+                delegations: table::new()
             });
         };
-        let handles = &mut borrow_global_mut<RegisteredDelegations>(addr).handle_bundles;
+        let handles = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
         assert!(!handles.contains(key), error::already_exists(EHANDLE_EXISTENCE));
         let handle = permissioned_signer::create_storable_permissioned_handle(master, expiration_time);
         let permissioned_signer = permissioned_signer::signer_from_storable_permissioned_handle(&handle);
@@ -69,10 +78,10 @@ module aptos_framework::permissioned_delegation {
     ) acquires RegisteredDelegations {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(master);
-        let handle_bundles = &mut borrow_global_mut<RegisteredDelegations>(addr).handle_bundles;
-        assert!(handle_bundles.contains(key), error::not_found(EHANDLE_EXISTENCE));
-        let bundle = handle_bundles.remove(key);
-        match (bundle) {
+        let delegations = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
+        assert!(delegations.contains(key), error::not_found(EHANDLE_EXISTENCE));
+        let delegation = delegations.remove(key);
+        match (delegation) {
             AccountDelegation::V1 { handle, rate_limiter: _ } => {
                 permissioned_signer::destroy_storable_permissioned_handle(handle);
             }
@@ -125,9 +134,9 @@ module aptos_framework::permissioned_delegation {
         count_rate: bool
     ): &StorablePermissionedHandle {
         if (exists<RegisteredDelegations>(master)) {
-            let bundles = &mut borrow_global_mut<RegisteredDelegations>(master).handle_bundles;
-            if (bundles.contains(key)) {
-                fetch_handle(bundles.borrow_mut(key), count_rate)
+            let delegations = &mut borrow_global_mut<RegisteredDelegations>(master).delegations;
+            if (delegations.contains(key)) {
+                fetch_handle(delegations.borrow_mut(key), count_rate)
             } else {
                 abort error::permission_denied(EINVALID_SIGNATURE)
             }
