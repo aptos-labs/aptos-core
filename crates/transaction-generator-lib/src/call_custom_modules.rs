@@ -8,12 +8,13 @@ use crate::{
 };
 use aptos_logger::{error, info};
 use aptos_sdk::{
+    move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use std::{borrow::Borrow, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc};
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -26,6 +27,8 @@ pub type TransactionGeneratorWorker = dyn Fn(
     ) -> Option<SignedTransaction>
     + Send
     + Sync;
+
+pub type SequenceNumberUpdateWorker = dyn Fn(&HashMap<AccountAddress, u64>) + Send + Sync;
 
 #[async_trait]
 pub trait UserModuleTransactionGenerator: Sync + Send {
@@ -54,6 +57,8 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
         txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker>;
+
+    async fn create_sequence_number_update_fn(&self) -> Option<Arc<SequenceNumberUpdateWorker>>;
 }
 
 pub struct CustomModulesDelegationGenerator {
@@ -61,6 +66,7 @@ pub struct CustomModulesDelegationGenerator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
+    sequence_number_updater: Option<Arc<SequenceNumberUpdateWorker>>,
 }
 
 impl CustomModulesDelegationGenerator {
@@ -69,12 +75,14 @@ impl CustomModulesDelegationGenerator {
         txn_factory: TransactionFactory,
         packages: Arc<Vec<(Package, LocalAccount)>>,
         txn_generator: Arc<TransactionGeneratorWorker>,
+        sequence_number_updater: Option<Arc<SequenceNumberUpdateWorker>>,
     ) -> Self {
         Self {
             rng,
             txn_factory,
             packages,
             txn_generator,
+            sequence_number_updater,
         }
     }
 }
@@ -102,12 +110,22 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         }
         requests
     }
+
+    fn update_sequence_numbers(
+        &mut self,
+        latest_fetched_sequence_numbers: &HashMap<AccountAddress, u64>,
+    ) {
+        if let Some(sequence_number_updater) = &self.sequence_number_updater {
+            (sequence_number_updater)(latest_fetched_sequence_numbers);
+        }
+    }
 }
 
 pub struct CustomModulesDelegationGeneratorCreator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
+    sequence_number_updater: Option<Arc<SequenceNumberUpdateWorker>>,
 }
 
 impl CustomModulesDelegationGeneratorCreator {
@@ -116,11 +134,13 @@ impl CustomModulesDelegationGeneratorCreator {
         txn_factory: TransactionFactory,
         packages: Arc<Vec<(Package, LocalAccount)>>,
         txn_generator: Arc<TransactionGeneratorWorker>,
+        sequence_number_updater: Option<Arc<SequenceNumberUpdateWorker>>,
     ) -> Self {
         Self {
             txn_factory,
             packages,
             txn_generator,
+            sequence_number_updater,
         }
     }
 
@@ -142,7 +162,7 @@ impl CustomModulesDelegationGeneratorCreator {
             None,
         )
         .await;
-        let worker = Self::create_worker(
+        let (txn_generator_worker, sequence_number_update_worker) = Self::create_worker(
             init_txn_factory,
             root_account,
             txn_executor,
@@ -153,7 +173,8 @@ impl CustomModulesDelegationGeneratorCreator {
         Self {
             txn_factory,
             packages: Arc::new(packages),
-            txn_generator: worker,
+            txn_generator: txn_generator_worker,
+            sequence_number_updater: sequence_number_update_worker,
         }
     }
 
@@ -163,7 +184,10 @@ impl CustomModulesDelegationGeneratorCreator {
         txn_executor: &dyn ReliableTransactionSubmitter,
         packages: &mut [(Package, LocalAccount)],
         workload: &mut dyn UserModuleTransactionGenerator,
-    ) -> Arc<TransactionGeneratorWorker> {
+    ) -> (
+        Arc<TransactionGeneratorWorker>,
+        Option<Arc<SequenceNumberUpdateWorker>>,
+    ) {
         let mut rng = StdRng::from_entropy();
         let mut requests_initialize = Vec::with_capacity(packages.len());
 
@@ -189,9 +213,12 @@ impl CustomModulesDelegationGeneratorCreator {
 
         info!("Done preparing workload for {} packages", packages.len());
 
-        workload
-            .create_generator_fn(root_account, &init_txn_factory, txn_executor, &mut rng)
-            .await
+        (
+            workload
+                .create_generator_fn(root_account, &init_txn_factory, txn_executor, &mut rng)
+                .await,
+            workload.create_sequence_number_update_fn().await,
+        )
     }
 
     pub async fn publish_package(
@@ -273,6 +300,7 @@ impl TransactionGeneratorCreator for CustomModulesDelegationGeneratorCreator {
             self.txn_factory.clone(),
             self.packages.clone(),
             self.txn_generator.clone(),
+            self.sequence_number_updater.clone(),
         ))
     }
 }

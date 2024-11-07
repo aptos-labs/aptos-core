@@ -6,7 +6,9 @@ use super::{
     ReliableTransactionSubmitter,
 };
 use crate::{
-    call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator},
+    call_custom_modules::{
+        SequenceNumberUpdateWorker, TransactionGeneratorWorker, UserModuleTransactionGenerator,
+    },
     create_account_transaction,
     publishing::module_simple::MultiSigConfig,
     RootAccountHandle,
@@ -112,5 +114,9 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                 },
             })
         })
+    }
+
+    async fn create_sequence_number_update_fn(&self) -> Option<Arc<SequenceNumberUpdateWorker>> {
+        None
     }
 }

@@ -256,6 +256,9 @@ impl SubmissionWorker {
             )
             .await;
 
+        self.txn_generator
+            .update_sequence_numbers(&latest_fetched_counts);
+
         for account in self.accounts.iter_mut() {
             update_account_seq_num(
                 Arc::get_mut(account).unwrap(),

@@ -124,6 +124,16 @@ pub trait TransactionGenerator: Sync + Send {
         account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
+
+    // The transaction emitter calls this function when it fetches the latest sequence numbers for the senders of
+    // the transactions it has sent. If the transaction generator is maintaining a local pool of accounts (usually happens
+    // in workflow transaction type), the transaction generator should update the sequence numbers of those accounts in the pool.
+    fn update_sequence_numbers(
+        &mut self,
+        _latest_fetched_sequence_numbers: &HashMap<AccountAddress, u64>,
+    ) {
+        // Default implementation does nothing
+    }
 }
 
 #[async_trait]

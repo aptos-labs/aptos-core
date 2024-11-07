@@ -293,26 +293,28 @@ impl WorkflowTxnGeneratorCreator {
                 )
                 .await;
 
-                let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
-                    init_txn_factory.clone(),
-                    root_account,
-                    txn_executor,
-                    &mut packages,
-                    &mut EntryPointTransactionGenerator {
-                        entry_point: mint_entry_point,
-                    },
-                )
-                .await;
-                let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
-                    init_txn_factory.clone(),
-                    root_account,
-                    txn_executor,
-                    &mut packages,
-                    &mut EntryPointTransactionGenerator {
-                        entry_point: burn_entry_point,
-                    },
-                )
-                .await;
+                let (mint_txn_generator_worker, mint_update_seq_num_worker) =
+                    CustomModulesDelegationGeneratorCreator::create_worker(
+                        init_txn_factory.clone(),
+                        root_account,
+                        txn_executor,
+                        &mut packages,
+                        &mut EntryPointTransactionGenerator {
+                            entry_point: mint_entry_point,
+                        },
+                    )
+                    .await;
+                let (burn_txn_generator_worker, burn_update_seq_num_worker) =
+                    CustomModulesDelegationGeneratorCreator::create_worker(
+                        init_txn_factory.clone(),
+                        root_account,
+                        txn_executor,
+                        &mut packages,
+                        &mut EntryPointTransactionGenerator {
+                            entry_point: burn_entry_point,
+                        },
+                    )
+                    .await;
 
                 let packages = Arc::new(packages);
 
@@ -328,7 +330,8 @@ impl WorkflowTxnGeneratorCreator {
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                             txn_factory.clone(),
                             packages.clone(),
-                            mint_worker,
+                            mint_txn_generator_worker,
+                            mint_update_seq_num_worker,
                         )),
                         created_pool.clone(),
                         Some(minted_pool.clone()),
@@ -337,7 +340,8 @@ impl WorkflowTxnGeneratorCreator {
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                             txn_factory.clone(),
                             packages.clone(),
-                            burn_worker,
+                            burn_txn_generator_worker,
+                            burn_update_seq_num_worker,
                         )),
                         minted_pool.clone(),
                         Some(burnt_pool.clone()),
