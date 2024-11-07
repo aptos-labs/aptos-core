@@ -9,7 +9,13 @@ use std::{ops::Deref, sync::Arc};
 
 pub trait WithBytes {
     fn bytes(&self) -> &Bytes;
+}
 
+pub trait WithSize {
+    fn size_in_bytes(&self) -> usize;
+}
+
+impl<T: WithBytes> WithSize for T {
     fn size_in_bytes(&self) -> usize {
         self.bytes().len()
     }

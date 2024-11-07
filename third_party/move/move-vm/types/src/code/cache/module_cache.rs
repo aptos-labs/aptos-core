@@ -138,6 +138,7 @@ pub trait ModuleCache {
     fn num_modules(&self) -> usize;
 }
 
+/// Same as [ModuleCode], additionally storing a version.
 struct VersionedModuleCode<DC, VC, E, V> {
     module_code: Arc<ModuleCode<DC, VC, E>>,
     version: V,
@@ -147,6 +148,7 @@ impl<DC, VC, E, V> VersionedModuleCode<DC, VC, E, V>
 where
     V: Default + Clone + Ord,
 {
+    /// Returns new [ModuleCode] with the specified version.
     fn new(module_code: ModuleCode<DC, VC, E>, version: V) -> Self {
         Self {
             module_code: Arc::new(module_code),
@@ -154,22 +156,27 @@ where
         }
     }
 
+    /// Returns new [ModuleCode] with the default (storage) version.
     fn new_with_default_version(module_code: ModuleCode<DC, VC, E>) -> Self {
         Self::new(module_code, V::default())
     }
 
+    /// Returns the reference to the stored module.
     fn module_code(&self) -> &Arc<ModuleCode<DC, VC, E>> {
         &self.module_code
     }
 
+    /// Returns the stored module.
     fn into_module_code(self) -> Arc<ModuleCode<DC, VC, E>> {
         self.module_code
     }
 
+    /// Returns the version associated with this module.
     fn version(&self) -> V {
         self.version.clone()
     }
 
+    /// Returns the clone of the module along with its version.
     fn as_module_code_and_version(&self) -> (Arc<ModuleCode<DC, VC, E>>, V) {
         (self.module_code.clone(), self.version.clone())
     }
