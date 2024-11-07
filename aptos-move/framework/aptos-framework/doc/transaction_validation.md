@@ -6,7 +6,10 @@
 
 
 -  [Resource `TransactionValidation`](#0x1_transaction_validation_TransactionValidation)
+-  [Struct `GasPermission`](#0x1_transaction_validation_GasPermission)
 -  [Constants](#@Constants_0)
+-  [Function `grant_gas_permission`](#0x1_transaction_validation_grant_gas_permission)
+-  [Function `revoke_gas_permission`](#0x1_transaction_validation_revoke_gas_permission)
 -  [Function `initialize`](#0x1_transaction_validation_initialize)
 -  [Function `prologue_common`](#0x1_transaction_validation_prologue_common)
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
@@ -57,6 +60,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -116,6 +120,33 @@ correct chain-specific prologue and epilogue functions
 </dd>
 <dt>
 <code>user_epilogue_name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_validation_GasPermission"></a>
+
+## Struct `GasPermission`
+
+
+
+<pre><code><b>struct</b> <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
 </dt>
 <dd>
 
@@ -242,6 +273,76 @@ important to the semantics of the system.
 </code></pre>
 
 
+
+<a id="0x1_transaction_validation_PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT">PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT</a>: u64 = 1011;
+</code></pre>
+
+
+
+<a id="0x1_transaction_validation_grant_gas_permission"></a>
+
+## Function `grant_gas_permission`
+
+Permission management
+
+Master signer grant permissioned signer ability to consume a given amount of gas in octas.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_grant_gas_permission">grant_gas_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_grant_gas_permission">grant_gas_permission</a>(
+    master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    gas_amount: u64
+) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_increase">permissioned_signer::authorize_increase</a>(
+        master,
+        permissioned,
+        (gas_amount <b>as</b> u256),
+        <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_revoke_gas_permission"></a>
+
+## Function `revoke_gas_permission`
+
+Removing permissions from permissioned signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_revoke_gas_permission">revoke_gas_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_revoke_gas_permission">revoke_gas_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(permissioned, <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {})
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_transaction_validation_initialize"></a>
 
@@ -382,6 +483,14 @@ Only called during genesis to initialize system resources for this module.
         is_simulation,
         gas_payer_address
     )) {
+        <b>assert</b>!(
+            <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">permissioned_signer::check_permission_capacity_above</a>(
+                gas_payer,
+                (max_transaction_fee <b>as</b> u256),
+                <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
+            ),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT">PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT</a>)
+        );
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
             <b>assert</b>!(
                 <a href="aptos_account.md#0x1_aptos_account_is_fungible_balance_at_least">aptos_account::is_fungible_balance_at_least</a>(gas_payer_address, max_transaction_fee),
@@ -960,12 +1069,23 @@ Called by the Adapter
             );
         };
 
+        <b>let</b> gas_payer_signer = &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(gas_payer);
         <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
             <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
             <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
+            <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(
+                gas_payer_signer,
+                (burn_amount <b>as</b> u256),
+                <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
+            );
         } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
             <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount)
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount);
+            <a href="permissioned_signer.md#0x1_permissioned_signer_increase_limit">permissioned_signer::increase_limit</a>(
+                gas_payer_signer,
+                (mint_amount <b>as</b> u256),
+                <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
+            );
         };
     };
 
@@ -1195,9 +1315,19 @@ If there is no fee_payer, fee_payer = sender
         <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
             <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
             <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer_address, burn_amount);
+            <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(
+                &gas_payer,
+                (burn_amount <b>as</b> u256),
+                <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
+            );
         } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
             <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer_address, mint_amount)
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer_address, mint_amount);
+            <a href="permissioned_signer.md#0x1_permissioned_signer_increase_limit">permissioned_signer::increase_limit</a>(
+                &gas_payer,
+                (mint_amount <b>as</b> u256),
+                <a href="transaction_validation.md#0x1_transaction_validation_GasPermission">GasPermission</a> {}
+            );
         };
     };
 
