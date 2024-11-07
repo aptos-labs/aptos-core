@@ -5,8 +5,8 @@
 pub struct GlobalCacheConfig {
     /// If true, when global caches are empty, Aptos framework is prefetched into module cache.
     pub prefetch_framework_code: bool,
-    /// The maximum size of module cache. If module cache exceeds this capacity, it should be
-    /// flushed.
+    /// The maximum number of entries stored in module cache. If module cache exceeds this value,
+    /// all its entries should be flushed.
     pub module_cache_capacity: usize,
     /// The maximum size of struct name re-indexing map stored in runtime environment.
     pub struct_name_index_map_capacity: usize,
@@ -20,8 +20,8 @@ impl Default for GlobalCacheConfig {
         //   are using.
         Self {
             prefetch_framework_code: true,
-            module_cache_capacity: 100_000,
-            struct_name_index_map_capacity: 100_000,
+            module_cache_capacity: 10_000,
+            struct_name_index_map_capacity: 10_000,
         }
     }
 }

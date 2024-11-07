@@ -71,7 +71,7 @@ impl WithHash for BytesWithHash {
 }
 
 /// Placeholder for module versioning since we do not allow to mutate [UnsyncModuleStorage].
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Default, Eq, PartialEq, Ord, PartialOrd)]
 struct NoVersion;
 
 /// Private implementation of module storage based on non-[Sync] module cache and the baseline
@@ -125,14 +125,11 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
     type Extension = BytesWithHash;
     type Key = ModuleId;
     type Verified = Module;
-    type Version = NoVersion;
 
     fn build(
         &self,
         key: &Self::Key,
-    ) -> VMResult<
-        Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension, Self::Version>>,
-    > {
+    ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         let bytes = match self
             .base_storage
             .fetch_module_bytes(key.address(), key.name())?
@@ -144,7 +141,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
             .runtime_environment()
             .deserialize_into_compiled_module(&bytes)?;
         let extension = Arc::new(BytesWithHash::new(bytes, hash));
-        let module = ModuleCode::from_deserialized(compiled_module, extension, NoVersion);
+        let module = ModuleCode::from_deserialized(compiled_module, extension);
         Ok(Some(module))
     }
 }
@@ -190,12 +187,12 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
         assert_eq!(self.0.num_modules(), deserialized.len() + verified.len());
         for id in deserialized {
             let result = self.0.get_module_or_build_with(id, &self.0);
-            let module = claims::assert_some!(claims::assert_ok!(result));
+            let module = claims::assert_some!(claims::assert_ok!(result)).0;
             assert!(!module.code().is_verified())
         }
         for id in verified {
             let result = self.0.get_module_or_build_with(id, &self.0);
-            let module = claims::assert_some!(claims::assert_ok!(result));
+            let module = claims::assert_some!(claims::assert_ok!(result)).0;
             assert!(module.code().is_verified())
         }
     }

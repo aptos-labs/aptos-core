@@ -125,7 +125,7 @@ impl<
     ) -> impl Iterator<
         Item = (
             ModuleId,
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>>,
+            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
         ),
     > {
         self.module_cache.take_modules_iter()

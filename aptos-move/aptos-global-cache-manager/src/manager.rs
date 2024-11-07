@@ -60,7 +60,6 @@ struct GlobalCacheManagerInner<K, DC, VC, E> {
     /// when it is known that there are no concurrent accesses, e.g., at block boundaries.
     /// [GlobalCacheManagerInner] tries to ensure that these invariants always hold.
     module_cache: Arc<ReadOnlyModuleCache<K, DC, VC, E>>,
-
     /// Identifies previously executed block, initially [BlockId::Unset].
     previous_block_id: Mutex<BlockId>,
     /// Identifies the previously used execution environment, initially [None]. The environment, as
@@ -178,7 +177,7 @@ where
         if struct_name_index_map_size > self.config.struct_name_index_map_capacity {
             flush_all_caches = true;
         }
-        if self.module_cache.size() > self.config.module_cache_capacity {
+        if self.module_cache.num_modules() > self.config.module_cache_capacity {
             // Technically, if we flush modules we do not need to flush type caches, but we unify
             // flushing logic for easier reasoning.
             flush_all_caches = true;
@@ -293,7 +292,7 @@ impl GlobalCacheManager {
         self.inner
             .mark_block_execution_start(state_view, previous_block_id)?;
 
-        if self.inner.config.prefetch_framework_code && self.module_cache().size() == 0 {
+        if self.inner.config.prefetch_framework_code && self.module_cache().num_modules() == 0 {
             let code_storage = state_view.as_aptos_code_storage(self.environment()?);
 
             // If framework code exists in storage, the transitive closure will be verified and
@@ -375,7 +374,9 @@ mod test {
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
     use claims::{assert_err, assert_ok};
-    use move_vm_types::code::{mock_verified_code, MockDeserializedCode, MockVerifiedCode};
+    use move_vm_types::code::{
+        mock_verified_code, MockDeserializedCode, MockExtension, MockVerifiedCode,
+    };
     use std::{collections::HashMap, thread, thread::JoinHandle};
     use test_case::test_case;
 
@@ -413,7 +414,7 @@ mod test {
             u32,
             MockDeserializedCode,
             MockVerifiedCode,
-            (),
+            MockExtension,
         >::new_with_default_config();
         assert!(global_cache_manager.ready_for_next_block());
 
@@ -431,11 +432,11 @@ mod test {
 
         global_cache_manager
             .module_cache
-            .insert(0, mock_verified_code(0, None));
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
         global_cache_manager
             .module_cache
-            .insert(1, mock_verified_code(1, None));
-        assert_eq!(global_cache_manager.module_cache.size(), 2);
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 2);
 
         assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, None));
         let old_environment = global_cache_manager
@@ -444,7 +445,7 @@ mod test {
             .clone()
             .unwrap();
         assert_ok!(global_cache_manager.mark_block_execution_end(Some(HashValue::zero())));
-        assert_eq!(global_cache_manager.module_cache.size(), 2);
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 2);
 
         // Tweak feature flags to force a different config.
         let mut features = old_environment.features().clone();
@@ -462,7 +463,7 @@ mod test {
         assert_ok!(
             global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::zero()))
         );
-        assert_eq!(global_cache_manager.module_cache.size(), 0);
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 0);
 
         let new_environment = global_cache_manager
             .previous_environment
@@ -490,17 +491,17 @@ mod test {
 
         global_cache_manager
             .module_cache
-            .insert(0, mock_verified_code(0, None));
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
         global_cache_manager
             .module_cache
-            .insert(1, mock_verified_code(1, None));
-        assert_eq!(global_cache_manager.module_cache.size(), 2);
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 2);
 
         // Cache is too large, should be flushed for next block.
         assert_ok!(
             global_cache_manager.mark_block_execution_start(&state_view, Some(HashValue::random()))
         );
-        assert_eq!(global_cache_manager.module_cache.size(), 0);
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 0);
     }
 
     #[test_case(None)]
@@ -511,13 +512,13 @@ mod test {
 
         global_cache_manager
             .module_cache
-            .insert(0, mock_verified_code(0, None));
-        assert_eq!(global_cache_manager.module_cache.size(), 1);
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 1);
 
         // If executed on top of unset state, or the state with matching previous hash, the cache
         // is not flushed.
         assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, previous_block_id));
-        assert_eq!(global_cache_manager.module_cache.size(), 1);
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 1);
         assert!(!global_cache_manager.ready_for_next_block());
     }
 
@@ -540,18 +541,18 @@ mod test {
 
         global_cache_manager
             .module_cache
-            .insert(0, mock_verified_code(0, None));
-        assert_eq!(global_cache_manager.module_cache.size(), 1);
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        assert_eq!(global_cache_manager.module_cache.num_modules(), 1);
 
         assert_ok!(global_cache_manager.mark_block_execution_start(&state_view, previous_block_id));
         assert!(!global_cache_manager.ready_for_next_block());
 
         if recorded_previous_block_id.is_some() && recorded_previous_block_id == previous_block_id {
             // In this case both IDs match, no cache flushing.
-            assert_eq!(global_cache_manager.module_cache.size(), 1);
+            assert_eq!(global_cache_manager.module_cache.num_modules(), 1);
         } else {
             // If previous block IDs do not match, or are unknown, caches must be flushed!
-            assert_eq!(global_cache_manager.module_cache.size(), 0);
+            assert_eq!(global_cache_manager.module_cache.num_modules(), 0);
         }
     }
 
