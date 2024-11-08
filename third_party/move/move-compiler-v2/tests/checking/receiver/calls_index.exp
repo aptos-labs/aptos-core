@@ -1,0 +1,112 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct T {
+        w: W,
+    }
+    struct S {
+        t: T,
+    }
+    struct W {
+        x: u64,
+    }
+    private fun boo(v: vector<S>,w: W) {
+        m::merge(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(vector::borrow_mut<S>(Borrow(Mutable)(v), 0)))), w)
+    }
+    private fun boo_(v: vector<S>,w: W) {
+        m::merge(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(vector::borrow_mut<S>(Borrow(Mutable)(v), 0)))), w)
+    }
+    private fun boo_greater(v: vector<S>,w: W): bool {
+        m::greater(Borrow(Immutable)(select m::T.w<T>(select m::S.t<S>(vector::borrow<S>(Borrow(Immutable)(v), 0)))), w)
+    }
+    private fun boo_greater_(v: vector<S>,w: W): bool {
+        m::greater(Freeze(false)(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(vector::borrow_mut<S>(Borrow(Mutable)(v), 0))))), w)
+    }
+    private fun foo(account: address,w: W)
+        acquires S(*)
+     {
+        m::merge(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(BorrowGlobal(Mutable)<S>(account)))), w)
+    }
+    private fun foo_(account: address,w: W)
+        acquires S(*)
+     {
+        m::merge(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(BorrowGlobal(Mutable)<S>(account)))), w)
+    }
+    private fun foo_greater(account: address,w: W): bool
+        acquires S(*)
+     {
+        m::greater(Borrow(Immutable)(select m::T.w<T>(select m::S.t<S>(BorrowGlobal(Immutable)<S>(account)))), w)
+    }
+    private fun foo_greater_(account: address,w: W): bool
+        acquires S(*)
+     {
+        m::greater(Freeze(false)(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(BorrowGlobal(Mutable)<S>(account))))), w)
+    }
+    private fun greater(self: &W,s: W): bool {
+        Gt<u64>(select m::W.x<&W>(self), select m::W.x<W>(s))
+    }
+    private fun merge(self: &mut W,s: W) {
+        {
+          let $t2: u64 = select m::W.x<W>(s);
+          {
+            let $t1: &mut u64 = Borrow(Mutable)(select m::W.x<&mut W>(self));
+            $t1 = Add<u64>(Deref($t1), $t2)
+          }
+        };
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct T has drop, store {
+        w: W,
+    }
+    struct S has drop, key {
+        t: T,
+    }
+    struct W has drop, store {
+        x: u64,
+    }
+    fun boo(v: vector<S>, w: W) {
+        merge(&mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w)
+    }
+    fun boo_(v: vector<S>, w: W) {
+        merge(&mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w)
+    }
+    fun boo_greater(v: vector<S>, w: W): bool {
+        greater(&0x1::vector::borrow<S>(&v, 0).t.w, w)
+    }
+    fun boo_greater_(v: vector<S>, w: W): bool {
+        greater(/*freeze*/&mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w)
+    }
+    fun foo(account: address, w: W)
+        acquires S
+    {
+        merge(&mut borrow_global_mut<S>(account).t.w, w)
+    }
+    fun foo_(account: address, w: W)
+        acquires S
+    {
+        merge(&mut borrow_global_mut<S>(account).t.w, w)
+    }
+    fun foo_greater(account: address, w: W): bool
+        acquires S
+    {
+        greater(&borrow_global<S>(account).t.w, w)
+    }
+    fun foo_greater_(account: address, w: W): bool
+        acquires S
+    {
+        greater(/*freeze*/&mut borrow_global_mut<S>(account).t.w, w)
+    }
+    fun greater(self: &W, s: W): bool {
+        self.x > s.x
+    }
+    fun merge(self: &mut W, s: W) {
+        {
+            let $t2 = s.x;
+            let $t1 = &mut self.x;
+            *$t1 = *$t1 + $t2
+        };
+    }
+}

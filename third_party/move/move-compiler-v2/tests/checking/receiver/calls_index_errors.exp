@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: the function takes `&mut` but `&` was provided
+   ┌─ tests/checking/receiver/calls_index_errors.move:18:9
+   │
+18 │         (&S[account].t.w).merge(w)
+   │         ^^^^^^^^^^^^^^^^^
+
+error: the function takes `&mut` but `&` was provided
+   ┌─ tests/checking/receiver/calls_index_errors.move:22:9
+   │
+22 │         (&v[0].t.w).merge(w)
+   │         ^^^^^^^^^^^

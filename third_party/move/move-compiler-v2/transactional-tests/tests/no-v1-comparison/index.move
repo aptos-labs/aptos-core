@@ -268,6 +268,53 @@ module 0x42::test {
         assert!(y[0] == 2, 0);
     }
 
+    // Test receiver call
+
+    struct S has key, drop, copy { t: T }
+
+    struct T has store, drop, copy {
+        w: W
+    }
+
+    struct W has store, drop, copy {
+        x: u64
+    }
+
+    fun init_receiver(signer: &signer) {
+        let w = W {
+            x: 2
+        };
+        let t = T {
+            w
+        };
+        let s = S {
+            t
+        };
+        move_to(signer, s);
+    }
+
+    fun merge(self: &mut W, s: W) {
+        self.x += s.x;
+    }
+
+    fun foo_1(account: address, w: W) acquires S {
+        S[account].t.w.merge(w)
+    }
+
+    fun boo_1(v: vector<S>, w: W): u64 {
+        v[0].t.w.merge(w);
+        v[0].t.w.x
+    }
+
+    fun test_receiver() {
+        let w = W {
+            x: 3
+        };
+        foo_1(@0x1, w);
+        assert!(S[@0x1].t.w.x == 5, 0);
+        assert!(boo_1(vector[S[@0x1]], w) == 8, 1);
+    }
+
 }
 
 //# run --verbose --signers 0x1 -- 0x42::test::init
@@ -317,3 +364,7 @@ module 0x42::test {
 //# run --verbose -- 0x42::test::test_index_then_field_select_3
 
 //# run --verbose -- 0x42::test::inc_vec_new_test
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_receiver
+
+//# run --verbose -- 0x42::test::test_receiver

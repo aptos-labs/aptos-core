@@ -31,7 +31,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast::{self as EA},
+    expansion::ast::{self as EA, Exp_},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
@@ -4136,7 +4136,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         // Translate arguments.
-        let (arg_types, translated_args) = self.translate_exp_list(args);
+        let (arg_types, mut translated_args) = self.translate_exp_list(args);
 
         // Special handling of receiver call functions
         if kind == CallKind::Receiver {
@@ -4144,6 +4144,26 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 module.is_none(),
                 "unexpected qualified name in receiver call"
             );
+            debug_assert!(
+                !args.is_empty(),
+                "receiver call needs to have at least one parameter"
+            );
+            let receiver_call_opt = self.get_receiver_function(&arg_types[0], name);
+            if let (Some(receiver_call), Exp_::ExpDotted(dotted)) =
+                (receiver_call_opt, &args[0].value)
+            {
+                // special case for the receiver call S[x].f.fun(&mut...)
+                // making sure the first argument is mutable ref
+                if receiver_call.arg_types[0].is_mutable_reference() {
+                    let first_arg = self.translate_dotted(
+                        dotted,
+                        &arg_types[0],
+                        true,
+                        &ErrorMessageContext::General,
+                    );
+                    translated_args[0] = first_arg.into_exp();
+                }
+            }
             return self.translate_receiver_call(
                 loc,
                 name,
