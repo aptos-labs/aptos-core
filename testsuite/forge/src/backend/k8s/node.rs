@@ -112,6 +112,21 @@ impl K8sNode {
         }
     }
 
+    /// Check if the pod is running
+    async fn is_pod_running(&self, pod_api: &Api<Pod>, pod_name: &str) -> Result<bool> {
+        match pod_api.get(pod_name).await {
+            Ok(pod) => {
+                if let Some(status) = pod.status {
+                    if let Some(phase) = status.phase {
+                        return Ok(phase == "Running");
+                    }
+                }
+                Ok(false)
+            },
+            Err(_) => Ok(false),
+        }
+    }
+
     pub async fn stop_for_duration(&self, duration: Duration) -> Result<()> {
         info!(
             "Stopping node {} for {} seconds",
@@ -130,22 +145,24 @@ impl K8sNode {
 
         // Keep deleting the pod if it recovers before the deadline
         while Instant::now() < deadline {
-            match self.wait_until_healthy(deadline).await {
-                Ok(_) => {
-                    info!("Pod {} recovered, deleting again", pod_name);
-                    pod_api.delete(&pod_name, &DeleteParams::default()).await?;
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                },
-                Err(e) => {
-                    info!("Pod {} still down", pod_name);
-                    break;
-                },
+            if self.is_pod_running(&pod_api, &pod_name).await? {
+                info!("Pod {} recovered, deleting again", pod_name);
+                pod_api.delete(&pod_name, &DeleteParams::default()).await?;
             }
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
-        // Wait for the pod to recover
-        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
-            .await
+        // Wait for pod to be running again
+        let recovery_deadline = Instant::now() + Duration::from_secs(60);
+        while Instant::now() < recovery_deadline {
+            if self.is_pod_running(&pod_api, &pod_name).await? {
+                info!("Pod {} recovered successfully", pod_name);
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+
+        Err(anyhow!("Pod {} failed to recover after stop", pod_name))
     }
 
     pub fn port_forward_rest_api(&self) -> Result<()> {
