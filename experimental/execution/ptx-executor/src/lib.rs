@@ -22,7 +22,6 @@ use crate::{
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_global_cache_manager::GlobalCacheManager;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
@@ -53,7 +52,6 @@ impl VMBlockExecutor for PtxBlockExecutor {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        _global_cache_manager: &GlobalCacheManager,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);

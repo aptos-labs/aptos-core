@@ -135,10 +135,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
-                let ret = BlockAptosVM::execute_block_on_thread_pool_without_global_caches(
+                let ret = BlockAptosVM::execute_block_on_thread_pool(
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
+                    // Since we execute blocks in parallel, we cannot share module caches.
+                    None,
                     config,
                     cross_shard_commit_sender,
                 )
@@ -230,11 +232,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         transactions,
                         state_view.as_ref(),
                         BlockExecutorConfig {
-                            local: BlockExecutorLocalConfig {
-                                concurrency_level: concurrency_level_per_shard,
-                                allow_fallback: true,
-                                discard_failed_blocks: false,
-                            },
+                            local: BlockExecutorLocalConfig::default_with_concurrency_level(
+                                concurrency_level_per_shard,
+                            ),
                             onchain: onchain_config,
                         },
                     );

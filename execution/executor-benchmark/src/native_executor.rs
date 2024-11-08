@@ -358,7 +358,6 @@ impl VMBlockExecutor for NativeExecutor {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        _global_cache_manager: &GlobalCacheManager,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let transaction_outputs = NATIVE_EXECUTOR_POOL

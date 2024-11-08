@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(unsafe_code)]
-
 use std::{
     cell::UnsafeCell,
     ops::{Deref, DerefMut},

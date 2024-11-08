@@ -20,7 +20,6 @@ aptos-drop-helper = { workspace = true }
 aptos-executor-service = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
-aptos-global-cache-manager = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

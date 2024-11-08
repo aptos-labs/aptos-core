@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::PanicError, explicit_sync_wrapper::ExplicitSyncWrapper};
+use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
+use aptos_types::error::PanicError;
 use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_vm_types::code::{ModuleCode, WithSize};
@@ -14,7 +15,7 @@ use std::{
     },
 };
 
-/// Entry stored in [ReadOnlyModuleCache].
+/// Entry stored in [GlobalModuleCache].
 struct Entry<DC, VC, E> {
     /// True if this code is "valid" within the block execution context (i.e., there has been no
     /// republishing of this module so far). If false, executor needs to read the module from the
@@ -61,14 +62,14 @@ where
 
 /// A read-only module cache for verified code, that can be accessed concurrently within the block.
 /// Can only be modified safely at block boundaries.
-pub struct ReadOnlyModuleCache<K, DC, VC, E> {
+pub struct GlobalModuleCache<K, DC, VC, E> {
     /// Module cache containing the verified code.
     module_cache: ExplicitSyncWrapper<HashMap<K, Entry<DC, VC, E>>>,
     /// Sum of serialized sizes (in bytes) of all cached modules.
     size: AtomicUsize,
 }
 
-impl<K, DC, VC, E> ReadOnlyModuleCache<K, DC, VC, E>
+impl<K, DC, VC, E> GlobalModuleCache<K, DC, VC, E>
 where
     K: Hash + Eq + Clone,
     VC: Deref<Target = Arc<DC>>,
@@ -122,6 +123,12 @@ where
     /// Returns the sum of serialized sizes of modules stored in cache.
     pub fn size_in_bytes(&self) -> usize {
         self.size.load(Ordering::Relaxed)
+    }
+
+    /// Returns true if the sum of serialized sizes of modules stored in cache is greater than the
+    /// specified value.
+    pub fn size_in_bytes_is_greater_than(&self, size: usize) -> bool {
+        self.size_in_bytes() > size
     }
 
     /// Inserts modules into the cache. Should never be called throughout block-execution. Use with
@@ -214,7 +221,7 @@ mod test {
 
     #[test]
     fn test_cache_contains_valid_and_get() {
-        let cache = ReadOnlyModuleCache::empty();
+        let cache = GlobalModuleCache::empty();
 
         // Set the state.
         cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
@@ -233,8 +240,8 @@ mod test {
     }
 
     #[test]
-    fn test_num_modules_and_flush_unchecked() {
-        let cache = ReadOnlyModuleCache::empty();
+    fn test_cache_sizes_and_flush_unchecked() {
+        let cache = GlobalModuleCache::empty();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
 
@@ -248,6 +255,10 @@ mod test {
         assert_eq!(cache.num_modules(), 2);
         assert_eq!(cache.size_in_bytes(), 24);
 
+        assert!(cache.size_in_bytes_is_greater_than(23));
+        assert!(!cache.size_in_bytes_is_greater_than(24));
+        assert!(!cache.size_in_bytes_is_greater_than(25));
+
         cache.flush_unchecked();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
@@ -255,7 +266,7 @@ mod test {
 
     #[test]
     fn test_cache_insert_verified_unchecked() {
-        let cache = ReadOnlyModuleCache::empty();
+        let cache = GlobalModuleCache::empty();
 
         let mut new_modules = vec![];
         for i in 0..10 {
@@ -271,7 +282,7 @@ mod test {
 
     #[test]
     fn test_cache_insert_verified_unchecked_does_not_add_deserialized_code() {
-        let cache = ReadOnlyModuleCache::empty();
+        let cache = GlobalModuleCache::empty();
 
         let deserialized_modules = vec![(0, mock_deserialized_code(0, MockExtension::new(8)))];
         assert_ok!(cache.insert_verified_unchecked(deserialized_modules.into_iter()));
@@ -282,7 +293,7 @@ mod test {
 
     #[test]
     fn test_cache_insert_verified_unchecked_does_not_override_valid_modules() {
-        let cache = ReadOnlyModuleCache::empty();
+        let cache = GlobalModuleCache::empty();
 
         cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
         assert_eq!(cache.num_modules(), 1);
@@ -294,7 +305,7 @@ mod test {
 
     #[test]
     fn test_cache_insert_verified_unchecked_overrides_invalid_modules() {
-        let cache = ReadOnlyModuleCache::empty();
+        let cache = GlobalModuleCache::empty();
 
         cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
         cache.mark_invalid_if_contains(&0);

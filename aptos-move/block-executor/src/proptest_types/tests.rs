@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    code_cache_global::GlobalModuleCache,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
@@ -17,8 +18,7 @@ use crate::{
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType, read_only_module_cache::ReadOnlyModuleCache,
-    state_store::MockStateView,
+    executable::ExecutableTestType, state_store::MockStateView,
 };
 use claims::{assert_matches, assert_ok};
 use num_cpus;
@@ -80,7 +80,7 @@ fn run_transactions<K, V, E>(
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(ReadOnlyModuleCache::empty()),
+            Arc::new(GlobalModuleCache::empty()),
             None,
         )
         .execute_transactions_parallel(&env, &transactions, &state_view);
@@ -217,7 +217,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(ReadOnlyModuleCache::empty()),
+            Arc::new(GlobalModuleCache::empty()),
             None,
         )
         .execute_transactions_parallel(&env, &transactions, &data_view);
@@ -270,7 +270,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(ReadOnlyModuleCache::empty()),
+            Arc::new(GlobalModuleCache::empty()),
             None,
         )
         .execute_transactions_parallel(&env, &transactions, &data_view);
@@ -428,7 +428,7 @@ fn publishing_fixed_params_with_block_gas_limit(
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
-        Arc::new(ReadOnlyModuleCache::empty()),
+        Arc::new(GlobalModuleCache::empty()),
         None,
     )
     .execute_transactions_parallel(&env, &transactions, &data_view);
@@ -475,7 +475,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             ),
             executor_thread_pool.clone(),
-            Arc::new(ReadOnlyModuleCache::empty()),
+            Arc::new(GlobalModuleCache::empty()),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel(&env, &transactions, &data_view);
@@ -556,7 +556,7 @@ fn non_empty_group(
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
-            Arc::new(ReadOnlyModuleCache::empty()),
+            Arc::new(GlobalModuleCache::empty()),
             None,
         )
         .execute_transactions_parallel(&env, &transactions, &data_view);
@@ -575,7 +575,7 @@ fn non_empty_group(
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
-            Arc::new(ReadOnlyModuleCache::empty()),
+            Arc::new(GlobalModuleCache::empty()),
             None,
         )
         .execute_transactions_sequential(&env, &transactions, &data_view, false);

@@ -170,10 +170,11 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
             .module_cache
             .into_modules_iter()
             .flat_map(|(key, module)| {
-                module
-                    .code()
-                    .is_verified()
-                    .then(|| (key, module.code().verified().clone()))
+                module.code().is_verified().then(|| {
+                    // TODO(loader_v2):
+                    //   We should be able to take ownership here, instead of clones.
+                    (key, module.code().verified().clone())
+                })
             })
     }
 
