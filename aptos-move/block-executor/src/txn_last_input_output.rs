@@ -4,6 +4,7 @@
 use crate::{
     captured_reads::CapturedReads,
     errors::ParallelBlockExecutionError,
+    explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
@@ -11,7 +12,6 @@ use aptos_logger::error;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
-    explicit_sync_wrapper::ExplicitSyncWrapper,
     fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,

@@ -27,7 +27,9 @@ use crate::{
     VMBlockExecutor, VMValidator,
 };
 use anyhow::anyhow;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
@@ -36,7 +38,6 @@ use aptos_framework::{
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
-use aptos_global_cache_manager::GlobalCacheManager;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -44,7 +45,10 @@ use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -66,6 +70,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
+    vm::modules::AptosModuleExtension,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::aptos_try;
@@ -112,7 +117,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    RuntimeEnvironment, WithRuntimeEnvironment,
+    Module, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -2774,29 +2779,32 @@ impl AptosVM {
 /// Transaction execution: AptosVM
 /// Executing conflicts: in the input order, via BlockSTM,
 /// State: BlockSTM-provided MVHashMap-based view with caching
-pub struct AptosVMBlockExecutor;
+pub struct AptosVMBlockExecutor {
+    /// Manages module cache and execution environment of this block executor. Users of executor
+    /// must use manager's API to ensure the correct state of caches.
+    module_cache_manager:
+        ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+}
 
-// Executor external API
 impl VMBlockExecutor for AptosVMBlockExecutor {
-    // NOTE: At the moment there are no persistent caches that live past the end of a block (that's
-    // why AptosVMBlockExecutor has no state)
-    // There are some cache invalidation issues around transactions publishing code that need to be
-    // sorted out before that's possible.
-
     fn new() -> Self {
-        Self
+        Self {
+            module_cache_manager: ModuleCacheManager::new(),
+        }
     }
 
-    /// Execute a block of `transactions`. The output vector will have the exact same length as the
-    /// input vector. The discarded transactions will be marked as `TransactionStatus::Discard` and
-    /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior
-    /// mutability. Writes to be applied to the data view are encoded in the write set part of a
-    /// transaction output.
+    fn module_cache_manager(
+        &self,
+    ) -> Option<
+        &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    > {
+        Some(&self.module_cache_manager)
+    }
+
     fn execute_block(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        global_cache_manager: &GlobalCacheManager,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
@@ -2819,12 +2827,13 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         >(
             transactions,
             state_view,
-            global_cache_manager,
+            Some(&self.module_cache_manager),
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: AptosVM::get_concurrency_level(),
                     allow_fallback: true,
                     discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+                    module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
                 },
                 onchain: onchain_config,
             },

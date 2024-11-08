@@ -675,20 +675,23 @@ fn run_transactions_naive(
 ) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let global_cache_manager = GlobalCacheManager::new_with_default_config();
 
     for txn in transactions {
         let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
         let out = DoGetExecutionOutput::by_transaction_execution(
             &MockVM::new(),
             vec![txn].into(),
-            state_view,
-            &global_cache_manager,
+            ledger_view
+                .verified_state_view(
+                    StateViewId::Miscellaneous,
+                    Arc::clone(&db.reader),
+                    Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+                )
+                .unwrap(),
             block_executor_onchain_config.clone(),
             None,
         )
         .unwrap();
-
         let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();
         db.writer
             .save_transactions(

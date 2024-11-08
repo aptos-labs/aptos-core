@@ -28,6 +28,7 @@ use aptos_types::{
     },
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+        BlockExecutorModuleCacheLocalConfig,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -633,16 +634,19 @@ impl FakeExecutor {
                 },
                 allow_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block_on_thread_pool_without_global_caches::<
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             self.executor_thread_pool.clone(),
             txn_block,
             &state_view,
+            // Do not use module caches in tests.
+            None,
             config,
             None,
         )

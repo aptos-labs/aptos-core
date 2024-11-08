@@ -187,7 +187,6 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
 
 mod test_utils {
     use aptos_block_partitioner::BlockPartitioner;
-    use aptos_global_cache_manager::GlobalCacheManager;
     use aptos_language_e2e_tests::{
         account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
         executor::FakeExecutor,

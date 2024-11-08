@@ -87,7 +87,6 @@ impl TransactionChunk for ChunkToExecute {
             &V::new(),
             sig_verified_txns.into(),
             state_view,
-            &global_cache_manager,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
             None,
         )

@@ -2,12 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
-use aptos_types::{
-    error::{code_invariant_error, PanicError},
-    explicit_sync_wrapper::ExplicitSyncWrapper,
-};
+use aptos_types::error::{code_invariant_error, PanicError};
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};

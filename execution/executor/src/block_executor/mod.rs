@@ -232,6 +232,16 @@ where
                         )))
                     });
 
+                    // In case block executor has a cache manager, we need to mark it as ready for
+                    // execution. If for some reason this fails, return an error.
+                    if let Some(module_cache_manager) = self.block_executor.module_cache_manager() {
+                        if !module_cache_manager.mark_ready(&parent_block_id, block_id) {
+                            return Err(ExecutorError::internal_err(
+                                "Unable to mark module cache manager as ready",
+                            ));
+                        }
+                    }
+
                     DoGetExecutionOutput::by_transaction_execution(
                         &self.block_executor,
                         transactions,

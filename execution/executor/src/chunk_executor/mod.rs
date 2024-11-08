@@ -605,7 +605,6 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
             None,
         )?;
-
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,

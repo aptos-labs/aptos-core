@@ -515,25 +515,9 @@ impl<'a> AptosTestAdapter<'a> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
-        let onchain_config = BlockExecutorConfigFromOnchain {
-            // TODO fetch values from state?
-            // Or should we just use execute_block_no_limit ?
-            block_gas_limit_type: BlockGasLimitType::Limit(30000),
-        };
-        let (mut outputs, _) = AptosVMBlockExecutor::new()
-            .execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
-            .into_inner();
+        let mut outputs = AptosVMBlockExecutor::new()
+            .execute_block_no_limit(&sig_verified_block, &self.storage.clone())?;
 
-        let global_cache_manager = GlobalCacheManager::new_with_default_config();
-        global_cache_manager.mark_block_execution_start(&state_view, None)?;
-        let result = AptosVM::execute_block_no_limit(
-            &sig_verified_block,
-            &state_view,
-            &global_cache_manager,
-        );
-        global_cache_manager.mark_block_execution_end(None)?;
-
-        let mut outputs = result?;
         assert_eq!(outputs.len(), 1);
 
         let output = outputs.pop().unwrap();

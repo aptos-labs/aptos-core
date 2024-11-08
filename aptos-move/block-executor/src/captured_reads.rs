@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
+use crate::{
+    code_cache_global::GlobalModuleCache, types::InputOutputKey,
+    value_exchange::filter_value_for_exchange,
+};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -19,7 +22,6 @@ use aptos_mvhashmap::{
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
     executable::ModulePath,
-    read_only_module_cache::ReadOnlyModuleCache,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -651,7 +653,7 @@ where
     ///   3. Entries that were in per-block cache have the same commit index.
     pub(crate) fn validate_module_reads(
         &self,
-        global_module_cache: &ReadOnlyModuleCache<K, DC, VC, S>,
+        global_module_cache: &GlobalModuleCache<K, DC, VC, S>,
         per_block_module_cache: &SyncModuleCache<K, DC, VC, S, Option<TxnIndex>>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
@@ -872,7 +874,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
+    use crate::{
+        code_cache_global::GlobalModuleCache,
+        proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
+    };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use aptos_types::executable::ExecutableTestType;
     use claims::{
@@ -1520,7 +1525,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        let global_module_cache = ReadOnlyModuleCache::empty();
+        let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
@@ -1555,7 +1560,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        let global_module_cache = ReadOnlyModuleCache::empty();
+        let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         global_module_cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
@@ -1632,7 +1637,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        let global_module_cache = ReadOnlyModuleCache::empty();
+        let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         let a = mock_deserialized_code(0, MockExtension::new(8));
@@ -1692,7 +1697,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        let global_module_cache = ReadOnlyModuleCache::empty();
+        let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         // Module exists in global cache.
