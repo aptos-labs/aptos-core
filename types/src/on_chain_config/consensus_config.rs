@@ -353,6 +353,12 @@ impl OnChainConsensusConfig {
                 alg,
             } => OnChainConsensusConfig::V4 {
                 alg,
+            },
+            OnChainConsensusConfig::V4 {
+                vtxn: ValidatorTxnConfig::V0,
+                alg,
+                window_size,
+            } => OnChainConsensusConfig::V4 {
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size: DEFAULT_WINDOW_SIZE,
             },
