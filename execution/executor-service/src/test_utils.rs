@@ -137,7 +137,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             .into_iter()
             .map(|t| t.into_txn())
             .collect();
-    let unsharded_txn_output = AptosVMBlockExecutor
+    let unsharded_txn_output = AptosVMBlockExecutor::new()
         .execute_block_no_limit(&txns, executor.data_store())
         .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
@@ -192,7 +192,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         )
         .unwrap();
 
-    let unsharded_txn_output = AptosVMBlockExecutor
+    let unsharded_txn_output = AptosVMBlockExecutor::new()
         .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
         .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);

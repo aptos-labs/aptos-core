@@ -270,7 +270,7 @@ impl Verifier {
         expected_epoch_events: &Vec<Vec<ContractEvent>>,
         expected_epoch_writesets: &Vec<WriteSet>,
     ) -> Result<Vec<Error>> {
-        let executed_outputs = AptosVMBlockExecutor.execute_block_no_limit(
+        let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             cur_txns
                 .iter()
                 .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))

@@ -522,7 +522,7 @@ impl<'a> AptosTestAdapter<'a> {
             // Or should we just use execute_block_no_limit ?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
-        let (mut outputs, _) = AptosVMBlockExecutor
+        let (mut outputs, _) = AptosVMBlockExecutor::new()
             .execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
             .into_inner();
 
