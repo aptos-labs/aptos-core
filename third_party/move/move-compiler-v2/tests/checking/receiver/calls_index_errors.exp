@@ -1,13 +1,19 @@
 
 Diagnostics:
-error: the function takes `&mut` but `&` was provided
-   ┌─ tests/checking/receiver/calls_index_errors.move:18:9
+error: undeclared receiver function `merge_non_receiver` for type `W`
+   ┌─ tests/checking/receiver/calls_index_errors.move:22:9
    │
-18 │         (&S[account].t.w).merge(w)
+22 │         S[account].t.w.merge_non_receiver(w)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the function takes `&mut` but `&` was provided
+   ┌─ tests/checking/receiver/calls_index_errors.move:26:9
+   │
+26 │         (&S[account].t.w).merge(w)
    │         ^^^^^^^^^^^^^^^^^
 
 error: the function takes `&mut` but `&` was provided
-   ┌─ tests/checking/receiver/calls_index_errors.move:22:9
+   ┌─ tests/checking/receiver/calls_index_errors.move:30:9
    │
-22 │         (&v[0].t.w).merge(w)
+30 │         (&v[0].t.w).merge(w)
    │         ^^^^^^^^^^^

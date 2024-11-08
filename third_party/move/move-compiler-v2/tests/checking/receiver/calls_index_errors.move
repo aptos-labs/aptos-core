@@ -14,6 +14,14 @@ module 0x42::m {
         self.x += s.x;
     }
 
+    fun merge_non_receiver(self1: &mut W, s: W) {
+        self1.x += s.x;
+    }
+
+    fun foo_non_receiver(account: address, w: W) acquires S {
+        S[account].t.w.merge_non_receiver(w)
+    }
+
     fun foo_(account: address, w: W) acquires S {
         (&S[account].t.w).merge(w)
     }
