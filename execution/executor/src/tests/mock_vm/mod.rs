@@ -77,8 +77,7 @@ impl VMBlockExecutor for MockVM {
         let mut outputs = vec![];
 
         for idx in 0..txn_provider.num_txns() {
-            let txn_arc = txn_provider.get_txn(idx as u32);
-            let txn = txn_arc.expect_valid();
+            let txn = txn_provider.get_txn(idx as u32).expect_valid();
             if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),

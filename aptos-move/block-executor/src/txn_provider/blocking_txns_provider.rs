@@ -19,13 +19,17 @@ impl<T: Transaction + std::fmt::Debug> BlockingTransaction<T> {
     }
 }
 
-pub struct BlockingTxnsProvider<T: Transaction + std::fmt::Debug> {
+pub struct BlockingTxnProvider<T: Transaction + std::fmt::Debug> {
     txns: Vec<BlockingTransaction<T>>,
 }
 
 #[allow(dead_code)]
-impl<T: Transaction + std::fmt::Debug> BlockingTxnsProvider<T> {
-    pub fn new(txns: Vec<BlockingTransaction<T>>) -> Self {
+impl<T: Transaction + std::fmt::Debug> BlockingTxnProvider<T> {
+    pub fn new(num_txns: usize) -> Self {
+        let mut txns = Vec::with_capacity(num_txns);
+        for _ in 0..num_txns {
+            txns.push(BlockingTransaction::new());
+        }
         Self { txns }
     }
 
@@ -37,7 +41,7 @@ impl<T: Transaction + std::fmt::Debug> BlockingTxnsProvider<T> {
     }
 }
 
-impl<T: Transaction + std::fmt::Debug> TxnProvider<T> for BlockingTxnsProvider<T> {
+impl<T: Transaction + std::fmt::Debug> TxnProvider<T> for BlockingTxnProvider<T> {
     fn num_txns(&self) -> usize {
         self.txns.len()
     }
