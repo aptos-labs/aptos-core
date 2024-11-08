@@ -52,7 +52,6 @@ enum MockVMTransaction {
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Keep(ExecutionStatus::Success));
 
-// We use 10 as the assertion error code for insufficient balance within the Aptos coin contract.
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 
@@ -67,7 +66,6 @@ impl VMBlockExecutor for MockVM {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
-        _global_cache_manager: &GlobalCacheManager,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later

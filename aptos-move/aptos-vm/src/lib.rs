@@ -126,6 +126,8 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
+use aptos_block_executor::code_cache_global_manager::ModuleCacheManager;
+use aptos_crypto::HashValue;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
@@ -135,9 +137,13 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         SignedTransaction, TransactionOutput, VMValidatorResult,
     },
+    vm::modules::AptosModuleExtension,
     vm_status::VMStatus,
 };
 use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
+use move_binary_format::CompiledModule;
+use move_core_types::language_storage::ModuleId;
+use move_vm_runtime::Module;
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
 
@@ -152,12 +158,23 @@ pub trait VMValidator {
     ) -> VMValidatorResult;
 }
 
-/// This trait describes the VM's execution interface.
+/// This trait describes the block executor interface.
 pub trait VMBlockExecutor: Send + Sync {
-    /// Be careful if any state is kept in VMBlockExecutor, as all validations are implementers responsibility
-    /// (and state_view passed in execute_block can go both backwards and forwards in time).
-    /// TODO: Currently, production uses new() on every block, and only executor-benchmark reuses across.
+    /// Be careful if any state (such as caches) is kept in [VMBlockExecutor]. It is the
+    /// responsibility of the implementation to ensure the state is valid across multiple
+    /// executions. For example, the same executor may be used to run on a new state, and then on
+    /// an old one.
     fn new() -> Self;
+
+    /// Returns the cache manager responsible for keeping module caches in sync. By default, is
+    /// [None].
+    fn module_cache_manager(
+        &self,
+    ) -> Option<
+        &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    > {
+        None
+    }
 
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
@@ -173,7 +190,6 @@ pub trait VMBlockExecutor: Send + Sync {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        global_cache_manager: &GlobalCacheManager,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         self.execute_block(
             transactions,

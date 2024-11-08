@@ -12,12 +12,14 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
+    code_cache_global::GlobalModuleCache, code_cache_global_manager::ModuleCacheManager,
     errors::BlockExecutionError, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
-use aptos_global_cache_manager::GlobalCacheManager;
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_logger::error;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
@@ -29,18 +31,29 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
+    vm::modules::AptosModuleExtension,
     write_set::WriteOp,
 };
-use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
+use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_logging::{
+    alert, flush_speculative_logs, init_speculative_logs, prelude::CRITICAL_ERRORS,
+};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, module_write_set::ModuleWrite, output::VMOutput,
-    resolver::ResourceGroupSize,
+    abstract_write_op::AbstractResourceWriteOp, module_and_script_storage::AsAptosCodeStorage,
+    module_write_set::ModuleWrite, output::VMOutput, resolver::ResourceGroupSize,
+};
+use move_binary_format::{
+    errors::{Location, VMError},
+    CompiledModule,
 };
 use move_core_types::{
-    language_storage::StructTag,
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
+use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
@@ -389,18 +402,21 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM;
 
 impl BlockAptosVM {
-    fn execute_block_on_thread_pool<
+    pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        global_cache_manager: &GlobalCacheManager,
+        module_cache_manager: Option<
+            &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        >,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
@@ -409,6 +425,56 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
+
+        // We should be checking different module cache configurations here.
+        let module_cache_config = &config.local.module_cache_config;
+
+        let (environment, module_cache) = match module_cache_manager {
+            Some(module_cache_manager) if !module_cache_manager.mark_executing() => {
+                let environment =
+                    module_cache_manager.get_or_initialize_environment_unchecked(state_view);
+                let module_cache = module_cache_manager.module_cache();
+                (environment, module_cache)
+            },
+            _ => {
+                // Either we do not have global caches , in which case we can create new ones, or
+                // something went wrong, and we were not able to mark the state as executing. In
+                // this case, fallback to empty caches. Note that the alert should have been raised
+                // during marking.
+                let environment =
+                    AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+                let module_cache = Arc::new(GlobalModuleCache::empty());
+                (environment, module_cache)
+            },
+        };
+
+        // Check 1: struct re-indexing map is not too large. If it is, we flush the cache. Also, we
+        // need to flush modules because they store indices into re-indexing map.
+        let runtime_environment = environment.runtime_environment();
+        let struct_name_index_map_size = runtime_environment
+            .struct_name_index_map_size()
+            .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
+        if struct_name_index_map_size > module_cache_config.max_struct_name_index_map_size {
+            module_cache.flush_unchecked();
+            runtime_environment.flush_struct_name_and_info_caches();
+        }
+
+        // Check 2: If the module cache is too big, flush it.
+        if module_cache
+            .size_in_bytes_is_greater_than(module_cache_config.max_module_cache_size_in_bytes)
+        {
+            module_cache.flush_unchecked();
+        }
+
+        // Finally, to avoid cold starts, fetch the framework code prior to block execution.
+        if module_cache.num_modules() == 0 && module_cache_config.prefetch_framework_code {
+            prefetch_aptos_framework(environment.clone(), state_view, &module_cache).map_err(
+                |err| {
+                    alert!("Failed to load Aptos framework to module cache: {:?}", err);
+                    VMError::from(err).into_vm_status()
+                },
+            )?;
+        }
 
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
@@ -419,12 +485,22 @@ impl BlockAptosVM {
         >::new(
             config,
             executor_thread_pool,
-            global_cache_manager.module_cache(),
+            module_cache,
             transaction_commit_listener,
         );
 
-        let environment = global_cache_manager.environment()?;
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
+        if let Some(module_cache_manager) = module_cache_manager {
+            if !module_cache_manager.mark_done() {
+                // Something is wrong as we were not able to mark execution as done. Return an
+                // error.
+                return Err(VMStatus::error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Unable to mark block execution as done".to_string()),
+                ));
+            }
+        }
+
         match ret {
             Ok(block_output) => {
                 let (transaction_outputs, block_end_info) = block_output.into_inner();
@@ -455,31 +531,6 @@ impl BlockAptosVM {
         }
     }
 
-    pub fn execute_block_on_thread_pool_without_global_caches<
-        S: StateView + Sync,
-        L: TransactionCommitHook<Output = AptosTransactionOutput>,
-    >(
-        executor_thread_pool: Arc<rayon::ThreadPool>,
-        signature_verified_block: &[SignatureVerifiedTransaction],
-        state_view: &S,
-        config: BlockExecutorConfig,
-        transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        let global_cache_manager = GlobalCacheManager::new_with_default_config();
-        global_cache_manager.mark_block_execution_start(state_view, None)?;
-
-        let result = Self::execute_block_on_thread_pool::<S, L>(
-            executor_thread_pool,
-            signature_verified_block,
-            state_view,
-            &global_cache_manager,
-            config,
-            transaction_commit_listener,
-        );
-        global_cache_manager.mark_block_execution_end(None)?;
-        result
-    }
-
     /// Uses shared thread pool to execute blocks.
     pub fn execute_block<
         S: StateView + Sync,
@@ -487,7 +538,9 @@ impl BlockAptosVM {
     >(
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        global_cache_manager: &GlobalCacheManager,
+        module_cache_manager: Option<
+            &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        >,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -495,9 +548,73 @@ impl BlockAptosVM {
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,
-            global_cache_manager,
+            module_cache_manager,
             config,
             transaction_commit_listener,
         )
+    }
+}
+
+/// If Aptos framework exists, loads "transaction_validation.move" and all its transitive
+/// dependencies from storage into provided module cache. If loading fails for any reason, a panic
+/// error is returned.
+fn prefetch_aptos_framework(
+    environment: AptosEnvironment,
+    state_view: &impl StateView,
+    module_cache: &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+) -> Result<(), PanicError> {
+    let code_storage = state_view.as_aptos_code_storage(environment);
+
+    // If framework code exists in storage, the transitive closure will be verified and cached.
+    let maybe_loaded = code_storage
+        .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+        .map_err(|err| {
+            // There should be no errors when pre-fetching the framework, if there are, we
+            // better return an error here.
+            PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+        })?;
+
+    if let Some(module) = maybe_loaded {
+        drop(module);
+
+        // Framework must have been loaded. Drain verified modules from local cache into
+        // global cache.
+        let verified_module_code_iter = code_storage.into_verified_module_code_iter()?;
+        module_cache.insert_verified_unchecked(verified_module_code_iter)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
+
+    #[test]
+    fn test_prefetch_existing_aptos_framework() {
+        let executor = FakeExecutor::from_head_genesis();
+        let state_view = executor.get_state_view();
+
+        let environment = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+        let module_cache = GlobalModuleCache::empty();
+        assert_eq!(module_cache.num_modules(), 0);
+
+        let result = prefetch_aptos_framework(environment, state_view, &module_cache);
+        assert!(result.is_ok());
+        assert!(module_cache.num_modules() > 0);
+    }
+
+    #[test]
+    fn test_prefetch_non_existing_aptos_framework() {
+        let state_view = FakeDataStore::default();
+
+        let environment =
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
+        let module_cache = GlobalModuleCache::empty();
+        assert_eq!(module_cache.num_modules(), 0);
+
+        let result = prefetch_aptos_framework(environment, &state_view, &module_cache);
+        assert!(result.is_ok());
+        assert_eq!(module_cache.num_modules(), 0);
     }
 }

@@ -25,8 +25,11 @@ fn test_mock_vm_different_senders() {
         txns.push(encode_mint_transaction(gen_address(i), amount));
     }
 
-    let outputs = MockVM
-        .execute_block_no_limit(&into_signature_verified_block(txns.clone()), &MockStateView::empty())
+    let outputs = MockVM::new()
+        .execute_block_no_limit(
+            &into_signature_verified_block(txns.clone()),
+            &MockStateView::empty(),
+        )
         .expect("MockVM should not fail to start");
 
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
@@ -62,8 +65,11 @@ fn test_mock_vm_same_sender() {
         txns.push(encode_mint_transaction(sender, amount));
     }
 
-    let outputs = MockVM
-        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView::empty())
+    let outputs = MockVM::new()
+        .execute_block_no_limit(
+            &into_signature_verified_block(txns),
+            &MockStateView::empty(),
+        )
         .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
@@ -97,8 +103,11 @@ fn test_mock_vm_payment() {
         encode_transfer_transaction(gen_address(0), gen_address(1), 50),
     ];
 
-    let output = MockVM
-        .execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView::empty())
+    let output = MockVM::new()
+        .execute_block_no_limit(
+            &into_signature_verified_block(txns),
+            &MockStateView::empty(),
+        )
         .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();

@@ -84,8 +84,7 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
     }
 
     /// Drains cached verified modules from the code storage, transforming them into format used by
-    /// global caches (i.e., with extension and no versioning). Should only be called when the code
-    /// storage borrows [StateView].
+    /// global caches. Should only be called when the code storage borrows [StateView].
     pub fn into_verified_module_code_iter(
         self,
     ) -> Result<
@@ -134,7 +133,6 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
                     PanicError::CodeInvariantError(msg)
                 })?;
 
-            // We are using storage version here.
             let module = ModuleCode::from_verified_ref(verified_code, Arc::new(extension));
             modules_to_add.push((key, Arc::new(module)))
         }

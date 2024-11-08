@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 pub mod access_path;
 pub mod account_address;
@@ -18,7 +18,6 @@ pub mod epoch_state;
 pub mod error;
 pub mod event;
 pub mod executable;
-pub mod explicit_sync_wrapper;
 pub mod fee_statement;
 pub mod governance;
 pub mod indexer;
@@ -36,7 +35,6 @@ pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 pub mod randomness;
-pub mod read_only_module_cache;
 pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;

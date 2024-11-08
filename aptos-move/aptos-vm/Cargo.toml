@@ -24,7 +24,6 @@ aptos-framework =  { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true }
-aptos-global-cache-manager = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-memory-usage-tracker = { workspace = true }
@@ -64,7 +63,7 @@ serde = { workspace = true }
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-block-executor = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true, features = ["fuzzing", "testing"] }
 claims = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }

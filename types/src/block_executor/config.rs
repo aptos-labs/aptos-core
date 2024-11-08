@@ -4,6 +4,31 @@
 use crate::on_chain_config::BlockGasLimitType;
 use serde::{Deserialize, Serialize};
 
+/// Local, per-node configurations for module cache. While caches can be persisted across multiple
+/// block executions, these configurations allow to specify cache sizes, etc.
+#[derive(Clone, Debug)]
+pub struct BlockExecutorModuleCacheLocalConfig {
+    /// If true, when global caches are empty, Aptos framework is prefetched into module cache.
+    pub prefetch_framework_code: bool,
+    /// The maximum size of module cache (the sum of serialized sizes of all cached modules in
+    /// bytes).
+    pub max_module_cache_size_in_bytes: usize,
+    /// The maximum size (in terms of entries) of struct name re-indexing map stored in the runtime
+    /// environment.
+    pub max_struct_name_index_map_size: usize,
+}
+
+impl Default for BlockExecutorModuleCacheLocalConfig {
+    fn default() -> Self {
+        Self {
+            prefetch_framework_code: true,
+            // Use 50 Mb for now, should be large enough to cache many modules.
+            max_module_cache_size_in_bytes: 50 * 1024 * 1024,
+            max_struct_name_index_map_size: 100_000,
+        }
+    }
+}
+
 /// Local, per-node configuration.
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
@@ -14,6 +39,24 @@ pub struct BlockExecutorLocalConfig {
     // If true, we will discard the failed blocks and continue with the next block.
     // (allow_fallback needs to be set)
     pub discard_failed_blocks: bool,
+
+    /// Various cache configurations, see [BlockExecutorModuleCacheLocalConfig] for more details.
+    pub module_cache_config: BlockExecutorModuleCacheLocalConfig,
+}
+
+impl BlockExecutorLocalConfig {
+    /// Returns a new config with specified concurrency level and:
+    ///   - Allowed fallback to sequential execution from parallel.
+    ///   - Not allowed discards of failed blocks.
+    ///   - Default module cache configs.
+    pub fn default_with_concurrency_level(concurrency_level: usize) -> Self {
+        Self {
+            concurrency_level,
+            allow_fallback: true,
+            discard_failed_blocks: false,
+            module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+        }
+    }
 }
 
 /// Configuration from on-chain configuration, that is
@@ -40,7 +83,7 @@ impl BlockExecutorConfigFromOnchain {
     pub const fn on_but_large_for_test() -> Self {
         Self {
             block_gas_limit_type:
-                // present, so code is excercised, but large to not limit blocks
+                // present, so code is exercised, but large to not limit blocks
                 BlockGasLimitType::ComplexLimitV1 {
                     effective_block_gas_limit: 1_000_000_000,
                     execution_gas_effective_multiplier: 1,
@@ -69,11 +112,7 @@ pub struct BlockExecutorConfig {
 impl BlockExecutorConfig {
     pub fn new_no_block_limit(concurrency_level: usize) -> Self {
         Self {
-            local: BlockExecutorLocalConfig {
-                concurrency_level,
-                allow_fallback: true,
-                discard_failed_blocks: false,
-            },
+            local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
     }
@@ -83,11 +122,7 @@ impl BlockExecutorConfig {
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         Self {
-            local: BlockExecutorLocalConfig {
-                concurrency_level,
-                allow_fallback: true,
-                discard_failed_blocks: false,
-            },
+            local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
             onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }
     }
