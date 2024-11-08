@@ -12,6 +12,9 @@ use move_model::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeSet, fmt, sync::Arc};
 
+/// Base URL for the linter documentation.
+const LINTER_URL_BASE: &str = "https://aptos.dev/en/build/smart-contracts/linter";
+
 /// Implement this trait to provide a collection of external checks.
 pub trait ExternalChecks {
     /// Get all the expression checkers.
@@ -60,13 +63,7 @@ pub trait ExpChecker {
 
     /// Report the `msg` highlighting the `loc`.
     fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
-        env.lint_diag_with_notes(loc, msg, vec![
-            format!(
-                "To suppress this warning, annotate the function/module with the attribute `#[{}({})]`.",
-                LintAttribute::SKIP,
-                self.get_name()
-            ),
-        ]);
+        report(env, loc, msg, self.get_name().as_str());
     }
 }
 
@@ -80,13 +77,7 @@ pub trait StacklessBytecodeChecker {
 
     /// Report the `msg` highlighting the `loc`.
     fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
-        env.lint_diag_with_notes(loc, msg, vec![
-            format!(
-                "To suppress this warning, annotate the function/module with the attribute `#[{}({})]`.",
-                LintAttribute::SKIP,
-                self.get_name()
-            ),
-        ]);
+        report(env, loc, msg, self.get_name().as_str());
     }
 }
 
@@ -102,4 +93,19 @@ pub fn known_checker_names(external_checkers: &Vec<Arc<dyn ExternalChecks>>) -> 
         }
     }
     names
+}
+
+/// Report the `msg` highlighting the `loc` for the `checker_name`.
+fn report(env: &GlobalEnv, loc: &Loc, msg: &str, checker_name: &str) {
+    env.lint_diag_with_notes(loc, msg, vec![
+        format!(
+        "To suppress this warning, annotate the function/module with the attribute `#[{}({})]`.",
+        LintAttribute::SKIP,
+        checker_name
+    ),
+        format!(
+            "For more information, see {}#{}.",
+            LINTER_URL_BASE, checker_name
+        ),
+    ]);
 }
