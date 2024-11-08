@@ -815,9 +815,11 @@ module aptos_framework::atomic_bridge_store {
     public(friend) fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) : vector<u8> acquires Nonce {
         let nonce = borrow_global_mut<Nonce>(@aptos_framework);
         let combined_bytes = vector::empty<u8>();
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.amount));
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.recipient));
-        vector::append(&mut combined_bytes, details.hash_lock);
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.hash_lock));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&now()));
         if (nonce.inner == MAX_U64) {
             nonce.inner = 0;  // Wrap around to 0 if at maximum value
         } else {
@@ -1353,6 +1355,8 @@ module aptos_framework::atomic_bridge_counterparty {
     /// @param time_lock The time lock duration for the transfer.
     /// @param recipient The address of the recipient on the Aptos blockchain.
     /// @param amount The amount of assets to be locked.
+    /// @param initiate_timestamp The timestamp of the initiation of the bridge transfer.
+    /// @param nonce The nonce of the bridge transfer.
     /// @abort If the caller is not the bridge operator.
     public entry fun lock_bridge_transfer_assets(
         caller: &signer,
@@ -1360,9 +1364,19 @@ module aptos_framework::atomic_bridge_counterparty {
         bridge_transfer_id: vector<u8>,
         hash_lock: vector<u8>,
         recipient: address,
-        amount: u64
+        amount: u64,
+        initiate_timestamp: u64,
+        nonce: u64
     ) {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
+        let combined_bytes = vector::empty<u8>();
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.amount));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.recipient));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.hash_lock));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&initiate_timestamp));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
+        assert!(bridge_transfer_id == keccak256(combined_bytes));
         let ethereum_address = ethereum::ethereum_address(initiator);
         let time_lock = atomic_bridge_configuration::counterparty_timelock_duration();
         let details = atomic_bridge_store::create_details(
@@ -1370,7 +1384,7 @@ module aptos_framework::atomic_bridge_counterparty {
             recipient,
             amount,
             hash_lock,
-            time_lock
+            initiate_timestamp + time_lock
         );
 
         // bridge_store::add_counterparty(bridge_transfer_id, details);
