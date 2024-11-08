@@ -4,12 +4,13 @@
 
 use crate::{metrics::TIMER, pipeline::LedgerUpdateMessage};
 use aptos_crypto::hash::HashValue;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
 use aptos_types::block_executor::{
     config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
 };
+use aptos_vm::VMBlockExecutor;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
@@ -28,7 +29,7 @@ pub struct TransactionExecutor<V> {
 
 impl<V> TransactionExecutor<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,

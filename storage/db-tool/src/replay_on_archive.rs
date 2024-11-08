@@ -19,7 +19,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use clap::Parser;
 use itertools::multizip;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -270,7 +270,7 @@ impl Verifier {
         expected_epoch_events: &Vec<Vec<ContractEvent>>,
         expected_epoch_writesets: &Vec<WriteSet>,
     ) -> Result<Vec<Error>> {
-        let executed_outputs = AptosVM::execute_block_no_limit(
+        let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             cur_txns
                 .iter()
                 .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))

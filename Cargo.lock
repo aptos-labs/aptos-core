@@ -1645,15 +1645,10 @@ dependencies = [
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-executor",
- "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",

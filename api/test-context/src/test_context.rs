@@ -17,10 +17,7 @@ use aptos_config::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
-use aptos_executor::{
-    block_executor::{AptosVMBlockExecutor, BlockExecutor},
-    db_bootstrapper,
-};
+use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_framework::BuiltPackage;
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
@@ -50,7 +47,7 @@ use aptos_types::{
         TransactionPayload, TransactionStatus, Version,
     },
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
@@ -171,8 +168,12 @@ pub fn new_test_context_inner(
         }
         DbReaderWriter::wrap(aptos_db)
     };
-    let ret =
-        db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
+    let ret = db_bootstrapper::maybe_bootstrap::<AptosVMBlockExecutor>(
+        &db_rw,
+        &genesis,
+        genesis_waypoint,
+    )
+    .unwrap();
     assert!(ret.is_some());
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, PooledVMValidator::new(db.clone(), 1));
