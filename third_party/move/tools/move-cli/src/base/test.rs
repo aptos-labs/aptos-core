@@ -241,7 +241,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // Move package system, to first grab the compilation env, construct the test plan from it, and
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
-    let (_compiled_package, model_opt) = build_plan.compile_with_driver(
+    let (compiled_package, model_opt) = build_plan.compile_with_driver(
         writer,
         &build_config.compiler_config,
         vec![],
@@ -306,7 +306,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     files.extend(dep_file_map);
     let test_plan = test_plan.unwrap();
     let no_tests = test_plan.is_empty();
-    let test_plan = TestPlan::new(test_plan, files, units);
+    let test_plan = TestPlan::new(test_plan, files, units, compiled_package.bytecode_deps);
 
     let trace_path = pkg_path.join(".trace");
     let coverage_map_path = pkg_path
