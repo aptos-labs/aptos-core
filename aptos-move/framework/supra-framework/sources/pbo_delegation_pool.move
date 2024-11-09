@@ -7861,6 +7861,9 @@ module supra_framework::pbo_delegation_pool {
             vector[30 * ONE_SUPRA, 70 * ONE_SUPRA]
         );
         assert!(coin::balance<SupraCoin>(funder) == 0, 0);
+        assert!(get_principle_stake(new_delegator_address,pool_address)== 30*ONE_SUPRA,9);
+        assert!(get_principle_stake(new_delegator_address2,pool_address)== 70*ONE_SUPRA,9);
+
 
         // 3 month
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
@@ -7941,6 +7944,12 @@ module supra_framework::pbo_delegation_pool {
             vector[30 * ONE_SUPRA, 70 * ONE_SUPRA]
         );
         assert!(coin::balance<SupraCoin>(funder) == 0, 0);
+        assert!(get_principle_stake(new_delegator_address,pool_address)==30*ONE_SUPRA,99);
+        assert!(get_principle_stake(new_delegator_address2,pool_address)==70*ONE_SUPRA,99);
+        let (amount1,_,_) = get_stake(pool_address,new_delegator_address);
+        let (amount2,_,_) = get_stake(pool_address,new_delegator_address2);
+        assert!(amount1>59*ONE_SUPRA,99);
+        assert!(amount2>138*ONE_SUPRA,99);
 
         // 3 month
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
