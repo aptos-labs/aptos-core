@@ -308,7 +308,11 @@ mod test_utils {
                 .into_iter()
                 .map(|t| t.into_txn())
                 .collect();
-        let unsharded_txn_output = AptosVMBlockExecutor::new()
+        let executor = AptosVMBlockExecutor::new();
+        if let Some(module_cache_manager) = executor.module_cache_manager() {
+            module_cache_manager.mark_ready(None, None);
+        }
+        let unsharded_txn_output = executor
             .execute_block_no_limit(&ordered_txns, executor.data_store())
             .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
@@ -358,7 +362,11 @@ mod test_utils {
             )
             .unwrap();
 
-        let unsharded_txn_output = AptosVMBlockExecutor::new()
+        let executor = AptosVMBlockExecutor::new();
+        if let Some(module_cache_manager) = executor.module_cache_manager() {
+            module_cache_manager.mark_ready(None, None);
+        }
+        let unsharded_txn_output = executor
             .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
             .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
@@ -412,7 +420,11 @@ mod test_utils {
             )
             .unwrap();
 
-        let unsharded_txn_output = AptosVMBlockExecutor::new()
+        let executor = AptosVMBlockExecutor::new();
+        if let Some(module_cache_manager) = executor.module_cache_manager() {
+            module_cache_manager.mark_ready(None, None);
+        }
+        let unsharded_txn_output = executor
             .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
             .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
