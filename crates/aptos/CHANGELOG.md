@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
 
 ## [4.4.0] - 2024/11/06
 - Fix typos in `aptos move compile` help text.
@@ -27,7 +28,6 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Update the default version of `movefmt` to be installed from 1.0.4 to 1.0.5
 - Update the local-testnet logs to use `println` for regular output and reserve `eprintln` for errors.
 - Set compiler V2 as default when using `aptos move prove`.
-- Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
 
 ## [4.2.3] - 2024/09/20
 - Fix the broken indexer in localnet in 4.2.2, which migrates table info from sycn to async ways.
