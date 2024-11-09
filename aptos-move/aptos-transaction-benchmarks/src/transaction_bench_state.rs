@@ -3,7 +3,9 @@
 
 use crate::transactions;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -218,7 +220,7 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
-            None,
+            &ModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
         )
@@ -267,7 +269,7 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
-            None,
+            &ModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,

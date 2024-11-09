@@ -29,72 +29,53 @@ macro_rules! alert_or_println {
 }
 
 /// Represents the state of [GlobalModuleCache]. The following transitions are allowed:
-///   1. [State::Clean] --> [State::Ready].
 ///   2. [State::Ready] --> [State::Executing].
 ///   3. [State::Executing] --> [State::Done].
 ///   4. [State::Done] --> [State::Ready].
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum State<T> {
-    Clean,
-    Ready(T),
-    Executing(T),
-    Done(T),
+    Ready(Option<T>),
+    Executing(Option<T>),
+    Done(Option<T>),
 }
 
 impl<T: Clone + Debug + Eq> State<T> {
-    /// If the state is [State::Clean] returns true, and false otherwise.
-    fn is_clean(&self) -> bool {
-        match self {
-            State::Clean => true,
-            State::Ready(_) | State::Executing(_) | State::Done(_) => false,
-        }
-    }
-
-    /// If the state is [State::Done], returns true.
-    fn is_done(&self) -> bool {
-        match self {
-            State::Done(_) => true,
-            State::Clean | State::Ready(_) | State::Executing(_) => false,
-        }
-    }
-
-    /// If the state is [State::Done] and its value equals the one provided, returns true. In other
-    /// cases, returns false.
-    fn is_done_with_value(&self, value: &T) -> bool {
-        match self {
-            State::Done(v) => v == value,
-            State::Clean | State::Executing(_) | State::Ready(_) => false,
-        }
-    }
-
     /// If the state is [State::Ready], returns its value. Otherwise, returns [None].
-    fn value_from_ready(&self) -> Option<T> {
+    fn value_from_ready(&self) -> Option<Option<T>> {
         match self {
             State::Ready(v) => Some(v.clone()),
-            State::Clean | State::Executing(_) | State::Done(_) => None,
+            _ => None,
         }
     }
 
     /// If the state is [State::Executing], returns its value. Otherwise, returns [None].
-    fn value_from_executing(&self) -> Option<T> {
+    fn value_from_executing(&self) -> Option<Option<T>> {
         match self {
             State::Executing(v) => Some(v.clone()),
-            State::Clean | State::Ready(_) | State::Done(_) => None,
+            _ => None,
+        }
+    }
+
+    /// If the state is [State::Done], returns its value. Otherwise, returns [None].
+    fn value_from_done(&self) -> Option<Option<T>> {
+        match self {
+            State::Done(v) => Some(v.clone()),
+            _ => None,
         }
     }
 
     /// Sets the current state to [State::Ready].
-    fn set_ready(&mut self, value: T) {
+    fn set_ready(&mut self, value: Option<T>) {
         *self = Self::Ready(value);
     }
 
     /// Sets the current state to [State::Executing].
-    fn set_executing(&mut self, value: T) {
+    fn set_executing(&mut self, value: Option<T>) {
         *self = Self::Executing(value);
     }
 
     /// Sets the current state to [State::Done].
-    fn set_done(&mut self, value: T) {
+    fn set_done(&mut self, value: Option<T>) {
         *self = Self::Done(value);
     }
 }
@@ -120,48 +101,55 @@ where
     VC: Deref<Target = Arc<DC>>,
     E: WithSize,
 {
-    /// Returns a new instance of [ModuleCacheManager].
+    /// Returns a new instance of [ModuleCacheManager] in a [State::Done] state with uninitialized
+    /// current value.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            state: Mutex::new(State::Clean),
+            state: Mutex::new(State::Done(None)),
             module_cache: Arc::new(GlobalModuleCache::empty()),
             environment: ExplicitSyncWrapper::new(None),
         }
     }
 
-    /// If state is [State::Clean], or [State::Ready] with matching previous value, sets the state
-    /// to [State::Ready] with the current value and returns true. Otherwise, raises an alert and
-    /// returns false.
-    pub fn mark_ready(&self, previous: &T, current: T) -> bool {
+    /// If state is [State::Done], sets the state to [State::Ready] with the current value and
+    /// returns true. Otherwise, raises an alert and returns false. Additionally, synchronizes
+    /// module and environment caches based on the provided previous value.
+    pub fn mark_ready(&self, previous: Option<&T>, current: Option<T>) -> bool {
         let mut state = self.state.lock();
 
-        if state.is_clean() || state.is_done_with_value(previous) {
-            state.set_ready(current);
-            return true;
+        let recorded_previous = state.value_from_done();
+        match (recorded_previous, previous) {
+            (None, _) => {
+                // We are not in the done state, this is an error.
+                alert_or_println!(
+                    "Unable to mark ready, state: {:?}, previous: {:?}, current: {:?}",
+                    state,
+                    previous,
+                    current
+                );
+                false
+            },
+            (Some(Some(recorded_previous)), Some(previous)) if recorded_previous.eq(previous) => {
+                // We are in done state with matching values. Can mark ready.
+                state.set_ready(current);
+                true
+            },
+            _ => {
+                // If the state is done, but the values do not exist or do not match, we still set
+                // the state as ready, but also flush global caches because they execute on top of
+                // unknown state (or on top of some different to previous state).
+                self.module_cache.flush_unchecked();
+                if let Some(environment) = self.environment.acquire().as_ref() {
+                    environment
+                        .runtime_environment()
+                        .flush_struct_name_and_info_caches();
+                }
+
+                state.set_ready(current);
+                true
+            },
         }
-
-        if state.is_done() {
-            // If the state is done, but the values to not match, we still set the state as ready, but
-            // also flush global caches because they execute not on top of the previous state.
-            self.module_cache.flush_unchecked();
-            if let Some(environment) = self.environment.acquire().as_ref() {
-                environment
-                    .runtime_environment()
-                    .flush_struct_name_and_info_caches();
-            }
-
-            state.set_ready(current);
-            return true;
-        }
-
-        alert_or_println!(
-            "Unable to mark ready, state: {:?}, previous: {:?}, current: {:?}",
-            state,
-            previous,
-            current
-        );
-        false
     }
 
     /// If state is [State::Ready], changes it to [State::Executing] with the same value, returning
@@ -195,10 +183,7 @@ where
     /// Returns the cached global environment if it already exists, and matches the one in storage.
     /// If it does not exist, or does not match, the new environment is initialized from the given
     /// state, cached, and returned.
-    pub fn get_or_initialize_environment_unchecked(
-        &self,
-        state_view: &impl StateView,
-    ) -> AptosEnvironment {
+    pub fn get_or_initialize_environment(&self, state_view: &impl StateView) -> AptosEnvironment {
         let _lock = self.state.lock();
 
         let new_environment =
@@ -251,70 +236,64 @@ mod test {
     use std::{collections::HashMap, thread, thread::JoinHandle};
     use test_case::test_case;
 
-    #[test]
-    fn test_clean_state() {
-        let state = State::Clean;
+    #[test_case(None)]
+    #[test_case(Some(0))]
+    fn test_ready_state(value: Option<i32>) {
+        let state = State::Ready(value);
 
-        assert!(state.is_clean());
-        assert!(!state.is_done());
-        assert!(!state.is_done_with_value(&0));
-        assert!(state.value_from_ready().is_none());
+        assert_eq!(state.value_from_ready(), Some(value));
         assert!(state.value_from_executing().is_none());
+        assert!(state.value_from_done().is_none());
     }
 
-    #[test]
-    fn test_ready_state() {
-        let state = State::Ready(0);
+    #[test_case(None)]
+    #[test_case(Some(0))]
+    fn test_executing_state(value: Option<i32>) {
+        let state = State::Executing(value);
 
-        assert!(!state.is_clean());
-        assert!(!state.is_done());
-        assert!(!state.is_done_with_value(&0));
-        assert_eq!(state.value_from_ready(), Some(0));
-        assert!(state.value_from_executing().is_none());
+        assert!(state.value_from_ready().is_none());
+        assert_eq!(state.value_from_executing(), Some(value));
+        assert!(state.value_from_done().is_none());
     }
 
-    #[test]
-    fn test_executing_state() {
-        let state = State::Executing(0);
+    #[test_case(None)]
+    #[test_case(Some(0))]
+    fn test_done_state(value: Option<i32>) {
+        let state = State::Done(value);
 
-        assert!(!state.is_clean());
-        assert!(!state.is_done());
-        assert!(!state.is_done_with_value(&0));
-        assert!(state.value_from_ready().is_none());
-        assert_eq!(state.value_from_executing(), Some(0));
-    }
-
-    #[test]
-    fn test_done_state() {
-        let state = State::Done(0);
-
-        assert!(!state.is_clean());
-        assert!(state.is_done());
-        assert!(state.is_done_with_value(&0));
-        assert!(!state.is_done_with_value(&10));
         assert!(state.value_from_ready().is_none());
         assert!(state.value_from_executing().is_none());
+        assert_eq!(state.value_from_done(), Some(value));
     }
 
     #[test]
     fn test_set_state() {
-        let mut state = State::Clean;
+        let mut state = State::Done(None);
 
-        state.set_ready(0);
-        assert_matches!(state, State::Ready(0));
+        state.set_ready(Some(0));
+        assert_matches!(state, State::Ready(Some(0)));
 
-        state.set_executing(10);
-        assert_matches!(state, State::Executing(10));
+        state.set_executing(Some(10));
+        assert_matches!(state, State::Executing(Some(10)));
 
-        state.set_done(100);
-        assert_matches!(state, State::Done(100));
+        state.set_done(Some(100));
+        assert_matches!(state, State::Done(Some(100)));
+
+        state.set_ready(Some(1000));
+        assert_matches!(state, State::Ready(Some(1000)));
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn test_marking(with_different_value_for_done: bool) {
+    #[test_case(None, None)]
+    #[test_case(None, Some(1))]
+    #[test_case(Some(0), None)]
+    #[test_case(Some(0), Some(1))]
+    #[test_case(Some(0), Some(0))]
+    fn test_mark_ready(recorded_previous: Option<i32>, previous: Option<i32>) {
         let module_cache_manager = ModuleCacheManager::new();
-        assert!(module_cache_manager.state.lock().is_clean());
+        module_cache_manager
+            .state
+            .lock()
+            .set_done(recorded_previous);
 
         // Pre-populate module cache to test flushing.
         module_cache_manager
@@ -322,47 +301,60 @@ mod test {
             .insert(0, mock_verified_code(0, MockExtension::new(8)));
         assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
 
-        // Can only go to ready state from clean state.
         assert!(!module_cache_manager.mark_executing());
         assert!(!module_cache_manager.mark_done());
-        assert!(module_cache_manager.mark_ready(&0, 1));
 
-        assert_matches!(module_cache_manager.state.lock().deref(), State::Ready(1));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert!(module_cache_manager.mark_ready(previous.as_ref(), Some(77)));
 
-        // Can only go to executing state from ready state.
+        // Only in matching case the module cache is not flushed.
+        if recorded_previous.is_some() && recorded_previous == previous {
+            assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        } else {
+            assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        }
+
+        let state = module_cache_manager.state.lock().clone();
+        assert_eq!(state, State::Ready(Some(77)))
+    }
+
+    #[test]
+    fn test_mark_executing() {
+        let module_cache_manager = ModuleCacheManager::<
+            _,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            MockExtension,
+        >::new();
+        module_cache_manager.state.lock().set_ready(Some(100));
+
+        assert!(!module_cache_manager.mark_ready(Some(&76), Some(77)));
         assert!(!module_cache_manager.mark_done());
-        assert!(!module_cache_manager.mark_ready(&0, 1));
+
         assert!(module_cache_manager.mark_executing());
 
-        assert_matches!(
-            module_cache_manager.state.lock().deref(),
-            State::Executing(1)
-        );
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        let state = module_cache_manager.state.lock().clone();
+        assert_eq!(state, State::Executing(Some(100)))
+    }
 
-        // Can only go to done state from executing state.
+    #[test]
+    fn test_mark_done() {
+        let module_cache_manager = ModuleCacheManager::<
+            _,
+            u32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            MockExtension,
+        >::new();
+        module_cache_manager.state.lock().set_executing(Some(100));
+
+        assert!(!module_cache_manager.mark_ready(Some(&76), Some(77)));
         assert!(!module_cache_manager.mark_executing());
-        assert!(!module_cache_manager.mark_ready(&0, 1));
+
         assert!(module_cache_manager.mark_done());
 
-        assert_matches!(module_cache_manager.state.lock().deref(), State::Done(1));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
-
-        // Can only go to ready state from done state.
-        assert!(!module_cache_manager.mark_executing());
-        assert!(!module_cache_manager.mark_done());
-
-        if with_different_value_for_done {
-            // Does not match! Caches should be flushed, but state reset.
-            assert!(module_cache_manager.mark_ready(&10, 11));
-            assert_matches!(module_cache_manager.state.lock().deref(), State::Ready(11));
-            assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
-        } else {
-            assert!(module_cache_manager.mark_ready(&1, 2));
-            assert_matches!(module_cache_manager.state.lock().deref(), State::Ready(2));
-            assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
-        }
+        let state = module_cache_manager.state.lock().clone();
+        assert_eq!(state, State::Done(Some(100)))
     }
 
     /// Joins threads. Succeeds only if a single handle evaluates to [Ok] and the rest are [Err]s.
@@ -382,9 +374,8 @@ mod test {
         assert_eq!(num_false, num_handles - 1);
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn test_mark_ready_concurrent(start_from_clean_state: bool) {
+    #[test]
+    fn test_mark_ready_concurrent() {
         let global_cache_manager = Arc::new(ModuleCacheManager::<
             _,
             u32,
@@ -392,18 +383,12 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new());
-        if !start_from_clean_state {
-            assert!(global_cache_manager.mark_ready(&0, 1));
-            assert!(global_cache_manager.mark_executing());
-            assert!(global_cache_manager.mark_done());
-            // We are at done with value of 1.
-        }
 
         let mut handles = vec![];
         for _ in 0..32 {
             let handle = thread::spawn({
                 let global_cache_manager = global_cache_manager.clone();
-                move || global_cache_manager.mark_ready(&1, 2)
+                move || global_cache_manager.mark_ready(Some(&1), Some(2))
             });
             handles.push(handle);
         }
@@ -419,7 +404,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new());
-        assert!(global_cache_manager.mark_ready(&0, 1));
+        assert!(global_cache_manager.mark_ready(Some(&0), Some(1)));
 
         let mut handles = vec![];
         for _ in 0..32 {
@@ -441,7 +426,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new());
-        assert!(global_cache_manager.mark_ready(&0, 1));
+        assert!(global_cache_manager.mark_ready(Some(&0), Some(1)));
         assert!(global_cache_manager.mark_executing());
 
         let mut handles = vec![];
@@ -476,7 +461,7 @@ mod test {
     }
 
     #[test]
-    fn mark_execution_start_when_different_environment() {
+    fn test_get_or_initialize_environment() {
         let module_cache_manager = ModuleCacheManager::<i32, _, _, _, _>::new();
 
         module_cache_manager
@@ -490,7 +475,7 @@ mod test {
 
         // Environment has to be set to the same value, cache flushed.
         let state_view = state_view_with_changed_feature_flag(None);
-        let environment = module_cache_manager.get_or_initialize_environment_unchecked(&state_view);
+        let environment = module_cache_manager.get_or_initialize_environment(&state_view);
         assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
         assert!(module_cache_manager
             .environment
@@ -507,7 +492,7 @@ mod test {
         // Environment has to be re-set to the new value, cache flushed.
         let state_view =
             state_view_with_changed_feature_flag(Some(FeatureFlag::CODE_DEPENDENCY_CHECK));
-        let environment = module_cache_manager.get_or_initialize_environment_unchecked(&state_view);
+        let environment = module_cache_manager.get_or_initialize_environment(&state_view);
         assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
         assert!(module_cache_manager
             .environment
@@ -522,8 +507,7 @@ mod test {
         assert!(module_cache_manager.environment.acquire().is_some());
 
         // Environment is kept, and module caches are not flushed.
-        let new_environment =
-            module_cache_manager.get_or_initialize_environment_unchecked(&state_view);
+        let new_environment = module_cache_manager.get_or_initialize_environment(&state_view);
         assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
         assert!(environment == new_environment);
     }

@@ -83,8 +83,14 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
+
+        let executor = V::new();
+        if let Some(module_cache_manager) = executor.module_cache_manager() {
+            module_cache_manager.mark_ready(None, None);
+        }
+
         DoGetExecutionOutput::by_transaction_execution::<V>(
-            &V::new(),
+            &executor,
             sig_verified_txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
