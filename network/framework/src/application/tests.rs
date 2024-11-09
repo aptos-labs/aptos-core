@@ -1224,23 +1224,26 @@ async fn wait_for_network_event(
                     (outbound_rpc_request.protocol_id, rmsg)
                 }
                 PeerManagerRequest::SendDirectSend(peer_id, message) => {
+                    // Unpack the message
+                    let (protocol_id, data) = message.into_parts();
+
                     // Verify the request is correct
                     assert!(!is_rpc_request);
                     assert_eq!(peer_id, expected_peer_id);
-                    assert_eq!(Some(message.protocol_id), expected_direct_send_protocol_id);
+                    assert_eq!(Some(protocol_id), expected_direct_send_protocol_id);
 
                     // Create and return the peer manager notification
                     let rmsg = ReceivedMessage {
                         message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                            protocol_id: message.protocol_id,
+                            protocol_id,
                             priority: 0,
-                            raw_msg: message.mdata.into(),
+                            raw_msg: data.into(),
                         }),
                         sender: PeerNetworkId::new(expected_network_id, peer_id),
                         receive_timestamp_micros: 0,
                         rpc_replier: None,
                     };
-                    (message.protocol_id, rmsg)
+                    (protocol_id, rmsg)
                 }
             };
 

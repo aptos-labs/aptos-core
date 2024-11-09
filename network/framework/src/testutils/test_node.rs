@@ -6,7 +6,7 @@ use crate::{
     application::{metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::PeerManagerRequest,
     protocols::{
-        network::ReceivedMessage,
+        network::{ReceivedMessage, SerializedRequest},
         rpc::OutboundRpcRequest,
         wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
     },
@@ -298,7 +298,7 @@ pub trait TestNode: ApplicationNode + Sync {
                 (peer_id, protocol_id, data)
             },
             PeerManagerRequest::SendDirectSend(peer_id, message) => {
-                (peer_id, message.protocol_id, message.mdata)
+                (peer_id, message.protocol_id(), message.data().clone())
             },
         }
     }
@@ -314,7 +314,7 @@ pub trait TestNode: ApplicationNode + Sync {
                         protocol_id: msg.protocol_id,
                         request_id: 0,
                         priority: 0,
-                        raw_request: msg.data.into(),
+                        raw_request: msg.data().clone().into(),
                     }),
                     sender: self.peer_network_id(network_id),
                     receive_timestamp_micros: 0,
@@ -325,15 +325,15 @@ pub trait TestNode: ApplicationNode + Sync {
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 let rmsg = ReceivedMessage {
                     message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                        protocol_id: msg.protocol_id,
+                        protocol_id: msg.protocol_id(),
                         priority: 0,
-                        raw_msg: msg.mdata.into(),
+                        raw_msg: msg.data().clone().into(),
                     }),
                     sender: self.peer_network_id(network_id),
                     receive_timestamp_micros: 0,
                     rpc_replier: None,
                 };
-                (peer_id, msg.protocol_id, rmsg)
+                (peer_id, msg.protocol_id(), rmsg)
             },
         };
 

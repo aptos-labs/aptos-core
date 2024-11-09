@@ -614,15 +614,18 @@ where
             // To send an outbound DirectSendMsg, we just bump some counters and
             // push it onto our outbound writer queue.
             PeerRequest::SendDirectSend(message) => {
+                // Unpack the message
+                let (protocol_id, data) = message.into_parts();
+
                 // Create the direct send message
-                let message_len = message.mdata.len();
-                let protocol_id = message.protocol_id;
+                let message_len = data.len();
                 let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
                     protocol_id,
                     priority: Priority::default(),
-                    raw_msg: Vec::from(message.mdata.as_ref()),
+                    raw_msg: Vec::from(data.as_ref()),
                 });
 
+                // Send the message to the outbound writer queue
                 match write_reqs_tx.push((), message) {
                     Ok(_) => {
                         self.update_outbound_direct_send_metrics(protocol_id, message_len as u64);

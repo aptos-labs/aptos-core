@@ -29,6 +29,7 @@ use aptos_network::{
     protocols::{
         network::{
             NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage,
+            SerializedRequest,
         },
         wire::{
             handshake::v1::ProtocolId::MempoolDirectSend,
@@ -314,7 +315,7 @@ impl MempoolNode {
             match self.get_outbound_handle(network_id).next().await.unwrap() {
                 PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                     assert_eq!(peer_id, remote_peer_id);
-                    msg.protocol_id.from_bytes(&msg.mdata).unwrap()
+                    msg.protocol_id().from_bytes(msg.data()).unwrap()
                 },
                 _ => panic!("Should not be getting an RPC response"),
             }
@@ -379,7 +380,7 @@ impl MempoolNode {
                 (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.mdata, None)
+                (peer_id, msg.protocol_id(), msg.data().clone(), None)
             },
         };
         assert_eq!(peer_id, expected_peer_id);
