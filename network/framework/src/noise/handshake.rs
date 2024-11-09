@@ -827,13 +827,13 @@ mod test {
         // Update the client network context
         let client_peer_id = client.network_context.peer_id();
         let client_network_context =
-            NetworkContext::new(RoleType::FullNode, NetworkId::Public, client_peer_id);
+            NetworkContext::new(RoleType::FullNode, NetworkId::Public, client_peer_id, true);
         client.network_context = client_network_context;
 
         // Update the server network context
         let server_peer_id = server.network_context.peer_id();
         let server_network_context =
-            NetworkContext::new(RoleType::FullNode, NetworkId::Public, server_peer_id);
+            NetworkContext::new(RoleType::FullNode, NetworkId::Public, server_peer_id, true);
         server.network_context = server_network_context;
 
         // Add the VFN to the trusted peers set
@@ -929,13 +929,13 @@ mod test {
         // Update the client network context
         let client_peer_id = client.network_context.peer_id();
         let client_network_context =
-            NetworkContext::new(RoleType::FullNode, NetworkId::Vfn, client_peer_id);
+            NetworkContext::new(RoleType::FullNode, NetworkId::Vfn, client_peer_id, true);
         client.network_context = client_network_context;
 
         // Update the server network context
         let server_peer_id = server.network_context.peer_id();
         let server_network_context =
-            NetworkContext::new(RoleType::Validator, NetworkId::Vfn, server_peer_id);
+            NetworkContext::new(RoleType::Validator, NetworkId::Vfn, server_peer_id, true);
         server.network_context = server_network_context;
 
         // Add the validator to the trusted peers set
@@ -993,13 +993,13 @@ mod test {
         // Update the client network context
         let client_peer_id = client.network_context.peer_id();
         let client_network_context =
-            NetworkContext::new(RoleType::FullNode, NetworkId::Public, client_peer_id);
+            NetworkContext::new(RoleType::FullNode, NetworkId::Public, client_peer_id, true);
         client.network_context = client_network_context;
 
         // Update the server network context
         let server_peer_id = server.network_context.peer_id();
         let server_network_context =
-            NetworkContext::new(RoleType::FullNode, NetworkId::Public, server_peer_id);
+            NetworkContext::new(RoleType::FullNode, NetworkId::Public, server_peer_id, true);
         server.network_context = server_network_context;
 
         // Add the client VFN and server VFN to the trusted peers set

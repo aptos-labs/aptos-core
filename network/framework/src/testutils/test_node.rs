@@ -6,9 +6,8 @@ use crate::{
     application::{metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::PeerManagerRequest,
     protocols::{
-        network::ReceivedMessage,
-        rpc::OutboundRpcRequest,
-        wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        network::{ReceivedMessage, SerializedRequest},
+        wire::messaging::v1::NetworkMessage,
     },
     transport::ConnectionMetadata,
     ProtocolId,
@@ -284,21 +283,17 @@ pub trait TestNode: ApplicationNode + Sync {
     ) -> (PeerId, ProtocolId, bytes::Bytes) {
         let message = self.get_next_network_msg(network_id).await;
         match message {
-            PeerManagerRequest::SendRpc(
-                peer_id,
-                OutboundRpcRequest {
-                    protocol_id,
-                    res_tx,
-                    data,
-                    ..
-                },
-            ) => {
-                // Forcefully close the oneshot channel, otherwise listening task will hang forever.
+            PeerManagerRequest::SendRpc(peer_id, outbound_rpc_request) => {
+                // Unpack the request
+                let (_, protocol_id, data, res_tx, _) = outbound_rpc_request.into_parts();
+
+                // Forcefully close the oneshot channel, otherwise listening task will hang forever
                 drop(res_tx);
+
                 (peer_id, protocol_id, data)
             },
             PeerManagerRequest::SendDirectSend(peer_id, message) => {
-                (peer_id, message.protocol_id, message.mdata)
+                (peer_id, message.protocol_id(), message.data().clone())
             },
         }
     }
@@ -307,33 +302,30 @@ pub trait TestNode: ApplicationNode + Sync {
     async fn send_next_network_msg(&mut self, network_id: NetworkId) {
         let request = self.get_next_network_msg(network_id).await;
 
-        let (remote_peer_id, protocol_id, rmsg) = match request {
+        let (remote_peer_id, protocol_id, received_message) = match request {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
-                let rmsg = ReceivedMessage {
-                    message: NetworkMessage::RpcRequest(RpcRequest {
-                        protocol_id: msg.protocol_id,
-                        request_id: 0,
-                        priority: 0,
-                        raw_request: msg.data.into(),
-                    }),
-                    sender: self.peer_network_id(network_id),
-                    receive_timestamp_micros: 0,
-                    rpc_replier: Some(Arc::new(msg.res_tx)),
-                };
-                (peer_id, msg.protocol_id, rmsg)
+                // Unpack the request
+                let (_, protocol_id, data, res_tx, _) = msg.into_parts();
+
+                // Create the received message
+                let network_message =
+                    NetworkMessage::rpc_request_for_testing(protocol_id, data.into());
+                let received_message = ReceivedMessage::new_for_testing(
+                    network_message,
+                    self.peer_network_id(network_id),
+                    Some(Arc::new(res_tx)),
+                );
+                (peer_id, protocol_id, received_message)
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                let rmsg = ReceivedMessage {
-                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                        protocol_id: msg.protocol_id,
-                        priority: 0,
-                        raw_msg: msg.mdata.into(),
-                    }),
-                    sender: self.peer_network_id(network_id),
-                    receive_timestamp_micros: 0,
-                    rpc_replier: None,
-                };
-                (peer_id, msg.protocol_id, rmsg)
+                let network_message =
+                    NetworkMessage::new_direct_send(msg.protocol_id(), msg.data().clone().into());
+                let received_message = ReceivedMessage::new_for_testing(
+                    network_message,
+                    self.peer_network_id(network_id),
+                    None,
+                );
+                (peer_id, msg.protocol_id(), received_message)
             },
         };
 
@@ -344,7 +336,7 @@ pub trait TestNode: ApplicationNode + Sync {
 
         receiver_handle
             .inbound_message_sender
-            .push((sender_peer_id, protocol_id), rmsg)
+            .push((sender_peer_id, protocol_id), received_message)
             .unwrap();
     }
 }

@@ -51,6 +51,7 @@
 //!     RoleType::Validator,
 //!     network_id,
 //!     client_peer_id,
+//!     true,
 //! );
 //! let client = NoiseUpgrader::new(client_context, client_private, client_auth);
 //!
@@ -59,6 +60,7 @@
 //!     RoleType::Validator,
 //!     network_id,
 //!     server_peer_id,
+//!     true,
 //! );
 //! let server = NoiseUpgrader::new(server_context, server_private, server_auth);
 //!

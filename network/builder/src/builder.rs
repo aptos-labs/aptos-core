@@ -175,7 +175,12 @@ impl NetworkBuilder {
             AuthenticationMode::MaybeMutual(identity_key)
         };
 
-        let network_context = NetworkContext::new(role, config.network_id, peer_id);
+        let network_context = NetworkContext::new(
+            role,
+            config.network_id,
+            peer_id,
+            config.enable_messages_with_metadata,
+        );
 
         let mut network_builder = NetworkBuilder::new(
             chain_id,

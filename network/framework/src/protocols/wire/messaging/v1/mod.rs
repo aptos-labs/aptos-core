@@ -25,6 +25,7 @@ use std::{
     io,
     pin::Pin,
     task::{Context, Poll},
+    time::SystemTime,
 };
 use thiserror::Error;
 use tokio_util::{
@@ -32,17 +33,21 @@ use tokio_util::{
     compat::{Compat, FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt},
 };
 
+pub mod metadata;
 #[cfg(test)]
-mod test;
+pub mod test;
 
-/// Most primitive message type set on the network.
+/// The most primitive message type sent on the network
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum NetworkMessage {
     Error(ErrorCode),
-    RpcRequest(RpcRequest),
-    RpcResponse(RpcResponse),
-    DirectSendMsg(DirectSendMsg),
+    RpcRequest(RpcRequest),       // TODO: Deprecate this message type
+    RpcResponse(RpcResponse),     // TODO: Deprecate this message type
+    DirectSendMsg(DirectSendMsg), // TODO: Deprecate this message type
+    RpcRequestAndMetadata(RpcRequestAndMetadata),
+    RpcResponseAndMetadata(RpcResponseAndMetadata),
+    DirectSendAndMetadata(DirectSendAndMetadata),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -54,13 +59,124 @@ pub enum MultiplexMessage {
 
 impl NetworkMessage {
     /// The size of the raw data excluding the headers
-    pub fn data_len(&self) -> usize {
+    pub fn data_length(&self) -> u64 {
         match self {
             NetworkMessage::Error(_) => 0,
-            NetworkMessage::RpcRequest(request) => request.raw_request.len(),
-            NetworkMessage::RpcResponse(response) => response.raw_response.len(),
-            NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
+            NetworkMessage::RpcRequest(request) => request.data_length(),
+            NetworkMessage::RpcResponse(response) => response.data_length(),
+            NetworkMessage::DirectSendMsg(message) => message.data_length(),
+            NetworkMessage::RpcRequestAndMetadata(request) => request.data_length(),
+            NetworkMessage::RpcResponseAndMetadata(response) => response.data_length(),
+            NetworkMessage::DirectSendAndMetadata(message) => message.data_length(),
         }
+    }
+
+    /// Returns the label of the message type
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            NetworkMessage::Error(_) => "Error",
+            NetworkMessage::RpcRequest(_) => "RpcRequest",
+            NetworkMessage::RpcResponse(_) => "RpcResponse",
+            NetworkMessage::DirectSendMsg(_) => "DirectSendMsg",
+            NetworkMessage::RpcRequestAndMetadata(_) => "RpcRequestAndMetadata",
+            NetworkMessage::RpcResponseAndMetadata(_) => "RpcResponseAndMetadata",
+            NetworkMessage::DirectSendAndMetadata(_) => "DirectSendAndMetadata",
+        }
+    }
+
+    /// Creates a direct send message with the default priority
+    pub fn new_direct_send(protocol_id: ProtocolId, raw_msg: Vec<u8>) -> Self {
+        let direct_send_message = DirectSendMsg::new(protocol_id, Priority::default(), raw_msg);
+        NetworkMessage::DirectSendMsg(direct_send_message)
+    }
+
+    /// Creates a direct send message with the default priority and metadata
+    pub fn new_direct_send_and_metadata(
+        protocol_id: ProtocolId,
+        application_send_time: SystemTime,
+        serialized_message: Vec<u8>,
+    ) -> Self {
+        let message_wire_metadata = MessageWireMetadata::new(
+            protocol_id,
+            Priority::default(),
+            Some(application_send_time),
+            None, // The wire send time is updated later (just before sending)
+        );
+        let direct_send_and_metadata =
+            DirectSendAndMetadata::new(serialized_message, message_wire_metadata);
+        NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata)
+    }
+
+    /// Creates an RPC response message with the default priority
+    pub fn new_rpc_response(request_id: RequestId, raw_response: Vec<u8>) -> Self {
+        let rpc_response = RpcResponse::new(request_id, Priority::default(), raw_response);
+        NetworkMessage::RpcResponse(rpc_response)
+    }
+
+    /// Creates an RPC response message with the given priority and given metadata
+    pub fn new_rpc_response_and_metadata(
+        protocol_id: ProtocolId,
+        priority: Priority,
+        request_id: RequestId,
+        application_send_time: Option<SystemTime>,
+        serialized_response: Vec<u8>,
+    ) -> Self {
+        let message_wire_metadata =
+            MessageWireMetadata::new(protocol_id, priority, application_send_time, None);
+        let rpc_response_and_metadata =
+            RpcResponseAndMetadata::new(request_id, serialized_response, message_wire_metadata);
+        NetworkMessage::RpcResponseAndMetadata(rpc_response_and_metadata)
+    }
+
+    /// Creates an RPC request message with the default priority
+    pub fn new_rpc_request(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        raw_request: Vec<u8>,
+    ) -> Self {
+        let rpc_request =
+            RpcRequest::new(protocol_id, request_id, Priority::default(), raw_request);
+        NetworkMessage::RpcRequest(rpc_request)
+    }
+
+    /// Creates an RPC request message with the default priority and given metadata
+    pub fn new_rpc_request_and_metadata(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        application_send_time: SystemTime,
+        serialized_request: Vec<u8>,
+    ) -> Self {
+        let message_wire_metadata = MessageWireMetadata::new(
+            protocol_id,
+            Priority::default(),
+            Some(application_send_time),
+            None, // The wire send time is updated later (just before sending)
+        );
+        let rpc_request_and_metadata =
+            RpcRequestAndMetadata::new(request_id, serialized_request, message_wire_metadata);
+        NetworkMessage::RpcRequestAndMetadata(rpc_request_and_metadata)
+    }
+
+    /// Creates an RPC request message for testing.
+    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
+    pub fn rpc_request_for_testing(protocol_id: ProtocolId, raw_request: Vec<u8>) -> Self {
+        Self::new_rpc_request(protocol_id, 0, raw_request)
+    }
+
+    /// Updates the wire send time for messages that support metadata
+    pub fn update_wire_send_time(&mut self, wire_send_time: SystemTime) {
+        // Get the message wire metadata
+        let message_wire_metadata = match self {
+            NetworkMessage::RpcRequestAndMetadata(request) => &mut request.message_wire_metadata,
+            NetworkMessage::RpcResponseAndMetadata(response) => &mut response.message_wire_metadata,
+            NetworkMessage::DirectSendAndMetadata(message) => &mut message.message_wire_metadata,
+            _ => {
+                return; // This message format does not support metadata
+            },
+        };
+
+        // Update the wire send time
+        message_wire_metadata.update_wire_send_time(wire_send_time);
     }
 }
 
@@ -107,6 +223,11 @@ pub trait IncomingRequest {
     fn protocol_id(&self) -> crate::ProtocolId;
     fn data(&self) -> &Vec<u8>;
 
+    /// Returns the length of the data in the request
+    fn data_length(&self) -> u64 {
+        self.data().len() as u64
+    }
+
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`crate::ProtocolId::from_bytes`]
     fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
@@ -118,14 +239,53 @@ pub trait IncomingRequest {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct RpcRequest {
     /// `protocol_id` is a variant of the ProtocolId enum.
-    pub protocol_id: ProtocolId,
+    protocol_id: ProtocolId,
     /// RequestId for the RPC Request.
-    pub request_id: RequestId,
+    request_id: RequestId,
     /// Request priority in the range 0..=255.
-    pub priority: Priority,
+    priority: Priority,
     /// Request payload. This will be parsed by the application-level handler.
     #[serde(with = "serde_bytes")]
-    pub raw_request: Vec<u8>,
+    raw_request: Vec<u8>,
+}
+
+impl RpcRequest {
+    pub fn new(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        priority: Priority,
+        raw_request: Vec<u8>,
+    ) -> Self {
+        Self {
+            protocol_id,
+            request_id,
+            priority,
+            raw_request,
+        }
+    }
+
+    /// Returns a mutable reference to the raw data of the RPC request
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw_request
+    }
+
+    /// Converts a legacy RCP request into a new RPC request and metadata.
+    /// Note: this should only be required during the migration period.
+    pub fn into_rpc_request_and_metadata(self) -> RpcRequestAndMetadata {
+        let message_wire_metadata =
+            MessageWireMetadata::new(self.protocol_id, self.priority, None, None);
+        RpcRequestAndMetadata::new(self.request_id, self.raw_request, message_wire_metadata)
+    }
+
+    /// Returns the priority of the RPC request
+    pub fn priority(&self) -> Priority {
+        self.priority
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
+    }
 }
 
 impl IncomingRequest for RpcRequest {
@@ -142,25 +302,90 @@ impl IncomingRequest for RpcRequest {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct RpcResponse {
     /// RequestId for corresponding request. This is copied as is from the RpcRequest.
-    pub request_id: RequestId,
+    request_id: RequestId,
     /// Response priority in the range 0..=255. This will likely be same as the priority of
     /// corresponding request.
-    pub priority: Priority,
+    priority: Priority,
     /// Response payload.
     #[serde(with = "serde_bytes")]
-    pub raw_response: Vec<u8>,
+    raw_response: Vec<u8>,
+}
+
+impl RpcResponse {
+    pub fn new(request_id: RequestId, priority: Priority, raw_response: Vec<u8>) -> Self {
+        Self {
+            request_id,
+            priority,
+            raw_response,
+        }
+    }
+
+    /// Returns the raw data of the RPC response and consumes the response
+    pub fn consume_data(self) -> Vec<u8> {
+        self.raw_response
+    }
+
+    /// Returns a mutable reference to the raw data of the RPC response
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw_response
+    }
+
+    /// Returns the length of the data in the response
+    pub fn data_length(&self) -> u64 {
+        self.raw_response.len() as u64
+    }
+
+    /// Converts a legacy RPC response into a new RPC response and metadata.
+    /// Note: this should only be required during the migration period.
+    pub fn into_rpc_response_and_metadata(self) -> RpcResponseAndMetadata {
+        let message_wire_metadata = MessageWireMetadata::new(
+            ProtocolId::Unknown, // Once we fully migrate, this can be removed
+            self.priority,
+            None,
+            None,
+        );
+        RpcResponseAndMetadata::new(self.request_id, self.raw_response, message_wire_metadata)
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct DirectSendMsg {
     /// `protocol_id` is a variant of the ProtocolId enum.
-    pub protocol_id: ProtocolId,
+    protocol_id: ProtocolId,
     /// Message priority in the range 0..=255.
-    pub priority: Priority,
+    priority: Priority,
     /// Message payload.
     #[serde(with = "serde_bytes")]
-    pub raw_msg: Vec<u8>,
+    raw_msg: Vec<u8>,
+}
+
+impl DirectSendMsg {
+    pub fn new(protocol_id: ProtocolId, priority: Priority, raw_msg: Vec<u8>) -> Self {
+        Self {
+            protocol_id,
+            priority,
+            raw_msg,
+        }
+    }
+
+    /// Returns a mutable reference to the raw data of the direct send message
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw_msg
+    }
+
+    /// Converts a legacy direct send message into a new direct send and metadata.
+    /// Note: this should only be required during the migration period.
+    pub fn into_direct_send_and_metadata(self) -> DirectSendAndMetadata {
+        let message_wire_metadata =
+            MessageWireMetadata::new(self.protocol_id, self.priority, None, None);
+        DirectSendAndMetadata::new(self.raw_msg, message_wire_metadata)
+    }
 }
 
 impl IncomingRequest for DirectSendMsg {
@@ -170,6 +395,190 @@ impl IncomingRequest for DirectSendMsg {
 
     fn data(&self) -> &Vec<u8> {
         &self.raw_msg
+    }
+}
+
+/// This struct contains message metadata for each message sent along the wire
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct MessageWireMetadata {
+    protocol_id: ProtocolId,                   // The protocol ID of the message
+    priority: Priority,                        // The priority of the message
+    application_send_time: Option<SystemTime>, // The time the message was sent by the application
+    wire_send_time: Option<SystemTime>,        // The time the message was sent on the wire
+}
+
+impl MessageWireMetadata {
+    pub fn new(
+        protocol_id: ProtocolId,
+        priority: Priority,
+        application_send_time: Option<SystemTime>,
+        wire_send_time: Option<SystemTime>,
+    ) -> Self {
+        Self {
+            protocol_id,
+            priority,
+            application_send_time,
+            wire_send_time,
+        }
+    }
+
+    /// Returns the application send time of the message
+    pub fn application_send_time(&self) -> Option<SystemTime> {
+        self.application_send_time
+    }
+
+    /// Returns the protocol ID of the message
+    pub fn protocol_id(&self) -> ProtocolId {
+        self.protocol_id
+    }
+
+    /// Updates the wire send time to the given value
+    pub fn update_wire_send_time(&mut self, wire_send_time: SystemTime) {
+        self.wire_send_time = Some(wire_send_time);
+    }
+
+    /// Returns the wire send time of the message
+    pub fn wire_send_time(&self) -> Option<SystemTime> {
+        self.wire_send_time
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct RpcRequestAndMetadata {
+    request_id: RequestId, // The ID for the RPC request
+    #[serde(with = "serde_bytes")]
+    serialized_request: Vec<u8>, // The serialized request bytes
+    message_wire_metadata: MessageWireMetadata, // Metadata associated with the request
+}
+
+impl RpcRequestAndMetadata {
+    pub fn new(
+        request_id: RequestId,
+        serialized_request: Vec<u8>,
+        message_wire_metadata: MessageWireMetadata,
+    ) -> Self {
+        Self {
+            request_id,
+            serialized_request,
+            message_wire_metadata,
+        }
+    }
+
+    /// Returns a mutable reference to the raw data of the RPC request
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.serialized_request
+    }
+
+    /// Returns the priority of the RPC request
+    pub fn priority(&self) -> Priority {
+        self.message_wire_metadata.priority
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
+    }
+
+    /// Returns a reference to the message wire metadata
+    pub fn message_wire_metadata(&self) -> &MessageWireMetadata {
+        &self.message_wire_metadata
+    }
+}
+
+impl IncomingRequest for RpcRequestAndMetadata {
+    fn protocol_id(&self) -> crate::ProtocolId {
+        self.message_wire_metadata.protocol_id
+    }
+
+    fn data(&self) -> &Vec<u8> {
+        &self.serialized_request
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct RpcResponseAndMetadata {
+    request_id: RequestId, // The ID for the RPC request that this response corresponds to
+    #[serde(with = "serde_bytes")]
+    serialized_response: Vec<u8>, // The serialized response bytes
+    message_wire_metadata: MessageWireMetadata, // Metadata associated with the response
+}
+
+impl RpcResponseAndMetadata {
+    pub fn new(
+        request_id: RequestId,
+        serialized_response: Vec<u8>,
+        message_wire_metadata: MessageWireMetadata,
+    ) -> Self {
+        Self {
+            request_id,
+            serialized_response,
+            message_wire_metadata,
+        }
+    }
+
+    /// Returns the raw data of the RPC response and consumes the response
+    pub fn consume_data(self) -> Vec<u8> {
+        self.serialized_response
+    }
+
+    /// Returns the length of the data in the response
+    pub fn data_length(&self) -> u64 {
+        self.serialized_response.len() as u64
+    }
+
+    /// Returns a mutable reference to the raw data of the RPC response
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.serialized_response
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
+    }
+
+    /// Returns a reference to the message wire metadata
+    pub fn message_wire_metadata(&self) -> &MessageWireMetadata {
+        &self.message_wire_metadata
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct DirectSendAndMetadata {
+    #[serde(with = "serde_bytes")]
+    serialized_message: Vec<u8>, // The serialized message bytes
+    message_wire_metadata: MessageWireMetadata, // Metadata associated with the message
+}
+
+impl DirectSendAndMetadata {
+    pub fn new(serialized_message: Vec<u8>, message_wire_metadata: MessageWireMetadata) -> Self {
+        Self {
+            serialized_message,
+            message_wire_metadata,
+        }
+    }
+
+    /// Returns a mutable reference to the raw data of the direct send message
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.serialized_message
+    }
+
+    /// Returns a reference to the message wire metadata
+    pub fn message_wire_metadata(&self) -> &MessageWireMetadata {
+        &self.message_wire_metadata
+    }
+}
+
+impl IncomingRequest for DirectSendAndMetadata {
+    fn protocol_id(&self) -> crate::ProtocolId {
+        self.message_wire_metadata.protocol_id
+    }
+
+    fn data(&self) -> &Vec<u8> {
+        &self.serialized_message
     }
 }
 

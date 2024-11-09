@@ -24,19 +24,25 @@ use crate::{
     peer_manager::{PeerManagerError, TransportNotification},
     protocols::{
         direct_send::Message,
-        network::ReceivedMessage,
+        network::{ReceivedMessage, SerializedRequest},
         rpc::{error::RpcError, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
-            DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
-            MultiplexMessageStream, NetworkMessage, Priority, ReadError, WriteError,
+            metadata::{
+                MessageLatencyType, MessageMetadata, MessageReceiveType, MessageSendType,
+                MessageStreamType, MultiplexMessageWithMetadata, NetworkMessageWithMetadata,
+                ReceivedMessageMetadata, SentMessageMetadata,
+            },
+            DirectSendAndMetadata, ErrorCode, IncomingRequest, MultiplexMessage,
+            MultiplexMessageSink, MultiplexMessageStream, NetworkMessage, ReadError,
+            RpcRequestAndMetadata, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::network_id::{NetworkContext, NetworkId, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -50,7 +56,12 @@ use futures::{
 };
 use futures_util::stream::select;
 use serde::Serialize;
-use std::{collections::HashMap, fmt, panic, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt, panic,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::{runtime::Handle, time::timeout};
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
@@ -59,7 +70,7 @@ use tokio_util::compat::{
 #[cfg(test)]
 mod test;
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(test)]
 pub mod fuzzing;
 
 /// Requests [`Peer`] receives from the [`PeerManager`](crate::peer_manager::PeerManager).
@@ -250,6 +261,7 @@ where
                 },
                 // Handle a new inbound MultiplexMessage that we've just read off
                 // the wire from the remote peer.
+                // TODO: move this to a separate thread!
                 maybe_message = reader.next() => {
                     match maybe_message {
                         Some(message) =>  {
@@ -274,7 +286,7 @@ where
                 maybe_response = self.inbound_rpcs.next_completed_response() => {
                     // Extract the relevant metadata from the message
                     let message_metadata = match &maybe_response {
-                        Ok((response, protocol_id)) => Some((response.request_id, *protocol_id)),
+                        Ok((response_with_metadata, protocol_id)) => Some((response_with_metadata.request_id(), *protocol_id)),
                         _ => None,
                     };
 
@@ -334,19 +346,24 @@ where
         max_frame_size: usize,
         max_message_size: usize,
     ) -> (
-        aptos_channel::Sender<(), NetworkMessage>,
+        aptos_channel::Sender<(), NetworkMessageWithMetadata>,
         oneshot::Sender<()>,
     ) {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (aptos_channel::Sender<(), NetworkMessage>, _) =
-            aptos_channel::new(
-                QueueStyle::KLAST,
-                1024,
-                Some(&counters::PENDING_WIRE_MESSAGES),
-            );
+        let (write_reqs_tx, mut write_reqs_rx): (
+            aptos_channel::Sender<(), NetworkMessageWithMetadata>,
+            _,
+        ) = aptos_channel::new(
+            QueueStyle::KLAST,
+            1024,
+            Some(&counters::PENDING_WIRE_MESSAGES),
+        );
         let (close_tx, mut close_rx) = oneshot::channel();
 
-        let (mut msg_tx, msg_rx) = aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
+        let (mut msg_tx, msg_rx) = aptos_channels::new::<MultiplexMessageWithMetadata>(
+            1024,
+            &counters::PENDING_MULTIPLEX_MESSAGE,
+        );
         let (stream_msg_tx, stream_msg_rx) =
             aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
 
@@ -357,8 +374,33 @@ where
                 NetworkSchema::new(&network_context).connection_metadata(&connection_metadata);
             loop {
                 futures::select! {
-                    message = stream.select_next_some() => {
-                        if let Err(err) = timeout(transport::TRANSPORT_TIMEOUT,writer.send(&message)).await {
+                    message_with_metadata = stream.select_next_some() => {
+                        // Extract the message and metadata
+                        let (message_metadata, mut message) = message_with_metadata.into_parts();
+                        let mut sent_message_metadata = match message_metadata.into_sent_metadata() {
+                            Some(sent_message_metadata) => sent_message_metadata,
+                            None => {
+                                error!(
+                                    "{} Failed to write message (metadata has the incorrect type)! Expected a sent message!",
+                                    network_context,
+                                );
+                                continue; // Skip ahead to the next event
+                            }
+                        };
+
+                        // Update the wire send start time for the message and metadata
+                        match &mut message {
+                            MultiplexMessage::Message(network_message) => {
+                                network_message.update_wire_send_time(SystemTime::now());
+                            }
+                            MultiplexMessage::Stream(_stream_message) => {
+                                // TODO: handle stream messages and wire send times!
+                            }
+                        };
+                        sent_message_metadata.update_wire_send_start_time();
+
+                        // Send the message along the wire
+                        if let Err(err) = timeout(transport::TRANSPORT_TIMEOUT, writer.send(&message)).await {
                             warn!(
                                 log_context,
                                 error = %err,
@@ -366,6 +408,9 @@ where
                                 network_context,
                                 remote_peer_id.short_str(),
                             );
+                        } else {
+                            // Otherwise, mark the message as sent along the wire
+                            sent_message_metadata.mark_message_as_sent();
                         }
                     }
                     _ = close_rx => {
@@ -416,17 +461,23 @@ where
                 },
             }
         };
+
         // the task ends when the write_reqs_tx is dropped
         let multiplex_task = async move {
             let mut outbound_stream =
                 OutboundStream::new(max_frame_size, max_message_size, stream_msg_tx);
-            while let Some(message) = write_reqs_rx.next().await {
+            while let Some(message_with_metadata) = write_reqs_rx.next().await {
                 // either channel full would block the other one
-                let result = if outbound_stream.should_stream(&message) {
-                    outbound_stream.stream_message(message).await
+                let result = if outbound_stream.should_stream(&message_with_metadata) {
+                    outbound_stream.stream_message(message_with_metadata).await
                 } else {
+                    // Transform the message into a multiplex message
+                    let multiplex_message_with_metadata =
+                        message_with_metadata.into_multiplex_message();
+
+                    // Send the message to the writer task
                     msg_tx
-                        .send(MultiplexMessage::Message(message))
+                        .send(multiplex_message_with_metadata)
                         .await
                         .map_err(|_| anyhow::anyhow!("Writer task ended"))
                 };
@@ -440,57 +491,63 @@ where
                 }
             }
         };
+
         executor.spawn(writer_task);
         executor.spawn(multiplex_task);
+
         (write_reqs_tx, close_tx)
     }
 
     fn handle_inbound_network_message(
         &mut self,
-        message: NetworkMessage,
+        network_message: NetworkMessage,
+        received_message_metadata: ReceivedMessageMetadata,
+        streamed_message: bool,
     ) -> Result<(), PeerManagerError> {
-        match &message {
-            NetworkMessage::DirectSendMsg(direct) => {
-                let data_len = direct.raw_msg.len();
-                network_application_inbound_traffic(
-                    self.network_context,
-                    direct.protocol_id,
-                    data_len as u64,
+        // Update the message transport latency metrics
+        let network_id = self.network_context.network_id();
+        update_transport_latency_metrics(network_id, &network_message, streamed_message);
+
+        // Process the inbound network message
+        match network_message {
+            NetworkMessage::DirectSendMsg(message) => {
+                let message_and_metadata = message.into_direct_send_and_metadata();
+                self.process_inbound_direct_send_message(
+                    message_and_metadata,
+                    received_message_metadata,
                 );
-                match self.upstream_handlers.get(&direct.protocol_id) {
-                    None => {
-                        counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
-                            .inc_by(data_len as u64);
-                    },
-                    Some(handler) => {
-                        let key = (self.connection_metadata.remote_peer_id, direct.protocol_id);
-                        let sender = self.connection_metadata.remote_peer_id;
-                        let network_id = self.network_context.network_id();
-                        let sender = PeerNetworkId::new(network_id, sender);
-                        match handler.push(key, ReceivedMessage::new(message, sender)) {
-                            Err(_err) => {
-                                // NOTE: aptos_channel never returns other than Ok(()), but we might switch to tokio::sync::mpsc and then this would work
-                                counters::direct_send_messages(
-                                    &self.network_context,
-                                    DECLINED_LABEL,
-                                )
-                                .inc();
-                                counters::direct_send_bytes(&self.network_context, DECLINED_LABEL)
-                                    .inc_by(data_len as u64);
-                            },
-                            Ok(_) => {
-                                counters::direct_send_messages(
-                                    &self.network_context,
-                                    RECEIVED_LABEL,
-                                )
-                                .inc();
-                                counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL)
-                                    .inc_by(data_len as u64);
-                            },
-                        }
-                    },
-                }
+            },
+            NetworkMessage::DirectSendAndMetadata(message_and_metadata) => {
+                self.process_inbound_direct_send_message(
+                    message_and_metadata,
+                    received_message_metadata,
+                );
+            },
+            NetworkMessage::RpcRequest(rpc_request) => {
+                let request_and_metadata = rpc_request.into_rpc_request_and_metadata();
+                self.process_inbound_rpc_request_message(
+                    request_and_metadata,
+                    received_message_metadata,
+                );
+            },
+            NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+                self.process_inbound_rpc_request_message(
+                    request_and_metadata,
+                    received_message_metadata,
+                );
+            },
+            NetworkMessage::RpcResponse(response) => {
+                let response_and_metadata = response.into_rpc_response_and_metadata();
+                self.outbound_rpcs.process_inbound_rpc_response_message(
+                    response_and_metadata,
+                    received_message_metadata,
+                );
+            },
+            NetworkMessage::RpcResponseAndMetadata(response_and_metadata) => {
+                self.outbound_rpcs.process_inbound_rpc_response_message(
+                    response_and_metadata,
+                    received_message_metadata,
+                );
             },
             NetworkMessage::Error(error_msg) => {
                 warn!(
@@ -503,42 +560,110 @@ where
                     error_msg,
                 );
             },
-            NetworkMessage::RpcRequest(request) => {
-                match self.upstream_handlers.get(&request.protocol_id) {
-                    None => {
-                        counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
-                            .inc_by(request.raw_request.len() as u64);
-                    },
-                    Some(handler) => {
-                        let sender = self.connection_metadata.remote_peer_id;
-                        let network_id = self.network_context.network_id();
-                        let sender = PeerNetworkId::new(network_id, sender);
-                        if let Err(err) = self
-                            .inbound_rpcs
-                            .handle_inbound_request(handler, ReceivedMessage::new(message, sender))
-                        {
-                            warn!(
-                                NetworkSchema::new(&self.network_context)
-                                    .connection_metadata(&self.connection_metadata),
-                                error = %err,
-                                "{} Error handling inbound rpc request: {}",
-                                self.network_context,
-                                err
-                            );
-                        }
-                    },
-                }
-            },
-            NetworkMessage::RpcResponse(_) => {
-                // non-reference cast identical to this match case
-                let NetworkMessage::RpcResponse(response) = message else {
-                    unreachable!("NetworkMessage type changed between match and let")
-                };
-                self.outbound_rpcs.handle_inbound_response(response)
-            },
         };
+
         Ok(())
+    }
+
+    /// Processes an inbound direct send message
+    fn process_inbound_direct_send_message(
+        &mut self,
+        message_and_metadata: DirectSendAndMetadata,
+        mut received_message_metadata: ReceivedMessageMetadata,
+    ) {
+        // Update the inbound traffic metrics
+        let protocol_id = message_and_metadata.protocol_id();
+        let message_length = message_and_metadata.data_length();
+        network_application_inbound_traffic(self.network_context, protocol_id, message_length);
+
+        // Attempt to get the handler for the protocol id
+        if let Some(handler) = self.upstream_handlers.get(&protocol_id) {
+            // Extract the message and context
+            let key = (self.connection_metadata.remote_peer_id, protocol_id);
+            let remote_peer_id = self.connection_metadata.remote_peer_id;
+            let network_id = self.network_context.network_id();
+            let sender = PeerNetworkId::new(network_id, remote_peer_id);
+
+            // Update the received message metadata
+            received_message_metadata
+                .update_protocol_id_and_message_type(protocol_id, MessageReceiveType::DirectSend);
+
+            // Create a new received message and forward it to the handler
+            let network_message = NetworkMessage::DirectSendAndMetadata(message_and_metadata);
+            let message_metadata =
+                MessageMetadata::new_received_metadata(received_message_metadata);
+            let received_message = ReceivedMessage::new(network_message, message_metadata, sender);
+
+            // Forward the message to the handler
+            match handler.push(key, received_message) {
+                Err(_err) => {
+                    // NOTE: aptos_channel never returns other than Ok(()), but we might switch
+                    // to tokio::sync::mpsc and then this would work
+                    counters::direct_send_messages(&self.network_context, DECLINED_LABEL).inc();
+                    counters::direct_send_bytes(&self.network_context, DECLINED_LABEL)
+                        .inc_by(message_length);
+                },
+                Ok(_) => {
+                    counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();
+                    counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL)
+                        .inc_by(message_length);
+                },
+            }
+        } else {
+            // No handler was found for the protocol ID!
+            counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
+            counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
+                .inc_by(message_length);
+        }
+    }
+
+    /// Processes an inbound RPC request message
+    fn process_inbound_rpc_request_message(
+        &mut self,
+        request_and_metadata: RpcRequestAndMetadata,
+        mut received_message_metadata: ReceivedMessageMetadata,
+    ) {
+        // Extract the protocol ID and message length
+        let protocol_id = request_and_metadata.protocol_id();
+        let message_length = request_and_metadata.data_length();
+
+        // Attempt to get the handler for the protocol id
+        if let Some(handler) = self.upstream_handlers.get(&protocol_id) {
+            // Extract the message and context
+            let remote_peer_id = self.connection_metadata.remote_peer_id;
+            let network_id = self.network_context.network_id();
+            let sender = PeerNetworkId::new(network_id, remote_peer_id);
+
+            // Update the received message metadata
+            received_message_metadata
+                .update_protocol_id_and_message_type(protocol_id, MessageReceiveType::RpcRequest);
+
+            // Create a new received message and forward it to the handler
+            let network_message = NetworkMessage::RpcRequestAndMetadata(request_and_metadata);
+            let message_metadata =
+                MessageMetadata::new_received_metadata(received_message_metadata);
+            let received_message = ReceivedMessage::new(network_message, message_metadata, sender);
+
+            // Forward the message to the handler
+            if let Err(err) = self
+                .inbound_rpcs
+                .handle_inbound_request(handler, received_message)
+            {
+                warn!(
+                    NetworkSchema::new(&self.network_context)
+                        .connection_metadata(&self.connection_metadata),
+                    error = %err,
+                    "{} Error handling inbound rpc request: {}",
+                    self.network_context,
+                    err
+                );
+            }
+        } else {
+            // No handler was found for the protocol ID!
+            counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
+            counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
+                .inc_by(message_length);
+        }
     }
 
     fn handle_inbound_stream_message(
@@ -550,8 +675,25 @@ where
                 self.inbound_stream.new_stream(header)?;
             },
             StreamMessage::Fragment(fragment) => {
-                if let Some(message) = self.inbound_stream.append_fragment(fragment)? {
-                    self.handle_inbound_network_message(message)?;
+                if let Some((stream_start_time, network_message)) =
+                    self.inbound_stream.append_fragment(fragment)?
+                {
+                    // Create a new received message metadata
+                    let mut received_message_metadata = ReceivedMessageMetadata::new(
+                        self.network_context.network_id(),
+                        stream_start_time,
+                    );
+
+                    // Update the message stream type
+                    received_message_metadata
+                        .update_message_stream_type(MessageStreamType::StreamedMessageTail);
+
+                    // Handle the message
+                    self.handle_inbound_network_message(
+                        network_message,
+                        received_message_metadata,
+                        true,
+                    )?;
                 }
             },
         }
@@ -561,7 +703,7 @@ where
     fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessageWithMetadata>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -571,6 +713,7 @@ where
             self.remote_peer_id().short_str()
         );
 
+        // Unpack the message result
         let message = match message {
             Ok(message) => message,
             Err(err) => match err {
@@ -582,8 +725,18 @@ where
                     let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);
+                    let sent_message_metadata = SentMessageMetadata::new(
+                        self.network_context.network_id(),
+                        None,
+                        MessageSendType::DirectSend,
+                        Some(SystemTime::now()),
+                    );
+                    let message_with_metadata = NetworkMessageWithMetadata::new(
+                        MessageMetadata::new_sent_metadata(sent_message_metadata),
+                        message,
+                    );
 
-                    write_reqs_tx.push((), message)?;
+                    write_reqs_tx.push((), message_with_metadata)?;
                     return Err(err.into());
                 },
                 ReadError::IoError(_) => {
@@ -594,8 +747,18 @@ where
             },
         };
 
+        // Handle the message based on the type
         match message {
-            MultiplexMessage::Message(message) => self.handle_inbound_network_message(message),
+            MultiplexMessage::Message(message) => {
+                // Create a new received message metadata
+                let received_message_metadata = ReceivedMessageMetadata::new(
+                    self.network_context.network_id(),
+                    SystemTime::now(),
+                );
+
+                // Handle the message
+                self.handle_inbound_network_message(message, received_message_metadata, false)
+            },
             MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message),
         }
     }
@@ -603,7 +766,7 @@ where
     fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessageWithMetadata>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
@@ -614,18 +777,20 @@ where
             // To send an outbound DirectSendMsg, we just bump some counters and
             // push it onto our outbound writer queue.
             PeerRequest::SendDirectSend(message) => {
-                // Create the direct send message
-                let message_len = message.mdata.len();
-                let protocol_id = message.protocol_id;
-                let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id,
-                    priority: Priority::default(),
-                    raw_msg: Vec::from(message.mdata.as_ref()),
-                });
+                // Get the data length and protocol id
+                let data_len = message.data().len();
+                let protocol_id = message.protocol_id();
 
-                match write_reqs_tx.push((), message) {
+                // Convert the message into a network message with metadata
+                let message_with_metadata = message.into_network_message(
+                    self.network_context.network_id(),
+                    self.network_context.enable_messages_with_metadata(),
+                );
+
+                // Send the message to the outbound writer queue
+                match write_reqs_tx.push((), message_with_metadata) {
                     Ok(_) => {
-                        self.update_outbound_direct_send_metrics(protocol_id, message_len as u64);
+                        self.update_outbound_direct_send_metrics(protocol_id, data_len as u64);
                     },
                     Err(e) => {
                         counters::direct_send_messages(&self.network_context, FAILED_LABEL).inc();
@@ -642,7 +807,7 @@ where
                 }
             },
             PeerRequest::SendRpc(request) => {
-                let protocol_id = request.protocol_id;
+                let protocol_id = request.protocol_id();
                 if let Err(e) = self
                     .outbound_rpcs
                     .handle_outbound_request(request, write_reqs_tx)
@@ -682,7 +847,7 @@ where
 
     async fn do_shutdown(
         mut self,
-        write_req_tx: aptos_channel::Sender<(), NetworkMessage>,
+        write_req_tx: aptos_channel::Sender<(), NetworkMessageWithMetadata>,
         writer_close_tx: oneshot::Sender<()>,
         reason: DisconnectReason,
     ) {
@@ -730,6 +895,72 @@ where
             "{} Peer actor for '{}' terminated",
             self.network_context,
             remote_peer_id.short_str()
+        );
+    }
+}
+
+/// Updates the transport latency metrics for the received message
+fn update_transport_latency_metrics(
+    network_id: NetworkId,
+    message: &NetworkMessage,
+    streamed_message: bool,
+) {
+    // Get the message receive type and metadata
+    let (message_receive_type, message_wire_metadata) = match message {
+        NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => (
+            MessageReceiveType::RpcRequest,
+            request_and_metadata.message_wire_metadata(),
+        ),
+        NetworkMessage::RpcResponseAndMetadata(response_and_metadata) => (
+            MessageReceiveType::RpcResponse,
+            response_and_metadata.message_wire_metadata(),
+        ),
+        NetworkMessage::DirectSendAndMetadata(message_and_metadata) => (
+            MessageReceiveType::DirectSend,
+            message_and_metadata.message_wire_metadata(),
+        ),
+        _ => return, // There's no message metadata to extract
+    };
+
+    // Determine the message stream type
+    let message_stream_type = if streamed_message {
+        MessageStreamType::StreamedMessageTail
+    } else {
+        MessageStreamType::NonStreamedMessage
+    };
+
+    // Observe the application to receive time
+    if let Some(application_send_time) = message_wire_metadata.application_send_time() {
+        // Calculate the application to receive time
+        let application_to_receive_time = application_send_time
+            .elapsed()
+            .unwrap_or_default()
+            .as_secs_f64();
+
+        // Update the latency metrics
+        counters::observe_message_transport_latency(
+            &network_id,
+            &message_wire_metadata.protocol_id(),
+            &message_receive_type,
+            &message_stream_type,
+            &MessageLatencyType::ApplicationSendToReceive,
+            application_to_receive_time,
+        );
+    }
+
+    // Observe the wire to receive time
+    if let Some(wire_send_time) = message_wire_metadata.wire_send_time() {
+        // Calculate the wire send to receive time
+        let wire_send_to_receive_time = wire_send_time.elapsed().unwrap_or_default().as_secs_f64();
+
+        // Update the latency metrics
+        counters::observe_message_transport_latency(
+            &network_id,
+            &message_wire_metadata.protocol_id(),
+            &message_receive_type,
+            &message_stream_type,
+            &MessageLatencyType::WireSendToReceive,
+            wire_send_to_receive_time,
         );
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     peer::Peer,
     protocols::wire::{
         handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
-        messaging::v1::{MultiplexMessage, MultiplexMessageSink},
+        messaging::v1::{test::arb_network_message, MultiplexMessage, MultiplexMessageSink},
     },
     testutils::fake_socket::ReadOnlyTestSocketVec,
     transport::{Connection, ConnectionId, ConnectionMetadata},
@@ -20,23 +20,28 @@ use aptos_proptest_helpers::ValueGenerator;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{executor::block_on, future, io::AsyncReadExt, sink::SinkExt, stream::StreamExt};
-use proptest::{arbitrary::any, collection::vec};
+use proptest::collection::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// Generate a sequence of `MultiplexMessage`, bcs serialize them, and write them
 /// out to a buffer using our length-prefixed message codec.
 pub fn generate_corpus(gen: &mut ValueGenerator) -> Vec<u8> {
-    let network_msgs = gen.generate(vec(any::<MultiplexMessage>(), 1..20));
+    let network_msgs = gen.generate(vec(arb_network_message(64 * 255), 1..20));
+    let multiplex_msgs = network_msgs
+        .into_iter()
+        .map(MultiplexMessage::Message)
+        .collect::<Vec<_>>();
 
     let (write_socket, mut read_socket) = MemorySocket::new_pair();
     let mut writer = MultiplexMessageSink::new(write_socket, constants::MAX_FRAME_SIZE);
 
     // Write the `MultiplexMessage`s to a fake socket
     let f_send = async move {
-        for network_msg in &network_msgs {
-            writer.send(network_msg).await.unwrap();
+        for multiplex_msg in &multiplex_msgs {
+            writer.send(multiplex_msg).await.unwrap();
         }
     };
+
     // Read the serialized `MultiplexMessage`s from the fake socket
     let f_recv = async move {
         let mut buf = Vec::new();

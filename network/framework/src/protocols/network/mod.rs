@@ -9,11 +9,14 @@ use crate::{
     error::NetworkError,
     peer::DisconnectReason,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::wire::messaging::v1::{IncomingRequest, NetworkMessage},
+    protocols::wire::messaging::v1::{
+        metadata::{MessageMetadata, ReceivedMessageMetadata},
+        IncomingRequest, NetworkMessage,
+    },
     ProtocolId,
 };
 use aptos_channels::aptos_channel;
-use aptos_config::network_id::PeerNetworkId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -26,7 +29,15 @@ use futures::{
 use futures_util::ready;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    fmt::Debug,
+    future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -135,53 +146,84 @@ impl NetworkApplicationConfig {
 
 #[derive(Debug, Clone)]
 pub struct ReceivedMessage {
-    pub message: NetworkMessage,
-    pub sender: PeerNetworkId,
-
-    // unix microseconds
-    pub receive_timestamp_micros: u64,
-
-    pub rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
+    network_message: NetworkMessage,
+    message_metadata: MessageMetadata,
+    sender: PeerNetworkId,
+    rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
 }
 
 impl ReceivedMessage {
-    pub fn new(message: NetworkMessage, sender: PeerNetworkId) -> Self {
-        let rx_at = unix_micros();
+    pub fn new(
+        network_message: NetworkMessage,
+        message_metadata: MessageMetadata,
+        sender: PeerNetworkId,
+    ) -> Self {
         Self {
-            message,
+            network_message,
+            message_metadata,
             sender,
-            receive_timestamp_micros: rx_at,
             rpc_replier: None,
         }
     }
 
-    pub fn protocol_id(&self) -> Option<ProtocolId> {
-        match &self.message {
-            NetworkMessage::Error(_e) => None,
-            NetworkMessage::RpcRequest(req) => Some(req.protocol_id),
-            NetworkMessage::RpcResponse(_response) => {
-                // design of RpcResponse lacking ProtocolId requires global rpc counter (or at least per-peer) and requires reply matching globally or per-peer
-                None
-            },
-            NetworkMessage::DirectSendMsg(msg) => Some(msg.protocol_id),
+    /// Creates a new received message with dummy metadata.
+    /// Note: this is only for testing purposes (but, it cannot be marked
+    /// as `#[cfg(test)]` because of several non-wrapped test utils).
+    pub fn new_for_testing(
+        network_message: NetworkMessage,
+        sender: PeerNetworkId,
+        rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
+    ) -> Self {
+        // Create a dummy received message metadata
+        let message_metadata = MessageMetadata::new_received_metadata(
+            ReceivedMessageMetadata::new(NetworkId::Validator, SystemTime::now()),
+        );
+
+        // Return the new received message
+        Self {
+            network_message,
+            message_metadata,
+            sender,
+            rpc_replier,
         }
     }
 
-    pub fn protocol_id_as_str(&self) -> &'static str {
-        match &self.message {
-            NetworkMessage::Error(_) => "error",
-            NetworkMessage::RpcRequest(rr) => rr.protocol_id.as_str(),
-            NetworkMessage::RpcResponse(_) => "rpc response",
-            NetworkMessage::DirectSendMsg(dm) => dm.protocol_id.as_str(),
-        }
+    /// Consumes the message and returns the individual parts
+    pub fn into_parts(
+        self,
+    ) -> (
+        NetworkMessage,
+        MessageMetadata,
+        PeerNetworkId,
+        Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
+    ) {
+        (
+            self.network_message,
+            self.message_metadata,
+            self.sender,
+            self.rpc_replier,
+        )
     }
-}
 
-impl PartialEq for ReceivedMessage {
-    fn eq(&self, other: &Self) -> bool {
-        (self.message == other.message)
-            && (self.receive_timestamp_micros == other.receive_timestamp_micros)
-            && (self.sender == other.sender)
+    /// Returns a reference to the network message
+    pub fn network_message(&self) -> &NetworkMessage {
+        &self.network_message
+    }
+
+    /// Returns the sender of the received message
+    pub fn sender(&self) -> PeerNetworkId {
+        self.sender
+    }
+
+    /// Sets the RPC replier channel to the given value
+    pub fn set_rpc_replier(&mut self, rpc_replier: Arc<oneshot::Sender<Result<Bytes, RpcError>>>) {
+        self.rpc_replier = Some(rpc_replier);
+    }
+
+    #[cfg(test)]
+    /// Takes the RPC replier channel. Note: this is only used for testing.
+    pub fn take_rpc_replier(&mut self) -> Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>> {
+        self.rpc_replier.take()
     }
 }
 
@@ -263,40 +305,58 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
     }
 }
 
-fn unix_micros() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_micros() as u64
-}
-
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
 /// type, logging and dropping messages that fail to deserialize.
 fn received_message_to_event<TMessage: Message>(
-    message: ReceivedMessage,
+    received_message: ReceivedMessage,
 ) -> Option<Event<TMessage>> {
-    let peer_id = message.sender.peer_id();
-    let ReceivedMessage {
-        message,
-        sender: _sender,
-        receive_timestamp_micros: rx_at,
-        rpc_replier,
-    } = message;
-    let dequeue_at = unix_micros();
-    let dt_micros = dequeue_at - rx_at;
-    let dt_seconds = (dt_micros as f64) / 1000000.0;
-    match message {
-        NetworkMessage::RpcRequest(rpc_req) => {
-            crate::counters::inbound_queue_delay_observe(rpc_req.protocol_id, dt_seconds);
+    // Unpack the received message
+    let (network_message, message_metadata, sender, rpc_replier) = received_message.into_parts();
+
+    // Update the metadata as having sent the message to the application
+    let mut received_message_metadata = match message_metadata.into_received_metadata() {
+        Some(metadata) => metadata,
+        None => {
+            error!("Failed to transform message into event! Metadata is not a received message!");
+            return None;
+        },
+    };
+    received_message_metadata.mark_message_as_application_received();
+
+    // Transform the message based on its type
+    let peer_id = sender.peer_id();
+    match network_message {
+        NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
-            request_to_network_event(peer_id, &rpc_req)
-                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
+            request_to_network_event(peer_id, &request_and_metadata).map(|msg| {
+                Event::RpcRequest(
+                    peer_id,
+                    msg,
+                    request_and_metadata.protocol_id(),
+                    rpc_replier,
+                )
+            })
         },
-        NetworkMessage::DirectSendMsg(request) => {
-            crate::counters::inbound_queue_delay_observe(request.protocol_id, dt_seconds);
-            request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
+        NetworkMessage::DirectSendAndMetadata(message_and_metadata) => {
+            request_to_network_event(peer_id, &message_and_metadata)
+                .map(|msg| Event::Message(peer_id, msg))
         },
-        _ => None,
+        // TODO: remove support for these once we've migrated to the new message formats (above)
+        NetworkMessage::RpcRequest(request) => {
+            let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
+            request_to_network_event(peer_id, &request)
+                .map(|msg| Event::RpcRequest(peer_id, msg, request.protocol_id(), rpc_replier))
+        },
+        NetworkMessage::DirectSendMsg(message) => {
+            request_to_network_event(peer_id, &message).map(|msg| Event::Message(peer_id, msg))
+        },
+        _ => {
+            error!(
+                "Failed to transform message into event! Unexpected message type: {:?}",
+                network_message.get_label()
+            );
+            None
+        },
     }
 }
 
@@ -476,6 +536,11 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
 pub trait SerializedRequest {
     fn protocol_id(&self) -> ProtocolId;
     fn data(&self) -> &Bytes;
+
+    /// Returns the length of the data in the request
+    fn data_length(&self) -> u64 {
+        self.data().len() as u64
+    }
 
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]

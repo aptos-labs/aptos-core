@@ -20,7 +20,7 @@ use crate::{
         },
         wire::{
             handshake::v1::{ProtocolId, ProtocolIdSet},
-            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+            messaging::v1::NetworkMessage,
         },
     },
     transport::ConnectionMetadata,
@@ -1203,44 +1203,47 @@ async fn wait_for_network_event(
         Ok(peer_manager_request) => {
             let (protocol_id, peer_manager_notification) = match peer_manager_request {
                 PeerManagerRequest::SendRpc(peer_id, outbound_rpc_request) => {
+                    // Unpack the request
+                    let (_, protocol_id, data, res_tx, timeout) = outbound_rpc_request.into_parts();
+
                     // Verify the request is correct
                     assert!(is_rpc_request);
                     assert_eq!(peer_id, expected_peer_id);
-                    assert_eq!(Some(outbound_rpc_request.protocol_id), expected_rpc_protocol_id);
-                    assert_eq!(outbound_rpc_request.timeout, message_wait_time);
+                    assert_eq!(Some(protocol_id), expected_rpc_protocol_id);
+                    assert_eq!(timeout, message_wait_time);
 
                     // Create and return the peer manager notification
-                    let rmsg = ReceivedMessage {
-                        message: NetworkMessage::RpcRequest(RpcRequest{
-                            protocol_id: outbound_rpc_request.protocol_id,
-                            request_id: 0,
-                            priority: 0,
-                            raw_request: outbound_rpc_request.data.into(),
-                        }),
-                        sender: PeerNetworkId::new(expected_network_id, peer_id),
-                        receive_timestamp_micros: 0,
-                        rpc_replier: Some(Arc::new(outbound_rpc_request.res_tx)),
-                    };
-                    (outbound_rpc_request.protocol_id, rmsg)
+                    let network_message = NetworkMessage::rpc_request_for_testing(
+                        protocol_id,
+                        data.into(),
+                    );
+                    let received_message = ReceivedMessage::new_for_testing(
+                        network_message,
+                        PeerNetworkId::new(expected_network_id, peer_id),
+                        Some(Arc::new(res_tx)),
+                    );
+                    (protocol_id, received_message)
                 }
                 PeerManagerRequest::SendDirectSend(peer_id, message) => {
+                    // Unpack the message
+                    let (_, protocol_id, data) = message.into_parts();
+
                     // Verify the request is correct
                     assert!(!is_rpc_request);
                     assert_eq!(peer_id, expected_peer_id);
-                    assert_eq!(Some(message.protocol_id), expected_direct_send_protocol_id);
+                    assert_eq!(Some(protocol_id), expected_direct_send_protocol_id);
 
                     // Create and return the peer manager notification
-                    let rmsg = ReceivedMessage {
-                        message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                            protocol_id: message.protocol_id,
-                            priority: 0,
-                            raw_msg: message.mdata.into(),
-                        }),
-                        sender: PeerNetworkId::new(expected_network_id, peer_id),
-                        receive_timestamp_micros: 0,
-                        rpc_replier: None,
-                    };
-                    (message.protocol_id, rmsg)
+                    let network_message = NetworkMessage::new_direct_send(
+                        protocol_id,
+                        data.into(),
+                    );
+                    let received_message = ReceivedMessage::new_for_testing(
+                        network_message,
+                        PeerNetworkId::new(expected_network_id, peer_id),
+                        None,
+                    );
+                    (protocol_id, received_message)
                 }
             };
 
