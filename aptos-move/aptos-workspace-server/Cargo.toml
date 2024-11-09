@@ -20,11 +20,12 @@ aptos-node = { workspace = true }
 aptos-types = { workspace = true }
 
 anyhow = { workspace = true }
+bollard = { workspace = true }
 futures = { workspace = true }
+maplit = { workspace = true }
 rand = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
-bollard = { workspace = true }
-maplit = {workspace = true }
