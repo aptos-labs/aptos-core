@@ -409,8 +409,12 @@ impl BlockAptosVM {
         executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        module_cache_manager: Option<
-            &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        module_cache_manager: &ModuleCacheManager<
+            HashValue,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
         >,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
@@ -426,27 +430,23 @@ impl BlockAptosVM {
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
+        let (environment, module_cache) = if module_cache_manager.mark_executing() {
+            let environment = module_cache_manager.get_or_initialize_environment(state_view);
+            let module_cache = module_cache_manager.module_cache();
+            (environment, module_cache)
+        } else {
+            // Either we do not have global caches , in which case we can create new ones, or
+            // something went wrong, and we were not able to mark the state as executing. In
+            // this case, fallback to empty caches. Note that the alert should have been raised
+            // during marking.
+            let environment =
+                AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+            let module_cache = Arc::new(GlobalModuleCache::empty());
+            (environment, module_cache)
+        };
+
         // We should be checking different module cache configurations here.
         let module_cache_config = &config.local.module_cache_config;
-
-        let (environment, module_cache) = match module_cache_manager {
-            Some(module_cache_manager) if !module_cache_manager.mark_executing() => {
-                let environment =
-                    module_cache_manager.get_or_initialize_environment_unchecked(state_view);
-                let module_cache = module_cache_manager.module_cache();
-                (environment, module_cache)
-            },
-            _ => {
-                // Either we do not have global caches , in which case we can create new ones, or
-                // something went wrong, and we were not able to mark the state as executing. In
-                // this case, fallback to empty caches. Note that the alert should have been raised
-                // during marking.
-                let environment =
-                    AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-                let module_cache = Arc::new(GlobalModuleCache::empty());
-                (environment, module_cache)
-            },
-        };
 
         // Check 1: struct re-indexing map is not too large. If it is, we flush the cache. Also, we
         // need to flush modules because they store indices into re-indexing map.
@@ -490,15 +490,13 @@ impl BlockAptosVM {
         );
 
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
-        if let Some(module_cache_manager) = module_cache_manager {
-            if !module_cache_manager.mark_done() {
-                // Something is wrong as we were not able to mark execution as done. Return an
-                // error.
-                return Err(VMStatus::error(
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    Some("Unable to mark block execution as done".to_string()),
-                ));
-            }
+        if !module_cache_manager.mark_done() {
+            // Something is wrong as we were not able to mark execution as done. Return an
+            // error.
+            return Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                Some("Unable to mark block execution as done".to_string()),
+            ));
         }
 
         match ret {
@@ -538,8 +536,12 @@ impl BlockAptosVM {
     >(
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        module_cache_manager: Option<
-            &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        module_cache_manager: &ModuleCacheManager<
+            HashValue,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
         >,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,

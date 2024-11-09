@@ -2827,7 +2827,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         >(
             transactions,
             state_view,
-            Some(&self.module_cache_manager),
+            &self.module_cache_manager,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: AptosVM::get_concurrency_level(),

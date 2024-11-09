@@ -14,7 +14,9 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -645,8 +647,8 @@ impl FakeExecutor {
             self.executor_thread_pool.clone(),
             txn_block,
             &state_view,
-            // Do not use module caches in tests.
-            None,
+            // Do not use shared module caches in tests.
+            &ModuleCacheManager::new(),
             config,
             None,
         )

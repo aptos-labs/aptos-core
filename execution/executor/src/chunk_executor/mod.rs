@@ -597,9 +597,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
+        // For now, we create executor for each chunk.
+        let executor = V::new();
+        if let Some(module_cache_manager) = executor.module_cache_manager() {
+            module_cache_manager.mark_ready(None, None);
+        }
+
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
-            &V::new(),
+            &executor,
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
