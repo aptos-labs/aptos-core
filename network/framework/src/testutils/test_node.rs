@@ -7,7 +7,6 @@ use crate::{
     peer_manager::PeerManagerRequest,
     protocols::{
         network::{ReceivedMessage, SerializedRequest},
-        rpc::OutboundRpcRequest,
         wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
     },
     transport::ConnectionMetadata,
@@ -284,17 +283,13 @@ pub trait TestNode: ApplicationNode + Sync {
     ) -> (PeerId, ProtocolId, bytes::Bytes) {
         let message = self.get_next_network_msg(network_id).await;
         match message {
-            PeerManagerRequest::SendRpc(
-                peer_id,
-                OutboundRpcRequest {
-                    protocol_id,
-                    res_tx,
-                    data,
-                    ..
-                },
-            ) => {
-                // Forcefully close the oneshot channel, otherwise listening task will hang forever.
+            PeerManagerRequest::SendRpc(peer_id, outbound_rpc_request) => {
+                // Unpack the request
+                let (protocol_id, data, res_tx, _) = outbound_rpc_request.into_parts();
+
+                // Forcefully close the oneshot channel, otherwise listening task will hang forever
                 drop(res_tx);
+
                 (peer_id, protocol_id, data)
             },
             PeerManagerRequest::SendDirectSend(peer_id, message) => {
@@ -309,18 +304,22 @@ pub trait TestNode: ApplicationNode + Sync {
 
         let (remote_peer_id, protocol_id, rmsg) = match request {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
+                // Unpack the request
+                let (protocol_id, data, res_tx, _) = msg.into_parts();
+
+                // Create the received message
                 let rmsg = ReceivedMessage {
                     message: NetworkMessage::RpcRequest(RpcRequest {
-                        protocol_id: msg.protocol_id,
+                        protocol_id,
                         request_id: 0,
                         priority: 0,
-                        raw_request: msg.data().clone().into(),
+                        raw_request: data.into(),
                     }),
                     sender: self.peer_network_id(network_id),
                     receive_timestamp_micros: 0,
-                    rpc_replier: Some(Arc::new(msg.res_tx)),
+                    rpc_replier: Some(Arc::new(res_tx)),
                 };
-                (peer_id, msg.protocol_id, rmsg)
+                (peer_id, protocol_id, rmsg)
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 let rmsg = ReceivedMessage {

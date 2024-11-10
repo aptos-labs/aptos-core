@@ -73,7 +73,13 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    cmp::PartialEq,
+    collections::HashMap,
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 pub mod error;
 
@@ -118,28 +124,59 @@ impl SerializedRequest for InboundRpcRequest {
 /// A wrapper struct for an outbound rpc request and its associated context.
 #[derive(Debug, Serialize)]
 pub struct OutboundRpcRequest {
+    /// The time at which the request was sent by the application
+    application_send_time: SystemTime,
     /// The remote peer's application module that should handle our outbound rpc
     /// request.
     ///
     /// For example, if `protocol_id == ProtocolId::ConsensusRpcBcs`, then this
     /// outbound rpc request should be handled by the remote peer's consensus
     /// application module.
-    pub protocol_id: ProtocolId,
+    protocol_id: ProtocolId,
     /// The serialized request data to be sent to the receiver. At this layer in
     /// the stack, the request data is just an opaque blob.
     #[serde(skip)]
-    pub data: Bytes,
+    data: Bytes,
     /// Channel over which the rpc response is sent from the rpc layer to the
     /// upper client layer.
     ///
     /// If there is an error while performing the rpc protocol, e.g., the remote
     /// peer drops the connection, we will send an [`RpcError`] over the channel.
     #[serde(skip)]
-    pub res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
+    res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
     /// The timeout duration for the entire rpc call. If the timeout elapses, the
     /// rpc layer will send an [`RpcError::TimedOut`] error over the
     /// `res_tx` channel to the upper client layer.
-    pub timeout: Duration,
+    timeout: Duration,
+}
+
+impl OutboundRpcRequest {
+    pub fn new(
+        protocol_id: ProtocolId,
+        data: Bytes,
+        res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
+        timeout: Duration,
+    ) -> Self {
+        Self {
+            application_send_time: SystemTime::now(),
+            protocol_id,
+            data,
+            res_tx,
+            timeout,
+        }
+    }
+
+    /// Consumes the request and returns the protocol id, data, channel, and timeout
+    pub fn into_parts(
+        self,
+    ) -> (
+        ProtocolId,
+        Bytes,
+        oneshot::Sender<Result<Bytes, RpcError>>,
+        Duration,
+    ) {
+        (self.protocol_id, self.data, self.res_tx, self.timeout)
+    }
 }
 
 impl SerializedRequest for OutboundRpcRequest {
@@ -440,12 +477,8 @@ impl OutboundRpcs {
         let peer_id = &self.remote_peer_id;
 
         // Unpack request.
-        let OutboundRpcRequest {
-            protocol_id,
-            data: request_data,
-            timeout,
-            res_tx: mut application_response_tx,
-        } = request;
+        let (protocol_id, request_data, mut application_response_tx, timeout) =
+            request.into_parts();
         let req_len = request_data.len() as u64;
 
         // Drop the outbound request if the application layer has already canceled.

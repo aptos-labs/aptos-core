@@ -233,11 +233,13 @@ impl MockNetwork {
         let peer_mgr_reqs_rx = self.peer_mgr_reqs_rxs.get_mut(&network_id).unwrap();
         match peer_mgr_reqs_rx.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
-                let peer_network_id = PeerNetworkId::new(network_id, peer_id);
-                let protocol_id = network_request.protocol_id;
-                let data = network_request.data;
-                let res_tx = network_request.res_tx;
+                // Unpack the network request
+                let (protocol_id, data, res_tx, _) = network_request.into_parts();
 
+                // Create the peer network ID
+                let peer_network_id = PeerNetworkId::new(network_id, peer_id);
+
+                // Deserialize the network message
                 let message: StorageServiceMessage = bcs::from_bytes(data.as_ref()).unwrap();
                 let storage_service_request = match message {
                     StorageServiceMessage::Request(request) => request,
@@ -245,6 +247,7 @@ impl MockNetwork {
                 };
                 let response_sender = ResponseSender::new(res_tx);
 
+                // Return the network request
                 Some(NetworkRequest {
                     peer_network_id,
                     protocol_id,
