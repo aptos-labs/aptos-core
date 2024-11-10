@@ -54,11 +54,13 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use aptos_types::account_address::{create_resource_address, create_seed_for_pbo_module};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
 
 const GENESIS_MODULE_NAME: &str = "genesis";
+const PBO_DELEGATION_POOL_MODULE_NAME: &str = "pbo_delegation_pool";
 const GOVERNANCE_MODULE_NAME: &str = "supra_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
@@ -124,6 +126,7 @@ pub fn encode_supra_mainnet_genesis_transaction(
     multisig_accounts: &[MultiSigAccountWithBalance],
     owner_group: Option<MultiSigAccountSchema>,
     delegation_pools: &[PboDelegatorConfiguration],
+    owner_stake_for_pbo_pool: u64,
     vesting_pools: &[VestingPoolsMap],
     initial_unlock_vesting_pools: &[VestingPoolsMap],
     framework: &ReleaseBundle,
@@ -177,6 +180,8 @@ pub fn encode_supra_mainnet_genesis_transaction(
     // All PBO delegated validators are initialized here
     create_pbo_delegation_pools(&mut session, delegation_pools);
 
+    add_owner_stakes_for_delegation_pools(&mut session, delegation_pools, owner_stake_for_pbo_pool);
+
     // PBO vesting accounts, employees, investors etc. are placed in their vesting pools
     create_vesting_without_staking_pools(&mut session, vesting_pools);
 
@@ -225,6 +230,8 @@ pub fn encode_supra_mainnet_genesis_transaction(
 pub fn encode_genesis_transaction_for_testnet(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
+    owner_group: Option<MultiSigAccountSchema>,
+    owner_stake_for_pbo_pool: u64,
     delegation_pools: &[PboDelegatorConfiguration],
     vesting_pools: &[VestingPoolsMap],
     initial_unlock_vesting_pools: &[VestingPoolsMap],
@@ -240,9 +247,10 @@ pub fn encode_genesis_transaction_for_testnet(
         &aptos_root_key,
         &[],
         &[],
-        None,
+        owner_group,
         validators,
         delegation_pools,
+        owner_stake_for_pbo_pool,
         vesting_pools,
         initial_unlock_vesting_pools,
         framework,
@@ -262,6 +270,7 @@ pub fn encode_genesis_change_set_for_testnet(
     owner_group: Option<MultiSigAccountSchema>,
     validators: &[Validator],
     delegation_pools: &[PboDelegatorConfiguration],
+    owner_stake_for_pbo_pool: u64,
     vesting_pools: &[VestingPoolsMap],
     initial_unlock_vesting_pools: &[VestingPoolsMap],
     framework: &ReleaseBundle,
@@ -332,6 +341,8 @@ pub fn encode_genesis_change_set_for_testnet(
     } else {
         // All PBO delegated validators are initialized here
         create_pbo_delegation_pools(&mut session, delegation_pools);
+
+        add_owner_stakes_for_delegation_pools(&mut session, delegation_pools, owner_stake_for_pbo_pool);
 
         // PBO vesting accounts, employees, investors etc. are placed in their vesting pools
         create_vesting_without_staking_pools(&mut session, vesting_pools);
@@ -873,6 +884,34 @@ fn create_pbo_delegation_pools(
     )
 }
 
+fn add_owner_stakes_for_delegation_pools(
+    session: &mut SessionExt,
+    pbo_delegator_configuration: &[PboDelegatorConfiguration],
+    owner_stake_for_pbo_pool: u64,
+) {
+    for pool_config in pbo_delegator_configuration {
+        let pbo_pool_seed = create_seed_for_pbo_module(
+            &pool_config.delegator_config.delegation_pool_creation_seed
+        );
+        let pool_address = create_resource_address(
+            pool_config.delegator_config.owner_address,
+            &pbo_pool_seed
+        );
+        let serialized_values = serialize_values(&vec![
+            MoveValue::Signer(pool_config.delegator_config.owner_address),
+            MoveValue::Address(pool_address),
+            MoveValue::U64(owner_stake_for_pbo_pool)
+        ]);
+        exec_function(
+            session,
+            PBO_DELEGATION_POOL_MODULE_NAME,
+            "add_stake",
+            vec![],
+            serialized_values,
+        )
+    }
+}
+
 fn create_vesting_without_staking_pools(
     session: &mut SessionExt,
     vesting_pools_map: &[VestingPoolsMap],
@@ -1115,6 +1154,7 @@ pub fn generate_test_genesis(
         None,
         validators,
         &[],
+        0,
         &[],
         &[],
         framework,
@@ -1168,6 +1208,7 @@ pub fn generate_mainnet_genesis(
         None,
         validators,
         &[],
+        0,
         &[],
         &[],
         framework,
@@ -1770,6 +1811,7 @@ pub fn test_mainnet_end_to_end() {
         &[],
         None,
         &pbo_delegator_configs,
+        0,
         &[employee_vesting_config1],
         &[],
         aptos_cached_packages::head_release_bundle(),

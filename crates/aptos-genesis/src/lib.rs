@@ -138,6 +138,8 @@ impl GenesisInfo {
         aptos_vm_genesis::encode_genesis_transaction_for_testnet(
             self.root_key.clone(),
             &self.validators,
+            None,
+            0,
             &[],
             &[],
             &[],

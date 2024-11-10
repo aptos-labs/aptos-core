@@ -131,6 +131,7 @@ impl MainnetGenesisInfo {
             &[],
             None,
             &[],
+            0,
             &[],
             &[],
             &self.framework,
