@@ -1016,6 +1016,7 @@ pub mod any_public_key {
         Secp256r1Ecdsa = 3,
         Keyless = 4,
         FederatedKeyless = 5,
+        InnerMulti = 6,
     }
     impl Type {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -1030,6 +1031,7 @@ pub mod any_public_key {
                 Type::Secp256r1Ecdsa => "TYPE_SECP256R1_ECDSA",
                 Type::Keyless => "TYPE_KEYLESS",
                 Type::FederatedKeyless => "TYPE_FEDERATED_KEYLESS",
+                Type::InnerMulti => "TYPE_INNER_MULTI",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1070,6 +1072,7 @@ pub mod any_signature {
         Secp256k1Ecdsa = 2,
         Webauthn = 3,
         Keyless = 4,
+        InnerMulti = 5,
     }
     impl Type {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -1083,6 +1086,7 @@ pub mod any_signature {
                 Type::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
                 Type::Webauthn => "TYPE_WEBAUTHN",
                 Type::Keyless => "TYPE_KEYLESS",
+                Type::InnerMulti => "TYPE_INNER_MULTI",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1109,6 +1113,8 @@ pub mod any_signature {
         Webauthn(super::WebAuthn),
         #[prost(message, tag="6")]
         Keyless(super::Keyless),
+        #[prost(message, tag="7")]
+        InnerMulti(super::InnerMulti),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1132,6 +1138,12 @@ pub struct WebAuthn {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Keyless {
+    #[prost(bytes="vec", tag="1")]
+    pub signature: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct InnerMulti {
     #[prost(bytes="vec", tag="1")]
     pub signature: ::prost::alloc::vec::Vec<u8>,
 }

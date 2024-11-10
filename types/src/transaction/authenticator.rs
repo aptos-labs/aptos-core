@@ -566,7 +566,15 @@ impl AccountAuthenticator {
                 public_key,
                 signature,
             } => signature.verify(message, public_key),
-            Self::SingleKey { authenticator } => authenticator.verify(message),
+            Self::SingleKey { authenticator } => {
+                if matches!(
+                    authenticator.public_key,
+                    AnyPublicKey::InnerMulti{ public_key: _ }
+                ) {
+                    bail!("MultiKey cannot be used as a single-key authenticator.  Use MultiKeyAuthenticator instead.");
+                }
+                authenticator.verify(message)
+            },
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
         }
@@ -782,6 +790,44 @@ impl fmt::Display for AuthenticationKey {
     }
 }
 
+pub fn multi_key_authenticator_to_single_key_authenticators(
+    public_keys: &MultiKey,
+    signatures: &Vec<AnySignature>,
+    signatures_bitmap: &aptos_bitvec::BitVec,
+) -> Result<Vec<SingleKeyAuthenticator>> {
+    ensure!(
+        signatures_bitmap.last_set_bit().is_some(),
+        "There were no signatures set in the bitmap."
+    );
+
+    ensure!(
+        (signatures_bitmap.last_set_bit().unwrap() as usize) < public_keys.len(),
+        "Mismatch in the position of the last signature and the number of PKs, {} >= {}.",
+        signatures_bitmap.last_set_bit().unwrap(),
+        public_keys.len(),
+    );
+    ensure!(
+        signatures_bitmap.count_ones() as usize == signatures.len(),
+        "Mismatch in number of signatures and the number of bits set in the signatures_bitmap, {} != {}.",
+        signatures_bitmap.count_ones(),
+        signatures.len(),
+    );
+    ensure!(
+        signatures.len() >= public_keys.signatures_required() as usize,
+        "Not enough signatures for verification, {} < {}.",
+        signatures.len(),
+        public_keys.signatures_required(),
+    );
+    let authenticators: Vec<SingleKeyAuthenticator> =
+        std::iter::zip(signatures_bitmap.iter_ones(), signatures.iter())
+            .map(|(idx, sig)| SingleKeyAuthenticator {
+                public_key: public_keys.public_keys[idx].clone(),
+                signature: sig.clone(),
+            })
+            .collect();
+    Ok(authenticators)
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct MultiKeyAuthenticator {
     public_keys: MultiKey,
@@ -838,37 +884,11 @@ impl MultiKeyAuthenticator {
     }
 
     pub fn to_single_key_authenticators(&self) -> Result<Vec<SingleKeyAuthenticator>> {
-        ensure!(
-            self.signatures_bitmap.last_set_bit().is_some(),
-            "There were no signatures set in the bitmap."
-        );
-
-        ensure!(
-            (self.signatures_bitmap.last_set_bit().unwrap() as usize) < self.public_keys.len(),
-            "Mismatch in the position of the last signature and the number of PKs, {} >= {}.",
-            self.signatures_bitmap.last_set_bit().unwrap(),
-            self.public_keys.len(),
-        );
-        ensure!(
-            self.signatures_bitmap.count_ones() as usize == self.signatures.len(),
-            "Mismatch in number of signatures and the number of bits set in the signatures_bitmap, {} != {}.",
-            self.signatures_bitmap.count_ones(),
-            self.signatures.len(),
-        );
-        ensure!(
-            self.signatures.len() >= self.public_keys.signatures_required() as usize,
-            "Not enough signatures for verification, {} < {}.",
-            self.signatures.len(),
-            self.public_keys.signatures_required(),
-        );
-        let authenticators: Vec<SingleKeyAuthenticator> =
-            std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
-                .map(|(idx, sig)| SingleKeyAuthenticator {
-                    public_key: self.public_keys.public_keys[idx].clone(),
-                    signature: sig.clone(),
-                })
-                .collect();
-        Ok(authenticators)
+        multi_key_authenticator_to_single_key_authenticators(
+            &self.public_keys,
+            &self.signatures,
+            &self.signatures_bitmap,
+        )
     }
 
     pub fn verify<T: Serialize + CryptoHash>(&self, message: &T) -> Result<()> {
@@ -907,6 +927,15 @@ impl From<MultiEd25519PublicKey> for MultiKey {
             public_keys,
             signatures_required,
         }
+    }
+}
+
+impl TryFrom<&[u8]> for MultiKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bcs::from_bytes::<MultiKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
@@ -950,6 +979,95 @@ impl MultiKey {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct InnerMultiSignature {
+    signatures: Vec<AnySignature>,
+    signatures_bitmap: aptos_bitvec::BitVec,
+}
+
+impl TryFrom<&[u8]> for InnerMultiSignature {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bcs::from_bytes::<InnerMultiSignature>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+impl InnerMultiSignature {
+    pub fn to_single_key_authenticators(
+        &self,
+        public_keys: &MultiKey,
+    ) -> Result<Vec<SingleKeyAuthenticator>> {
+        multi_key_authenticator_to_single_key_authenticators(public_keys, &self.signatures, &self.signatures_bitmap)
+    }
+
+    pub fn verify<T: Serialize + CryptoHash>(
+        &self,
+        message: &T,
+        public_keys: &MultiKey,
+    ) -> Result<()> {
+        let authenticators = self.to_single_key_authenticators(public_keys)?;
+        authenticators
+            .iter()
+            .try_for_each(|authenticator| authenticator.verify(message))?;
+        Ok(())
+    }
+}
+
+// impl ValidCryptoMaterial for InnerMultiSignature {
+//     fn to_bytes(&self) -> Vec<u8> {
+//         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
+//     }
+// }
+
+// #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+// pub struct InnerMultiPublicKey {
+//     public_keys: Vec<AnyPublicKey>,
+//     signatures_required: u8,
+// }
+
+// impl InnerMultiPublicKey {
+//     pub fn new(public_keys: Vec<AnyPublicKey>, signatures_required: u8) -> Result<Self> {
+//         ensure!(
+//             signatures_required > 0,
+//             "The number of required signatures is 0."
+//         );
+
+//         ensure!(
+//             public_keys.len() >= signatures_required as usize,
+//             "The number of public keys is smaller than the number of required signatures, {} < {}",
+//             public_keys.len(),
+//             signatures_required
+//         );
+
+//         Ok(Self {
+//             public_keys,
+//             signatures_required,
+//         })
+//     }
+
+//     pub fn is_empty(&self) -> bool {
+//         self.public_keys.is_empty()
+//     }
+
+//     pub fn len(&self) -> usize {
+//         self.public_keys.len()
+//     }
+
+//     pub fn public_keys(&self) -> &[AnyPublicKey] {
+//         &self.public_keys
+//     }
+
+//     pub fn signatures_required(&self) -> u8 {
+//         self.signatures_required
+//     }
+
+//     pub fn to_bytes(&self) -> Vec<u8> {
+//         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
+//     }
+// }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SingleKeyAuthenticator {
@@ -1000,6 +1118,9 @@ pub enum AnySignature {
     Keyless {
         signature: KeylessSignature,
     },
+    InnerMulti {
+        signature: InnerMultiSignature,
+    },
 }
 
 impl AnySignature {
@@ -1019,12 +1140,17 @@ impl AnySignature {
         Self::Keyless { signature }
     }
 
+    pub fn inner_multi(signature: InnerMultiSignature) -> Self {
+        Self::InnerMulti { signature }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             Self::Ed25519 { .. } => "Ed25519",
             Self::Secp256k1Ecdsa { .. } => "Secp256k1Ecdsa",
             Self::WebAuthn { .. } => "WebAuthn",
             Self::Keyless { .. } => "Keyless",
+            Self::InnerMulti { .. } => "InnerMulti",
         }
     }
 
@@ -1046,6 +1172,9 @@ impl AnySignature {
             },
             (Self::Keyless { signature }, AnyPublicKey::FederatedKeyless { public_key: _ }) => {
                 Self::verify_keyless_ephemeral_signature(message, signature)
+            },
+            (Self::InnerMulti { signature }, AnyPublicKey::InnerMulti { public_key }) => {
+                signature.verify(message, public_key)
             },
             _ => bail!("Invalid key, signature pairing"),
         }
@@ -1112,6 +1241,9 @@ pub enum AnyPublicKey {
     FederatedKeyless {
         public_key: FederatedKeylessPublicKey,
     },
+    InnerMulti {
+        public_key: MultiKey,
+    },
 }
 
 impl AnyPublicKey {
@@ -1133,6 +1265,10 @@ impl AnyPublicKey {
 
     pub fn federated_keyless(public_key: FederatedKeylessPublicKey) -> Self {
         Self::FederatedKeyless { public_key }
+    }
+
+    pub fn inner_multi(public_key: MultiKey) -> Self {
+        Self::InnerMulti { public_key }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
