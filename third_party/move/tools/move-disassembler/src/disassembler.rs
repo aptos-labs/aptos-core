@@ -48,6 +48,10 @@ pub struct DisassemblerOptions {
     /// Print bytecode statistics for the module.
     #[clap(long = "print-bytecode-stats")]
     pub print_bytecode_stats: bool,
+
+    /// Show source locations for bytecodes.
+    #[clap(long = "show-locs")]
+    pub show_locs: bool,
 }
 
 impl DisassemblerOptions {
@@ -58,6 +62,7 @@ impl DisassemblerOptions {
             print_basic_blocks: true,
             print_locals: true,
             print_bytecode_stats: false,
+            show_locs: false,
         }
     }
 }
@@ -297,12 +302,12 @@ impl<'a> Disassembler<'a> {
         instruction: String,
     ) -> String {
         if self.coverage_map.is_none() {
-            return format!("\t{}: {}", pc, instruction);
+            return format!("\t{:5}: {}", pc, instruction);
         }
         let coverage = function_coverage_map.and_then(|map| map.get(&(pc as u64)));
         match coverage {
-            Some(coverage) => format!("[{}]\t{}: {}", coverage, pc, instruction).green(),
-            None => format!("\t{}: {}", pc, instruction).red(),
+            Some(coverage) => format!("[{}]\t{:5}: {}", coverage, pc, instruction).green(),
+            None => format!("\t{}: {:5}", pc, instruction).red(),
         }
         .to_string()
     }
@@ -1158,17 +1163,39 @@ impl<'a> Disassembler<'a> {
         let instrs: Vec<String> = code
             .code
             .iter()
-            .map(|instruction| {
-                self.disassemble_instruction(
+            .enumerate()
+            .map(|(idx, instruction)| {
+                match self.disassemble_instruction(
                     parameters,
                     instruction,
                     locals_sigs,
                     function_source_map,
                     decl_location,
-                )
+                ) {
+                    Ok(instr_str) => {
+                        if self.options.show_locs {
+                            if let Some(loc) = function_source_map.get_code_location(idx as u16) {
+                                let hash =
+                                    (format!("{}", loc.file_hash()).to_string())[..8].to_string();
+                                Ok(format!(
+                                    "{:60}     {}:{}-{}",
+                                    instr_str,
+                                    hash,
+                                    loc.start(),
+                                    loc.end()
+                                )
+                                .to_string())
+                            } else {
+                                Ok(instr_str)
+                            }
+                        } else {
+                            Ok(instr_str)
+                        }
+                    },
+                    Err(err) => Err(err),
+                }
             })
             .collect::<Result<Vec<String>>>()?;
-
         let mut instrs: Vec<String> = instrs
             .into_iter()
             .enumerate()

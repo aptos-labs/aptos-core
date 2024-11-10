@@ -124,7 +124,17 @@ impl CliCommand<()> for SourceCoverage {
             }) => (module, source_map),
             _ => panic!("Should all be modules"),
         };
-        let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
+        let packages: Vec<_> = package
+            .root_modules()
+            .map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule {
+                    module, source_map, ..
+                }) => (module, source_map),
+                _ => panic!("Should all be modules"),
+            })
+            .collect();
+        let source_coverage =
+            SourceCoverageBuilder::new(module, &coverage_map, source_map, packages);
         let source_coverage = source_coverage.compute_source_coverage(source_path);
         let output_result =
             source_coverage.output_source_coverage(&mut std::io::stdout(), self.color, self.tag);

@@ -79,8 +79,17 @@ impl Coverage {
                     }) => (module, source_map),
                     _ => panic!("Should all be modules"),
                 };
+                let packages: Vec<_> = package
+                    .root_modules()
+                    .map(|unit| match &unit.unit {
+                        CompiledUnit::Module(NamedCompiledModule {
+                            module, source_map, ..
+                        }) => (module, source_map),
+                        _ => panic!("Should all be modules"),
+                    })
+                    .collect();
                 let source_coverage_builder =
-                    SourceCoverageBuilder::new(module, &coverage_map, source_map);
+                    SourceCoverageBuilder::new(module, &coverage_map, source_map, packages);
                 let source_coverage = source_coverage_builder.compute_source_coverage(source_path);
                 source_coverage
                     .output_source_coverage(&mut std::io::stdout(), self.color, self.tag)

@@ -27,7 +27,7 @@ use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::Command,
 };
 
@@ -62,6 +62,9 @@ pub struct BytecodeCommand {
     /// Treat input file as a script (default is to treat file as a module)
     #[clap(long)]
     pub is_script: bool,
+
+    #[clap(long)]
+    pub show_locs: bool,
 
     #[clap(flatten)]
     input: BytecodeCommandInput,
@@ -203,11 +206,43 @@ impl BytecodeCommand {
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
-        let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
-        let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
 
-        let source = fs::read_to_string(move_path).ok();
-        let source_map = source_map_from_file(&source_map_path).ok();
+        let source = {
+            let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
+            if let Ok(source) = fs::read_to_string(move_path.clone()) {
+                Some(source)
+            } else {
+                let move_path = move_path
+                    .components()
+                    .map(|elt| {
+                        if elt.as_os_str() == "bytecode_modules" {
+                            Component::Normal("sources".as_ref())
+                        } else {
+                            elt.clone()
+                        }
+                    })
+                    .collect::<PathBuf>();
+                fs::read_to_string(move_path).ok()
+            }
+        };
+        let source_map = {
+            let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
+            if let Ok(source_map) = source_map_from_file(&source_map_path) {
+                Some(source_map)
+            } else {
+                let source_map_path = source_map_path
+                    .components()
+                    .map(|elt| {
+                        if elt.as_os_str() == "bytecode_modules" {
+                            Component::Normal("source_maps".as_ref())
+                        } else {
+                            elt.clone()
+                        }
+                    })
+                    .collect::<PathBuf>();
+                source_map_from_file(&source_map_path).ok()
+            }
+        };
 
         let disassembler_options = DisassemblerOptions {
             print_code: true,
@@ -215,6 +250,7 @@ impl BytecodeCommand {
             print_basic_blocks: true,
             print_locals: true,
             print_bytecode_stats: false,
+            show_locs: self.show_locs,
         };
         let no_loc = Spanned::unsafe_no_loc(()).loc;
         let module: CompiledModule;
@@ -232,6 +268,11 @@ impl BytecodeCommand {
         let mut source_mapping = if let Some(s) = source_map {
             SourceMapping::new(s, bytecode)
         } else {
+            if self.show_locs {
+                return Err(CliError::UnexpectedError(
+                    "Missing source_map with option show-locs".to_string(),
+                ));
+            }
             SourceMapping::new_from_view(bytecode, no_loc)
                 .context("Unable to build dummy source mapping")?
         };
