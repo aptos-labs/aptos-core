@@ -377,7 +377,8 @@ impl MempoolNode {
         let message = self.get_next_network_msg(network_id).await;
         let (peer_id, protocol_id, data, maybe_rpc_sender) = match message {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
+                let (protocol_id, data, res_tx, _) = msg.into_parts();
+                (peer_id, protocol_id, data, Some(res_tx))
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id(), msg.data().clone(), None)

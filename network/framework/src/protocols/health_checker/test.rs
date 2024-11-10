@@ -105,10 +105,7 @@ impl TestHarness {
             _ => panic!("Unexpected PeerManagerRequest: {:?}", req),
         };
 
-        let protocol_id = rpc_req.protocol_id;
-        let req_data = rpc_req.data;
-        let res_tx = rpc_req.res_tx;
-
+        let (protocol_id, req_data, res_tx, _) = rpc_req.into_parts();
         assert_eq!(protocol_id, ProtocolId::HealthCheckerRpc);
 
         match bcs::from_bytes(&req_data).unwrap() {

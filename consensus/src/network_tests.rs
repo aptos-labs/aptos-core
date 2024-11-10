@@ -155,11 +155,12 @@ impl NetworkPlayground {
                         None => continue, // drop rpc
                     };
 
+                    let (protocol_id, data, res_tx, _) = outbound_req.into_parts();
                     if timeout_config
                         .read()
                         .is_message_timedout(&src_twin_id, dst_twin_id)
                     {
-                        outbound_req.res_tx.send(Err(RpcError::TimedOut)).unwrap();
+                        res_tx.send(Err(RpcError::TimedOut)).unwrap();
                         continue;
                     }
 
@@ -171,17 +172,17 @@ impl NetworkPlayground {
                             (src_twin_id.author, ProtocolId::ConsensusRpcBcs),
                             ReceivedMessage {
                                 message: NetworkMessage::RpcRequest(RpcRequest {
-                                    protocol_id: outbound_req.protocol_id,
+                                    protocol_id,
                                     request_id: 123,
                                     priority: 0,
-                                    raw_request: outbound_req.data.into(),
+                                    raw_request: data.into(),
                                 }),
                                 sender: PeerNetworkId::new(
                                     NetworkId::Validator,
                                     src_twin_id.author,
                                 ),
                                 receive_timestamp_micros: 0,
-                                rpc_replier: Some(Arc::new(outbound_req.res_tx)),
+                                rpc_replier: Some(Arc::new(res_tx)),
                             },
                         )
                         .unwrap();

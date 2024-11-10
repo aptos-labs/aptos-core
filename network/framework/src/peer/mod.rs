@@ -24,7 +24,7 @@ use crate::{
     peer_manager::{PeerManagerError, TransportNotification},
     protocols::{
         direct_send::Message,
-        network::ReceivedMessage,
+        network::{ReceivedMessage, SerializedRequest},
         rpc::{error::RpcError, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
@@ -645,7 +645,7 @@ where
                 }
             },
             PeerRequest::SendRpc(request) => {
-                let protocol_id = request.protocol_id;
+                let protocol_id = request.protocol_id();
                 if let Err(e) = self
                     .outbound_rpcs
                     .handle_outbound_request(request, write_reqs_tx)

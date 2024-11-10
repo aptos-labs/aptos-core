@@ -132,11 +132,11 @@ impl MockMonitoringServer {
         // Wait for the next request
         match peer_manager_request_receiver.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
-                // Deconstruct the network request
+                // Unpack the network request
+                let (protocol_id, request_data, response_sender, _) = network_request.into_parts();
+
+                // Identify the peer network ID
                 let peer_network_id = PeerNetworkId::new(*network_id, peer_id);
-                let protocol_id = network_request.protocol_id;
-                let request_data = network_request.data;
-                let response_sender = network_request.res_tx;
 
                 // Deserialize the network message
                 let peer_monitoring_message: PeerMonitoringServiceMessage =

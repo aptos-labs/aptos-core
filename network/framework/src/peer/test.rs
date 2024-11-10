@@ -188,12 +188,7 @@ impl PeerHandle {
         timeout: Duration,
     ) -> Result<Bytes, RpcError> {
         let (res_tx, res_rx) = oneshot::channel();
-        let request = OutboundRpcRequest {
-            protocol_id,
-            data,
-            res_tx,
-            timeout,
-        };
+        let request = OutboundRpcRequest::new(protocol_id, data, res_tx, timeout);
         self.0.push(protocol_id, PeerRequest::SendRpc(request))?;
         let response_data = res_rx.await??;
         Ok(response_data)
@@ -769,12 +764,13 @@ fn peer_send_rpc_cancel() {
     let test = async move {
         // Client sends rpc request.
         let (response_tx, mut response_rx) = oneshot::channel();
-        let request = PeerRequest::SendRpc(OutboundRpcRequest {
-            protocol_id: PROTOCOL,
-            data: Bytes::from(&b"hello world"[..]),
-            res_tx: response_tx,
+        let outbound_rpc_request = OutboundRpcRequest::new(
+            PROTOCOL,
+            Bytes::from(&b"hello world"[..]),
+            response_tx,
             timeout,
-        });
+        );
+        let request = PeerRequest::SendRpc(outbound_rpc_request);
         peer_handle.0.push(PROTOCOL, request).unwrap();
 
         // Server receives the rpc request from client.
@@ -831,12 +827,13 @@ fn peer_send_rpc_timeout() {
     let test = async move {
         // Client sends rpc request.
         let (response_tx, mut response_rx) = oneshot::channel();
-        let request = PeerRequest::SendRpc(OutboundRpcRequest {
-            protocol_id: PROTOCOL,
-            data: Bytes::from(&b"hello world"[..]),
-            res_tx: response_tx,
+        let outbound_rpc_request = OutboundRpcRequest::new(
+            PROTOCOL,
+            Bytes::from(&b"hello world"[..]),
+            response_tx,
             timeout,
-        });
+        );
+        let request = PeerRequest::SendRpc(outbound_rpc_request);
         peer_handle.0.push(PROTOCOL, request).unwrap();
 
         // Server receives the rpc request from client.

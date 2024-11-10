@@ -96,12 +96,7 @@ impl PeerManagerRequestSender {
         timeout: Duration,
     ) -> Result<Bytes, RpcError> {
         let (res_tx, res_rx) = oneshot::channel();
-        let request = OutboundRpcRequest {
-            protocol_id,
-            data: req,
-            res_tx,
-            timeout,
-        };
+        let request = OutboundRpcRequest::new(protocol_id, req, res_tx, timeout);
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendRpc(peer_id, request),
