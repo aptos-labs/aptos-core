@@ -507,6 +507,11 @@ module aptos_framework::transaction_fee {
     #[expected_failure(abort_code = EATOMIC_BRIDGE_NOT_ENABLED, location = Self)]
     fun test_copy_capabilities_no_bridge(aptos_framework: &signer) acquires AptosCoinCapabilities, AptosCoinMintCapability {
         setup_coin_caps(aptos_framework);
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_atomic_bridge_feature()],
+        );
         let (mint_cap, burn_cap) = copy_capabilities_for_bridge(aptos_framework);
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
