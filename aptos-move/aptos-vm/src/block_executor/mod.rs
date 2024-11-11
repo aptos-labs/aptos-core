@@ -39,8 +39,11 @@ use aptos_vm_logging::{
     alert, flush_speculative_logs, init_speculative_logs, prelude::CRITICAL_ERRORS,
 };
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, module_and_script_storage::AsAptosCodeStorage,
-    module_write_set::ModuleWrite, output::VMOutput, resolver::ResourceGroupSize,
+    abstract_write_op::AbstractResourceWriteOp,
+    module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage},
+    module_write_set::ModuleWrite,
+    output::VMOutput,
+    resolver::ResourceGroupSize,
 };
 use move_binary_format::{
     errors::{Location, VMError},
@@ -454,26 +457,23 @@ impl BlockAptosVM {
         let struct_name_index_map_size = runtime_environment
             .struct_name_index_map_size()
             .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
-        if struct_name_index_map_size > module_cache_config.max_struct_name_index_map_size {
-            module_cache.flush_unchecked();
+        if struct_name_index_map_size > module_cache_config.max_struct_name_index_map_num_entries {
+            module_cache.flush_unsync();
             runtime_environment.flush_struct_name_and_info_caches();
         }
 
         // Check 2: If the module cache is too big, flush it.
-        if module_cache
-            .size_in_bytes_is_greater_than(module_cache_config.max_module_cache_size_in_bytes)
-        {
-            module_cache.flush_unchecked();
+        if module_cache.size_in_bytes() > module_cache_config.max_module_cache_size_in_bytes {
+            module_cache.flush_unsync();
         }
 
         // Finally, to avoid cold starts, fetch the framework code prior to block execution.
         if module_cache.num_modules() == 0 && module_cache_config.prefetch_framework_code {
-            prefetch_aptos_framework(environment.clone(), state_view, &module_cache).map_err(
-                |err| {
-                    alert!("Failed to load Aptos framework to module cache: {:?}", err);
-                    VMError::from(err).into_vm_status()
-                },
-            )?;
+            let code_storage = state_view.as_aptos_code_storage(environment.clone());
+            prefetch_aptos_framework(code_storage, &module_cache).map_err(|err| {
+                alert!("Failed to load Aptos framework to module cache: {:?}", err);
+                VMError::from(err).into_vm_status()
+            })?;
         }
 
         let executor = BlockExecutor::<
@@ -491,8 +491,6 @@ impl BlockAptosVM {
 
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         if !module_cache_manager.mark_done() {
-            // Something is wrong as we were not able to mark execution as done. Return an
-            // error.
             return Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 Some("Unable to mark block execution as done".to_string()),
@@ -560,13 +558,10 @@ impl BlockAptosVM {
 /// If Aptos framework exists, loads "transaction_validation.move" and all its transitive
 /// dependencies from storage into provided module cache. If loading fails for any reason, a panic
 /// error is returned.
-fn prefetch_aptos_framework(
-    environment: AptosEnvironment,
-    state_view: &impl StateView,
+fn prefetch_aptos_framework<S: StateView>(
+    code_storage: AptosCodeStorageAdapter<S, AptosEnvironment>,
     module_cache: &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
 ) -> Result<(), PanicError> {
-    let code_storage = state_view.as_aptos_code_storage(environment);
-
     // If framework code exists in storage, the transitive closure will be verified and cached.
     let maybe_loaded = code_storage
         .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
@@ -576,13 +571,11 @@ fn prefetch_aptos_framework(
             PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
         })?;
 
-    if let Some(module) = maybe_loaded {
-        drop(module);
-
+    if maybe_loaded.is_some() {
         // Framework must have been loaded. Drain verified modules from local cache into
         // global cache.
         let verified_module_code_iter = code_storage.into_verified_module_code_iter()?;
-        module_cache.insert_verified_unchecked(verified_module_code_iter)?;
+        module_cache.insert_verified_unsync(verified_module_code_iter)?;
     }
     Ok(())
 }
@@ -598,10 +591,12 @@ mod test {
         let state_view = executor.get_state_view();
 
         let environment = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+        let code_storage = state_view.as_aptos_code_storage(environment);
+
         let module_cache = GlobalModuleCache::empty();
         assert_eq!(module_cache.num_modules(), 0);
 
-        let result = prefetch_aptos_framework(environment, state_view, &module_cache);
+        let result = prefetch_aptos_framework(code_storage, &module_cache);
         assert!(result.is_ok());
         assert!(module_cache.num_modules() > 0);
     }
@@ -612,10 +607,12 @@ mod test {
 
         let environment =
             AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(environment);
+
         let module_cache = GlobalModuleCache::empty();
         assert_eq!(module_cache.num_modules(), 0);
 
-        let result = prefetch_aptos_framework(environment, &state_view, &module_cache);
+        let result = prefetch_aptos_framework(code_storage, &module_cache);
         assert!(result.is_ok());
         assert_eq!(module_cache.num_modules(), 0);
     }

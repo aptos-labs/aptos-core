@@ -165,17 +165,24 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
     }
 
     /// Returns an iterator of all modules that have been cached and verified.
-    pub fn into_verified_modules_iter(self) -> impl Iterator<Item = (ModuleId, Arc<Module>)> {
-        self.0
-            .module_cache
-            .into_modules_iter()
-            .flat_map(|(key, module)| {
-                module.code().is_verified().then(|| {
-                    // TODO(loader_v2):
-                    //   We should be able to take ownership here, instead of clones.
-                    (key, module.code().verified().clone())
-                })
-            })
+    pub fn unpack_into_verified_modules_iter(
+        self,
+    ) -> (
+        BorrowedOrOwned<'s, S>,
+        impl Iterator<Item = (ModuleId, Arc<Module>)>,
+    ) {
+        let verified_modules_iter =
+            self.0
+                .module_cache
+                .into_modules_iter()
+                .flat_map(|(key, module)| {
+                    module.code().is_verified().then(|| {
+                        // TODO(loader_v2):
+                        //   We should be able to take ownership here, instead of clones.
+                        (key, module.code().verified().clone())
+                    })
+                });
+        (self.0.base_storage, verified_modules_iter)
     }
 
     /// Test-only method that checks the state of the module cache.
@@ -185,15 +192,17 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorage<'
         deserialized: Vec<&'b ModuleId>,
         verified: Vec<&'b ModuleId>,
     ) {
+        use claims::*;
+
         assert_eq!(self.0.num_modules(), deserialized.len() + verified.len());
         for id in deserialized {
             let result = self.0.get_module_or_build_with(id, &self.0);
-            let module = claims::assert_some!(claims::assert_ok!(result)).0;
+            let module = assert_some!(assert_ok!(result)).0;
             assert!(!module.code().is_verified())
         }
         for id in verified {
             let result = self.0.get_module_or_build_with(id, &self.0);
-            let module = claims::assert_some!(claims::assert_ok!(result)).0;
+            let module = assert_some!(assert_ok!(result)).0;
             assert!(module.code().is_verified())
         }
     }
