@@ -19,6 +19,7 @@ use aptos_types::{
 use mini_moka::sync::Cache;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
+use crate::network_interface::ConsensusMsg_;
 
 pub struct MockBatchReader {
     peer: PeerId,
@@ -83,8 +84,8 @@ async fn test_proof_coordinator_basic() {
             .is_ok());
     }
 
-    let proof_msg = match rx.recv().await.expect("channel dropped") {
-        (ConsensusMsg::ProofOfStoreMsg(proof_msg), _) => *proof_msg,
+    let proof_msg = match rx.recv().await.expect("channel dropped").0.consensus_msg {
+        ConsensusMsg_::ProofOfStoreMsg(proof_msg) => *proof_msg,
         msg => panic!("Expected LocalProof but received: {:?}", msg),
     };
     // check normal path
@@ -148,8 +149,8 @@ async fn test_proof_coordinator_with_unverified_signatures() {
             }
         }
 
-        let proof_msg = match rx.recv().await.expect("channel dropped") {
-            (ConsensusMsg::ProofOfStoreMsg(proof_msg), _) => *proof_msg,
+        let proof_msg = match rx.recv().await.expect("channel dropped").0 {
+            ConsensusMsg_::ProofOfStoreMsg(proof_msg) => *proof_msg,
             msg => panic!("Expected LocalProof but received: {:?}", msg),
         };
 

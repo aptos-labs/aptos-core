@@ -18,6 +18,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use crate::network_interface::ConsensusMsg_;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// Network message for the pipeline phase
@@ -120,10 +121,10 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         let response = match self
             .consensus_network_client
             .send_rpc_raw(receiver, raw_message, timeout_duration)
-            .await?
+            .await?.consensus_msg
         {
-            ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
-            ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Nack) => {
+            ConsensusMsg_::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
+            ConsensusMsg_::CommitMessage(resp) if matches!(*resp, CommitMessage::Nack) => {
                 bail!("Received nack, will retry")
             },
             _ => bail!("Invalid response to request"),
@@ -138,10 +139,14 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         message: CommitMessage,
         timeout: Duration,
     ) -> anyhow::Result<CommitMessage> {
-        let req = ConsensusMsg::CommitMessage(Box::new(message));
-        let response = match self.send_rpc(receiver, req, timeout).await? {
-            ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
-            ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Nack) => {
+        let req_ = ConsensusMsg_::CommitMessage(Box::new(message));
+        let req = ConsensusMsg {
+            id: 0,
+            consensus_msg: req_
+        };
+        let response = match self.send_rpc(receiver, req, timeout).await?.consensus_msg {
+            ConsensusMsg_::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
+            ConsensusMsg_::CommitMessage(resp) if matches!(*resp, CommitMessage::Nack) => {
                 bail!("Received nack, will retry")
             },
             _ => bail!("Invalid response to request"),
@@ -155,7 +160,11 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         peers: Vec<Author>,
         message: CommitMessage,
     ) -> Result<HashMap<Author, bytes::Bytes>, anyhow::Error> {
-        let msg = ConsensusMsg::CommitMessage(Box::new(message));
+        let msg_ = ConsensusMsg_::CommitMessage(Box::new(message));
+        let msg = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg_
+        };
         self.consensus_network_client
             .to_bytes_by_protocol(peers, msg)
     }

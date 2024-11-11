@@ -60,6 +60,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
+use crate::network_interface::ConsensusMsg_;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -67,6 +68,8 @@ pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self>;
 
     fn into_network_message(self) -> ConsensusMsg;
+
+    fn into_network_message_with_id(self, id: usize) -> ConsensusMsg;
 }
 
 #[derive(Debug)]
@@ -156,11 +159,11 @@ impl IncomingRpcRequest {
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
     pub consensus_messages: aptos_channel::Receiver<
-        (AccountAddress, Discriminant<ConsensusMsg>),
+        ((AccountAddress,usize), Discriminant<ConsensusMsg_>),
         (AccountAddress, ConsensusMsg),
     >,
     pub quorum_store_messages: aptos_channel::Receiver<
-        (AccountAddress, Discriminant<ConsensusMsg>),
+        ((AccountAddress,usize), Discriminant<ConsensusMsg_>),
         (AccountAddress, ConsensusMsg),
     >,
     pub rpc_rx: aptos_channel::Receiver<
@@ -235,13 +238,17 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg_ = ConsensusMsg_::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg_
+        };
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
         let response_msg = monitor!("block_retrieval", self.send_rpc(from, msg, timeout).await)?;
-        let response = match response_msg {
-            ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
+        let response = match response_msg.consensus_msg {
+            ConsensusMsg_::BlockRetrievalResponse(resp) => *resp,
             _ => return Err(anyhow!("Invalid response to request")),
         };
         response
@@ -367,26 +374,52 @@ impl NetworkSender {
 
     pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
-        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
-        self.broadcast(msg).await
+        let msg = ConsensusMsg_::ProposalMsg(Box::new(proposal_msg));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.broadcast(msg_0).await;
+        self.broadcast(msg_1).await
     }
 
-    pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo) {
+    pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo, id: usize) {
         fail_point!("consensus::send::broadcast_sync_info", |_| ());
-        let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
+        let msg = ConsensusMsg_::SyncInfo(Box::new(sync_info_msg));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg.clone()
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_timeout_vote(&self, timeout_vote_msg: VoteMsg) {
+    pub async fn broadcast_timeout_vote(&self, timeout_vote_msg: VoteMsg, id: usize) {
         fail_point!("consensus::send::broadcast_timeout_vote", |_| ());
-        let msg = ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg));
+        let msg = ConsensusMsg_::VoteMsg(Box::new(timeout_vote_msg));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg.clone()
+        };
         self.broadcast(msg).await
     }
 
     pub async fn broadcast_epoch_change(&self, epoch_change_proof: EpochChangeProof) {
         fail_point!("consensus::send::broadcast_epoch_change", |_| ());
-        let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_change_proof));
-        self.broadcast(msg).await
+        let msg = ConsensusMsg_::EpochChangeProof(Box::new(epoch_change_proof));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.broadcast(msg_0).await;
+        self.broadcast(msg_1).await
     }
 
     #[allow(dead_code)]
@@ -396,34 +429,58 @@ impl NetworkSender {
         recipient: Author,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::send::commit_vote", |_| Ok(()));
-        let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Vote(commit_vote)));
-        self.send_rpc(recipient, msg, Duration::from_millis(500))
+        let msg = ConsensusMsg_::CommitMessage(Box::new(CommitMessage::Vote(commit_vote)));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        let _ = self.send_rpc(recipient.clone(), msg_0, Duration::from_millis(500))
+            .await
+            .map(|_| ());
+        self.send_rpc(recipient, msg_1, Duration::from_millis(500))
             .await
             .map(|_| ())
     }
 
-    pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
+    pub async fn broadcast_vote(&self, vote_msg: VoteMsg, id: usize) {
         fail_point!("consensus::send::vote", |_| ());
-        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        let msg = ConsensusMsg_::VoteMsg(Box::new(vote_msg));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg.clone()
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg) {
+    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg, id: usize) {
         fail_point!("consensus::send::round_timeout", |_| ());
-        let msg = ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout));
+        let msg = ConsensusMsg_::RoundTimeoutMsg(Box::new(round_timeout));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg.clone()
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg) {
+    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg, id: usize) {
         fail_point!("consensus::send::order_vote", |_| ());
-        let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
+        let msg = ConsensusMsg_::OrderVoteMsg(Box::new(order_vote_msg));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg.clone()
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
+    pub async fn broadcast_fast_share(&self, share: FastShare<Share>, id: usize) {
         fail_point!("consensus::send::broadcast_share", |_| ());
-        let msg = tokio::task::spawn_blocking(|| {
-            RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
+        let share_clone = share.clone();
+        let msg = tokio::task::spawn_blocking(move || {
+            RandMessage::<Share, AugmentedData>::FastShare(share_clone).into_network_message_with_id(id)
         })
         .await
         .expect("task cannot fail to execute");
@@ -438,33 +495,66 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
-    pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>) {
+    pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>, id: usize) {
         fail_point!("consensus::send::vote", |_| ());
-        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
-        self.send(msg, recipients).await
+        let msg = ConsensusMsg_::VoteMsg(Box::new(vote_msg));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg.clone()
+        };
+        self.send(msg, recipients).await;
     }
 
     #[cfg(feature = "failpoints")]
     pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::proposal", |_| ());
-        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
-        self.send(msg, recipients).await
+        let msg = ConsensusMsg_::ProposalMsg(Box::new(proposal_msg));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.send(msg_0, recipients.clone()).await;
+        self.send(msg_1, recipients).await
     }
 
     pub async fn send_epoch_change(&self, proof: EpochChangeProof) {
         fail_point!("consensus::send::epoch_change", |_| ());
-        let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
-        self.send(msg, vec![self.author]).await
+        let msg = ConsensusMsg_::EpochChangeProof(Box::new(proof));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.send(msg_0, vec![self.author]).await;
+        self.send(msg_1, vec![self.author]).await
     }
 
     /// Sends the ledger info to self buffer manager
     pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::commit_decision", |_| ());
-        let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Decision(
+        let msg = ConsensusMsg_::CommitMessage(Box::new(CommitMessage::Decision(
             CommitDecision::new(ledger_info),
         )));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
         let _ = self
-            .send_rpc(self.author, msg, Duration::from_millis(500))
+            .send_rpc(self.author, msg_0, Duration::from_millis(500))
+            .await;
+        let _ = self
+            .send_rpc(self.author, msg_1, Duration::from_millis(500))
             .await;
     }
 
@@ -486,15 +576,19 @@ impl QuorumStoreSender for NetworkSender {
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
         let request_digest = request.digest();
-        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
+        let msg_ = ConsensusMsg_::BatchRequestMsg(Box::new(request));
+        let msg = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg_
+        };
         let response = self.send_rpc(recipient, msg, timeout).await?;
-        match response {
+        match response.consensus_msg {
             // TODO: deprecated, remove after another release (likely v1.11)
-            ConsensusMsg::BatchResponse(batch) => {
+            ConsensusMsg_::BatchResponse(batch) => {
                 batch.verify_with_digest(request_digest)?;
                 Ok(BatchResponse::Batch(*batch))
             },
-            ConsensusMsg::BatchResponseV2(maybe_batch) => {
+            ConsensusMsg_::BatchResponseV2(maybe_batch) => {
                 if let BatchResponse::Batch(batch) = maybe_batch.as_ref() {
                     batch.verify_with_digest(request_digest)?;
                 }
@@ -512,26 +606,62 @@ impl QuorumStoreSender for NetworkSender {
     ) {
         fail_point!("consensus::send::signed_batch_info", |_| ());
         let msg =
-            ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
-        self.send(msg, recipients).await
+            ConsensusMsg_::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.send(msg_0, recipients.clone()).await;
+        self.send(msg_1, recipients).await
     }
 
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
-        let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
-        self.broadcast(msg).await
+        let msg = ConsensusMsg_::BatchMsg(Box::new(BatchMsg::new(batches)));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.broadcast(msg_0).await;
+        self.broadcast(msg_1).await
     }
 
     async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
-        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
-        self.broadcast(msg).await
+        let msg = ConsensusMsg_::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.broadcast(msg_0).await;
+        self.broadcast(msg_1).await
     }
 
     async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
-        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
-        self.send(msg, vec![self.author]).await
+        let msg = ConsensusMsg_::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        let msg_0 = ConsensusMsg {
+            id: 0,
+            consensus_msg: msg.clone()
+        };
+        let msg_1 = ConsensusMsg {
+            id: 1,
+            consensus_msg: msg.clone()
+        };
+        self.send(msg_0, vec![self.author.clone()]).await;
+        self.send(msg_1, vec![self.author]).await
     }
 }
 
@@ -630,11 +760,11 @@ impl ProofNotifier for NetworkSender {
 
 pub struct NetworkTask {
     consensus_messages_tx: aptos_channel::Sender<
-        (AccountAddress, Discriminant<ConsensusMsg>),
+        ((AccountAddress, usize), Discriminant<ConsensusMsg_>),
         (AccountAddress, ConsensusMsg),
     >,
     quorum_store_messages_tx: aptos_channel::Sender<
-        (AccountAddress, Discriminant<ConsensusMsg>),
+        ((AccountAddress, usize), Discriminant<ConsensusMsg_>),
         (AccountAddress, ConsensusMsg),
     >,
     rpc_tx: aptos_channel::Sender<
@@ -696,11 +826,11 @@ impl NetworkTask {
         peer_id: AccountAddress,
         msg: ConsensusMsg,
         tx: &aptos_channel::Sender<
-            (AccountAddress, Discriminant<ConsensusMsg>),
+            ((AccountAddress, usize), Discriminant<ConsensusMsg_>),
             (AccountAddress, ConsensusMsg),
         >,
     ) {
-        if let Err(e) = tx.push((peer_id, discriminant(&msg)), (peer_id, msg)) {
+        if let Err(e) = tx.push(((peer_id, msg.id), discriminant(&msg.consensus_msg)), (peer_id, msg)) {
             warn!(
                 remote_peer = peer_id,
                 error = ?e, "Error pushing consensus msg",
@@ -715,18 +845,18 @@ impl NetworkTask {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
                         .inc();
-                    match msg {
-                        quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
-                        | ConsensusMsg::BatchMsg(_)
-                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                    match msg.consensus_msg {
+                        ref quorum_store_msg @ (ConsensusMsg_::SignedBatchInfo(_)
+                        | ConsensusMsg_::BatchMsg(_)
+                        | ConsensusMsg_::ProofOfStoreMsg(_)) => {
                             Self::push_msg(
                                 peer_id,
-                                quorum_store_msg,
+                                msg.clone(),
                                 &self.quorum_store_messages_tx,
                             );
                         },
                         // Remove after migration to use rpc.
-                        ConsensusMsg::CommitVoteMsg(commit_vote) => {
+                        ConsensusMsg_::CommitVoteMsg(commit_vote) => {
                             let (tx, _rx) = oneshot::channel();
                             let req_with_callback =
                                 IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
@@ -741,7 +871,7 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
-                        ConsensusMsg::CommitDecisionMsg(commit_decision) => {
+                        ConsensusMsg_::CommitDecisionMsg(commit_decision) => {
                             let (tx, _rx) = oneshot::channel();
                             let req_with_callback =
                                 IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
@@ -756,14 +886,14 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
-                        consensus_msg @ (ConsensusMsg::ProposalMsg(_)
-                        | ConsensusMsg::VoteMsg(_)
-                        | ConsensusMsg::RoundTimeoutMsg(_)
-                        | ConsensusMsg::OrderVoteMsg(_)
-                        | ConsensusMsg::SyncInfo(_)
-                        | ConsensusMsg::EpochRetrievalRequest(_)
-                        | ConsensusMsg::EpochChangeProof(_)) => {
-                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                        consensus_msg @ (ConsensusMsg_::ProposalMsg(_)
+                        | ConsensusMsg_::VoteMsg(_)
+                        | ConsensusMsg_::RoundTimeoutMsg(_)
+                        | ConsensusMsg_::OrderVoteMsg(_)
+                        | ConsensusMsg_::SyncInfo(_)
+                        | ConsensusMsg_::EpochRetrievalRequest(_)
+                        | ConsensusMsg_::EpochChangeProof(_)) => {
+                            if let ConsensusMsg_::ProposalMsg(proposal) = &consensus_msg {
                                 observe_block(
                                     proposal.proposal().timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED,
@@ -775,10 +905,14 @@ impl NetworkTask {
                                     block_hash = proposal.proposal().id(),
                                 );
                             }
-                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                            let msg = ConsensusMsg {
+                                id: msg.id,
+                                consensus_msg
+                            };
+                            Self::push_msg(peer_id, msg, &self.consensus_messages_tx);
                         },
                         // TODO: get rid of the rpc dummy value
-                        ConsensusMsg::RandGenMessage(req) => {
+                        ConsensusMsg_::RandGenMessage(req) => {
                             let (tx, _rx) = oneshot::channel();
                             let req_with_callback =
                                 IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
@@ -804,8 +938,8 @@ impl NetworkTask {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
                         .inc();
-                    let req = match msg {
-                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                    let req = match msg.consensus_msg {
+                        ConsensusMsg_::BlockRetrievalRequest(request) => {
                             debug!(
                                 remote_peer = peer_id,
                                 event = LogEvent::ReceiveBlockRetrieval,
@@ -818,7 +952,7 @@ impl NetworkTask {
                                 response_sender: callback,
                             })
                         },
-                        ConsensusMsg::BatchRequestMsg(request) => {
+                        ConsensusMsg_::BatchRequestMsg(request) => {
                             debug!(
                                 remote_peer = peer_id,
                                 event = LogEvent::ReceiveBatchRetrieval,
@@ -831,7 +965,7 @@ impl NetworkTask {
                                 response_sender: callback,
                             })
                         },
-                        ConsensusMsg::DAGMessage(req) => {
+                        ConsensusMsg_::DAGMessage(req) => {
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
                                 req,
                                 sender: peer_id,
@@ -841,14 +975,14 @@ impl NetworkTask {
                                 },
                             })
                         },
-                        ConsensusMsg::CommitMessage(req) => {
+                        ConsensusMsg_::CommitMessage(req) => {
                             IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                 req: *req,
                                 protocol,
                                 response_sender: callback,
                             })
                         },
-                        ConsensusMsg::RandGenMessage(req) => {
+                        ConsensusMsg_::RandGenMessage(req) => {
                             IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
                                 req,
                                 sender: peer_id,

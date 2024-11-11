@@ -81,6 +81,7 @@ use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
 };
+use crate::network_interface::ConsensusMsg_;
 
 #[derive(Debug, Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -199,15 +200,15 @@ impl UnverifiedEvent {
 
 impl From<ConsensusMsg> for UnverifiedEvent {
     fn from(value: ConsensusMsg) -> Self {
-        match value {
-            ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
-            ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
-            ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
-            ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
-            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
-            ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
-            ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
-            ConsensusMsg::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
+        match value.consensus_msg{
+            ConsensusMsg_::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
+            ConsensusMsg_::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
+            ConsensusMsg_::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
+            ConsensusMsg_::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
+            ConsensusMsg_::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
+            ConsensusMsg_::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
+            ConsensusMsg_::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
+            ConsensusMsg_::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -270,6 +271,7 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+    id: usize,
 }
 
 impl RoundManager {
@@ -290,6 +292,7 @@ impl RoundManager {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+        id: usize,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -321,6 +324,7 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
+            id
         }
     }
 
@@ -410,6 +414,7 @@ impl RoundManager {
             let proposal_generator = self.proposal_generator.clone();
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
+            let id = self.id;
             tokio::spawn(async move {
                 if let Err(e) = monitor!(
                     "generate_and_send_proposal",
@@ -421,6 +426,7 @@ impl RoundManager {
                         proposal_generator,
                         safety_rules,
                         proposer_election,
+                        id
                     )
                     .await
                 ) {
@@ -439,6 +445,7 @@ impl RoundManager {
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        id: usize
     ) -> anyhow::Result<()> {
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
         let proposal_msg = Self::generate_proposal(
@@ -449,6 +456,7 @@ impl RoundManager {
             proposal_generator,
             safety_rules,
             proposer_election,
+            id
         )
         .await?;
         #[cfg(feature = "failpoints")]
@@ -556,6 +564,7 @@ impl RoundManager {
             self.proposal_generator.clone(),
             self.safety_rules.clone(),
             self.proposer_election.clone(),
+            self.id
         )
         .await
     }
@@ -568,11 +577,12 @@ impl RoundManager {
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        id: usize
     ) -> anyhow::Result<ProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
         let callback_sync_info = sync_info.clone();
         let callback = async move {
-            network.broadcast_sync_info(callback_sync_info).await;
+            network.broadcast_sync_info(callback_sync_info, id).await;
         }
         .boxed();
 
@@ -773,7 +783,7 @@ impl RoundManager {
 
         if self.sync_only() {
             self.network
-                .broadcast_sync_info(self.block_store.sync_info())
+                .broadcast_sync_info(self.block_store.sync_info(), self.id)
                 .await;
             bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
         }
@@ -809,7 +819,7 @@ impl RoundManager {
             self.round_state.record_round_timeout(timeout.clone());
             let round_timeout_msg = RoundTimeoutMsg::new(timeout, self.block_store.sync_info());
             self.network
-                .broadcast_round_timeout(round_timeout_msg)
+                .broadcast_round_timeout(round_timeout_msg, self.id)
                 .await;
             warn!(
                 round = round,
@@ -854,7 +864,7 @@ impl RoundManager {
 
             self.round_state.record_vote(timeout_vote.clone());
             let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
-            self.network.broadcast_timeout_vote(timeout_vote_msg).await;
+            self.network.broadcast_timeout_vote(timeout_vote_msg, self.id).await;
             warn!(
                 round = round,
                 remote_peer = self.proposer_election.get_valid_proposer(round),
@@ -1107,7 +1117,7 @@ impl RoundManager {
                 info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
                     .epoch(fast_share.epoch())
                     .round(fast_share.round()));
-                self.network.broadcast_fast_share(fast_share).await;
+                self.network.broadcast_fast_share(fast_share, self.id).await;
                 self.blocks_with_broadcasted_fast_shares
                     .put(block_info.id(), ());
             }
@@ -1145,7 +1155,7 @@ impl RoundManager {
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
-            self.network.broadcast_vote(vote_msg).await;
+            self.network.broadcast_vote(vote_msg, self.id).await;
         } else {
             let recipient = self
                 .proposer_election
@@ -1154,7 +1164,7 @@ impl RoundManager {
                 self.new_log(LogEvent::Vote).remote_peer(recipient),
                 "{}", vote
             );
-            self.network.send_vote(vote_msg, vec![recipient]).await;
+            self.network.send_vote(vote_msg, vec![recipient], self.id).await;
         }
         Ok(())
     }
@@ -1328,7 +1338,7 @@ impl RoundManager {
                 self.new_log(LogEvent::BroadcastOrderVote),
                 "{}", order_vote_msg
             );
-            self.network.broadcast_order_vote(order_vote_msg).await;
+            self.network.broadcast_order_vote(order_vote_msg, self.id).await;
             ORDER_VOTE_BROADCASTED.inc();
         }
         Ok(())

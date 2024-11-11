@@ -40,6 +40,7 @@ use std::{
     time::Duration,
 };
 use tokio::runtime::Handle;
+use crate::network_interface::ConsensusMsg_;
 
 /// `TwinId` is used by the NetworkPlayground to uniquely identify
 /// nodes, even if they have the same `AccountAddress` (e.g. for Twins)
@@ -320,11 +321,11 @@ impl NetworkPlayground {
 
     /// Return the round of a given message
     fn get_message_round(msg: ConsensusMsg) -> Option<u64> {
-        match msg {
-            ConsensusMsg::ProposalMsg(proposal_msg) => Some(proposal_msg.proposal().round()),
-            ConsensusMsg::VoteMsg(vote_msg) => Some(vote_msg.vote().vote_data().proposed().round()),
-            ConsensusMsg::SyncInfo(sync_info) => Some(sync_info.highest_certified_round()),
-            ConsensusMsg::CommitVoteMsg(commit_vote) => Some(commit_vote.commit_info().round()),
+        match msg.consensus_msg {
+            ConsensusMsg_::ProposalMsg(proposal_msg) => Some(proposal_msg.proposal().round()),
+            ConsensusMsg_::VoteMsg(vote_msg) => Some(vote_msg.vote().vote_data().proposed().round()),
+            ConsensusMsg_::SyncInfo(sync_info) => Some(sync_info.highest_certified_round()),
+            ConsensusMsg_::CommitVoteMsg(commit_vote) => Some(commit_vote.commit_info().round()),
             _ => None,
         }
     }
@@ -336,12 +337,12 @@ impl NetworkPlayground {
 
     /// Returns true for proposal messages only.
     pub fn proposals_only(msg: &(Author, ConsensusMsg)) -> bool {
-        matches!(&msg.1, ConsensusMsg::ProposalMsg(_))
+        matches!(&msg.1.consensus_msg, ConsensusMsg_::ProposalMsg(_))
     }
 
     /// Returns true for vote messages only.
     pub fn votes_only(msg: &(Author, ConsensusMsg)) -> bool {
-        matches!(&msg.1, ConsensusMsg::VoteMsg(_))
+        matches!(&msg.1.consensus_msg, ConsensusMsg_::VoteMsg(_))
     }
 
     pub fn extend_author_to_twin_ids(&mut self, author: Author, twin_id: TwinId) {
@@ -705,15 +706,15 @@ mod tests {
         );
         timed_block_on(&runtime, async {
             nodes[0]
-                .send_vote(vote_msg.clone(), peers[2..5].to_vec())
+                .send_vote(vote_msg.clone(), peers[2..5].to_vec(), 0)
                 .await;
             playground
                 .wait_for_messages(3, NetworkPlayground::take_all)
                 .await;
             for r in receivers.iter_mut().take(5).skip(2) {
                 let (_, msg) = r.consensus_messages.next().await.unwrap();
-                match msg {
-                    ConsensusMsg::VoteMsg(v) => assert_eq!(*v, vote_msg),
+                match msg.consensus_msg {
+                    ConsensusMsg_::VoteMsg(v) => assert_eq!(*v, vote_msg),
                     _ => panic!("unexpected messages"),
                 }
             }
@@ -723,8 +724,8 @@ mod tests {
                 .await;
             for r in receivers.iter_mut().take(num_nodes - 1) {
                 let (_, msg) = r.consensus_messages.next().await.unwrap();
-                match msg {
-                    ConsensusMsg::ProposalMsg(p) => assert_eq!(*p, proposal),
+                match msg.consensus_msg {
+                    ConsensusMsg_::ProposalMsg(p) => assert_eq!(*p, proposal),
                     _ => panic!("unexpected messages"),
                 }
             }
@@ -815,14 +816,18 @@ mod tests {
                 // make sure the network task is not blocked during RPC
                 // we limit the network notification queue size to 1 so if it's blocked,
                 // we can not process 2 votes and the test will timeout
-                node0.send_vote(vote_msg.clone(), vec![peer1]).await;
-                node0.send_vote(vote_msg.clone(), vec![peer1]).await;
+                node0.send_vote(vote_msg.clone(), vec![peer1], 0).await;
+                node0.send_vote(vote_msg.clone(), vec![peer1], 0).await;
                 playground
                     .wait_for_messages(2, NetworkPlayground::votes_only)
                     .await;
                 let response =
                     BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
-                let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
+                let response_ = ConsensusMsg_::BlockRetrievalResponse(Box::new(response));
+                let response = ConsensusMsg {
+                    id: 0,
+                    consensus_msg: response_
+                };
                 let bytes = Bytes::from(serde_json::to_vec(&response).unwrap());
                 match request {
                     IncomingRpcRequest::BlockRetrieval(request) => {
@@ -879,9 +884,13 @@ mod tests {
             .push((peer_id, protocol_id), bad_msg)
             .unwrap();
 
-        let liveness_check_msg = ConsensusMsg::BlockRetrievalRequest(Box::new(
+        let liveness_check_msg_ = ConsensusMsg_::BlockRetrievalRequest(Box::new(
             BlockRetrievalRequest::new(HashValue::random(), 1),
         ));
+        let liveness_check_msg = ConsensusMsg {
+            id: 0,
+            consensus_msg: liveness_check_msg_
+        };
 
         let protocol_id = ProtocolId::ConsensusRpcJson;
         let (res_tx, _res_rx) = oneshot::channel();

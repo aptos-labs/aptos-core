@@ -12,6 +12,7 @@ use aptos_consensus_types::{
 };
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
+use crate::network_interface::ConsensusMsg_;
 
 #[derive(Clone)]
 pub struct MockQuorumStoreSender {
@@ -42,9 +43,12 @@ impl QuorumStoreSender for MockQuorumStoreSender {
     ) {
         self.tx
             .send((
-                ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(
-                    signed_batch_infos,
-                ))),
+                ConsensusMsg {
+                    id: 0,
+                    consensus_msg: ConsensusMsg_::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(
+                        signed_batch_infos,
+                    )))
+                },
                 recipients,
             ))
             .await
@@ -58,7 +62,10 @@ impl QuorumStoreSender for MockQuorumStoreSender {
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>) {
         self.tx
             .send((
-                ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proof_of_stores))),
+                ConsensusMsg {
+                    id: 0,
+                    consensus_msg: ConsensusMsg_::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proof_of_stores))),
+                },
                 vec![],
             ))
             .await

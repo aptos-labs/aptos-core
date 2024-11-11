@@ -20,6 +20,7 @@ use bytes::Bytes;
 use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};
 use std::cmp::min;
+use crate::network_interface::ConsensusMsg_;
 
 #[derive(Clone, Serialize, Deserialize, EnumConversion)]
 pub enum RandMessage<S, D> {
@@ -76,18 +77,32 @@ impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
     }
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::RandGenMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+        match msg.consensus_msg {
+            ConsensusMsg_::RandGenMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
             _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 
     #[allow(clippy::unwrap_used)]
     fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::RandGenMessage(RandGenMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
-        })
+        ConsensusMsg {
+            id: 0,
+            consensus_msg: ConsensusMsg_::RandGenMessage(RandGenMessage {
+                epoch: self.epoch(),
+                data: bcs::to_bytes(&self).unwrap(),
+            })
+        }
+    }
+
+    #[allow(clippy::unwrap_used)]
+    fn into_network_message_with_id(self, id: usize) -> ConsensusMsg {
+        ConsensusMsg {
+            id: id,
+            consensus_msg: ConsensusMsg_::RandGenMessage(RandGenMessage {
+                epoch: self.epoch(),
+                data: bcs::to_bytes(&self).unwrap(),
+            })
+        }
     }
 }
 

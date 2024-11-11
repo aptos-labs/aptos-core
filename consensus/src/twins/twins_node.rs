@@ -9,7 +9,7 @@ use crate::{
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::DirectMempoolPayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
     quorum_store::quorum_store_db::MockQuorumStoreDB,
     rand::rand_gen::storage::in_memory::InMemRandDb,
     test_utils::{mock_execution_client::MockExecutionClient, MockStorage},
@@ -114,6 +114,7 @@ impl SMRNode {
             ordered_blocks_tx,
             Arc::clone(&storage),
         ));
+        let dummy_client = Arc::new(DummyExecutionClient {});
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
@@ -156,6 +157,7 @@ impl SMRNode {
             timeout_sender,
             quorum_store_to_mempool_sender,
             execution_client.clone(),
+            dummy_client,
             storage.clone(),
             quorum_store_storage,
             reconfig_listener,

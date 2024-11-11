@@ -61,6 +61,7 @@ use std::{
 };
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
+use crate::network_interface::ConsensusMsg_;
 
 pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
@@ -772,8 +773,12 @@ impl BufferManager {
                     let mut item = self.buffer.take(&current_cursor);
                     let new_item = match item.add_signature_if_matched(vote) {
                         Ok(()) => {
-                            let response =
-                                ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
+                            let response_ =
+                                ConsensusMsg_::CommitMessage(Box::new(CommitMessage::Ack(())));
+                            let response = ConsensusMsg {
+                                id: 0,
+                                consensus_msg: response_
+                            };
                             if let Ok(bytes) = protocol.to_bytes(&response) {
                                 let _ = response_sender.send(Ok(bytes.into()));
                             }
@@ -1042,7 +1047,11 @@ fn reply_commit_msg(
     response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
     msg: CommitMessage,
 ) {
-    let response = ConsensusMsg::CommitMessage(Box::new(msg));
+    let response_ = ConsensusMsg_::CommitMessage(Box::new(msg));
+    let response = ConsensusMsg {
+        id: 0,
+        consensus_msg: response_
+    };
     if let Ok(bytes) = protocol.to_bytes(&response) {
         let _ = response_sender.send(Ok(bytes.into()));
     }

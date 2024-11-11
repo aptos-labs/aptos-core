@@ -40,6 +40,7 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
 use std::{sync::Arc, time::Duration};
+use crate::network_interface::ConsensusMsg_;
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
@@ -416,7 +417,11 @@ impl InnerBuilder {
                     }
                 };
 
-                let msg = ConsensusMsg::BatchResponseV2(Box::new(response));
+                let msg_ = ConsensusMsg_::BatchResponseV2(Box::new(response));
+                let msg = ConsensusMsg {
+                    id: 0,
+                    consensus_msg: msg_
+                };
                 let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
                 if let Err(e) = rpc_request
                     .response_sender

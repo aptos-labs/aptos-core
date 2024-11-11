@@ -108,8 +108,8 @@ impl DagBootstrapUnit {
     async fn start(mut self) {
         loop {
             match self.network_events.next().await.unwrap() {
-                Event::RpcRequest(sender, msg, protocol, response_sender) => match msg {
-                    ConsensusMsg::DAGMessage(msg) => {
+                Event::RpcRequest(sender, msg, protocol, response_sender) => match msg.consensus_msg {
+                    ConsensusMsg_::DAGMessage(msg) => {
                         debug!("handling RPC...");
                         self.dag_rpc_tx.push(sender, IncomingDAGRequest {
                             req: msg,

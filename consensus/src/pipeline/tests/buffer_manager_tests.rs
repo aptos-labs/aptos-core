@@ -238,7 +238,7 @@ async fn loopback_commit_vote(
 ) {
     match msg {
         Event::RpcRequest(author, msg, protocol, callback) => {
-            if let ConsensusMsg::CommitMessage(msg) = msg {
+            if let ConsensusMsg_::CommitMessage(msg) = msg.consensus_msg {
                 msg.verify(verifier).unwrap();
                 let request = IncomingCommitRequest {
                     req: *msg,

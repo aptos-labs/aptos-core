@@ -97,6 +97,7 @@ pub fn start_consensus(
         node_config.consensus_observer,
         consensus_publisher.clone(),
     ));
+    let dummy_client = Arc::new(DummyExecutionClient {});
 
     let epoch_mgr = EpochManager::new(
         node_config,
@@ -106,6 +107,7 @@ pub fn start_consensus(
         timeout_sender,
         consensus_to_mempool_sender,
         execution_client,
+        dummy_client,
         storage.clone(),
         quorum_store_db.clone(),
         reconfig_events,

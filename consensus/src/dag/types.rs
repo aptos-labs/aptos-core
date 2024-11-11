@@ -40,6 +40,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use crate::network_interface::ConsensusMsg_;
 
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub enum Extensions {
@@ -883,17 +884,30 @@ impl TConsensusMsg for DAGMessage {
     }
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+        match msg.consensus_msg {
+            ConsensusMsg_::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
             _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 
     fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGMessage(DAGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes"),
-        })
+        ConsensusMsg {
+            id: 0,
+            consensus_msg: ConsensusMsg_::DAGMessage(DAGNetworkMessage {
+                epoch: self.epoch(),
+                data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes"),
+            })
+        }
+    }
+
+    fn into_network_message_with_id(self, id: usize) -> ConsensusMsg {
+        ConsensusMsg {
+            id,
+            consensus_msg: ConsensusMsg_::DAGMessage(DAGNetworkMessage {
+                epoch: self.epoch(),
+                data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes"),
+            })
+        }
     }
 }
 
@@ -925,18 +939,32 @@ impl TConsensusMsg for DAGRpcResult {
     }
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+        match msg.consensus_msg {
+            ConsensusMsg_::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
             _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 
     fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGMessage(DAGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes!"),
-        })
+        ConsensusMsg {
+            id: 0,
+            consensus_msg:  ConsensusMsg_::DAGMessage(DAGNetworkMessage {
+                epoch: self.epoch(),
+                data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes!"),
+            })
+        }
     }
+
+    fn into_network_message_with_id(self, id: usize) -> ConsensusMsg {
+        ConsensusMsg {
+            id,
+            consensus_msg:  ConsensusMsg_::DAGMessage(DAGNetworkMessage {
+                epoch: self.epoch(),
+                data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes!"),
+            })
+        }
+    }
+
 }
 
 impl RBMessage for DAGRpcResult {}

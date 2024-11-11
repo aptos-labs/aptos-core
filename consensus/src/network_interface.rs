@@ -34,7 +34,7 @@ use std::{collections::HashMap, time::Duration};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum ConsensusMsg {
+pub enum ConsensusMsg_ {
     /// RPC to get a chain of block of the given length starting from the given block id.
     BlockRetrievalRequest(Box<BlockRetrievalRequest>),
     /// Carries the returned blocks and the retrieval status.
@@ -85,32 +85,38 @@ pub enum ConsensusMsg {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ConsensusMsg {
+    pub id: usize,
+    pub consensus_msg: ConsensusMsg_
+}
+
 /// Network type for consensus
 impl ConsensusMsg {
     /// ConsensusMsg type in string
     ///
     pub fn name(&self) -> &str {
-        match self {
-            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
-            ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
-            ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
-            ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
-            ConsensusMsg::SyncInfo(_) => "SyncInfo",
-            ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
-            ConsensusMsg::VoteMsg(_) => "VoteMsg",
-            ConsensusMsg::OrderVoteMsg(_) => "OrderVoteMsg",
-            ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
-            ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
-            ConsensusMsg::BatchMsg(_) => "BatchMsg",
-            ConsensusMsg::BatchRequestMsg(_) => "BatchRequestMsg",
-            ConsensusMsg::BatchResponse(_) => "BatchResponse",
-            ConsensusMsg::SignedBatchInfo(_) => "SignedBatchInfo",
-            ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
-            ConsensusMsg::DAGMessage(_) => "DAGMessage",
-            ConsensusMsg::CommitMessage(_) => "CommitMessage",
-            ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
-            ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
-            ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
+        match self.consensus_msg {
+            ConsensusMsg_::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg_::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
+            ConsensusMsg_::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
+            ConsensusMsg_::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg_::SyncInfo(_) => "SyncInfo",
+            ConsensusMsg_::EpochChangeProof(_) => "EpochChangeProof",
+            ConsensusMsg_::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg_::OrderVoteMsg(_) => "OrderVoteMsg",
+            ConsensusMsg_::CommitVoteMsg(_) => "CommitVoteMsg",
+            ConsensusMsg_::CommitDecisionMsg(_) => "CommitDecisionMsg",
+            ConsensusMsg_::BatchMsg(_) => "BatchMsg",
+            ConsensusMsg_::BatchRequestMsg(_) => "BatchRequestMsg",
+            ConsensusMsg_::BatchResponse(_) => "BatchResponse",
+            ConsensusMsg_::SignedBatchInfo(_) => "SignedBatchInfo",
+            ConsensusMsg_::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
+            ConsensusMsg_::DAGMessage(_) => "DAGMessage",
+            ConsensusMsg_::CommitMessage(_) => "CommitMessage",
+            ConsensusMsg_::RandGenMessage(_) => "RandGenMessage",
+            ConsensusMsg_::BatchResponseV2(_) => "BatchResponseV2",
+            ConsensusMsg_::RoundTimeoutMsg(_) => "RoundTimeoutV2",
         }
     }
 }

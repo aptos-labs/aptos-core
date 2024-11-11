@@ -170,6 +170,7 @@ impl LedgerRecoveryData {
     }
 }
 
+#[derive(Clone)]
 pub struct RootMetadata {
     pub accu_hash: HashValue,
     pub frozen_root_hashes: Vec<HashValue>,
@@ -203,6 +204,7 @@ impl From<TransactionAccumulatorSummary> for RootMetadata {
 
 /// The recovery data constructed from raw consensusdb data, it'll find the root value and
 /// blocks that need cleanup or return error if the input data is inconsistent.
+#[derive(Clone)]
 pub struct RecoveryData {
     // The last vote message sent by this validator.
     last_vote: Option<Vote>,
@@ -271,6 +273,10 @@ impl RecoveryData {
                 _ => None,
             },
         })
+    }
+
+    pub fn clone_data(&self) -> Self {
+        self.clone()
     }
 
     pub fn root_block(&self) -> &Block {

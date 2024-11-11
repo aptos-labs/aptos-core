@@ -98,6 +98,7 @@ use tokio::{
     task::JoinHandle,
     time::timeout,
 };
+use crate::network_interface::ConsensusMsg_;
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
@@ -403,7 +404,7 @@ impl NodeSetup {
     pub async fn next_network_message(&mut self) -> ConsensusMsg {
         match self.next_network_event().await {
             Event::Message(_, msg) => msg,
-            Event::RpcRequest(_, msg, _, _) if matches!(msg, ConsensusMsg::CommitMessage(_)) => msg,
+            Event::RpcRequest(_, msg, _, _) if matches!(msg.consensus_msg, ConsensusMsg_::CommitMessage(_)) => msg,
             Event::RpcRequest(_, msg, _, _) => {
                 panic!(
                     "Unexpected event, got RpcRequest, expected Message: {:?} on node {}",
@@ -426,8 +427,8 @@ impl NodeSetup {
     }
 
     pub async fn next_proposal(&mut self) -> ProposalMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::ProposalMsg(p) => *p,
+        match self.next_network_message().await.consensus_msg {
+            ConsensusMsg_::ProposalMsg(p) => *p,
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
@@ -437,8 +438,8 @@ impl NodeSetup {
     }
 
     pub async fn next_vote(&mut self) -> VoteMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::VoteMsg(v) => *v,
+        match self.next_network_message().await.consensus_msg {
+            ConsensusMsg_::VoteMsg(v) => *v,
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
@@ -448,8 +449,8 @@ impl NodeSetup {
     }
 
     pub async fn next_timeout(&mut self) -> RoundTimeoutMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::RoundTimeoutMsg(v) => *v,
+        match self.next_network_message().await.consensus_msg {
+            ConsensusMsg_::RoundTimeoutMsg(v) => *v,
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
@@ -459,9 +460,9 @@ impl NodeSetup {
     }
 
     pub async fn next_commit_decision(&mut self) -> CommitDecision {
-        match self.next_network_message().await {
-            ConsensusMsg::CommitDecisionMsg(v) => *v,
-            ConsensusMsg::CommitMessage(d) if matches!(*d, CommitMessage::Decision(_)) => {
+        match self.next_network_message().await.consensus_msg {
+            ConsensusMsg_::CommitDecisionMsg(v) => *v,
+            ConsensusMsg_::CommitMessage(d) if matches!(*d, CommitMessage::Decision(_)) => {
                 match *d {
                     CommitMessage::Decision(d) => d,
                     _ => unreachable!(),
@@ -477,8 +478,8 @@ impl NodeSetup {
 
     pub async fn poll_block_retreival(&mut self) -> Option<IncomingBlockRetrievalRequest> {
         match self.poll_next_network_event() {
-            Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
-                ConsensusMsg::BlockRetrievalRequest(v) => Some(IncomingBlockRetrievalRequest {
+            Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg.consensus_msg {
+                ConsensusMsg_::BlockRetrievalRequest(v) => Some(IncomingBlockRetrievalRequest {
                     req: *v,
                     protocol,
                     response_sender,
@@ -1326,7 +1327,13 @@ fn response_on_block_retrieval() {
         match rx1.await {
             Ok(Ok(bytes)) => {
                 let response = match bcs::from_bytes(&bytes) {
-                    Ok(ConsensusMsg::BlockRetrievalResponse(resp)) => *resp,
+                    Ok(msg) => {
+                        if let ConsensusMsg_::BlockRetrievalResponse(resp) = msg.consensus_msg {
+                            *resp
+                        } else {
+                            panic!("block retrieval failure")
+                        }
+                    },
                     _ => panic!("block retrieval failure"),
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::Succeeded);
@@ -1350,7 +1357,13 @@ fn response_on_block_retrieval() {
         match rx2.await {
             Ok(Ok(bytes)) => {
                 let response = match bcs::from_bytes(&bytes) {
-                    Ok(ConsensusMsg::BlockRetrievalResponse(resp)) => *resp,
+                    Ok(msg) => {
+                        if let ConsensusMsg_::BlockRetrievalResponse(resp) = msg.consensus_msg {
+                            *resp
+                        } else {
+                            panic!("block retrieval failure")
+                        }
+                    },
                     _ => panic!("block retrieval failure"),
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
@@ -1373,8 +1386,13 @@ fn response_on_block_retrieval() {
         match rx3.await {
             Ok(Ok(bytes)) => {
                 let response = match bcs::from_bytes(&bytes) {
-                    Ok(ConsensusMsg::BlockRetrievalResponse(resp)) => *resp,
-                    _ => panic!("block retrieval failure"),
+                    Ok(msg) => {
+                        if let ConsensusMsg_::BlockRetrievalResponse(resp) = msg.consensus_msg {
+                            *resp
+                        } else {
+                            panic!("block retrieval failure")
+                        }
+                    },
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::NotEnoughBlocks);
                 assert_eq!(block_id, response.blocks().first().unwrap().id());
@@ -2284,12 +2302,19 @@ pub fn forking_retrieval_test() {
         for (proposal, node) in proposals.into_iter().zip(nodes.iter_mut()) {
             node.pending_network_events.push(Event::Message(
                 node.signer.author(),
-                ConsensusMsg::ProposalMsg(Box::new(proposal)),
+                ConsensusMsg {
+                    id: 0,
+                    consensus_msg: ConsensusMsg_::ProposalMsg(Box::new(proposal))
+                },
             ));
         }
         behind_node_obj.pending_network_events.push(Event::Message(
             behind_node_obj.signer.author(),
-            ConsensusMsg::ProposalMsg(Box::new(proposal_msg)),
+            ConsensusMsg {
+                id: 0,
+                consensus_msg: ConsensusMsg_::ProposalMsg(Box::new(proposal_msg)),
+
+            },
         ));
 
         nodes.push(behind_node_obj);
@@ -2311,15 +2336,15 @@ pub fn forking_retrieval_test() {
     );
 
     let next_message = timed_block_on(&runtime, nodes[proposal_node].next_network_message());
-    match next_message {
-        ConsensusMsg::VoteMsg(_) => info!("Skip extra vote msg"),
-        ConsensusMsg::ProposalMsg(msg) => {
+    match next_message.consensus_msg {
+        ConsensusMsg_::VoteMsg(_) => info!("Skip extra vote msg"),
+        ConsensusMsg_::ProposalMsg(msg) => {
             // put the message back in the queue.
             // actual peer doesn't matter, it is ignored, so use self.
             let peer = nodes[proposal_node].signer.author();
             nodes[proposal_node]
                 .pending_network_events
-                .push(Event::Message(peer, ConsensusMsg::ProposalMsg(msg)))
+                .push(Event::Message(peer, ConsensusMsg_::ProposalMsg(msg)))
         },
         _ => panic!("unexpected network message {:?}", next_message),
     }

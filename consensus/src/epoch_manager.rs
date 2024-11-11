@@ -40,7 +40,7 @@ use crate::{
     },
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::TExecutionClient,
+    pipeline::execution_client::{DummyExecutionClient, TExecutionClient},
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
@@ -110,6 +110,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use crate::network_interface::ConsensusMsg_;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -139,18 +140,26 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     execution_client: Arc<dyn TExecutionClient>,
+    dummy_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
+    rand_manager_msg_tx_1: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
     // channels to round manager
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
     buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
+    // channels to round manager
+    round_manager_tx_1: Option<
+        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    >,
+    buffered_proposal_tx_1: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
+    round_manager_close_tx_1: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
@@ -185,6 +194,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         execution_client: Arc<dyn TExecutionClient>,
+        dummy_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn PersistentLivenessStorage>,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener<P>,
@@ -219,9 +229,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
+            rand_manager_msg_tx_1: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
             buffered_proposal_tx: None,
+            round_manager_tx_1: None,
+            round_manager_close_tx_1: None,
+            buffered_proposal_tx_1: None,
             epoch_state: None,
             block_retrieval_tx: None,
             quorum_store_msg_tx: None,
@@ -244,6 +258,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
             key_storage,
+            dummy_client
         }
     }
 
@@ -439,6 +454,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         request: EpochRetrievalRequest,
         peer_id: AccountAddress,
+        id: usize
     ) -> anyhow::Result<()> {
         debug!(
             LogSchema::new(LogEvent::ReceiveEpochRetrieval)
@@ -452,7 +468,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch)
             .map_err(DbError::from)
             .context("[EpochManager] Failed to get epoch proof")?;
-        let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
+        let msg_ = ConsensusMsg_::EpochChangeProof(Box::new(proof));
+        let msg = ConsensusMsg {
+            id,
+            consensus_msg: msg_
+        };
         if let Err(err) = self.network_sender.send_to(peer_id, msg) {
             warn!(
                 "[EpochManager] Failed to send epoch proof to {}, with error: {:?}",
@@ -466,6 +486,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         different_epoch: u64,
         peer_id: AccountAddress,
+        id: usize
     ) -> anyhow::Result<()> {
         debug!(
             LogSchema::new(LogEvent::ReceiveMessageFromDifferentEpoch)
@@ -498,7 +519,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 start_epoch: different_epoch,
                                 end_epoch: self.epoch(),
                             },
-                            peer_id
+                            peer_id,
+                            id
                         )
                     )
                 }
@@ -509,7 +531,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     start_epoch: self.epoch(),
                     end_epoch: different_epoch,
                 };
-                let msg = ConsensusMsg::EpochRetrievalRequest(Box::new(request));
+                let msg_ = ConsensusMsg_::EpochRetrievalRequest(Box::new(request));
+                let msg = ConsensusMsg {
+                    id,
+                    consensus_msg: msg_
+                };
                 if let Err(err) = self.network_sender.send_to(peer_id, msg) {
                     warn!(
                         "[EpochManager] Failed to send epoch retrieval to {}, {:?}",
@@ -602,6 +628,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
         self.round_manager_tx = None;
 
+        if let Some(close_tx) = self.round_manager_close_tx_1.take() {
+            // Release the previous RoundManager, especially the SafetyRule client
+            let (ack_tx, ack_rx) = oneshot::channel();
+            close_tx
+                .send(ack_tx)
+                .expect("[EpochManager] Fail to drop round manager");
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop round manager");
+        }
+        self.round_manager_tx_1 = None;
+
         if let Some(close_tx) = self.dag_shutdown_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -616,6 +654,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Shutdown the previous rand manager
         self.rand_manager_msg_tx = None;
+        self.rand_manager_msg_tx_1 = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.execution_client.end_epoch().await;
@@ -761,6 +800,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        id: usize,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -808,7 +848,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        self.execution_client
+        if id == 0 {
+            self.execution_client
             .start_epoch(
                 consensus_key,
                 epoch_state.clone(),
@@ -823,6 +864,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 recovery_data.root_block().round(),
             )
             .await;
+        }
+
 
         info!(epoch = epoch, "Create BlockStore");
         // Read the last vote, before "moving" `recovery_data`
@@ -830,7 +873,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let block_store = Arc::new(BlockStore::new(
             Arc::clone(&self.storage),
             recovery_data,
-            self.execution_client.clone(),
+            if id == 0 {
+                self.execution_client.clone()
+            } else {
+                self.dummy_client.clone()
+            },
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
@@ -890,8 +937,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
-        self.round_manager_tx = Some(round_manager_tx.clone());
-        self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
+        if id == 0 {
+            self.round_manager_tx = Some(round_manager_tx.clone());
+            self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
+        } else {
+            self.round_manager_tx_1 = Some(round_manager_tx.clone());
+            self.buffered_proposal_tx_1 = Some(buffered_proposal_tx.clone());
+        }
         let max_blocks_allowed = self
             .config
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
@@ -912,12 +964,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_jwk_consensus_config,
             fast_rand_config,
             failures_tracker,
+            id
         );
 
         round_manager.init(last_vote).await;
 
         let (close_tx, close_rx) = oneshot::channel();
-        self.round_manager_close_tx = Some(close_tx);
+        if id == 0 {
+            self.round_manager_close_tx = Some(close_tx);
+        } else {
+            self.round_manager_close_tx_1 = Some(close_tx);
+        }
         tokio::spawn(round_manager.start(round_manager_rx, buffered_proposal_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
@@ -1199,7 +1256,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             None,
         );
 
+        let (rand_msg_tx_1, rand_msg_rx_1) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
+            QueueStyle::KLAST,
+            10,
+            None,
+        );
+
         self.rand_manager_msg_tx = Some(rand_msg_tx);
+        self.rand_manager_msg_tx_1 = Some(rand_msg_tx_1);
 
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
@@ -1231,6 +1295,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                rand_msg_rx_1,
             )
             .await
         }
@@ -1280,10 +1345,28 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        rand_msg_rx_1: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         match self.storage.start(consensus_config.order_vote_enabled()) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
+                self.start_round_manager(
+                    consensus_key.clone(),
+                    initial_data.clone_data(),
+                    epoch_state.clone(),
+                    consensus_config.clone(),
+                    execution_config.clone(),
+                    onchain_randomness_config.clone(),
+                    jwk_consensus_config.clone(),
+                    Arc::new(network_sender.clone()),
+                    payload_client.clone(),
+                    payload_manager.clone(),
+                    rand_config.clone(),
+                    fast_rand_config.clone(),
+                    rand_msg_rx,
+                    0,
+                )
+                .await;
                 self.start_round_manager(
                     consensus_key,
                     initial_data,
@@ -1297,7 +1380,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_manager,
                     rand_config,
                     fast_rand_config,
-                    rand_msg_rx,
+                    rand_msg_rx_1,
+                    1,
                 )
                 .await
             },
@@ -1431,14 +1515,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
 
-        if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+        if let ConsensusMsg_::ProposalMsg(proposal) = &consensus_msg.consensus_msg {
             observe_block(
                 proposal.proposal().timestamp_usecs(),
                 BlockStage::EPOCH_MANAGER_RECEIVED,
             );
         }
         // we can't verify signatures from a different epoch
-        let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
+        let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg.clone()).await?;
 
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
@@ -1455,8 +1539,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
-            let buffered_proposal_tx = self.buffered_proposal_tx.clone();
-            let round_manager_tx = self.round_manager_tx.clone();
+            let msg_id = consensus_msg.id;
+            let mut buffered_proposal_tx = self.buffered_proposal_tx.clone();
+            let mut round_manager_tx = self.round_manager_tx.clone();
+            if msg_id != 0 {
+                buffered_proposal_tx = self.buffered_proposal_tx_1.clone();
+                round_manager_tx = self.round_manager_tx_1.clone();
+            }
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             let max_batch_expiry_gap_usecs =
@@ -1508,29 +1597,29 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         peer_id: AccountAddress,
         msg: ConsensusMsg,
     ) -> anyhow::Result<Option<UnverifiedEvent>> {
-        match msg {
-            ConsensusMsg::ProposalMsg(_)
-            | ConsensusMsg::SyncInfo(_)
-            | ConsensusMsg::VoteMsg(_)
-            | ConsensusMsg::RoundTimeoutMsg(_)
-            | ConsensusMsg::OrderVoteMsg(_)
-            | ConsensusMsg::CommitVoteMsg(_)
-            | ConsensusMsg::CommitDecisionMsg(_)
-            | ConsensusMsg::BatchMsg(_)
-            | ConsensusMsg::BatchRequestMsg(_)
-            | ConsensusMsg::SignedBatchInfo(_)
-            | ConsensusMsg::ProofOfStoreMsg(_) => {
-                let event: UnverifiedEvent = msg.into();
+        match msg.consensus_msg {
+            ConsensusMsg_::ProposalMsg(_)
+            | ConsensusMsg_::SyncInfo(_)
+            | ConsensusMsg_::VoteMsg(_)
+            | ConsensusMsg_::RoundTimeoutMsg(_)
+            | ConsensusMsg_::OrderVoteMsg(_)
+            | ConsensusMsg_::CommitVoteMsg(_)
+            | ConsensusMsg_::CommitDecisionMsg(_)
+            | ConsensusMsg_::BatchMsg(_)
+            | ConsensusMsg_::BatchRequestMsg(_)
+            | ConsensusMsg_::SignedBatchInfo(_)
+            | ConsensusMsg_::ProofOfStoreMsg(_) => {
+                let event: UnverifiedEvent = msg.clone().into();
                 if event.epoch()? == self.epoch() {
                     return Ok(Some(event));
                 } else {
                     monitor!(
                         "process_different_epoch_consensus_msg",
-                        self.process_different_epoch(event.epoch()?, peer_id)
+                        self.process_different_epoch(event.epoch()?, peer_id, msg.id)
                     )?;
                 }
             },
-            ConsensusMsg::EpochChangeProof(proof) => {
+            ConsensusMsg_::EpochChangeProof(proof) => {
                 let msg_epoch = proof.epoch()?;
                 debug!(
                     LogSchema::new(LogEvent::ReceiveEpochChangeProof)
@@ -1552,14 +1641,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .inc();
                 }
             },
-            ConsensusMsg::EpochRetrievalRequest(request) => {
+            ConsensusMsg_::EpochRetrievalRequest(request) => {
                 ensure!(
                     request.end_epoch <= self.epoch(),
                     "[EpochManager] Received EpochRetrievalRequest beyond what we have locally"
                 );
                 monitor!(
                     "process_epoch_retrieval",
-                    self.process_epoch_retrieval(*request, peer_id)
+                    self.process_epoch_retrieval(*request, peer_id, msg.id)
                 )?;
             },
             _ => {
@@ -1665,7 +1754,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Some(epoch) if epoch != self.epoch() => {
                 monitor!(
                     "process_different_epoch_rpc_request",
-                    self.process_different_epoch(epoch, peer_id)
+                    self.process_different_epoch(epoch, peer_id, 0)
+                )?;
+                monitor!(
+                    "process_different_epoch_rpc_request",
+                    self.process_different_epoch(epoch, peer_id, 1)
                 )?;
                 return Ok(());
             },
@@ -1719,10 +1812,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
             return;
         };
+        let Some(sender_1) = self.round_manager_tx_1.as_mut() else {
+            warn!(
+                "Received local timeout for round {} without Round Manager",
+                round
+            );
+            return;
+        };
 
         let peer_id = self.author;
         let event = VerifiedEvent::LocalTimeout(round);
         if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
+            error!("Failed to send event to round manager {:?}", e);
+        }
+        let event = VerifiedEvent::LocalTimeout(round);
+        if let Err(e) = sender_1.push((peer_id, discriminant(&event)), (peer_id, event)) {
             error!("Failed to send event to round manager {:?}", e);
         }
     }

@@ -42,8 +42,8 @@ fn basic_start_test() {
         let msg = playground
             .wait_for_messages(1, NetworkPlayground::proposals_only)
             .await;
-        let first_proposal = match &msg[0].1 {
-            ConsensusMsg::ProposalMsg(proposal) => proposal,
+        let first_proposal = match &msg[0].1.consensus_msg {
+            ConsensusMsg_::ProposalMsg(proposal) => proposal,
             _ => panic!("Unexpected message found"),
         };
         assert_eq!(first_proposal.proposal().parent_id(), genesis.id());

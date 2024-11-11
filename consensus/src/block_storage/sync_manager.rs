@@ -48,6 +48,7 @@ use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
 use tokio::{time, time::timeout};
+use crate::network_interface::ConsensusMsg_;
 
 #[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.
@@ -497,9 +498,14 @@ impl BlockStore {
         }
 
         let response = Box::new(BlockRetrievalResponse::new(status, blocks));
+        let response_msg_ = ConsensusMsg_::BlockRetrievalResponse(response);
+        let response_msg = ConsensusMsg {
+            id: 0,
+            consensus_msg: response_msg_
+        };
         let response_bytes = request
             .protocol
-            .to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))?;
+            .to_bytes(&response_msg)?;
         request
             .response_sender
             .send(Ok(response_bytes.into()))
