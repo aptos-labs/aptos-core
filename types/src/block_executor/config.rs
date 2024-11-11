@@ -15,7 +15,7 @@ pub struct BlockExecutorModuleCacheLocalConfig {
     pub max_module_cache_size_in_bytes: usize,
     /// The maximum size (in terms of entries) of struct name re-indexing map stored in the runtime
     /// environment.
-    pub max_struct_name_index_map_size: usize,
+    pub max_struct_name_index_map_num_entries: usize,
 }
 
 impl Default for BlockExecutorModuleCacheLocalConfig {
@@ -24,7 +24,7 @@ impl Default for BlockExecutorModuleCacheLocalConfig {
             prefetch_framework_code: true,
             // Use 50 Mb for now, should be large enough to cache many modules.
             max_module_cache_size_in_bytes: 50 * 1024 * 1024,
-            max_struct_name_index_map_size: 100_000,
+            max_struct_name_index_map_num_entries: 100_000,
         }
     }
 }
@@ -39,8 +39,6 @@ pub struct BlockExecutorLocalConfig {
     // If true, we will discard the failed blocks and continue with the next block.
     // (allow_fallback needs to be set)
     pub discard_failed_blocks: bool,
-
-    /// Various cache configurations, see [BlockExecutorModuleCacheLocalConfig] for more details.
     pub module_cache_config: BlockExecutorModuleCacheLocalConfig,
 }
 

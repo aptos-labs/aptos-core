@@ -56,21 +56,21 @@ pub fn mock_verified_code<E>(
 
 #[derive(Clone, Debug)]
 pub struct MockExtension {
-    size: usize,
+    mock_size: usize,
 }
 
 impl MockExtension {
-    pub fn new(size: usize) -> Self {
-        Self { size }
+    pub fn new(mock_size: usize) -> Self {
+        Self { mock_size }
     }
 }
 
 impl WithSize for MockExtension {
     fn size_in_bytes(&self) -> usize {
-        self.size
+        self.mock_size
     }
 }
 
-pub fn mock_extension(size: usize) -> Arc<MockExtension> {
-    Arc::new(MockExtension::new(size))
+pub fn mock_extension(mock_size: usize) -> Arc<MockExtension> {
+    Arc::new(MockExtension::new(mock_size))
 }

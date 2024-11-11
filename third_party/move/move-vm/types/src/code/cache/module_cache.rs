@@ -32,13 +32,13 @@ where
 
     /// Creates new [ModuleCode] from verified code.
     pub fn from_verified(verified_code: VC, extension: Arc<E>) -> Self {
-        Self::from_verified_ref(Arc::new(verified_code), extension)
+        Self::from_arced_verified(Arc::new(verified_code), extension)
     }
 
     /// Creates new [ModuleCode] from [Arc]ed verified code.
-    pub fn from_verified_ref(verified_code: Arc<VC>, extension: Arc<E>) -> Self {
+    pub fn from_arced_verified(verified_code: Arc<VC>, extension: Arc<E>) -> Self {
         Self {
-            code: Code::from_verified_ref(verified_code),
+            code: Code::from_arced_verified(verified_code),
             extension,
         }
     }

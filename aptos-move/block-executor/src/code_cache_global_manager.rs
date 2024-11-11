@@ -10,6 +10,7 @@ use parking_lot::Mutex;
 use std::{
     fmt::Debug,
     hash::Hash,
+    mem,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -32,52 +33,18 @@ macro_rules! alert_or_println {
 ///   2. [State::Ready] --> [State::Executing].
 ///   3. [State::Executing] --> [State::Done].
 ///   4. [State::Done] --> [State::Ready].
+/// The optional value stored in variants is propagated during state transitions. When a full cycle
+/// is reached (just before [State::Done] to [State::Ready] transition), the user can check if the
+/// value is expected and continue with a new one. For instance:
+/// ```text
+/// Ready(Some(0)) --> Executing(Some(0)) --> Done(Some(0)) --> Ready(Some(1)) is allowed.
+/// Ready(Some(0)) --> Executing(Some(0)) --> Done(Some(0)) --> Ready(Some(2)) is not allowed.
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum State<T> {
     Ready(Option<T>),
     Executing(Option<T>),
     Done(Option<T>),
-}
-
-impl<T: Clone + Debug + Eq> State<T> {
-    /// If the state is [State::Ready], returns its value. Otherwise, returns [None].
-    fn value_from_ready(&self) -> Option<Option<T>> {
-        match self {
-            State::Ready(v) => Some(v.clone()),
-            _ => None,
-        }
-    }
-
-    /// If the state is [State::Executing], returns its value. Otherwise, returns [None].
-    fn value_from_executing(&self) -> Option<Option<T>> {
-        match self {
-            State::Executing(v) => Some(v.clone()),
-            _ => None,
-        }
-    }
-
-    /// If the state is [State::Done], returns its value. Otherwise, returns [None].
-    fn value_from_done(&self) -> Option<Option<T>> {
-        match self {
-            State::Done(v) => Some(v.clone()),
-            _ => None,
-        }
-    }
-
-    /// Sets the current state to [State::Ready].
-    fn set_ready(&mut self, value: Option<T>) {
-        *self = Self::Ready(value);
-    }
-
-    /// Sets the current state to [State::Executing].
-    fn set_executing(&mut self, value: Option<T>) {
-        *self = Self::Executing(value);
-    }
-
-    /// Sets the current state to [State::Done].
-    fn set_done(&mut self, value: Option<T>) {
-        *self = Self::Done(value);
-    }
 }
 
 /// Manages module caches and the execution environment, possible across multiple blocks.
@@ -96,7 +63,7 @@ pub struct ModuleCacheManager<T, K, DC, VC, E> {
 
 impl<T, K, DC, VC, E> ModuleCacheManager<T, K, DC, VC, E>
 where
-    T: Clone + Debug + Eq,
+    T: Debug + Eq,
     K: Hash + Eq + Clone,
     VC: Deref<Target = Arc<DC>>,
     E: WithSize,
@@ -118,37 +85,35 @@ where
     pub fn mark_ready(&self, previous: Option<&T>, current: Option<T>) -> bool {
         let mut state = self.state.lock();
 
-        let recorded_previous = state.value_from_done();
-        match (recorded_previous, previous) {
-            (None, _) => {
-                // We are not in the done state, this is an error.
-                alert_or_println!(
-                    "Unable to mark ready, state: {:?}, previous: {:?}, current: {:?}",
-                    state,
-                    previous,
-                    current
-                );
-                false
-            },
-            (Some(Some(recorded_previous)), Some(previous)) if recorded_previous.eq(previous) => {
-                // We are in done state with matching values. Can mark ready.
-                state.set_ready(current);
-                true
-            },
-            _ => {
-                // If the state is done, but the values do not exist or do not match, we still set
-                // the state as ready, but also flush global caches because they execute on top of
-                // unknown state (or on top of some different to previous state).
-                self.module_cache.flush_unchecked();
+        if let State::Done(recorded_previous) = state.deref() {
+            // If the state is done, but the values do not exist or do not match, we flush global
+            // caches because they execute on top of unknown state (or on top of some different to
+            // the previous state).
+            if !recorded_previous
+                .as_ref()
+                .is_some_and(|r| previous.is_some_and(|p| r == p))
+            {
                 if let Some(environment) = self.environment.acquire().as_ref() {
                     environment
                         .runtime_environment()
                         .flush_struct_name_and_info_caches();
+                    self.module_cache.flush_unsync();
+                } else {
+                    debug_assert!(self.module_cache.num_modules() == 0);
                 }
+            }
 
-                state.set_ready(current);
-                true
-            },
+            *state = State::Ready(current);
+            true
+        } else {
+            // We are not in the done state, this is an error.
+            alert_or_println!(
+                "Unable to mark ready, state: {:?}, previous: {:?}, current: {:?}",
+                state,
+                previous,
+                current
+            );
+            false
         }
     }
 
@@ -157,13 +122,13 @@ where
     /// alert.
     pub fn mark_executing(&self) -> bool {
         let mut state = self.state.lock();
-        if let Some(value) = state.value_from_ready() {
-            state.set_executing(value);
-            return true;
+        if let State::Ready(v) = state.deref_mut() {
+            *state = State::Executing(mem::take(v));
+            true
+        } else {
+            alert_or_println!("Unable to mark executing, state: {:?}", state);
+            false
         }
-
-        alert_or_println!("Unable to mark executing, state: {:?}", state);
-        false
     }
 
     /// If state is [State::Executing], changes it to [State::Done] with the same value, returning
@@ -171,13 +136,13 @@ where
     /// alert.
     pub fn mark_done(&self) -> bool {
         let mut state = self.state.lock();
-        if let Some(value) = state.value_from_executing() {
-            state.set_done(value);
-            return true;
+        if let State::Executing(v) = state.deref_mut() {
+            *state = State::Done(mem::take(v));
+            true
+        } else {
+            alert_or_println!("Unable to mark done, state: {:?}", state);
+            false
         }
-
-        alert_or_println!("Unable to mark done, state: {:?}", state);
-        false
     }
 
     /// Returns the cached global environment if it already exists, and matches the one in storage.
@@ -192,28 +157,20 @@ where
         let mut guard = self.environment.acquire();
         let existing_environment = guard.deref_mut();
 
-        let (environment, is_new) = match existing_environment.as_ref() {
-            None => {
-                *existing_environment = Some(new_environment.clone());
-                (new_environment, true)
-            },
-            Some(environment) => {
-                if environment == &new_environment {
-                    (environment.clone(), false)
-                } else {
-                    *existing_environment = Some(new_environment.clone());
-                    (new_environment, true)
-                }
-            },
-        };
+        let environment_requires_update = existing_environment
+            .as_ref()
+            .map_or(true, |environment| environment == &new_environment);
+        if environment_requires_update {
+            *existing_environment = Some(new_environment);
 
-        // If this environment has been (re-)initialized, we need to flush the module cache because
-        // it can contain now out-dated code.
-        if is_new {
-            self.module_cache.flush_unchecked();
+            // If this environment has been (re-)initialized, we need to flush the module cache
+            // because it can contain now out-dated code.
+            self.module_cache.flush_unsync();
         }
 
-        environment
+        existing_environment
+            .clone()
+            .expect("Environment must be set")
     }
 
     /// Returns the global module cache.
@@ -229,59 +186,11 @@ mod test {
         on_chain_config::{FeatureFlag, Features, OnChainConfig},
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
-    use claims::assert_matches;
     use move_vm_types::code::{
         mock_verified_code, MockDeserializedCode, MockExtension, MockVerifiedCode,
     };
     use std::{collections::HashMap, thread, thread::JoinHandle};
     use test_case::test_case;
-
-    #[test_case(None)]
-    #[test_case(Some(0))]
-    fn test_ready_state(value: Option<i32>) {
-        let state = State::Ready(value);
-
-        assert_eq!(state.value_from_ready(), Some(value));
-        assert!(state.value_from_executing().is_none());
-        assert!(state.value_from_done().is_none());
-    }
-
-    #[test_case(None)]
-    #[test_case(Some(0))]
-    fn test_executing_state(value: Option<i32>) {
-        let state = State::Executing(value);
-
-        assert!(state.value_from_ready().is_none());
-        assert_eq!(state.value_from_executing(), Some(value));
-        assert!(state.value_from_done().is_none());
-    }
-
-    #[test_case(None)]
-    #[test_case(Some(0))]
-    fn test_done_state(value: Option<i32>) {
-        let state = State::Done(value);
-
-        assert!(state.value_from_ready().is_none());
-        assert!(state.value_from_executing().is_none());
-        assert_eq!(state.value_from_done(), Some(value));
-    }
-
-    #[test]
-    fn test_set_state() {
-        let mut state = State::Done(None);
-
-        state.set_ready(Some(0));
-        assert_matches!(state, State::Ready(Some(0)));
-
-        state.set_executing(Some(10));
-        assert_matches!(state, State::Executing(Some(10)));
-
-        state.set_done(Some(100));
-        assert_matches!(state, State::Done(Some(100)));
-
-        state.set_ready(Some(1000));
-        assert_matches!(state, State::Ready(Some(1000)));
-    }
 
     #[test_case(None, None)]
     #[test_case(None, Some(1))]
@@ -290,10 +199,7 @@ mod test {
     #[test_case(Some(0), Some(0))]
     fn test_mark_ready(recorded_previous: Option<i32>, previous: Option<i32>) {
         let module_cache_manager = ModuleCacheManager::new();
-        module_cache_manager
-            .state
-            .lock()
-            .set_done(recorded_previous);
+        *module_cache_manager.state.lock() = State::Done(recorded_previous);
 
         // Pre-populate module cache to test flushing.
         module_cache_manager
@@ -326,7 +232,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        module_cache_manager.state.lock().set_ready(Some(100));
+        *module_cache_manager.state.lock() = State::Ready(Some(100));
 
         assert!(!module_cache_manager.mark_ready(Some(&76), Some(77)));
         assert!(!module_cache_manager.mark_done());
@@ -346,7 +252,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        module_cache_manager.state.lock().set_executing(Some(100));
+        *module_cache_manager.state.lock() = State::Executing(Some(100));
 
         assert!(!module_cache_manager.mark_ready(Some(&76), Some(77)));
         assert!(!module_cache_manager.mark_executing());

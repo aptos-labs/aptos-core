@@ -3,7 +3,6 @@
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_types::error::PanicError;
-use crossbeam::utils::CachePadded;
 use hashbrown::HashMap;
 use move_vm_types::code::{ModuleCode, WithSize};
 use std::{
@@ -16,22 +15,22 @@ use std::{
 };
 
 /// Entry stored in [GlobalModuleCache].
-struct Entry<DC, VC, E> {
+struct Entry<Deserialized, Verified, Extension> {
     /// True if this code is "valid" within the block execution context (i.e., there has been no
     /// republishing of this module so far). If false, executor needs to read the module from the
     /// sync/unsync module caches.
-    valid: CachePadded<AtomicBool>,
+    valid: AtomicBool,
     /// Cached verified module. Must always be verified.
-    module: CachePadded<Arc<ModuleCode<DC, VC, E>>>,
+    module: Arc<ModuleCode<Deserialized, Verified, Extension>>,
 }
 
-impl<DC, VC, E> Entry<DC, VC, E>
+impl<Deserialized, Verified, Extension> Entry<Deserialized, Verified, Extension>
 where
-    VC: Deref<Target = Arc<DC>>,
-    E: WithSize,
+    Verified: Deref<Target = Arc<Deserialized>>,
+    Extension: WithSize,
 {
     /// Returns a new valid module. Returns a (panic) error if the module is not verified.
-    fn new(module: Arc<ModuleCode<DC, VC, E>>) -> Result<Self, PanicError> {
+    fn new(module: Arc<ModuleCode<Deserialized, Verified, Extension>>) -> Result<Self, PanicError> {
         if !module.code().is_verified() {
             return Err(PanicError::CodeInvariantError(
                 "Module code is not verified".to_string(),
@@ -39,8 +38,8 @@ where
         }
 
         Ok(Self {
-            valid: CachePadded::new(AtomicBool::new(true)),
-            module: CachePadded::new(module),
+            valid: AtomicBool::new(true),
+            module,
         })
     }
 
@@ -55,24 +54,24 @@ where
     }
 
     /// Returns the module code stored is this [Entry].
-    fn module_code(&self) -> &Arc<ModuleCode<DC, VC, E>> {
-        self.module.deref()
+    fn module_code(&self) -> &Arc<ModuleCode<Deserialized, Verified, Extension>> {
+        &self.module
     }
 }
 
-/// A read-only module cache for verified code, that can be accessed concurrently within the block.
-/// Can only be modified safely at block boundaries.
-pub struct GlobalModuleCache<K, DC, VC, E> {
+/// A global module cache for verified code that is read-only and concurrently accessed during the
+/// block execution. Modified safely only at block boundaries.
+pub struct GlobalModuleCache<K, D, V, E> {
     /// Module cache containing the verified code.
-    module_cache: ExplicitSyncWrapper<HashMap<K, Entry<DC, VC, E>>>,
+    module_cache: ExplicitSyncWrapper<HashMap<K, Entry<D, V, E>>>,
     /// Sum of serialized sizes (in bytes) of all cached modules.
     size: AtomicUsize,
 }
 
-impl<K, DC, VC, E> GlobalModuleCache<K, DC, VC, E>
+impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
 where
     K: Hash + Eq + Clone,
-    VC: Deref<Target = Arc<DC>>,
+    V: Deref<Target = Arc<D>>,
     E: WithSize,
 {
     /// Returns new empty module cache.
@@ -92,27 +91,21 @@ where
     }
 
     /// Marks the cached module (if it exists) as invalid. As a result, all subsequent calls to the
-    /// cache for the associated key will result in a cache miss. If an entry does not to exist, is
-    /// a no-op.
+    /// cache for the associated key will result in a cache miss. If an entry does not to exist, it
+    /// is a no-op.
     pub fn mark_invalid_if_contains(&self, key: &K) {
         if let Some(entry) = self.module_cache.acquire().get(key) {
             entry.mark_invalid();
         }
     }
 
-    /// Returns the module stored in cache. If the module has not been cached, or it exists but it
-    /// is not valid, [None] is returned.
-    pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<DC, VC, E>>> {
+    /// Returns the module stored in cache. If the module has not been cached, or it exists but is
+    /// not valid, [None] is returned.
+    pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<D, V, E>>> {
         self.module_cache
             .acquire()
             .get(key)
-            .and_then(|entry| entry.is_valid().then(|| entry.module_code().clone()))
-    }
-
-    /// Flushes the cache. Should never be called throughout block-execution. Use with caution.
-    pub fn flush_unchecked(&self) {
-        self.module_cache.acquire().clear();
-        self.size.store(0, Ordering::Relaxed);
+            .and_then(|entry| entry.is_valid().then(|| Arc::clone(entry.module_code())))
     }
 
     /// Returns the number of entries in the cache.
@@ -125,22 +118,24 @@ where
         self.size.load(Ordering::Relaxed)
     }
 
-    /// Returns true if the sum of serialized sizes of modules stored in cache is greater than the
-    /// specified value.
-    pub fn size_in_bytes_is_greater_than(&self, size: usize) -> bool {
-        self.size_in_bytes() > size
+    /// **Use with caution: should never be called during block execution.**
+    ///
+    /// Flushes the module cache.
+    pub fn flush_unsync(&self) {
+        self.module_cache.acquire().clear();
+        self.size.store(0, Ordering::Relaxed);
     }
 
-    /// Inserts modules into the cache. Should never be called throughout block-execution. Use with
-    /// caution.
+    /// **Use with caution: should never be called during block execution.**
     ///
+    /// Inserts modules into the cache.
     /// Notes:
     ///   1. Only verified modules are inserted.
     ///   2. Valid modules should not be removed, and new modules should have unique ownership. If
     ///      these constraints are violated, a panic error is returned.
-    pub fn insert_verified_unchecked(
+    pub fn insert_verified_unsync(
         &self,
-        modules: impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E>>)>,
+        modules: impl Iterator<Item = (K, Arc<ModuleCode<D, V, E>>)>,
     ) -> Result<(), PanicError> {
         use hashbrown::hash_map::Entry::*;
 
@@ -177,7 +172,7 @@ where
 
     /// Insert the module to cache. Used for tests only.
     #[cfg(any(test, feature = "testing"))]
-    pub fn insert(&self, key: K, module: Arc<ModuleCode<DC, VC, E>>) {
+    pub fn insert(&self, key: K, module: Arc<ModuleCode<D, V, E>>) {
         self.size
             .fetch_add(module.extension().size_in_bytes(), Ordering::Relaxed);
         self.module_cache.acquire().insert(
@@ -186,14 +181,18 @@ where
         );
     }
 
-    /// Removes the module from cache. Used for tests only.
+    /// Removes the module from cache and returns true. If the module does not exist for the
+    /// associated key, returns false. Used for tests only.
     #[cfg(any(test, feature = "testing"))]
-    pub fn remove(&self, key: &K) {
+    pub fn remove(&self, key: &K) -> bool {
         if let Some(entry) = self.module_cache.acquire().remove(key) {
             self.size.fetch_sub(
                 entry.module_code().extension().size_in_bytes(),
                 Ordering::Relaxed,
             );
+            true
+        } else {
+            false
         }
     }
 }
@@ -251,15 +250,11 @@ mod test {
         assert_eq!(cache.num_modules(), 3);
         assert_eq!(cache.size_in_bytes(), 32);
 
-        cache.remove(&2);
+        assert!(cache.remove(&2));
         assert_eq!(cache.num_modules(), 2);
         assert_eq!(cache.size_in_bytes(), 24);
 
-        assert!(cache.size_in_bytes_is_greater_than(23));
-        assert!(!cache.size_in_bytes_is_greater_than(24));
-        assert!(!cache.size_in_bytes_is_greater_than(25));
-
-        cache.flush_unchecked();
+        cache.flush_unsync();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
     }
@@ -273,7 +268,7 @@ mod test {
             new_modules.push((i, mock_verified_code(i, MockExtension::new(8))));
         }
         assert!(cache
-            .insert_verified_unchecked(new_modules.into_iter())
+            .insert_verified_unsync(new_modules.into_iter())
             .is_ok());
 
         assert_eq!(cache.num_modules(), 10);
@@ -285,7 +280,7 @@ mod test {
         let cache = GlobalModuleCache::empty();
 
         let deserialized_modules = vec![(0, mock_deserialized_code(0, MockExtension::new(8)))];
-        assert_ok!(cache.insert_verified_unchecked(deserialized_modules.into_iter()));
+        assert_ok!(cache.insert_verified_unsync(deserialized_modules.into_iter()));
 
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
@@ -300,7 +295,7 @@ mod test {
         assert_eq!(cache.size_in_bytes(), 8);
 
         let new_modules = vec![(0, mock_verified_code(100, MockExtension::new(32)))];
-        assert_err!(cache.insert_verified_unchecked(new_modules.into_iter()));
+        assert_err!(cache.insert_verified_unsync(new_modules.into_iter()));
     }
 
     #[test]
@@ -313,7 +308,7 @@ mod test {
         assert_eq!(cache.size_in_bytes(), 8);
 
         let new_modules = vec![(0, mock_verified_code(100, MockExtension::new(32)))];
-        assert_ok!(cache.insert_verified_unchecked(new_modules.into_iter()));
+        assert_ok!(cache.insert_verified_unsync(new_modules.into_iter()));
 
         assert_eq!(cache.num_modules(), 1);
         assert_eq!(cache.size_in_bytes(), 32);
