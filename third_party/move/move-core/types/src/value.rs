@@ -76,7 +76,7 @@ pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary))]
 pub enum MoveStruct {
     /// The representation used by the MoveVM
     Runtime(Vec<MoveValue>),
@@ -94,7 +94,7 @@ pub enum MoveStruct {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary))]
 pub enum MoveValue {
     U8(u8),
     U64(u64),

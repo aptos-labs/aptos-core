@@ -5424,9 +5424,9 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
-version = "0.21.6"
+version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c79fed4cdb43e993fcdadc7e58a09fd0e3e649c4436fa11da71c9f1f3ee7feb9"
+checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
@@ -5782,7 +5782,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f03db470b3c0213c47e978da93200259a1eb4dae2e5512cba9955e2b540a6fc6"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "bollard-stubs",
  "bytes",
  "futures-core",
@@ -7139,6 +7139,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dearbitrary"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "708ee6091d6965eb85c69f7a707303dcc48cc55fd937fb30e531909a10b314d4"
+dependencies = [
+ "derive_dearbitrary",
+]
+
+[[package]]
 name = "debug-ignore"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7256,6 +7265,17 @@ checksum = "206868b8242f27cecce124c19fd88157fbd0dd334df2587f36417bafbc85097b"
 dependencies = [
  "derive_builder_core",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "derive_dearbitrary"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afdf9e6fb6c8a925c6b19b78ec3a80152e7a46dc7811be5f1fa64568e7c7b6c0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -8484,9 +8504,16 @@ version = "0.1.0"
 dependencies = [
  "aptos-framework",
  "aptos-types",
+ "arbitrary",
+ "base64 0.21.7",
  "bcs 0.1.4",
  "clap 4.5.20",
+ "csv",
+ "dearbitrary",
+ "hex",
+ "move-binary-format",
  "move-core-types",
+ "sha2 0.9.9",
 ]
 
 [[package]]
@@ -8797,7 +8824,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "931bedb2264cb00f914b0a6a5c304e34865c34306632d3932e0951a073e4a67d"
 dependencies = [
  "async-trait",
- "base64 0.21.6",
+ "base64 0.21.7",
  "google-cloud-metadata",
  "google-cloud-token",
  "home",
@@ -8876,7 +8903,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22c57ca1d971d7c6f852c02eda4e87e88b1247b6ed8be9fa5b2768c68b0f2ca5"
 dependencies = [
  "async-stream",
- "base64 0.21.6",
+ "base64 0.21.7",
  "bytes",
  "futures-util",
  "google-cloud-auth",
@@ -9095,7 +9122,7 @@ version = "7.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "765c9198f173dd59ce26ff9f95ef0aafd0a0fe01fb9d72841bc5066a4c06511d"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "byteorder",
  "flate2",
  "nom",
@@ -9108,7 +9135,7 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "bytes",
  "headers-core 0.2.0",
  "http 0.2.11",
@@ -9123,7 +9150,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322106e6bd0cba2d5ead589ddb8150a13d7c4217cf80d7c4f682ca994ccc6aa9"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "bytes",
  "headers-core 0.3.0",
  "http 1.1.0",
@@ -9381,7 +9408,7 @@ dependencies = [
  "assert-json-diff",
  "async-object-pool",
  "async-trait",
- "base64 0.21.6",
+ "base64 0.21.7",
  "basic-cookies",
  "crossbeam-utils",
  "form_urlencoded",
@@ -10114,7 +10141,7 @@ version = "8.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6971da4d9c3aa03c3d8f3ff0f4155b534aad021292003895a469716b2a230378"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "pem 1.1.1",
  "ring 0.16.20",
  "serde",
@@ -10128,7 +10155,7 @@ version = "9.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9ae10193d25051e74945f1ea2d0b42e03cc3b890f7e4cc5faa44997d808193f"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "js-sys",
  "pem 3.0.4",
  "ring 0.17.7",
@@ -10974,6 +11001,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "backtrace",
+ "dearbitrary",
  "indexmap 1.9.3",
  "move-bytecode-spec",
  "move-core-types",
@@ -11191,6 +11219,7 @@ dependencies = [
  "arbitrary",
  "bcs 0.1.4",
  "bytes",
+ "dearbitrary",
  "ethnum",
  "hashbrown 0.14.3",
  "hex",
@@ -13291,7 +13320,7 @@ version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49b6c5ef183cd3ab4ba005f1ca64c21e8bd97ce4699cfea9e8d9a2c4958ca520"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "byteorder",
  "bytes",
  "fallible-iterator",
@@ -14341,7 +14370,7 @@ version = "0.11.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b1ae8d9ac08420c66222fb9096fc5de435c3c48542bc5336c51892cffafb41"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "bytes",
  "cookie 0.16.2",
  "cookie_store",
@@ -14846,7 +14875,7 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
 ]
 
 [[package]]
@@ -14855,7 +14884,7 @@ version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f48172685e6ff52a556baa527774f61fcaa884f59daf3375c62a3f1cd2549dab"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "rustls-pki-types",
 ]
 
@@ -15329,7 +15358,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64cd236ccc1b7a29e7e2739f27c0b2dd199804abc4290e32f59f3b68d6405c23"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.21.7",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -16842,7 +16871,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "axum 0.6.20",
- "base64 0.21.6",
+ "base64 0.21.7",
  "bytes",
  "flate2",
  "futures-core",
@@ -18278,7 +18307,7 @@ checksum = "b61da40aeb0907a65f7fb5c1de83c5a224d6a9ebb83bf918588a2bb744d636b8"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.21.6",
+ "base64 0.21.7",
  "futures",
  "http 0.2.11",
  "hyper 0.14.28",

@@ -21,6 +21,7 @@ proptest-derive = { workspace = true, optional = true }
 ref-cast = { workspace = true }
 serde = { workspace = true }
 variant_count = { workspace = true }
+dearbitrary = { version = "1.0.4", optional = true, features = ["derive"] }
 
 [dev-dependencies]
 move-core-types = { path = "../move-core/types", features = ["fuzzing"] }
@@ -30,5 +31,5 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "arbitrary", "move-core-types/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "arbitrary", "dearbitrary", "move-core-types/fuzzing"]
 testing = []

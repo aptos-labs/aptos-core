@@ -77,7 +77,7 @@ function usage() {
         *)
             echo "Usage: $0 <add|block-builder|build|build-oss-fuzz|coverage|clean-coverage|flamegraph|list|run|debug|test>"
             echo "    add               adds a new fuzz target"
-            echo "    block-build       blocks the build command"
+            echo "    block-builder     runs rust tool to hel build fuzzers"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
             echo "    coverage          generates coverage for a fuzz target"
@@ -320,7 +320,7 @@ case "$1" in
     ;;
   "block-builder")
     shift
-    block-build "$@"
+    block-builder "$@"
     ;;
   "build")
     shift

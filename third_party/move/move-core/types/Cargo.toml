@@ -30,6 +30,7 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 thiserror = { workspace = true }
 uint = { workspace = true }
+dearbitrary = { version = "1.0.4", optional = true, features = ["derive"] }
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive_arbitrary"] }
@@ -40,4 +41,4 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "arbitrary"]
+fuzzing = ["proptest", "proptest-derive", "arbitrary", "dearbitrary"]

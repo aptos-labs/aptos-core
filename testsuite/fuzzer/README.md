@@ -115,6 +115,15 @@ When building in the OSS-Fuzz environment, `fuzz.sh` will place the corpus archi
 - **Error Handling:** Implement robust error handling to intercept crashes or unwanted/unexpected behavior.
 - **Performance Optimization:** Optimize for performance to enable more iterations and deeper fuzzing.
 
+## Generate Corpora
+Some fuzzers operate better if a good initial corpus is provided. In order to generate the corpus, utilities are available via `./fuzz.sh block-builder`. Once a corpus is obtained, to feed it to fuzzers running on OSS-Fuzz, building a ZIP archive with a specific name is required: `$FUZZERNAME_seed_corpus.zip`. Upload it to a publicly accessible cloud, e.g., GCP Bucket or S3; avoid GDrive. Obtain a public link and add it to the `CORPUS_ZIPS` array in `fuzz.sh`. It will automatically be downloaded and used inside Google's infrastructure.
+### Aptos-VM Publish & Run
+`./fuzz.sh block-builder generate_runnable_state /tmp/modules.csv /tmp/Modules`
+The CSV file is structured as follows:  
+- Column 1: Module name  
+- Column 2: Module address  
+- Column 3: Base64-encoded bytecode of the module
+
 ## References
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)
 - [Google OSS-Fuzz](https://google.github.io/oss-fuzz/)
