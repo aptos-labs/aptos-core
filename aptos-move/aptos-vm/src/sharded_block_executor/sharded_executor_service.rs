@@ -136,13 +136,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
+                // Since we execute blocks in parallel, we cannot share module caches, so each
+                // thread has its own caches.
+                let module_cache_manager = ModuleCacheManager::new();
+                module_cache_manager.mark_ready(None, None);
+
                 let ret = BlockAptosVM::execute_block_on_thread_pool(
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
-                    // Since we execute blocks in parallel, we cannot share module caches, so each
-                    // thread has its own caches.
-                    &ModuleCacheManager::new(),
+                    &module_cache_manager,
                     config,
                     cross_shard_commit_sender,
                 )
