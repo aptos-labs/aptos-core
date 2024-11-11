@@ -137,7 +137,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     }
 
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
-        &V::new(),
+        &executor,
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
