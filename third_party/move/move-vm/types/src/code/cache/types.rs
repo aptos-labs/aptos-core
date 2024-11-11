@@ -68,7 +68,7 @@ where
     }
 
     /// Returns new verified code from [Arc]ed instance.
-    pub fn from_verified_ref(verified_code: Arc<V>) -> Self {
+    pub fn from_arced_verified(verified_code: Arc<V>) -> Self {
         Self::Verified(verified_code)
     }
 

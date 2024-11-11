@@ -295,11 +295,11 @@ impl DelayedFieldRead {
 /// Represents a module read, either from immutable cross-block cache, or from code [SyncCodeCache]
 /// used by block executor (per-block cache). This way, when transaction needs to read a module
 /// from [SyncCodeCache] it can first check the read-set here.
-enum ModuleRead<DC, VC, S, V> {
+enum ModuleRead<DC, VC, S> {
     /// Read from the cross-block module cache.
     GlobalCache,
     /// Read from per-block cache ([SyncCodeCache]) used by parallel execution.
-    PerBlockCache(Option<(Arc<ModuleCode<DC, VC, S>>, V)>),
+    PerBlockCache(Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>),
 }
 
 /// Represents a result of a read from [CapturedReads] when they are used as the transaction-level
@@ -326,7 +326,7 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
 
     #[deprecated]
     pub(crate) deprecated_module_reads: Vec<T::Key>,
-    module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S, Option<TxnIndex>>>,
+    module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -1578,12 +1578,12 @@ mod test {
         assert!(!valid);
 
         // Without invalid module (and if it is not captured), validation should pass.
-        global_module_cache.remove(&1);
+        assert!(global_module_cache.remove(&1));
         captured_reads.module_reads.remove(&1);
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
         // Validation fails if we captured a cross-block module which does not exist anymore.
-        global_module_cache.remove(&0);
+        assert!(global_module_cache.remove(&0));
         let valid =
             captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
         assert!(!valid);

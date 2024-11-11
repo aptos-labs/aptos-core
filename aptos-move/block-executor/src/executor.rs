@@ -618,9 +618,9 @@ where
                 // Publish modules before we decrease validation index so that validations observe
                 // the new module writes as well.
                 if runtime_environment.vm_config().use_loader_v2 {
-                    executed_at_commit = true;
                     let module_write_set = last_input_output.module_write_set(txn_idx);
                     if !module_write_set.is_empty() {
+                        executed_at_commit = true;
                         Self::publish_module_writes(
                             txn_idx,
                             module_write_set,
@@ -1169,7 +1169,7 @@ where
 
         counters::update_state_counters(versioned_cache.stats(), true);
         self.global_module_cache
-            .insert_verified_unchecked(versioned_cache.take_modules_iter())
+            .insert_verified_unsync(versioned_cache.take_modules_iter())
             .map_err(|err| {
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
@@ -1647,7 +1647,7 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
         self.global_module_cache
-            .insert_verified_unchecked(unsync_map.into_modules_iter())?;
+            .insert_verified_unsync(unsync_map.into_modules_iter())?;
 
         let block_end_info = if self
             .config
@@ -1709,7 +1709,7 @@ where
             // Flush the cache and the environment to re-run from the "clean" state.
             env.runtime_environment()
                 .flush_struct_name_and_info_caches();
-            self.global_module_cache.flush_unchecked();
+            self.global_module_cache.flush_unsync();
 
             info!("parallel execution requiring fallback");
         }
