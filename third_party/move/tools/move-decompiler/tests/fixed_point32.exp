@@ -13,17 +13,16 @@ module 0x1::fixed_point32 {
         *&(&self).value >> 32u8
     }
     public fun create_from_rational(numerator: u64, denominator: u64): FixedPoint32 {
-        let _t5;
+        let _t6;
+        let _t4;
         let _t3;
-        let _t2;
-        _t2 = (numerator as u128) << 64u8;
         _t3 = (denominator as u128) << 32u8;
         if (!(_t3 != 0u128)) abort 65537;
-        _t2 = _t2 / _t3;
-        if (_t2 != 0u128) _t5 = true else _t5 = numerator == 0;
-        if (!_t5) abort 131077;
-        if (!(_t2 <= 18446744073709551615u128)) abort 131077;
-        FixedPoint32{value: _t2 as u64}
+        _t4 = ((numerator as u128) << 64u8) / _t3;
+        if (_t4 != 0u128) _t6 = true else _t6 = numerator == 0;
+        if (!_t6) abort 131077;
+        if (!(_t4 <= 18446744073709551615u128)) abort 131077;
+        FixedPoint32{value: _t4 as u64}
     }
     public fun create_from_raw_value(value: u64): FixedPoint32 {
         FixedPoint32{value: value}

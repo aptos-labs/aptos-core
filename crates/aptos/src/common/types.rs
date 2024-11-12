@@ -53,7 +53,10 @@ use hex::FromHexError;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
@@ -1165,24 +1168,23 @@ pub struct MovePackageDir {
 
     /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
-    /// Defaults to `1`, or `2` if `--move-2` is selected.
+    /// Defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
-           default_value_if("move_2", "true", "2.0"),
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Currently, defaults to `1`, unless `--move-2` is selected.
+    /// Defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", "2.1"),
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
-    /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode-version=7 --language-version=2.1 --compiler-version=2.0`
+    /// Select bytecode, language, and compiler versions to support the latest Move 2.
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }

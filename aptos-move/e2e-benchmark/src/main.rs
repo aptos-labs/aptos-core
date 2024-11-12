@@ -15,7 +15,7 @@ use aptos_transaction_generator_lib::{
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
-use std::process::exit;
+use std::{collections::HashMap, process::exit};
 
 pub fn execute_txn(
     executor: &mut FakeExecutor,
@@ -80,9 +80,54 @@ const ALLOWED_REGRESSION: f32 = 0.15;
 const ALLOWED_IMPROVEMENT: f32 = 0.15;
 const ABSOLUTE_BUFFER_US: f32 = 2.0;
 
+const CALIBRATION_VALUES: &str = "
+Loop { loop_count: Some(100000), loop_type: NoOp }	6	0.988	1.039	41212.4
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	6	0.977	1.038	25868.8
+CreateObjects { num_objects: 10, object_payload_size: 0 }	6	0.940	1.026	152.1
+CreateObjects { num_objects: 10, object_payload_size: 10240 }	6	0.934	1.051	9731.3
+CreateObjects { num_objects: 100, object_payload_size: 0 }	6	0.966	1.051	1458.3
+CreateObjects { num_objects: 100, object_payload_size: 10240 }	6	0.969	1.077	11196.4
+InitializeVectorPicture { length: 40 }	6	0.973	1.066	75.0
+VectorPicture { length: 40 }	6	0.955	1.092	22.0
+VectorPictureRead { length: 40 }	6	0.952	1.047	21.0
+InitializeVectorPicture { length: 30720 }	6	0.969	1.071	27295.8
+VectorPicture { length: 30720 }	6	0.957	1.066	6560.2
+VectorPictureRead { length: 30720 }	6	0.948	1.053	6642.8
+SmartTablePicture { length: 30720, num_points_per_txn: 200 }	6	0.972	1.024	42660.4
+SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	6	0.961	1.020	73725.5
+ResourceGroupsSenderWriteTag { string_length: 1024 }	6	0.867	1.001	15.0
+ResourceGroupsSenderMultiChange { string_length: 1024 }	6	0.966	1.069	29.0
+TokenV1MintAndTransferFT	6	0.972	1.045	356.8
+TokenV1MintAndTransferNFTSequential	6	0.991	1.067	543.7
+TokenV2AmbassadorMint { numbered: true }	6	0.987	1.052	474.4
+LiquidityPoolSwap { is_stable: true }	6	0.970	1.042	555.4
+LiquidityPoolSwap { is_stable: false }	6	0.925	1.001	535.3
+";
+
+struct CalibrationInfo {
+    // count: usize,
+    expected_time: f32,
+}
+
+fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
+    CALIBRATION_VALUES
+        .trim()
+        .split('\n')
+        .map(|line| {
+            let parts = line.split('\t').collect::<Vec<_>>();
+            (parts[0].to_string(), CalibrationInfo {
+                // count: parts[1].parse().unwrap(),
+                expected_time: parts[parts.len() - 1].parse().unwrap(),
+            })
+        })
+        .collect()
+}
+
 fn main() {
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
+
+    let calibration_values = get_parsed_calibration_values();
 
     let entry_points = vec![
         // too fast for the timer
@@ -91,59 +136,57 @@ fn main() {
         //     data_length: Some(32),
         // }),
         // (, EntryPoints::IncGlobal),
-        (34651, EntryPoints::Loop {
+        EntryPoints::Loop {
             loop_count: Some(100000),
             loop_type: LoopType::NoOp,
-        }),
-        (21145, EntryPoints::Loop {
+        },
+        EntryPoints::Loop {
             loop_count: Some(10000),
             loop_type: LoopType::Arithmetic,
-        }),
+        },
         // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
         // (, EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 }}),
-        (124, EntryPoints::CreateObjects {
+        EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 0,
-        }),
-        (8090, EntryPoints::CreateObjects {
+        },
+        EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 10 * 1024,
-        }),
-        (1246, EntryPoints::CreateObjects {
+        },
+        EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 0,
-        }),
-        (9556, EntryPoints::CreateObjects {
+        },
+        EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 10 * 1024,
-        }),
-        (61, EntryPoints::InitializeVectorPicture { length: 40 }),
-        (16, EntryPoints::VectorPicture { length: 40 }),
-        (16, EntryPoints::VectorPictureRead { length: 40 }),
-        (23256, EntryPoints::InitializeVectorPicture {
-            length: 30 * 1024,
-        }),
-        (5860, EntryPoints::VectorPicture { length: 30 * 1024 }),
-        (5849, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
-        (35440, EntryPoints::SmartTablePicture {
+        },
+        EntryPoints::InitializeVectorPicture { length: 40 },
+        EntryPoints::VectorPicture { length: 40 },
+        EntryPoints::VectorPictureRead { length: 40 },
+        EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
+        EntryPoints::VectorPicture { length: 30 * 1024 },
+        EntryPoints::VectorPictureRead { length: 30 * 1024 },
+        EntryPoints::SmartTablePicture {
             length: 30 * 1024,
             num_points_per_txn: 200,
-        }),
-        (60464, EntryPoints::SmartTablePicture {
+        },
+        EntryPoints::SmartTablePicture {
             length: 1024 * 1024,
             num_points_per_txn: 300,
-        }),
-        (13, EntryPoints::ResourceGroupsSenderWriteTag {
+        },
+        EntryPoints::ResourceGroupsSenderWriteTag {
             string_length: 1024,
-        }),
-        (27, EntryPoints::ResourceGroupsSenderMultiChange {
+        },
+        EntryPoints::ResourceGroupsSenderMultiChange {
             string_length: 1024,
-        }),
-        (291, EntryPoints::TokenV1MintAndTransferFT),
-        (468, EntryPoints::TokenV1MintAndTransferNFTSequential),
-        (386, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
-        (467, EntryPoints::LiquidityPoolSwap { is_stable: true }),
-        (429, EntryPoints::LiquidityPoolSwap { is_stable: false }),
+        },
+        EntryPoints::TokenV1MintAndTransferFT,
+        EntryPoints::TokenV1MintAndTransferNFTSequential,
+        EntryPoints::TokenV2AmbassadorMint { numbered: true },
+        EntryPoints::LiquidityPoolSwap { is_stable: true },
+        EntryPoints::LiquidityPoolSwap { is_stable: false },
     ];
 
     let mut failures = Vec::new();
@@ -154,7 +197,12 @@ fn main() {
         "wall time (us)", "expected (us)", "diff(- is impr)"
     );
 
-    for (index, (expected_time, entry_point)) in entry_points.into_iter().enumerate() {
+    for (index, entry_point) in entry_points.into_iter().enumerate() {
+        let entry_point_name = format!("{:?}", entry_point);
+        let expected_time = calibration_values
+            .get(&entry_point_name)
+            .unwrap()
+            .expected_time;
         let publisher = executor.new_account_at(AccountAddress::random());
 
         let mut package_handler = PackageHandler::new(entry_point.package_name());
@@ -189,23 +237,23 @@ fn main() {
             &package,
             publisher.address(),
             &mut executor,
-            if expected_time > 10000 {
+            if expected_time > 10000.0 {
                 6
-            } else if expected_time > 1000 {
+            } else if expected_time > 1000.0 {
                 10
             } else {
                 100
             },
         );
-        let diff = (elapsed_micros as f32 - expected_time as f32) / (expected_time as f32) * 100.0;
+        let diff = (elapsed_micros as f32 - expected_time) / expected_time * 100.0;
         println!(
-            "{:15}  {:15}  {:14.1}%   {:?}",
+            "{:15}  {:15.1}  {:14.1}%   {:?}",
             elapsed_micros, expected_time, diff, entry_point
         );
 
         json_lines.push(json!({
             "grep": "grep_json_aptos_move_vm_perf",
-            "transaction_type": format!("{:?}", entry_point),
+            "transaction_type": entry_point_name,
             "wall_time_us": elapsed_micros,
             "expected_wall_time_us": expected_time,
             "test_index": index,

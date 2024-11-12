@@ -8,6 +8,6 @@ aptos_token_objects = "0x4"
 example_addr = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
-AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
+AptosTokenObjects = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-token-objects", rev = "mainnet" }
 ManagedFungibleAsset = { local = "../managed_fungible_asset" }

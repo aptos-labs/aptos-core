@@ -20,7 +20,10 @@ mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
   api_key: MAINNET_API_KEY
   versions_to_import:
+    # fungible asset processor
     308783012: 308783012_fa_transfer
+
+    # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
     11648867: 11648867_token_v1_burn_event
     178179220: 178179220_token_v1_mutate_event
@@ -35,7 +38,27 @@ mainnet:
     967255533: 967255533_token_v2_mutation_event
     578366445: 578366445_token_v2_burn_event_v2
     1080786089: 1080786089_token_v2_burn_event_v1
+
+    # default processor
     1845035942: 1845035942_default_current_table_items
     513424821: 513424821_default_block_metadata_transactions
     155112189: 155112189_default_table_items
+
+    # account processor
     145959468: 145959468_account_transaction
+    423176063: 423176063_account_transaction_delete
+
+    # ans processor
+    438536688: 438536688_ans_current_ans_lookup_v2
+    303690531: 303690531_ans_lookup_v2
+    1056780409: 1056780409_ans_current_ans_primary_name_v2
+
+    # objects processor
+    578318306: 578318306_objects_write_resource
+
+    # stake processor
+    121508544: 121508544_stake_distribute
+    139449359: 139449359_stake_reactivate
+    1830706009: 1830706009_staker_governance_record
+    125600867: 125600867_stake_delegation_pool
+    4827964: 4827964_stake_initialize

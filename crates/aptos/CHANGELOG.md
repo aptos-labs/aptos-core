@@ -3,7 +3,11 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## [4.4.0] - 2024/11/06
 - Fix typos in `aptos move compile` help text.
+- Update the default version of `movefmt` to be installed from 1.0.5 to 1.0.6
+- Add `--host-postgres-host` flag: https://github.com/aptos-labs/aptos-core/pull/15216.
 
 ## [4.3.0] - 2024/10/30
 - Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`

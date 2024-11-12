@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   permission-check:
+    if: github.event.pull_request.merged == true && contains(join(github.event.pull_request.labels.*.name, ','), 'v1.')
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
