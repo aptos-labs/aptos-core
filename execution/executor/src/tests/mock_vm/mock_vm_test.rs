@@ -29,8 +29,6 @@ fn test_mock_vm_different_senders() {
         .execute_block_no_limit(
             &into_signature_verified_block(txns.clone()),
             &MockStateView::empty(),
-            None,
-            None,
         )
         .expect("MockVM should not fail to start");
 
@@ -71,8 +69,6 @@ fn test_mock_vm_same_sender() {
         .execute_block_no_limit(
             &into_signature_verified_block(txns),
             &MockStateView::empty(),
-            None,
-            None,
         )
         .expect("MockVM should not fail to start");
 
@@ -111,8 +107,6 @@ fn test_mock_vm_payment() {
         .execute_block_no_limit(
             &into_signature_verified_block(txns),
             &MockStateView::empty(),
-            None,
-            None,
         )
         .expect("MockVM should not fail to start");
 
