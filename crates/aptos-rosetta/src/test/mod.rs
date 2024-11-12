@@ -98,10 +98,10 @@ fn resource_group_modification_write_op<T: Serialize>(
 ) -> (StateKey, WriteOp) {
     let encoded = bcs::to_bytes(input).unwrap();
     let state_key = StateKey::resource_group(address, resource);
-    let write_op = WriteOp::Modification {
-        data: encoded.into(),
-        metadata: StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 }),
-    };
+    let write_op = WriteOp::modification(
+        encoded.into(),
+        StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 }),
+    );
     (state_key, write_op)
 }
 

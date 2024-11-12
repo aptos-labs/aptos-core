@@ -53,12 +53,12 @@ pub static COMMIT_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static VM_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+pub static GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_vm_execute_block_seconds",
+        "aptos_executor_get_block_execution_output_by_executing_seconds",
         // metric description
-        "The time spent in seconds of vm block execution in Aptos executor",
+        "The total time spent in seconds in executing execute_and_state_checkpoint in the BlockExecutorInner.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -80,12 +80,12 @@ pub static EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
 });
 
-pub static EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+pub static BLOCK_EXECUTION_WORKFLOW_WHOLE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_execute_block_seconds",
+        "aptos_executor_block_execution_workflow_whole_seconds",
         // metric description
-        "The total time spent in seconds of block execution in the block executor.",
+        "The total time spent in seconds in executing execute_and_state_checkpoint in the BlockExecutorInner.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()

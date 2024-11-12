@@ -1646,15 +1646,10 @@ dependencies = [
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-executor",
- "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -3748,6 +3743,7 @@ dependencies = [
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "reqwest 0.11.23",
  "serde",
  "serde_json",
  "tiny-bip39",
