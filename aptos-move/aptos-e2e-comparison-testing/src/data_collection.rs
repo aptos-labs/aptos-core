@@ -93,7 +93,7 @@ impl DataCollection {
         let val = debugger_state_view.get_state_value(TOTAL_SUPPLY_STATE_KEY.deref());
         assert!(val.is_ok() && val.unwrap().is_some());
         AptosVMBlockExecutor::new()
-            .execute_block_no_limit(&sig_verified_txns, debugger_state_view)
+            .execute_block_no_limit(&sig_verified_txns, debugger_state_view, None, None)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 

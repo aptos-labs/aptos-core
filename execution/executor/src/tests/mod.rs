@@ -690,6 +690,7 @@ fn run_transactions_naive(
                 .unwrap(),
             block_executor_onchain_config.clone(),
             None,
+            None,
         )
         .unwrap();
         let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();

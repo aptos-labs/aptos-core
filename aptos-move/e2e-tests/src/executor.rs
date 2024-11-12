@@ -640,11 +640,6 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-
-        // Do not use shared module caches in tests.
-        let module_cache_manager = ModuleCacheManager::new();
-        module_cache_manager.mark_ready(None, None);
-
         BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -652,8 +647,11 @@ impl FakeExecutor {
             self.executor_thread_pool.clone(),
             txn_block,
             &state_view,
-            &module_cache_manager,
+            // Do not use shared module caches in tests.
+            &ModuleCacheManager::new(),
             config,
+            None,
+            None,
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)

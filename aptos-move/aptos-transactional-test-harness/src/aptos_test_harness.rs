@@ -515,14 +515,12 @@ impl<'a> AptosTestAdapter<'a> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
-
-        let executor = AptosVMBlockExecutor::new();
-        if let Some(module_cache_manager) = executor.module_cache_manager() {
-            module_cache_manager.mark_ready(None, None);
-        }
-
-        let mut outputs =
-            executor.execute_block_no_limit(&sig_verified_block, &self.storage.clone())?;
+        let mut outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
+            &sig_verified_block,
+            &self.storage.clone(),
+            None,
+            None,
+        )?;
 
         assert_eq!(outputs.len(), 1);
 

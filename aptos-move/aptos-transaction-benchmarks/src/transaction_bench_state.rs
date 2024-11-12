@@ -223,6 +223,8 @@ where
             &ModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
+            None,
+            None,
         )
         .expect("VM should not fail to start")
         .into_transaction_outputs_forced();
@@ -274,6 +276,8 @@ where
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
             ),
+            None,
+            None,
             None,
         )
         .expect("VM should not fail to start")

@@ -131,16 +131,12 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let executor = V::new();
-    if let Some(module_cache_manager) = executor.module_cache_manager() {
-        module_cache_manager.mark_ready(None, None);
-    }
-
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
-        &executor,
+        &V::new(),
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        None,
         None,
     )?;
     ensure!(

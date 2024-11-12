@@ -439,6 +439,8 @@ fn execute_block_no_limit(
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         },
         None,
+        None,
+        None,
     )
     .map(BlockOutput::into_transaction_outputs_forced)
 }
