@@ -1,54 +1,54 @@
-module publisher_address::tree_dependencies {
-    use publisher_address::tree_dependencies_1;
-    use publisher_address::tree_dependencies_2;
-    use publisher_address::tree_dependencies_3;
-    use publisher_address::tree_dependencies_4;
-    use publisher_address::tree_dependencies_5;
-    use publisher_address::tree_dependencies_6;
-    use publisher_address::tree_dependencies_7;
-    use publisher_address::tree_dependencies_8;
-    use publisher_address::tree_dependencies_9;
-    use publisher_address::tree_dependencies_10;
-    use publisher_address::tree_dependencies_11;
-    use publisher_address::tree_dependencies_12;
-    use publisher_address::tree_dependencies_13;
-    use publisher_address::tree_dependencies_14;
-    use publisher_address::tree_dependencies_15;
-    use publisher_address::tree_dependencies_16;
-    use publisher_address::tree_dependencies_17;
-    use publisher_address::tree_dependencies_18;
-    use publisher_address::tree_dependencies_19;
-    use publisher_address::tree_dependencies_20;
+module publisher_address::star_dependencies {
+    use publisher_address::star_dependencies_1;
+    use publisher_address::star_dependencies_2;
+    use publisher_address::star_dependencies_3;
+    use publisher_address::star_dependencies_4;
+    use publisher_address::star_dependencies_5;
+    use publisher_address::star_dependencies_6;
+    use publisher_address::star_dependencies_7;
+    use publisher_address::star_dependencies_8;
+    use publisher_address::star_dependencies_9;
+    use publisher_address::star_dependencies_10;
+    use publisher_address::star_dependencies_11;
+    use publisher_address::star_dependencies_12;
+    use publisher_address::star_dependencies_13;
+    use publisher_address::star_dependencies_14;
+    use publisher_address::star_dependencies_15;
+    use publisher_address::star_dependencies_16;
+    use publisher_address::star_dependencies_17;
+    use publisher_address::star_dependencies_18;
+    use publisher_address::star_dependencies_19;
+    use publisher_address::star_dependencies_20;
 
     public entry fun run() {
         let sum = 0;
 
-        sum = sum + tree_dependencies_1::next();
-        sum = sum + tree_dependencies_2::next();
-        sum = sum + tree_dependencies_3::next();
-        sum = sum + tree_dependencies_4::next();
-        sum = sum + tree_dependencies_5::next();
-        sum = sum + tree_dependencies_6::next();
-        sum = sum + tree_dependencies_7::next();
-        sum = sum + tree_dependencies_8::next();
-        sum = sum + tree_dependencies_9::next();
-        sum = sum + tree_dependencies_10::next();
-        sum = sum + tree_dependencies_11::next();
-        sum = sum + tree_dependencies_12::next();
-        sum = sum + tree_dependencies_13::next();
-        sum = sum + tree_dependencies_14::next();
-        sum = sum + tree_dependencies_15::next();
-        sum = sum + tree_dependencies_16::next();
-        sum = sum + tree_dependencies_17::next();
-        sum = sum + tree_dependencies_18::next();
-        sum = sum + tree_dependencies_19::next();
-        sum = sum + tree_dependencies_20::next();
+        sum = sum + star_dependencies_1::next();
+        sum = sum + star_dependencies_2::next();
+        sum = sum + star_dependencies_3::next();
+        sum = sum + star_dependencies_4::next();
+        sum = sum + star_dependencies_5::next();
+        sum = sum + star_dependencies_6::next();
+        sum = sum + star_dependencies_7::next();
+        sum = sum + star_dependencies_8::next();
+        sum = sum + star_dependencies_9::next();
+        sum = sum + star_dependencies_10::next();
+        sum = sum + star_dependencies_11::next();
+        sum = sum + star_dependencies_12::next();
+        sum = sum + star_dependencies_13::next();
+        sum = sum + star_dependencies_14::next();
+        sum = sum + star_dependencies_15::next();
+        sum = sum + star_dependencies_16::next();
+        sum = sum + star_dependencies_17::next();
+        sum = sum + star_dependencies_18::next();
+        sum = sum + star_dependencies_19::next();
+        sum = sum + star_dependencies_20::next();
 
         assert!(sum == 20, 77);
     }
 }
 
-module publisher_address::tree_dependencies_1 {
+module publisher_address::star_dependencies_1 {
 
     const MAGIC: u64 = 1;
 
@@ -126,7 +126,7 @@ module publisher_address::tree_dependencies_1 {
     }
 }
 
-module publisher_address::tree_dependencies_2 {
+module publisher_address::star_dependencies_2 {
 
     const MAGIC: u64 = 2;
 
@@ -204,7 +204,7 @@ module publisher_address::tree_dependencies_2 {
     }
 }
 
-module publisher_address::tree_dependencies_3 {
+module publisher_address::star_dependencies_3 {
 
     const MAGIC: u64 = 3;
 
@@ -282,7 +282,7 @@ module publisher_address::tree_dependencies_3 {
     }
 }
 
-module publisher_address::tree_dependencies_4 {
+module publisher_address::star_dependencies_4 {
 
     const MAGIC: u64 = 4;
 
@@ -360,7 +360,7 @@ module publisher_address::tree_dependencies_4 {
     }
 }
 
-module publisher_address::tree_dependencies_5 {
+module publisher_address::star_dependencies_5 {
 
     const MAGIC: u64 = 5;
 
@@ -438,7 +438,7 @@ module publisher_address::tree_dependencies_5 {
     }
 }
 
-module publisher_address::tree_dependencies_6 {
+module publisher_address::star_dependencies_6 {
 
     const MAGIC: u64 = 6;
 
@@ -516,7 +516,7 @@ module publisher_address::tree_dependencies_6 {
     }
 }
 
-module publisher_address::tree_dependencies_7 {
+module publisher_address::star_dependencies_7 {
 
     const MAGIC: u64 = 7;
 
@@ -594,7 +594,7 @@ module publisher_address::tree_dependencies_7 {
     }
 }
 
-module publisher_address::tree_dependencies_8 {
+module publisher_address::star_dependencies_8 {
 
     const MAGIC: u64 = 8;
 
@@ -672,7 +672,7 @@ module publisher_address::tree_dependencies_8 {
     }
 }
 
-module publisher_address::tree_dependencies_9 {
+module publisher_address::star_dependencies_9 {
 
     const MAGIC: u64 = 9;
 
@@ -750,7 +750,7 @@ module publisher_address::tree_dependencies_9 {
     }
 }
 
-module publisher_address::tree_dependencies_10 {
+module publisher_address::star_dependencies_10 {
 
     const MAGIC: u64 = 10;
 
@@ -828,7 +828,7 @@ module publisher_address::tree_dependencies_10 {
     }
 }
 
-module publisher_address::tree_dependencies_11 {
+module publisher_address::star_dependencies_11 {
 
     const MAGIC: u64 = 11;
 
@@ -906,7 +906,7 @@ module publisher_address::tree_dependencies_11 {
     }
 }
 
-module publisher_address::tree_dependencies_12 {
+module publisher_address::star_dependencies_12 {
 
     const MAGIC: u64 = 12;
 
@@ -984,7 +984,7 @@ module publisher_address::tree_dependencies_12 {
     }
 }
 
-module publisher_address::tree_dependencies_13 {
+module publisher_address::star_dependencies_13 {
 
     const MAGIC: u64 = 13;
 
@@ -1062,7 +1062,7 @@ module publisher_address::tree_dependencies_13 {
     }
 }
 
-module publisher_address::tree_dependencies_14 {
+module publisher_address::star_dependencies_14 {
 
     const MAGIC: u64 = 14;
 
@@ -1140,7 +1140,7 @@ module publisher_address::tree_dependencies_14 {
     }
 }
 
-module publisher_address::tree_dependencies_15 {
+module publisher_address::star_dependencies_15 {
 
     const MAGIC: u64 = 15;
 
@@ -1218,7 +1218,7 @@ module publisher_address::tree_dependencies_15 {
     }
 }
 
-module publisher_address::tree_dependencies_16 {
+module publisher_address::star_dependencies_16 {
 
     const MAGIC: u64 = 16;
 
@@ -1296,7 +1296,7 @@ module publisher_address::tree_dependencies_16 {
     }
 }
 
-module publisher_address::tree_dependencies_17 {
+module publisher_address::star_dependencies_17 {
 
     const MAGIC: u64 = 17;
 
@@ -1374,7 +1374,7 @@ module publisher_address::tree_dependencies_17 {
     }
 }
 
-module publisher_address::tree_dependencies_18 {
+module publisher_address::star_dependencies_18 {
 
     const MAGIC: u64 = 18;
 
@@ -1452,7 +1452,7 @@ module publisher_address::tree_dependencies_18 {
     }
 }
 
-module publisher_address::tree_dependencies_19 {
+module publisher_address::star_dependencies_19 {
 
     const MAGIC: u64 = 19;
 
@@ -1530,7 +1530,7 @@ module publisher_address::tree_dependencies_19 {
     }
 }
 
-module publisher_address::tree_dependencies_20 {
+module publisher_address::star_dependencies_20 {
 
     const MAGIC: u64 = 20;
 

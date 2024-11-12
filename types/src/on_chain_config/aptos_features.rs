@@ -196,6 +196,11 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
+        if std::env::var("USE_LOADER_V2").is_ok() {
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        } else {
+            features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        }
         features
     }
 }

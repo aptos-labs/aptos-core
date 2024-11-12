@@ -7,7 +7,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{Features, TimedFeaturesBuilder},
+    on_chain_config::{FeatureFlag, Features, TimedFeaturesBuilder},
     transaction::user_transaction_context::UserTransactionContext,
 };
 use aptos_vm_environment::{
@@ -30,7 +30,13 @@ pub struct GenesisRuntimeBuilder {
 impl GenesisRuntimeBuilder {
     /// Returns a builder, capable of creating VM and runtime environment to run genesis.
     pub fn new(chain_id: ChainId) -> Self {
-        let features = Features::default();
+        let mut features = Features::default();
+        if std::env::var("USE_LOADER_V2").is_ok() {
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        } else {
+            features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        }
+
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
         let vm_config =

@@ -44,7 +44,7 @@ impl Default for VMConfig {
             ty_builder: TypeBuilder::with_limits(128, 20),
             disallow_dispatch_for_native: true,
             use_compatibility_checker_v2: true,
-            use_loader_v2: false,
+            use_loader_v2: std::env::var("USE_LOADER_V2").is_ok(),
         }
     }
 }
