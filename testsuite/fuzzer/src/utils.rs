@@ -183,11 +183,7 @@ pub(crate) mod cli {
             let mut hasher = Sha256::new();
             hasher.update(&bytes);
             let hash = hasher.finalize();
-            let filename = format!(
-                "{}/{}.bytes",
-                destination_path,
-                hex::encode(hash)
-            );
+            let filename = format!("{}/{}.bytes", destination_path, hex::encode(hash));
             let mut file = File::create(&filename).map_err(|e| e.to_string())?;
             file.write_all(&bytes).map_err(|e| e.to_string())?;
         }
@@ -229,14 +225,14 @@ pub(crate) mod cli {
                 Err(err) => {
                     eprintln!("Invalid address {}: {:?}", address, err);
                     continue;
-                }
+                },
             };
             let identifier = match Identifier::new(module_name) {
                 Ok(id) => id,
                 Err(err) => {
                     eprintln!("Invalid module name {}: {:?}", module_name, err);
                     continue;
-                }
+                },
             };
             let key = ModuleId::new(account_address, identifier);
             let compiled_module = match CompiledModule::deserialize(&bytecode) {
