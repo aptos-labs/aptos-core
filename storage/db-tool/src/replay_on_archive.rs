@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_config::config::{
     StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
@@ -62,6 +62,12 @@ pub struct Opt {
 
     #[clap(long, default_value = "1", help = "The number of concurrent replays")]
     pub concurrent_replay: usize,
+
+    #[clap(
+        long,
+        help = "The maximum time in seconds to wait for each transaction replay"
+    )]
+    pub timeout_secs: Option<u64>,
 }
 
 impl Opt {
@@ -102,6 +108,10 @@ impl ReplayTps {
             cnt, elapsed, tps
         );
     }
+
+    pub fn get_elapsed_secs(&self) -> u64 {
+        self.timer.elapsed().as_secs()
+    }
 }
 
 struct Verifier {
@@ -113,6 +123,7 @@ struct Verifier {
     chunk_size: usize,
     concurrent_replay: usize,
     replay_stat: ReplayTps,
+    timeout_secs: Option<u64>,
 }
 
 impl Verifier {
@@ -148,6 +159,7 @@ impl Verifier {
             chunk_size: config.chunk_size,
             concurrent_replay: config.concurrent_replay,
             replay_stat: ReplayTps::new(),
+            timeout_secs: config.timeout_secs,
         })
     }
 
@@ -211,6 +223,12 @@ impl Verifier {
                 self.replay_stat.update_cnt(cur_txns.len() as u64);
                 self.replay_stat.print_tps();
 
+                if let Some(duration) = self.timeout_secs {
+                    if self.replay_stat.get_elapsed_secs() >= duration {
+                        return Ok(total_failed_txns);
+                    }
+                }
+
                 // empty for the new chunk
                 chunk_start_version = start + (idx as u64) + 1;
                 cur_txns.clear();
@@ -270,6 +288,9 @@ impl Verifier {
         expected_epoch_events: &Vec<Vec<ContractEvent>>,
         expected_epoch_writesets: &Vec<WriteSet>,
     ) -> Result<Vec<Error>> {
+        if cur_txns.is_empty() {
+            return Ok(Vec::new());
+        }
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             cur_txns
                 .iter()

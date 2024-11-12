@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "replay-verify"
+version = "0.1.0"
+description = ""
+authors = ["Bo Wu <bo@aptoslabs.com>"]
+readme = "README.md"
+packages = [{include = "replay_verify"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+kubernetes = "^31.0.0"
+google-cloud-compute = "^1.20.1"
+google-cloud-container = "^2.53.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry.scripts]
+replay-verify = "main:main"
