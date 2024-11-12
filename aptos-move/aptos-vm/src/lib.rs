@@ -177,15 +177,14 @@ pub trait VMBlockExecutor: Send + Sync {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         self.execute_block(
             transactions,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
-            parent_block,
-            current_block,
+            // For all use cases, we run on an unknown state. Hence, defaulting to None here.
+            None,
+            None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
     }

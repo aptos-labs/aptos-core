@@ -279,8 +279,6 @@ impl Verifier {
             &self
                 .arc_db
                 .state_view_at_version(start_version.checked_sub(1))?,
-            None,
-            None,
         )?;
 
         let mut failed_txns = Vec::new();
