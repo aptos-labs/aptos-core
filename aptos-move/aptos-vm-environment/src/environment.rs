@@ -15,7 +15,8 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{
-        ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
+        ConfigurationResource, FeatureFlag, Features, OnChainConfig, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
@@ -175,8 +176,13 @@ impl Environment {
     ) -> Self {
         // We compute and store a hash of configs in order to distinguish different environments.
         let mut sha3_256 = Sha3_256::new();
-        let features =
+        let mut features =
             fetch_config_and_update_hash::<Features>(&mut sha3_256, state_view).unwrap_or_default();
+        if std::env::var("USE_LOADER_V1").is_ok() {
+            features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        } else {
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
         let chain_id = fetch_config_and_update_hash::<ChainId>(&mut sha3_256, state_view)
