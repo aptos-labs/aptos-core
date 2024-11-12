@@ -75,9 +75,11 @@ pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum MoveStruct {
     /// The representation used by the MoveVM
     Runtime(Vec<MoveValue>),
@@ -95,7 +97,10 @@ pub enum MoveStruct {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum MoveValue {
     U8(u8),
     U64(u64),
@@ -283,7 +288,10 @@ impl MoveStruct {
     }
 
     pub fn with_types(type_: StructTag, fields: Vec<(Identifier, MoveValue)>) -> Self {
-        Self::WithTypes { _type_: type_, _fields: fields }
+        Self::WithTypes {
+            _type_: type_,
+            _fields: fields,
+        }
     }
 
     pub fn simple_deserialize(blob: &[u8], ty: &MoveStructLayout) -> AResult<Self> {
@@ -355,9 +363,10 @@ impl MoveStruct {
         match self {
             Self::Runtime(vals) => (None, vals),
             Self::RuntimeVariant(tag, vals) => (Some(tag), vals),
-            Self::WithFields(fields) | Self::WithTypes { _fields: fields, .. } => {
-                (None, fields.into_iter().map(|(_, f)| f).collect())
-            },
+            Self::WithFields(fields)
+            | Self::WithTypes {
+                _fields: fields, ..
+            } => (None, fields.into_iter().map(|(_, f)| f).collect()),
             Self::WithVariantFields(_, tag, fields) => {
                 (Some(tag), fields.into_iter().map(|(_, f)| f).collect())
             },
@@ -366,7 +375,10 @@ impl MoveStruct {
 
     pub fn undecorate(self) -> Self {
         match self {
-            MoveStruct::WithFields(fields) | MoveStruct::WithTypes { _fields: fields, .. } => Self::Runtime(
+            MoveStruct::WithFields(fields)
+            | MoveStruct::WithTypes {
+                _fields: fields, ..
+            } => Self::Runtime(
                 fields
                     .into_iter()
                     .map(|(_, v)| MoveValue::undecorate(v))
@@ -743,7 +755,10 @@ impl serde::Serialize for MoveStruct {
                 }
             },
             Self::WithFields(fields) => MoveFields(fields).serialize(serializer),
-            Self::WithTypes { _type_: type_, _fields: fields } => {
+            Self::WithTypes {
+                _type_: type_,
+                _fields: fields,
+            } => {
                 // Serialize a Move struct as Serde struct type named `struct `with two fields named `type` and `fields`.
                 // `fields` will get serialized as a Serde map.
                 // Unfortunately, we can't serialize this in the logical way: as a Serde struct named `type` with a field for
@@ -903,7 +918,10 @@ impl fmt::Display for MoveStruct {
             MoveStruct::WithFields(fields) => {
                 fmt_list(f, "{", fields.iter().map(DisplayFieldBinding), "}")
             },
-            MoveStruct::WithTypes { _type_: type_, _fields: fields } => {
+            MoveStruct::WithTypes {
+                _type_: type_,
+                _fields: fields,
+            } => {
                 fmt::Display::fmt(type_, f)?;
                 fmt_list(f, " {", fields.iter().map(DisplayFieldBinding), "}")
             },
