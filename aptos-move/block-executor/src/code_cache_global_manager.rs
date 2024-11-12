@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{code_cache_global::GlobalModuleCache, explicit_sync_wrapper::ExplicitSyncWrapper};
-use aptos_types::{
-    block_executor::config::BlockExecutorModuleCacheLocalConfig, state_store::StateView,
-};
+use aptos_types::block_executor::config::BlockExecutorModuleCacheLocalConfig;
 use aptos_vm_environment::environment::AptosEnvironment;
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, VMStatus};
@@ -128,7 +126,7 @@ where
     /// The final environment and module caches are returned.
     pub fn check_ready_and_get_caches(
         &self,
-        state_view: &impl StateView,
+        storage_environment: AptosEnvironment,
         config: &BlockExecutorModuleCacheLocalConfig,
     ) -> Result<(AptosEnvironment, Arc<GlobalModuleCache<K, DC, VC, E>>), VMStatus> {
         let state = self.state.lock();
@@ -143,7 +141,7 @@ where
             ));
         }
 
-        let environment = self.get_or_initialize_environment(state_view);
+        let environment = self.get_or_initialize_environment(storage_environment);
         let module_cache = self.module_cache.clone();
 
         // Check 1: struct re-indexing map is not too large. If it is, we flush the cache. Also, we
@@ -196,18 +194,18 @@ where
     /// Returns the cached global environment if it already exists, and matches the one in storage.
     /// If it does not exist, or does not match, the new environment is initialized from the given
     /// state, cached, and returned. Should be called when in [State::Ready] state, under lock.
-    fn get_or_initialize_environment(&self, state_view: &impl StateView) -> AptosEnvironment {
-        let new_environment =
-            AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-
+    fn get_or_initialize_environment(
+        &self,
+        storage_environment: AptosEnvironment,
+    ) -> AptosEnvironment {
         let mut guard = self.environment.acquire();
         let existing_environment = guard.deref_mut();
 
         let environment_requires_update = existing_environment
             .as_ref()
-            .map_or(true, |environment| environment != &new_environment);
+            .map_or(true, |environment| environment != &storage_environment);
         if environment_requires_update {
-            *existing_environment = Some(new_environment);
+            *existing_environment = Some(storage_environment);
 
             // If this environment has been (re-)initialized, we need to flush the module cache
             // because it can contain now out-dated code.
@@ -287,7 +285,9 @@ mod test {
 
         // Set up the state and the environment.
         *module_cache_manager.state.lock() = State::Ready(None);
-        let environment = module_cache_manager.get_or_initialize_environment(&state_view);
+        let environment = module_cache_manager.get_or_initialize_environment(
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
+        );
 
         module_cache_manager
             .module_cache
@@ -309,7 +309,7 @@ mod test {
 
         // Module cache size in bytes is too large, should be flushed (but not struct types).
         assert!(module_cache_manager
-            .check_ready_and_get_caches(&state_view, &config)
+            .check_ready_and_get_caches(environment.clone(), &config)
             .is_ok());
         assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
         assert_eq!(
@@ -323,7 +323,7 @@ mod test {
 
         // This time size is less than the one specified in config. No flushing.
         assert!(module_cache_manager
-            .check_ready_and_get_caches(&state_view, &config)
+            .check_ready_and_get_caches(environment.clone(), &config)
             .is_ok());
         assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
         assert_eq!(
@@ -353,7 +353,7 @@ mod test {
 
         // Too many struct names cached.
         assert!(module_cache_manager
-            .check_ready_and_get_caches(&state_view, &config)
+            .check_ready_and_get_caches(environment.clone(), &config)
             .is_ok());
         assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
         assert_eq!(
@@ -527,7 +527,9 @@ mod test {
 
         // Environment has to be set to the same value, cache flushed.
         let state_view = state_view_with_changed_feature_flag(None);
-        let environment = module_cache_manager.get_or_initialize_environment(&state_view);
+        let environment = module_cache_manager.get_or_initialize_environment(
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
+        );
         assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
         assert!(module_cache_manager
             .environment
@@ -544,7 +546,9 @@ mod test {
         // Environment has to be re-set to the new value, cache flushed.
         let state_view =
             state_view_with_changed_feature_flag(Some(FeatureFlag::CODE_DEPENDENCY_CHECK));
-        let environment = module_cache_manager.get_or_initialize_environment(&state_view);
+        let environment = module_cache_manager.get_or_initialize_environment(
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
+        );
         assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
         assert!(module_cache_manager
             .environment
@@ -559,7 +563,9 @@ mod test {
         assert!(module_cache_manager.environment.acquire().is_some());
 
         // Environment is kept, and module caches are not flushed.
-        let new_environment = module_cache_manager.get_or_initialize_environment(&state_view);
+        let new_environment = module_cache_manager.get_or_initialize_environment(
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
+        );
         assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
         assert!(environment == new_environment);
     }

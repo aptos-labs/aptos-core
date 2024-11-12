@@ -432,17 +432,26 @@ impl BlockAptosVM {
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
-        if !module_cache_manager.mark_ready(parent_block, current_block) {
-            return Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                Some("Unable to mark module caches for block execution as ready".to_string()),
-            ));
-        }
-        let (environment, module_cache) = module_cache_manager
-            .check_ready_and_get_caches(state_view, &config.local.module_cache_config)?;
+        let environment =
+            AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
+        let is_loader_v2_enabled = environment.features().is_loader_v2_enabled();
+
+        let (environment, module_cache) = if is_loader_v2_enabled {
+            if !module_cache_manager.mark_ready(parent_block, current_block) {
+                return Err(VMStatus::error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Unable to mark module caches for block execution as ready".to_string()),
+                ));
+            }
+            module_cache_manager
+                .check_ready_and_get_caches(environment, &config.local.module_cache_config)?
+        } else {
+            (environment, Arc::new(GlobalModuleCache::empty()))
+        };
 
         // Finally, to avoid cold starts, fetch the framework code prior to block execution.
-        if module_cache.num_modules() == 0
+        if is_loader_v2_enabled
+            && module_cache.num_modules() == 0
             && config.local.module_cache_config.prefetch_framework_code
         {
             let code_storage = state_view.as_aptos_code_storage(environment.clone());
@@ -465,14 +474,14 @@ impl BlockAptosVM {
             transaction_commit_listener,
         );
 
-        if !module_cache_manager.mark_executing() {
+        if is_loader_v2_enabled && !module_cache_manager.mark_executing() {
             return Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 Some("Unable to mark block execution start".to_string()),
             ));
         }
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
-        if !module_cache_manager.mark_done() {
+        if is_loader_v2_enabled && !module_cache_manager.mark_done() {
             return Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 Some("Unable to mark block execution as done".to_string()),
