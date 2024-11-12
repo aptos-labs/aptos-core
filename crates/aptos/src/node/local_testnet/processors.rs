@@ -10,9 +10,11 @@ use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPg
 use maplit::hashset;
 use processor::{
     processors::{
-        objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
-        token_processor::TokenProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
-        ProcessorConfig, ProcessorName,
+        objects_processor::ObjectsProcessorConfig,
+        parquet_processors::parquet_default_processor::ParquetDefaultProcessorConfig,
+        parquet_processors::parquet_fungible_asset_processor::ParquetFungibleAssetProcessorConfig,
+        stake_processor::StakeProcessorConfig, token_processor::TokenProcessorConfig,
+        token_v2_processor::TokenV2ProcessorConfig, ProcessorConfig, ProcessorName,
     },
     utils::database::run_pending_migrations,
     IndexerGrpcProcessorConfig,
@@ -113,6 +115,28 @@ impl ProcessorManager {
                 ProcessorConfig::TransactionMetadataProcessor
             },
             ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
+            ProcessorName::ParquetDefaultProcessor => {
+                ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+                    google_application_credentials: Default::default(),
+                    bucket_name: Default::default(),
+                    bucket_root: Default::default(),
+                    parquet_handler_response_channel_size: Default::default(),
+                    max_buffer_size: Default::default(),
+                    parquet_upload_interval: Default::default(),
+                })
+            },
+            ProcessorName::ParquetFungibleAssetProcessor => {
+                ProcessorConfig::ParquetFungibleAssetProcessor(
+                    ParquetFungibleAssetProcessorConfig {
+                        google_application_credentials: Default::default(),
+                        bucket_name: Default::default(),
+                        bucket_root: Default::default(),
+                        parquet_handler_response_channel_size: Default::default(),
+                        max_buffer_size: Default::default(),
+                        parquet_upload_interval: Default::default(),
+                    },
+                )
+            },
         };
         let config = IndexerGrpcProcessorConfig {
             processor_config,
@@ -128,10 +152,14 @@ impl ProcessorManager {
             // many in a localnet environment.
             db_pool_size: Some(8),
             gap_detection_batch_size: 50,
+            parquet_gap_detection_batch_size: 50,
             pb_channel_txn_chunk_size: 100_000,
             per_table_chunk_sizes: Default::default(),
-            transaction_filter: Default::default(),
             grpc_response_item_timeout_in_secs: 10,
+            transaction_filter: Default::default(),
+            deprecated_tables: Default::default(),
+            default_sleep_time_between_request:
+                IndexerGrpcProcessorConfig::default_sleep_time_between_request(),
         };
         let manager = Self {
             config,
