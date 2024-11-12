@@ -7,11 +7,14 @@ For every user transaction, the following steps are performed:
 1. ***Prologue:***
    Responsible for checking the structure of the transaction such as signature verification, balance checks on the account paying gas for this transaction, etc.
    If prologue checks fail, transaction is discarded and there are no updates to the blockchain state.
+
 2. **Execution:**
    Runs the code specified by the transaction - can be a script or an entry function.
-   Internally, the code execution is done by MoveVM which AptosVM wraps.
-   If execution is successful, produces a change set that can be (but is not yet) applied to the blockchain state.
-3. **Aborted execution (hack):**
+   If transaction payload is a script, it is verified with Move bytecode verifier prior to execution.
+   If the payload is an entry function, it is loaded from the code cache (which guarantees that loaded code is verified).
+   When the code is verified and loaded, transaction arguments are checked and then the payload is executed via MoveVM that AptosVM wraps. 
+   If execution is successful, a change set that can be (but is not yet) applied to the blockchain state is produced.
+3. **Aborted execution:**
    If execution is not successful, AptosVM checks if an account needs to be created for this user transaction.
    For more details about sponsored account creation, see [AIP-52](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-52.md).
 4. **Epilogue:**
