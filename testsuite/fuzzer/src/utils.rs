@@ -186,10 +186,7 @@ pub(crate) mod cli {
             let filename = format!(
                 "{}/{}.bytes",
                 destination_path,
-                hash.to_vec()
-                    .iter()
-                    .map(|b| format!("{:02x}", b))
-                    .collect::<String>()
+                hex::encode(hash)
             );
             let mut file = File::create(&filename).map_err(|e| e.to_string())?;
             file.write_all(&bytes).map_err(|e| e.to_string())?;
