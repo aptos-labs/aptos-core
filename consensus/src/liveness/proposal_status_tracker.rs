@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::round_state::NewRoundReason;
+use crate::counters;
 use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::{
     common::Author, payload_pull_params::OptQSPayloadPullParams, round_timeout::RoundTimeoutReason,
 };
 use aptos_infallible::Mutex;
+use aptos_logger::warn;
+use aptos_short_hex_str::AsShortHexStr;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
 pub trait TPastProposalStatusTracker: Send + Sync {
@@ -103,16 +106,19 @@ impl TPastProposalStatusTracker for Mutex<ExponentialWindowFailureTracker> {
 
 pub struct OptQSPullParamsProvider {
     enable_opt_qs: bool,
+    minimum_batch_age_usecs: u64,
     failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
 }
 
 impl OptQSPullParamsProvider {
     pub fn new(
         enable_opt_qs: bool,
+        minimum_batch_age_usecs: u64,
         failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
     ) -> Self {
         Self {
             enable_opt_qs,
+            minimum_batch_age_usecs,
             failure_tracker,
         }
     }
@@ -126,14 +132,30 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
 
         let tracker = self.failure_tracker.lock();
 
+        counters::OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT
+            .observe(tracker.last_consecutive_success_count as f64);
         if tracker.last_consecutive_success_count < tracker.window {
+            warn!(
+                "Skipping OptQS: (last_consecutive_successes) {} < {} (window)",
+                tracker.last_consecutive_success_count, tracker.window
+            );
             return None;
         }
 
         let exclude_authors = tracker.get_exclude_authors();
+        if !exclude_authors.is_empty() {
+            let exclude_authors_str: Vec<_> =
+                exclude_authors.iter().map(|a| a.short_str()).collect();
+            for author in &exclude_authors_str {
+                counters::OPTQS_EXCLUDE_AUTHORS_COUNT
+                    .with_label_values(&[author.as_str()])
+                    .inc();
+            }
+            warn!("OptQS exclude authors: {:?}", exclude_authors_str);
+        }
         Some(OptQSPayloadPullParams {
             exclude_authors,
-            minimum_batch_age_usecs: Duration::from_millis(10).as_micros() as u64,
+            minimum_batch_age_usecs: self.minimum_batch_age_usecs,
         })
     }
 }
