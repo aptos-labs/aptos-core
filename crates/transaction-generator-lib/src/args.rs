@@ -73,6 +73,9 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
     SimpleScript,
+    ChainDependencies,
+    ChainFriends,
+    StarDependencies,
 }
 
 impl TransactionTypeArg {
@@ -320,6 +323,9 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
             TransactionTypeArg::SimpleScript => call_custom_module(EntryPoints::SimpleScript),
+            TransactionTypeArg::ChainDependencies => call_custom_module(EntryPoints::ChainDependencies),
+            TransactionTypeArg::ChainFriends => call_custom_module(EntryPoints::ChainFriends),
+            TransactionTypeArg::StarDependencies => call_custom_module(EntryPoints::StarDependencies),
         }
     }
 

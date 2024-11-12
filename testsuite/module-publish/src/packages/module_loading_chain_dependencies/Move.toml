@@ -1,0 +1,9 @@
+[package]
+name = 'module_loading_chain_dependencies'
+version = '1.0.0'
+
+[dependencies]
+AptosStdlib = { local = "../../../../../aptos-move/framework/aptos-stdlib" }
+
+[addresses]
+publisher_address = "0xABCD"

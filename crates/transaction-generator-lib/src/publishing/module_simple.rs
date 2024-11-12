@@ -272,6 +272,9 @@ pub enum EntryPoints {
     /// there to slow down deserialization & verification, effectively making it more expensive to
     /// load it into code cache.
     SimpleScript,
+    ChainDependencies,
+    ChainFriends,
+    StarDependencies,
 }
 
 impl EntryPoints {
@@ -329,6 +332,9 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::ChainDependencies => "module_loading_chain_dependencies",
+            EntryPoints::ChainFriends => "module_loading_chain_friends",
+            EntryPoints::StarDependencies => "module_loading_star_dependencies",
         }
     }
 
@@ -389,6 +395,9 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::ChainDependencies => "module_loading_chain_dependencies",
+            EntryPoints::ChainFriends => "module_loading_chain_friends",
+            EntryPoints::StarDependencies => "module_loading_star_dependencies",
         }
     }
 
@@ -732,6 +741,7 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::ChainDependencies | EntryPoints::ChainFriends | EntryPoints::StarDependencies => get_payload_void(module_id, ident_str!("run").to_owned()),
         }
     }
 
@@ -840,6 +850,7 @@ impl EntryPoints {
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
+            EntryPoints::ChainDependencies | EntryPoints::ChainFriends | EntryPoints::StarDependencies => AutomaticArgs::None,
         }
     }
 }
