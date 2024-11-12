@@ -36,3 +36,14 @@ pub use hash::HashValue;
 pub use once_cell as _once_cell;
 #[doc(hidden)]
 pub use serde_name as _serde_name;
+use crate::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+
+#[test]
+fn hihi() {
+    let path_in = std::env::var("PATH_IN").unwrap();
+    let text = std::fs::read_to_string(path_in).unwrap();
+    let sk_bytes = hex::decode(text).unwrap();
+    let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let pk = Ed25519PublicKey::from(&sk);
+    println!("{}", hex::encode(pk.to_bytes().to_vec()));
+}
