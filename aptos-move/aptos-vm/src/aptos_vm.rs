@@ -126,6 +126,7 @@ use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     marker::Sync,
+    str::FromStr,
     sync::Arc,
 };
 
@@ -2815,6 +2816,9 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         );
 
         let count = transactions.len();
+        let concurrency_level =
+            usize::from_str(&std::env::var("CONCURRENCY_LEVEL").unwrap()).unwrap();
+
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -2824,7 +2828,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
             &self.module_cache_manager,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
-                    concurrency_level: AptosVM::get_concurrency_level(),
+                    concurrency_level,
                     allow_fallback: true,
                     discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
                     module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),

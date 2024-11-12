@@ -6,6 +6,7 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_rest_client::Client;
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use clap::Parser;
 use std::path::PathBuf;
 use url::Url;
@@ -84,11 +85,15 @@ impl Command {
             user_txns
         };
 
+        let executor = AptosVMBlockExecutor::new();
         let txn_outputs = debugger.execute_transactions_at_version(
+            &executor,
             self.begin_version,
             block,
             self.repeat_execution_times.unwrap_or(1),
             &self.opts.concurrency_level,
+            None,
+            None,
         )?;
         println!("{txn_outputs:#?}");
 
