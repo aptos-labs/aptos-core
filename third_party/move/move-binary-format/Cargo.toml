@@ -13,7 +13,7 @@ edition = "2021"
 anyhow = { workspace = true }
 arbitrary = { workspace = true, optional = true, features = ["derive"] }
 backtrace = { workspace = true }
-dearbitrary = { version = "1.0.4", optional = true, features = ["derive"] }
+dearbitrary = { workspace = true, optional = true, features = ["derive"] }
 indexmap = { workspace = true }
 move-bytecode-spec = { workspace = true }
 move-core-types = { path = "../move-core/types" }
