@@ -259,9 +259,11 @@ BlockRetrievalRequest:
     - block_id:
         TYPENAME: HashValue
     - num_blocks: U64
-    - target_block_id:
+    - target_epoch_and_round:
         OPTION:
-          TYPENAME: HashValue
+          TUPLEARRAY:
+            CONTENT: U64
+            SIZE: 2
 BlockRetrievalResponse:
   STRUCT:
     - status:
