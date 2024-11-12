@@ -17,9 +17,12 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
-use move_vm_types::code::{
-    ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode, ModuleCodeBuilder,
-    UnsyncModuleCache, WithBytes, WithHash,
+use move_vm_types::{
+    code::{
+        ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
+        ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
+    },
+    sha3_256,
 };
 use std::{borrow::Borrow, ops::Deref, sync::Arc};
 
@@ -137,9 +140,10 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
             Some(bytes) => bytes,
             None => return Ok(None),
         };
-        let (compiled_module, _, hash) = self
+        let compiled_module = self
             .runtime_environment()
             .deserialize_into_compiled_module(&bytes)?;
+        let hash = sha3_256(&bytes);
         let extension = Arc::new(BytesWithHash::new(bytes, hash));
         let module = ModuleCode::from_deserialized(compiled_module, extension);
         Ok(Some(module))

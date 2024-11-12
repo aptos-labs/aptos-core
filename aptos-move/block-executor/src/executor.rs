@@ -1239,7 +1239,7 @@ where
 
         // Since we have successfully serialized the module when converting into this transaction
         // write, the deserialization should never fail.
-        let (compiled_module, _, _) = runtime_environment
+        let compiled_module = runtime_environment
             .deserialize_into_compiled_module(state_value.bytes())
             .map_err(|err| {
                 let msg = format!("Failed to construct the module from state value: {:?}", err);
