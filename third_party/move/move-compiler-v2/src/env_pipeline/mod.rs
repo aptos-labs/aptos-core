@@ -4,7 +4,7 @@
 //! This module contains a set of transformers and analyzers of global environment.
 //! Those can be arranged in a pipeline and executed in sequence.
 
-use log::trace;
+use log::debug;
 use move_model::model::GlobalEnv;
 use std::io::Write;
 
@@ -43,10 +43,10 @@ impl<'a> EnvProcessorPipeline<'a> {
     /// Runs the pipeline. Running will be ended if any of the steps produces an error.
     /// The function returns true if all steps succeeded without errors.
     pub fn run(&self, env: &mut GlobalEnv) -> bool {
-        trace!("before env processor pipeline: {}", env.dump_env());
+        debug!("before env processor pipeline: {}", env.dump_env());
         for (name, proc) in &self.processors {
             proc(env);
-            trace!("after env processor {}", name);
+            debug!("after env processor {}: {}", name, env.dump_env());
             if env.has_errors() {
                 return false;
             }
@@ -58,13 +58,13 @@ impl<'a> EnvProcessorPipeline<'a> {
     /// only.
     pub fn run_and_record(&self, env: &mut GlobalEnv, w: &mut impl Write) -> anyhow::Result<bool> {
         let msg = format!("before env processor pipeline:\n{}\n", env.dump_env());
-        trace!("{}", msg);
+        debug!("{}", msg);
         writeln!(w, "// -- Model dump {}", msg)?;
         for (name, proc) in &self.processors {
             proc(env);
             if !env.has_errors() {
                 let msg = format!("after env processor {}:\n{}\n", name, env.dump_env());
-                trace!("{}", msg);
+                debug!("{}", msg);
                 writeln!(w, "// -- Model dump {}", msg)?;
             } else {
                 return Ok(false);

@@ -452,6 +452,7 @@ impl<'env> FunctionTarget<'env> {
 
         // add location
         if verbose {
+            texts.push(format!("     # attr_id {:?}", attr_id));
             texts.push(format!(
                 "     # {}",
                 self.get_bytecode_loc(attr_id).display(self.global_env())

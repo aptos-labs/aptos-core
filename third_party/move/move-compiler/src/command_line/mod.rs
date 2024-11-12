@@ -77,3 +77,8 @@ pub const MVC_BACKTRACE_ENV_VAR: &str = "MVC_BACKTRACE";
 pub fn get_move_compiler_backtrace_from_env() -> bool {
     read_bool_env_var(MOVE_COMPILER_BACKTRACE_ENV_VAR) || read_bool_env_var(MVC_BACKTRACE_ENV_VAR)
 }
+
+// Flag to dump bytecode files
+pub fn get_move_compiler_dump_from_env() -> bool {
+    read_bool_env_var(MOVE_COMPILER_DUMP_ENV_VAR) || read_bool_env_var(MVC_DUMP_ENV_VAR)
+}

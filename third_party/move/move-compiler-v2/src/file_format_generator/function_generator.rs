@@ -12,6 +12,7 @@ use crate::{
         livevar_analysis_processor::LiveVarAnnotation,
     },
 };
+use log::debug;
 use move_binary_format::{
     file_format as FF,
     file_format::{CodeOffset, FunctionDefinitionIndex},
@@ -209,6 +210,12 @@ impl<'a> FunctionGenerator<'a> {
         for i in 0..bytecode.len() {
             let code_offset = i as FF::CodeOffset;
             let bc = &bytecode[i];
+            debug!(
+                "Generating code for bytecode {:?} ({}) at offset {}",
+                bc,
+                bc.display(&ctx.fun, &BTreeMap::new()),
+                i
+            );
             let bytecode_ctx = BytecodeContext {
                 fun_ctx: ctx,
                 code_offset,
@@ -260,16 +267,17 @@ impl<'a> FunctionGenerator<'a> {
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode
     /// for peephole optimizations.
     fn gen_bytecode(&mut self, ctx: &BytecodeContext, bc: &Bytecode, next_bc: Option<&Bytecode>) {
+        let loc = ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id);
+        let ir_loc = ctx.fun_ctx.module.env.to_ir_loc(&loc);
+        let offset = self.code.len();
+        let func_name = ctx.fun_ctx.fun.func_env.get_full_name_str();
+        debug!(
+            "Setting location for {}:{} with attr_id {:?} to {:?} (from {:?})",
+            func_name, offset, ctx.attr_id, ir_loc, loc
+        );
         self.gen
             .source_map
-            .add_code_mapping(
-                ctx.fun_ctx.def_idx,
-                self.code.len() as FF::CodeOffset,
-                ctx.fun_ctx
-                    .module
-                    .env
-                    .to_ir_loc(&ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id)),
-            )
+            .add_code_mapping(ctx.fun_ctx.def_idx, offset as FF::CodeOffset, ir_loc)
             .expect(SOURCE_MAP_OK);
         match bc {
             Bytecode::Assign(_, dest, source, mode) => {

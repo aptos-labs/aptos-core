@@ -122,7 +122,7 @@ where
             &env,
             &mut targets,
             &dump_base_name,
-            false,
+            command_line::get_move_compiler_dump_from_env(),
             &pipeline::register_formatters,
             || !env.has_errors(),
         )

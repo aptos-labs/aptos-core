@@ -115,17 +115,16 @@ fn subtract_locations(locs1: BTreeSet<Loc>, locs2: &BTreeSet<Loc>) -> Vec<Loc> {
                         } else {
                             // loc2 is finished but loc1 is not,
                             // finish adding all loc1
-                            result.push(current_loc1);
-                            for loc1 in locs1_iter {
-                                result.push(loc1);
-                            }
-                            return result;
+                            break;
                         }
                     }
                 }
             }
         }
         result.push(current_loc1);
+        for loc1 in locs1_iter {
+            result.push(loc1);
+        }
     }
     result
 }
@@ -732,9 +731,10 @@ impl SourceCoverage {
             TextIndicator::Explicit | TextIndicator::On => {
                 write!(
                     output_writer,
-                    "Code coverage per line of code:\n  {} indicates the line is not executable or is fully covered during execution\n  {} indicates the line is executable but NOT fully covered during execution\nSource code follows:\n",
+                    "Code coverage per line of code:\n  {} indicates the line is covered during execution\n  {} indicates the line is executable but NOT fully covered during execution\n  {} indicates the line is either test code or is not executable\nSource code follows:\n",
                     "+".to_string().green(),
                     "-".to_string().bold().red(),
+                    " ".to_string(),
                 )?;
                 true
             },
