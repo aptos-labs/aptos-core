@@ -124,9 +124,9 @@ pub struct ExecutionBackpressureConfig {
     pub percentile: f64,
     /// Recalibrating max block size, to target blocks taking this long.
     pub target_block_time_ms: usize,
-    /// A minimal number of transactions per block, even if calibration suggests otherwise
+    /// A minimal block gas limit, even if calibration suggests otherwise
     /// To make sure backpressure doesn't become too aggressive.
-    pub min_calibrated_txns_per_block: u64,
+    pub min_calibrated_block_gas_limit: u64,
     // We compute re-calibrated block size, and use that for `max_txns_in_block`.
     // But after execution pool and cost of overpacking being minimal - we should
     // change so that backpressure sets `max_txns_to_execute` instead
@@ -200,8 +200,8 @@ impl Default for ConsensusConfig {
                 percentile: 0.5,
                 target_block_time_ms: 200,
                 min_block_time_ms_to_activate: 100,
-                // allow at least two spreading group from reordering in a single block, to utilize paralellism
-                min_calibrated_txns_per_block: 8,
+                // TODO: appropriate value?
+                min_calibrated_block_gas_limit: 1000,
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {

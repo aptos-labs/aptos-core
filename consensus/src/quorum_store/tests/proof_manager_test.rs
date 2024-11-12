@@ -90,7 +90,8 @@ fn assert_payload_response(
             }
             assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
-        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
+        // TODO: add block_gas_limit check?
+        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute, _) => {
             assert_eq!(proofs.proofs.len(), expected.len());
             for proof in proofs.proofs {
                 assert!(expected.contains(&proof));
@@ -136,7 +137,7 @@ async fn test_max_txns_from_block_to_execute() {
     // convert payload to v2 format and assert
     let max_txns_from_block_to_execute = 10;
     assert_payload_response(
-        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute)),
+        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute), None),
         &vec![proof],
         Some(max_txns_from_block_to_execute),
     );

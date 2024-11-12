@@ -157,7 +157,7 @@ impl ExecutionPipeline {
             block,
             max_block_txns,
             metadata,
-            block_executor_onchain_config,
+            mut block_executor_onchain_config,
             parent_block_id,
             block_preparer,
             pre_commit_hook,
@@ -177,7 +177,9 @@ impl ExecutionPipeline {
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let (input_txns, max_txns_to_execute) = prepare_result.expect("input_txns must be Some.");
+        let (input_txns, max_txns_to_execute, block_gas_limit) =
+            prepare_result.expect("input_txns must be Some.");
+        block_executor_onchain_config.block_gas_limit_override = block_gas_limit;
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);

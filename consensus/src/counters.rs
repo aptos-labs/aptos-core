@@ -1218,6 +1218,16 @@ pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the override block gas limit.
+pub static BLOCK_GAS_LIMIT_OVERRIDE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "block_gas_limit_override",
+        "Histogram for the override block gas limit.",
+        exponential_buckets(/*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Count of the number of `DKG` validator transactions received while the feature is disabled.
 pub static UNEXPECTED_DKG_VTXN_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

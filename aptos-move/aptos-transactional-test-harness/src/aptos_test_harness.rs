@@ -14,9 +14,13 @@ use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEA
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    on_chain_config::BlockGasLimitType,
     state_store::{state_key::StateKey, table::TableHandle, TStateView},
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
@@ -517,8 +521,19 @@ impl<'a> AptosTestAdapter<'a> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
         let txn_provider = DefaultTxnProvider::new(sig_verified_block);
-        let mut outputs = AptosVMBlockExecutor::new()
-            .execute_block_no_limit(&txn_provider, &self.storage.clone())?;
+        let onchain_config = BlockExecutorConfigFromOnchain::new(
+            // TODO fetch values from state?
+            // Or should we just use execute_block_no_limit ?
+            BlockGasLimitType::Limit(30000),
+        );
+        let (mut outputs, _) = AptosVMBlockExecutor::new()
+            .execute_block(
+                &txn_provider,
+                &self.storage.clone(),
+                onchain_config,
+                TransactionSliceMetadata::unknown(),
+            )?
+            .into_inner();
 
         assert_eq!(outputs.len(), 1);
 

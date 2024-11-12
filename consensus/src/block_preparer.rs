@@ -49,7 +49,11 @@ impl BlockPreparer {
         &self,
         block: &Block,
         block_window: &OrderedBlockWindow,
-    ) -> ExecutorResult<(Vec<(Arc<Vec<SignedTransaction>>, u64)>, Option<u64>)> {
+    ) -> ExecutorResult<(
+        Vec<(Arc<Vec<SignedTransaction>>, u64)>,
+        Option<u64>,
+        Option<u64>,
+    )> {
         let mut txns = vec![];
         let pipelined_blocks = block_window.pipelined_blocks();
         let mut futures = FuturesOrdered::new();
@@ -64,13 +68,15 @@ impl BlockPreparer {
 
         let mut idx = 0;
         let mut max_txns_from_block_to_execute = None;
+        let mut block_gas_limit_override = None;
         loop {
             info!("get_transactions waiting for next: {}", idx);
             match futures.next().await {
-                Some(Ok((block_txns, max_txns))) => {
+                Some(Ok((block_txns, max_txns, gas_limit))) => {
                     txns.extend(block_txns);
                     // We only care about max_txns from the current block, which is the last future
                     max_txns_from_block_to_execute = max_txns;
+                    block_gas_limit_override = gas_limit;
                 },
                 Some(Err(e)) => {
                     return Err(e);
@@ -84,14 +90,18 @@ impl BlockPreparer {
             block.epoch(),
             block.round()
         );
-        Ok((txns, max_txns_from_block_to_execute))
+        Ok((
+            txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit_override,
+        ))
     }
 
     pub async fn prepare_block(
         &self,
         block: &Block,
         block_window: &OrderedBlockWindow,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
             use std::{thread, time::Duration};
@@ -116,9 +126,10 @@ impl BlockPreparer {
         let mut committed_transactions = HashSet::new();
 
         // TODO: don't materialize these?
-        let (mut batched_txns, max_txns_from_block_to_execute) = monitor!("get_transactions", {
-            self.get_transactions(block, block_window).await?
-        });
+        let (mut batched_txns, max_txns_from_block_to_execute, block_gas_limit_override) =
+            monitor!("get_transactions", {
+                self.get_transactions(block, block_window).await?
+            });
 
         let num_blocks_in_window = block_window.pipelined_blocks().len();
         for b in block_window
@@ -193,7 +204,14 @@ impl BlockPreparer {
                 num_txns_to_execute = num_txns_to_execute.min(max_txns_from_block_to_execute);
             }
             MAX_TXNS_FROM_BLOCK_TO_EXECUTE.observe(num_txns_to_execute as f64);
-            Ok((deduped_txns, max_txns_from_block_to_execute))
+            if let Some(block_gas_limit_override) = block_gas_limit_override {
+                counters::BLOCK_GAS_LIMIT_OVERRIDE.observe(block_gas_limit_override as f64);
+            }
+            Ok((
+                deduped_txns,
+                max_txns_from_block_to_execute,
+                block_gas_limit_override,
+            ))
         })
         .await
         .expect("Failed to spawn blocking task for transaction generation");
