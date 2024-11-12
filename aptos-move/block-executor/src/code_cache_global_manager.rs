@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{code_cache_global::GlobalModuleCache, explicit_sync_wrapper::ExplicitSyncWrapper};
-use aptos_types::state_store::StateView;
+use aptos_types::{
+    block_executor::config::BlockExecutorModuleCacheLocalConfig, state_store::StateView,
+};
 use aptos_vm_environment::environment::AptosEnvironment;
+use move_binary_format::errors::Location;
+use move_core_types::vm_status::{StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, VMStatus};
 use move_vm_runtime::WithRuntimeEnvironment;
 use move_vm_types::code::WithSize;
 use parking_lot::Mutex;
@@ -97,10 +101,8 @@ where
                     environment
                         .runtime_environment()
                         .flush_struct_name_and_info_caches();
-                    self.module_cache.flush_unsync();
-                } else {
-                    debug_assert!(self.module_cache.num_modules() == 0);
                 }
+                self.module_cache.flush_unsync();
             }
 
             *state = State::Ready(current);
@@ -115,6 +117,52 @@ where
             );
             false
         }
+    }
+
+    /// When in [State::Ready], runs different checks on cached modules and environment:
+    ///   1. If the environment is not initialized, or is different from the one in storage, it is
+    ///      re-initialized, and module caches are flushed.
+    ///   2. If too many struct names have been cached in re-indexing map in runtime environment,
+    ///      struct type caches and module caches are flushed.
+    ///   3. If module cache size is too large (in bytes), it is flushed.
+    /// The final environment and module caches are returned.
+    pub fn check_ready_and_get_caches(
+        &self,
+        state_view: &impl StateView,
+        config: &BlockExecutorModuleCacheLocalConfig,
+    ) -> Result<(AptosEnvironment, Arc<GlobalModuleCache<K, DC, VC, E>>), VMStatus> {
+        let state = self.state.lock();
+        if !matches!(state.deref(), State::Ready(_)) {
+            let msg = format!(
+                "Expected ready state to check caches, got {:?}",
+                state.deref()
+            );
+            return Err(VMStatus::error(
+                UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                Some(msg),
+            ));
+        }
+
+        let environment = self.get_or_initialize_environment(state_view);
+        let module_cache = self.module_cache.clone();
+
+        // Check 1: struct re-indexing map is not too large. If it is, we flush the cache. Also, we
+        // need to flush modules because they store indices into re-indexing map.
+        let runtime_environment = environment.runtime_environment();
+        let struct_name_index_map_size = runtime_environment
+            .struct_name_index_map_size()
+            .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
+        if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
+            module_cache.flush_unsync();
+            runtime_environment.flush_struct_name_and_info_caches();
+        }
+
+        // Check 2: If the module cache is too big, flush it.
+        if module_cache.size_in_bytes() > config.max_module_cache_size_in_bytes {
+            module_cache.flush_unsync();
+        }
+
+        Ok((environment, module_cache))
     }
 
     /// If state is [State::Ready], changes it to [State::Executing] with the same value, returning
@@ -147,10 +195,8 @@ where
 
     /// Returns the cached global environment if it already exists, and matches the one in storage.
     /// If it does not exist, or does not match, the new environment is initialized from the given
-    /// state, cached, and returned.
-    pub fn get_or_initialize_environment(&self, state_view: &impl StateView) -> AptosEnvironment {
-        let _lock = self.state.lock();
-
+    /// state, cached, and returned. Should be called when in [State::Ready] state, under lock.
+    fn get_or_initialize_environment(&self, state_view: &impl StateView) -> AptosEnvironment {
         let new_environment =
             AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
 
@@ -159,7 +205,7 @@ where
 
         let environment_requires_update = existing_environment
             .as_ref()
-            .map_or(true, |environment| environment == &new_environment);
+            .map_or(true, |environment| environment != &new_environment);
         if environment_requires_update {
             *existing_environment = Some(new_environment);
 
@@ -172,11 +218,6 @@ where
             .clone()
             .expect("Environment must be set")
     }
-
-    /// Returns the global module cache.
-    pub fn module_cache(&self) -> Arc<GlobalModuleCache<K, DC, VC, E>> {
-        self.module_cache.clone()
-    }
 }
 
 #[cfg(test)]
@@ -186,8 +227,13 @@ mod test {
         on_chain_config::{FeatureFlag, Features, OnChainConfig},
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
-    use move_vm_types::code::{
-        mock_verified_code, MockDeserializedCode, MockExtension, MockVerifiedCode,
+    use claims::assert_ok;
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    };
+    use move_vm_types::{
+        code::{mock_verified_code, MockDeserializedCode, MockExtension, MockVerifiedCode},
+        loaded_data::runtime_types::StructIdentifier,
     };
     use std::{collections::HashMap, thread, thread::JoinHandle};
     use test_case::test_case;
@@ -209,7 +255,6 @@ mod test {
 
         assert!(!module_cache_manager.mark_executing());
         assert!(!module_cache_manager.mark_done());
-
         assert!(module_cache_manager.mark_ready(previous.as_ref(), Some(77)));
 
         // Only in matching case the module cache is not flushed.
@@ -224,10 +269,104 @@ mod test {
     }
 
     #[test]
+    fn test_check_ready() {
+        let state_view = MockStateView::empty();
+        let config = BlockExecutorModuleCacheLocalConfig {
+            prefetch_framework_code: false,
+            max_module_cache_size_in_bytes: 8,
+            max_struct_name_index_map_num_entries: 2,
+        };
+
+        let module_cache_manager = ModuleCacheManager::<
+            i32,
+            i32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            MockExtension,
+        >::new();
+
+        // Set up the state and the environment.
+        *module_cache_manager.state.lock() = State::Ready(None);
+        let environment = module_cache_manager.get_or_initialize_environment(&state_view);
+
+        module_cache_manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(16)));
+        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+
+        let runtime_environment = environment.runtime_environment();
+        let dummy_struct_name = StructIdentifier {
+            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+            name: Identifier::new("Bar").unwrap(),
+        };
+        assert!(runtime_environment
+            .struct_name_to_idx_for_test(dummy_struct_name)
+            .is_ok());
+        assert_eq!(
+            assert_ok!(runtime_environment.struct_name_index_map_size()),
+            1
+        );
+
+        // Module cache size in bytes is too large, should be flushed (but not struct types).
+        assert!(module_cache_manager
+            .check_ready_and_get_caches(&state_view, &config)
+            .is_ok());
+        assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(
+            assert_ok!(runtime_environment.struct_name_index_map_size()),
+            1
+        );
+
+        module_cache_manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(4)));
+
+        // This time size is less than the one specified in config. No flushing.
+        assert!(module_cache_manager
+            .check_ready_and_get_caches(&state_view, &config)
+            .is_ok());
+        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(
+            assert_ok!(runtime_environment.struct_name_index_map_size()),
+            1
+        );
+
+        let dummy_struct_names = [
+            StructIdentifier {
+                module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+                name: Identifier::new("Foo").unwrap(),
+            },
+            StructIdentifier {
+                module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+                name: Identifier::new("Baz").unwrap(),
+            },
+        ];
+        for dummy_struct_name in dummy_struct_names {
+            assert!(runtime_environment
+                .struct_name_to_idx_for_test(dummy_struct_name)
+                .is_ok());
+        }
+        assert_eq!(
+            assert_ok!(runtime_environment.struct_name_index_map_size()),
+            3
+        );
+
+        // Too many struct names cached.
+        assert!(module_cache_manager
+            .check_ready_and_get_caches(&state_view, &config)
+            .is_ok());
+        assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(
+            assert_ok!(runtime_environment.struct_name_index_map_size()),
+            0
+        );
+    }
+
+    #[test]
     fn test_mark_executing() {
         let module_cache_manager = ModuleCacheManager::<
-            _,
-            u32,
+            i32,
+            i32,
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
@@ -246,8 +385,8 @@ mod test {
     #[test]
     fn test_mark_done() {
         let module_cache_manager = ModuleCacheManager::<
-            _,
-            u32,
+            i32,
+            i32,
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
@@ -283,8 +422,8 @@ mod test {
     #[test]
     fn test_mark_ready_concurrent() {
         let global_cache_manager = Arc::new(ModuleCacheManager::<
-            _,
-            u32,
+            i32,
+            i32,
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
@@ -304,8 +443,8 @@ mod test {
     #[test]
     fn test_mark_executing_concurrent() {
         let global_cache_manager = Arc::new(ModuleCacheManager::<
-            _,
-            u32,
+            i32,
+            i32,
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
@@ -326,8 +465,8 @@ mod test {
     #[test]
     fn test_mark_done_concurrent() {
         let global_cache_manager = Arc::new(ModuleCacheManager::<
-            _,
-            u32,
+            i32,
+            i32,
             MockDeserializedCode,
             MockVerifiedCode,
             MockExtension,
@@ -368,7 +507,14 @@ mod test {
 
     #[test]
     fn test_get_or_initialize_environment() {
-        let module_cache_manager = ModuleCacheManager::<i32, _, _, _, _>::new();
+        let module_cache_manager = ModuleCacheManager::<
+            i32,
+            i32,
+            MockDeserializedCode,
+            MockVerifiedCode,
+            MockExtension,
+        >::new();
+        *module_cache_manager.state.lock() = State::Ready(None);
 
         module_cache_manager
             .module_cache

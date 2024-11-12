@@ -6,6 +6,7 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{DepositEvent, WithdrawEvent},
@@ -359,6 +360,8 @@ impl VMBlockExecutor for NativeExecutor {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _parent_block: Option<&HashValue>,
+        _current_block: Option<HashValue>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let transaction_outputs = NATIVE_EXECUTOR_POOL
             .install(|| {

@@ -49,7 +49,8 @@ impl DoGetExecutionOutput {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         let out = match transactions {
             ExecutableTransactions::Unsharded(txns) => {
@@ -58,14 +59,15 @@ impl DoGetExecutionOutput {
                     txns,
                     state_view,
                     onchain_config,
-                    append_state_checkpoint_to_block,
+                    parent_block,
+                    current_block,
                 )?
             },
             ExecutableTransactions::Sharded(txns) => Self::by_transaction_execution_sharded::<V>(
                 txns,
                 state_view,
                 onchain_config,
-                append_state_checkpoint_to_block,
+                current_block,
             )?,
         };
 
@@ -89,10 +91,17 @@ impl DoGetExecutionOutput {
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
-        let block_output =
-            Self::execute_block::<V>(executor, &transactions, &state_view, onchain_config)?;
+        let block_output = Self::execute_block::<V>(
+            executor,
+            &transactions,
+            &state_view,
+            onchain_config,
+            parent_block,
+            current_block,
+        )?;
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
         Parser::parse(
@@ -101,7 +110,7 @@ impl DoGetExecutionOutput {
             transaction_outputs,
             state_view.into_state_cache(),
             block_end_info,
-            append_state_checkpoint_to_block,
+            current_block,
         )
     }
 
@@ -202,9 +211,17 @@ impl DoGetExecutionOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<BlockOutput<TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
-        Ok(executor.execute_block(transactions, state_view, onchain_config)?)
+        Ok(executor.execute_block(
+            transactions,
+            state_view,
+            onchain_config,
+            parent_block,
+            current_block,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -217,6 +234,8 @@ impl DoGetExecutionOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
@@ -226,9 +245,13 @@ impl DoGetExecutionOutput {
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => {
-                executor.execute_block(transactions, state_view, onchain_config)?
-            },
+            StateViewId::Miscellaneous => executor.execute_block(
+                transactions,
+                state_view,
+                onchain_config,
+                parent_block,
+                current_block,
+            )?,
             _ => BlockOutput::new(
                 transactions
                     .iter()

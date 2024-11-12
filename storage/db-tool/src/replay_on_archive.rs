@@ -270,12 +270,7 @@ impl Verifier {
         expected_epoch_events: &Vec<Vec<ContractEvent>>,
         expected_epoch_writesets: &Vec<WriteSet>,
     ) -> Result<Vec<Error>> {
-        let executor = AptosVMBlockExecutor::new();
-        if let Some(module_cache_manager) = executor.module_cache_manager() {
-            module_cache_manager.mark_ready(None, None);
-        }
-
-        let executed_outputs = executor.execute_block_no_limit(
+        let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             cur_txns
                 .iter()
                 .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
@@ -284,6 +279,8 @@ impl Verifier {
             &self
                 .arc_db
                 .state_view_at_version(start_version.checked_sub(1))?,
+            None,
+            None,
         )?;
 
         let mut failed_txns = Vec::new();

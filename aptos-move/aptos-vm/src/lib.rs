@@ -126,7 +126,6 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
-use aptos_block_executor::code_cache_global_manager::ModuleCacheManager;
 use aptos_crypto::HashValue;
 use aptos_types::{
     block_executor::{
@@ -137,13 +136,9 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         SignedTransaction, TransactionOutput, VMValidatorResult,
     },
-    vm::modules::AptosModuleExtension,
     vm_status::VMStatus,
 };
 use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
-use move_binary_format::CompiledModule;
-use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::Module;
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
 
@@ -166,22 +161,14 @@ pub trait VMBlockExecutor: Send + Sync {
     /// an old one.
     fn new() -> Self;
 
-    /// Returns the cache manager responsible for keeping module caches in sync. By default, is
-    /// [None].
-    fn module_cache_manager(
-        &self,
-    ) -> Option<
-        &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
-    > {
-        None
-    }
-
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions and returns output for each one of them, without applying
@@ -190,11 +177,15 @@ pub trait VMBlockExecutor: Send + Sync {
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         self.execute_block(
             transactions,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            parent_block,
+            current_block,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
     }

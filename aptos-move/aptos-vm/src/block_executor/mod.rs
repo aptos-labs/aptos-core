@@ -45,10 +45,7 @@ use aptos_vm_types::{
     output::VMOutput,
     resolver::ResourceGroupSize,
 };
-use move_binary_format::{
-    errors::{Location, VMError},
-    CompiledModule,
-};
+use move_binary_format::{errors::VMError, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -56,7 +53,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, ModuleStorage};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
@@ -420,6 +417,8 @@ impl BlockAptosVM {
             AptosModuleExtension,
         >,
         config: BlockExecutorConfig,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -433,42 +432,19 @@ impl BlockAptosVM {
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
-        let (environment, module_cache) = if module_cache_manager.mark_executing() {
-            let environment = module_cache_manager.get_or_initialize_environment(state_view);
-            let module_cache = module_cache_manager.module_cache();
-            (environment, module_cache)
-        } else {
-            // Either we do not have global caches , in which case we can create new ones, or
-            // something went wrong, and we were not able to mark the state as executing. In
-            // this case, fallback to empty caches. Note that the alert should have been raised
-            // during marking.
-            let environment =
-                AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
-            let module_cache = Arc::new(GlobalModuleCache::empty());
-            (environment, module_cache)
-        };
-
-        // We should be checking different module cache configurations here.
-        let module_cache_config = &config.local.module_cache_config;
-
-        // Check 1: struct re-indexing map is not too large. If it is, we flush the cache. Also, we
-        // need to flush modules because they store indices into re-indexing map.
-        let runtime_environment = environment.runtime_environment();
-        let struct_name_index_map_size = runtime_environment
-            .struct_name_index_map_size()
-            .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
-        if struct_name_index_map_size > module_cache_config.max_struct_name_index_map_num_entries {
-            module_cache.flush_unsync();
-            runtime_environment.flush_struct_name_and_info_caches();
+        if !module_cache_manager.mark_ready(parent_block, current_block) {
+            return Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                Some("Unable to mark module caches for block execution as ready".to_string()),
+            ));
         }
-
-        // Check 2: If the module cache is too big, flush it.
-        if module_cache.size_in_bytes() > module_cache_config.max_module_cache_size_in_bytes {
-            module_cache.flush_unsync();
-        }
+        let (environment, module_cache) = module_cache_manager
+            .check_ready_and_get_caches(state_view, &config.local.module_cache_config)?;
 
         // Finally, to avoid cold starts, fetch the framework code prior to block execution.
-        if module_cache.num_modules() == 0 && module_cache_config.prefetch_framework_code {
+        if module_cache.num_modules() == 0
+            && config.local.module_cache_config.prefetch_framework_code
+        {
             let code_storage = state_view.as_aptos_code_storage(environment.clone());
             prefetch_aptos_framework(code_storage, &module_cache).map_err(|err| {
                 alert!("Failed to load Aptos framework to module cache: {:?}", err);
@@ -489,6 +465,12 @@ impl BlockAptosVM {
             transaction_commit_listener,
         );
 
+        if !module_cache_manager.mark_executing() {
+            return Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                Some("Unable to mark block execution start".to_string()),
+            ));
+        }
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         if !module_cache_manager.mark_done() {
             return Err(VMStatus::error(
@@ -542,6 +524,8 @@ impl BlockAptosVM {
             AptosModuleExtension,
         >,
         config: BlockExecutorConfig,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L>(
@@ -550,6 +534,8 @@ impl BlockAptosVM {
             state_view,
             module_cache_manager,
             config,
+            parent_block,
+            current_block,
             transaction_commit_listener,
         )
     }

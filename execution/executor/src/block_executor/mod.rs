@@ -198,77 +198,64 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
-        let (execution_output, state_checkpoint_output) = if parent_block_id != committed_block_id
-            && parent_output.has_reconfiguration()
-        {
-            // ignore reconfiguration suffix, even if the block is non-empty
-            info!(
-                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                "reconfig_descendant_block_received"
-            );
-            (
-                parent_output.execution_output.reconfig_suffix(),
-                parent_output
-                    .expect_state_checkpoint_output()
-                    .reconfig_suffix(),
-            )
-        } else {
-            let state_view = {
-                let _timer = OTHER_TIMERS.timer_with(&["verified_state_view"]);
-
-                CachedStateView::new(
-                    StateViewId::BlockExecution { block_id },
-                    Arc::clone(&self.db.reader),
-                    parent_output.execution_output.next_version(),
-                    parent_output.expect_result_state().current.clone(),
-                    Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-                )?
-            };
-
-            let execution_output = {
-                let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
-                fail_point!("executor::block_executor_execute_block", |_| {
-                    Err(ExecutorError::from(anyhow::anyhow!(
-                        "Injected error in block_executor_execute_block"
-                    )))
-                });
-
-                // In case block executor has a cache manager, we need to mark it as ready for
-                // execution. If for some reason this fails, return an error.
-                if let Some(module_cache_manager) = self.block_executor.module_cache_manager() {
-                    // TODO(loader_v2):
-                    //   Refactor to be able to move this into AptosVM block executor. This will
-                    //   also allow us to remove all ready markings in other places.
-                    if !module_cache_manager.mark_ready(Some(&parent_block_id), Some(block_id)) {
-                        return Err(ExecutorError::internal_err(
-                            "Unable to mark module cache manager as ready",
-                        ));
-                    }
-                }
-
-                DoGetExecutionOutput::by_transaction_execution(
-                    &self.block_executor,
-                    transactions,
-                    state_view,
-                    onchain_config.clone(),
-                    Some(block_id),
-                )?
-            };
-
-            let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
-
-            let state_checkpoint_output = THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                fail_point!("executor::block_state_checkpoint", |_| {
-                    Err(anyhow::anyhow!("Injected error in block state checkpoint."))
-                });
-                DoStateCheckpoint::run(
-                    &execution_output,
-                    parent_output.expect_result_state(),
-                    Option::<Vec<_>>::None,
+        let (execution_output, state_checkpoint_output) =
+            if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+                // ignore reconfiguration suffix, even if the block is non-empty
+                info!(
+                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                    "reconfig_descendant_block_received"
+                );
+                (
+                    parent_output.execution_output.reconfig_suffix(),
+                    parent_output
+                        .expect_state_checkpoint_output()
+                        .reconfig_suffix(),
                 )
-            })?;
-            (execution_output, state_checkpoint_output)
-        };
+            } else {
+                let state_view = {
+                    let _timer = OTHER_TIMERS.timer_with(&["verified_state_view"]);
+
+                    CachedStateView::new(
+                        StateViewId::BlockExecution { block_id },
+                        Arc::clone(&self.db.reader),
+                        parent_output.execution_output.next_version(),
+                        parent_output.expect_result_state().current.clone(),
+                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                    )?
+                };
+
+                let execution_output = {
+                    let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+                    fail_point!("executor::block_executor_execute_block", |_| {
+                        Err(ExecutorError::from(anyhow::anyhow!(
+                            "Injected error in block_executor_execute_block"
+                        )))
+                    });
+
+                    DoGetExecutionOutput::by_transaction_execution(
+                        &self.block_executor,
+                        transactions,
+                        state_view,
+                        onchain_config.clone(),
+                        Some(&parent_block_id),
+                        Some(block_id),
+                    )?
+                };
+
+                let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
+
+                let state_checkpoint_output = THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    fail_point!("executor::block_state_checkpoint", |_| {
+                        Err(anyhow::anyhow!("Injected error in block state checkpoint."))
+                    });
+                    DoStateCheckpoint::run(
+                        &execution_output,
+                        parent_output.expect_result_state(),
+                        Option::<Vec<_>>::None,
+                    )
+                })?;
+                (execution_output, state_checkpoint_output)
+            };
         let output = PartialStateComputeResult::new(execution_output);
         output.set_state_checkpoint_output(state_checkpoint_output);
 

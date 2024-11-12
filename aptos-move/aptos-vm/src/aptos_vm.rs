@@ -2793,19 +2793,13 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         }
     }
 
-    fn module_cache_manager(
-        &self,
-    ) -> Option<
-        &ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
-    > {
-        Some(&self.module_cache_manager)
-    }
-
     fn execute_block(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
+        parent_block: Option<&HashValue>,
+        current_block: Option<HashValue>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -2837,6 +2831,8 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
                 },
                 onchain: onchain_config,
             },
+            parent_block,
+            current_block,
             None,
         );
         if ret.is_ok() {
