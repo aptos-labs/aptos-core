@@ -305,7 +305,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = if module_storage.is_enabled() {
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .fetch_existing_module_metadata(&struct_tag.module_id())
                         .map_err(|e| e.to_partial())?;
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 } else {

@@ -13,10 +13,7 @@ use crate::{
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, CompiledModule};
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    metadata::Metadata,
-};
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::code::{
     ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode, ModuleCodeBuilder,
     UnsyncModuleCache, WithBytes, WithHash,
@@ -130,10 +127,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let bytes = match self
-            .base_storage
-            .fetch_module_bytes(key.address(), key.name())?
-        {
+        let bytes = match self.base_storage.fetch_module_bytes(key)? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
@@ -273,22 +267,21 @@ pub(crate) mod test {
     fn test_module_does_not_exist() {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = InMemoryStorage::new().into_unsync_module_storage(runtime_environment);
+        let id = ModuleId::new(AccountAddress::ZERO, ident_str!("a").to_owned());
 
-        let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
+        let result = module_storage.check_module_exists(&id);
         assert!(!assert_ok!(result));
 
-        let result =
-            module_storage.fetch_module_size_in_bytes(&AccountAddress::ZERO, ident_str!("a"));
+        let result = module_storage.fetch_module_size_in_bytes(&id);
         assert_none!(assert_ok!(result));
 
-        let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
+        let result = module_storage.fetch_module_metadata(&id);
         assert_none!(assert_ok!(result));
 
-        let result =
-            module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a"));
+        let result = module_storage.fetch_deserialized_module(&id);
         assert_none!(assert_ok!(result));
 
-        let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
+        let result = module_storage.fetch_verified_module(&id);
         assert_none!(assert_ok!(result));
     }
 
@@ -301,9 +294,7 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        assert!(assert_ok!(
-            module_storage.check_module_exists(id.address(), id.name())
-        ));
+        assert!(assert_ok!(module_storage.check_module_exists(&id)));
         module_storage.assert_cached_state(vec![&id], vec![]);
     }
 
@@ -323,12 +314,12 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        let result = module_storage.fetch_module_metadata(a_id.address(), a_id.name());
+        let result = module_storage.fetch_module_metadata(&a_id);
         let expected = make_module("a", vec!["b", "c"], vec![]).0.metadata;
         assert_eq!(assert_some!(assert_ok!(result)), expected);
         module_storage.assert_cached_state(vec![&a_id], vec![]);
 
-        let result = module_storage.fetch_deserialized_module(c_id.address(), c_id.name());
+        let result = module_storage.fetch_deserialized_module(&c_id);
         let expected = make_module("c", vec!["d", "e"], vec![]).0;
         assert_eq!(assert_some!(assert_ok!(result)).as_ref(), &expected);
         module_storage.assert_cached_state(vec![&a_id, &c_id], vec![]);
@@ -353,13 +344,13 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        assert_ok!(module_storage.fetch_verified_module(c_id.address(), c_id.name()));
+        assert_ok!(module_storage.fetch_verified_module(&c_id));
         module_storage.assert_cached_state(vec![], vec![&c_id, &d_id, &e_id]);
 
-        assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+        assert_ok!(module_storage.fetch_verified_module(&a_id));
         module_storage.assert_cached_state(vec![], vec![&a_id, &b_id, &c_id, &d_id, &e_id]);
 
-        assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+        assert_ok!(module_storage.fetch_verified_module(&a_id));
     }
 
     #[test]
@@ -385,14 +376,14 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        assert_ok!(module_storage.fetch_deserialized_module(a_id.address(), a_id.name()));
-        assert_ok!(module_storage.fetch_deserialized_module(c_id.address(), c_id.name()));
+        assert_ok!(module_storage.fetch_deserialized_module(&a_id));
+        assert_ok!(module_storage.fetch_deserialized_module(&c_id));
         module_storage.assert_cached_state(vec![&a_id, &c_id], vec![]);
 
-        assert_ok!(module_storage.fetch_verified_module(d_id.address(), d_id.name()));
+        assert_ok!(module_storage.fetch_verified_module(&d_id));
         module_storage.assert_cached_state(vec![&a_id, &c_id], vec![&d_id, &e_id, &f_id, &g_id]);
 
-        assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+        assert_ok!(module_storage.fetch_verified_module(&a_id));
         module_storage.assert_cached_state(vec![], vec![
             &a_id, &b_id, &c_id, &d_id, &e_id, &f_id, &g_id,
         ]);
@@ -411,7 +402,7 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        let result = module_storage.fetch_verified_module(c_id.address(), c_id.name());
+        let result = module_storage.fetch_verified_module(&c_id);
         assert_eq!(
             assert_err!(result).major_status(),
             StatusCode::CYCLIC_MODULE_DEPENDENCY
@@ -431,7 +422,7 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        let result = module_storage.fetch_verified_module(c_id.address(), c_id.name());
+        let result = module_storage.fetch_verified_module(&c_id);
         assert_ok!(result);
 
         // Since `c` has no dependencies, only it gets deserialized and verified.
@@ -454,7 +445,7 @@ pub(crate) mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
 
-        assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+        assert_ok!(module_storage.fetch_verified_module(&a_id));
         module_storage.assert_cached_state(vec![], vec![&a_id, &b_id, &c_id]);
     }
 }

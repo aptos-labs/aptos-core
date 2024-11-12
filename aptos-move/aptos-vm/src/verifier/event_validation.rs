@@ -126,7 +126,7 @@ pub(crate) fn extract_event_metadata_from_module(
     if module_storage.is_enabled() {
         // TODO(loader_v2): We can optimize metadata calls as well.
         let metadata = module_storage
-            .fetch_deserialized_module(module_id.address(), module_id.name())?
+            .fetch_deserialized_module(module_id)?
             .map(|module| aptos_framework::get_metadata_from_compiled_module(module.as_ref()));
         if let Some(Some(metadata)) = metadata {
             extract_event_metadata(&metadata)

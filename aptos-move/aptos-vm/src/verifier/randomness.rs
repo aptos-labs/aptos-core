@@ -15,10 +15,7 @@ pub(crate) fn get_randomness_annotation(
 ) -> VMResult<Option<RandomnessAnnotation>> {
     let module = if module_storage.is_enabled() {
         // TODO(loader_v2): Enhance this further by querying RuntimeModuleMetadataV1 directly.
-        module_storage.fetch_existing_deserialized_module(
-            entry_fn.module().address(),
-            entry_fn.module().name(),
-        )?
+        module_storage.fetch_existing_deserialized_module(entry_fn.module())?
     } else {
         #[allow(deprecated)]
         session

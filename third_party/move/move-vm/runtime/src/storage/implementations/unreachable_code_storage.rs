@@ -6,7 +6,7 @@ use crate::{
 };
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use std::sync::Arc;
 
 /// Implementation of code storage (for modules and scripts) traits, to be used in case VM uses
@@ -20,51 +20,30 @@ impl WithRuntimeEnvironment for UnreachableCodeStorage {
 }
 
 impl ModuleStorage for UnreachableCodeStorage {
-    fn check_module_exists(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<bool> {
+    fn check_module_exists(&self, _module_id: &ModuleId) -> VMResult<bool> {
         unreachable!()
     }
 
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
+    fn fetch_module_bytes(&self, _module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         unreachable!()
     }
 
-    fn fetch_module_size_in_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
+    fn fetch_module_size_in_bytes(&self, _module_id: &ModuleId) -> VMResult<Option<usize>> {
         unreachable!()
     }
 
-    fn fetch_module_metadata(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
+    fn fetch_module_metadata(&self, _module_id: &ModuleId) -> VMResult<Option<Vec<Metadata>>> {
         unreachable!()
     }
 
     fn fetch_deserialized_module(
         &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
+        _module_id: &ModuleId,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
         unreachable!()
     }
 
-    fn fetch_verified_module(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
+    fn fetch_verified_module(&self, _module_id: &ModuleId) -> VMResult<Option<Arc<Module>>> {
         unreachable!()
     }
 }

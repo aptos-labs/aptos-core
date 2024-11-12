@@ -198,7 +198,7 @@ fn fetch_module(
     module_id: &ModuleId,
 ) -> VMResult<Arc<CompiledModule>> {
     if module_storage.is_enabled() {
-        module_storage.fetch_existing_deserialized_module(module_id.address(), module_id.name())
+        module_storage.fetch_existing_deserialized_module(module_id)
     } else {
         #[allow(deprecated)]
         let bytes = session.fetch_module_from_data_store(module_id)?;

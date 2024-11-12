@@ -15,7 +15,7 @@ use crate::{
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache,
 };
@@ -125,7 +125,9 @@ mod test {
     use move_binary_format::{
         file_format::empty_script_with_dependencies, file_format_common::VERSION_DEFAULT,
     };
-    use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    };
     use move_vm_test_utils::InMemoryStorage;
     use move_vm_types::sha3_256;
 

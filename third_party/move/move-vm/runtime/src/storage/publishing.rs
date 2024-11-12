@@ -14,11 +14,8 @@ use move_binary_format::{
     normalized, CompiledModule, IndexKind,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    metadata::Metadata,
-    vm_status::StatusCode,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    metadata::Metadata, vm_status::StatusCode,
 };
 use move_vm_types::{code::ModuleBytesStorage, module_linker_error};
 use std::{
@@ -50,17 +47,13 @@ struct StagingModuleBytesStorage<'a, M> {
 }
 
 impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.staged_module_bytes.get(address) {
-            if let Some(bytes) = account_storage.get(module_name) {
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>> {
+        if let Some(account_storage) = self.staged_module_bytes.get(module_id.address()) {
+            if let Some(bytes) = account_storage.get(module_id.name()) {
                 return Ok(Some(bytes.clone()));
             }
         }
-        self.module_storage.fetch_module_bytes(address, module_name)
+        self.module_storage.fetch_module_bytes(module_id)
     }
 }
 
@@ -127,7 +120,6 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                         .finish(Location::Undefined)
                     })?;
             let addr = compiled_module.self_addr();
-            let name = compiled_module.self_name();
 
             // Make sure all modules' addresses match the sender. The self address is
             // where the module will actually be published. If we did not check this,
@@ -150,7 +142,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             // with the old module.
             if compatibility.need_check_compat() {
                 if let Some(old_module_ref) =
-                    existing_module_storage.fetch_deserialized_module(addr, name)?
+                    existing_module_storage.fetch_deserialized_module(&compiled_module.self_id())?
                 {
                     let old_module = old_module_ref.as_ref();
                     if runtime_environment.vm_config().use_compatibility_checker_v2 {
@@ -219,7 +211,8 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         {
             // Verify the module and its dependencies, and that they do not form a cycle.
             let module = staged_module_storage
-                .fetch_verified_module(addr, name)?
+                // FIXME: Can optimize this
+                .fetch_verified_module(&ModuleId::new(*addr, name.to_owned()))?
                 .ok_or_else(|| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
@@ -231,7 +224,9 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
 
             // Also verify that all friends exist.
             for (friend_addr, friend_name) in module.immediate_friends_iter() {
-                if !staged_module_storage.check_module_exists(friend_addr, friend_name)? {
+                if !staged_module_storage
+                    .check_module_exists(&ModuleId::new(*friend_addr, friend_name.to_owned()))?
+                {
                     return Err(module_linker_error!(friend_addr, friend_name));
                 }
             }

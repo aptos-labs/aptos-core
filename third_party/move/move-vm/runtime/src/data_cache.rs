@@ -252,10 +252,7 @@ impl<'r> TransactionDataCache<'r> {
                 },
                 Loader::V2(_) => {
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(
-                            &ty_tag.address,
-                            ty_tag.module.as_ident_str(),
-                        )
+                        .fetch_existing_module_metadata(&ty_tag.module_id())
                         .map_err(|e| e.to_partial())?;
 
                     // If we need to process aggregator lifting, we pass type layout to remote.

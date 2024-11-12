@@ -27,6 +27,10 @@ impl<V: TransactionWrite> ModuleWrite<V> {
         Self { id, write_op }
     }
 
+    pub fn module_id(&self) -> &ModuleId {
+        &self.id
+    }
+
     /// Returns the address of the module written.
     pub fn module_address(&self) -> &AccountAddress {
         self.id.address()
@@ -113,7 +117,7 @@ impl ModuleWriteSet {
         self.writes.iter_mut().map(move |(key, write)| {
             let prev_size = if module_storage.is_enabled() {
                 module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                    .fetch_module_size_in_bytes(write.module_id())
                     .map_err(|e| e.to_partial())?
                     .unwrap_or(0) as u64
             } else {

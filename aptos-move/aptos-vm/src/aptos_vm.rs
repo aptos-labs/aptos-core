@@ -1567,7 +1567,7 @@ impl AptosVM {
 
                 let size_if_module_exists = if self.features().is_loader_v2_enabled() {
                     module_storage
-                        .fetch_module_size_in_bytes(addr, name)?
+                        .fetch_module_size_in_bytes(&module.self_id())?
                         .map(|v| v as u64)
                 } else {
                     resolver
@@ -2226,7 +2226,7 @@ impl AptosVM {
             if self.features().is_loader_v2_enabled() {
                 // It is sufficient to simply get the size in order to enforce read-before-write.
                 module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                    .fetch_module_size_in_bytes(write.module_id())
                     .map_err(|e| e.to_partial())?;
             } else {
                 executor_view.get_module_state_value(state_key)?;
@@ -3074,7 +3074,7 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     module_storage: &impl AptosModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
     if module_storage.is_enabled() {
-        module_storage.fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+        module_storage.fetch_existing_module_metadata(&struct_tag.module_id())
     } else {
         Ok(resolver.get_module_metadata(&struct_tag.module_id()))
     }

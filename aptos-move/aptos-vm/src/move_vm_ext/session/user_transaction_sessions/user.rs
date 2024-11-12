@@ -97,7 +97,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
         let init_func_name = ident_str!("init_module");
         for module in modules {
             // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            if module_storage.check_module_exists(&module.self_id())? {
                 continue;
             }
 

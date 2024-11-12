@@ -224,8 +224,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             Loader::V2(loader) => loader
                 .load_function_without_ty_args(
                     self.resolver.module_storage(),
-                    module_id.address(),
-                    module_id.name(),
+                    module_id,
                     function_name,
                 )
                 // TODO(loader_v2):

@@ -234,9 +234,7 @@ pub fn get_vm_metadata(
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if module_storage.is_enabled() {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
+        let metadata = module_storage.fetch_module_metadata(module_id).ok()??;
         get_metadata(&metadata)
     } else {
         #[allow(deprecated)]
@@ -251,9 +249,7 @@ pub fn get_vm_metadata_v0(
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
     if module_storage.is_enabled() {
-        let metadata = module_storage
-            .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()??;
+        let metadata = module_storage.fetch_module_metadata(module_id).ok()??;
         get_metadata_v0(&metadata)
     } else {
         #[allow(deprecated)]

@@ -89,14 +89,14 @@ impl LoaderV2 {
         push_next_ids_to_visit(&mut stack, visited, ids);
 
         while let Some((addr, name)) = stack.pop() {
+            let module_id = ModuleId::new(*addr, name.to_owned());
             let size = module_storage
-                .fetch_module_size_in_bytes(addr, name)?
+                // FIXME: allocate?
+                .fetch_module_size_in_bytes(&module_id)?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
             gas_meter
                 .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
+                .map_err(|err| err.finish(Location::Module(module_id.clone())))?;
 
             // Extend the lifetime of the module to the remainder of the function body
             // by storing it in an arena.
@@ -104,7 +104,7 @@ impl LoaderV2 {
             // This is needed because we need to store references derived from it in the
             // work list.
             let compiled_module = module_storage
-                .fetch_deserialized_module(addr, name)?
+                .fetch_deserialized_module(&module_id)?
                 .ok_or_else(|| module_linker_error!(addr, name))?;
             let compiled_module = referenced_modules.alloc(compiled_module);
 
@@ -159,13 +159,12 @@ impl LoaderV2 {
     pub(crate) fn load_module(
         &self,
         module_storage: &dyn ModuleStorage,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Arc<Module>> {
         module_storage
-            .fetch_verified_module(address, module_name)
+            .fetch_verified_module(module_id)
             .map_err(expect_no_verification_errors)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 
     /// Returns the function definition corresponding to the specified name, as well as the module
@@ -173,11 +172,10 @@ impl LoaderV2 {
     pub(crate) fn load_function_without_ty_args(
         &self,
         module_storage: &dyn ModuleStorage,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let module = self.load_module(module_storage, address, module_name)?;
+        let module = self.load_module(module_storage, module_id)?;
         let function = module
             .function_map
             .get(function_name)
@@ -186,7 +184,9 @@ impl LoaderV2 {
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                     .with_message(format!(
                         "Function {}::{}::{} does not exist",
-                        address, module_name, function_name
+                        module_id.address(),
+                        module_id.name(),
+                        function_name
                     ))
                     .finish(Location::Undefined)
             })?
@@ -199,12 +199,11 @@ impl LoaderV2 {
     pub(crate) fn load_struct_ty(
         &self,
         module_storage: &dyn ModuleStorage,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
         struct_name: &IdentStr,
     ) -> PartialVMResult<Arc<StructType>> {
         let module = self
-            .load_module(module_storage, address, module_name)
+            .load_module(module_storage, module_id)
             .map_err(|e| e.to_partial())?;
         Ok(module
             .struct_map
@@ -213,7 +212,9 @@ impl LoaderV2 {
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
                     "Struct {}::{}::{} does not exist",
-                    address, module_name, struct_name
+                    module_id.address(),
+                    module_id.name(),
+                    struct_name
                 ))
             })?
             .definition_struct_type
@@ -233,13 +234,8 @@ impl LoaderV2 {
         //                  type builder implementation, and then strip the location info.
         self.ty_builder()
             .create_ty(ty_tag, |st| {
-                self.load_struct_ty(
-                    module_storage,
-                    &st.address,
-                    st.module.as_ident_str(),
-                    st.name.as_ident_str(),
-                )
-                .map_err(|e| e.finish(Location::Undefined))
+                self.load_struct_ty(module_storage, &st.module_id(), st.name.as_ident_str())
+                    .map_err(|e| e.finish(Location::Undefined))
             })
             .map_err(|e| e.to_partial())
     }

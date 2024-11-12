@@ -6,10 +6,7 @@ use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
 use move_binary_format::{errors::VMResult, CompiledModule};
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    metadata::Metadata,
-};
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
     module_cyclic_dependency_error, module_linker_error,
@@ -29,45 +26,25 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool>;
+    fn check_module_exists(&self, module_id: &ModuleId) -> VMResult<bool>;
 
     /// Returns module bytes if module exists, or [None] otherwise. An error is returned if there
     /// is a storage error.
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>>;
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>>;
 
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>>;
+    fn fetch_module_size_in_bytes(&self, module_id: &ModuleId) -> VMResult<Option<usize>>;
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>>;
+    fn fetch_module_metadata(&self, module_id: &ModuleId) -> VMResult<Option<Vec<Metadata>>>;
 
     /// Returns the metadata in the module. An error is returned if there is a storage error,
     /// module fails deserialization, or does not exist.
-    fn fetch_existing_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
-        self.fetch_module_metadata(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+    fn fetch_existing_module_metadata(&self, module_id: &ModuleId) -> VMResult<Vec<Metadata>> {
+        self.fetch_module_metadata(module_id)?
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
@@ -75,8 +52,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   2. there is an error from the underlying storage.
     fn fetch_deserialized_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Option<Arc<CompiledModule>>>;
 
     /// Returns the deserialized module. An error is returned if:
@@ -85,21 +61,16 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   3. module does not exist.
     fn fetch_existing_deserialized_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.fetch_deserialized_module(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+        self.fetch_deserialized_module(module_id)?
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 
     /// Returns the verified module if it exists, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module and verify it.
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>>;
+    fn fetch_verified_module(&self, module_id: &ModuleId) -> VMResult<Option<Arc<Module>>>;
 }
 
 impl<T, E, V> ModuleStorage for T
@@ -120,69 +91,41 @@ where
     E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-        Ok(self.get_module_or_build_with(&id, self)?.is_some())
+    fn check_module_exists(&self, module_id: &ModuleId) -> VMResult<bool> {
+        Ok(self.get_module_or_build_with(module_id, self)?.is_some())
     }
 
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_size_in_bytes(&self, module_id: &ModuleId) -> VMResult<Option<usize>> {
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_metadata(&self, module_id: &ModuleId) -> VMResult<Option<Vec<Metadata>>> {
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
     fn fetch_deserialized_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-
+    fn fetch_verified_module(&self, module_id: &ModuleId) -> VMResult<Option<Arc<Module>>> {
         // Look up the verified module in cache, if it is not there, or if the module is not yet
         // verified, we need to load & verify its transitive dependencies.
-        let (module, version) = match self.get_module_or_build_with(&id, self)? {
+        let (module, version) = match self.get_module_or_build_with(module_id, self)? {
             Some(module_and_version) => module_and_version,
             None => return Ok(None),
         };
@@ -192,9 +135,9 @@ where
         }
 
         let mut visited = HashSet::new();
-        visited.insert(id.clone());
+        visited.insert(module_id.clone());
         Ok(Some(visit_dependencies_and_verify(
-            id,
+            module_id.clone(),
             module,
             version,
             &mut visited,

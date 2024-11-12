@@ -84,11 +84,8 @@ impl<'r> WriteOpConverter<'r> {
     ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
         let mut writes = BTreeMap::new();
         for (module_id, bytes) in verified_module_bundle {
-            let addr = module_id.address();
-            let name = module_id.name();
-
             let module_exists = module_storage
-                .check_module_exists(addr, name)
+                .check_module_exists(&module_id)
                 .map_err(|e| e.to_partial())?;
             let op = if module_exists {
                 Op::Modify(bytes)
@@ -96,7 +93,7 @@ impl<'r> WriteOpConverter<'r> {
                 Op::New(bytes)
             };
 
-            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let state_value_metadata = module_storage.fetch_state_value_metadata(&module_id)?;
             let write_op = self.convert(
                 state_value_metadata,
                 op,

@@ -41,11 +41,7 @@ impl BlankStorage {
 }
 
 impl ModuleBytesStorage for BlankStorage {
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
+    fn fetch_module_bytes(&self, _module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -271,13 +267,9 @@ impl InMemoryStorage {
 }
 
 impl ModuleBytesStorage for InMemoryStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage.modules.get(module_name).cloned());
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>> {
+        if let Some(account_storage) = self.accounts.get(module_id.address()) {
+            return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
         Ok(None)
     }

@@ -307,12 +307,9 @@ impl Loader {
                     .resolve_module_and_function_by_name(module_id, function_name)
                     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(loader) => loader.load_function_without_ty_args(
-                module_storage,
-                module_id.address(),
-                module_id.name(),
-                function_name,
-            ),
+            Loader::V2(loader) => {
+                loader.load_function_without_ty_args(module_storage, module_id, function_name)
+            },
         }
     }
 
@@ -357,8 +354,7 @@ impl Loader {
             },
             Loader::V2(loader) => loader.load_struct_ty(
                 module_storage,
-                struct_name.module.address(),
-                struct_name.module.name(),
+                &struct_name.module,
                 struct_name.name.as_ident_str(),
             ),
         }
@@ -1297,12 +1293,7 @@ impl<'a> Resolver<'a> {
                 .module_store
                 .resolve_module_and_function_by_name(module_id, function_name)?,
             Loader::V2(loader) => loader
-                .load_function_without_ty_args(
-                    self.module_storage,
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
+                .load_function_without_ty_args(self.module_storage, module_id, function_name)
                 .map_err(|_| {
                     // TODO(loader_v2):
                     //   Loader V1 implementation uses this error, but it should be a linker error.
