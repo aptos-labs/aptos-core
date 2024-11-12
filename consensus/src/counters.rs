@@ -1350,3 +1350,19 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS: Lazy<IntCounterV
         .unwrap()
     },
 );
+
+pub static OPTQS_EXCLUDE_AUTHORS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_optqs_exclude_authors",
+        "The number of times a batch author appears on the exclude list",
+        &["author"]
+    )
+    .unwrap()
+});
+
+pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_optqs_last_consecutive_successes",
+        "The number of last consecutive successes capped at window length",
+    )
+});
