@@ -54,6 +54,7 @@ mod token_event_store;
 mod token_objects;
 mod transaction_context;
 mod type_too_large;
+mod upgrade_compatibility;
 mod vector_numeric_address;
 mod vm;
 mod vote;
