@@ -46,8 +46,16 @@ module 0x42::m {
         S[account].t.w.greater(w)
     }
 
+    fun foo_greater_2(account: address, w: W): bool acquires S {
+        W[account].greater(w)
+    }
+
     fun boo_greater(v: vector<S>, w: W): bool {
         v[0].t.w.greater(w)
+    }
+
+    fun boo_greater_2(v: vector<W>, w: W): bool {
+        v[0].greater(w)
     }
 
     fun foo_greater_(account: address, w: W): bool acquires S {
@@ -56,6 +64,22 @@ module 0x42::m {
 
     fun boo_greater_(v: vector<S>, w: W): bool {
         (&mut v[0].t.w).greater(w)
+    }
+
+    fun boo_greater_2_(v: vector<W>, w: W): bool {
+        (&v[0]).greater(w)
+    }
+
+    struct Wrapper<T: copy> has drop, key, store, copy {
+        inner: T
+    }
+
+    fun unwrap<T: copy>(self: &Wrapper<T>): T {
+        self.inner
+    }
+
+    fun dispatch<T: store + copy>(account: address): T acquires Wrapper {
+        Wrapper<T>[account].unwrap()
     }
 
 }

@@ -4151,8 +4151,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let receiver_call_opt = self.get_receiver_function(&arg_types[0], name);
             if let Some(receiver_call) = receiver_call_opt {
                 if let Exp_::ExpDotted(dotted) = &args[0].value {
-                    // special case for the receiver call S[x].f.fun(&mut...)
-                    // making sure the first argument is mutable ref
+                    // we need a special case for the receiver call S[x].f.fun(&mut...)
+                    // when the first argument is a dotted expression with index notation:
+                    // S[x].y because the reference type is by default set immutable ref
                     if receiver_call.arg_types[0].is_mutable_reference() {
                         let first_arg = self.translate_dotted(
                             dotted,
@@ -4163,8 +4164,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         translated_args[0] = first_arg.into_exp();
                     }
                 } else if let Exp_::Index(target, index) = &args[0].value {
-                    // special case for the receiver call S[x].fun(&...)
-                    // S[x] will be translated into a reference
+                    // special case for the receiver call S[x].fun(&...), S[x].fun(&mut...)
+                    // so that it behaves the same as (&S[x]).fun(&...), (&mut S[x]).fun(&mut...)
                     if receiver_call.arg_types[0].is_reference() {
                         let index_mutate = receiver_call.arg_types[0].is_mutable_reference();
                         if let Some(first_arg) = self.try_resource_or_vector_index(
