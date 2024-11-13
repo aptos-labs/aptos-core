@@ -115,9 +115,11 @@ impl TestPlan {
                     None
                 }
             })
-            .chain(bytecode_modules.into_iter().map(|module| {
-                (module.self_id(), NamedOrBytecodeModule::Bytecode(module))
-            }))
+            .chain(
+                bytecode_modules
+                    .into_iter()
+                    .map(|module| (module.self_id(), NamedOrBytecodeModule::Bytecode(module))),
+            )
             .collect();
 
         Self {

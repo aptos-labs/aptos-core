@@ -306,7 +306,12 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     files.extend(dep_file_map);
     let test_plan = test_plan.unwrap();
     let no_tests = test_plan.is_empty();
-    let test_plan = TestPlan::new(test_plan, files, units, compiled_package.bytecode_deps.into_values().collect());
+    let test_plan = TestPlan::new(
+        test_plan,
+        files,
+        units,
+        compiled_package.bytecode_deps.into_values().collect(),
+    );
 
     let trace_path = pkg_path.join(".trace");
     let coverage_map_path = pkg_path

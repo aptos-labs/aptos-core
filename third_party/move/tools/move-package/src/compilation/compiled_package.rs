@@ -809,8 +809,7 @@ impl CompiledPackage {
                 .flat_map(|package| {
                     let name = package.name.unwrap();
                     package.paths.iter().map(move |pkg_path| {
-                        get_module_in_package(name, pkg_path.as_str())
-                            .map(|module| (name, module))
+                        get_module_in_package(name, pkg_path.as_str()).map(|module| (name, module))
                     })
                 })
                 .try_collect()?,

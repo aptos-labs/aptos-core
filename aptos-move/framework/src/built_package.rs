@@ -18,7 +18,10 @@ use codespan_reporting::{
 use itertools::Itertools;
 use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::{compiled_unit::{CompiledUnit, NamedCompiledModule}, shared::NumericalAddress};
+use move_compiler::{
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    shared::NumericalAddress,
+};
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
@@ -508,7 +511,8 @@ impl BuiltPackage {
                     .bytecode_deps
                     .iter()
                     .map(|(name, module)| PackageDep {
-                        account: NumericalAddress::from_account_address(*module.self_addr()).into_inner(),
+                        account: NumericalAddress::from_account_address(*module.self_addr())
+                            .into_inner(),
                         package_name: name.as_str().to_string(),
                     }),
             )
