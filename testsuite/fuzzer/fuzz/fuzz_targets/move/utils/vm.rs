@@ -3,15 +3,14 @@
 
 #![allow(dead_code)]
 
+use super::helpers::UserAccount;
+use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
 use aptos_framework::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::{
-    keyless::{AnyKeylessPublicKey, EphemeralCertificate},
-    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
-};
+use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
 use arbitrary::Arbitrary;
 use libfuzzer_sys::Corpus;
 use move_binary_format::{
@@ -20,67 +19,10 @@ use move_binary_format::{
 };
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
-    value::{MoveStructLayout, MoveTypeLayout, MoveValue},
+    value::MoveValue,
     vm_status::{StatusType, VMStatus},
 };
-use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-
-#[macro_export]
-macro_rules! tdbg {
-    () => {
-        ()
-    };
-    ($val:expr $(,)?) => {
-        {
-            if std::env::var("DEBUG").is_ok() {
-                dbg!($val)
-            } else {
-                $val
-            }
-        }
-    };
-    ($($val:expr),+ $(,)?) => {
-        {
-            if std::env::var("DEBUG").is_ok() {
-                dbg!($($val),+)
-            } else {
-                ($($val),+)
-            }
-        }
-    };
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
-pub enum FundAmount {
-    Zero,
-    Poor,
-    Rich,
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
-pub struct UserAccount {
-    is_inited_and_funded: bool,
-    fund: FundAmount,
-}
-
-impl UserAccount {
-    pub fn fund_amount(&self) -> u64 {
-        match self.fund {
-            FundAmount::Zero => 0,
-            FundAmount::Poor => 1_000,
-            FundAmount::Rich => 1_000_000_000_000_000,
-        }
-    }
-
-    pub fn convert_account(&self, vm: &mut FakeExecutor) -> Account {
-        if self.is_inited_and_funded {
-            vm.create_accounts(1, self.fund_amount(), 0).remove(0)
-        } else {
-            Account::new()
-        }
-    }
-}
 
 // Used to fuzz the MoveVM
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
@@ -136,117 +78,6 @@ pub struct RunnableState {
     pub dep_modules: Vec<CompiledModule>,
     pub exec_variant: ExecVariant,
     pub tx_auth_type: FuzzerRunnableAuthenticator,
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct JwtHeader {
-    pub alg: String,
-    pub typ: Option<String>,
-    pub kid: Option<String>,
-    // Add other JWT header fields as needed
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct FuzzingKeylessSignature {
-    exp_date_secs: u64,
-    jwt_header: JwtHeader,
-    cert: EphemeralCertificate,
-    //ephemeral_pubkey: EphemeralPublicKey,
-    //ephemeral_signature: EphemeralSignature,
-}
-
-impl FuzzingKeylessSignature {
-    pub fn exp_date_secs(&self) -> u64 {
-        self.exp_date_secs
-    }
-
-    pub fn jwt_header(&self) -> &JwtHeader {
-        &self.jwt_header
-    }
-
-    pub fn cert(&self) -> &EphemeralCertificate {
-        &self.cert
-    }
-
-    /*
-    pub fn ephemeral_pubkey(&self) -> &EphemeralPublicKey {
-        &self.ephemeral_pubkey
-    }
-
-    pub fn ephemeral_signature(&self) -> &EphemeralSignature {
-        &self.ephemeral_signature
-    }
-     */
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub enum Style {
-    Break,
-    //MatchJWT,
-    //MatchKeys,
-}
-
-//TODO: reorganize this type excluding not usefull fields. Do it after implementing JWK and Federated Keyless.
-// Used to fuzz the transaction authenticator
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub enum FuzzerTransactionAuthenticator {
-    Ed25519 {
-        sender: UserAccount,
-    },
-    Keyless {
-        sender: UserAccount,
-        style: Style,
-        any_keyless_public_key: AnyKeylessPublicKey,
-        keyless_signature: FuzzingKeylessSignature,
-    },
-    MultiAgent {
-        sender: UserAccount,
-        secondary_signers: Vec<UserAccount>,
-    },
-    FeePayer {
-        sender: UserAccount,
-        secondary_signers: Vec<UserAccount>,
-        fee_payer: UserAccount,
-    },
-}
-
-impl FuzzerTransactionAuthenticator {
-    pub fn sender(&self) -> UserAccount {
-        match self {
-            FuzzerTransactionAuthenticator::Ed25519 { sender } => *sender,
-            FuzzerTransactionAuthenticator::Keyless {
-                sender,
-                style: _,
-                any_keyless_public_key: _,
-                keyless_signature: _,
-            } => *sender,
-            FuzzerTransactionAuthenticator::MultiAgent {
-                sender,
-                secondary_signers: _,
-            } => *sender,
-            FuzzerTransactionAuthenticator::FeePayer {
-                sender,
-                secondary_signers: _,
-                fee_payer: _,
-            } => *sender,
-        }
-    }
-
-    pub fn get_jwt_header_json(&self) -> Option<String> {
-        if let FuzzerTransactionAuthenticator::Keyless {
-            keyless_signature, ..
-        } = self
-        {
-            serde_json::to_string(&keyless_signature.jwt_header).ok()
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub struct TransactionState {
-    pub tx_auth_type: FuzzerTransactionAuthenticator,
 }
 
 // used for ordering modules topologically
@@ -380,36 +211,4 @@ pub(crate) fn publish_group(
         },
         _ => Err(Corpus::Keep),
     }
-}
-
-pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
-    use MoveTypeLayout as L;
-
-    match layout {
-        L::Bool | L::U8 | L::U16 | L::U32 | L::U64 | L::U128 | L::U256 | L::Address | L::Signer => {
-            true
-        },
-
-        L::Vector(layout) | L::Native(_, layout) => is_valid_layout(layout),
-        L::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
-            variants.iter().all(|v| v.iter().all(is_valid_layout))
-        },
-        L::Struct(MoveStructLayout::Runtime(fields)) => {
-            if fields.is_empty() {
-                return false;
-            }
-            fields.iter().all(is_valid_layout)
-        },
-        L::Struct(_) => {
-            // decorated layouts not supported
-            false
-        },
-    }
-}
-
-pub(crate) fn compiled_module_serde(module: &CompiledModule) -> Result<(), ()> {
-    let mut blob = vec![];
-    module.serialize(&mut blob).map_err(|_| ())?;
-    CompiledModule::deserialize(&blob).map_err(|_| ())?;
-    Ok(())
 }
