@@ -22,7 +22,7 @@ impl Default for BlockExecutorModuleCacheLocalConfig {
     fn default() -> Self {
         Self {
             prefetch_framework_code: true,
-            // Use 1 Gb for now, should be large enough to cache all mainnet modules (at the time
+            // Use 1Gb for now, should be large enough to cache all mainnet modules (at the time
             // of writing this comment, 13.11.24).
             max_module_cache_size_in_bytes: 1024 * 1024 * 1024,
             max_struct_name_index_map_num_entries: 1_000_000,
