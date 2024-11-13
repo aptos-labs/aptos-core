@@ -510,6 +510,22 @@ module aptos_framework::delegation_pool {
         delegator_address: address,
     }
 
+    #[event]
+    struct InitializeDelegationPoolFromStakingContract has drop, store {
+        staker: address,
+        operator: address,
+        pool_address: address,
+        principal: u64,
+        operator_commission_percentage: u64,
+    }
+
+    #[event]
+    struct DistributePendingInactiveStakeFromStakingContract has drop, store {
+        pool_address: address,
+        recipient: address,
+        amount: u64,
+    }
+
     #[view]
     /// Return whether supplied address `addr` is owner of a delegation pool.
     public fun owner_cap_exists(addr: address): bool {
@@ -961,6 +977,16 @@ module aptos_framework::delegation_pool {
             distribute_commission_events: account::new_event_handle<DistributeCommissionEvent>(&stake_pool_signer),
         };
 
+        event::emit(
+            InitializeDelegationPoolFromStakingContract {
+                staker: staker_address,
+                operator,
+                pool_address,
+                principal,
+                operator_commission_percentage,
+            }
+        );
+
         // Grant ownership of the existing stake to the participants of the destroyed staking contract.
         // 1. `synchronize_delegation_pool` MUST NOT be called during this process because stake would be distributed as
         // rewards instead of being individually allocated
@@ -983,6 +1009,14 @@ module aptos_framework::delegation_pool {
 
             // no need to assert on minimum required stake as any next operation of delegator enforces it
             buy_in_pending_inactive_shares(&mut pool, recipient, amount_to_distribute);
+
+            event::emit(
+                DistributePendingInactiveStakeFromStakingContract {
+                    pool_address,
+                    recipient,
+                    amount: amount_to_distribute,
+                }
+            );
         };
         // destroy distribution pool of 0 remaining coins, any dust will be distributed as pending_inactive rewards
         pool_u64_iterable::destroy_empty(distribution_pool);
