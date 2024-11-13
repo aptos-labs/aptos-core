@@ -2889,6 +2889,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-native-interface",
  "aptos-types",
+ "bcs 0.1.4",
  "dir-diff",
  "file_diff",
  "move-cli",

@@ -80,7 +80,7 @@ Aborts with <code>0x1c5</code> error code if there is a failure when calculating
 Note:
 For some types it might not be known they have constant size, and function might return None.
 For example, signer appears to have constant size, but it's size might change.
-If this function returned Some() for some type before - it is guaranteed to continue returning Some()
+If this function returned Some() for some type before - it is guaranteed to continue returning Some().
 On the other hand, if function has returned None for some type,
 it might change in the future to return Some() instead, if size becomes "known".
 
@@ -94,7 +94,7 @@ it might change in the future to return Some() instead, if size becomes "known".
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): std::option::Option&lt;u64&gt;;
+<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): Option&lt;u64&gt;;
 </code></pre>
 
 

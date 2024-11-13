@@ -11,17 +11,17 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use move_core_types::{
+    account_address::AccountAddress,
     gas_algebra::{NumBytes, NumTypeNodes},
-    vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
+    u256,
+    value::{MoveStructLayout, MoveTypeLayout},
+    vm_status::{sub_status::NFE_BCS_SERIALIZATION_FAILURE, StatusCode},
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::PartialVMResult,
-    value_serde::{
-        constant_serialized_size, serialized_size_allowing_delayed_values,
-        type_visit_count_for_constant_serialized_size,
-    },
+    natives::function::{PartialVMError, PartialVMResult},
+    value_serde::serialized_size_allowing_delayed_values,
     values::{values_impl::Reference, Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -164,6 +164,106 @@ fn native_constant_serialized_size(
     };
 
     Ok(smallvec![result])
+}
+
+/// Count upper limit on the number of types constant_serialized_size would visit,
+/// which is then used for gas charging, before performing the operation.
+/// This is different done type.num_nodes(), as some types are not traversed (i.e. vector),
+/// and for structs types and number of fields matter as well.
+///
+/// Unclear if type_visit_count would be the same for other usages
+/// (for example, whether vector types need to be traversed),
+/// so name it very specifically, and on future usages see how it generalizes.
+fn type_visit_count_for_constant_serialized_size(ty_layout: &MoveTypeLayout) -> u64 {
+    match ty_layout {
+        MoveTypeLayout::Bool
+        | MoveTypeLayout::U8
+        | MoveTypeLayout::U16
+        | MoveTypeLayout::U32
+        | MoveTypeLayout::U128
+        | MoveTypeLayout::U256
+        | MoveTypeLayout::U64
+        | MoveTypeLayout::Address
+        | MoveTypeLayout::Signer => 1,
+        // non-recursed:
+        MoveTypeLayout::Struct(
+            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
+        )
+        | MoveTypeLayout::Vector(_) => 1,
+        // recursed:
+        MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
+            let mut total = 1; // Count the current visit, and aggregate all children
+            for field in fields {
+                total += type_visit_count_for_constant_serialized_size(field);
+            }
+            total
+        },
+        MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields))
+        | MoveTypeLayout::Struct(MoveStructLayout::WithTypes { fields, .. }) => {
+            let mut total = 1; // Count the current visit, and aggregate all children
+            for field in fields {
+                total += type_visit_count_for_constant_serialized_size(&field.layout);
+            }
+            total
+        },
+        // Count the current visit, and inner visits
+        MoveTypeLayout::Native(_, inner) => {
+            1 + type_visit_count_for_constant_serialized_size(inner)
+        },
+    }
+}
+
+/// If given type has a constant serialized size (irrespective of the instance), it returns the serialized
+/// size in bytes any value would have.
+/// Otherwise it returns None.
+fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> PartialVMResult<Option<usize>> {
+    let bcs_size_result = match ty_layout {
+        MoveTypeLayout::Bool => bcs::serialized_size(&false).map(Some),
+        MoveTypeLayout::U8 => bcs::serialized_size(&0u8).map(Some),
+        MoveTypeLayout::U16 => bcs::serialized_size(&0u16).map(Some),
+        MoveTypeLayout::U32 => bcs::serialized_size(&0u32).map(Some),
+        MoveTypeLayout::U64 => bcs::serialized_size(&0u64).map(Some),
+        MoveTypeLayout::U128 => bcs::serialized_size(&0u128).map(Some),
+        MoveTypeLayout::U256 => bcs::serialized_size(&u256::U256::zero()).map(Some),
+        MoveTypeLayout::Address => bcs::serialized_size(&AccountAddress::ZERO).map(Some),
+        // signer's size is VM implementation detail, and can change at will.
+        MoveTypeLayout::Signer => Ok(None),
+        // vectors have no constant size
+        MoveTypeLayout::Vector(_) => Ok(None),
+        // enums have no constant size
+        MoveTypeLayout::Struct(
+            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
+        ) => Ok(None),
+        MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
+            let mut total = Some(0);
+            for field in fields {
+                let cur = constant_serialized_size(field)?;
+                match cur {
+                    Some(cur_value) => total = total.map(|v| v + cur_value),
+                    None => {
+                        total = None;
+                        break;
+                    },
+                }
+            }
+            Ok(total)
+        },
+        MoveTypeLayout::Struct(MoveStructLayout::WithFields(_))
+        | MoveTypeLayout::Struct(MoveStructLayout::WithTypes { .. }) => {
+            return Err(
+                PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(
+                    "Only runtime types expected, but found WithFields/WithTypes".to_string(),
+                ),
+            )
+        },
+        MoveTypeLayout::Native(_, inner) => Ok(constant_serialized_size(inner)?),
+    };
+    bcs_size_result.map_err(|e| {
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+            "failed to compute serialized size of a value: {:?}",
+            e
+        ))
+    })
 }
 
 /***************************************************************************************************

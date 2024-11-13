@@ -8,7 +8,8 @@ use crate::{
     gas_schedule::NativeGasParameters,
 };
 use aptos_gas_algebra::{
-    InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerTypeNode, InternalGasPerArg, InternalGasPerByte,
+    InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
+    InternalGasPerTypeNode,
 };
 
 crate::gas_schedule::macros::define_gas_parameters!(

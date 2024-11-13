@@ -3,6 +3,8 @@
 /// published on-chain. See https://github.com/aptos-labs/bcs#binary-canonical-serialization-bcs for more
 /// details on BCS.
 module std::bcs {
+    use std::option::Option;
+
     /// Returns the binary representation of `v` in BCS (Binary Canonical Serialization) format.
     /// Aborts with `0x1c5` error code if serialization fails.
     native public fun to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
@@ -23,10 +25,10 @@ module std::bcs {
     /// Note:
     /// For some types it might not be known they have constant size, and function might return None.
     /// For example, signer appears to have constant size, but it's size might change.
-    /// If this function returned Some() for some type before - it is guaranteed to continue returning Some()
+    /// If this function returned Some() for some type before - it is guaranteed to continue returning Some().
     /// On the other hand, if function has returned None for some type,
     /// it might change in the future to return Some() instead, if size becomes "known".
-    native public(friend) fun constant_serialized_size<MoveValue>(): std::option::Option<u64>;
+    native public(friend) fun constant_serialized_size<MoveValue>(): Option<u64>;
 
     // ==============================
     // Module Specification
