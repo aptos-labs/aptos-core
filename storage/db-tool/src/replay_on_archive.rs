@@ -204,6 +204,13 @@ impl Verifier {
         let mut expected_txn_infos = Vec::new();
         let mut chunk_start_version = start;
         for (idx, item) in txn_iter.enumerate() {
+            // timeout check
+            if let Some(duration) = self.timeout_secs {
+                if self.replay_stat.get_elapsed_secs() >= duration {
+                    return Ok(total_failed_txns);
+                }
+            }
+            
             let (input_txn, expected_txn_info, expected_event, expected_writeset) = item?;
             let is_epoch_ending = expected_event.iter().any(ContractEvent::is_new_epoch_event);
             cur_txns.push(input_txn);
@@ -223,12 +230,6 @@ impl Verifier {
                 total_failed_txns.extend(fail_txns);
                 self.replay_stat.update_cnt(cur_txns.len() as u64);
                 self.replay_stat.print_tps();
-
-                if let Some(duration) = self.timeout_secs {
-                    if self.replay_stat.get_elapsed_secs() >= duration {
-                        return Ok(total_failed_txns);
-                    }
-                }
 
                 // empty for the new chunk
                 chunk_start_version = start + (idx as u64) + 1;
