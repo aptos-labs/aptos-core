@@ -146,12 +146,11 @@ fn native_constant_serialized_size(
     let ty = ty_args.pop().unwrap();
     let ty_layout = context.type_to_type_layout(&ty)?;
 
-    context.charge(
-        BCS_CONSTANT_SERIALIZED_SIZE_PER_TYPE_NODE
-            * NumTypeNodes::new(type_visit_count_for_constant_serialized_size(&ty_layout)),
-    )?;
+    let (visited_count, serialized_size_result) = constant_serialized_size(&ty_layout);
+    context
+        .charge(BCS_CONSTANT_SERIALIZED_SIZE_PER_TYPE_NODE * NumTypeNodes::new(visited_count))?;
 
-    let result = match constant_serialized_size(&ty_layout) {
+    let result = match serialized_size_result {
         Ok(value) => create_option_u64(value.map(|v| v as u64)),
         Err(_) => {
             context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
@@ -166,57 +165,12 @@ fn native_constant_serialized_size(
     Ok(smallvec![result])
 }
 
-/// Count upper limit on the number of types constant_serialized_size would visit,
-/// which is then used for gas charging, before performing the operation.
-/// This is different done type.num_nodes(), as some types are not traversed (i.e. vector),
-/// and for structs types and number of fields matter as well.
-///
-/// Unclear if type_visit_count would be the same for other usages
-/// (for example, whether vector types need to be traversed),
-/// so name it very specifically, and on future usages see how it generalizes.
-fn type_visit_count_for_constant_serialized_size(ty_layout: &MoveTypeLayout) -> u64 {
-    match ty_layout {
-        MoveTypeLayout::Bool
-        | MoveTypeLayout::U8
-        | MoveTypeLayout::U16
-        | MoveTypeLayout::U32
-        | MoveTypeLayout::U128
-        | MoveTypeLayout::U256
-        | MoveTypeLayout::U64
-        | MoveTypeLayout::Address
-        | MoveTypeLayout::Signer => 1,
-        // non-recursed:
-        MoveTypeLayout::Struct(
-            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
-        )
-        | MoveTypeLayout::Vector(_) => 1,
-        // recursed:
-        MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
-            let mut total = 1; // Count the current visit, and aggregate all children
-            for field in fields {
-                total += type_visit_count_for_constant_serialized_size(field);
-            }
-            total
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields))
-        | MoveTypeLayout::Struct(MoveStructLayout::WithTypes { fields, .. }) => {
-            let mut total = 1; // Count the current visit, and aggregate all children
-            for field in fields {
-                total += type_visit_count_for_constant_serialized_size(&field.layout);
-            }
-            total
-        },
-        // Count the current visit, and inner visits
-        MoveTypeLayout::Native(_, inner) => {
-            1 + type_visit_count_for_constant_serialized_size(inner)
-        },
-    }
-}
-
 /// If given type has a constant serialized size (irrespective of the instance), it returns the serialized
 /// size in bytes any value would have.
 /// Otherwise it returns None.
-fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> PartialVMResult<Option<usize>> {
+/// First element of the returned tuple represents number of visited nodes, used to charge gas.
+fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult<Option<usize>>) {
+    let mut visited_count = 1;
     let bcs_size_result = match ty_layout {
         MoveTypeLayout::Bool => bcs::serialized_size(&false).map(Some),
         MoveTypeLayout::U8 => bcs::serialized_size(&0u8).map(Some),
@@ -237,10 +191,12 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> PartialVMResult<Optio
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let mut total = Some(0);
             for field in fields {
-                let cur = constant_serialized_size(field)?;
+                let (cur_visited_count, cur) = constant_serialized_size(field);
+                visited_count += cur_visited_count;
                 match cur {
-                    Some(cur_value) => total = total.map(|v| v + cur_value),
-                    None => {
+                    Err(e) => return (visited_count, Err(e)),
+                    Ok(Some(cur_value)) => total = total.map(|v| v + cur_value),
+                    Ok(None) => {
                         total = None;
                         break;
                     },
@@ -250,20 +206,33 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> PartialVMResult<Optio
         },
         MoveTypeLayout::Struct(MoveStructLayout::WithFields(_))
         | MoveTypeLayout::Struct(MoveStructLayout::WithTypes { .. }) => {
-            return Err(
-                PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(
-                    "Only runtime types expected, but found WithFields/WithTypes".to_string(),
+            return (
+                visited_count,
+                Err(
+                    PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(
+                        "Only runtime types expected, but found WithFields/WithTypes".to_string(),
+                    ),
                 ),
             )
         },
-        MoveTypeLayout::Native(_, inner) => Ok(constant_serialized_size(inner)?),
+        MoveTypeLayout::Native(_, inner) => {
+            let (cur_visited_count, cur) = constant_serialized_size(inner);
+            visited_count += cur_visited_count;
+            match cur {
+                Err(e) => return (visited_count, Err(e)),
+                Ok(v) => Ok(v),
+            }
+        },
     };
-    bcs_size_result.map_err(|e| {
-        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
-            "failed to compute serialized size of a value: {:?}",
-            e
-        ))
-    })
+    (
+        visited_count,
+        bcs_size_result.map_err(|e| {
+            PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+                "failed to compute serialized size of a value: {:?}",
+                e
+            ))
+        }),
+    )
 }
 
 /***************************************************************************************************
