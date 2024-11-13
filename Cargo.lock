@@ -1191,6 +1191,7 @@ dependencies = [
  "clap 4.4.14",
  "crossbeam-channel",
  "dashmap",
+ "derive_more",
  "either",
  "hex",
  "indicatif 0.15.0",
