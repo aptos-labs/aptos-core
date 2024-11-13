@@ -15,6 +15,7 @@ pub enum TimedFeatureFlag {
     DisableInvariantViolationCheckInSwapLoc,
     LimitTypeTagSize,
     ModuleComplexityCheck,
+    EntryCompatibility,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -43,10 +44,14 @@ impl TimedFeatureOverride {
             Replay => match flag {
                 LimitTypeTagSize => true,
                 ModuleComplexityCheck => true,
+                EntryCompatibility => true,
                 // Add overrides for replay here.
                 _ => return None,
             },
-            Testing => false, // Activate all flags
+            Testing => match flag {
+                EntryCompatibility => true,
+                _ => return None, // Activate all flags
+            },
         })
     }
 }
@@ -62,6 +67,9 @@ impl TimedFeatureFlag {
 
             (ModuleComplexityCheck, TESTNET) => 1719356400000, /* Tuesday, June 21, 2024 16:00:00 AM GMT-07:00 */
             (ModuleComplexityCheck, MAINNET) => 1720033200000, /* Wednesday, July 3, 2024 12:00:00 AM GMT-07:00 */
+
+            (EntryCompatibility, TESTNET) => 1730923200000, /* Wednesday, Nov 6, 2024 12:00:00 AM GMT-07:00 */
+            (EntryCompatibility, MAINNET) => 1731441600000, /* Tuesday, Nov 12, 2024 12:00:00 AM GMT-07:00 */
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
