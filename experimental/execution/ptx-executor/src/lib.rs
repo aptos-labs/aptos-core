@@ -21,17 +21,12 @@ use crate::{
     analyzer::PtxAnalyzer, finalizer::PtxFinalizer, metrics::TIMER, runner::PtxRunner,
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
-use aptos_executor::{
-    block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
-};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableTransactions, PartitionedTransactions},
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
     state_store::StateView,
     transaction::{
@@ -41,15 +36,20 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    AptosVM, VMExecutor,
+    AptosVM, VMBlockExecutor,
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::{mpsc::channel, Arc};
 
 pub struct PtxBlockExecutor;
 
-impl VMExecutor for PtxBlockExecutor {
+impl VMBlockExecutor for PtxBlockExecutor {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_block(
+        &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
@@ -111,19 +111,5 @@ impl VMExecutor for PtxBlockExecutor {
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         unimplemented!()
-    }
-}
-
-impl TransactionBlockExecutor for PtxBlockExecutor {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> anyhow::Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
-            transactions,
-            state_view,
-            onchain_config,
-        )
     }
 }

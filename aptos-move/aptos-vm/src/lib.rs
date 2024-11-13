@@ -137,6 +137,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
+use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
 
@@ -147,18 +148,20 @@ pub trait VMValidator {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
+        module_storage: &impl AptosCodeStorage,
     ) -> VMValidatorResult;
 }
 
 /// This trait describes the VM's execution interface.
-pub trait VMExecutor: Send + Sync {
-    // NOTE: At the moment there are no persistent caches that live past the end of a block (that's
-    // why execute_block doesn't take &self.)
-    // There are some cache invalidation issues around transactions publishing code that need to be
-    // sorted out before that's possible.
+pub trait VMBlockExecutor: Send + Sync {
+    /// Be careful if any state is kept in VMBlockExecutor, as all validations are implementers responsibility
+    /// (and state_view passed in execute_block can go both backwards and forwards in time).
+    /// TODO: Currently, production uses new() on every block, and only executor-benchmark reuses across.
+    fn new() -> Self;
 
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
+        &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -167,10 +170,11 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them,
     /// Without applying any block limit
     fn execute_block_no_limit(
+        &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        Self::execute_block(
+        self.execute_block(
             transactions,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

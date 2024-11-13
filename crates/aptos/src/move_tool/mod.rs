@@ -10,7 +10,7 @@ use crate::{
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
             MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
             ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -206,8 +206,8 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
-        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-framework.git";
+        const SUBDIR_PATH: &str = "aptos-framework";
         const DEFAULT_BRANCH: &str = "mainnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
@@ -270,6 +270,15 @@ impl FrameworkPackageArgs {
             toml::to_string_pretty(&manifest)
                 .map_err(|err| CliError::UnexpectedError(err.to_string()))?
                 .as_bytes(),
+        )?;
+
+        // Write a .gitignore
+        let gitignore = package_dir.join(GIT_IGNORE);
+        check_if_file_exists(gitignore.as_path(), prompt_options)?;
+        write_to_file(
+            gitignore.as_path(),
+            GIT_IGNORE,
+            ".aptos/\nbuild/".as_bytes(),
         )
     }
 }
@@ -644,14 +653,21 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options,
         } = self;
 
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
+
         let result = task::spawn_blocking(move || {
             prover_options.prove(
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
-                move_options.compiler_version,
-                move_options.language_version,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],
@@ -768,8 +784,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
     type Error = CliError;
 
     fn try_into(self) -> Result<PackagePublicationData, Self::Error> {
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
 
         let package_publication_data =
             create_package_publication_data(package, PublishType::AccountDeploy, None)?;
@@ -799,11 +814,14 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
     type Error = CliError;
 
     async fn async_try_into(self) -> Result<ChunkedPublishPayloads, Self::Error> {
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
 
-        let chunked_publish_payloads =
-            create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?;
+        let chunked_publish_payloads = create_chunked_publish_payloads(
+            package,
+            PublishType::AccountDeploy,
+            None,
+            self.chunked_publish_option.large_packages_module_address,
+        )?;
 
         let size = &chunked_publish_payloads
             .payloads
@@ -994,6 +1012,7 @@ fn create_chunked_publish_payloads(
     package: BuiltPackage,
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
+    large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
@@ -1010,6 +1029,7 @@ fn create_chunked_publish_payloads(
         compiled_units,
         publish_type,
         maybe_object_address,
+        large_packages_module_address,
     );
 
     Ok(ChunkedPublishPayloads { payloads })
@@ -1030,6 +1050,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             submit_chunked_publish_transactions(
                 chunked_package_payloads.payloads,
                 &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
             )
             .await
         } else {
@@ -1130,11 +1151,14 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let package =
-                build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
-            let mock_payloads =
-                create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?
-                    .payloads;
+            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            let mock_payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::AccountDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
             self.txn_options.sequence_number(sender_address).await? + staging_tx_count + 1
         } else {
@@ -1146,8 +1170,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let message = format!(
             "Do you want to publish this package at object address {}",
             object_address
@@ -1155,8 +1178,13 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let payloads =
-                create_chunked_publish_payloads(package, PublishType::ObjectDeploy, None)?.payloads;
+            let payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::ObjectDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
 
             let size = &payloads
                 .iter()
@@ -1166,7 +1194,12 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
             println!("{}", message.bold());
 
-            submit_chunked_publish_transactions(payloads, &self.txn_options).await
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1230,7 +1263,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let built_package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+            build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let url = self
             .txn_options
             .rest_options
@@ -1261,6 +1294,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
+                self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
 
@@ -1271,7 +1305,12 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             println!("package size {} bytes", size);
             let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
             println!("{}", message.bold());
-            submit_chunked_publish_transactions(payloads, &self.txn_options).await
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
         } else {
             let payload = create_package_publication_data(
                 built_package,
@@ -1341,11 +1380,14 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let package =
-                build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
-            let mock_payloads =
-                create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?
-                    .payloads;
+            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            let mock_payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::AccountDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
             self.txn_options.sequence_number(sender_address).await? + staging_tx_count + 1
         } else {
@@ -1357,8 +1399,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let message = format!(
             "Do you want to deploy this package at object address {}",
             object_address
@@ -1366,8 +1407,13 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let payloads =
-                create_chunked_publish_payloads(package, PublishType::ObjectDeploy, None)?.payloads;
+            let payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::ObjectDeploy,
+                None,
+                self.chunked_publish_option.large_packages_module_address,
+            )?
+            .payloads;
 
             let size = &payloads
                 .iter()
@@ -1377,7 +1423,12 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
             println!("{}", message.bold());
 
-            submit_chunked_publish_transactions(payloads, &self.txn_options).await
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1447,8 +1498,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         self.move_options
             .add_named_address(self.address_name, self.object_address.to_string());
 
-        let package =
-            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
         let url = self
             .txn_options
             .rest_options
@@ -1479,6 +1529,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
+                self.chunked_publish_option.large_packages_module_address,
             )?
             .payloads;
 
@@ -1489,7 +1540,12 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             println!("package size {} bytes", size);
             let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
             println!("{}", message.bold());
-            submit_chunked_publish_transactions(payloads, &self.txn_options).await
+            submit_chunked_publish_transactions(
+                payloads,
+                &self.txn_options,
+                self.chunked_publish_option.large_packages_module_address,
+            )
+            .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1538,6 +1594,7 @@ fn build_package_options(
 async fn submit_chunked_publish_transactions(
     payloads: Vec<TransactionPayload>,
     txn_options: &TransactionOptions,
+    large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<TransactionSummary> {
     let mut publishing_result = Err(CliError::UnexpectedError(
         "No payload provided for batch transaction run".to_string(),
@@ -1547,12 +1604,12 @@ async fn submit_chunked_publish_transactions(
 
     let account_address = txn_options.profile_options.account_address()?;
 
-    if !is_staging_area_empty(txn_options).await? {
+    if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
         let message = format!(
             "The resource {}::large_packages::StagingArea under account {} is not empty.\
         \nThis may cause package publishing to fail if the data is unexpected. \
         \nUse the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under the account.",
-            LARGE_PACKAGES_MODULE_ADDRESS, account_address,
+            large_packages_module_address, account_address,
         )
             .bold();
         println!("{}", message);
@@ -1607,7 +1664,10 @@ async fn submit_chunked_publish_transactions(
     publishing_result
 }
 
-async fn is_staging_area_empty(txn_options: &TransactionOptions) -> CliTypedResult<bool> {
+async fn is_staging_area_empty(
+    txn_options: &TransactionOptions,
+    large_packages_module_address: AccountAddress,
+) -> CliTypedResult<bool> {
     let url = txn_options.rest_options.url(&txn_options.profile_options)?;
     let client = Client::new(url);
 
@@ -1616,7 +1676,7 @@ async fn is_staging_area_empty(txn_options: &TransactionOptions) -> CliTypedResu
             txn_options.profile_options.account_address()?,
             &format!(
                 "{}::large_packages::StagingArea",
-                LARGE_PACKAGES_MODULE_ADDRESS
+                large_packages_module_address
             ),
         )
         .await;
@@ -1640,6 +1700,10 @@ async fn is_staging_area_empty(txn_options: &TransactionOptions) -> CliTypedResu
 pub struct ClearStagingArea {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: AccountAddress,
 }
 
 #[async_trait]
@@ -1651,10 +1715,10 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
-            LARGE_PACKAGES_MODULE_ADDRESS,
+            &self.large_packages_module_address,
             self.txn_options.profile_options.account_address()?
         );
-        let payload = large_packages_cleanup_staging_area();
+        let payload = large_packages_cleanup_staging_area(self.large_packages_module_address);
         self.txn_options
             .submit_transaction(payload)
             .await

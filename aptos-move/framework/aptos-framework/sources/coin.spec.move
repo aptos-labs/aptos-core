@@ -119,24 +119,9 @@ spec aptos_framework::coin {
         ensures [abstract] result == type_info::type_of<CoinType>().account_address;
     }
 
-    /// Can only be initialized once.
-    /// Can only be published by reserved addresses.
-    spec initialize_supply_config(aptos_framework: &signer) {
-        let aptos_addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-        aborts_if exists<SupplyConfig>(aptos_addr);
-        ensures !global<SupplyConfig>(aptos_addr).allow_upgrades;
-        ensures exists<SupplyConfig>(aptos_addr);
-    }
-
     /// Can only be updated by `@aptos_framework`.
-    spec allow_supply_upgrades(aptos_framework: &signer, allowed: bool) {
-        modifies global<SupplyConfig>(@aptos_framework);
-        let aptos_addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-        aborts_if !exists<SupplyConfig>(aptos_addr);
-        let post allow_upgrades_post = global<SupplyConfig>(@aptos_framework);
-        ensures allow_upgrades_post.allow_upgrades == allowed;
+    spec allow_supply_upgrades(_aptos_framework: &signer, _allowed: bool) {
+        aborts_if true;
     }
 
     spec balance<CoinType>(owner: address): u64 {
@@ -394,32 +379,8 @@ spec aptos_framework::coin {
 
     /// The creator of `CoinType` must be `@aptos_framework`.
     /// `SupplyConfig` allow upgrade.
-    spec upgrade_supply<CoinType>(account: &signer) {
-        let account_addr = signer::address_of(account);
-        let coin_address = type_info::type_of<CoinType>().account_address;
-        aborts_if coin_address != account_addr;
-        aborts_if !exists<SupplyConfig>(@aptos_framework);
-        /// [high-level-req-1.1]
-        aborts_if !exists<CoinInfo<CoinType>>(account_addr);
-
-        let supply_config = global<SupplyConfig>(@aptos_framework);
-        aborts_if !supply_config.allow_upgrades;
-        modifies global<CoinInfo<CoinType>>(account_addr);
-
-        let maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
-        let supply = option::spec_borrow(maybe_supply);
-        let value = optional_aggregator::optional_aggregator_value(supply);
-
-        let post post_maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
-        let post post_supply = option::spec_borrow(post_maybe_supply);
-        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
-
-        let supply_no_parallel = option::spec_is_some(maybe_supply) &&
-            !optional_aggregator::is_parallelizable(supply);
-
-        aborts_if supply_no_parallel && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
-        ensures supply_no_parallel ==>
-            optional_aggregator::is_parallelizable(post_supply) && post_value == value;
+    spec upgrade_supply<CoinType>(_account: &signer) {
+        aborts_if true;
     }
 
     spec initialize {
@@ -577,47 +538,5 @@ spec aptos_framework::coin {
         /// [high-level-req-8.1]
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
-    }
-
-    spec initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
-        include system_addresses::AbortsIfNotAptosFramework { account: aptos_framework };
-        include aggregator_factory::CreateAggregatorInternalAbortsIf;
-    }
-
-    spec is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
-        aborts_if false;
-        ensures result == (aggregator::spec_read(coin.value) == 0);
-    }
-
-    spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
-        aborts_if aggregator::spec_read(coin.value) > MAX_U64;
-        ensures result.value == aggregator::spec_aggregator_get_val(old(coin).value);
-    }
-
-    spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
-        let aggr = dst_coin.value;
-        let post p_aggr = dst_coin.value;
-        aborts_if aggregator::spec_aggregator_get_val(aggr)
-            + coin.value > aggregator::spec_get_limit(aggr);
-        aborts_if aggregator::spec_aggregator_get_val(aggr)
-            + coin.value > MAX_U128;
-        ensures aggregator::spec_aggregator_get_val(aggr) + coin.value == aggregator::spec_aggregator_get_val(p_aggr);
-    }
-
-    spec collect_into_aggregatable_coin<CoinType>(account_addr: address, amount: u64, dst_coin: &mut AggregatableCoin<CoinType>) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        let aggr = dst_coin.value;
-        let post p_aggr = dst_coin.value;
-        let coin_store = global<CoinStore<CoinType>>(account_addr);
-        let post p_coin_store = global<CoinStore<CoinType>>(account_addr);
-        aborts_if amount > 0 && !exists<CoinStore<CoinType>>(account_addr);
-        aborts_if amount > 0 && coin_store.coin.value < amount;
-        aborts_if amount > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + amount > aggregator::spec_get_limit(aggr);
-        aborts_if amount > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + amount > MAX_U128;
-        ensures aggregator::spec_aggregator_get_val(aggr) + amount == aggregator::spec_aggregator_get_val(p_aggr);
-        ensures coin_store.coin.value - amount == p_coin_store.coin.value;
     }
 }

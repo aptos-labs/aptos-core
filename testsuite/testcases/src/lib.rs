@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
+    borrow::Cow,
     fmt::Write,
     ops::DerefMut,
     sync::Arc,
@@ -643,6 +644,15 @@ impl NetworkTest for CompositeNetworkTest {
 impl Test for CompositeNetworkTest {
     fn name(&self) -> &'static str {
         "CompositeNetworkTest"
+    }
+
+    fn reporting_name(&self) -> Cow<'static, str> {
+        let mut name_builder = self.test.name().to_owned();
+        for wrapper in self.wrappers.iter() {
+            name_builder = format!("{}({})", wrapper.name(), name_builder);
+        }
+        name_builder = format!("CompositeNetworkTest({}) with ", name_builder);
+        Cow::Owned(name_builder)
     }
 }
 

@@ -144,7 +144,9 @@ impl ExecutionProxy {
             Box::pin(async move {
                 pre_commit_notifier
                     .send(Box::pin(async move {
-                        let txns = state_compute_result.transactions_to_commit();
+                        let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
+
+                        let txns = state_compute_result.transactions_to_commit().to_vec();
                         let subscribable_events =
                             state_compute_result.subscribable_events().to_vec();
                         if let Err(e) = monitor!(
@@ -464,7 +466,6 @@ async fn test_commit_sync_race() {
     };
     use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
-    use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
@@ -503,7 +504,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _onchain_config: BlockExecutorConfigFromOnchain,
-        ) -> ExecutorResult<StateCheckpointOutput> {
+        ) -> ExecutorResult<()> {
             todo!()
         }
 
@@ -511,7 +512,6 @@ async fn test_commit_sync_race() {
             &self,
             _block_id: HashValue,
             _parent_block_id: HashValue,
-            _state_checkpoint_output: StateCheckpointOutput,
         ) -> ExecutorResult<StateComputeResult> {
             todo!()
         }

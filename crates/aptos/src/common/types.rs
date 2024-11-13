@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::{explorer_transaction_link, fund_account};
+use super::utils::{explorer_transaction_link, fund_account, strip_private_key_prefix};
 use crate::{
     common::{
         init::Network,
         local_simulation,
         utils::{
-            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_account_with_state, get_auth_key, get_sequence_number, parse_json_file,
-            prompt_yes_with_override, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
+            check_if_file_exists, create_dir_if_not_exist, deserialize_private_key_with_prefix,
+            dir_default_to_current, get_account_with_state, get_auth_key, get_sequence_number,
+            parse_json_file, prompt_yes_with_override, read_from_file, start_logger,
+            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
@@ -25,6 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -52,7 +53,10 @@ use hex::FromHexError;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
@@ -73,6 +77,7 @@ const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
+pub const GIT_IGNORE: &str = ".gitignore";
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -246,6 +251,7 @@ pub struct ProfileConfig {
     pub network: Option<Network>,
     /// Private key for commands.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_private_key_with_prefix")]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -374,7 +380,18 @@ impl CliConfig {
         let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
+        let no_dir = !aptos_folder.exists();
         create_dir_if_not_exist(aptos_folder.as_path())?;
+
+        // If the `.aptos/` doesn't exist, we'll add a .gitignore in it to ignore the config file
+        // so people don't save their credentials...
+        if no_dir {
+            write_to_user_only_file(
+                aptos_folder.join(GIT_IGNORE).as_path(),
+                GIT_IGNORE,
+                "*\ntestnet/\nconfig.yaml".as_bytes(),
+            )?;
+        }
 
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
@@ -675,7 +692,7 @@ pub trait ParsePrivateKey {
                 encoding.load_key("--private-key-file", file.as_path())?,
             ))
         } else if let Some(ref key) = private_key {
-            let key = key.as_bytes().to_vec();
+            let key = strip_private_key_prefix(key)?.as_bytes().to_vec();
             Ok(Some(encoding.decode_key("--private-key", key)?))
         } else {
             Ok(None)
@@ -1141,7 +1158,7 @@ pub struct MovePackageDir {
     /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
     /// Defaults to `6`, or `7` if language version 2 is selected
-    /// (through `--move-2` or `--language_version=2`), .
+    /// (through `--move-2` or `--language-version=2`), .
     #[clap(
         long,
         default_value_if("move_2", "true", "7"),
@@ -1152,24 +1169,23 @@ pub struct MovePackageDir {
 
     /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
-    /// Defaults to `1`, or `2` if `--move-2` is selected.
+    /// Defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
-           default_value_if("move_2", "true", "2.0"),
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Currently, defaults to `1`, unless `--move-2` is selected.
+    /// Defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value_if("move_2", "true", "2.0"),
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
-    /// Select bytecode, language version, and compiler to support Move 2:
-    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    /// Select bytecode, language, and compiler versions to support the latest Move 2.
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
 }
@@ -2338,4 +2354,12 @@ pub struct ChunkedPublishOption {
     /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
     #[clap(long)]
     pub(crate) chunked_publish: bool,
+
+    /// Address of the `large_packages` move module for chunked publishing
+    ///
+    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet.  On any other network, you will need to first publish it from the framework
+    /// under move-examples/large_packages.
+    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: AccountAddress,
 }

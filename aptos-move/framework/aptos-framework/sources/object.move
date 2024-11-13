@@ -498,15 +498,16 @@ module aptos_framework::object {
                     to,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut object.transfer_events,
+                TransferEvent {
+                    object: ref.self,
+                    from: object.owner,
+                    to,
+                },
+            );
         };
-        event::emit_event(
-            &mut object.transfer_events,
-            TransferEvent {
-                object: ref.self,
-                from: object.owner,
-                to,
-            },
-        );
         object.owner = to;
     }
 
@@ -554,15 +555,16 @@ module aptos_framework::object {
                         to,
                     },
                 );
+            } else {
+                event::emit_event(
+                    &mut object_core.transfer_events,
+                    TransferEvent {
+                        object,
+                        from: object_core.owner,
+                        to,
+                    },
+                );
             };
-            event::emit_event(
-                &mut object_core.transfer_events,
-                TransferEvent {
-                    object,
-                    from: object_core.owner,
-                    to,
-                },
-            );
             object_core.owner = to;
         };
     }

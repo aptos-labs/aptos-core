@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
-use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
-    account_config::NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
+    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
@@ -24,7 +23,6 @@ use aptos_types::{
 };
 pub use error::{ExecutorError, ExecutorResult};
 pub use ledger_update_output::LedgerUpdateOutput;
-pub use parsed_transaction_output::ParsedTransactionOutput;
 use state_compute_result::StateComputeResult;
 use std::{
     collections::{BTreeSet, HashMap},
@@ -36,10 +34,12 @@ use std::{
 };
 
 mod error;
+pub mod execution_output;
 mod ledger_update_output;
-pub mod parsed_transaction_output;
+pub mod planned;
 pub mod state_checkpoint_output;
 pub mod state_compute_result;
+pub mod transactions_with_output;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -134,9 +134,8 @@ pub trait BlockExecutorTrait: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
-        let state_checkpoint_output =
-            self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
-        self.ledger_update(block_id, parent_block_id, state_checkpoint_output)
+        self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
+        self.ledger_update(block_id, parent_block_id)
     }
 
     /// Executes a block and returns the state checkpoint output.
@@ -145,13 +144,12 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput>;
+    ) -> ExecutorResult<()>;
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -267,23 +265,25 @@ pub struct ChunkCommitNotification {
     pub reconfiguration_occurred: bool,
 }
 
-pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProofExt>,
+pub struct ProofReader<'a> {
+    proofs: Option<&'a HashMap<HashValue, SparseMerkleProofExt>>,
 }
 
-impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
-        ProofReader { proofs }
+impl<'a> ProofReader<'a> {
+    pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
+        Self {
+            proofs: Some(proofs),
+        }
     }
 
     pub fn new_empty() -> Self {
-        Self::new(HashMap::new())
+        Self { proofs: None }
     }
 }
 
-impl ProofRead for ProofReader {
+impl<'a> ProofRead for ProofReader<'a> {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
-        self.proofs.get(&key)
+        self.proofs.and_then(|proofs| proofs.get(&key))
     }
 }
 
@@ -293,6 +293,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
     type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref()
         || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
+        || type_tag == NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.deref()
 }
 
 #[cfg(feature = "bench")]

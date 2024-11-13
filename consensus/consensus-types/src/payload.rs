@@ -17,6 +17,10 @@ use std::{
     sync::Arc,
 };
 
+pub type OptBatches = BatchPointer<BatchInfo>;
+
+pub type ProofBatches = BatchPointer<ProofOfStore>;
+
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
 
@@ -178,6 +182,10 @@ impl InlineBatch {
             transactions,
         }
     }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.batch_info
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -250,8 +258,8 @@ impl DerefMut for InlineBatches {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct OptQuorumStorePayloadV1 {
     inline_batches: InlineBatches,
-    opt_batches: BatchPointer<BatchInfo>,
-    proofs: BatchPointer<ProofOfStore>,
+    opt_batches: OptBatches,
+    proofs: ProofBatches,
     execution_limits: PayloadExecutionLimit,
 }
 
@@ -288,8 +296,8 @@ pub enum OptQuorumStorePayload {
 impl OptQuorumStorePayload {
     pub fn new(
         inline_batches: InlineBatches,
-        opt_batches: BatchPointer<BatchInfo>,
-        proofs: BatchPointer<ProofOfStore>,
+        opt_batches: OptBatches,
+        proofs: ProofBatches,
         execution_limits: PayloadExecutionLimit,
     ) -> Self {
         Self::V1(OptQuorumStorePayloadV1 {

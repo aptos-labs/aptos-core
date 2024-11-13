@@ -6,32 +6,35 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
-use aptos_executor::{
-    block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
-};
-use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
-    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableTransactions},
+    account_config::{DepositEvent, WithdrawEvent},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
     contract_event::ContractEvent,
     event::EventKey,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
-        ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
-        TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ExecutionStatus,
+        Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
     vm_status::AbortLocation,
     write_set::{WriteOp, WriteSet, WriteSetMut},
+};
+use aptos_vm::{
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    VMBlockExecutor,
 };
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
+    vm_status::{StatusCode, VMStatus},
 };
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 struct IncrementalOutput {
     write_set: Vec<(StateKey, WriteOp)>,
@@ -65,7 +68,7 @@ impl IncrementalOutput {
     }
 }
 
-pub struct NativeExecutor {}
+pub struct NativeExecutor;
 
 static NATIVE_EXECUTOR_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NATIVE_EXECUTOR_POOL: Lazy<ThreadPool> = Lazy::new(|| {
@@ -93,7 +96,7 @@ impl NativeExecutor {
     fn withdraw_from_signer(
         sender_address: AccountAddress,
         transfer_amount: u64,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
     ) -> Result<Result<IncrementalOutput, TransactionStatus>> {
         let sender_account_key = DbAccessUtil::new_state_key_account(sender_address);
         let mut sender_account = {
@@ -152,7 +155,7 @@ impl NativeExecutor {
     fn deposit(
         recipient_address: AccountAddress,
         transfer_amount: u64,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
         fail_on_existing: bool,
         fail_on_missing: bool,
     ) -> Result<Result<IncrementalOutput, TransactionStatus>> {
@@ -248,7 +251,7 @@ impl NativeExecutor {
         sender_address: AccountAddress,
         recipient_address: AccountAddress,
         transfer_amount: u64,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
         fail_on_existing: bool,
         fail_on_missing: bool,
     ) -> Result<TransactionOutput> {
@@ -283,7 +286,7 @@ impl NativeExecutor {
         sender_address: AccountAddress,
         recipient_addresses: Vec<AccountAddress>,
         transfer_amounts: Vec<u64>,
-        state_view: &CachedStateView,
+        state_view: &impl StateView,
         fail_on_existing: bool,
         fail_on_missing: bool,
     ) -> Result<TransactionOutput> {
@@ -346,87 +349,98 @@ impl NativeExecutor {
     }
 }
 
-impl TransactionBlockExecutor for NativeExecutor {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
+impl VMBlockExecutor for NativeExecutor {
+    fn new() -> Self {
+        Self
+    }
+
+    fn execute_block(
+        &self,
+        transactions: &[SignatureVerifiedTransaction],
+        state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ChunkOutput> {
-        let transactions = match transactions {
-            ExecutableTransactions::Unsharded(txns) => txns,
-            _ => todo!("sharded execution not yet supported"),
-        };
-        let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
-            transactions
-                .par_iter()
-                .map(|txn| match &txn.expect_valid() {
-                    Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
-                    Transaction::UserTransaction(user_txn) => match user_txn.payload() {
-                        aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
-                            match (
-                                *f.module().address(),
-                                f.module().name().as_str(),
-                                f.function().as_str(),
-                            ) {
-                                (AccountAddress::ONE, "coin", "transfer") => {
-                                    Self::handle_account_creation_and_transfer(
-                                        user_txn.sender(),
-                                        bcs::from_bytes(&f.args()[0]).unwrap(),
-                                        bcs::from_bytes(&f.args()[1]).unwrap(),
-                                        &state_view,
-                                        false,
-                                        true,
-                                    )
-                                },
-                                (AccountAddress::ONE, "aptos_account", "transfer") => {
-                                    Self::handle_account_creation_and_transfer(
-                                        user_txn.sender(),
-                                        bcs::from_bytes(&f.args()[0]).unwrap(),
-                                        bcs::from_bytes(&f.args()[1]).unwrap(),
-                                        &state_view,
-                                        false,
-                                        false,
-                                    )
-                                },
-                                (AccountAddress::ONE, "aptos_account", "create_account") => {
-                                    Self::handle_account_creation_and_transfer(
-                                        user_txn.sender(),
-                                        bcs::from_bytes(&f.args()[0]).unwrap(),
-                                        0,
-                                        &state_view,
-                                        true,
-                                        false,
-                                    )
-                                },
-                                (AccountAddress::ONE, "aptos_account", "batch_transfer") => {
-                                    Self::handle_batch_account_creation_and_transfer(
-                                        user_txn.sender(),
-                                        bcs::from_bytes(&f.args()[0]).unwrap(),
-                                        bcs::from_bytes(&f.args()[1]).unwrap(),
-                                        &state_view,
-                                        false,
-                                        true,
-                                    )
-                                },
-                                _ => unimplemented!(
-                                    "{} {}::{}",
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        let transaction_outputs = NATIVE_EXECUTOR_POOL
+            .install(|| {
+                transactions
+                    .par_iter()
+                    .map(|txn| match &txn.expect_valid() {
+                        Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
+                        Transaction::UserTransaction(user_txn) => match user_txn.payload() {
+                            aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
+                                match (
                                     *f.module().address(),
                                     f.module().name().as_str(),
-                                    f.function().as_str()
-                                ),
-                            }
+                                    f.function().as_str(),
+                                ) {
+                                    (AccountAddress::ONE, "coin", "transfer") => {
+                                        Self::handle_account_creation_and_transfer(
+                                            user_txn.sender(),
+                                            bcs::from_bytes(&f.args()[0]).unwrap(),
+                                            bcs::from_bytes(&f.args()[1]).unwrap(),
+                                            &state_view,
+                                            false,
+                                            true,
+                                        )
+                                    },
+                                    (AccountAddress::ONE, "aptos_account", "transfer") => {
+                                        Self::handle_account_creation_and_transfer(
+                                            user_txn.sender(),
+                                            bcs::from_bytes(&f.args()[0]).unwrap(),
+                                            bcs::from_bytes(&f.args()[1]).unwrap(),
+                                            &state_view,
+                                            false,
+                                            false,
+                                        )
+                                    },
+                                    (AccountAddress::ONE, "aptos_account", "create_account") => {
+                                        Self::handle_account_creation_and_transfer(
+                                            user_txn.sender(),
+                                            bcs::from_bytes(&f.args()[0]).unwrap(),
+                                            0,
+                                            &state_view,
+                                            true,
+                                            false,
+                                        )
+                                    },
+                                    (AccountAddress::ONE, "aptos_account", "batch_transfer") => {
+                                        Self::handle_batch_account_creation_and_transfer(
+                                            user_txn.sender(),
+                                            bcs::from_bytes(&f.args()[0]).unwrap(),
+                                            bcs::from_bytes(&f.args()[1]).unwrap(),
+                                            &state_view,
+                                            false,
+                                            true,
+                                        )
+                                    },
+                                    _ => unimplemented!(
+                                        "{} {}::{}",
+                                        *f.module().address(),
+                                        f.module().name().as_str(),
+                                        f.function().as_str()
+                                    ),
+                                }
+                            },
+                            _ => unimplemented!(),
                         },
                         _ => unimplemented!(),
-                    },
-                    _ => unimplemented!(),
-                })
-                .collect::<Result<Vec<_>>>()
-        })?;
-        Ok(ChunkOutput {
-            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
-            transaction_outputs,
-            state_cache: state_view.into_state_cache(),
-            block_end_info: None,
-        })
+                    })
+                    .collect::<Result<Vec<_>>>()
+            })
+            .map_err(|err| VMStatus::Error {
+                status_code: StatusCode::ABORTED,
+                sub_status: None,
+                message: Some(err.to_string()),
+            })?;
+        Ok(BlockOutput::new(transaction_outputs, None))
+    }
+
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
+        _transactions: PartitionedTransactions,
+        _state_view: Arc<S>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
+        unimplemented!()
     }
 }

@@ -71,25 +71,33 @@ pub enum PeerRequest {
     SendDirectSend(Message),
 }
 
-/// The reason for closing a connection.
-///
-/// For example, if the remote peer closed the connection or the connection was
-/// lost, the disconnect reason will be `ConnectionLost`. In contrast, if the
-/// [`PeerManager`](crate::peer_manager::PeerManager) requested us to close this
-/// connection, then the disconnect reason will be `Requested`.
+/// The reason for closing a network connection
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum DisconnectReason {
-    Requested,
-    ConnectionLost,
+    ConnectionClosed, // The connection was gracefully closed (e.g., by the peer)
+    InputOutputError, // An I/O error occurred on the connection (e.g., when reading messages)
+    NetworkHealthCheckFailure, // The connection failed the network health check (e.g., pings)
+    RequestedByPeerManager, // The peer manager requested the connection to be closed
+    StaleConnection,  // The connection is stale (e.g., when a validator leaves the validator set)
+}
+
+impl DisconnectReason {
+    /// Returns a string label for the disconnect reason
+    pub fn get_label(&self) -> String {
+        let label = match self {
+            DisconnectReason::ConnectionClosed => "ConnectionClosed",
+            DisconnectReason::InputOutputError => "InputOutputError",
+            DisconnectReason::NetworkHealthCheckFailure => "NetworkHealthCheckFailure",
+            DisconnectReason::RequestedByPeerManager => "RequestedByPeerManager",
+            DisconnectReason::StaleConnection => "StaleConnection",
+        };
+        label.to_string()
+    }
 }
 
 impl fmt::Display for DisconnectReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            DisconnectReason::Requested => "Requested",
-            DisconnectReason::ConnectionLost => "ConnectionLost",
-        };
-        write!(f, "{}", s)
+        write!(f, "{}", self.get_label())
     }
 }
 
@@ -237,7 +245,7 @@ where
                         Some(request) => self.handle_outbound_request(request, &mut write_reqs_tx),
                         // The PeerManager is requesting this connection to close
                         // by dropping the corresponding peer_reqs_tx handle.
-                        None => self.shutdown(DisconnectReason::Requested),
+                        None => self.shutdown(DisconnectReason::RequestedByPeerManager),
                     }
                 },
                 // Handle a new inbound MultiplexMessage that we've just read off
@@ -258,7 +266,7 @@ where
                             }
                         },
                         // The socket was gracefully closed by the remote peer.
-                        None => self.shutdown(DisconnectReason::ConnectionLost),
+                        None => self.shutdown(DisconnectReason::ConnectionClosed),
                     }
                 },
                 // Drive the queue of pending inbound rpcs. When one is fulfilled
@@ -580,7 +588,7 @@ where
                 },
                 ReadError::IoError(_) => {
                     // IoErrors are mostly unrecoverable so just close the connection.
-                    self.shutdown(DisconnectReason::ConnectionLost);
+                    self.shutdown(DisconnectReason::InputOutputError);
                     return Err(err.into());
                 },
             },

@@ -8,7 +8,7 @@ import os
 import tempfile
 import json
 import itertools
-from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
+from typing import Callable, Optional, Tuple, Mapping, Sequence, Any, List
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass, field
@@ -53,7 +53,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=30))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [
@@ -73,9 +73,9 @@ NOISE_UPPER_LIMIT_WARN = 1.05
 SKIP_WARNS = IS_MAINNET
 SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
-# bump after a perf improvement, so you can easily distinguish runs
+# bump after a bigger test or perf change, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v6"
+CODE_PERF_VERSION = "v8"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
@@ -87,12 +87,12 @@ if os.environ.get("DETAILED"):
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
-if os.environ.get("RELEASE_BUILD"):
-    BUILD_FLAG = "--release"
-    BUILD_FOLDER = "target/release"
-else:
+if os.environ.get("PERFORMANCE_BUILD"):
     BUILD_FLAG = "--profile performance"
     BUILD_FOLDER = "target/performance"
+else:
+    BUILD_FLAG = "--release"
+    BUILD_FOLDER = "target/release"
 
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
@@ -101,10 +101,8 @@ else:
 
 if os.environ.get("DISABLE_FA_APT"):
     FEATURE_FLAGS = ""
-    SKIP_NATIVE = False
 else:
     FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE"
-    SKIP_NATIVE = True
 
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
@@ -127,6 +125,10 @@ class RunGroupKeyExtra:
     transaction_type_override: Optional[str] = field(default=None)
     transaction_weights_override: Optional[str] = field(default=None)
     sharding_traffic_flags: Optional[str] = field(default=None)
+    sig_verify_num_threads_override: Optional[int] = field(default=None)
+    execution_num_threads_override: Optional[int] = field(default=None)
+    split_stages_override: bool = field(default=False)
+    single_block_dst_working_set: bool = field(default=False)
 
 
 @dataclass
@@ -159,46 +161,47 @@ CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
 CALIBRATION = """
-no-op	1	VM	59	0.815	1.101	37283.8
-no-op	1000	VM	59	0.679	1.036	22232.7
-apt-fa-transfer	1	VM	59	0.779	1.064	28096.3
-account-generation	1	VM	59	0.763	1.046	22960.6
-account-resource32-b	1	VM	59	0.794	1.085	34394.7
-modify-global-resource	1	VM	59	0.849	1.029	2784.1
-modify-global-resource	100	VM	17	0.845	1.071	33592.9
-publish-package	1	VM	59	0.926	1.076	142.6
-mix_publish_transfer	1	VM	59	0.917	1.134	2145.5
-batch100-transfer	1	VM	59	0.695	1.028	740.9
-vector-picture30k	1	VM	59	0.891	1.027	111.2
-vector-picture30k	100	VM	17	0.593	1.042	1982.6
-smart-table-picture30-k-with200-change	1	VM	59	0.844	1.078	21.5
-smart-table-picture30-k-with200-change	100	VM	17	0.786	1.018	405.6
-modify-global-resource-agg-v2	1	VM	59	0.706	1.113	35274.8
-modify-global-flag-agg-v2	1	VM	59	0.818	1.023	5508.5
-modify-global-bounded-agg-v2	1	VM	59	0.766	1.089	9840.3
-modify-global-milestone-agg-v2	1	VM	59	0.723	1.038	28560.2
-resource-groups-global-write-tag1-kb	1	VM	59	0.872	1.046	9198.2
-resource-groups-global-write-and-read-tag1-kb	1	VM	59	0.867	1.023	6174.8
-resource-groups-sender-write-tag1-kb	1	VM	59	0.843	1.129	19680.5
-resource-groups-sender-multi-change1-kb	1	VM	59	0.825	1.074	16174.0
-token-v1ft-mint-and-transfer	1	VM	59	0.811	1.045	1262.2
-token-v1ft-mint-and-transfer	100	VM	17	0.718	1.041	17535.3
-token-v1nft-mint-and-transfer-sequential	1	VM	59	0.820	1.032	795.5
-token-v1nft-mint-and-transfer-sequential	100	VM	17	0.586	1.035	12683.5
-coin-init-and-mint	1	VM	59	0.704	1.073	28612.4
-coin-init-and-mint	100	VM	17	0.716	1.087	23415.6
-fungible-asset-mint	1	VM	59	0.644	1.052	26193.9
-fungible-asset-mint	100	VM	17	0.698	1.070	20606.2
-no-op5-signers	1	VM	59	0.783	1.124	37424.8
-token-v2-ambassador-mint	1	VM	59	0.670	1.035	17671.5
-token-v2-ambassador-mint	100	VM	17	0.717	1.058	15617.8
-liquidity-pool-swap	1	VM	59	0.728	1.021	963.2
-liquidity-pool-swap	100	VM	17	0.717	1.019	11116.3
-liquidity-pool-swap-stable	1	VM	59	0.776	1.023	934.6
-liquidity-pool-swap-stable	100	VM	17	0.796	1.021	10839.9
-deserialize-u256	1	VM	59	0.817	1.093	37002.8
-no-op-fee-payer	1	VM	59	0.775	1.027	2103.7
-no-op-fee-payer	100	VM	17	0.585	1.021	27642.4
+no-op	1	VM	5	0.914	1.024	40987.0
+no-op	1000	VM	5	0.880	1.008	20606.2
+apt-fa-transfer	1	VM	5	0.885	1.024	27345.0
+account-generation	1	VM	5	0.956	1.035	21446.3
+account-resource32-b	1	VM	5	0.917	1.055	35479.7
+modify-global-resource	1	VM	5	0.891	1.006	2396.8
+modify-global-resource	100	VM	5	0.888	1.010	33129.7
+publish-package	1	VM	5	0.988	1.026	127.6
+mix_publish_transfer	1	VM	5	0.802	1.068	3274.2
+batch100-transfer	1	VM	5	0.835	1.011	669.0
+vector-picture30k	1	VM	5	0.977	1.002	100.2
+vector-picture30k	100	VM	5	0.707	1.024	1818.0
+smart-table-picture30-k-with200-change	1	VM	5	0.969	1.009	16.0
+smart-table-picture30-k-with200-change	100	VM	5	0.950	1.044	246.9
+modify-global-resource-agg-v2	1	VM	5	0.870	1.033	37992.0
+modify-global-flag-agg-v2	1	VM	5	0.948	1.010	4607.8
+modify-global-bounded-agg-v2	1	VM	5	0.903	1.120	8233.1
+modify-global-milestone-agg-v2	1	VM	5	0.890	1.020	26334.6
+resource-groups-global-write-tag1-kb	1	VM	5	0.929	1.019	9515.8
+resource-groups-global-write-and-read-tag1-kb	1	VM	5	0.908	1.016	5791.6
+resource-groups-sender-write-tag1-kb	1	VM	5	0.966	1.105	19103.0
+resource-groups-sender-multi-change1-kb	1	VM	5	0.860	1.037	16597.8
+token-v1ft-mint-and-transfer	1	VM	5	0.840	1.004	1227.8
+token-v1ft-mint-and-transfer	100	VM	5	0.860	1.003	17399.7
+token-v1nft-mint-and-transfer-sequential	1	VM	5	0.874	1.011	763.7
+token-v1nft-mint-and-transfer-sequential	100	VM	5	0.860	1.006	12305.8
+coin-init-and-mint	1	VM	5	0.866	1.004	30075.3
+coin-init-and-mint	100	VM	5	0.880	1.024	22797.1
+fungible-asset-mint	1	VM	5	0.879	1.013	25097.7
+fungible-asset-mint	100	VM	5	0.868	1.016	19174.6
+no-op5-signers	1	VM	5	0.875	1.017	41438.6
+token-v2-ambassador-mint	1	VM	5	0.875	1.012	16335.1
+token-v2-ambassador-mint	100	VM	5	0.880	1.012	14124.9
+liquidity-pool-swap	1	VM	5	0.843	1.005	849.9
+liquidity-pool-swap	100	VM	5	0.906	1.006	9163.3
+liquidity-pool-swap-stable	1	VM	5	0.838	1.007	817.1
+liquidity-pool-swap-stable	100	VM	5	0.876	1.003	9024.6
+deserialize-u256	1	VM	5	0.844	1.010	39288.2
+no-op-fee-payer	1	VM	5	0.877	1.010	1657.7
+no-op-fee-payer	100	VM	5	0.857	1.017	23963.8
+simple-script	1	VM	5	0.863	1.072	35274.8
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
@@ -210,19 +213,20 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
-    RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    # RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="NativeSpeculative"), included_in=Flow.CONTINUOUS),
+
     RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
-    RunGroupConfig(key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(key=RunGroupKey("account-generation", executor_type="NativeSpeculative"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
         transaction_type_override="publish-package apt-fa-transfer",
-        transaction_weights_override="1 500",
-    ), included_in=LAND_BLOCKING_AND_C),
+        transaction_weights_override="1 100",
+    ), included_in=LAND_BLOCKING_AND_C, waived=True),
     RunGroupConfig(key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="NativeSpeculative"), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=100, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow(0), waived=True),
@@ -282,6 +286,7 @@ TESTS = [
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("simple-script"), included_in=LAND_BLOCKING_AND_C, waived=True),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -293,6 +298,7 @@ TESTS = [
     RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET_LARGE_DB),
     # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+
 ]
 # fmt: on
 
@@ -352,8 +358,11 @@ class RunResults:
     gpt: float
     storage_fee_pt: float
     output_bps: float
+    fraction_in_sig_verify: float
     fraction_in_execution: float
-    fraction_of_execution_in_vm: float
+    fraction_of_execution_in_block_executor: float
+    fraction_of_execution_in_inner_block_executor: float
+    fraction_in_ledger_update: float
     fraction_in_commit: float
 
 
@@ -407,8 +416,11 @@ def extract_run_results(
         gpt = 0
         storage_fee_pt = 0
         output_bps = 0
+        fraction_in_sig_verify = 0
         fraction_in_execution = 0
-        fraction_of_execution_in_vm = 0
+        fraction_of_execution_in_block_executor = 0
+        fraction_of_execution_in_inner_block_executor = 0
+        fraction_in_ledger_update = 0
         fraction_in_commit = 0
     else:
         tps = float(get_only(re.findall(prefix + r" TPS: (\d+\.?\d*) txn/s", output)))
@@ -432,13 +444,35 @@ def extract_run_results(
         output_bps = float(
             get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
         )
+        fraction_in_sig_verify = float(
+            re.findall(
+                prefix + r" fraction of total: (\d+\.?\d*) in signature verification",
+                output,
+            )[-1]
+        )
         fraction_in_execution = float(
             re.findall(
                 prefix + r" fraction of total: (\d+\.?\d*) in execution", output
             )[-1]
         )
-        fraction_of_execution_in_vm = float(
-            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
+        # see if useful or to remove
+        fraction_of_execution_in_block_executor = float(
+            re.findall(
+                prefix
+                + r" fraction of execution (\d+\.?\d*) in get execution output by executing",
+                output,
+            )[-1]
+        )
+        fraction_of_execution_in_inner_block_executor = float(
+            re.findall(
+                prefix + r" fraction of execution (\d+\.?\d*) in inner block executor",
+                output,
+            )[-1]
+        )
+        fraction_in_ledger_update = float(
+            re.findall(
+                prefix + r" fraction of total: (\d+\.?\d*) in ledger update", output
+            )[-1]
         )
         fraction_in_commit = float(
             re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[
@@ -455,8 +489,11 @@ def extract_run_results(
         gpt=gpt,
         storage_fee_pt=storage_fee_pt,
         output_bps=output_bps,
+        fraction_in_sig_verify=fraction_in_sig_verify,
         fraction_in_execution=fraction_in_execution,
-        fraction_of_execution_in_vm=fraction_of_execution_in_vm,
+        fraction_of_execution_in_block_executor=fraction_of_execution_in_block_executor,
+        fraction_of_execution_in_inner_block_executor=fraction_of_execution_in_inner_block_executor,
+        fraction_in_ledger_update=fraction_in_ledger_update,
         fraction_in_commit=fraction_in_commit,
     )
 
@@ -464,31 +501,39 @@ def extract_run_results(
 def print_table(
     results: Sequence[RunGroupInstance],
     by_levels: bool,
-    single_field: Optional[Tuple[str, Callable[[RunResults], Any]]],
+    only_fields: List[Tuple[str, Callable[[RunGroupInstance], Any]]],
     number_of_execution_threads=EXECUTION_ONLY_NUMBER_OF_THREADS,
 ):
     headers = [
         "transaction_type",
         "module_working_set",
         "executor",
-        "block_size",
-        "expected t/s",
     ]
+
+    if not only_fields:
+        headers.extend(
+            [
+                "block_size",
+                "expected t/s",
+            ]
+        )
+
     if by_levels:
         headers.extend(
             [f"exe_only {num_threads}" for num_threads in number_of_execution_threads]
         )
-        assert single_field is not None
+        assert only_fields
 
-    if single_field is not None:
-        field_name, _ = single_field
-        headers.append(field_name)
+    if only_fields:
+        for field_name, _ in only_fields:
+            headers.append(field_name)
     else:
         headers.extend(
             [
                 "t/s",
+                "sigver/total",
                 "exe/total",
-                "vm/exe",
+                "block_exe/exe",
                 "commit/total",
                 "g/s",
                 "eff g/s",
@@ -506,12 +551,16 @@ def print_table(
             result.key.transaction_type,
             result.key.module_working_set_size,
             result.key.executor_type,
-            result.block_size,
-            result.expected_tps,
         ]
+        if not only_fields:
+            row.extend(
+                [
+                    result.block_size,
+                    result.expected_tps,
+                ]
+            )
         if by_levels:
-            if single_field is not None:
-                _, field_getter = single_field
+            for _, field_getter in only_fields:
                 for num_threads in number_of_execution_threads:
                     if num_threads in result.number_of_threads_results:
                         row.append(
@@ -520,13 +569,18 @@ def print_table(
                     else:
                         row.append("-")
 
-        if single_field is not None:
-            _, field_getter = single_field
-            row.append(field_getter(result.single_node_result))
+        if only_fields:
+            for _, field_getter in only_fields:
+                row.append(field_getter(result))
         else:
             row.append(int(round(result.single_node_result.tps)))
+            row.append(round(result.single_node_result.fraction_in_sig_verify, 3))
             row.append(round(result.single_node_result.fraction_in_execution, 3))
-            row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
+            row.append(
+                round(
+                    result.single_node_result.fraction_of_execution_in_block_executor, 3
+                )
+            )
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
             row.append(int(round(result.single_node_result.effective_gps)))
@@ -580,7 +634,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -602,9 +656,6 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         if SELECTED_FLOW not in test.included_in:
             continue
 
-        if SKIP_NATIVE and test.key.executor_type == "native":
-            continue
-
         if test.expected_tps is not None:
             print(f"WARNING: using uncalibrated TPS for {test.key}")
             criteria = Criteria(
@@ -617,32 +668,30 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         else:
             assert test.key in calibrated_expected_tps, test
             cur_calibration = calibrated_expected_tps[test.key]
-            if cur_calibration.count > 20:
-                criteria = Criteria(
-                    expected_tps=cur_calibration.expected_tps,
-                    min_tps=cur_calibration.expected_tps
-                    * (cur_calibration.min_ratio - 0.01),
-                    min_warn_tps=cur_calibration.expected_tps
-                    * pow(cur_calibration.min_ratio, 0.5),
-                    max_tps=cur_calibration.expected_tps
-                    * (cur_calibration.max_ratio + 0.01),
-                    max_warn_tps=cur_calibration.expected_tps
-                    * pow(cur_calibration.max_ratio, 0.5),
-                )
-            else:
-                criteria = Criteria(
-                    expected_tps=cur_calibration.expected_tps,
-                    min_tps=cur_calibration.expected_tps
-                    * (cur_calibration.min_ratio - 0.1),
-                    min_warn_tps=cur_calibration.expected_tps
-                    * min(cur_calibration.min_ratio, 0.95),
-                    max_tps=cur_calibration.expected_tps
-                    * (cur_calibration.max_ratio + 0.1),
-                    max_warn_tps=cur_calibration.expected_tps
-                    * max(cur_calibration.max_ratio, 1.05),
-                )
+            criteria = Criteria(
+                expected_tps=cur_calibration.expected_tps,
+                min_tps=cur_calibration.expected_tps
+                * (
+                    1
+                    - (1 - cur_calibration.min_ratio)
+                    * (1 + 10.0 / cur_calibration.count)
+                    - 1.0 / cur_calibration.count
+                ),
+                min_warn_tps=cur_calibration.expected_tps
+                * pow(cur_calibration.min_ratio, 0.8),
+                max_tps=cur_calibration.expected_tps
+                * (
+                    1
+                    + (cur_calibration.max_ratio - 1)
+                    * (1 + 10.0 / cur_calibration.count)
+                    + 1.0 / cur_calibration.count
+                ),
+                max_warn_tps=cur_calibration.expected_tps
+                * pow(cur_calibration.max_ratio, 0.8),
+            )
 
-        cur_block_size = int(min([criteria.expected_tps, MAX_BLOCK_SIZE]))
+        # target 250ms blocks, a bit larger than prod
+        cur_block_size = max(4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE])))
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":
@@ -656,21 +705,57 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
             workload_args_str = f"--transaction-type {transaction_type_list} --transaction-weights {transaction_weights_list}"
 
+        pipeline_extra_args = []
+
+        number_of_execution_threads = NUMBER_OF_EXECUTION_THREADS
+        if test.key_extra.execution_num_threads_override:
+            number_of_execution_threads = test.key_extra.execution_num_threads_override
+
+        if test.key_extra.sig_verify_num_threads_override:
+            pipeline_extra_args.extend(
+                [
+                    "--num-sig-verify-threads",
+                    str(test.key_extra.sig_verify_num_threads_override),
+                ]
+            )
+
+        if test.key_extra.split_stages_override:
+            pipeline_extra_args.append("--split-stages")
+
         sharding_traffic_flags = test.key_extra.sharding_traffic_flags or ""
 
         if test.key.executor_type == "VM":
-            executor_type_str = "--transactions-per-sender 1"
-        elif test.key.executor_type == "native":
-            executor_type_str = "--use-native-executor --transactions-per-sender 1"
+            executor_type_str = "--block-executor-type aptos-vm-with-block-stm --transactions-per-sender 1"
+        # elif test.key.executor_type == "NativeVM":
+        #     executor_type_str = (
+        #         "--block-executor-type native-vm-with-block-stm --transactions-per-sender 1"
+        #     )
+        elif test.key.executor_type == "NativeSpeculative":
+            executor_type_str = "--block-executor-type native-loose-speculative --transactions-per-sender 1"
+        # elif test.key.executor_type == "NativeValueCacheSpeculative":
+        #     executor_type_str = (
+        #         "--block-executor-type native-value-cache-loose-speculative --transactions-per-sender 1"
+        #     )
+        # elif test.key.executor_type == "NativeNoStorageSpeculative":
+        #     executor_type_str = (
+        #         "--block-executor-type native-no-storage-loose-speculative --transactions-per-sender 1"
+        #     )
         elif test.key.executor_type == "sharded":
-            executor_type_str = f"--num-executor-shards {NUMBER_OF_EXECUTION_THREADS} {sharding_traffic_flags}"
+            executor_type_str = f"--num-executor-shards {number_of_execution_threads} {sharding_traffic_flags}"
         else:
             raise Exception(f"executor type not supported {test.key.executor_type}")
-        txn_emitter_prefix_str = "" if NUM_BLOCKS > 200 else " --generate-then-execute"
 
-        ADDITIONAL_DST_POOL_ACCOUNTS = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
+        if NUM_BLOCKS < 200:
+            pipeline_extra_args.append("--generate-then-execute")
 
-        common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        pipeline_extra_args_str = " ".join(pipeline_extra_args)
+
+        if test.key_extra.single_block_dst_working_set:
+            additional_dst_pool_accounts = MAX_BLOCK_SIZE
+        else:
+            additional_dst_pool_accounts = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
+
+        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         number_of_threads_results = {}
 
@@ -682,7 +767,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 output, "Overall execution"
             )
 
-        test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
+        test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {number_of_execution_threads} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
         single_node_result = extract_run_results(output, "Overall")
@@ -732,7 +817,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "module_working_set_size": test.key.module_working_set_size,
                     "executor_type": test.key.executor_type,
                     "block_size": cur_block_size,
-                    "execution_threads": NUMBER_OF_EXECUTION_THREADS,
+                    "execution_threads": number_of_execution_threads,
                     "warmup_num_accounts": NUM_ACCOUNTS,
                     "expected_tps": criteria.expected_tps,
                     "expected_min_tps": criteria.min_tps,
@@ -741,6 +826,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "tps": single_node_result.tps,
                     "gps": single_node_result.gps,
                     "gpt": single_node_result.gpt,
+                    "fraction_in_sig_verify": single_node_result.fraction_in_sig_verify,
+                    "fraction_in_execution": single_node_result.fraction_in_execution,
+                    "fraction_of_execution_in_block_executor": single_node_result.fraction_of_execution_in_block_executor,
+                    "fraction_of_execution_in_inner_block_executor": single_node_result.fraction_of_execution_in_inner_block_executor,
+                    "fraction_in_ledger_update": single_node_result.fraction_in_ledger_update,
+                    "fraction_in_commit": single_node_result.fraction_in_commit,
                     "code_perf_version": CODE_PERF_VERSION,
                     "flow": str(SELECTED_FLOW),
                     "test_index": test_index,
@@ -752,55 +843,135 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             print_table(
                 results,
                 by_levels=True,
-                single_field=("t/s", lambda r: int(round(r.tps))),
+                only_fields=[
+                    ("block_size", lambda r: r.block_size),
+                    ("expected t/s", lambda r: r.expected_tps),
+                    ("t/s", lambda r: int(round(r.single_node_result.tps))),
+                ],
             )
             print_table(
-                results,
+                results[1:],
                 by_levels=True,
-                single_field=("g/s", lambda r: int(round(r.gps))),
+                only_fields=[
+                    ("g/s", lambda r: int(round(r.single_node_result.gps))),
+                    ("gas/txn", lambda r: int(round(r.single_node_result.gpt))),
+                    (
+                        "storage fee/txn",
+                        lambda r: int(round(r.single_node_result.storage_fee_pt)),
+                    ),
+                ],
             )
             print_table(
-                results,
-                by_levels=False,
-                single_field=("gas/txn", lambda r: int(round(r.gpt))),
-            )
-            print_table(
-                results,
-                by_levels=False,
-                single_field=(
-                    "storage fee/txn",
-                    lambda r: int(round(r.storage_fee_pt)),
-                ),
-            )
-            print_table(
-                results,
+                results[1:],
                 by_levels=True,
-                single_field=("exe/total", lambda r: round(r.fraction_in_execution, 3)),
+                only_fields=[
+                    (
+                        "sigver/total",
+                        lambda r: round(r.single_node_result.fraction_in_sig_verify, 3),
+                    ),
+                    (
+                        "exe/total",
+                        lambda r: round(r.single_node_result.fraction_in_execution, 3),
+                    ),
+                    (
+                        "block_exe/exe",
+                        lambda r: round(
+                            r.single_node_result.fraction_of_execution_in_block_executor,
+                            3,
+                        ),
+                    ),
+                    (
+                        "ledger/total",
+                        lambda r: round(
+                            r.single_node_result.fraction_in_ledger_update, 3
+                        ),
+                    ),
+                    (
+                        "commit/total",
+                        lambda r: round(r.single_node_result.fraction_in_commit, 3),
+                    ),
+                ],
             )
             print_table(
-                results,
+                results[1:],
                 by_levels=True,
-                single_field=(
-                    "vm/exe",
-                    lambda r: round(r.fraction_of_execution_in_vm, 3),
-                ),
+                only_fields=[
+                    (
+                        "sigver tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(r.single_node_result.fraction_in_sig_verify, 0.001),
+                            1,
+                        ),
+                    ),
+                    (
+                        "exe tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(r.single_node_result.fraction_in_execution, 0.001),
+                            1,
+                        ),
+                    ),
+                    (
+                        "block exe tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(r.single_node_result.fraction_in_execution, 0.001)
+                            / max(
+                                r.single_node_result.fraction_of_execution_in_block_executor,
+                                0.001,
+                            ),
+                            1,
+                        ),
+                    ),
+                    (
+                        "inner block exe tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(r.single_node_result.fraction_in_execution, 0.001)
+                            / max(
+                                r.single_node_result.fraction_of_execution_in_inner_block_executor,
+                                0.001,
+                            ),
+                            1,
+                        ),
+                    ),
+                    (
+                        "ledger tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(
+                                r.single_node_result.fraction_in_ledger_update, 0.001
+                            ),
+                            1,
+                        ),
+                    ),
+                    (
+                        "commit tps",
+                        lambda r: round(
+                            r.single_node_result.tps
+                            / max(r.single_node_result.fraction_in_commit, 0.001),
+                            1,
+                        ),
+                    ),
+                ],
             )
-            print_table(results, by_levels=False, single_field=None)
+            print_table(results, by_levels=False, only_fields=None)
 
         if single_node_result.tps < criteria.min_tps:
-            text = f"regression detected {single_node_result.tps} < {criteria.min_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
+            text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
         elif single_node_result.tps < criteria.min_warn_tps:
-            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {criteria.min_warn_tps} (expected median {criteria.expected_tps}), {test.key} didn't meet TPS requirements"
+            text = f"potential (but within normal noise) regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_warn_tps}), {test.key} didn't meet TPS requirements"
             warnings.append(text)
         elif (
             not SKIP_PERF_IMPROVEMENT_NOTICE
             and single_node_result.tps > criteria.max_tps
         ):
-            text = f"perf improvement detected {single_node_result.tps} > {criteria.max_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if not test.waived:
                 errors.append(text)
             else:
@@ -809,7 +980,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             not SKIP_PERF_IMPROVEMENT_NOTICE
             and single_node_result.tps > criteria.max_warn_tps
         ):
-            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {criteria.max_warn_tps} (expected median {criteria.expected_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_warn_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             warnings.append(text)
 
 if HIDE_OUTPUT:
@@ -825,10 +996,10 @@ if errors:
     print("\n".join(errors))
     print(
         """If you expect your PR to change the performance, you need to recalibrate the values.
-To do so, you should run the test on your branch 6 times 
-(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml).
+To do so, you should run the test on your branch 6 times
+(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS).
 Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
-update it to your branch, and export values as CSV, and then open and copy values inside 
+update it to your branch, and export values as CSV, and then open and copy values inside
 testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
 """
     )

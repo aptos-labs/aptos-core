@@ -677,10 +677,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
-        let is_lang_version_2 = self
+        let is_lang_version_2_1 = self
             .env()
             .language_version
-            .is_at_least(LanguageVersion::V2_0);
+            .is_at_least(LanguageVersion::V2_1);
         params
             .iter()
             .enumerate()
@@ -690,7 +690,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
 
-                if !is_lang_version_2 || var_str != "_" {
+                if !is_lang_version_2_1 || var_str != "_" {
                     self.define_local(
                         &loc,
                         sym,
@@ -785,7 +785,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             .lookup_receiver_function(ty, name)
             .cloned()
         {
-            let type_inst = self.fresh_type_vars(entry.type_params.len());
+            let type_params = entry.type_params.clone();
+            let type_inst = self.fresh_type_vars(type_params.len());
             let arg_types = entry
                 .params
                 .iter()
@@ -794,6 +795,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             let result_type = entry.result_type.instantiate(&type_inst);
             Some(ReceiverFunctionInstance {
                 id: entry.module_id.qualified(entry.fun_id),
+                fun_name: name,
+                type_params,
                 type_inst,
                 arg_types,
                 result_type,
@@ -1584,7 +1587,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_loop_exit() {
+                let loop_type = if body.branches_to(0..usize::MAX) {
                     self.check_type(&loc, &Type::unit(), expected_type, context)
                 } else {
                     expected_type.clone()
@@ -2159,8 +2162,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &inst.result_type,
                 )
                 .map_err(|_| ok = false);
-            // `type.inst` is now unified with the actual types,
-            // annotate the instance. Since this post processor
+            // `type_inst` is now unified with the actual types,
+            // annotate the instance.  Since this post processor
             // is run after type finalization, we need to finalize
             // it to report any un-inferred type errors. However,
             // to avoid follow-up errors, only do if unification
@@ -2173,6 +2176,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
                     .collect();
+                // Also need to evaluate type constraints on type parameters
+
                 self.env().set_node_instantiation(id, inst)
             }
         }

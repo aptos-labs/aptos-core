@@ -63,14 +63,13 @@ fn put_value_set(
     let enable_sharding = state_store.state_kv_db.enabled_sharding();
     state_store
         .put_value_sets(
-            vec![&sharded_value_set],
+            &[sharded_value_set],
             version,
             StateStorageUsage::new_untracked(),
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
             enable_sharding,
-            /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
         )
         .unwrap();

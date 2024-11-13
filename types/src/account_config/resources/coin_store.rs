@@ -81,8 +81,16 @@ impl<C: CoinType> CoinStoreResource<C> {
         &self.deposit_events
     }
 
+    pub fn deposit_events_mut(&mut self) -> &mut EventHandle {
+        &mut self.deposit_events
+    }
+
     pub fn withdraw_events(&self) -> &EventHandle {
         &self.withdraw_events
+    }
+
+    pub fn withdraw_events_mut(&mut self) -> &mut EventHandle {
+        &mut self.withdraw_events
     }
 }
 

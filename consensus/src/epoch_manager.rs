@@ -74,7 +74,9 @@ use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_safety_rules::{safety_rules_manager, PersistentSafetyStorage, SafetyRulesManager};
+use aptos_safety_rules::{
+    safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
+};
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
@@ -152,7 +154,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
-    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     batch_retrieval_tx:
@@ -772,12 +774,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let mut safety_rules =
             MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
-        if let Err(error) = safety_rules.perform_initialize() {
-            error!(
-                epoch = epoch,
-                error = error,
-                "Unable to initialize safety rules.",
-            );
+        match safety_rules.perform_initialize() {
+            Err(e) if matches!(e, Error::ValidatorNotInSet(_)) => {
+                warn!(
+                    epoch = epoch,
+                    error = e,
+                    "Unable to initialize safety rules.",
+                );
+            },
+            Err(e) => {
+                error!(
+                    epoch = epoch,
+                    error = e,
+                    "Unable to initialize safety rules.",
+                );
+            },
+            Ok(()) => (),
         }
 
         info!(epoch = epoch, "Create RoundState");
@@ -833,6 +845,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )));
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
+            self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
             failures_tracker.clone(),
         ));
 
@@ -1593,7 +1606,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn forward_event(
-        quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
@@ -1613,7 +1626,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
             | VerifiedEvent::BatchMsg(_)) => {
-                Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
+                Self::forward_event_to(quorum_store_msg_tx, peer_id, (peer_id, quorum_store_event))
                     .context("quorum store sender")
             },
             proposal_event @ VerifiedEvent::ProposalMsg(_) => {

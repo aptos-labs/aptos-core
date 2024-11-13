@@ -55,7 +55,7 @@ async fn test_keyless_oidc_txn_verifies() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -83,7 +83,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to initial VK; should succeed");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -104,7 +104,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to upgraded VK; should fail");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -121,7 +121,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to old VK; should fail");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -133,7 +133,7 @@ async fn test_keyless_rotate_vk() {
     info!("Submitting keyless Groth16 transaction w.r.t. to upgraded VK; should succeed");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -184,7 +184,7 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
     info!("Submit OpenID transaction with bad JWT signature");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -205,7 +205,7 @@ async fn test_keyless_oidc_txn_with_expired_epk() {
     info!("Submit OpenID transaction with expired EPK");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -221,7 +221,7 @@ async fn test_keyless_groth16_verifies() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -331,8 +331,8 @@ script {{
         ephemeral_key_pair,
         root_addr,
         None,
-        Some(get_sample_pepper()),
-        Some(get_sample_zk_sig()),
+        get_sample_pepper(),
+        get_sample_zk_sig(),
     )
     .unwrap();
 
@@ -380,7 +380,7 @@ script {{
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
     debug!("result={:?}", result);
     assert_eq!(expect_txn_succeed, result.is_ok());
@@ -395,7 +395,7 @@ async fn test_keyless_no_extra_field_groth16_verifies() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -418,7 +418,7 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -478,7 +478,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -501,8 +501,8 @@ async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
         &get_sample_jwt_token(),
         ephemeral_key_pair,
         None,
-        Some(get_sample_pepper()),
-        Some(get_sample_zk_sig()),
+        get_sample_pepper(),
+        get_sample_zk_sig(),
     )
     .unwrap();
     let addr = info
@@ -535,7 +535,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if let Err(e) = result {
@@ -555,7 +555,7 @@ async fn test_keyless_groth16_with_mauled_proof() {
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
@@ -585,7 +585,7 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_without_deserializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {

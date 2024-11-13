@@ -290,7 +290,7 @@ async fn test_insert_vote() {
             VoteData::new(
                 block.block().gen_block_info(
                     block.compute_result().root_hash(),
-                    block.compute_result().version(),
+                    block.compute_result().last_version_or_0(),
                     block.compute_result().epoch_state().clone(),
                 ),
                 block.quorum_cert().certified_block().clone(),
@@ -300,7 +300,6 @@ async fn test_insert_vote() {
             voter,
         )
         .unwrap();
-        vote.set_verified();
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
@@ -320,7 +319,7 @@ async fn test_insert_vote() {
         VoteData::new(
             block.block().gen_block_info(
                 block.compute_result().root_hash(),
-                block.compute_result().version(),
+                block.compute_result().last_version_or_0(),
                 block.compute_result().epoch_state().clone(),
             ),
             block.quorum_cert().certified_block().clone(),
@@ -330,7 +329,6 @@ async fn test_insert_vote() {
         final_voter,
     )
     .unwrap();
-    vote.set_verified();
     match pending_votes.insert_vote(&vote, &validator_verifier) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());

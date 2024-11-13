@@ -131,6 +131,7 @@ pub enum FeatureFlag {
     FederatedKeyless,
     TransactionSimulationEnhancement,
     CollectionOwner,
+    EnableLoaderV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -214,7 +215,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
         match f {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::CollectAndDistributeGasFees => {
-                AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES
+                AptosFeatureFlag::_DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES
             },
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::Sha512AndRipeMd160Natives => {
@@ -347,6 +348,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
         }
     }
 }
@@ -356,7 +358,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
     fn from(f: AptosFeatureFlag) -> Self {
         match f {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
-            AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES => {
+            AptosFeatureFlag::_DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES => {
                 FeatureFlag::CollectAndDistributeGasFees
             },
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
@@ -490,6 +492,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::TransactionSimulationEnhancement
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
+            AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
         }
     }
 }
