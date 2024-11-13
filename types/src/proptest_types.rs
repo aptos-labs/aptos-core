@@ -1194,7 +1194,7 @@ impl BlockGen {
             } else {
                 vec![]
             },
-            false,
+            ledger_info.ends_epoch(),
             TransactionAuxiliaryData::default(),
         ));
 
