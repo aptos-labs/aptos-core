@@ -7,7 +7,9 @@ use crate::{
     gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_24},
     gas_schedule::NativeGasParameters,
 };
-use aptos_gas_algebra::{InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerByte};
+use aptos_gas_algebra::{
+    InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
+};
 
 crate::gas_schedule::macros::define_gas_parameters!(
     MoveStdlibGasParameters,
@@ -42,5 +44,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         [cmp_compare_base: InternalGas, { RELEASE_V1_24.. => "cmp.compare.base" }, 367],
         [cmp_compare_per_abs_val_unit: InternalGasPerAbstractValueUnit, { RELEASE_V1_24.. => "cmp.compare.per_abs_val_unit"}, 14],
+
+        [vector_move_range_base: InternalGas, { RELEASE_V1_24.. => "vector.move_range.base" }, 4000],
+        [vector_move_range_per_index_moved: InternalGasPerArg, { RELEASE_V1_24.. => "vector.move_range.per_index_moved" }, 10],
     ]
 );
