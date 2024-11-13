@@ -1646,11 +1646,11 @@ impl AptosVM {
         let check_friend_linking = !self
             .features()
             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
-        let compatability_checks = Compatibility::new(
+        let compatibility_checks = Compatibility::new(
             check_struct_layout,
             check_friend_linking,
             self.timed_features()
-                .is_enabled(TimedFeatureFlag::EntryCompatibility),    
+                .is_enabled(TimedFeatureFlag::EntryCompatibility),
         );
 
         if self.features().is_loader_v2_enabled() {
@@ -1664,7 +1664,7 @@ impl AptosVM {
                 destination,
                 bundle,
                 modules,
-                compatability_checks,
+                compatibility_checks,
             )
         } else {
             // Check what modules exist before publishing.
@@ -1688,7 +1688,7 @@ impl AptosVM {
                     bundle.into_inner(),
                     destination,
                     gas_meter,
-                    compatability_checks,
+                    compatibility_checks,
                 )
             })?;
 
