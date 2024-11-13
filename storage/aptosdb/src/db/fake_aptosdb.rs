@@ -994,10 +994,7 @@ mod tests {
 
             let mut in_memory_state = db
                 .inner
-                .buffered_state()
-                .lock()
-                .current_state()
-                .clone();
+            .get_latest_executed_trees().state;
 
             let mut cur_ver: Version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.iter() {

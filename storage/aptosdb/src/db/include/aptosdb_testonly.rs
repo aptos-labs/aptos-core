@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::buffered_state::BufferedState;
 use aptos_config::config::{ BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
-use aptos_infallible::Mutex;
 use aptos_types::state_store::{create_empty_sharded_state_updates, ShardedStateUpdates};
 use std::default::Default;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
@@ -89,11 +87,6 @@ impl AptosDB {
             false, /* indexer */
             false,
         )
-    }
-
-    /// This gets the current buffered_state in StateStore.
-    pub fn buffered_state(&self) -> &Mutex<BufferedState> {
-        self.state_store.buffered_state()
     }
 
     pub(crate) fn state_merkle_db(&self) -> Arc<StateMerkleDb> {

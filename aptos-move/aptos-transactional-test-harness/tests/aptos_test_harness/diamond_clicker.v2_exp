@@ -53,15 +53,11 @@ B2:
 	27: LdU64(1)
 	28: Add
 	29: StLoc[3](loc2: u64)
-	30: Branch(34)
+	30: Branch(17)
 B3:
 	31: MoveLoc[2](loc1: &mut vector<InnerStruct>)
 	32: Pop
-	33: Branch(35)
-B4:
-	34: Branch(17)
-B5:
-	35: Ret
+	33: Ret
 }
 }
 

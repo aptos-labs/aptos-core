@@ -195,7 +195,7 @@ mod test {
             let tmp_dir = TempPath::new();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
+            let mut in_memory_state = db.state_store.current_state_cloned();
             let _ancestor = in_memory_state.base.clone();
             let mut version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {
