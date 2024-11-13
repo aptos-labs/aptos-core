@@ -500,7 +500,17 @@ impl IndexerStreamCoordinator {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0;
+        let latest_table_info_version = self
+            .context
+            .indexer_reader
+            .as_ref()
+            .expect("Table info reader not set")
+            .get_latest_table_info_ledger_version()?
+            .expect("Table info ledger version not set");
+
+        self.highest_known_version =
+            std::cmp::min(info.ledger_version.0, latest_table_info_version);
+
         Ok(())
     }
 
