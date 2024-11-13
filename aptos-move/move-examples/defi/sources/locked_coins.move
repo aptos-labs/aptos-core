@@ -266,13 +266,11 @@ module defi::locked_coins {
     }
 
     #[test_only]
-    use std::string;
-    #[test_only]
     use aptos_framework::account;
     #[test_only]
     use aptos_framework::coin::BurnCapability;
     #[test_only]
-    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     #[test_only]
     use aptos_framework::aptos_account;
 
@@ -280,19 +278,12 @@ module defi::locked_coins {
     fun setup(aptos_framework: &signer, sponsor: &signer): BurnCapability<AptosCoin> {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<AptosCoin>(
-            aptos_framework,
-            string::utf8(b"TC"),
-            string::utf8(b"TC"),
-            8,
-            false,
-        );
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
         account::create_account_for_test(signer::address_of(sponsor));
         coin::register<AptosCoin>(sponsor);
         let coins = coin::mint<AptosCoin>(2000, &mint_cap);
         coin::deposit(signer::address_of(sponsor), coins);
         coin::destroy_mint_cap(mint_cap);
-        coin::destroy_freeze_cap(freeze_cap);
 
         burn_cap
     }

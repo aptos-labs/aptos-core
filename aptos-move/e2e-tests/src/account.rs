@@ -506,7 +506,7 @@ impl AccountData {
     ///
     /// This constructor is non-deterministic and should not be used against golden file.
     pub fn new(balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(Account::new(), balance, sequence_number, false, false)
+        Self::with_account(Account::new(), balance, sequence_number, true, false)
     }
 
     pub fn increment_sequence_number(&mut self) {

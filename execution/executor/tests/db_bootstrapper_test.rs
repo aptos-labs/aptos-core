@@ -15,18 +15,19 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
-        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, FungibleStoreResource,
+        NewBlockEvent, ObjectGroupResource, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     },
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
-    state_store::{state_key::StateKey, MoveResourceExt},
+    state_store::{state_key::StateKey, MoveResourceExt, TStateView},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
@@ -36,9 +37,12 @@ use aptos_types::{
     AptosCoinType,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
-use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::{
+    language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
+};
 use rand::SeedableRng;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 #[test]
 fn test_empty_db() {
@@ -174,8 +178,32 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
     CoinStoreResource::<AptosCoinType>::fetch_move_resource(&db_state_view, account)
         .unwrap()
-        .unwrap()
-        .coin()
+        .map(|x| x.coin())
+        .unwrap_or(0)
+        + {
+            let bytes_opt = TStateView::get_state_value_bytes(
+                &db_state_view,
+                &StateKey::resource_group(
+                    &get_apt_primary_store_address(*account),
+                    &ObjectGroupResource::struct_tag(),
+                ),
+            )
+            .expect("account must exist in data store");
+
+            let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
+                .map(|bytes| bcs::from_bytes(&bytes))
+                .transpose()
+                .unwrap();
+            group
+                .and_then(|g| {
+                    g.get(&FungibleStoreResource::struct_tag())
+                        .map(|b| bcs::from_bytes(b))
+                })
+                .transpose()
+                .unwrap()
+                .map(|x: FungibleStoreResource| x.balance())
+                .unwrap_or(0)
+        }
 }
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
@@ -276,7 +304,7 @@ fn test_new_genesis() {
     assert_eq!(trusted_state.version(), 6);
 
     // Effect of bootstrapping reflected.
-    assert_eq!(get_balance(&account1, &db), 100_000_000);
+    assert_eq!(get_balance(&account1, &db), 300_000_000);
     // State before new genesis accessible.
     assert_eq!(get_balance(&account2, &db), 200_000_000);
 

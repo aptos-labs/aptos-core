@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    state_store::{state_key::StateKey, StateView},
+    account_config::{FungibleStoreResource, ObjectGroupResource},
+    state_store::{state_key::StateKey, StateView, TStateView},
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct CoinStore {
@@ -111,6 +114,31 @@ impl DbAccessUtil {
         state_view: &impl StateView,
     ) -> Result<Option<CoinStore>> {
         Self::get_value(coin_store_key, state_view)
+    }
+
+    pub fn get_fa_store(
+        account: AccountAddress,
+        state_view: &impl StateView,
+    ) -> Option<FungibleStoreResource> {
+        let bytes_opt = TStateView::get_state_value_bytes(
+            &state_view,
+            &StateKey::resource_group(
+                &get_apt_primary_store_address(account),
+                &ObjectGroupResource::struct_tag(),
+            ),
+        )
+        .expect("account must exist in data store");
+        let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .unwrap();
+        group
+            .and_then(|g| {
+                g.get(&FungibleStoreResource::struct_tag())
+                    .map(|b| bcs::from_bytes(b))
+            })
+            .transpose()
+            .unwrap()
     }
 
     pub fn get_value<T: DeserializeOwned>(

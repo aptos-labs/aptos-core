@@ -1189,8 +1189,6 @@ module aptos_framework::vesting {
     #[test_only]
     use aptos_framework::stake::with_rewards;
 
-    #[test_only]
-    use aptos_framework::account::create_account_for_test;
     use aptos_std::math64::min;
 
     #[test_only]
@@ -1459,40 +1457,6 @@ module aptos_framework::vesting {
         let admin_address = signer::address_of(admin);
         setup(aptos_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], admin_address, 0);
-    }
-
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @5, 0);
-    }
-
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
-    }
-
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_create_vesting_contract_with_unregistered_withdrawal_account_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        create_account_for_test(@11);
-        setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
     }
 
     #[test(aptos_framework = @0x1)]
@@ -2027,20 +1991,6 @@ module aptos_framework::vesting {
         setup(aptos_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address, 0);
-        set_beneficiary(admin, contract_address, @1, @11);
-    }
-
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
-    public entry fun test_set_beneficiary_with_unregistered_account_should_fail(
-        aptos_framework: &signer,
-        admin: &signer,
-    ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
-        let contract_address = setup_vesting_contract(
-            admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address, 0);
-        create_account_for_test(@11);
         set_beneficiary(admin, contract_address, @1, @11);
     }
 

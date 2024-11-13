@@ -25,9 +25,11 @@ use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
 use aptos_types::{
+    account_address::get_apt_primary_store_address,
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
+        ConcurrentSupplyResource, FungibleStoreResource, NewBlockEvent, ObjectGroupResource,
+        CORE_CODE_ADDRESS,
     },
     block_executor::{
         config::{
@@ -552,6 +554,14 @@ impl FakeExecutor {
         account: &Account,
     ) -> Option<CoinStoreResource<AptosCoinType>> {
         self.read_apt_coin_store_resource_at_address(account.address())
+    }
+
+    /// Reads the CoinStore resource value for an account from this executor's data store.
+    pub fn read_apt_pfs_resource(&self, account: &Account) -> Option<FungibleStoreResource> {
+        self.read_resource_from_group::<FungibleStoreResource>(
+            &get_apt_primary_store_address(*account.address()),
+            &ObjectGroupResource::struct_tag(),
+        )
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.

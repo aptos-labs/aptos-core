@@ -10,7 +10,9 @@ use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag}
 
 #[test]
 fn test_metadata_tracking() {
-    let mut harness = MoveHarness::new();
+    let mut harness = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+    ]);
     harness.new_epoch(); // so that timestamp is not 0 (rather, 7200000001)
     let timestamp = CurrentTimeMicroseconds {
         microseconds: 7200000001,

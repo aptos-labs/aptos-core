@@ -3,6 +3,7 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
+use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, MultisigTransactionPayload},
@@ -478,13 +479,16 @@ async fn test_multisig_transaction_simulation() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::coin::CoinWithdraw"
+        "0x1::fungible_asset::Withdraw"
     );
-    let withdraw_from_account =
-        AccountAddress::from_hex_literal(withdraw_event["data"]["account"].as_str().unwrap())
+    let withdraw_from_object =
+        AccountAddress::from_hex_literal(withdraw_event["data"]["store"].as_str().unwrap())
             .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
-    assert_eq!(withdraw_from_account, multisig_account);
+    assert_eq!(
+        withdraw_from_object,
+        get_apt_primary_store_address(multisig_account)
+    );
     assert_eq!(withdrawn_amount, "1000");
 }
 
@@ -530,13 +534,16 @@ async fn test_multisig_transaction_simulation_2_of_3() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::coin::CoinWithdraw"
+        "0x1::fungible_asset::Withdraw"
     );
-    let withdraw_from_account =
-        AccountAddress::from_hex_literal(withdraw_event["data"]["account"].as_str().unwrap())
+    let withdraw_from_object =
+        AccountAddress::from_hex_literal(withdraw_event["data"]["store"].as_str().unwrap())
             .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
-    assert_eq!(withdraw_from_account, multisig_account);
+    assert_eq!(
+        withdraw_from_object,
+        get_apt_primary_store_address(multisig_account)
+    );
     assert_eq!(withdrawn_amount, "1000");
 }
 
@@ -628,6 +635,7 @@ async fn test_multisig_transaction_simulation_fail_2_of_3_insufficient_approvals
 async fn test_simulate_multisig_transaction_should_charge_gas_against_sender() {
     let mut context = new_test_context(current_function_name!());
     let owner_account = &mut context.create_account().await;
+
     let multisig_account = context
         .create_multisig_account(
             owner_account,

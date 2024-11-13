@@ -29,11 +29,14 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
         let sender_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(account_address);
-        let sender_coin_store =
-            DbAccessUtil::get_db_value::<CoinStore>(&sender_coin_store_key, &db_state_view)?
-                .unwrap();
+        let coin = DbAccessUtil::get_db_value::<CoinStore>(&sender_coin_store_key, &db_state_view)?
+            .map(|x| x.coin)
+            .unwrap_or(0);
+        let fa = DbAccessUtil::get_fa_store(account_address, &db_state_view)
+            .map(|x| x.balance())
+            .unwrap_or(0);
 
-        Ok(sender_coin_store.coin)
+        Ok(coin + fa)
     }
 
     async fn query_sequence_number(&self, address: AccountAddress) -> Result<u64> {

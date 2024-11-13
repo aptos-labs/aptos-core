@@ -179,8 +179,9 @@ fn test_basic_fungible_token() {
 // A simple test to verify gas paying still work for prologue and epilogue.
 #[test]
 fn test_coin_to_fungible_asset_migration() {
-    let mut h = MoveHarness::new();
-
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+    ]);
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let alice_primary_store_addr =
         account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);

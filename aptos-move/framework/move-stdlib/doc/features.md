@@ -3727,6 +3727,17 @@ Helper to check whether a feature flag is enabled.
 
 
 
+<a id="0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled">spec_new_accounts_default_to_fa_apt_store_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
+}
+</code></pre>
+
+
+
+
 <a id="0x1_features_spec_simulation_enhancement_enabled"></a>
 
 
