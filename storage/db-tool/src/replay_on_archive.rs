@@ -213,7 +213,7 @@ impl Verifier {
                     return Ok(total_failed_txns);
                 }
             }
-            
+
             let (input_txn, expected_txn_info, expected_event, expected_writeset) = item?;
             let is_epoch_ending = expected_event.iter().any(ContractEvent::is_new_epoch_event);
             cur_txns.push(input_txn);
