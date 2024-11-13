@@ -81,14 +81,15 @@ module groth16_example::groth16 {
     #[test_only]
     use aptos_std::crypto_algebra::{deserialize, enable_cryptography_algebra_natives};
     #[test_only]
-    use aptos_std::bls12381_algebra::{Fr, FormatFrLsb, FormatG1Uncompr, FormatG2Uncompr, FormatG1Compr, FormatG2Compr, FormatFq12LscLsb, G1, G2, Gt, Fq12, FormatGt};
+    use aptos_std::bls12381_algebra::{Fr, FormatFrLsb, FormatG1Compr, FormatG2Compr, FormatFq12LscLsb, G1, G2, Gt, Fq12, FormatGt};
+    #[test_only]
+    use aptos_std::bn254_algebra;
     #[test_only]
     use std::bcs;
     #[test_only]
     use std::vector;
     #[test_only]
     use std::debug;
-
 
     #[test(fx = @std)]
     fun test_verify_circom_proof(fx: signer) {
@@ -97,35 +98,50 @@ module groth16_example::groth16 {
         let a_y = 4751084799539532208179359846086616641767957505361605807745261011239799367574u256;
         let a_bytes = bcs::to_bytes<u256>(&a_x);
         let a_y_bytes = bcs::to_bytes<u256>(&a_y);
-        vector::reverse(&mut a_bytes);
-        vector::reverse(&mut a_y_bytes);
         vector::append(&mut a_bytes, a_y_bytes);
+        let a = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&a_bytes));
 
-        let test = 10000000000000000000000u256;
-        let test_bytes = bcs::to_bytes<u256>(&test);
-        let a_bytes = x"01000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000";
-        vector::reverse(&mut test_bytes);
-        debug::print<vector<u8>>(&a_bytes);
-        debug::print<u64>(&vector::length(&a_bytes));
-
-
-        //let vk_alpha_g1 = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&x"9819f632fa8d724e351d25081ea31ccf379991ac25c90666e07103fffb042ed91c76351cd5a24041b40e26d231a5087e"));
-        let a = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"01000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000"));
-        //let a = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&a_bytes));
         let b_x1 = 4154738608741966676660560127107026081842675422117462672893103452342068780854u256;
         let b_y1 = 4513470140932917342403349901925141325820502953664313447973655116956106256795u256;
         let b_x2 = 15981382089229198179693168711034036915586021039523535710774744447138572769902u256;
         let b_y2 = 11691946641863119124627852663455054061430853487917262585560660740296157381098u256;
-        let b_x1_bytes = bcs::to_bytes<u256>(&b_x1);
+        let b_bytes = bcs::to_bytes<u256>(&b_x1);
         let b_y1_bytes = bcs::to_bytes<u256>(&b_y1);
         let b_x2_bytes = bcs::to_bytes<u256>(&b_x2);
         let b_y2_bytes = bcs::to_bytes<u256>(&b_y2);
+        vector::append(&mut b_bytes, b_y1_bytes);
+        vector::append(&mut b_bytes, b_x2_bytes);
+        vector::append(&mut b_bytes, b_y2_bytes);
+        let b = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&b_bytes));
 
         let c_x = 19416574444268205378069689424519026208317515867624593374135746889327790637883u256;
         let c_y = 9387724931669771435449663200581094189180308746057595118467671565223418773035u256;
-        let c_x_bytes = bcs::to_bytes<u256>(&c_x);
+        let c_bytes = bcs::to_bytes<u256>(&c_x);
         let c_y_bytes = bcs::to_bytes<u256>(&c_y);
+        vector::append(&mut c_bytes, c_y_bytes);
+        let c = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&c_bytes));
 
+        let vk_alpha_x = 20491192805390485299153009773594534940189261866228447918068658471970481763042u256;
+        let vk_alpha_y = 9383485363053290200918347156157836566562967994039712273449902621266178545958u256;
+        let vk_alpha_bytes = bcs::to_bytes<u256>(&vk_alpha_x);
+        let vk_alpha_y_bytes = bcs::to_bytes<u256>(&vk_alpha_y);
+        vector::append(&mut vk_alpha_bytes, vk_alpha_y_bytes);
+        let vk_alpha = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_alpha_bytes));
+
+        let vk_beta_2_x1 = 6375614351688725206403948262868962793625744043794305715222011528459656738731u256;
+        let vk_beta_2_y1 = 4252822878758300859123897981450591353533073413197771768651442665752259397132u256;
+        let vk_beta_2_x2 = 10505242626370262277552901082094356697409835680220590971873171140371331206856u256;
+        let vk_beta_2_y2 = 21847035105528745403288232691147584728191162732299865338377159692350059136679u256;
+
+        let vk_gamma_2_x1 = 10857046999023057135944570762232829481370756359578518086990519993285655852781u256;
+        let vk_gamma_2_y1 = 11559732032986387107991004021392285783925812861821192530917403151452391805634u256;
+        let vk_gamma_2_x2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930u256;
+        let vk_gamma_2_y2 = 4082367875863433681332203403145435568316851327593401208105741076214120093531u256;
+
+        let vk_delta_2_x1 = 11733257046589851891850695012146277477007262722187040969185039828348964552798u256;
+        let vk_delta_2_y1 = 4027038803827470819590008730534113934894139311083936102089700708335772383417u256;
+        let vk_delta_2_x2 = 4501048010313692533367858190733760821904297928029128233318781536412685771070u256;
+        let vk_delta_2_y2 = 7929485975251451284651333169168875690528578182699769192928243180764480545757u256;
     }
 
     #[test(fx = @std)]
