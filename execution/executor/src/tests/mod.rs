@@ -18,7 +18,9 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+    },
     block_info::BlockInfo,
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -689,7 +691,7 @@ fn run_transactions_naive(
                 )
                 .unwrap(),
             block_executor_onchain_config.clone(),
-            None,
+            TransactionSliceMetadata::unknown(),
         )
         .unwrap();
         let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();

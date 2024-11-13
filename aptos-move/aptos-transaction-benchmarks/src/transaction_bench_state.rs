@@ -3,7 +3,9 @@
 
 use crate::transactions;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -16,6 +18,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
+        execution_state::TransactionSliceMetadata,
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -218,7 +221,9 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
+            &AptosModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .expect("VM should not fail to start")
@@ -266,10 +271,12 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
+            &AptosModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
             ),
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .expect("VM should not fail to start")
@@ -285,7 +292,7 @@ where
         partitioned_txns: Option<PartitionedTransactions>,
         run_par: bool,
         run_seq: bool,
-        conurrency_level_per_shard: usize,
+        concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
         let (output, par_tps) = if run_par {
@@ -293,13 +300,13 @@ where
             let (output, tps) = if self.is_shareded() {
                 self.execute_benchmark_sharded(
                     partitioned_txns.unwrap(),
-                    conurrency_level_per_shard,
+                    concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 )
             } else {
                 self.execute_benchmark_parallel(
                     &transactions,
-                    conurrency_level_per_shard,
+                    concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 )
             };

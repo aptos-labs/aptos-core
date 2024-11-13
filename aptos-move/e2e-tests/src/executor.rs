@@ -14,7 +14,9 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -26,8 +28,12 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
         ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    block_executor::{
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
+        execution_state::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -633,17 +639,21 @@ impl FakeExecutor {
                 },
                 allow_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block_on_thread_pool_without_global_module_cache::<
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             self.executor_thread_pool.clone(),
             txn_block,
             &state_view,
+            // Do not use shared module caches in tests.
+            &AptosModuleCacheManager::new(),
             config,
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)

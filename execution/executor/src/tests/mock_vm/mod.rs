@@ -11,7 +11,8 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -52,7 +53,6 @@ enum MockVMTransaction {
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Keep(ExecutionStatus::Success));
 
-// We use 10 as the assertion error code for insufficient balance within the Aptos coin contract.
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 
@@ -68,6 +68,7 @@ impl VMBlockExecutor for MockVM {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.

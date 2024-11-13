@@ -25,6 +25,8 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+#[cfg(any(test, feature = "testing"))]
+use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
 use move_vm_types::sha3_256;
 use std::sync::Arc;
 
@@ -283,6 +285,15 @@ impl RuntimeEnvironment {
     pub fn flush_struct_name_and_info_caches(&self) {
         self.flush_struct_info_cache();
         self.struct_name_index_map.flush();
+    }
+
+    /// Test-only function to be able to populate [StructNameIndexMap] outside of this crate.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn struct_name_to_idx_for_test(
+        &self,
+        struct_name: StructIdentifier,
+    ) -> PartialVMResult<StructNameIndex> {
+        self.struct_name_index_map.struct_name_to_idx(struct_name)
     }
 }
 

@@ -9,7 +9,8 @@ use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter};
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateView,
@@ -79,6 +80,7 @@ impl VMBlockExecutor for FakeVM {
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         Ok(BlockOutput::new(vec![], None))
     }

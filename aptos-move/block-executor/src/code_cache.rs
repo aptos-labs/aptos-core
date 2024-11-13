@@ -44,28 +44,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeB
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
     type Verified = Module;
-    type Version = Option<TxnIndex>;
 
     fn build(
         &self,
         key: &Self::Key,
-    ) -> VMResult<
-        Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension, Self::Version>>,
-    > {
+    ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         let key = T::Key::from_address_and_module_name(key.address(), key.name());
         self.get_raw_base_value(&key)
             .map_err(|err| err.finish(Location::Undefined))?
             .map(|state_value| {
-                let extension = AptosModuleExtension::new(state_value);
+                let extension = Arc::new(AptosModuleExtension::new(state_value));
+
+                // TODO(loader_v2): This recomputes module hash twice, we should avoid it.
                 let (compiled_module, _, _) = self
                     .runtime_environment()
                     .deserialize_into_compiled_module(extension.bytes())?;
-                let version = None;
-                Ok(ModuleCode::from_deserialized(
-                    compiled_module,
-                    Arc::new(extension),
-                    version,
-                ))
+                Ok(ModuleCode::from_deserialized(compiled_module, extension))
             })
             .transpose()
     }
@@ -101,8 +95,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
         verified_code: Self::Verified,
         extension: Arc<Self::Extension>,
         version: Self::Version,
-    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension, Self::Version>>>
-    {
+    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // For parallel execution, if we insert a verified module, we might need to also
@@ -118,7 +111,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                 state
                     .captured_reads
                     .borrow_mut()
-                    .capture_per_block_cache_read(key, Some(module.clone()));
+                    .capture_per_block_cache_read(key, Some((module.clone(), version)));
                 Ok(module)
             },
             ViewState::Unsync(state) => state.unsync_map.module_cache().insert_verified_module(
@@ -138,14 +131,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
             Deserialized = Self::Deserialized,
             Verified = Self::Verified,
             Extension = Self::Extension,
-            Version = Self::Version,
         >,
     ) -> VMResult<
-        Option<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension, Self::Version>>>,
+        Option<(
+            Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
+            Self::Version,
+        )>,
     > {
         // First, look up the module in the cross-block global module cache. Record the read for
         // later validation in case the read module is republished.
-        if let Some(module) = self.global_module_cache.get(key) {
+        if let Some(module) = self.global_module_cache.get_valid(key) {
             match &self.latest_view {
                 ViewState::Sync(state) => state
                     .captured_reads
@@ -155,7 +150,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                     state.read_set.borrow_mut().capture_module_read(key.clone())
                 },
             }
-            return Ok(Some(module.clone()));
+            return Ok(Some((module, Self::Version::default())));
         }
 
         // Global cache miss: check module cache in versioned/unsync maps.
@@ -208,7 +203,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         let state_value_metadata = self
             .get_module_or_build_with(&id, self)
             .map_err(|err| err.to_partial())?
-            .map(|module| module.extension().state_value_metadata().clone());
+            .map(|(module, _)| module.extension().state_value_metadata().clone());
         Ok(state_value_metadata)
     }
 }

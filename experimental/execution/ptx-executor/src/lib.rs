@@ -26,7 +26,8 @@ use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     state_store::StateView,
     transaction::{
@@ -53,6 +54,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 

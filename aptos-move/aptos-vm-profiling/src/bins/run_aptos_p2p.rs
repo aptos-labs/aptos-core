@@ -48,9 +48,9 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let res = AptosVMBlockExecutor::new().execute_block_no_limit(&txns, &state_store)?;
+    let outputs = AptosVMBlockExecutor::new().execute_block_no_limit(&txns, &state_store)?;
     for i in 0..NUM_TXNS {
-        assert!(res[i as usize].status().status().unwrap().is_success());
+        assert!(outputs[i as usize].status().status().unwrap().is_success());
     }
 
     Ok(())

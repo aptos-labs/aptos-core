@@ -27,13 +27,12 @@ pub(crate) struct AptosExecutorTask {
 }
 
 impl ExecutorTask for AptosExecutorTask {
-    type Environment = AptosEnvironment;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new(env, state_view);
+    fn init(environment: AptosEnvironment, state_view: &impl StateView) -> Self {
+        let vm = AptosVM::new(environment, state_view);
         let id = state_view.id();
         Self { vm, id }
     }

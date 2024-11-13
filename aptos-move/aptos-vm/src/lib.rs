@@ -128,7 +128,8 @@ pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     state_store::StateView,
     transaction::{
@@ -152,11 +153,16 @@ pub trait VMValidator {
     ) -> VMValidatorResult;
 }
 
-/// This trait describes the VM's execution interface.
+/// This trait describes the block executor interface which is responsible for executing a block of
+/// transactions. In general, block execution returns a vector of transaction outputs. This vector
+/// has the same length as the input vector of transactions. In case transactions are skipped or
+/// discarded, they are still included - but their output is empty. The outputs are not applied to
+/// the state directly. It is the responsibility of the caller to update the state accordingly.
 pub trait VMBlockExecutor: Send + Sync {
-    /// Be careful if any state is kept in VMBlockExecutor, as all validations are implementers responsibility
-    /// (and state_view passed in execute_block can go both backwards and forwards in time).
-    /// TODO: Currently, production uses new() on every block, and only executor-benchmark reuses across.
+    /// Be careful if any state (such as caches) is kept in [VMBlockExecutor]. It is the
+    /// responsibility of the implementation to ensure the state is valid across multiple
+    /// executions. For example, the same executor may be used to run on a new state, and then on
+    /// an old one.
     fn new() -> Self;
 
     /// Executes a block of transactions and returns output for each one of them.
@@ -165,10 +171,11 @@ pub trait VMBlockExecutor: Send + Sync {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
 
-    /// Executes a block of transactions and returns output for each one of them,
-    /// Without applying any block limit
+    /// Executes a block of transactions and returns output for each one of them, without applying
+    /// any block limit.
     fn execute_block_no_limit(
         &self,
         transactions: &[SignatureVerifiedTransaction],
@@ -178,6 +185,8 @@ pub trait VMBlockExecutor: Send + Sync {
             transactions,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            // For all use cases, we run on an unknown state.
+            TransactionSliceMetadata::unknown(),
         )
         .map(BlockOutput::into_transaction_outputs_forced)
     }

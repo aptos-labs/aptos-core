@@ -27,7 +27,9 @@ use crate::{
     VMBlockExecutor, VMValidator,
 };
 use anyhow::anyhow;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
@@ -43,7 +45,11 @@ use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
+        execution_state::TransactionSliceMetadata,
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -2773,29 +2779,25 @@ impl AptosVM {
 /// Transaction execution: AptosVM
 /// Executing conflicts: in the input order, via BlockSTM,
 /// State: BlockSTM-provided MVHashMap-based view with caching
-pub struct AptosVMBlockExecutor;
+pub struct AptosVMBlockExecutor {
+    /// Manages module cache and execution environment of this block executor. Users of executor
+    /// must use manager's API to ensure the correct state of caches.
+    module_cache_manager: AptosModuleCacheManager,
+}
 
-// Executor external API
 impl VMBlockExecutor for AptosVMBlockExecutor {
-    // NOTE: At the moment there are no persistent caches that live past the end of a block (that's
-    // why AptosVMBlockExecutor has no state)
-    // There are some cache invalidation issues around transactions publishing code that need to be
-    // sorted out before that's possible.
-
     fn new() -> Self {
-        Self
+        Self {
+            module_cache_manager: AptosModuleCacheManager::new(),
+        }
     }
 
-    /// Execute a block of `transactions`. The output vector will have the exact same length as the
-    /// input vector. The discarded transactions will be marked as `TransactionStatus::Discard` and
-    /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior
-    /// mutability. Writes to be applied to the data view are encoded in the write set part of a
-    /// transaction output.
     fn execute_block(
         &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -2817,14 +2819,17 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         >(
             transactions,
             state_view,
+            &self.module_cache_manager,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: AptosVM::get_concurrency_level(),
                     allow_fallback: true,
                     discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+                    module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
                 },
                 onchain: onchain_config,
             },
+            transaction_slice_metadata,
             None,
         );
         if ret.is_ok() {
