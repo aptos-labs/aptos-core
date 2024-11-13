@@ -56,6 +56,7 @@ use move_core_types::{
 use move_vm_runtime::{Module, ModuleStorage};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
+use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -446,18 +447,21 @@ impl BlockAptosVM {
             module_cache_manager
                 .check_ready_and_get_caches(environment, &config.local.module_cache_config)?
         } else {
-            (environment, Arc::new(GlobalModuleCache::empty()))
+            (
+                environment,
+                Arc::new(RwLock::new(GlobalModuleCache::empty())),
+            )
         };
 
         // Finally, to avoid cold starts, fetch the framework code prior to block execution. This
         // ensures the state with 0 modules cached is not possible for block execution (as long as
         // the config enables the framework prefetch).
         if is_loader_v2_enabled
-            && module_cache.num_modules() == 0
+            && module_cache.read().num_modules() == 0
             && config.local.module_cache_config.prefetch_framework_code
         {
             let code_storage = state_view.as_aptos_code_storage(environment.clone());
-            prefetch_aptos_framework(code_storage, &module_cache).map_err(|err| {
+            prefetch_aptos_framework(code_storage, &mut module_cache.write()).map_err(|err| {
                 alert!("Failed to load Aptos framework to module cache: {:?}", err);
                 VMError::from(err).into_vm_status()
             })?;
@@ -469,12 +473,7 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
-        >::new(
-            config,
-            executor_thread_pool,
-            module_cache,
-            transaction_commit_listener,
-        );
+        >::new(config, executor_thread_pool, transaction_commit_listener);
 
         if is_loader_v2_enabled && !module_cache_manager.mark_executing() {
             return Err(VMStatus::error(
@@ -482,7 +481,12 @@ impl BlockAptosVM {
                 Some("Unable to mark block execution start".to_string()),
             ));
         }
-        let ret = executor.execute_block(environment, signature_verified_block, state_view);
+        let ret = executor.execute_block(
+            environment,
+            signature_verified_block,
+            state_view,
+            module_cache.as_ref(),
+        );
         if is_loader_v2_enabled && !module_cache_manager.mark_done() {
             return Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -557,7 +561,7 @@ impl BlockAptosVM {
 /// error is returned.
 fn prefetch_aptos_framework<S: StateView>(
     code_storage: AptosCodeStorageAdapter<S, AptosEnvironment>,
-    module_cache: &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    module_cache: &mut GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
 ) -> Result<(), PanicError> {
     // If framework code exists in storage, the transitive closure will be verified and cached.
     let maybe_loaded = code_storage
@@ -590,10 +594,10 @@ mod test {
         let environment = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
         let code_storage = state_view.as_aptos_code_storage(environment);
 
-        let module_cache = GlobalModuleCache::empty();
+        let mut module_cache = GlobalModuleCache::empty();
         assert_eq!(module_cache.num_modules(), 0);
 
-        let result = prefetch_aptos_framework(code_storage, &module_cache);
+        let result = prefetch_aptos_framework(code_storage, &mut module_cache);
         assert!(result.is_ok());
         assert!(module_cache.num_modules() > 0);
     }
@@ -606,10 +610,10 @@ mod test {
             AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view);
         let code_storage = state_view.as_aptos_code_storage(environment);
 
-        let module_cache = GlobalModuleCache::empty();
+        let mut module_cache = GlobalModuleCache::empty();
         assert_eq!(module_cache.num_modules(), 0);
 
-        let result = prefetch_aptos_framework(code_storage, &module_cache);
+        let result = prefetch_aptos_framework(code_storage, &mut module_cache);
         assert!(result.is_ok());
         assert_eq!(module_cache.num_modules(), 0);
     }

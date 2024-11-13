@@ -58,11 +58,13 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::ModuleCache;
 use num_cpus;
+use parking_lot::RwLock;
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
+    ops::Deref,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
@@ -74,8 +76,6 @@ pub struct BlockExecutor<T, E, S, L, X> {
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    global_module_cache:
-        Arc<GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -93,9 +93,6 @@ where
     pub fn new(
         config: BlockExecutorConfig,
         executor_thread_pool: Arc<ThreadPool>,
-        global_module_cache: Arc<
-            GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        >,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
@@ -106,7 +103,6 @@ where
         Self {
             config,
             executor_thread_pool,
-            global_module_cache,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -560,6 +556,7 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txns(
         &self,
         block_gas_limit_type: &BlockGasLimitType,
@@ -569,6 +566,12 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         runtime_environment: &RuntimeEnvironment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
@@ -605,7 +608,7 @@ where
                     versioned_cache,
                     executor,
                     base_view,
-                    self.global_module_cache.as_ref(),
+                    global_module_cache,
                     runtime_environment,
                     ParallelState::new(
                         versioned_cache,
@@ -624,7 +627,7 @@ where
                         Self::publish_module_writes(
                             txn_idx,
                             module_write_set,
-                            self.global_module_cache.as_ref(),
+                            global_module_cache,
                             versioned_cache,
                             scheduler,
                             runtime_environment,
@@ -637,7 +640,7 @@ where
                 let validation_result = Self::validate(
                     txn_idx,
                     last_input_output,
-                    self.global_module_cache.as_ref(),
+                    global_module_cache,
                     versioned_cache,
                     scheduler,
                 );
@@ -666,7 +669,7 @@ where
                     Self::publish_module_writes(
                         txn_idx,
                         module_write_set,
-                        self.global_module_cache.as_ref(),
+                        global_module_cache,
                         versioned_cache,
                         scheduler,
                         runtime_environment,
@@ -841,6 +844,12 @@ where
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         runtime_environment: &RuntimeEnvironment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
@@ -852,7 +861,7 @@ where
         );
         let latest_view = LatestView::new(
             base_view,
-            self.global_module_cache.as_ref(),
+            global_module_cache,
             runtime_environment,
             ViewState::Sync(parallel_state),
             txn_idx,
@@ -946,6 +955,12 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -974,6 +989,7 @@ where
                     shared_counter,
                     last_input_output,
                     base_view,
+                    global_module_cache,
                     runtime_environment,
                     final_results,
                 )?;
@@ -1001,6 +1017,7 @@ where
                     last_input_output,
                     shared_commit_state,
                     base_view,
+                    global_module_cache,
                     runtime_environment,
                     start_shared_counter,
                     shared_counter,
@@ -1018,7 +1035,7 @@ where
                     let valid = Self::validate(
                         txn_idx,
                         last_input_output,
-                        self.global_module_cache.as_ref(),
+                        global_module_cache,
                         versioned_cache,
                         scheduler,
                     );
@@ -1046,7 +1063,7 @@ where
                         versioned_cache,
                         &executor,
                         base_view,
-                        self.global_module_cache.as_ref(),
+                        global_module_cache,
                         runtime_environment,
                         ParallelState::new(
                             versioned_cache,
@@ -1084,6 +1101,9 @@ where
         env: &E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
+        global_module_cache: &RwLock<
+            GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        >,
     ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -1126,6 +1146,11 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
+
+        // Read lock for execution because global cache is not mutated.
+        let global_module_cache_read_lock = global_module_cache.read();
+        let immutable_global_module_cache = global_module_cache_read_lock.deref();
+
         self.executor_thread_pool.scope(|s| {
             for _ in 0..num_workers {
                 s.spawn(|_| {
@@ -1136,6 +1161,7 @@ where
                         &versioned_cache,
                         &scheduler,
                         base_view,
+                        immutable_global_module_cache,
                         start_shared_counter,
                         &shared_counter,
                         &shared_commit_state,
@@ -1156,6 +1182,7 @@ where
                 });
             }
         });
+        drop(global_module_cache_read_lock);
         drop(timer);
 
         if !shared_maybe_error.load(Ordering::SeqCst) && scheduler.pop_from_commit_queue().is_ok() {
@@ -1168,7 +1195,8 @@ where
         }
 
         counters::update_state_counters(versioned_cache.stats(), true);
-        self.global_module_cache
+        global_module_cache
+            .write()
             .insert_verified_unsync(versioned_cache.take_modules_iter())
             .map_err(|err| {
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
@@ -1342,6 +1370,9 @@ where
         env: &E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
+        global_module_cache: &RwLock<
+            GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        >,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
@@ -1363,10 +1394,14 @@ where
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
+        // Global module cache is only readable throughout execution.
+        let global_module_cache_read_lock = global_module_cache.read();
+        let immutable_global_module_cache = global_module_cache_read_lock.deref();
+
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
-                self.global_module_cache.as_ref(),
+                immutable_global_module_cache,
                 runtime_environment,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
@@ -1558,7 +1593,7 @@ where
                     Self::apply_output_sequential(
                         idx as TxnIndex,
                         runtime_environment,
-                        self.global_module_cache.as_ref(),
+                        immutable_global_module_cache,
                         &unsync_map,
                         &output,
                         resource_write_set.clone(),
@@ -1646,7 +1681,12 @@ where
         ret.resize_with(num_txns, E::Output::skip_output);
 
         counters::update_state_counters(unsync_map.stats(), false);
-        self.global_module_cache
+
+        // Release the read lock on the global module cache, and acquire a write lock to mutate
+        // it by adding cached modules from unsync map.
+        drop(global_module_cache_read_lock);
+        global_module_cache
+            .write()
             .insert_verified_unsync(unsync_map.into_modules_iter())?;
 
         let block_end_info = if self
@@ -1686,12 +1726,19 @@ where
         env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
+        global_module_cache: &RwLock<
+            GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        >,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
-            let parallel_result =
-                self.execute_transactions_parallel(&env, signature_verified_block, base_view);
+            let parallel_result = self.execute_transactions_parallel(
+                &env,
+                signature_verified_block,
+                base_view,
+                global_module_cache,
+            );
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -1709,14 +1756,19 @@ where
             // Flush the cache and the environment to re-run from the "clean" state.
             env.runtime_environment()
                 .flush_struct_name_and_info_caches();
-            self.global_module_cache.flush_unsync();
+            global_module_cache.write().flush_unsync();
 
             info!("parallel execution requiring fallback");
         }
 
         // If we didn't run parallel, or it didn't finish successfully - run sequential
-        let sequential_result =
-            self.execute_transactions_sequential(&env, signature_verified_block, base_view, false);
+        let sequential_result = self.execute_transactions_sequential(
+            &env,
+            signature_verified_block,
+            base_view,
+            global_module_cache,
+            false,
+        );
 
         // If sequential gave us result, return it
         let sequential_error = match sequential_result {
@@ -1738,6 +1790,7 @@ where
                     &env,
                     signature_verified_block,
                     base_view,
+                    global_module_cache,
                     true,
                 );
 

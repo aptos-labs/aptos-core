@@ -15,7 +15,7 @@ use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, VMStatus};
 use move_vm_runtime::WithRuntimeEnvironment;
 use move_vm_types::code::WithSize;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -64,7 +64,8 @@ pub struct ModuleCacheManager<T, K, DC, VC, E> {
     /// During concurrent executions, this module cache is read-only. However, it can be mutated
     /// when it is known that there are no concurrent accesses. [ModuleCacheManager] must ensure
     /// the safety.
-    module_cache: Arc<GlobalModuleCache<K, DC, VC, E>>,
+    // TODO(loader_v2): Remove this Arc when the feature is enabled on mainnet.
+    module_cache: Arc<RwLock<GlobalModuleCache<K, DC, VC, E>>>,
     /// The execution environment, initially set to [None]. The environment, as long as it does not
     /// change, can be kept for multiple block executions.
     environment: ExplicitSyncWrapper<Option<AptosEnvironment>>,
@@ -83,7 +84,7 @@ where
     pub fn new() -> Self {
         Self {
             state: Mutex::new(State::Done(None)),
-            module_cache: Arc::new(GlobalModuleCache::empty()),
+            module_cache: Arc::new(RwLock::new(GlobalModuleCache::empty())),
             environment: ExplicitSyncWrapper::new(None),
         }
     }
@@ -107,7 +108,7 @@ where
                         .runtime_environment()
                         .flush_struct_name_and_info_caches();
                 }
-                self.module_cache.flush_unsync();
+                self.module_cache.write().flush_unsync();
             }
 
             *state = State::Ready(current);
@@ -135,7 +136,13 @@ where
         &self,
         storage_environment: AptosEnvironment,
         config: &BlockExecutorModuleCacheLocalConfig,
-    ) -> Result<(AptosEnvironment, Arc<GlobalModuleCache<K, DC, VC, E>>), VMStatus> {
+    ) -> Result<
+        (
+            AptosEnvironment,
+            Arc<RwLock<GlobalModuleCache<K, DC, VC, E>>>,
+        ),
+        VMStatus,
+    > {
         let state = self.state.lock();
         if !matches!(state.deref(), State::Ready(_)) {
             let msg = format!(
@@ -160,17 +167,17 @@ where
         STRUCT_NAME_INDEX_MAP_NUM_ENTRIES.set(struct_name_index_map_size as i64);
 
         if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
-            module_cache.flush_unsync();
+            module_cache.write().flush_unsync();
             runtime_environment.flush_struct_name_and_info_caches();
         }
 
         // Check 2: If the module cache is too big, flush it.
-        let module_cache_size_in_bytes = module_cache.size_in_bytes();
+        let module_cache_size_in_bytes = module_cache.read().size_in_bytes();
         GLOBAL_MODULE_CACHE_SIZE_IN_BYTES.set(module_cache_size_in_bytes as i64);
-        GLOBAL_MODULE_CACHE_NUM_MODULES.set(module_cache.num_modules() as i64);
+        GLOBAL_MODULE_CACHE_NUM_MODULES.set(module_cache.read().num_modules() as i64);
 
         if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
-            module_cache.flush_unsync();
+            module_cache.write().flush_unsync();
         }
 
         Ok((environment, module_cache))
@@ -222,7 +229,7 @@ where
 
             // If this environment has been (re-)initialized, we need to flush the module cache
             // because it can contain now out-dated code.
-            self.module_cache.flush_unsync();
+            self.module_cache.write().flush_unsync();
         }
 
         existing_environment
@@ -261,8 +268,9 @@ mod test {
         // Pre-populate module cache to test flushing.
         module_cache_manager
             .module_cache
+            .write()
             .insert(0, mock_verified_code(0, MockExtension::new(8)));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
 
         assert!(!module_cache_manager.mark_executing());
         assert!(!module_cache_manager.mark_done());
@@ -270,9 +278,9 @@ mod test {
 
         // Only in matching case the module cache is not flushed.
         if recorded_previous.is_some() && recorded_previous == previous {
-            assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+            assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
         } else {
-            assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+            assert_eq!(module_cache_manager.module_cache.read().num_modules(), 0);
         }
 
         let state = module_cache_manager.state.lock().clone();
@@ -304,8 +312,9 @@ mod test {
 
         module_cache_manager
             .module_cache
+            .write()
             .insert(0, mock_verified_code(0, MockExtension::new(16)));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
 
         let runtime_environment = environment.runtime_environment();
         let dummy_struct_name = StructIdentifier {
@@ -324,7 +333,7 @@ mod test {
         assert!(module_cache_manager
             .check_ready_and_get_caches(environment.clone(), &config)
             .is_ok());
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 0);
         assert_eq!(
             assert_ok!(runtime_environment.struct_name_index_map_size()),
             1
@@ -332,13 +341,14 @@ mod test {
 
         module_cache_manager
             .module_cache
+            .write()
             .insert(0, mock_verified_code(0, MockExtension::new(4)));
 
         // This time size is less than the one specified in config. No flushing.
         assert!(module_cache_manager
             .check_ready_and_get_caches(environment.clone(), &config)
             .is_ok());
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
         assert_eq!(
             assert_ok!(runtime_environment.struct_name_index_map_size()),
             1
@@ -368,7 +378,7 @@ mod test {
         assert!(module_cache_manager
             .check_ready_and_get_caches(environment.clone(), &config)
             .is_ok());
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 0);
         assert_eq!(
             assert_ok!(runtime_environment.struct_name_index_map_size()),
             0
@@ -531,11 +541,13 @@ mod test {
 
         module_cache_manager
             .module_cache
+            .write()
             .insert(0, mock_verified_code(0, MockExtension::new(8)));
         module_cache_manager
             .module_cache
+            .write()
             .insert(1, mock_verified_code(1, MockExtension::new(8)));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 2);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 2);
         assert!(module_cache_manager.environment.acquire().is_none());
 
         // Environment has to be set to the same value, cache flushed.
@@ -543,7 +555,7 @@ mod test {
         let environment = module_cache_manager.get_or_initialize_environment(
             AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
         );
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 0);
         assert!(module_cache_manager
             .environment
             .acquire()
@@ -552,8 +564,9 @@ mod test {
 
         module_cache_manager
             .module_cache
+            .write()
             .insert(2, mock_verified_code(2, MockExtension::new(8)));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
         assert!(module_cache_manager.environment.acquire().is_some());
 
         // Environment has to be re-set to the new value, cache flushed.
@@ -562,7 +575,7 @@ mod test {
         let environment = module_cache_manager.get_or_initialize_environment(
             AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
         );
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 0);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 0);
         assert!(module_cache_manager
             .environment
             .acquire()
@@ -571,15 +584,16 @@ mod test {
 
         module_cache_manager
             .module_cache
+            .write()
             .insert(3, mock_verified_code(3, MockExtension::new(8)));
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
         assert!(module_cache_manager.environment.acquire().is_some());
 
         // Environment is kept, and module caches are not flushed.
         let new_environment = module_cache_manager.get_or_initialize_environment(
             AptosEnvironment::new_with_delayed_field_optimization_enabled(&state_view),
         );
-        assert_eq!(module_cache_manager.module_cache.num_modules(), 1);
+        assert_eq!(module_cache_manager.module_cache.read().num_modules(), 1);
         assert!(environment == new_environment);
     }
 }

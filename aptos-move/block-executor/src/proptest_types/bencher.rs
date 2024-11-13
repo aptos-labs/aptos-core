@@ -20,6 +20,7 @@ use aptos_types::{
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
+use parking_lot::RwLock;
 use proptest::{
     arbitrary::Arbitrary,
     collection::vec,
@@ -126,18 +127,19 @@ where
                 .build()
                 .unwrap(),
         );
-        let global_module_cache = Arc::new(GlobalModuleCache::empty());
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
-        >::new(config, executor_thread_pool, global_module_cache, None)
-        .execute_transactions_parallel(&env, &self.transactions, &state_view);
+        >::new(config, executor_thread_pool, None)
+        .execute_transactions_parallel(&env, &self.transactions, &state_view, &global_module_cache);
 
         self.baseline_output.assert_parallel_output(&output);
     }

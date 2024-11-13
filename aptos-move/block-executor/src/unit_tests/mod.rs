@@ -35,6 +35,7 @@ use aptos_types::{
 };
 use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
+use parking_lot::RwLock;
 use rand::{prelude::*, random};
 use std::{
     cmp::min,
@@ -87,7 +88,6 @@ fn test_resource_group_deletion() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(GlobalModuleCache::empty()),
         None,
     );
 
@@ -96,9 +96,15 @@ fn test_resource_group_deletion() {
         &env,
         &transactions,
         &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
         false
     ));
-    assert_ok!(block_executor.execute_transactions_parallel(&env, &transactions, &data_view));
+    assert_ok!(block_executor.execute_transactions_parallel(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty())
+    ));
 }
 
 #[test]
@@ -154,13 +160,17 @@ fn resource_group_bcs_fallback() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(GlobalModuleCache::empty()),
         None,
     );
 
     // Execute the block normally.
     let env = MockEnvironment::new();
-    let output = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let output = block_executor.execute_transactions_parallel(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+    );
     match output {
         Ok(block_output) => {
             let txn_outputs = block_output.into_transaction_outputs_forced();
@@ -179,12 +189,22 @@ fn resource_group_bcs_fallback() {
     assert!(!fail::list().is_empty());
 
     let env = MockEnvironment::new();
-    let par_output = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let par_output = block_executor.execute_transactions_parallel(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+    );
     assert_matches!(par_output, Err(()));
 
     let env = MockEnvironment::new();
-    let seq_output =
-        block_executor.execute_transactions_sequential(&env, &transactions, &data_view, false);
+    let seq_output = block_executor.execute_transactions_sequential(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+        false,
+    );
     assert_matches!(
         seq_output,
         Err(SequentialBlockExecutionError::ResourceGroupSerializationError)
@@ -193,7 +213,13 @@ fn resource_group_bcs_fallback() {
     // Now execute with fallback handling for resource group serialization error:
     let env = MockEnvironment::new();
     let fallback_output = block_executor
-        .execute_transactions_sequential(&env, &transactions, &data_view, true)
+        .execute_transactions_sequential(
+            &env,
+            &transactions,
+            &data_view,
+            &RwLock::new(GlobalModuleCache::empty()),
+            true,
+        )
         .map_err(|e| match e {
             SequentialBlockExecutionError::ResourceGroupSerializationError => {
                 panic!("Unexpected error")
@@ -202,7 +228,12 @@ fn resource_group_bcs_fallback() {
         });
 
     let env = MockEnvironment::new();
-    let fallback_output_block = block_executor.execute_block(env, &transactions, &data_view);
+    let fallback_output_block = block_executor.execute_block(
+        env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+    );
     for output in [fallback_output, fallback_output_block] {
         match output {
             Ok(block_output) => {
@@ -254,7 +285,6 @@ fn block_output_err_precedence() {
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(GlobalModuleCache::empty()),
         None,
     );
 
@@ -265,7 +295,12 @@ fn block_output_err_precedence() {
     // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
     // Confirm that the fatal VM error is still detected and sequential fallback triggered.
     let env = MockEnvironment::new();
-    let output = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let output = block_executor.execute_transactions_parallel(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+    );
     assert_matches!(output, Err(()));
     scenario.teardown();
 }
@@ -294,13 +329,17 @@ fn skip_rest_gas_limit() {
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
-        Arc::new(GlobalModuleCache::empty()),
         None,
     );
 
     // Should hit block limit on the skip transaction.
     let env = MockEnvironment::new();
-    let _ = block_executor.execute_transactions_parallel(&env, &transactions, &data_view);
+    let _ = block_executor.execute_transactions_parallel(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+    );
 }
 
 // TODO: add unit test for block gas limit!
@@ -330,10 +369,14 @@ where
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
-        Arc::new(GlobalModuleCache::empty()),
         None,
     )
-    .execute_transactions_parallel(&env, &transactions, &data_view);
+    .execute_transactions_parallel(
+        &env,
+        &transactions,
+        &data_view,
+        &RwLock::new(GlobalModuleCache::empty()),
+    );
 
     let baseline = BaselineOutput::generate(&transactions, None);
     baseline.assert_parallel_output(&output);

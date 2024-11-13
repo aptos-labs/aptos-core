@@ -22,6 +22,7 @@ use aptos_types::{
 };
 use claims::{assert_matches, assert_ok};
 use num_cpus;
+use parking_lot::RwLock;
 use proptest::{
     collection::vec,
     prelude::*,
@@ -71,6 +72,8 @@ fn run_transactions<K, V, E>(
 
     for _ in 0..num_repeat {
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
@@ -80,10 +83,14 @@ fn run_transactions<K, V, E>(
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(GlobalModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &state_view);
+        .execute_transactions_parallel(
+            &env,
+            &transactions,
+            &state_view,
+            &global_module_cache,
+        );
 
         if module_access.0 && module_access.1 {
             assert_matches!(output, Err(()));
@@ -208,6 +215,8 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
 
     for _ in 0..20 {
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -217,10 +226,14 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(GlobalModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(
+            &env,
+            &transactions,
+            &data_view,
+            &global_module_cache,
+        );
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -261,6 +274,8 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 
     for _ in 0..20 {
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -270,10 +285,14 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(GlobalModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(
+            &env,
+            &transactions,
+            &data_view,
+            &global_module_cache,
+        );
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -419,6 +438,8 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Confirm still no intersection
     let env = MockEnvironment::new();
+    let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
     let output = BlockExecutor::<
         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -428,10 +449,9 @@ fn publishing_fixed_params_with_block_gas_limit(
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
-        Arc::new(GlobalModuleCache::empty()),
         None,
     )
-    .execute_transactions_parallel(&env, &transactions, &data_view);
+    .execute_transactions_parallel(&env, &transactions, &data_view, &global_module_cache);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -463,6 +483,8 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     for _ in 0..200 {
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -475,10 +497,14 @@ fn publishing_fixed_params_with_block_gas_limit(
                 Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             ),
             executor_thread_pool.clone(),
-            Arc::new(GlobalModuleCache::empty()),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(
+            &env,
+            &transactions,
+            &data_view,
+            &global_module_cache,
+        );
 
         assert_matches!(output, Err(()));
     }
@@ -547,6 +573,8 @@ fn non_empty_group(
 
     for _ in 0..num_repeat_parallel {
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -556,16 +584,22 @@ fn non_empty_group(
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
-            Arc::new(GlobalModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(
+            &env,
+            &transactions,
+            &data_view,
+            &global_module_cache,
+        );
 
         BaselineOutput::generate(&transactions, None).assert_parallel_output(&output);
     }
 
     for _ in 0..num_repeat_sequential {
         let env = MockEnvironment::new();
+        let global_module_cache = RwLock::new(GlobalModuleCache::empty());
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -575,10 +609,15 @@ fn non_empty_group(
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
-            Arc::new(GlobalModuleCache::empty()),
             None,
         )
-        .execute_transactions_sequential(&env, &transactions, &data_view, false);
+        .execute_transactions_sequential(
+            &env,
+            &transactions,
+            &data_view,
+            &global_module_cache,
+            false,
+        );
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(&transactions, None).assert_output(&output.map_err(|e| match e {
