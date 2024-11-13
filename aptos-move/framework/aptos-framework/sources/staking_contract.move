@@ -784,6 +784,8 @@ module aptos_framework::staking_contract {
 
         // withdraw entire inactive stake and unlock commission produced so far
         distribute_internal(staker_address, operator, &mut staking_contract, &mut store.distribute_events);
+        // pending-inactive commission will be converted into pending-inactive shares owned by the operator
+        // within the newly created delegation pool
         request_commission_internal(
             operator,
             &mut staking_contract,

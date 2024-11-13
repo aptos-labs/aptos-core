@@ -899,6 +899,8 @@ module aptos_framework::delegation_pool {
     /// Initialize a delegation pool from an existing owned staking contract.
     /// The newly created delegation pool will preserve the operator and commission fee. The staker becomes the pool
     /// owner and has the same delegated voter set.
+    /// The conversion fails if there is any pending-active stake on the staking contract or if the staker already owns
+    /// a delegation pool.
     public entry fun initialize_delegation_pool_from_staking_contract(
         staker: &signer,
         operator: address,
