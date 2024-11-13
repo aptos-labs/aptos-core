@@ -81,7 +81,52 @@ module groth16_example::groth16 {
     #[test_only]
     use aptos_std::crypto_algebra::{deserialize, enable_cryptography_algebra_natives};
     #[test_only]
-    use aptos_std::bls12381_algebra::{Fr, FormatFrLsb, FormatG1Compr, FormatG2Compr, FormatFq12LscLsb, G1, G2, Gt, Fq12, FormatGt};
+    use aptos_std::bls12381_algebra::{Fr, FormatFrLsb, FormatG1Uncompr, FormatG2Uncompr, FormatG1Compr, FormatG2Compr, FormatFq12LscLsb, G1, G2, Gt, Fq12, FormatGt};
+    #[test_only]
+    use std::bcs;
+    #[test_only]
+    use std::vector;
+    #[test_only]
+    use std::debug;
+
+
+    #[test(fx = @std)]
+    fun test_verify_circom_proof(fx: signer) {
+        enable_cryptography_algebra_natives(&fx);
+        let a_x = 9291141442484249183824149917322150275993152355313319552386216014158050680949u256;
+        let a_y = 4751084799539532208179359846086616641767957505361605807745261011239799367574u256;
+        let a_bytes = bcs::to_bytes<u256>(&a_x);
+        let a_y_bytes = bcs::to_bytes<u256>(&a_y);
+        vector::reverse(&mut a_bytes);
+        vector::reverse(&mut a_y_bytes);
+        vector::append(&mut a_bytes, a_y_bytes);
+
+        let test = 10000000000000000000000u256;
+        let test_bytes = bcs::to_bytes<u256>(&test);
+        let a_bytes = x"01000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000";
+        vector::reverse(&mut test_bytes);
+        debug::print<vector<u8>>(&a_bytes);
+        debug::print<u64>(&vector::length(&a_bytes));
+
+
+        //let vk_alpha_g1 = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&x"9819f632fa8d724e351d25081ea31ccf379991ac25c90666e07103fffb042ed91c76351cd5a24041b40e26d231a5087e"));
+        let a = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"01000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000"));
+        //let a = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&a_bytes));
+        let b_x1 = 4154738608741966676660560127107026081842675422117462672893103452342068780854u256;
+        let b_y1 = 4513470140932917342403349901925141325820502953664313447973655116956106256795u256;
+        let b_x2 = 15981382089229198179693168711034036915586021039523535710774744447138572769902u256;
+        let b_y2 = 11691946641863119124627852663455054061430853487917262585560660740296157381098u256;
+        let b_x1_bytes = bcs::to_bytes<u256>(&b_x1);
+        let b_y1_bytes = bcs::to_bytes<u256>(&b_y1);
+        let b_x2_bytes = bcs::to_bytes<u256>(&b_x2);
+        let b_y2_bytes = bcs::to_bytes<u256>(&b_y2);
+
+        let c_x = 19416574444268205378069689424519026208317515867624593374135746889327790637883u256;
+        let c_y = 9387724931669771435449663200581094189180308746057595118467671565223418773035u256;
+        let c_x_bytes = bcs::to_bytes<u256>(&c_x);
+        let c_y_bytes = bcs::to_bytes<u256>(&c_y);
+
+    }
 
     #[test(fx = @std)]
     fun test_verify_proof_with_bls12381(fx: signer) {
