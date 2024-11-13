@@ -131,26 +131,29 @@ impl BlockPreparer {
                 self.get_transactions(block, block_window).await?
             });
 
-        let num_blocks_in_window = block_window.pipelined_blocks().len();
-        for b in block_window
-            .pipelined_blocks()
-            .iter()
-            .take(num_blocks_in_window.saturating_sub(1))
-        {
-            info!(
-                "BlockPreparer: Waiting for committed transactions at block {} for block {}",
-                b.round(),
-                block.round()
-            );
-            for txn_hash in b.wait_for_committed_transactions()?.iter() {
-                committed_transactions.insert(*txn_hash);
+        // TODO: lots of repeated code here
+        monitor!("wait_for_committed_transactions", {
+            let num_blocks_in_window = block_window.pipelined_blocks().len();
+            for b in block_window
+                .pipelined_blocks()
+                .iter()
+                .take(num_blocks_in_window.saturating_sub(1))
+            {
+                info!(
+                    "BlockPreparer: Waiting for committed transactions at block {} for block {}",
+                    b.round(),
+                    block.round()
+                );
+                for txn_hash in b.wait_for_committed_transactions()?.iter() {
+                    committed_transactions.insert(*txn_hash);
+                }
+                info!(
+                    "BlockPreparer: Waiting for committed transactions at block {} for block {}: Done",
+                    b.round(),
+                    block.round()
+                );
             }
-            info!(
-                "BlockPreparer: Waiting for committed transactions at block {} for block {}: Done",
-                b.round(),
-                block.round()
-            );
-        }
+        });
 
         info!(
             "BlockPreparer: Waiting for part of committed transactions for round {} took {} ms",

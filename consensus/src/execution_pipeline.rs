@@ -258,11 +258,12 @@ impl ExecutionPipeline {
 
             // TODO: lots of repeated code here
             monitor!("execute_wait_for_committed_transactions", {
+                let num_blocks_in_window = pipelined_block.block_window().pipelined_blocks().len();
                 for b in pipelined_block
                     .block_window()
                     .pipelined_blocks()
                     .iter()
-                    .filter(|window_block| window_block.round() == pipelined_block.round() - 1)
+                    .skip(num_blocks_in_window.saturating_sub(1))
                 {
                     info!(
                         "Execution: Waiting for committed transactions at block {} for block {}",

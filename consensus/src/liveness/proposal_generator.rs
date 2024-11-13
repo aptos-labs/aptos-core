@@ -170,9 +170,7 @@ impl PipelineBackpressureConfig {
                     let execution_time_ms = summary.execution_time.as_millis();
                     // Only block above the time threshold are considered giving enough signal to support calibration
                     // so we filter out shorter locks
-                    if execution_time_ms > config.min_block_time_ms_to_activate as u128
-                        && summary.payload_len > 0
-                    {
+                    if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
                         if let Some(gas_used) = summary.gas_used {
                             Some(
                                 ((config.target_block_time_ms as f64 / execution_time_ms as f64
