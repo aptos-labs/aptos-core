@@ -272,11 +272,11 @@ module 0x42::test {
 
     struct S has key, drop, copy { t: T }
 
-    struct T has store, drop, copy {
+    struct T has key, store, drop, copy {
         w: W
     }
 
-    struct W has store, drop, copy {
+    struct W has key, store, drop, copy {
         x: u64
     }
 
@@ -290,6 +290,7 @@ module 0x42::test {
         let s = S {
             t
         };
+        move_to(signer, w);
         move_to(signer, s);
     }
 
@@ -301,9 +302,18 @@ module 0x42::test {
         S[account].t.w.merge(w)
     }
 
+    fun foo_2(account: address, w: W) acquires W {
+        W[account].merge(w)
+    }
+
     fun boo_1(v: vector<S>, w: W): u64 {
         v[0].t.w.merge(w);
         v[0].t.w.x
+    }
+
+    fun boo_2(v: vector<W>, w: W) {
+        v[0].merge(w);
+        assert!(v[0].x == 8, 0);
     }
 
     fun test_receiver() {
@@ -313,6 +323,9 @@ module 0x42::test {
         foo_1(@0x1, w);
         assert!(S[@0x1].t.w.x == 5, 0);
         assert!(boo_1(vector[S[@0x1]], w) == 8, 1);
+        foo_2(@0x1, w);
+        assert!(W[@0x1].x == 5, 0);
+        boo_2(vector[W[@0x1]], w);
     }
 
 }

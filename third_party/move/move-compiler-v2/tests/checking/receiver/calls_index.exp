@@ -31,6 +31,16 @@ module 0x42::m {
      {
         m::merge(Borrow(Mutable)(select m::T.w<T>(select m::S.t<S>(BorrowGlobal(Mutable)<S>(account)))), w)
     }
+    private fun foo_2(account: address,w: W)
+        acquires W(*)
+     {
+        m::merge(BorrowGlobal(Mutable)<W>(account), w)
+    }
+    private fun foo_3(account: address,w: W)
+        acquires W(*)
+     {
+        m::merge(BorrowGlobal(Mutable)<W>(account), w)
+    }
     private fun foo_greater(account: address,w: W): bool
         acquires S(*)
      {
@@ -58,13 +68,13 @@ module 0x42::m {
 
 // -- Sourcified model before bytecode pipeline
 module 0x42::m {
-    struct T has drop, store {
+    struct T has drop, store, key {
         w: W,
     }
     struct S has drop, key {
         t: T,
     }
-    struct W has drop, store {
+    struct W has drop, store, key {
         x: u64,
     }
     fun boo(v: vector<S>, w: W) {
@@ -88,6 +98,16 @@ module 0x42::m {
         acquires S
     {
         merge(&mut borrow_global_mut<S>(account).t.w, w)
+    }
+    fun foo_2(account: address, w: W)
+        acquires W
+    {
+        merge(borrow_global_mut<W>(account), w)
+    }
+    fun foo_3(account: address, w: W)
+        acquires W
+    {
+        merge(borrow_global_mut<W>(account), w)
     }
     fun foo_greater(account: address, w: W): bool
         acquires S

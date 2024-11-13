@@ -2,11 +2,11 @@ module 0x42::m {
 
     struct S has key, drop { t: T }
 
-    struct T has store, drop {
+    struct T has key, store, drop {
         w: W
     }
 
-    struct W has store, drop {
+    struct W has key, store, drop {
         x: u64
     }
 
@@ -16,6 +16,14 @@ module 0x42::m {
 
     fun foo(account: address, w: W) acquires S {
         S[account].t.w.merge(w)
+    }
+
+    fun foo_2(account: address, w: W) acquires W {
+        W[account].merge(w)
+    }
+
+    fun foo_3(account: address, w: W) acquires W {
+        borrow_global_mut<W>(account).merge(w)
     }
 
     fun boo(v: vector<S>, w: W) {
