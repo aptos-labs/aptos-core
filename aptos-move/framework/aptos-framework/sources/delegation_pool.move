@@ -903,7 +903,6 @@ module aptos_framework::delegation_pool {
         staker: &signer,
         operator: address,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-        assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
         assert!(
             features::staking_contract_to_delegation_pool_conversion_enabled(),
             error::invalid_state(ESTAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION_NOT_SUPPORTED)
@@ -994,18 +993,15 @@ module aptos_framework::delegation_pool {
         move_to(staker, DelegationPoolOwnership { pool_address });
 
         // enable partial governance voting
-        if (features::partial_governance_voting_enabled(
-        ) && features::delegation_pool_partial_governance_voting_enabled()) {
-            // get staker's voter before being set to the resource account
-            let staker_delegated_voter = stake::get_delegated_voter(pool_address);
+        // get staker's voter before being set to the resource account
+        let staker_delegated_voter = stake::get_delegated_voter(pool_address);
 
-            // partial governance voting could not have been enabled as the following would fail
-            enable_partial_governance_voting(pool_address);
+        // partial governance voting could not have been enabled as the following would fail
+        enable_partial_governance_voting(pool_address);
 
-            // set delegated voter of staker which takes effect immediately
-            if (staker_delegated_voter != staker_address) {
-                initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
-            };
+        // set delegated voter of staker which takes effect immediately
+        if (staker_delegated_voter != staker_address) {
+            initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
         };
     }
 
@@ -5305,7 +5301,11 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
-            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting(),
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
+            ],
             vector[],
         );
         staking_contract::setup_staking_contract(
@@ -5395,7 +5395,11 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
-            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting(),
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
+            ],
             vector[],
         );
         staking_contract::setup_staking_contract(
@@ -5494,7 +5498,11 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
-            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting(),
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
+            ],
             vector[],
         );
         staking_contract::setup_staking_contract(
@@ -5653,7 +5661,11 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
-            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting(),
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
+            ],
             vector[],
         );
         staking_contract::setup_staking_contract(
