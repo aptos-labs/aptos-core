@@ -111,8 +111,6 @@ pub struct PipelineInputRx {
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
-    /// Input transactions in the order of execution
-    input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
@@ -141,13 +139,14 @@ impl Serialize for PipelinedBlock {
         #[serde(rename = "PipelineBlock")]
         struct SerializedBlock<'a> {
             block: &'a Block,
-            input_transactions: &'a Vec<SignedTransaction>,
+            // Removed, keeping for backwards compatibility
+            _input_transactions: &'a Vec<SignedTransaction>,
             randomness: Option<&'a Randomness>,
         }
 
         let serialized = SerializedBlock {
             block: &self.block,
-            input_transactions: &self.input_transactions,
+            _input_transactions: &vec![],
             randomness: self.randomness.get(),
         };
         serialized.serialize(serializer)
@@ -163,17 +162,18 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
         #[serde(rename = "PipelineBlock")]
         struct SerializedBlock {
             block: Block,
-            input_transactions: Vec<SignedTransaction>,
+            // Removed, keeping for backwards compatibility
+            _input_transactions: Vec<SignedTransaction>,
             randomness: Option<Randomness>,
         }
 
         let SerializedBlock {
             block,
-            input_transactions,
+            _input_transactions: _,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
 
-        let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
+        let block = PipelinedBlock::new(block, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);
         }
@@ -191,14 +191,13 @@ impl PipelinedBlock {
         pipeline_execution_result: PipelineExecutionResult,
     ) -> Self {
         let PipelineExecutionResult {
-            input_txns,
+            input_txns: _,
             result,
             execution_time,
             pre_commit_fut,
         } = pipeline_execution_result;
 
         self.state_compute_result = result;
-        self.input_transactions = input_txns;
         self.pre_commit_fut = Arc::new(Mutex::new(Some(pre_commit_fut)));
 
         let mut to_commit = 0;
@@ -280,14 +279,9 @@ impl Display for PipelinedBlock {
 }
 
 impl PipelinedBlock {
-    pub fn new(
-        block: Block,
-        input_transactions: Vec<SignedTransaction>,
-        state_compute_result: StateComputeResult,
-    ) -> Self {
+    pub fn new(block: Block, state_compute_result: StateComputeResult) -> Self {
         Self {
             block,
-            input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
@@ -300,7 +294,7 @@ impl PipelinedBlock {
     }
 
     pub fn new_ordered(block: Block) -> Self {
-        Self::new(block, vec![], StateComputeResult::new_dummy())
+        Self::new(block, StateComputeResult::new_dummy())
     }
 
     pub fn block(&self) -> &Block {
@@ -309,10 +303,6 @@ impl PipelinedBlock {
 
     pub fn id(&self) -> HashValue {
         self.block().id()
-    }
-
-    pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
-        &self.input_transactions
     }
 
     pub fn epoch(&self) -> u64 {

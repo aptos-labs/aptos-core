@@ -517,7 +517,6 @@ mod test {
                 BlockData::dummy_with_validator_txns(vec![]),
                 None,
             ),
-            vec![],
             StateComputeResult::new_dummy(),
         )
     }

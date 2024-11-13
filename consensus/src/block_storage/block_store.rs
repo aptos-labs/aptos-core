@@ -188,7 +188,6 @@ impl BlockStore {
 
         let pipelined_root_block = PipelinedBlock::new(
             *root_block,
-            vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );

@@ -36,7 +36,6 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
                     ),
                     None,
                 ),
-                vec![],
                 StateComputeResult::new_dummy(),
             )
         })
