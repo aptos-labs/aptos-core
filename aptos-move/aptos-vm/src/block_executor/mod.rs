@@ -449,7 +449,9 @@ impl BlockAptosVM {
             (environment, Arc::new(GlobalModuleCache::empty()))
         };
 
-        // Finally, to avoid cold starts, fetch the framework code prior to block execution.
+        // Finally, to avoid cold starts, fetch the framework code prior to block execution. This
+        // ensures the state with 0 modules cached is not possible for block execution (as long as
+        // the config enables the framework prefetch).
         if is_loader_v2_enabled
             && module_cache.num_modules() == 0
             && config.local.module_cache_config.prefetch_framework_code
