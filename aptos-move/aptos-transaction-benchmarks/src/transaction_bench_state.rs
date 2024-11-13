@@ -4,7 +4,7 @@
 use crate::transactions;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::{
-    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
@@ -18,6 +18,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
+        execution_state::TransactionSliceMetadata,
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -220,10 +221,9 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
-            &ModuleCacheManager::new(),
+            &AptosModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
-            None,
-            None,
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .expect("VM should not fail to start")
@@ -271,13 +271,12 @@ where
         >(
             transactions,
             self.state_view.as_ref(),
-            &ModuleCacheManager::new(),
+            &AptosModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
             ),
-            None,
-            None,
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .expect("VM should not fail to start")

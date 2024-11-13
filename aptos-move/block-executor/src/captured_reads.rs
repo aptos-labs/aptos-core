@@ -1560,7 +1560,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        let global_module_cache = GlobalModuleCache::empty();
+        let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         global_module_cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
@@ -1697,7 +1697,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        let global_module_cache = GlobalModuleCache::empty();
+        let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
         // Module exists in global cache.

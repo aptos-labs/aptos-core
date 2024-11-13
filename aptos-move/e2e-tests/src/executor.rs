@@ -15,7 +15,7 @@ use crate::{
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::{
-    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
@@ -28,9 +28,12 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
         ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
-        BlockExecutorModuleCacheLocalConfig,
+    block_executor::{
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
+        execution_state::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -648,10 +651,9 @@ impl FakeExecutor {
             txn_block,
             &state_view,
             // Do not use shared module caches in tests.
-            &ModuleCacheManager::new(),
+            &AptosModuleCacheManager::new(),
             config,
-            None,
-            None,
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)

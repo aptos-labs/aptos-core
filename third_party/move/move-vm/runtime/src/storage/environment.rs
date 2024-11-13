@@ -25,10 +25,9 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::{
-    loaded_data::runtime_types::{StructIdentifier, StructNameIndex},
-    sha3_256,
-};
+#[cfg(any(test, feature = "testing"))]
+use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
+use move_vm_types::sha3_256;
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and

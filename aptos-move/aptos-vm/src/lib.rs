@@ -126,10 +126,10 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
-use aptos_crypto::HashValue;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     state_store::StateView,
     transaction::{
@@ -171,8 +171,7 @@ pub trait VMBlockExecutor: Send + Sync {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions and returns output for each one of them, without applying
@@ -186,9 +185,8 @@ pub trait VMBlockExecutor: Send + Sync {
             transactions,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
-            // For all use cases, we run on an unknown state. Hence, defaulting to None here.
-            None,
-            None,
+            // For all use cases, we run on an unknown state.
+            TransactionSliceMetadata::unknown(),
         )
         .map(BlockOutput::into_transaction_outputs_forced)
     }

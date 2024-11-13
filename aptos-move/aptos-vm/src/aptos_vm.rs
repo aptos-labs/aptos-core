@@ -28,7 +28,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_block_executor::{
-    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
@@ -49,6 +49,7 @@ use aptos_types::{
             BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
             BlockExecutorModuleCacheLocalConfig,
         },
+        execution_state::TransactionSliceMetadata,
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -70,7 +71,6 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
-    vm::modules::AptosModuleExtension,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::aptos_try;
@@ -117,7 +117,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    Module, RuntimeEnvironment, WithRuntimeEnvironment,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -2782,14 +2782,13 @@ impl AptosVM {
 pub struct AptosVMBlockExecutor {
     /// Manages module cache and execution environment of this block executor. Users of executor
     /// must use manager's API to ensure the correct state of caches.
-    module_cache_manager:
-        ModuleCacheManager<HashValue, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    module_cache_manager: AptosModuleCacheManager,
 }
 
 impl VMBlockExecutor for AptosVMBlockExecutor {
     fn new() -> Self {
         Self {
-            module_cache_manager: ModuleCacheManager::new(),
+            module_cache_manager: AptosModuleCacheManager::new(),
         }
     }
 
@@ -2798,8 +2797,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -2831,8 +2829,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
                 },
                 onchain: onchain_config,
             },
-            parent_block,
-            current_block,
+            transaction_slice_metadata,
             None,
         );
         if ret.is_ok() {

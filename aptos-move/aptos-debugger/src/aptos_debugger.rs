@@ -3,14 +3,15 @@
 
 use anyhow::{bail, format_err, Result};
 use aptos_block_executor::{
-    code_cache_global_manager::ModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        execution_state::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     state_store::TStateView,
@@ -433,13 +434,12 @@ fn execute_block_no_limit(
     BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
         sig_verified_txns,
         state_view,
-        &ModuleCacheManager::new(),
+        &AptosModuleCacheManager::new(),
         BlockExecutorConfig {
             local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         },
-        None,
-        None,
+        TransactionSliceMetadata::unknown(),
         None,
     )
     .map(BlockOutput::into_transaction_outputs_forced)

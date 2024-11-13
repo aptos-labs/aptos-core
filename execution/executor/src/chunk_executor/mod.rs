@@ -28,7 +28,9 @@ use aptos_storage_interface::{
     state_delta::StateDelta, DbReaderWriter,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+    },
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
@@ -603,8 +605,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
-            None,
-            None,
+            TransactionSliceMetadata::chunk(begin_version, end_version),
         )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((

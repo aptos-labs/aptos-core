@@ -6,12 +6,13 @@
 mod mock_vm_test;
 
 use anyhow::Result;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -67,8 +68,7 @@ impl VMBlockExecutor for MockVM {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _parent_block: Option<&HashValue>,
-        _current_block: Option<HashValue>,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.

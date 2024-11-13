@@ -25,6 +25,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
@@ -38,7 +39,6 @@ use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::{
     ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
 };
-use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -833,36 +833,16 @@ impl<K, E> MockTask<K, E> {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct MockEnvironment {
-    runtime_environment: RuntimeEnvironment,
-}
-
-impl MockEnvironment {
-    pub(crate) fn new() -> Self {
-        Self {
-            runtime_environment: RuntimeEnvironment::new(vec![]),
-        }
-    }
-}
-
-impl WithRuntimeEnvironment for MockEnvironment {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.runtime_environment
-    }
-}
-
 impl<K, E> ExecutorTask for MockTask<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Environment = MockEnvironment;
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_env: Self::Environment, _state_view: &impl TStateView<Key = K>) -> Self {
+    fn init(_environment: AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
         Self::new()
     }
 

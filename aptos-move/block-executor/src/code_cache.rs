@@ -140,7 +140,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
     > {
         // First, look up the module in the cross-block global module cache. Record the read for
         // later validation in case the read module is republished.
-        if let Some(module) = self.global_module_cache.get(key) {
+        if let Some(module) = self.global_module_cache.get_valid(key) {
             match &self.latest_view {
                 ViewState::Sync(state) => state
                     .captured_reads

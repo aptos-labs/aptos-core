@@ -30,7 +30,10 @@ use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
 use aptos_types::{
-    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::ExecutableBlock,
+    },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
 };
@@ -237,8 +240,7 @@ where
                         transactions,
                         state_view,
                         onchain_config.clone(),
-                        Some(&parent_block_id),
-                        Some(block_id),
+                        TransactionSliceMetadata::block(parent_block_id, block_id),
                     )?
                 };
 

@@ -22,6 +22,7 @@ use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
+        execution_state::TransactionSliceMetadata,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     contract_event::ContractEvent,
@@ -44,14 +45,12 @@ use std::{iter, sync::Arc};
 pub struct DoGetExecutionOutput;
 
 impl DoGetExecutionOutput {
-    // Note: state checkpoint will be appended in when the current block is Some(..).
     pub fn by_transaction_execution<V: VMBlockExecutor>(
         executor: &V,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
         let out = match transactions {
             ExecutableTransactions::Unsharded(txns) => {
@@ -60,15 +59,14 @@ impl DoGetExecutionOutput {
                     txns,
                     state_view,
                     onchain_config,
-                    parent_block,
-                    current_block,
+                    transaction_slice_metadata,
                 )?
             },
             ExecutableTransactions::Sharded(txns) => Self::by_transaction_execution_sharded::<V>(
                 txns,
                 state_view,
                 onchain_config,
-                current_block,
+                transaction_slice_metadata.append_state_checkpoint_to_block(),
             )?,
         };
 
@@ -92,16 +90,16 @@ impl DoGetExecutionOutput {
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
+        let append_state_checkpoint_to_block =
+            transaction_slice_metadata.append_state_checkpoint_to_block();
         let block_output = Self::execute_block::<V>(
             executor,
             &transactions,
             &state_view,
             onchain_config,
-            parent_block,
-            current_block,
+            transaction_slice_metadata,
         )?;
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
@@ -111,7 +109,7 @@ impl DoGetExecutionOutput {
             transaction_outputs,
             state_view.into_state_cache(),
             block_end_info,
-            current_block,
+            append_state_checkpoint_to_block,
         )
     }
 
@@ -212,16 +210,14 @@ impl DoGetExecutionOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
         Ok(executor.execute_block(
             transactions,
             state_view,
             onchain_config,
-            parent_block,
-            current_block,
+            transaction_slice_metadata,
         )?)
     }
 
@@ -235,8 +231,7 @@ impl DoGetExecutionOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        parent_block: Option<&HashValue>,
-        current_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
@@ -250,8 +245,7 @@ impl DoGetExecutionOutput {
                 transactions,
                 state_view,
                 onchain_config,
-                parent_block,
-                current_block,
+                transaction_slice_metadata,
             )?,
             _ => BlockOutput::new(
                 transactions

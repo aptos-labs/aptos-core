@@ -679,6 +679,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-drop-helper",
  "aptos-infallible",
+ "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-mvhashmap",
@@ -1648,7 +1649,6 @@ dependencies = [
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
- "aptos-crypto",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",

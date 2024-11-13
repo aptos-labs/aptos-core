@@ -16,11 +16,12 @@ use crate::{
         ExecutorShardCommand,
     },
 };
-use aptos_block_executor::code_cache_global_manager::ModuleCacheManager;
+use aptos_block_executor::code_cache_global_manager::AptosModuleCacheManager;
 use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorLocalConfig},
+        execution_state::TransactionSliceMetadata,
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
     state_store::StateView,
@@ -142,10 +143,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     aggr_overridden_state_view.as_ref(),
                     // Since we execute blocks in parallel, we cannot share module caches, so each
                     // thread has its own caches.
-                    &ModuleCacheManager::new(),
+                    &AptosModuleCacheManager::new(),
                     config,
-                    None,
-                    None,
+                    TransactionSliceMetadata::unknown(),
                     cross_shard_commit_sender,
                 )
                 .map(BlockOutput::into_transaction_outputs_forced);
