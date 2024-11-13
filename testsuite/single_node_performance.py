@@ -75,7 +75,7 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
 # bump after a bigger test or perf change, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v8"
+CODE_PERF_VERSION = "v9"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
