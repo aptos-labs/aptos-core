@@ -49,6 +49,18 @@ fn output_buckets() -> std::vec::Vec<f64> {
     .unwrap()
 }
 
+pub static BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_executor_block_executor_inner_execute_block_seconds",
+        // metric description
+        "The time spent in the most-inner part of executing a block of transactions, \
+        i.e. for BlockSTM that is how long parallel or sequential execution took.",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Count of times the module publishing fallback was triggered in parallel execution.
 pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

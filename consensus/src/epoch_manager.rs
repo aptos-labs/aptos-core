@@ -845,6 +845,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )));
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
+            self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
             failures_tracker.clone(),
         ));
 

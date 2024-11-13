@@ -42,6 +42,7 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
+    "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
     "aptos-utils",
@@ -141,8 +142,6 @@ members = [
     "experimental/runtimes",
     "experimental/storage/hexy",
     "experimental/storage/layered-map",
-    "keyless/circuit",
-    "keyless/common",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
@@ -249,6 +248,7 @@ members = [
     "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-explain",
+    "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
@@ -429,6 +429,7 @@ aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
+aptos-script-composer = { path = "aptos-move/script-composer" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
@@ -588,6 +589,7 @@ ethnum = "1.5.0"
 event-listener = "2.5.3"
 evm = { version = "0.33.1", features = ["tracing"] }
 evm-runtime = { version = "0.33.0", features = ["tracing"] }
+dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
@@ -793,6 +795,7 @@ toml_edit = "0.14.3"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
+try_match = "0.4.2"
 tokio = { version = "1.35.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.3.1"
@@ -813,6 +816,7 @@ tonic = { version = "0.11.0", features = [
 tonic-reflection = "0.11.0"
 topological-sort = "0.2.2"
 triomphe = "0.1.9"
+tsify-next = "0.5.4"
 tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
@@ -827,6 +831,8 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.42"
 which = "4.2.5"
 whoami = "1.5.0"
 x25519-dalek = "1.2.0"
@@ -849,6 +855,7 @@ move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
+move-linter = { path = "third_party/move/tools/move-linter" }
 move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }

@@ -33,6 +33,7 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
 use mock_vm::{
     encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -677,7 +678,8 @@ fn run_transactions_naive(
 
     for txn in transactions {
         let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
-        let out = DoGetExecutionOutput::by_transaction_execution::<MockVM>(
+        let out = DoGetExecutionOutput::by_transaction_execution(
+            &MockVM::new(),
             vec![txn].into(),
             ledger_view
                 .verified_state_view(

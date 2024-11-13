@@ -6,6 +6,6 @@ version = "0.0.0"
 named_addr = "0xCAFE"
 
 [dependencies.AptosStdlib]
-git = 'https://github.com/aptos-labs/aptos-core.git'
+git = 'https://github.com/aptos-labs/aptos-framework.git'
 rev = 'main'
-subdir = 'aptos-move/framework/aptos-stdlib'
+subdir = 'aptos-stdlib'

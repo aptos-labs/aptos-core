@@ -352,7 +352,6 @@ impl AptosDB {
             // Always put in state value index for now.
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),
-            skip_index_and_usage,
             chunk.transaction_infos
                 .iter()
                 .rposition(|t| t.state_checkpoint_hash().is_some()),
@@ -615,6 +614,18 @@ impl AptosDB {
             ledger_info_with_sig.ledger_info().epoch(),
             current_epoch,
         );
+
+        // Ensure that state tree at the end of the epoch is persisted.
+        if ledger_info_with_sig.ledger_info().ends_epoch() {
+            let state_snapshot = self.state_store.get_state_snapshot_before(version + 1)?;
+            ensure!(
+                state_snapshot.is_some() && state_snapshot.as_ref().unwrap().0 == version,
+                "State checkpoint not persisted at the end of the epoch, version {}, next_epoch {}, snapshot in db: {:?}",
+                version,
+                ledger_info_with_sig.ledger_info().next_block_epoch(),
+                state_snapshot,
+            );
+        }
 
         // Put write to batch.
         self.ledger_db

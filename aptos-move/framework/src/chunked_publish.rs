@@ -23,7 +23,7 @@ pub fn chunk_package_and_create_payloads(
     package_code: Vec<Vec<u8>>,
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
-    large_packages_module_address: &str,
+    large_packages_module_address: AccountAddress,
 ) -> Vec<TransactionPayload> {
     // Chunk the metadata
     let mut metadata_chunks = create_chunks(metadata);
@@ -105,11 +105,11 @@ fn large_packages_stage_code_chunk(
     metadata_chunk: Vec<u8>,
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
-    large_packages_module_address: &str,
+    large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
-            AccountAddress::from_hex_literal(large_packages_module_address).unwrap(),
+            large_packages_module_address,
             ident_str!("large_packages").to_owned(),
         ),
         ident_str!("stage_code_chunk").to_owned(),
@@ -127,11 +127,11 @@ fn large_packages_stage_code_chunk_and_publish_to_account(
     metadata_chunk: Vec<u8>,
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
-    large_packages_module_address: &str,
+    large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
-            AccountAddress::from_hex_literal(large_packages_module_address).unwrap(),
+            large_packages_module_address,
             ident_str!("large_packages").to_owned(),
         ),
         ident_str!("stage_code_chunk_and_publish_to_account").to_owned(),
@@ -149,11 +149,11 @@ fn large_packages_stage_code_chunk_and_publish_to_object(
     metadata_chunk: Vec<u8>,
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
-    large_packages_module_address: &str,
+    large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
-            AccountAddress::from_hex_literal(large_packages_module_address).unwrap(),
+            large_packages_module_address,
             ident_str!("large_packages").to_owned(),
         ),
         ident_str!("stage_code_chunk_and_publish_to_object").to_owned(),
@@ -172,11 +172,11 @@ fn large_packages_stage_code_chunk_and_upgrade_object_code(
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
     code_object: AccountAddress,
-    large_packages_module_address: &str,
+    large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
-            AccountAddress::from_hex_literal(large_packages_module_address).unwrap(),
+            large_packages_module_address,
             ident_str!("large_packages").to_owned(),
         ),
         ident_str!("stage_code_chunk_and_upgrade_object_code").to_owned(),
@@ -192,11 +192,11 @@ fn large_packages_stage_code_chunk_and_upgrade_object_code(
 
 // Cleanup account's `StagingArea` resource.
 pub fn large_packages_cleanup_staging_area(
-    large_packages_module_address: &str,
+    large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
-            AccountAddress::from_hex_literal(large_packages_module_address).unwrap(),
+            large_packages_module_address,
             ident_str!("large_packages").to_owned(),
         ),
         ident_str!("cleanup_staging_area").to_owned(),
