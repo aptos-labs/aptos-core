@@ -677,10 +677,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
-        let is_lang_version_2 = self
+        let is_lang_version_2_1 = self
             .env()
             .language_version
-            .is_at_least(LanguageVersion::V2_0);
+            .is_at_least(LanguageVersion::V2_1);
         params
             .iter()
             .enumerate()
@@ -690,7 +690,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
 
-                if !is_lang_version_2 || var_str != "_" {
+                if !is_lang_version_2_1 || var_str != "_" {
                     self.define_local(
                         &loc,
                         sym,
@@ -1587,7 +1587,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_loop_exit() {
+                let loop_type = if body.branches_to(0..usize::MAX) {
                     self.check_type(&loc, &Type::unit(), expected_type, context)
                 } else {
                     expected_type.clone()

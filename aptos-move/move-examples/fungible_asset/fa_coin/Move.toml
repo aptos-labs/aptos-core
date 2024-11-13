@@ -7,4 +7,4 @@ aptos_framework = "0x1"
 FACoin = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }

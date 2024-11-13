@@ -31,6 +31,7 @@ pub enum ConnectionRequest {
     ),
     DisconnectPeer(
         PeerId,
+        DisconnectReason,
         #[serde(skip)] oneshot::Sender<Result<(), PeerManagerError>>,
     ),
 }

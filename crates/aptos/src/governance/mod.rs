@@ -43,7 +43,10 @@ use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -913,11 +916,11 @@ pub struct CompileScriptFunction {
     pub bytecode_version: Option<u32>,
 
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION))]
     pub compiler_version: Option<CompilerVersion>,
 
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION))]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language, compiler for Move 2

@@ -16,6 +16,15 @@ module 0x815::m {
         }
     }
 
+    fun if_else_if(c: bool, d: bool): u8 {
+        if (c) {
+          1
+        } else if (d) {
+          2
+        } else {
+          3
+        }
+    }
 
     fun if_1(c: bool): u8 {
         let result = 0;
@@ -30,7 +39,7 @@ module 0x815::m {
         r
     }
 
-    fun if_else_with_shard_exp(x: u64): u64 {
+    fun if_else_with_shared_exp(x: u64): u64 {
         let y = x + x;
         let z = y * y;
         if (z > 0) z + 1 else z - 1

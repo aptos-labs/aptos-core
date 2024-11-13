@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    smoke_test_environment::new_local_swarm_with_aptos,
     state_sync_utils::create_fullnode,
     utils::{create_test_accounts, execute_transactions, MAX_HEALTHY_WAIT_SECS},
 };
@@ -110,14 +110,7 @@ fn enable_internal_indexer(node_config: &mut NodeConfig) {
 #[tokio::test]
 async fn test_internal_indexer_with_fast_sync() {
     // Create a swarm with 2 validators
-    let mut swarm = SwarmBuilder::new_local(2)
-        .with_aptos()
-        .with_init_config(Arc::new(move |_, config, _| {
-            config.state_sync.state_sync_driver.bootstrapping_mode =
-                BootstrappingMode::DownloadLatestStates;
-        }))
-        .build()
-        .await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();

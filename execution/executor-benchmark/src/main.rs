@@ -13,8 +13,10 @@ use aptos_block_partitioner::{
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
-use aptos_executor::block_executor::TransactionBlockExecutor;
-use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+use aptos_executor_benchmark::{
+    native::native_config::NativeConfig, native_executor::NativeExecutor, pipeline::PipelineConfig,
+    BenchmarkWorkload,
+};
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
@@ -24,9 +26,9 @@ use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::AptosVM;
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
     net::SocketAddr,
@@ -98,20 +100,43 @@ impl PrunerOpt {
 
 #[derive(Debug, Parser)]
 pub struct PipelineOpt {
+    /// First generate all transactions for all blocks (and keep them in memory),
+    /// and only then start the pipeline.
+    /// Useful when not running large number of blocks (so it can fit in memory),
+    /// as generation of blocks takes not-insignificant amount of CPU.
     #[clap(long)]
     generate_then_execute: bool,
+    /// Run each stage separately, i.e. each stage wait for previous stage to finish
+    /// processing all blocks, before starting.
+    /// Allows to see individual throughput of each stage, avoiding resource contention.
     #[clap(long)]
     split_stages: bool,
+    /// Skip commit stage - i.e. create executed blocks in memory, but never commit them.
+    /// Useful when commit is the bottleneck, to see throughput of the rest of the pipeline.
     #[clap(long)]
     skip_commit: bool,
+    /// Whether transactions are allowed to abort.
+    /// By default, workload generates transactions that are all expected to succeeded,
+    /// so aborts are not allowed - to catch any correctness/configuration issues.
     #[clap(long)]
     allow_aborts: bool,
+    /// Whether transactions are allowed to be discarded.
+    /// By default, workload generates transactions that are all expected to succeeded,
+    /// so discards are not allowed - to catch any correctness/configuration issues.
     #[clap(long)]
     allow_discards: bool,
+    /// Whether transactions are allowed to be retried.
+    /// By default, workload generates transactions that are all expected to succeeded,
+    /// so retries are not allowed - to catch any correctness/configuration issues.
     #[clap(long)]
     allow_retries: bool,
+    /// Number of worker threads transaction generation will use.
     #[clap(long, default_value = "4")]
     num_generator_workers: usize,
+    /// Number of worker threads signature verification will use.
+    #[clap(long, default_value = "8")]
+    num_sig_verify_threads: usize,
+    /// Sharding configuration.
     #[clap(flatten)]
     sharding_opt: ShardingOpt,
 }
@@ -119,16 +144,16 @@ pub struct PipelineOpt {
 impl PipelineOpt {
     fn pipeline_config(&self) -> PipelineConfig {
         PipelineConfig {
-            delay_execution_start: self.generate_then_execute,
+            generate_then_execute: self.generate_then_execute,
             split_stages: self.split_stages,
             skip_commit: self.skip_commit,
             allow_aborts: self.allow_aborts,
             allow_discards: self.allow_discards,
             allow_retries: self.allow_retries,
             num_executor_shards: self.sharding_opt.num_executor_shards,
-            use_global_executor: self.sharding_opt.use_global_executor,
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
+            num_sig_verify_threads: self.num_sig_verify_threads,
         }
     }
 }
@@ -202,17 +227,18 @@ struct ProfilerOpt {
     memory_profiling: bool,
 }
 
-#[derive(Parser, Debug)]
-#[clap(group(
-    ArgGroup::new("vm_selection")
-    .args(&["use_native_executor", "use_ptx_executor"]),
-))]
-pub struct VmSelectionOpt {
-    #[clap(long)]
-    use_native_executor: bool,
-
-    #[clap(long)]
-    use_ptx_executor: bool,
+#[derive(Parser, Debug, ValueEnum, Clone, Default)]
+enum BlockExecutorTypeOpt {
+    /// Transaction execution: AptosVM
+    /// Executing conflicts: in the input order, via BlockSTM,
+    /// State: BlockSTM-provided MVHashMap-based view with caching
+    #[default]
+    AptosVMWithBlockSTM,
+    /// Transaction execution: Native rust code producing WriteSet
+    /// Executing conflicts: All transactions execute on the state at the beginning of the block
+    /// State: Raw CachedStateView
+    NativeLooseSpeculative,
+    PtxExecutor,
 }
 
 #[derive(Parser, Debug)]
@@ -256,8 +282,8 @@ struct Opt {
     #[clap(long)]
     verify_sequence_numbers: bool,
 
-    #[clap(flatten)]
-    vm_selection_opt: VmSelectionOpt,
+    #[clap(long, value_enum, ignore_case = true)]
+    block_executor_type: BlockExecutorTypeOpt,
 
     #[clap(flatten)]
     profiler_opt: ProfilerOpt,
@@ -396,7 +422,7 @@ fn get_init_features(
 
 fn run<E>(opt: Opt)
 where
-    E: TransactionBlockExecutor + 'static,
+    E: VMBlockExecutor + 'static,
 {
     match opt.cmd {
         Command::CreateDb {
@@ -436,8 +462,12 @@ where
             //     disable_feature,
             // );
 
-            let transaction_mix = if transaction_type.is_empty() {
-                None
+            let workload = if transaction_type.is_empty() {
+                BenchmarkWorkload::Transfer {
+                    connected_tx_grps: opt.connected_tx_grps,
+                    shuffle_connected_txns: opt.shuffle_connected_txns,
+                    hotspot_probability: opt.hotspot_probability,
+                }
             } else {
                 let mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
                     &transaction_type,
@@ -448,7 +478,7 @@ where
                     WorkflowProgress::MoveByPhases,
                 );
                 assert!(mix_per_phase.len() == 1);
-                Some(mix_per_phase[0].clone())
+                BenchmarkWorkload::TransactionMix(mix_per_phase[0].clone())
             };
 
             if let Some(hotspot_probability) = opt.hotspot_probability {
@@ -462,11 +492,8 @@ where
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
-                transaction_mix,
+                workload,
                 opt.transactions_per_sender,
-                opt.connected_tx_grps,
-                opt.shuffle_connected_txns,
-                opt.hotspot_probability,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
@@ -563,7 +590,7 @@ fn main() {
     }
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
-    NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
+    NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
     AptosVM::set_processed_transactions_detailed_counters();
 
     let config = ProfilerConfig::new_with_defaults();
@@ -582,14 +609,20 @@ fn main() {
         let _mem_start = memory_profiler.start_profiling();
     }
 
-    if opt.vm_selection_opt.use_native_executor {
-        run::<NativeExecutor>(opt);
-    } else if opt.vm_selection_opt.use_ptx_executor {
-        #[cfg(target_os = "linux")]
-        ThreadManagerBuilder::set_thread_config_strategy(ThreadConfigStrategy::ThreadsPriority(48));
-        run::<PtxBlockExecutor>(opt);
-    } else {
-        run::<AptosVM>(opt);
+    match opt.block_executor_type {
+        BlockExecutorTypeOpt::AptosVMWithBlockSTM => {
+            run::<AptosVMBlockExecutor>(opt);
+        },
+        BlockExecutorTypeOpt::NativeLooseSpeculative => {
+            run::<NativeExecutor>(opt);
+        },
+        BlockExecutorTypeOpt::PtxExecutor => {
+            #[cfg(target_os = "linux")]
+            ThreadManagerBuilder::set_thread_config_strategy(
+                ThreadConfigStrategy::ThreadsPriority(48),
+            );
+            run::<PtxBlockExecutor>(opt);
+        },
     }
 
     if cpu_profiling {

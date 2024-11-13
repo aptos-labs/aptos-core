@@ -95,7 +95,6 @@ pub(crate) fn update_store(
                 &ledger_batch,
                 &sharded_state_kv_batches,
                 /*put_state_value_indices=*/ enable_sharding,
-                /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
             )
             .unwrap();
@@ -319,10 +318,7 @@ fn gen_snapshot_version(
     let mut snapshot_version = None;
     let last_checkpoint = txns_to_commit
         .iter()
-        .enumerate()
-        .filter(|(_idx, x)| x.has_state_checkpoint_hash())
-        .last()
-        .map(|(idx, _)| idx);
+        .rposition(TransactionToCommit::has_state_checkpoint_hash);
     if let Some(idx) = last_checkpoint {
         updates.extend(
             txns_to_commit[0..=idx]
@@ -331,7 +327,7 @@ fn gen_snapshot_version(
                 .flatten()
                 .collect::<HashMap<_, _>>(),
         );
-        if updates.len() >= threshold {
+        if updates.len() >= threshold || txns_to_commit[idx].is_reconfig {
             snapshot_version = Some(cur_ver + idx as u64);
             updates.clear();
         }

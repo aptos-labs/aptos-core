@@ -123,7 +123,7 @@ impl ModuleWriteSet {
                 key,
                 op_size: write.write_op().write_op_size(),
                 prev_size,
-                metadata_mut: write.write_op_mut().get_metadata_mut(),
+                metadata_mut: write.write_op_mut().metadata_mut(),
             })
         })
     }

@@ -106,7 +106,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
         .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
-        .set_language_version(LanguageVersion::V2_1);
+        .set_language_version(LanguageVersion::latest_stable());
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -665,21 +665,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_skip_attribute_checks(true),
             // Run the entire compiler pipeline to double-check the result
-            stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
-        },
-        TestConfig {
-            name: "lint-checks",
-            runner: |p| run_test(p, get_config_by_name("lint-checks")),
-            include: vec![
-                "/lints/model_ast_lints/",
-                "/lints/stackless_bytecode_lints/",
-            ],
-            exclude: vec![],
-            exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::LINT_CHECKS, true),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,

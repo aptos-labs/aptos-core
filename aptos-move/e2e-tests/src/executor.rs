@@ -24,7 +24,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupply, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
+        ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
@@ -438,10 +438,10 @@ impl FakeExecutor {
                 let mut fa_resource_group = self
                     .read_resource_group::<ObjectGroupResource>(&AccountAddress::TEN)
                     .expect("resource group must exist in data store");
-                let mut supply = bcs::from_bytes::<ConcurrentSupply>(
+                let mut supply = bcs::from_bytes::<ConcurrentSupplyResource>(
                     fa_resource_group
                         .group
-                        .get(&ConcurrentSupply::struct_tag())
+                        .get(&ConcurrentSupplyResource::struct_tag())
                         .unwrap(),
                 )
                 .unwrap();
@@ -451,7 +451,7 @@ impl FakeExecutor {
                 fa_resource_group
                     .group
                     .insert(
-                        ConcurrentSupply::struct_tag(),
+                        ConcurrentSupplyResource::struct_tag(),
                         bcs::to_bytes(&supply).unwrap(),
                     )
                     .unwrap();
