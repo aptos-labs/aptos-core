@@ -2888,6 +2888,7 @@ version = "0.1.1"
 dependencies = [
  "aptos-gas-schedule",
  "aptos-native-interface",
+ "aptos-types",
  "dir-diff",
  "file_diff",
  "move-cli",

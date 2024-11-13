@@ -7,7 +7,6 @@
 
 //! Implementation of native functions (non-bytecode instructions) for vector.
 
-use super::mem::get_feature_not_available_error;
 use aptos_gas_schedule::gas_params::natives::move_stdlib::{
     VECTOR_MOVE_RANGE_BASE, VECTOR_MOVE_RANGE_PER_INDEX_MOVED,
 };
@@ -28,6 +27,9 @@ use std::collections::VecDeque;
 /// Given input positions/lengths are outside of vector boundaries.
 pub const EINDEX_OUT_OF_BOUNDS: u64 = 1;
 
+/// The feature is not enabled.
+pub const EFEATURE_NOT_ENABLED: u64 = 2;
+
 /***************************************************************************************************
  * native fun move_range<T>(from: &mut vector<T>, removal_position: u64, length: u64, to: &mut vector<T>, insert_position: u64)
  *
@@ -43,7 +45,9 @@ fn native_move_range(
         .get_feature_flags()
         .is_native_memory_operations_enabled()
     {
-        return Err(get_feature_not_available_error());
+        return Err(SafeNativeError::Abort {
+            abort_code: error::unavailable(EFEATURE_NOT_ENABLED),
+        });
     }
 
     context.charge(VECTOR_MOVE_RANGE_BASE)?;
