@@ -1,7 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{code_cache_global::GlobalModuleCache, explicit_sync_wrapper::ExplicitSyncWrapper};
+use crate::{
+    code_cache_global::GlobalModuleCache,
+    counters::{
+        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES,
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+    },
+    explicit_sync_wrapper::ExplicitSyncWrapper,
+};
 use aptos_types::block_executor::config::BlockExecutorModuleCacheLocalConfig;
 use aptos_vm_environment::environment::AptosEnvironment;
 use move_binary_format::errors::Location;
@@ -150,13 +157,19 @@ where
         let struct_name_index_map_size = runtime_environment
             .struct_name_index_map_size()
             .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES.set(struct_name_index_map_size as i64);
+
         if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
             module_cache.flush_unsync();
             runtime_environment.flush_struct_name_and_info_caches();
         }
 
         // Check 2: If the module cache is too big, flush it.
-        if module_cache.size_in_bytes() > config.max_module_cache_size_in_bytes {
+        let module_cache_size_in_bytes = module_cache.size_in_bytes();
+        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES.set(module_cache_size_in_bytes as i64);
+        GLOBAL_MODULE_CACHE_NUM_MODULES.set(module_cache.num_modules() as i64);
+
+        if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
             module_cache.flush_unsync();
         }
 

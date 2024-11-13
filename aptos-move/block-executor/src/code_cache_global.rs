@@ -133,6 +133,7 @@ where
     ///   1. Only verified modules are inserted.
     ///   2. Valid modules should not be removed, and new modules should have unique ownership. If
     ///      these constraints are violated, a panic error is returned.
+    // TODO(loader_v2): Use a trait for sync methods, and a concrete implementation for unsync.
     pub fn insert_verified_unsync(
         &self,
         modules: impl Iterator<Item = (K, Arc<ModuleCode<D, V, E>>)>,

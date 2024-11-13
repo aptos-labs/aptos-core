@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_avg_counter_vec, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge,
 };
 use aptos_mvhashmap::BlockStateStats;
 use aptos_types::fee_statement::FeeStatement;
@@ -333,3 +333,27 @@ pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_paral
         .with_label_values(&[mode_str, "delayed_field"])
         .observe(block_state_stats.base_delayed_fields_size as f64);
 }
+
+pub static GLOBAL_MODULE_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_module_cache_size_in_bytes",
+        "Sum of sizes of all serialized modules stored in global module cache"
+    )
+    .unwrap()
+});
+
+pub static GLOBAL_MODULE_CACHE_NUM_MODULES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_module_cache_num_modules",
+        "Number of modules cached in global module cache"
+    )
+    .unwrap()
+});
+
+pub static STRUCT_NAME_INDEX_MAP_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "struct_name_index_map_num_entries",
+        "Number of struct names interned and cached in execution environment"
+    )
+    .unwrap()
+});

@@ -153,7 +153,11 @@ pub trait VMValidator {
     ) -> VMValidatorResult;
 }
 
-/// This trait describes the block executor interface.
+/// This trait describes the block executor interface which is responsible for executing a block of
+/// transactions. In general, block execution returns a vector of transaction outputs. This vector
+/// has the same length as the input vector of transactions. In case transactions are skipped or
+/// discarded, they are still included - but their output is empty. The outputs are not applied to
+/// the state directly. It is the responsibility of the caller to update the state accordingly.
 pub trait VMBlockExecutor: Send + Sync {
     /// Be careful if any state (such as caches) is kept in [VMBlockExecutor]. It is the
     /// responsibility of the implementation to ensure the state is valid across multiple

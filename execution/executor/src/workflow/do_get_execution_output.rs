@@ -44,6 +44,7 @@ use std::{iter, sync::Arc};
 pub struct DoGetExecutionOutput;
 
 impl DoGetExecutionOutput {
+    // Note: state checkpoint will be appended in when the current block is Some(..).
     pub fn by_transaction_execution<V: VMBlockExecutor>(
         executor: &V,
         transactions: ExecutableTransactions,
