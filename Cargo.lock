@@ -11876,6 +11876,7 @@ dependencies = [
  "itertools 0.13.0",
  "move-binary-format",
  "move-bytecode-utils",
+ "move-cli",
  "move-command-line-common",
  "move-compiler",
  "move-compiler-v2",
@@ -11895,6 +11896,7 @@ dependencies = [
  "primitive-types 0.10.1",
  "rayon",
  "regex",
+ "tempfile",
 ]
 
 [[package]]

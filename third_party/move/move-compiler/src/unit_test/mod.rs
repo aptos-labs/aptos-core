@@ -12,7 +12,6 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     value::MoveValue, vm_status::StatusCode,
 };
-use move_symbol_pool::Symbol;
 use std::{collections::BTreeMap, fmt};
 
 pub mod filter_test_members;
@@ -34,7 +33,6 @@ pub struct TestPlan {
     pub module_tests: BTreeMap<ModuleId, ModuleTestPlan>,
     // `NamedCompiledModule` for compiled modules with source,
     // `CompiledModule` for modules with bytecode only
-    // pub module_info: BTreeMap<ModuleId, Either<NamedCompiledModule, CompiledModule>>,
     pub module_info: BTreeMap<ModuleId, NamedOrBytecodeModule>,
 }
 
@@ -98,7 +96,7 @@ impl TestPlan {
         tests: Vec<ModuleTestPlan>,
         files: FilesSourceText,
         units: Vec<AnnotatedCompiledUnit>,
-        bytecode_modules: BTreeMap<Symbol, CompiledModule>,
+        bytecode_modules: Vec<CompiledModule>,
     ) -> Self {
         let module_tests: BTreeMap<_, _> = tests
             .into_iter()
@@ -117,7 +115,7 @@ impl TestPlan {
                     None
                 }
             })
-            .chain(bytecode_modules.into_iter().map(|(_name, module)| {
+            .chain(bytecode_modules.into_iter().map(|module| {
                 (module.self_id(), NamedOrBytecodeModule::Bytecode(module))
             }))
             .collect();

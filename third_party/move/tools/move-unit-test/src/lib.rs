@@ -159,6 +159,8 @@ impl UnitTestingConfig {
         source_files: Vec<String>,
         deps: Vec<String>,
     ) -> Option<TestPlan> {
+        println!("source_files: {:?}", source_files);
+        println!("deps: {:?}", deps);
         let addresses =
             verify_and_create_named_address_mapping(self.named_address_values.clone()).ok()?;
         let (test_plan, files, units) = if get_move_compiler_v2_from_env() {
@@ -209,12 +211,10 @@ impl UnitTestingConfig {
 
             let compilation_result = compiler.at_cfgir(cfgir).build();
 
-            let (units, warnings) =
-                diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-            diagnostics::report_warnings(&files, warnings);
-            (test_plan, files, units)
-        };
-        test_plan.map(|tests| TestPlan::new(tests, files, units))
+        let (units, warnings) =
+            diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
+        diagnostics::report_warnings(&files, warnings);
+        test_plan.map(|tests| TestPlan::new(tests, files, units, Default::default()))
     }
 
     /// Build a test plan from a unit test config
