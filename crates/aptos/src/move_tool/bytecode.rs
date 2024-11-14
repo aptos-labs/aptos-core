@@ -14,6 +14,7 @@ use crate::{
 use anyhow::Context;
 use aptos_framework::{
     get_compilation_metadata_from_compiled_module, get_compilation_metadata_from_compiled_script,
+    get_metadata_from_compiled_module, get_metadata_from_compiled_script, APTOS_METADATA_KEY_V1,
 };
 use async_trait::async_trait;
 use clap::{Args, Parser};
@@ -28,11 +29,15 @@ use move_command_line_common::files::{
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
-use move_model::metadata::CompilerVersion;
+use move_model::metadata::{
+    CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY,
+};
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
+    str,
 };
 
 const DISASSEMBLER_EXTENSION: &str = "mv.asm";
@@ -86,9 +91,9 @@ pub struct BytecodeCommand {
     pub(crate) prompt_options: PromptOptions,
 
     /// When `--bytecode-path` is set with this option,
-    /// print out the version of compiler that generated the bytecode
+    /// print out the metadata and bytecode version of the target bytecode
     #[clap(long)]
-    pub print_compiler_version_only: bool,
+    pub print_metadata: bool,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -150,8 +155,8 @@ impl BytecodeCommand {
             unreachable!("arguments required by clap")
         };
 
-        if self.print_compiler_version_only && self.input.bytecode_path.is_some() {
-            return self.compiler_version(&inputs[0]);
+        if self.print_metadata && self.input.bytecode_path.is_some() {
+            return self.print_metadata(&inputs[0]);
         }
 
         let mut report = vec![];
@@ -214,29 +219,64 @@ impl BytecodeCommand {
         })
     }
 
-    fn compiler_version(&self, bytecode_path: &Path) -> Result<String, CliError> {
+    fn print_metadata(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
 
         let module: CompiledModule;
         let script: CompiledScript;
-        let version_string = if self.is_script {
+        let v1_metadata = CompilationMetadata {
+            unstable: false,
+            compiler_version: CompilerVersion::V1.to_string(),
+            language_version: LanguageVersion::V1.to_string(),
+        };
+        let mut metadata_map = BTreeMap::new();
+        let compilation_metadata_string;
+        let mut aptos_metadata_string = "".to_string();
+        let bytecode_version_string;
+        if self.is_script {
             script = CompiledScript::deserialize(&bytecode_bytes)
                 .context("Script blob can't be deserialized")?;
-            if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
-                data.compiler_version.to_string()
-            } else {
-                CompilerVersion::V1.to_string()
-            }
+            compilation_metadata_string =
+                if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
+                    serde_json::to_string_pretty(&data).unwrap()
+                } else {
+                    serde_json::to_string_pretty(&v1_metadata).unwrap()
+                };
+            if let Some(data) = get_metadata_from_compiled_script(&script) {
+                aptos_metadata_string = serde_json::to_string(&data).unwrap();
+            };
+            bytecode_version_string = script.version.to_string();
         } else {
             module = CompiledModule::deserialize(&bytecode_bytes)
                 .context("Module blob can't be deserialized")?;
-            if let Some(data) = get_compilation_metadata_from_compiled_module(&module) {
-                data.compiler_version.to_string()
-            } else {
-                CompilerVersion::V1.to_string()
-            }
+            compilation_metadata_string =
+                if let Some(data) = get_compilation_metadata_from_compiled_module(&module) {
+                    serde_json::to_string_pretty(&data).unwrap()
+                } else {
+                    serde_json::to_string_pretty(&v1_metadata).unwrap()
+                };
+            if let Some(data) = get_metadata_from_compiled_module(&module) {
+                aptos_metadata_string = serde_json::to_string(&data).unwrap();
+            };
+            bytecode_version_string = module.version.to_string();
         };
-        Ok(format!("Compiled by v{}", version_string))
+
+        metadata_map.insert(
+            str::from_utf8(COMPILATION_METADATA_KEY)
+                .unwrap()
+                .to_string(),
+            compilation_metadata_string,
+        );
+        metadata_map.insert(
+            str::from_utf8(APTOS_METADATA_KEY_V1).unwrap().to_string(),
+            aptos_metadata_string,
+        );
+        metadata_map.insert("bytecode_version".to_string(), bytecode_version_string);
+        println!(
+            "Metadata: {}",
+            serde_json::to_string_pretty(&metadata_map).unwrap()
+        );
+        Ok("ok".to_string())
     }
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
