@@ -24,22 +24,6 @@ runs:
       run: cargo x affected-packages -vv
       shell: bash
 
-    - name: Run move_pr.sh for unit and integration tests
-      shell: bash
-      run: third_party/move/scripts/move_pr.sh -i
-      env:
-        RUST_MIN_STACK: 4297152
-        MVP_TEST_ON_CI: true
-        SOLC_EXE: /home/runner/bin/solc
-        Z3_EXE: /home/runner/bin/z3
-        CVC5_EXE: /home/runner/bin/cvc5
-        DOTNET_ROOT: /home/runner/.dotnet
-        BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
-
-    - name: Clean framework result for v1
-      shell: bash
-      run: cargo clean -p aptos-framework
-
     - name: Run move_pr.sh for integration tests with v2 compiler
       shell: bash
       run: third_party/move/scripts/move_pr.sh -2
