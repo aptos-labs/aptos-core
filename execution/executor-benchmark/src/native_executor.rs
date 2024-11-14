@@ -11,8 +11,8 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{DepositEvent, WithdrawEvent},
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
-        partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     event::EventKey,

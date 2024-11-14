@@ -137,12 +137,12 @@ where
         for (key, module) in modules {
             if let Occupied(entry) = self.module_cache.entry(key.clone()) {
                 if entry.get().is_not_overridden() {
-                    self.size -= entry.get().module_code().extension().size_in_bytes();
-                    entry.remove();
-                } else {
                     return Err(PanicError::CodeInvariantError(
                         "Should never replace a non-overridden module".to_string(),
                     ));
+                } else {
+                    self.size -= entry.get().module_code().extension().size_in_bytes();
+                    entry.remove();
                 }
             }
 
