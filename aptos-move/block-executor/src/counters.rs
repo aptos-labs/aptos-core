@@ -350,6 +350,16 @@ pub static GLOBAL_MODULE_CACHE_NUM_MODULES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of global module cache misses per-block.
+pub static GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "global_module_cache_num_misses_per_block",
+        "Number of global module cache misses in parallel execution (per-block)"
+    )
+        .unwrap()
+});
+
+
 pub static STRUCT_NAME_INDEX_MAP_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "struct_name_index_map_num_entries",

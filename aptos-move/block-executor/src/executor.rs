@@ -71,6 +71,7 @@ use std::{
         Arc,
     },
 };
+use crate::counters::GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK;
 
 pub struct BlockExecutor<T, E, S, L, X, TP> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -1710,6 +1711,7 @@ where
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+        GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK.reset();
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
