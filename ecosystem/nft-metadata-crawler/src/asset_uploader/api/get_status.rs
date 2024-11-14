@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    asset_uploader::api::GetStatusResponseSuccess,
-    models::asset_uploader_request_statuses_query::AssetUploaderRequestStatusesQuery, schema,
+    asset_uploader::api::{GetStatusResponseSuccess, IdempotencyTuple},
+    models::asset_uploader_request_statuses_query::AssetUploaderRequestStatusesQuery,
+    schema,
 };
 use ahash::AHashMap;
 use axum::http::StatusCode;
@@ -15,12 +16,11 @@ use tracing::debug;
 
 pub fn get_status(
     pool: Pool<ConnectionManager<PgConnection>>,
-    idempotency_key: &str,
-    application_id: &str,
+    idempotency_tuple: &IdempotencyTuple,
 ) -> anyhow::Result<AHashMap<String, GetStatusResponseSuccess>> {
     let mut conn = pool.get()?;
     let mut status_response = AHashMap::new();
-    let rows = query_status(&mut conn, idempotency_key, application_id)?;
+    let rows = query_status(&mut conn, idempotency_tuple)?;
     for row in rows {
         if row.status_code == StatusCode::OK.as_u16() as i64 {
             status_response.insert(row.asset_uri, GetStatusResponseSuccess::Success {
@@ -40,13 +40,15 @@ pub fn get_status(
 
 fn query_status(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    id_key: &str,
-    app_id: &str,
+    idempotency_tuple: &IdempotencyTuple,
 ) -> anyhow::Result<Vec<AssetUploaderRequestStatusesQuery>> {
     use schema::nft_metadata_crawler::asset_uploader_request_statuses::dsl::*;
 
-    let query = asset_uploader_request_statuses
-        .filter(idempotency_key.eq(id_key).and(application_id.eq(app_id)));
+    let query = asset_uploader_request_statuses.filter(
+        idempotency_key
+            .eq(&idempotency_tuple.idempotency_key)
+            .and(application_id.eq(&idempotency_tuple.application_id)),
+    );
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     debug!("Executing Query: {}", debug_query);

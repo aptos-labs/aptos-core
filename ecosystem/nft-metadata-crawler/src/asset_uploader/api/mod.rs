@@ -70,8 +70,8 @@ pub enum GetStatusResponseSuccess {
 #[serde(untagged)]
 enum GetStatusResponse {
     Success {
-        idempotency_key: String,
-        application_id: String,
+        #[serde(flatten)]
+        idempotency_tuple: IdempotencyTuple,
         urls: AHashMap<String, GetStatusResponseSuccess>,
     },
     Error {
@@ -109,12 +109,16 @@ impl AssetUploaderApiContext {
         Extension(context): Extension<Arc<AssetUploaderApiContext>>,
         Path((application_id, idempotency_key)): Path<(String, String)>, // Extracts application_id and idempotency_key from the URL
     ) -> impl IntoResponse {
-        match get_status(context.pool.clone(), &idempotency_key, &application_id) {
+        let idempotency_tuple = IdempotencyTuple {
+            idempotency_key,
+            application_id,
+        };
+
+        match get_status(context.pool.clone(), &idempotency_tuple) {
             Ok(statuses) => (
                 StatusCode::OK,
                 Json(GetStatusResponse::Success {
-                    idempotency_key,
-                    application_id,
+                    idempotency_tuple,
                     urls: statuses,
                 }),
             ),
