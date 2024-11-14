@@ -88,8 +88,6 @@ module groth16_example::groth16 {
     use std::bcs;
     #[test_only]
     use std::vector;
-    #[test_only]
-    use std::debug;
 
     #[test(fx = @std)]
     fun test_verify_circom_proof(fx: signer) {
@@ -166,44 +164,6 @@ module groth16_example::groth16 {
         vector::append(&mut vk_delta_bytes, vk_delta_x2_bytes);
         vector::append(&mut vk_delta_bytes, vk_delta_y2_bytes);
         let vk_delta = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_delta_bytes));
-
-        let vk_alphabeta_x11 = 2029413683389138792403550203267699914886160938906632433982220835551125967885u256;
-        let vk_alphabeta_x12 = 21072700047562757817161031222997517981543347628379360635925549008442030252106u256;
-        let vk_alphabeta_x21 = 5940354580057074848093997050200682056184807770593307860589430076672439820312u256;
-        let vk_alphabeta_x22 = 12156638873931618554171829126792193045421052652279363021382169897324752428276u256;
-        let vk_alphabeta_x31 = 7898200236362823042373859371574133993780991612861777490112507062703164551277u256;
-        let vk_alphabeta_x32 = 7074218545237549455313236346927434013100842096812539264420499035217050630853u256;
-        let vk_alphabeta_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x11);
-        let vk_alphabeta_x12_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x12);
-        let vk_alphabeta_x21_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x21);
-        let vk_alphabeta_x22_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x22);
-        let vk_alphabeta_x31_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x31);
-        let vk_alphabeta_x32_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x32);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x12_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x21_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x22_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x31_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x32_bytes);
-
-        let vk_alphabeta_y11 = 7077479683546002997211712695946002074877511277312570035766170199895071832130u256;
-        let vk_alphabeta_y12 = 10093483419865920389913245021038182291233451549023025229112148274109565435465u256;
-        let vk_alphabeta_y21 = 4595479056700221319381530156280926371456704509942304414423590385166031118820u256;
-        let vk_alphabeta_y22 = 19831328484489333784475432780421641293929726139240675179672856274388269393268u256;
-        let vk_alphabeta_y31 = 11934129596455521040620786944827826205713621633706285934057045369193958244500u256;
-        let vk_alphabeta_y32 = 8037395052364110730298837004334506829870972346962140206007064471173334027475u256;
-        let vk_alphabeta_y11_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y11);
-        let vk_alphabeta_y12_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y12);
-        let vk_alphabeta_y21_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y21);
-        let vk_alphabeta_y22_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y22);
-        let vk_alphabeta_y31_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y31);
-        let vk_alphabeta_y32_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y32);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y11_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y12_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y21_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y22_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y31_bytes);
-        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y32_bytes);
-        let vk_alphabeta = std::option::extract(&mut deserialize<bn254_algebra::Gt, bn254_algebra::FormatGt>(&vk_alphabeta_bytes));
 
         let vk_gamma_abc_1_x = 9301933260370907965380929235907744187309044275532228633956723711236164592702u256;
         let vk_gamma_abc_1_y = 16430819258686105004298644553325509170608676387027348203797023622583733864344u256;
