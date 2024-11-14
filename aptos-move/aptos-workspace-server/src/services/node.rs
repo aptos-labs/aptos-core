@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::IP_LOCAL_HOST;
 use anyhow::{bail, Result};
 use aptos::node::local_testnet::HealthChecker;
 use aptos_config::config::{NodeConfig, TableInfoServiceMode};
@@ -8,16 +9,8 @@ use aptos_node::{load_node_config, start_and_report_ports};
 use aptos_types::network_address::{NetworkAddress, Protocol};
 use futures::channel::oneshot;
 use rand::{rngs::StdRng, SeedableRng};
-use std::{
-    future::Future,
-    net::{IpAddr, Ipv4Addr},
-    path::Path,
-    thread,
-    time::Duration,
-};
+use std::{future::Future, path::Path, thread, time::Duration};
 use url::Url;
-
-const IP_LOCAL_HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
 
 /// Sets all ports in the node config to zero so the OS can assign them random ones.
 fn zero_all_ports(config: &mut NodeConfig) {
@@ -43,6 +36,10 @@ fn zero_all_ports(config: &mut NodeConfig) {
         ])
         .unwrap();
     }
+}
+
+pub fn get_data_service_url(indexer_grpc_port: u16) -> Url {
+    Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, indexer_grpc_port)).unwrap()
 }
 
 /// Starts a local node and returns three futures:
@@ -85,6 +82,8 @@ pub fn start_node(
     let (indexer_grpc_port_tx, indexer_grpc_port_rx) = oneshot::channel();
 
     let run_node = {
+        println!("Starting node..");
+
         let test_dir = test_dir.to_owned();
         let node_config = node_config.clone();
         move || -> Result<()> {
@@ -130,9 +129,8 @@ pub fn start_node(
     let fut_indexer_grpc = async move {
         let indexer_grpc_port = indexer_grpc_port_rx.await?;
 
-        let indexer_grpc_health_checker = HealthChecker::DataServiceGrpc(
-            Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, indexer_grpc_port)).unwrap(),
-        );
+        let indexer_grpc_health_checker =
+            HealthChecker::DataServiceGrpc(get_data_service_url(indexer_grpc_port));
 
         indexer_grpc_health_checker.wait(None).await?;
         println!(

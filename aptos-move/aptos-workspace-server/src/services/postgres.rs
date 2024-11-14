@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::IP_LOCAL_HOST;
 use anyhow::{anyhow, bail, Context, Result};
 use aptos::node::local_testnet::{docker, HealthChecker};
 use bollard::{
@@ -13,18 +14,14 @@ use bollard::{
 };
 use futures::{channel::oneshot, TryStreamExt};
 use maplit::hashmap;
-use std::{
-    future::Future,
-    net::{IpAddr, Ipv4Addr},
-    sync::Arc,
-};
+use std::{future::Future, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const IP_LOCAL_HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-
 const POSTGRES_DEFAULT_PORT: u16 = 5432;
 const POSTGRES_IMAGE: &str = "postgres:14.11";
+const POSTGRES_USER: &str = "postgres";
+const POSTGRES_DB_NAME: &str = "local-testnet";
 
 fn get_postgres_assigned_port(container_info: &ContainerInspectResponse) -> Option<u16> {
     if let Some(port_bindings) = container_info
@@ -53,6 +50,13 @@ enum PostgresState {
     },
 }
 
+pub fn get_postgres_connection_string(postgres_port: u16) -> String {
+    format!(
+        "postgres://{}@{}:{}/{}",
+        POSTGRES_USER, IP_LOCAL_HOST, postgres_port, POSTGRES_DB_NAME
+    )
+}
+
 pub fn start_postgres(
     instance_id: Uuid,
 ) -> Result<(
@@ -72,6 +76,8 @@ pub fn start_postgres(
 
     let state = state_.clone();
     let handle_postgres = tokio::spawn(async move {
+        println!("Starting postgres..");
+
         let docker = docker::get_docker().await?;
 
         let data_volume_name = format!("aptos-workspace-{}-postgres-data", instance_id);
@@ -88,9 +94,10 @@ pub fn start_postgres(
                         .context("failed to create data volume for postgres")?;
                     *data_volume = Some(vol.name.clone())
                 },
-                Stopped => bail!("service has stopped"),
+                Stopped => bail!("cancellation requested"),
             }
         }
+        println!("Created docker volume {}", data_volume_name);
 
         let network_name = format!("aptos-workspace-{}-postgres", instance_id);
         {
@@ -108,9 +115,10 @@ pub fn start_postgres(
                         .context("failed to create network for postgres")?;
                     *network = Some(network_name.clone())
                 },
-                Stopped => bail!("service has stopped"),
+                Stopped => bail!("cancellation requested"),
             }
         }
+        println!("Created docker network {}", network_name);
 
         let host_config = Some(HostConfig {
             // Bind the container to the network we created in the pre_run. This does
@@ -143,8 +151,8 @@ pub fn start_postgres(
             env: Some(vec![
                 // We run postgres without any auth + no password.
                 "POSTGRES_HOST_AUTH_METHOD=trust".to_string(),
-                format!("POSTGRES_USER={}", "postgres"),
-                format!("POSTGRES_DB={}", "local-testnet"),
+                format!("POSTGRES_USER={}", POSTGRES_USER),
+                format!("POSTGRES_DB={}", POSTGRES_DB_NAME),
                 // This tells where postgres to store the DB data on disk. This is the
                 // directory inside the container that is mounted from the host system.
                 // format!("PGDATA={}", DATA_PATH_IN_CONTAINER),
@@ -198,9 +206,10 @@ pub fn start_postgres(
 
                     (container_id, container_info)
                 },
-                Stopped => bail!("service has stopped"),
+                Stopped => bail!("cancellation requested"),
             }
         };
+        println!("Created docker container {}", container_id);
 
         postgres_container_id_tx
             .send(container_id)
@@ -209,22 +218,19 @@ pub fn start_postgres(
         let postgres_port = get_postgres_assigned_port(&container_info)
             .ok_or_else(|| anyhow!("failed to get postgres port"))?;
 
+        // TODO: health checker
+        let health_checker = HealthChecker::Postgres(get_postgres_connection_string(postgres_port));
+        health_checker.wait(None).await?;
+
         println!(
             "Postgres is ready. Endpoint: http://{}:{}",
             IP_LOCAL_HOST, postgres_port
         );
 
-        // TODO: health checker
-        let health_checker = HealthChecker::Postgres(format!(
-            "postgres://{}@{}:{}/{}",
-            "postgres", IP_LOCAL_HOST, postgres_port, "local-testnet"
-        ));
-        health_checker.wait(None).await?;
-
         Ok(postgres_port)
     });
 
-    let abort_handle = handle_postgres.abort_handle();
+    //let abort_handle = handle_postgres.abort_handle();
 
     let fut_postgres_port = async move {
         handle_postgres
@@ -260,9 +266,9 @@ pub fn start_postgres(
                 }
 
                 *guard = PostgresState::Stopped;
-                abort_handle.abort();
+                //abort_handle.abort();
 
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             },
             Stopped => Ok(()),
         }

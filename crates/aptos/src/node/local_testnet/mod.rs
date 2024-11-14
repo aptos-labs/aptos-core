@@ -4,7 +4,6 @@
 mod indexer_api;
 mod logging;
 mod postgres;
-mod processors;
 mod ready_server;
 mod utils;
 
@@ -13,6 +12,7 @@ pub mod docker;
 pub mod faucet;
 pub mod health_checker;
 pub mod node;
+pub mod processors;
 pub mod traits;
 
 use self::{

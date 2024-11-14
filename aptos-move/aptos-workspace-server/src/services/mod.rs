@@ -4,3 +4,4 @@
 pub mod faucet;
 pub mod node;
 pub mod postgres;
+pub mod processors;

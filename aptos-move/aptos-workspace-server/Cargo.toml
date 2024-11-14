@@ -12,6 +12,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+# aptos deps
 aptos = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
@@ -19,8 +20,13 @@ aptos-faucet-core = { workspace = true }
 aptos-node = { workspace = true }
 aptos-types = { workspace = true }
 
+# third party deps
 anyhow = { workspace = true }
 bollard = { workspace = true }
+diesel = { workspace = true, features = [
+    "postgres_backend",
+] }
+diesel-async = { workspace = true }
 futures = { workspace = true }
 maplit = { workspace = true }
 rand = { workspace = true }
@@ -29,3 +35,7 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
+
+# indexer deps
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515", default-features = false }
+server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515" }
