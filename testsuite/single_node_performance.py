@@ -168,7 +168,7 @@ account-generation	1	VM	10	0.928	1.051	19826.7
 account-resource32-b	1	VM	10	0.879	1.076	31969.2
 modify-global-resource	1	VM	10	0.965	1.042	2208.9
 modify-global-resource	100	VM	10	0.935	1.049	31969.2
-publish-package	1	VM	10	0.924	1.040	1519.2
+publish-package	1	VM	10	0.924	1.040	1800
 mix_publish_transfer	1	VM	10	0.946	1.097	19680.5
 batch100-transfer	1	VM	10	0.900	1.079	600.3
 vector-picture30k	1	VM	10	0.965	1.029	100.9
