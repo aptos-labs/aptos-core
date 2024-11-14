@@ -238,6 +238,18 @@ spec aptos_framework::aptos_account {
         ensures if_exist_coin ==> post_coin_store_to == coin_store_to + coins.value;
     }
 
+    spec deposit_fungible_assets(to: address, fa: FungibleAsset) {
+        pragma verify = false;
+    }
+
+    spec transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, to: address, amount: u64) {
+        pragma verify = false;
+    }
+
+    spec batch_transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, recipients: vector<address>, amounts: vector<u64>) {
+        pragma verify = false;
+    }
+
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
         // TODO(fa_migration)
         pragma verify = false;

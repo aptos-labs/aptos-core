@@ -4,9 +4,8 @@
 use crate::{
     common::native_coin,
     types::{
-        Currency, CurrencyMetadata, FungibleAssetChangeEvent, ObjectCore, OperationType,
-        Transaction, FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE,
-        OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
+        Currency, CurrencyMetadata, OperationType, Transaction, FUNGIBLE_ASSET_MODULE,
+        FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP,
     },
     RosettaContext,
 };
@@ -16,21 +15,20 @@ use aptos_crypto::{
 };
 use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData};
 use aptos_types::{
-    account_config::fungible_store::FungibleStoreResource,
+    account_config::{
+        fungible_store::FungibleStoreResource, DepositFAEvent, ObjectCoreResource, WithdrawFAEvent,
+    },
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::{EventHandle, EventKey},
+    move_utils::move_event_v2::MoveEventV2Type,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     test_helpers::transaction_test_helpers::get_test_raw_transaction,
     transaction::{ExecutionStatus, TransactionInfo, TransactionInfoV0},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::{account_address::AccountAddress, ident_str, language_storage::StructTag};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{collections::HashSet, str::FromStr};
@@ -100,10 +98,10 @@ fn resource_group_modification_write_op<T: Serialize>(
 ) -> (StateKey, WriteOp) {
     let encoded = bcs::to_bytes(input).unwrap();
     let state_key = StateKey::resource_group(address, resource);
-    let write_op = WriteOp::Modification {
-        data: encoded.into(),
-        metadata: StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 }),
-    };
+    let write_op = WriteOp::modification(
+        encoded.into(),
+        StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 }),
+    );
     (state_key, write_op)
 }
 
@@ -118,7 +116,7 @@ struct FaData {
 
 impl FaData {
     fn create_change(&self) -> (Vec<(StateKey, WriteOp)>, Vec<ContractEvent>) {
-        let object_core = ObjectCore {
+        let object_core = ObjectCoreResource {
             guid_creation_num: 0,
             owner: self.owner,
             allow_ungated_transfer: false,
@@ -126,36 +124,18 @@ impl FaData {
         };
 
         let (new_balance, contract_event) = if self.deposit {
-            let type_tag = TypeTag::Struct(Box::new(StructTag {
-                address: AccountAddress::ONE,
-                module: ident_str!(FUNGIBLE_ASSET_MODULE).into(),
-                name: ident_str!("Deposit").into(),
-                type_args: vec![],
-            }));
-            let event = FungibleAssetChangeEvent {
+            let event = DepositFAEvent {
                 store: self.store_address,
                 amount: self.amount,
             };
-            (
-                self.previous_balance + self.amount,
-                ContractEvent::new_v2(type_tag, bcs::to_bytes(&event).unwrap()),
-            )
+            (self.previous_balance + self.amount, event.create_event_v2())
         } else {
-            let event = FungibleAssetChangeEvent {
+            let event = WithdrawFAEvent {
                 store: self.store_address,
                 amount: self.amount,
             };
-            let type_tag = TypeTag::Struct(Box::new(StructTag {
-                address: AccountAddress::ONE,
-                module: ident_str!(FUNGIBLE_ASSET_MODULE).into(),
-                name: ident_str!("Withdraw").into(),
-                type_args: vec![],
-            }));
 
-            (
-                self.previous_balance - self.amount,
-                ContractEvent::new_v2(type_tag, bcs::to_bytes(&event).unwrap()),
-            )
+            (self.previous_balance - self.amount, event.create_event_v2())
         };
 
         let store = FungibleStoreResource::new(self.fa_metadata_address, new_balance, false);

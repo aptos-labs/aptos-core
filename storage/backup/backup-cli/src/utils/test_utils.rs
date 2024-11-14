@@ -9,6 +9,7 @@ use aptos_db::{
     AptosDB,
 };
 use aptos_proptest_helpers::ValueGenerator;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -34,7 +35,12 @@ pub fn tmp_db_with_random_content() -> (
 ) {
     let (tmpdir, db) = tmp_db_empty();
     let mut cur_ver: Version = 0;
-    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let mut in_memory_state = db
+        .get_latest_executed_trees()
+        .unwrap()
+        .state
+        .as_ref()
+        .clone();
     let _ancestor = in_memory_state.base.clone();
     let blocks = ValueGenerator::new().generate(arb_blocks_to_commit());
     for (txns_to_commit, ledger_info_with_sigs) in &blocks {

@@ -70,7 +70,6 @@ fn put_value_set(
             &ledger_batch,
             &sharded_state_kv_batches,
             enable_sharding,
-            /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
         )
         .unwrap();

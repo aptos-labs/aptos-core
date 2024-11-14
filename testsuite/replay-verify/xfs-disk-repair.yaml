@@ -1,0 +1,23 @@
+apiVersion: batch/v1  
+kind: Job  
+metadata:  
+  name: self-deleting-job  
+spec:  
+  ttlSecondsAfterFinished: 60  
+  template:  
+    metadata:  
+      name: self-deleting-job  
+    spec:  
+      containers:  
+      - name: self-deleting-container  
+        image: busybox  
+        command: ["sh", "-c", "ls /mnt/* && sleep 30"]  
+        volumeMounts:  
+        - name: my-volume
+          mountPath: /mnt  
+      restartPolicy: Never  
+      volumes:  
+      - name: my-volume  
+        persistentVolumeClaim:  
+          claimName: testnet-archive-claim-0
+  backoffLimit: 0 

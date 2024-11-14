@@ -93,6 +93,7 @@ pub struct ConsensusConfig {
     pub max_pending_rounds_in_commit_vote_cache: u64,
     pub optimistic_sig_verification: bool,
     pub enable_round_timeout_msg: bool,
+    pub enable_pipeline: bool,
 }
 
 /// Deprecated
@@ -194,10 +195,10 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 7,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                num_blocks_to_look_at: 12,
+                num_blocks_to_look_at: 20,
                 min_blocks_to_activate: 4,
                 percentile: 0.5,
-                target_block_time_ms: 250,
+                target_block_time_ms: 200,
                 min_block_time_ms_to_activate: 100,
                 // allow at least two spreading group from reordering in a single block, to utilize paralellism
                 min_calibrated_txns_per_block: 8,
@@ -323,6 +324,7 @@ impl Default for ConsensusConfig {
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: false,
             enable_round_timeout_msg: true,
+            enable_pipeline: false,
         }
     }
 }

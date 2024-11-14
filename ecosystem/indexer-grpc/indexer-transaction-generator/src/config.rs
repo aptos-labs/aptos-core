@@ -161,6 +161,7 @@ impl TransactionImporterConfig {
             let modified_output_path = match network_name.as_str() {
                 "mainnet" => output_path.join("imported_mainnet_txns"),
                 "testnet" => output_path.join("imported_testnet_txns"),
+                "devnet" => output_path.join("imported_devnet_txns"),
                 _ => {
                     return Err(anyhow::anyhow!(
                         "[Transaction Importer] Unknown network: {}",

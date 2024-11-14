@@ -356,7 +356,7 @@ impl AssetUploaderThrottlerContext {
 
         let query = diesel::insert_into(asset_uploader_request_statuses)
             .values(asset)
-            .on_conflict((request_id, asset_uri))
+            .on_conflict((idempotency_key, application_id, asset_uri))
             .do_update()
             .set((
                 status_code.eq(excluded(status_code)),

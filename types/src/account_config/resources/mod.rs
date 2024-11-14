@@ -11,6 +11,7 @@ pub mod core_account;
 pub mod fungible_asset_metadata;
 pub mod fungible_store;
 pub mod object;
+pub mod type_info;
 
 pub use chain_id::*;
 pub use challenge::*;
@@ -20,3 +21,4 @@ pub use core_account::*;
 pub use fungible_asset_metadata::*;
 pub use fungible_store::*;
 pub use object::*;
+pub use type_info::*;

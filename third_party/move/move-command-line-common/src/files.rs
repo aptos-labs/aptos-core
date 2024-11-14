@@ -13,7 +13,11 @@ pub struct FileHash(pub [u8; 32]);
 
 impl FileHash {
     pub fn new(file_contents: &str) -> Self {
-        Self(sha2::Sha256::digest(file_contents.as_bytes()).into())
+        Self::new_from_bytes(file_contents.as_bytes())
+    }
+
+    pub fn new_from_bytes(bytes: &[u8]) -> Self {
+        Self(sha2::Sha256::digest(bytes).into())
     }
 
     pub const fn empty() -> Self {

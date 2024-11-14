@@ -277,17 +277,11 @@ pub async fn query_sequence_number_with_client(
 ) -> Result<u64> {
     let result = FETCH_ACCOUNT_RETRY_POLICY
         .retry_if(
-            move || rest_client.get_account_bcs(account_address),
+            move || rest_client.get_account_sequence_number(account_address),
             |error: &RestError| !is_account_not_found(error),
         )
         .await;
-    match result {
-        Ok(account) => Ok(account.into_inner().sequence_number()),
-        Err(error) => match is_account_not_found(&error) {
-            true => Ok(0),
-            false => Err(error.into()),
-        },
-    }
+    Ok(*result?.inner())
 }
 
 fn is_account_not_found(error: &RestError) -> bool {

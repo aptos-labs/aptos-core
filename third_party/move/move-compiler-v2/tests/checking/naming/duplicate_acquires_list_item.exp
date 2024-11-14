@@ -35,13 +35,19 @@ module 0x8675309::M {
     struct X has key {
     }
     fun t0()
-        acquires Racquires Xacquires R
+        acquires R
+        acquires X
+        acquires R
     {
         borrow_global_mut<R>(0x1);
         borrow_global_mut<X>(0x1);
     }
     fun t1()
-        acquires Racquires Xacquires Racquires Racquires R
+        acquires R
+        acquires X
+        acquires R
+        acquires R
+        acquires R
     {
         borrow_global_mut<R>(0x1);
         borrow_global_mut<X>(0x1);

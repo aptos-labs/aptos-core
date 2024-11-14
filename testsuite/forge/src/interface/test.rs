@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use rand::SeedableRng;
+use std::borrow::Cow;
 
 /// Whether a test is expected to fail or not
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -10,6 +11,22 @@ pub enum ShouldFail {
     No,
     Yes,
     YesWithMessage(&'static str),
+}
+
+#[derive(Debug, Clone)]
+pub struct TestDetails {
+    pub name: String,
+    pub reporting_name: String,
+}
+
+impl TestDetails {
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn reporting_name(&self) -> String {
+        self.reporting_name.clone()
+    }
 }
 
 /// Represents a Test in Forge
@@ -27,6 +44,18 @@ pub trait Test: Send + Sync {
     /// Indicates if the Test should fail
     fn should_fail(&self) -> ShouldFail {
         ShouldFail::No
+    }
+
+    /// Name used specifically for external reporting
+    fn reporting_name(&self) -> Cow<'static, str> {
+        Cow::Borrowed(self.name())
+    }
+
+    fn details(&self) -> TestDetails {
+        TestDetails {
+            name: self.name().to_string(),
+            reporting_name: self.reporting_name().to_string(),
+        }
     }
 }
 

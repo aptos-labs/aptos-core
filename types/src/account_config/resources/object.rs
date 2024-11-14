@@ -42,10 +42,10 @@ impl MoveResource for ObjectGroupResource {}
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ObjectCoreResource {
-    guid_creation_num: u64,
-    owner: AccountAddress,
-    allow_ungated_transfer: bool,
-    transfer_events: EventHandle,
+    pub guid_creation_num: u64,
+    pub owner: AccountAddress,
+    pub allow_ungated_transfer: bool,
+    pub transfer_events: EventHandle,
 }
 
 impl ObjectCoreResource {

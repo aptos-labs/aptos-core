@@ -3,5 +3,5 @@ name = "TooLargeTest"
 version = "0.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
-MoveStdlib = { local = "../../../framework/move-stdlib" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
+MoveStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "move-stdlib", rev = "mainnet" }

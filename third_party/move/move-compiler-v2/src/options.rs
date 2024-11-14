@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experiments::{DefaultValue, EXPERIMENTS};
+use crate::{
+    experiments::{DefaultValue, EXPERIMENTS},
+    external_checks::ExternalChecks,
+};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -19,6 +22,7 @@ use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
+    sync::Arc,
 };
 
 /// Defines options for a run of the compiler.
@@ -121,6 +125,10 @@ pub struct Options {
     /// Whether to compile #[verify_only] code
     #[clap(skip)]
     pub compile_verify_code: bool,
+
+    /// External checks to be performed.
+    #[clap(skip)]
+    pub external_checks: Vec<Arc<dyn ExternalChecks>>,
 }
 
 impl Default for Options {
@@ -234,6 +242,13 @@ impl Options {
     pub fn set_warn_unused(self, value: bool) -> Self {
         Self {
             warn_unused: value,
+            ..self
+        }
+    }
+
+    pub fn set_external_checks(self, value: Vec<Arc<dyn ExternalChecks>>) -> Self {
+        Self {
+            external_checks: value,
             ..self
         }
     }

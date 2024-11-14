@@ -23,8 +23,9 @@ use move_core_types::{
 };
 use std::{
     cell::RefCell,
+    cmp::Ordering,
     fmt::{self, Debug, Display, Formatter},
-    iter,
+    iter, mem,
     rc::Rc,
 };
 
@@ -536,8 +537,62 @@ impl ValueImpl {
             | (ContainerRef(_), _)
             | (IndexedRef(_), _)
             | (DelayedFieldID { .. }, _) => {
-                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                    .with_message(format!("cannot compare values: {:?}, {:?}", self, other)))
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "inconsistent argument types passed to equals check: {:?}, {:?}",
+                        self, other
+                    )),
+                )
+            },
+        };
+
+        Ok(res)
+    }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        use ValueImpl::*;
+
+        let res = match (self, other) {
+            (U8(l), U8(r)) => l.cmp(r),
+            (U16(l), U16(r)) => l.cmp(r),
+            (U32(l), U32(r)) => l.cmp(r),
+            (U64(l), U64(r)) => l.cmp(r),
+            (U128(l), U128(r)) => l.cmp(r),
+            (U256(l), U256(r)) => l.cmp(r),
+            (Bool(l), Bool(r)) => l.cmp(r),
+            (Address(l), Address(r)) => l.cmp(r),
+
+            (Container(l), Container(r)) => l.compare(r)?,
+
+            (ContainerRef(l), ContainerRef(r)) => l.compare(r)?,
+            (IndexedRef(l), IndexedRef(r)) => l.compare(r)?,
+
+            // Disallow comparison for delayed values.
+            // (see `ValueImpl::equals` above for details on reasoning behind it)
+            (DelayedFieldID { .. }, DelayedFieldID { .. }) => {
+                return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                    .with_message("cannot compare delayed values".to_string()))
+            },
+
+            (Invalid, _)
+            | (U8(_), _)
+            | (U16(_), _)
+            | (U32(_), _)
+            | (U64(_), _)
+            | (U128(_), _)
+            | (U256(_), _)
+            | (Bool(_), _)
+            | (Address(_), _)
+            | (Container(_), _)
+            | (ContainerRef(_), _)
+            | (IndexedRef(_), _)
+            | (DelayedFieldID { .. }, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "inconsistent argument types passed to comparison: {:?}, {:?}",
+                        self, other
+                    )),
+                )
             },
         };
 
@@ -595,11 +650,64 @@ impl Container {
 
         Ok(res)
     }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        use Container::*;
+
+        let res = match (self, other) {
+            (Vec(l), Vec(r)) | (Struct(l), Struct(r)) => {
+                let l = &l.borrow();
+                let r = &r.borrow();
+
+                for (v1, v2) in l.iter().zip(r.iter()) {
+                    let value_cmp = v1.compare(v2)?;
+                    if value_cmp.is_ne() {
+                        return Ok(value_cmp);
+                    }
+                }
+
+                l.len().cmp(&r.len())
+            },
+            (VecU8(l), VecU8(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU16(l), VecU16(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU32(l), VecU32(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU64(l), VecU64(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU128(l), VecU128(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU256(l), VecU256(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecBool(l), VecBool(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecAddress(l), VecAddress(r)) => l.borrow().cmp(&*r.borrow()),
+
+            (Locals(_), _)
+            | (Vec(_), _)
+            | (Struct(_), _)
+            | (VecU8(_), _)
+            | (VecU16(_), _)
+            | (VecU32(_), _)
+            | (VecU64(_), _)
+            | (VecU128(_), _)
+            | (VecU256(_), _)
+            | (VecBool(_), _)
+            | (VecAddress(_), _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "cannot compare container values: {:?}, {:?}",
+                        self, other
+                    )),
+                )
+            },
+        };
+
+        Ok(res)
+    }
 }
 
 impl ContainerRef {
     fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         self.container().equals(other.container())
+    }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        self.container().compare(other.container())
     }
 }
 
@@ -704,11 +812,116 @@ impl IndexedRef {
         };
         Ok(res)
     }
+
+    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        use Container::*;
+
+        let res = match (
+            self.container_ref.container(),
+            other.container_ref.container(),
+        ) {
+            // VecC <=> VecR impossible
+            (Vec(r1), Vec(r2))
+            | (Vec(r1), Struct(r2))
+            | (Vec(r1), Locals(r2))
+            | (Struct(r1), Vec(r2))
+            | (Struct(r1), Struct(r2))
+            | (Struct(r1), Locals(r2))
+            | (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2))
+            | (Locals(r1), Locals(r2)) => r1.borrow()[self.idx].compare(&r2.borrow()[other.idx])?,
+
+            (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU32(r1), VecU32(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU64(r1), VecU64(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU128(r1), VecU128(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU256(r1), VecU256(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+
+            // Comparison between a generic and a specialized container.
+            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u8>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u8>()?)
+            },
+
+            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u16>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u16>()?)
+            },
+
+            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u32>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u32>()?)
+            },
+
+            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u64>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u64>()?)
+            },
+
+            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u128>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u128>()?)
+            },
+
+            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<u256::U256>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u256::U256>()?)
+            },
+
+            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<bool>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<bool>()?)
+            },
+
+            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self.idx]
+                .as_value_ref::<AccountAddress>()?
+                .cmp(&r2.borrow()[other.idx]),
+            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?)
+            },
+
+            // All other combinations are illegal.
+            (Vec(_), _)
+            | (VecU8(_), _)
+            | (VecU16(_), _)
+            | (VecU32(_), _)
+            | (VecU64(_), _)
+            | (VecU128(_), _)
+            | (VecU256(_), _)
+            | (VecBool(_), _)
+            | (VecAddress(_), _) => {
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("cannot compare references {:?}, {:?}", self, other)))
+            },
+        };
+        Ok(res)
+    }
 }
 
 impl Value {
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         self.0.equals(&other.0)
+    }
+
+    pub fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        self.0.compare(&other.0)
     }
 }
 
@@ -900,6 +1113,241 @@ impl ReferenceImpl {
 impl Reference {
     pub fn write_ref(self, x: Value) -> PartialVMResult<()> {
         self.0.write_ref(x)
+    }
+}
+
+/**************************************************************************************
+ *
+ * Helpers: from primitive
+ *
+ *************************************************************************************/
+trait VMValueFromPrimitive<T> {
+    fn from_primitive(val: T) -> Self;
+}
+
+macro_rules! impl_vm_value_from_primitive {
+    ($ty:ty, $tc:ident) => {
+        impl VMValueFromPrimitive<$ty> for ValueImpl {
+            fn from_primitive(val: $ty) -> Self {
+                Self::$tc(val)
+            }
+        }
+    };
+}
+
+impl_vm_value_from_primitive!(u8, U8);
+impl_vm_value_from_primitive!(u16, U16);
+impl_vm_value_from_primitive!(u32, U32);
+impl_vm_value_from_primitive!(u64, U64);
+impl_vm_value_from_primitive!(u128, U128);
+impl_vm_value_from_primitive!(u256::U256, U256);
+impl_vm_value_from_primitive!(bool, Bool);
+impl_vm_value_from_primitive!(AccountAddress, Address);
+
+/**************************************************************************************
+ *
+ * Swap reference (Move)
+ *
+ *   Implementation of the Move operation to swap contents of a reference.
+ *
+ *************************************************************************************/
+impl Container {
+    /// Swaps contents of two mutable references.
+    ///
+    /// Precondition for this funciton is that `self` and `other` are required to be
+    /// distinct references.
+    /// Move will guarantee that invariant, because it prevents from having two
+    /// mutable references to the same value.
+    fn swap_contents(&self, other: &Self) -> PartialVMResult<()> {
+        use Container::*;
+
+        match (self, other) {
+            (Vec(l), Vec(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (Struct(l), Struct(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+
+            (VecBool(l), VecBool(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecAddress(l), VecAddress(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+
+            (VecU8(l), VecU8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU16(l), VecU16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU32(l), VecU32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU64(l), VecU64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU128(l), VecU128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU256(l), VecU256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+
+            (
+                Locals(_) | Vec(_) | Struct(_) | VecBool(_) | VecAddress(_) | VecU8(_) | VecU16(_)
+                | VecU32(_) | VecU64(_) | VecU128(_) | VecU256(_),
+                _,
+            ) => {
+                return Err(
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                        "cannot swap container values: {:?}, {:?}",
+                        self, other
+                    )),
+                )
+            },
+        }
+
+        Ok(())
+    }
+}
+
+impl ContainerRef {
+    fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        self.container().swap_contents(other.container())?;
+
+        self.mark_dirty();
+        other.mark_dirty();
+
+        Ok(())
+    }
+}
+
+impl IndexedRef {
+    fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        use Container::*;
+
+        macro_rules! swap {
+            ($r1:ident, $r2:ident) => {{
+                if Rc::ptr_eq($r1, $r2) {
+                    if self.idx == other.idx {
+                        return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                            .with_message(format!(
+                                "cannot swap references to the same item {:?}",
+                                self
+                            )));
+                    }
+
+                    $r1.borrow_mut().swap(self.idx, other.idx);
+                } else {
+                    mem::swap(
+                        &mut $r1.borrow_mut()[self.idx],
+                        &mut $r2.borrow_mut()[other.idx],
+                    )
+                }
+            }};
+        }
+
+        macro_rules! swap_general_with_specialized {
+            ($r1:ident, $r2:ident) => {{
+                let mut r1 = $r1.borrow_mut();
+                let mut r2 = $r2.borrow_mut();
+
+                let v1 = *r1[self.idx].as_value_ref()?;
+                r1[self.idx] = ValueImpl::from_primitive(r2[other.idx]);
+                r2[other.idx] = v1;
+            }};
+        }
+
+        macro_rules! swap_specialized_with_general {
+            ($r1:ident, $r2:ident) => {{
+                let mut r1 = $r1.borrow_mut();
+                let mut r2 = $r2.borrow_mut();
+
+                let v2 = *r2[other.idx].as_value_ref()?;
+                r2[other.idx] = ValueImpl::from_primitive(r1[self.idx]);
+                r1[self.idx] = v2;
+            }};
+        }
+
+        match (
+            self.container_ref.container(),
+            other.container_ref.container(),
+        ) {
+            // Case 1: (generic, generic)
+            (Vec(r1), Vec(r2))
+            | (Vec(r1), Struct(r2))
+            | (Vec(r1), Locals(r2))
+            | (Struct(r1), Vec(r2))
+            | (Struct(r1), Struct(r2))
+            | (Struct(r1), Locals(r2))
+            | (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2))
+            | (Locals(r1), Locals(r2)) => swap!(r1, r2),
+
+            // Case 2: (specialized, specialized)
+            (VecU8(r1), VecU8(r2)) => swap!(r1, r2),
+            (VecU16(r1), VecU16(r2)) => swap!(r1, r2),
+            (VecU32(r1), VecU32(r2)) => swap!(r1, r2),
+            (VecU64(r1), VecU64(r2)) => swap!(r1, r2),
+            (VecU128(r1), VecU128(r2)) => swap!(r1, r2),
+            (VecU256(r1), VecU256(r2)) => swap!(r1, r2),
+            (VecBool(r1), VecBool(r2)) => swap!(r1, r2),
+            (VecAddress(r1), VecAddress(r2)) => swap!(r1, r2),
+
+            // Case 3: (generic, specialized) or (specialized, generic)
+            (Locals(r1) | Struct(r1), VecU8(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU8(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU16(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU16(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU32(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU32(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU64(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU64(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU128(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU128(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecU256(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU256(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecBool(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecBool(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            (Locals(r1) | Struct(r1), VecAddress(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecAddress(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+
+            // All other combinations are illegal.
+            (Vec(_), _)
+            | (VecU8(_), _)
+            | (VecU16(_), _)
+            | (VecU32(_), _)
+            | (VecU64(_), _)
+            | (VecU128(_), _)
+            | (VecU256(_), _)
+            | (VecBool(_), _)
+            | (VecAddress(_), _) => {
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("cannot swap references {:?}, {:?}", self, other)))
+            },
+        }
+
+        self.container_ref.mark_dirty();
+        other.container_ref.mark_dirty();
+
+        Ok(())
+    }
+}
+
+impl ReferenceImpl {
+    /// Swap contents of two passed mutable references.
+    ///
+    /// Precondition for this function is that `self` and `other` references are required to
+    /// be distinct.
+    /// Move will guaranteee that invariant, because it prevents from having two mutable
+    /// references to the same value.
+    fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        use ReferenceImpl::*;
+
+        match (self, other) {
+            (ContainerRef(r1), ContainerRef(r2)) => r1.swap_values(r2),
+            (IndexedRef(r1), IndexedRef(r2)) => r1.swap_values(r2),
+
+            (ContainerRef(_), IndexedRef(_)) | (IndexedRef(_), ContainerRef(_)) => {
+                Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message("cannot swap references: reference type mismatch".to_string()))
+            },
+        }
+    }
+}
+
+impl Reference {
+    pub fn swap_values(self, other: Self) -> PartialVMResult<()> {
+        self.0.swap_values(other.0)
     }
 }
 
@@ -2082,7 +2530,7 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 }
 
 impl VectorRef {
-    pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
+    pub fn length_as_usize(&self, type_param: &Type) -> PartialVMResult<usize> {
         let c: &Container = self.0.container();
         check_elem_layout(type_param, c)?;
 
@@ -2098,7 +2546,11 @@ impl VectorRef {
             Container::Vec(r) => r.borrow().len(),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
-        Ok(Value::u64(len as u64))
+        Ok(len)
+    }
+
+    pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
+        Ok(Value::u64(self.length_as_usize(type_param)? as u64))
     }
 
     pub fn push_back(&self, e: Value, type_param: &Type) -> PartialVMResult<()> {
@@ -2225,6 +2677,78 @@ impl VectorRef {
         }
 
         self.0.mark_dirty();
+        Ok(())
+    }
+
+    /// Moves range of elements `[removal_position, removal_position + length)` from vector `from`,
+    /// to vector `to`, inserting them starting at the `insert_position`.
+    /// In the `from` vector, elements after the selected range are moved left to fill the hole
+    /// (i.e. range is removed, while the order of the rest of the elements is kept)
+    /// In the `to` vector, elements after the `insert_position` are moved to the right to make space for new elements
+    /// (i.e. range is inserted, while the order of the rest of the elements is kept).
+    ///
+    /// Precondition for this function is that `from` and `to` vectors are required to be distinct
+    /// Move will guaranteee that invariant, because it prevents from having two mutable references to the same value.
+    pub fn move_range(
+        from_self: &Self,
+        removal_position: usize,
+        length: usize,
+        to_self: &Self,
+        insert_position: usize,
+        type_param: &Type,
+    ) -> PartialVMResult<()> {
+        let from_c = from_self.0.container();
+        let to_c = to_self.0.container();
+
+        // potentially unnecessary as native call should've checked the types already
+        // (unlike other vector functions that are bytecodes)
+        // TODO: potentially unnecessary, can be removed - as these are only required for
+        // bytecode instructions, as types are checked when native functions are called.
+        check_elem_layout(type_param, from_c)?;
+        check_elem_layout(type_param, to_c)?;
+
+        macro_rules! move_range {
+            ($from:expr, $to:expr) => {{
+                let mut from_v = $from.borrow_mut();
+                let mut to_v = $to.borrow_mut();
+
+                if removal_position.checked_add(length).map_or(true, |end| end > from_v.len())
+                        || insert_position > to_v.len() {
+                    return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
+                        .with_sub_status(INDEX_OUT_OF_BOUNDS));
+                }
+
+                // Short-circuit with faster implementation some of the common cases.
+                // This includes all non-direct calls to move-range (i.e. insert/remove/append/split_off inside vector).
+                if length == 1 {
+                    to_v.insert(insert_position, from_v.remove(removal_position));
+                } else if removal_position == 0 && length == from_v.len() && insert_position == to_v.len() {
+                    to_v.append(&mut from_v);
+                } else if (removal_position + length == from_v.len() && insert_position == to_v.len()) {
+                    to_v.append(&mut from_v.split_off(removal_position));
+                } else {
+                    to_v.splice(insert_position..insert_position, from_v.splice(removal_position..(removal_position + length), []));
+                }
+            }};
+        }
+
+        match (from_c, to_c) {
+            (Container::VecU8(from_r), Container::VecU8(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU16(from_r), Container::VecU16(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU32(from_r), Container::VecU32(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU64(from_r), Container::VecU64(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU128(from_r), Container::VecU128(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU256(from_r), Container::VecU256(to_r)) => move_range!(from_r, to_r),
+            (Container::VecBool(from_r), Container::VecBool(to_r)) => move_range!(from_r, to_r),
+            (Container::VecAddress(from_r), Container::VecAddress(to_r)) => {
+                move_range!(from_r, to_r)
+            },
+            (Container::Vec(from_r), Container::Vec(to_r)) => move_range!(from_r, to_r),
+            (_, _) => unreachable!(),
+        }
+
+        from_self.0.mark_dirty();
+        to_self.0.mark_dirty();
         Ok(())
     }
 }

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    asset_uploader::api::BatchUploadRequest,
-    models::asset_uploader_request_statuses::AssetUploaderRequestStatuses, schema,
+    asset_uploader::api::{BatchUploadRequest, IdempotencyTuple},
+    models::asset_uploader_request_statuses::AssetUploaderRequestStatuses,
+    schema,
 };
 use ahash::AHashMap;
 use anyhow::Context;
@@ -13,38 +14,33 @@ use diesel::{
 };
 use tracing::debug;
 use url::Url;
-use uuid::Uuid;
 
 /// Uploads a batch of assets to the asset uploader worker
 pub fn upload_batch(
     pool: Pool<ConnectionManager<PgConnection>>,
     request: &BatchUploadRequest,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<IdempotencyTuple> {
     let mut conn = pool.get()?;
     let existing_rows = get_existing_rows(&mut conn, &request.urls)?;
 
-    let request_id = Uuid::new_v4();
-    let application_id = Uuid::parse_str(&request.application_id)?;
     let mut request_statuses = vec![];
     for url in &request.urls {
         if let Some(cdn_image_uri) = existing_rows.get(url.as_str()) {
             request_statuses.push(AssetUploaderRequestStatuses::new_completed(
-                request_id,
+                &request.idempotency_tuple,
                 url.as_str(),
-                application_id,
                 cdn_image_uri.as_deref().unwrap(), // Safe to unwrap because we checked for existence when querying
             ));
         } else {
             request_statuses.push(AssetUploaderRequestStatuses::new(
-                request_id,
+                &request.idempotency_tuple,
                 url.as_str(),
-                application_id,
             ));
         }
     }
 
     insert_request_statuses(&mut conn, &request_statuses)?;
-    Ok(request_id.to_string())
+    Ok(request.idempotency_tuple.clone())
 }
 
 fn get_existing_rows(
@@ -76,7 +72,7 @@ fn insert_request_statuses(
     let query =
         diesel::insert_into(schema::nft_metadata_crawler::asset_uploader_request_statuses::table)
             .values(request_statuses)
-            .on_conflict((request_id, asset_uri))
+            .on_conflict((idempotency_key, application_id, asset_uri))
             .do_nothing();
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();

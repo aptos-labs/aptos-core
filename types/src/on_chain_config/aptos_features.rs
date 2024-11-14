@@ -12,6 +12,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
+
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
@@ -95,6 +96,10 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    /// covers mem::swap and vector::move_range
+    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
+    NATIVE_MEMORY_OPERATIONS = 80,
+    ENABLE_LOADER_V2 = 81,
 }
 
 impl FeatureFlag {
@@ -172,6 +177,8 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
@@ -192,7 +199,6 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-
         features
     }
 }
@@ -315,6 +321,14 @@ impl Features {
 
     pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn is_native_memory_operations_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
+    }
+
+    pub fn is_loader_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

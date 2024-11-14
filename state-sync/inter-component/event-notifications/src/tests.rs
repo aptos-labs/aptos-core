@@ -21,7 +21,7 @@ use aptos_types::{
     on_chain_config::OnChainConfig,
     transaction::{Transaction, Version, WriteSetPayload},
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use claims::{assert_lt, assert_matches, assert_ok};
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
@@ -560,7 +560,10 @@ fn create_database() -> Arc<RwLock<DbReaderWriter>> {
 
     // Bootstrap the genesis transaction
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    assert_ok!(bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn));
+    assert_ok!(bootstrap_genesis::<AptosVMBlockExecutor>(
+        &db_rw,
+        &genesis_txn
+    ));
 
     Arc::new(RwLock::new(db_rw))
 }

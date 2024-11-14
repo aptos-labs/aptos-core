@@ -15,7 +15,7 @@ use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
 use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
-use std::{sync::Arc, time::Duration};
+use std::{cmp::Ordering, sync::Arc, time::Duration};
 
 type EndVersion = u64;
 const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
@@ -83,6 +83,7 @@ impl TableInfoService {
             None => false,
         };
 
+        let mut current_epoch: Option<u64> = None;
         loop {
             let start_time = std::time::Instant::now();
             let ledger_version = self.get_highest_known_version().await.unwrap_or_default();
@@ -94,7 +95,7 @@ impl TableInfoService {
                 .map(|txn| txn.version)
                 .unwrap_or_default();
             let (transactions_in_previous_epoch, transactions_in_current_epoch, epoch) =
-                transactions_in_epochs(&self.context, transactions);
+                transactions_in_epochs(&self.context, current_epoch, transactions);
 
             // At the end of the epoch, snapshot the database.
             if !transactions_in_previous_epoch.is_empty() {
@@ -105,6 +106,10 @@ impl TableInfoService {
                 .await;
                 let previous_epoch = epoch - 1;
                 if backup_is_enabled {
+                    aptos_logger::info!(
+                        epoch = previous_epoch,
+                        "[Table Info] Snapshot taken at the end of the epoch"
+                    );
                     Self::snapshot_indexer_async_v2(
                         self.context.clone(),
                         self.indexer_async_v2.clone(),
@@ -113,7 +118,30 @@ impl TableInfoService {
                     .await
                     .expect("Failed to snapshot indexer async v2");
                 }
+            } else {
+                // If there are no transactions in the previous epoch, it means we have caught up to the latest epoch.
+                // We still need to figure out if we're at the start of the epoch or in the middle of the epoch.
+                if let Some(current_epoch) = current_epoch {
+                    if current_epoch != epoch {
+                        // We're at the start of the epoch.
+                        // We need to snapshot the database.
+                        if backup_is_enabled {
+                            aptos_logger::info!(
+                                epoch = current_epoch,
+                                "[Table Info] Snapshot taken at the start of the epoch"
+                            );
+                            Self::snapshot_indexer_async_v2(
+                                self.context.clone(),
+                                self.indexer_async_v2.clone(),
+                                current_epoch,
+                            )
+                            .await
+                            .expect("Failed to snapshot indexer async v2");
+                        }
+                    }
+                }
             }
+
             self.process_transactions_in_parallel(
                 self.indexer_async_v2.clone(),
                 transactions_in_current_epoch,
@@ -136,6 +164,7 @@ impl TableInfoService {
             );
 
             self.current_version = last_version + 1;
+            current_epoch = Some(epoch);
         }
     }
 
@@ -517,6 +546,13 @@ async fn backup_the_snapshot_and_cleanup(
         .join(snapshot_folder_name.clone());
     // If the backup is for old epoch, clean up and return.
     if let Some(metadata) = backup_metadata {
+        aptos_logger::info!(
+            epoch = epoch,
+            metadata_epoch = metadata.epoch,
+            snapshot_folder_name = snapshot_folder_name,
+            snapshot_dir = snapshot_dir.to_str(),
+            "[Table Info] Checking the metadata before backup."
+        );
         if metadata.epoch >= epoch {
             aptos_logger::info!(
                 epoch = epoch,
@@ -559,6 +595,7 @@ async fn backup_the_snapshot_and_cleanup(
 /// Otherwise, it will be in the current epoch.
 fn transactions_in_epochs(
     context: &ApiContext,
+    current_epoch: Option<u64>,
     mut transactions: Vec<TransactionOnChainData>,
 ) -> (
     Vec<TransactionOnChainData>,
@@ -578,15 +615,36 @@ fn transactions_in_epochs(
         .db
         .get_block_info_by_version(last_version)
         .unwrap_or_else(|_| panic!("Could not get block_info for last version {}", last_version));
-    let split_off_index = if first_version >= epoch_first_version {
-        // All transactions are in the this epoch.
-        // Previous epoch is empty, i.e., [0, 0), and this epoch is [first_version, last_version].
-        0
-    } else {
-        // Some transactions are in the previous epoch.
-        // Previous epoch is [0, epoch_first_version - first_version), and the rest.
-        epoch_first_version - first_version
+
+    if current_epoch.is_none() {
+        // Current epoch is not tracked yet, assume that all transactions are in the current epoch.
+        return (vec![], transactions, block_epoch.epoch());
+    }
+    let current_epoch = current_epoch.unwrap();
+
+    let split_off_index = match current_epoch.cmp(&block_epoch.epoch()) {
+        Ordering::Equal => {
+            // All transactions are in the this epoch.
+            // Previous epoch is empty, i.e., [0, 0), and this epoch is [first_version, last_version].
+            0
+        },
+        Ordering::Less => {
+            // Try the best to split the transactions into two epochs.
+            epoch_first_version - first_version
+        },
+        _ => unreachable!("Epochs are not sorted."),
     };
+
+    // Log the split of the transactions.
+    aptos_logger::info!(
+        split_off_index = split_off_index,
+        last_version = last_version,
+        first_version = first_version,
+        epoch_first_version = epoch_first_version,
+        block_epoch = block_epoch.epoch(),
+        current_epoch = current_epoch,
+        "[Table Info] Split transactions into two epochs."
+    );
 
     let transactions_in_this_epoch = transactions.split_off(split_off_index as usize);
     // The rest of the transactions are in the previous epoch.

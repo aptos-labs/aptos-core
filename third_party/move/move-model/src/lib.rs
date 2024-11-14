@@ -67,6 +67,10 @@ pub mod symbol;
 pub mod ty;
 pub mod well_known;
 
+pub use builder::binary_module_loader;
+use move_binary_format::access::ScriptAccess;
+
+//
 // =================================================================================================
 // Entry Point V2
 
@@ -575,6 +579,20 @@ pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
     }
 }
 
+/// Converts the given compiled script into an equivalent compiled module. This assigns
+/// a unique name to the module based on the script function's name and the passed index.
+/// The index must be unique w.r.t. the context of where the result shall be used
+/// since the function name alone can be used by multiple scripts in the context.
+pub fn convert_script_to_module(script: CompiledScript, index: usize) -> CompiledModule {
+    let fhd = script
+        .function_handles
+        .first()
+        .expect("malformed script without function");
+    let name = script.identifier_at(fhd.name);
+    let unique_name = format!("{}_{}", name, index);
+    script_into_module(script, &unique_name)
+}
+
 #[allow(deprecated)]
 pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> CompiledModule {
     let mut script = compiled_script;
@@ -922,7 +940,7 @@ fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
 }
 
 // =================================================================================================
-// AST visitors
+// AST visitors (v1 compiler infra)
 
 fn collect_lambda_lifted_functions_in_sequence(
     collection: &mut Vec<T::SpecLambdaLiftedFunction>,

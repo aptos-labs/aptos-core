@@ -2,18 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::publishing::{module_simple, raw_module_data};
-use aptos_framework::{natives::code::PackageMetadata, KnownAttribute};
+use aptos_framework::{
+    natives::code::PackageMetadata, KnownAttribute, APTOS_METADATA_KEY, APTOS_METADATA_KEY_V1,
+};
 use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
-        transaction::{SignedTransaction, TransactionPayload},
+        transaction::{Script, SignedTransaction, TransactionPayload},
         LocalAccount,
     },
 };
-use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{CompiledScript, SignatureToken},
+    CompiledModule,
+};
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -123,6 +129,23 @@ impl Package {
             &raw_module_data::PACKAGE_TO_MODULES[name],
         );
         Self::Simple(modules, metadata)
+    }
+
+    pub fn script(publisher: AccountAddress) -> TransactionPayload {
+        let code = &*raw_module_data::SCRIPT_SIMPLE;
+        let mut script = CompiledScript::deserialize(code).expect("Script must deserialize");
+
+        // Change the constant to the sender's address to change script's hash.
+        for constant in &mut script.constant_pool {
+            if constant.type_ == SignatureToken::Address {
+                constant.data = bcs::to_bytes(&publisher).expect("Address must serialize");
+                break;
+            }
+        }
+
+        let mut code = vec![];
+        script.serialize(&mut code).expect("Script must serialize");
+        TransactionPayload::Script(Script::new(code, vec![], vec![]))
     }
 
     fn load_package(
@@ -272,10 +295,17 @@ fn update(
                         }
                     });
                 });
-            assert!(new_module.metadata.len() == 1);
+            let mut count = 0;
             new_module.metadata.iter_mut().for_each(|metadata_holder| {
-                metadata_holder.value = bcs::to_bytes(&metadata).expect("Metadata must serialize");
-            })
+                if metadata_holder.key == APTOS_METADATA_KEY_V1
+                    || metadata_holder.key == APTOS_METADATA_KEY
+                {
+                    metadata_holder.value =
+                        bcs::to_bytes(&metadata).expect("Metadata must serialize");
+                    count += 1;
+                }
+            });
+            assert!(count == 1, "{:?}", new_module.metadata);
         }
 
         new_modules.push((original_name.clone(), new_module));

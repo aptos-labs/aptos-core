@@ -2,6 +2,9 @@
 
 export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
+# Nightly version control
+# Pin nightly-2024-02-12 because of https://github.com/google/oss-fuzz/issues/11626
+NIGHTLY_VERSION="nightly-2024-02-12"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
 CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")
@@ -16,9 +19,6 @@ function error() {
 }
 
 function cargo_fuzz() {
-    # Nightly version control
-    # Pin nightly-2024-02-12 because of https://github.com/google/oss-fuzz/issues/11626
-    NIGHTLY_VERSION="nightly-2024-02-12"
     rustup install $NIGHTLY_VERSION
     if [ -z "$1" ]; then
         error "error using cargo()"
@@ -28,10 +28,24 @@ function cargo_fuzz() {
     $cargo_fuzz_cmd $EXTRAFLAGS $@
 }
 
+function cargo_local() {
+    rustup install $NIGHTLY_VERSION
+    if [ -z "$1" ]; then
+        error "error using cargo()"
+    fi
+    cargo_cmd="cargo "+$NIGHTLY_VERSION" $1"
+    shift
+    $cargo_cmd $EXTRAFLAGS $@
+}
+
 function usage() {
     case "$1" in
         "add")
             echo "Usage: $0 add <fuzz_target>"
+            ;;
+        "block-builder")
+            #echo "Usage: $0 block-builder <command> [argumetns]"
+            cargo_local run --quiet -- --help
             ;;
         "build")
             echo "Usage: $0 build <fuzz_target|all> [target_dir]"
@@ -61,8 +75,9 @@ function usage() {
             echo "Usage: $0 test"
             ;;
         *)
-            echo "Usage: $0 <build|build-oss-fuzz|coverage|clean-coverage|flamegraph|list|run|debug|test>"
+            echo "Usage: $0 <add|block-builder|build|build-oss-fuzz|coverage|clean-coverage|flamegraph|list|run|debug|test>"
             echo "    add               adds a new fuzz target"
+            echo "    block-builder     runs rust tool to hel build fuzzers"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
             echo "    coverage          generates coverage for a fuzz target"
@@ -75,6 +90,16 @@ function usage() {
             ;;
     esac
     exit 1
+}
+
+function block-builder() {
+    if [ -z "$1" ]; then
+        usage block-builder
+    fi
+    command=$1
+    shift
+    cargo_local run --quiet -- $command $@
+    exit 0
 }
 
 function build() {
@@ -217,14 +242,9 @@ function flamegraph() {
         error "$testcase does not exist"
     fi
     info "Generating flamegraph for $fuzz_target with $testcase"
-    # find the binary
-    binary=$(find ./target -name $fuzz_target -type f -perm /111)
-    if [ -z "$binary" ]; then
-        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
-    fi
     # run the binary with cargo-flamegraph
     time=$(date +%s)
-    cargo flamegraph -o "${fuzz_target}_${time}.svg" --bin "$binary" "$testcase -- -runs=1"
+    cargo flamegraph -o "${fuzz_target}_${time}.svg" --root -p="fuzzer-fuzz" --bin="$fuzz_target" -- "$testcase" "-- -runs=1"
 }
 
 function run() {
@@ -297,6 +317,10 @@ case "$1" in
   "add")
     shift
     add "$@"
+    ;;
+  "block-builder")
+    shift
+    block-builder "$@"
     ;;
   "build")
     shift

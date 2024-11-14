@@ -191,7 +191,7 @@ async fn check_correct_connection_is_live(
         assert_peer_disconnected_event(
             expected_peer_id,
             dropped_connection_origin,
-            DisconnectReason::Requested,
+            DisconnectReason::RequestedByPeerManager,
             peer_manager,
         )
         .await;
@@ -218,7 +218,7 @@ async fn check_correct_connection_is_live(
     assert_peer_disconnected_event(
         expected_peer_id,
         live_connection_origin,
-        DisconnectReason::ConnectionLost,
+        DisconnectReason::ConnectionClosed,
         peer_manager,
     )
     .await;
@@ -580,7 +580,7 @@ fn peer_manager_simultaneous_dial_disconnect_event() {
                 ProtocolIdSet::mock(),
                 PeerRole::Unknown,
             ),
-            DisconnectReason::ConnectionLost,
+            DisconnectReason::ConnectionClosed,
         );
         peer_manager.handle_connection_event(event);
         // The active connection should still remain.
@@ -621,6 +621,7 @@ fn test_dial_disconnect() {
         peer_manager
             .handle_outbound_connection_request(ConnectionRequest::DisconnectPeer(
                 ids[0],
+                DisconnectReason::ConnectionClosed,
                 disconnect_resp_tx,
             ))
             .await;
@@ -636,7 +637,7 @@ fn test_dial_disconnect() {
                 ProtocolIdSet::mock(),
                 PeerRole::Unknown,
             ),
-            DisconnectReason::Requested,
+            DisconnectReason::RequestedByPeerManager,
         );
         peer_manager.handle_connection_event(event);
 

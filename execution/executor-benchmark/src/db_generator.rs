@@ -11,13 +11,10 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_db::AptosDB;
-use aptos_executor::{
-    block_executor::TransactionBlockExecutor,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-};
+use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::on_chain_config::Features;
-use aptos_vm::AptosVM;
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::{fs, path::Path};
 
 pub fn create_db_with_accounts<V>(
@@ -31,7 +28,7 @@ pub fn create_db_with_accounts<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
 ) where
-    V: TransactionBlockExecutor + 'static,
+    V: VMBlockExecutor + 'static,
 {
     println!("Initializing...");
 
@@ -62,7 +59,7 @@ pub fn create_db_with_accounts<V>(
     );
 }
 
-fn bootstrap_with_genesis(
+pub(crate) fn bootstrap_with_genesis(
     db_dir: impl AsRef<Path>,
     enable_storage_sharding: bool,
     init_features: Features,
@@ -88,6 +85,9 @@ fn bootstrap_with_genesis(
     );
 
     // Bootstrap db with genesis
-    let waypoint = generate_waypoint::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap()).unwrap();
-    maybe_bootstrap::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint).unwrap();
+    let waypoint =
+        generate_waypoint::<AptosVMBlockExecutor>(&db_rw, get_genesis_txn(&config).unwrap())
+            .unwrap();
+    maybe_bootstrap::<AptosVMBlockExecutor>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint)
+        .unwrap();
 }

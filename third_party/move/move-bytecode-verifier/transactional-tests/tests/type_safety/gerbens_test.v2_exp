@@ -6,6 +6,6 @@ Error: compilation errors:
   ┌─ TEMPFILE:9:16
   │
 9 │     public fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
-  │                ^^^^^^^^^^^^                               - Parameter `f` has a function type.
+  │                ^^^^^^^^^^^^                               - Parameter `f` has function-valued type `|&Element|`.
 
 

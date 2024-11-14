@@ -24,7 +24,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_temppath::TempPath;
 use aptos_time_service::TimeService;
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use futures::{FutureExt, StreamExt};
 use std::{collections::HashMap, sync::Arc};
 
@@ -47,7 +47,8 @@ fn test_new_initialized_configs() {
 
     // Bootstrap the database
     let (node_config, _) = test_config();
-    bootstrap_genesis::<AptosVM>(&db_rw, get_genesis_txn(&node_config).unwrap()).unwrap();
+    bootstrap_genesis::<AptosVMBlockExecutor>(&db_rw, get_genesis_txn(&node_config).unwrap())
+        .unwrap();
 
     // Create mempool and consensus notifiers
     let (mempool_notifier, _) = new_mempool_notifier_listener_pair(100);
@@ -84,7 +85,7 @@ fn test_new_initialized_configs() {
     );
 
     // Create the state sync driver factory
-    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db_rw.clone()));
     let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());
     let _ = DriverFactory::create_and_spawn_driver(
         true,

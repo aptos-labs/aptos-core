@@ -30,7 +30,7 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_genesis::Validator;
 use std::convert::TryInto;
 
@@ -171,6 +171,6 @@ impl GenesisInfo {
             None,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
-        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
+        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVMBlockExecutor>(&db_rw, genesis)
     }
 }

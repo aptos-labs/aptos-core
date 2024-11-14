@@ -1,0 +1,27 @@
+apiVersion: v1  
+kind: PersistentVolume  
+metadata:  
+  name: testnet-archive  
+spec:  
+  capacity:  
+    storage: 10000Gi  
+  accessModes:  
+    - ReadOnlyMany  
+  gcePersistentDisk:  
+    pdName: testnet-archive-0
+    fsType: xfs
+  persistentVolumeReclaimPolicy: Retain  
+  storageClassName: standard  
+---  
+apiVersion: v1  
+kind: PersistentVolumeClaim  
+metadata:  
+  name: testnet-archive-claim  
+spec:  
+  accessModes:  
+    - ReadOnlyMany  
+  resources:  
+    requests:  
+      storage: 10000Gi  
+  storageClassName: standard  
+  volumeName: testnet-archive

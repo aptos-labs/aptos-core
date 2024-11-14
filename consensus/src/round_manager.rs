@@ -355,9 +355,13 @@ impl RoundManager {
         &mut self,
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<()> {
+        let new_round = new_round_event.round;
         let is_current_proposer = self
             .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), new_round_event.round);
+            .is_valid_proposer(self.proposal_generator.author(), new_round);
+        let prev_proposer = self
+            .proposer_election
+            .get_valid_proposer(new_round.saturating_sub(1));
 
         counters::CURRENT_ROUND.set(new_round_event.round as i64);
         counters::ROUND_TIMEOUT_MS.set(new_round_event.timeout.as_millis() as i64);
@@ -368,7 +372,11 @@ impl RoundManager {
             NewRoundReason::Timeout(ref reason) => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
                 counters::AGGREGATED_ROUND_TIMEOUT_REASON
-                    .with_label_values(&[&reason.to_string(), &is_current_proposer.to_string()])
+                    .with_label_values(&[
+                        &reason.to_string(),
+                        prev_proposer.short_str().as_str(),
+                        &is_current_proposer.to_string(),
+                    ])
                     .inc();
                 if is_current_proposer {
                     if let RoundTimeoutReason::PayloadUnavailable { missing_authors } = reason {
@@ -403,17 +411,19 @@ impl RoundManager {
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
-                if let Err(e) = Self::generate_and_send_proposal(
-                    epoch_state,
-                    new_round_event,
-                    network,
-                    sync_info,
-                    proposal_generator,
-                    safety_rules,
-                    proposer_election,
-                )
-                .await
-                {
+                if let Err(e) = monitor!(
+                    "generate_and_send_proposal",
+                    Self::generate_and_send_proposal(
+                        epoch_state,
+                        new_round_event,
+                        network,
+                        sync_info,
+                        proposal_generator,
+                        safety_rules,
+                        proposer_election,
+                    )
+                    .await
+                ) {
                     warn!("Error generating and sending proposal: {}", e);
                 }
             });

@@ -52,7 +52,7 @@ impl QuorumStoreBuilder {
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<dyn TPayloadManager>,
-        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
@@ -101,7 +101,7 @@ impl DirectMempoolInnerBuilder {
         &mut self,
     ) -> (
         Arc<dyn TPayloadManager>,
-        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
         (Arc::from(DirectMempoolPayloadManager::new()), None)
     }
@@ -141,8 +141,8 @@ pub struct InnerBuilder {
     back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
-    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
+    quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, (Author, VerifiedEvent)>>,
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
     remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
     batch_store: Option<Arc<BatchStore>>,
@@ -176,7 +176,7 @@ impl InnerBuilder {
             tokio::sync::mpsc::channel(config.channel_size);
         let (back_pressure_tx, back_pressure_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (quorum_store_msg_tx, quorum_store_msg_rx) =
-            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+            aptos_channel::new::<AccountAddress, (Author, VerifiedEvent)>(
                 QueueStyle::FIFO,
                 config.channel_size,
                 None,
@@ -328,6 +328,7 @@ impl InnerBuilder {
                 self.config.receiver_max_batch_bytes as u64,
                 self.config.receiver_max_total_txns as u64,
                 self.config.receiver_max_total_bytes as u64,
+                self.config.batch_expiry_gap_when_init_usecs,
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i);
@@ -345,6 +346,7 @@ impl InnerBuilder {
             self.batch_generator_cmd_tx.clone(),
             self.proof_cache,
             self.broadcast_proofs,
+            self.config.batch_expiry_gap_when_init_usecs,
         );
         spawn_named!(
             "proof_coordinator",
@@ -435,7 +437,7 @@ impl InnerBuilder {
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<dyn TPayloadManager>,
-        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
         let batch_reader = self.create_batch_store();
 

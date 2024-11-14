@@ -36,7 +36,9 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, RuntimeEnvironment,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -75,14 +77,14 @@ fn storage_with_stdlib_and_modules(additional_modules: Vec<&CompiledModule>) -> 
     for module in compiled_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
     }
 
     // Now add the additional modules.
     for module in additional_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
     }
     storage
 }
@@ -141,12 +143,15 @@ fn execute_function_in_module(
         module.identifier_at(entry_name_idx)
     };
     {
-        let vm = MoveVM::new(move_stdlib::natives::all_natives(
+        let natives = move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
-        ));
+        );
+        let runtime_environment = RuntimeEnvironment::new(natives);
+        let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
         let storage = storage_with_stdlib_and_modules(vec![&module]);
+        let module_storage = storage.as_unsync_module_storage(runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let traversal_storage = TraversalStorage::new();
@@ -157,6 +162,7 @@ fn execute_function_in_module(
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &module_storage,
         )?;
 
         Ok(())

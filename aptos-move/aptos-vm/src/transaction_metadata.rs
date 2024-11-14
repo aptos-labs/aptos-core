@@ -20,6 +20,8 @@ pub struct TransactionMetadata {
     pub secondary_authentication_keys: Vec<Vec<u8>>,
     pub sequence_number: u64,
     pub fee_payer: Option<AccountAddress>,
+    /// `None` if the [TransactionAuthenticator] lacks an authenticator for the fee payer.
+    /// `Some([])` if the authenticator for the fee payer is a [NoAccountAuthenticator].
     pub fee_payer_authentication_key: Option<Vec<u8>>,
     pub max_gas_amount: Gas,
     pub gas_unit_price: FeePerGasUnit,

@@ -266,6 +266,13 @@ function {:inline} $IsEqual'$1_aggregator_Aggregator'(s1: $1_aggregator_Aggregat
 function {:inline} $1_aggregator_spec_get_limit(s: $1_aggregator_Aggregator): int {
     s->$limit
 }
+function {:inline} $1_aggregator_limit(s: $1_aggregator_Aggregator): int {
+    s->$limit
+}
+procedure {:inline 1} $1_aggregator_limit(s: $1_aggregator_Aggregator) returns (res: int) {
+    res := s->$limit;
+    return;
+}
 function {:inline} $1_aggregator_spec_get_handle(s: $1_aggregator_Aggregator): int {
     s->$handle
 }

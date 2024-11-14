@@ -48,7 +48,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     }
     if get_move_compiler_v2_from_env() {
         // Run test against v2 when MOVE_COMPILER_V2 is set
-        compiler_config.compiler_version = Some(CompilerVersion::V2_0);
+        compiler_config.compiler_version = Some(CompilerVersion::latest_stable());
         build_config.compiler_config = compiler_config;
         ok = run_move_unit_tests(
             &pkg_path,

@@ -6,5 +6,5 @@ version = "0.0.0"
 aggregator_examples = "0xCAFE"
 
 [dependencies]
-AptosStdlib = { local = "../../framework/aptos-stdlib" }
-AptosFramework = { local = "../../framework/aptos-framework" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-stdlib", rev = "mainnet" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }

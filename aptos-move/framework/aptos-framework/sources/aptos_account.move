@@ -4,7 +4,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit_event, emit};
-    use aptos_framework::fungible_asset::{Self, Metadata, BurnRef};
+    use aptos_framework::fungible_asset::{Self, Metadata, BurnRef, FungibleAsset};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
 
@@ -12,6 +12,7 @@ module aptos_framework::aptos_account {
     use std::features;
     use std::signer;
     use std::vector;
+    use aptos_framework::object::Object;
 
     friend aptos_framework::genesis;
     friend aptos_framework::resource_account;
@@ -130,6 +131,40 @@ module aptos_framework::aptos_account {
             coin::register<CoinType>(&create_signer(to));
         };
         coin::deposit<CoinType>(to, coins)
+    }
+
+    /// Batch version of transfer_fungible_assets.
+    public entry fun batch_transfer_fungible_assets(
+        from: &signer,
+        metadata: Object<Metadata>,
+        recipients: vector<address>,
+        amounts: vector<u64>
+    ) {
+        let recipients_len = vector::length(&recipients);
+        assert!(
+            recipients_len == vector::length(&amounts),
+            error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
+        );
+
+        vector::enumerate_ref(&recipients, |i, to| {
+            let amount = *vector::borrow(&amounts, i);
+            transfer_fungible_assets(from, metadata, *to, amount);
+        });
+    }
+
+    /// Convenient function to deposit fungible asset into a recipient account that might not exist.
+    /// This would create the recipient account first to receive the fungible assets.
+    public entry fun transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, to: address, amount: u64) {
+        deposit_fungible_assets(to, primary_fungible_store::withdraw(from, metadata, amount));
+    }
+
+    /// Convenient function to deposit fungible asset into a recipient account that might not exist.
+    /// This would create the recipient account first to receive the fungible assets.
+    public fun deposit_fungible_assets(to: address, fa: FungibleAsset) {
+        if (!account::exists_at(to)) {
+            create_account(to);
+        };
+        primary_fungible_store::deposit(to, fa)
     }
 
     public fun assert_account_exists(addr: address) {

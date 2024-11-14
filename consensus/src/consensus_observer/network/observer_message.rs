@@ -4,6 +4,7 @@
 use crate::consensus_observer::common::error::Error;
 use aptos_consensus_types::{
     common::{BatchPayload, Payload},
+    payload::InlineBatches,
     pipelined_block::PipelinedBlock,
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
@@ -366,7 +367,10 @@ pub enum BlockTransactionPayload {
     InQuorumStore(PayloadWithProof),
     InQuorumStoreWithLimit(PayloadWithProofAndLimit),
     QuorumStoreInlineHybrid(PayloadWithProofAndLimit, Vec<BatchInfo>),
-    OptQuorumStore(PayloadWithProofAndLimit, Vec<BatchInfo>),
+    OptQuorumStore(
+        PayloadWithProofAndLimit,
+        /* OptQS and Inline Batches */ Vec<BatchInfo>,
+    ),
 }
 
 impl BlockTransactionPayload {
@@ -419,13 +423,14 @@ impl BlockTransactionPayload {
         Self::QuorumStoreInlineHybrid(PayloadWithProofAndLimit::empty(), vec![])
     }
 
-    /// Returns the list of inline batches in the transaction payload
-    pub fn inline_batches(&self) -> Vec<&BatchInfo> {
+    /// Returns the list of inline batches and optimistic batches in the transaction payload
+    pub fn optqs_and_inline_batches(&self) -> &[BatchInfo] {
         match self {
-            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches) => {
-                inline_batches.iter().collect()
+            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches) => inline_batches,
+            BlockTransactionPayload::OptQuorumStore(_, optqs_and_inline_batches) => {
+                optqs_and_inline_batches
             },
-            _ => vec![],
+            _ => &[],
         }
     }
 
@@ -513,8 +518,11 @@ impl BlockTransactionPayload {
                 // Verify the batches in the requested block
                 self.verify_batches(opt_qs_payload.proof_with_data())?;
 
-                // Verify the inline batches
-                self.verify_opt_batches(opt_qs_payload.opt_batches())?;
+                // Verify optQS and inline batches
+                self.verify_optqs_and_inline_batches(
+                    opt_qs_payload.opt_batches(),
+                    opt_qs_payload.inline_batches(),
+                )?;
 
                 // Verify the transaction limit
                 self.verify_transaction_limit(opt_qs_payload.max_txns_to_execute())?;
@@ -578,9 +586,15 @@ impl BlockTransactionPayload {
         Ok(())
     }
 
-    fn verify_opt_batches(&self, expected_opt_batches: &Vec<BatchInfo>) -> Result<(), Error> {
-        let opt_batches: &Vec<BatchInfo> = match self {
-            BlockTransactionPayload::OptQuorumStore(_, opt_batches) => opt_batches,
+    fn verify_optqs_and_inline_batches(
+        &self,
+        expected_opt_batches: &Vec<BatchInfo>,
+        expected_inline_batches: &InlineBatches,
+    ) -> Result<(), Error> {
+        let optqs_and_inline_batches: &Vec<BatchInfo> = match self {
+            BlockTransactionPayload::OptQuorumStore(_, optqs_and_inline_batches) => {
+                optqs_and_inline_batches
+            },
             _ => {
                 return Err(Error::InvalidMessageError(
                     "Transaction payload is not an OptQS Payload".to_string(),
@@ -588,10 +602,16 @@ impl BlockTransactionPayload {
             },
         };
 
-        if expected_opt_batches != opt_batches {
+        let expected_opt_and_inline_batches = expected_opt_batches.iter().chain(
+            expected_inline_batches
+                .iter()
+                .map(|inline_batch| inline_batch.info()),
+        );
+
+        if !expected_opt_and_inline_batches.eq(optqs_and_inline_batches.iter()) {
             return Err(Error::InvalidMessageError(format!(
-                "Transaction payload failed optimistic batch verification! Expected optimistic batches {:?} but found {:?}",
-                expected_opt_batches, opt_batches
+                "Transaction payload failed batch verification! Expected optimistic batches {:?}, inline batches {:?} but found {:?}",
+                expected_opt_batches, expected_inline_batches, optqs_and_inline_batches
             )));
         }
         Ok(())
@@ -608,6 +628,7 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.transaction_limit
             },
+            BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
             _ => {
                 return Err(Error::InvalidMessageError(
                     "Transaction payload does not contain a limit!".to_string(),
@@ -668,12 +689,12 @@ impl BlockPayload {
         let block_info = self.block.clone();
         let transactions = self.transaction_payload.transactions();
         let payload_proofs = self.transaction_payload.payload_proofs();
-        let inline_batches = self.transaction_payload.inline_batches();
+        let opt_and_inline_batches = self.transaction_payload.optqs_and_inline_batches();
 
         // Get the number of transactions, payload proofs and inline batches
         let num_transactions = transactions.len();
         let num_payload_proofs = payload_proofs.len();
-        let num_inline_batches = inline_batches.len();
+        let num_opt_and_inline_batches = opt_and_inline_batches.len();
 
         // Gather the transactions for each payload batch
         let mut batches_and_transactions = vec![];
@@ -694,29 +715,29 @@ impl BlockPayload {
                     return Err(Error::InvalidMessageError(format!(
                         "Failed to reconstruct payload proof batch! Num transactions: {:?}, \
                         num batches: {:?}, num inline batches: {:?}, failed batch: {:?}, Error: {:?}",
-                        num_transactions, num_payload_proofs, num_inline_batches, proof_of_store.info(), error
+                        num_transactions, num_payload_proofs, num_opt_and_inline_batches, proof_of_store.info(), error
                     )));
                 },
             }
         }
 
         // Gather the transactions for each inline batch
-        for batch_info in inline_batches.into_iter() {
+        for batch_info in opt_and_inline_batches.iter() {
             match reconstruct_batch(&block_info, &mut transactions_iter, batch_info, false) {
                 Ok(Some(batch_transactions)) => {
                     batches_and_transactions.push((batch_info.clone(), batch_transactions));
                 },
                 Ok(None) => {
                     return Err(Error::UnexpectedError(format!(
-                        "Failed to reconstruct inline batch! Batch was unexpectedly skipped: {:?}",
+                        "Failed to reconstruct inline/opt batch! Batch was unexpectedly skipped: {:?}",
                         batch_info
                     )));
                 },
                 Err(error) => {
                     return Err(Error::InvalidMessageError(format!(
-                        "Failed to reconstruct inline batch! Num transactions: {:?}, \
-                        num batches: {:?}, num inline batches: {:?}, failed batch: {:?}, Error: {:?}",
-                        num_transactions, num_payload_proofs, num_inline_batches, batch_info, error
+                        "Failed to reconstruct inline/opt batch! Num transactions: {:?}, \
+                        num batches: {:?}, num opt/inline batches: {:?}, failed batch: {:?}, Error: {:?}",
+                        num_transactions, num_payload_proofs, num_opt_and_inline_batches, batch_info, error
                     )));
                 },
             }
@@ -836,6 +857,10 @@ mod test {
         block::Block,
         block_data::{BlockData, BlockType},
         common::{Author, ProofWithData, ProofWithDataWithTxnLimit},
+        payload::{
+            BatchPointer, InlineBatch, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
+            ProofBatches,
+        },
         proof_of_store::BatchId,
         quorum_cert::QuorumCert,
     };
@@ -851,6 +876,7 @@ mod test {
     };
     use claims::{assert_matches, assert_ok};
     use move_core_types::account_address::AccountAddress;
+    use std::ops::Deref;
 
     #[test]
     fn test_verify_against_ordered_payload_mempool() {
@@ -1009,6 +1035,127 @@ mod test {
         let proof_with_data = ProofWithData::new(vec![]);
         let ordered_payload =
             Payload::QuorumStoreInlineHybrid(vec![], proof_with_data, transaction_limit);
+
+        // Verify the transaction payload and ensure it passes
+        transaction_payload
+            .verify_against_ordered_payload(&ordered_payload)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_verify_against_ordered_payload_optqs() {
+        // Create an empty transaction payload with no proofs and no inline batches
+        let proofs = vec![];
+        let transaction_limit = Some(100);
+        let opt_and_inline_batches = vec![];
+        let transaction_payload = BlockTransactionPayload::new_opt_quorum_store(
+            vec![],
+            proofs.clone(),
+            transaction_limit,
+            opt_and_inline_batches.clone(),
+        );
+
+        // Create a quorum store payload with a single proof
+        let inline_batches = InlineBatches::from(Vec::<InlineBatch>::new());
+        let opt_batches: BatchPointer<BatchInfo> = Vec::new().into();
+        let batch_info = create_batch_info();
+        let proof_with_data: ProofBatches =
+            vec![ProofOfStore::new(batch_info, AggregateSignature::empty())].into();
+        let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            inline_batches.clone(),
+            opt_batches.clone(),
+            proof_with_data,
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify the transaction payload and ensure it fails (the batch infos don't match)
+        let error = transaction_payload
+            .verify_against_ordered_payload(&ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Create a quorum store payload with no transaction limit
+        let proof_with_data: ProofBatches = Vec::new().into();
+        let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            inline_batches,
+            opt_batches,
+            proof_with_data,
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
+        let error = transaction_payload
+            .verify_against_ordered_payload(&ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Create a quorum store payload with a single inline batch
+        let proof_with_data: ProofBatches = Vec::new().into();
+        let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            vec![(create_batch_info(), vec![])].into(),
+            Vec::new().into(),
+            proof_with_data,
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify the transaction payload and ensure it fails (the inline batches don't match)
+        let error = transaction_payload
+            .verify_against_ordered_payload(&ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Create a quorum store payload with a single opt batch
+        let proof_with_data: ProofBatches = Vec::new().into();
+        let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            Vec::<InlineBatch>::new().into(),
+            vec![create_batch_info()].into(),
+            proof_with_data,
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify the transaction payload and ensure it fails (the opt batches don't match)
+        let error = transaction_payload
+            .verify_against_ordered_payload(&ordered_payload)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Create an empty opt quorum store payload
+        let proof_with_data = Vec::new().into();
+        let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            Vec::<InlineBatch>::new().into(),
+            Vec::new().into(),
+            proof_with_data,
+            PayloadExecutionLimit::MaxTransactionsToExecute(100),
+        ));
+
+        // Verify the transaction payload and ensure it passes
+        transaction_payload
+            .verify_against_ordered_payload(&ordered_payload)
+            .unwrap();
+
+        // Create an opt quorum store payload with a inline batch, opt batch, and proof batch
+        let proofs = vec![ProofOfStore::new(
+            create_batch_info(),
+            AggregateSignature::empty(),
+        )];
+        let inline_batches: InlineBatches = vec![(create_batch_info(), vec![])].into();
+        let opt_batches: OptBatches = vec![create_batch_info()].into();
+        let opt_and_inline_batches =
+            [opt_batches.deref().clone(), inline_batches.batch_infos()].concat();
+
+        let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            inline_batches,
+            opt_batches,
+            proofs.clone().into(),
+            PayloadExecutionLimit::MaxTransactionsToExecute(100),
+        ));
+
+        let transaction_payload = BlockTransactionPayload::new_opt_quorum_store(
+            vec![],
+            proofs,
+            Some(100),
+            opt_and_inline_batches,
+        );
 
         // Verify the transaction payload and ensure it passes
         transaction_payload
@@ -1185,6 +1332,11 @@ mod test {
         // Create multiple signed transactions
         let num_signed_transactions = 10;
         let mut signed_transactions = create_signed_transactions(num_signed_transactions);
+        let signed_transactions_for_optqs: Vec<_> = signed_transactions
+            .iter()
+            .cloned()
+            .chain(std::iter::once(signed_transactions.last().unwrap().clone()))
+            .collect();
 
         // Create multiple batch proofs with random digests
         let num_batches = num_signed_transactions - 1;
@@ -1197,13 +1349,29 @@ mod test {
 
         // Create a single inline batch with a random digest
         let inline_batch = create_batch_info_with_digest(HashValue::random(), 1, 1000);
-        let inline_batches = vec![inline_batch];
+        let inline_batches = vec![inline_batch.clone()];
 
-        // Create a block payload (with the transactions, proofs and inline batches)
+        // Create a single optqs batch with a random digest
+        let opt_batch = create_batch_info_with_digest(HashValue::zero(), 1, 1000);
+        let opt_and_inline_batches = vec![opt_batch, inline_batch];
+
+        // Create a block hybrid payload (with the transactions, proofs and inline batches)
         let block_payload =
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
 
-        // Verify the block payload digests and ensure it fails (the batch digests don't match)
+        // Verify the block hybrid payload digests and ensure it fails (the batch digests don't match)
+        let error = block_payload.verify_payload_digests().unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Create a block optqs payload (with the transactions, proofs and inline batches)
+        let block_payload = create_block_optqs_payload(
+            None,
+            &signed_transactions_for_optqs,
+            &proofs,
+            &opt_and_inline_batches,
+        );
+
+        // Verify the block optqs payload digests and ensure it fails (the batch digests don't match)
         let error = block_payload.verify_payload_digests().unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
@@ -1224,17 +1392,48 @@ mod test {
         let error = block_payload.verify_payload_digests().unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
+        // Create a block optqs payload (with the transactions, correct proofs and optqs and inline batches)
+        let block_payload = create_block_optqs_payload(
+            None,
+            &signed_transactions_for_optqs,
+            &proofs,
+            &opt_and_inline_batches,
+        );
+
+        // Verify the block optqs payload digests and ensure it fails (the inline batch digests don't match)
+        let error = block_payload.verify_payload_digests().unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
         // Create a single inline batch with the correct digest
         let inline_batch_payload = BatchPayload::new(PeerId::ZERO, vec![signed_transactions
             .last()
             .unwrap()
             .clone()]);
         let inline_batch_info = create_batch_info_with_digest(inline_batch_payload.hash(), 1, 1000);
-        let inline_batches = vec![inline_batch_info];
+        let inline_batches = vec![inline_batch_info.clone()];
+
+        // Create a single opt batch with the correct digest
+        let opt_batch_payload = BatchPayload::new(PeerId::ZERO, vec![signed_transactions
+            .last()
+            .unwrap()
+            .clone()]);
+        let opt_batch_info = create_batch_info_with_digest(opt_batch_payload.hash(), 1, 1000);
+        let opt_and_inline_batches = vec![opt_batch_info, inline_batch_info];
 
         // Create a block payload (with the transactions, correct proofs and correct inline batches)
         let block_payload =
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
+
+        // Verify the block payload digests and ensure it passes
+        block_payload.verify_payload_digests().unwrap();
+
+        // Create a block payload (with the transactions, correct proofs and correct inline batches)
+        let block_payload = create_block_optqs_payload(
+            None,
+            &signed_transactions_for_optqs,
+            &proofs,
+            &opt_and_inline_batches,
+        );
 
         // Verify the block payload digests and ensure it passes
         block_payload.verify_payload_digests().unwrap();
@@ -1248,12 +1447,46 @@ mod test {
         let error = block_payload.verify_payload_digests().unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
+        // Create a block optqs payload (with too many transactions)
+        let signed_transactions_for_optqs: Vec<_> = signed_transactions
+            .iter()
+            .cloned()
+            .chain(std::iter::once(signed_transactions.last().unwrap().clone()))
+            .collect();
+        let block_payload = create_block_optqs_payload(
+            None,
+            &signed_transactions_for_optqs,
+            &proofs,
+            &opt_and_inline_batches,
+        );
+
+        // Verify the block payload digests and ensure it fails (there are too many transactions)
+        let error = block_payload.verify_payload_digests().unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
         // Create a block payload (with too few transactions)
         for _ in 0..3 {
             signed_transactions.pop();
         }
         let block_payload =
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
+
+        // Verify the block payload digests and ensure it fails (there are too few transactions)
+        let error = block_payload.verify_payload_digests().unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Create a block optqs payload (with too few transactions)
+        let signed_transactions_for_optqs: Vec<_> = signed_transactions
+            .iter()
+            .cloned()
+            .chain(std::iter::once(signed_transactions.last().unwrap().clone()))
+            .collect();
+        let block_payload = create_block_optqs_payload(
+            None,
+            &signed_transactions_for_optqs,
+            &proofs,
+            &opt_and_inline_batches,
+        );
 
         // Verify the block payload digests and ensure it fails (there are too few transactions)
         let error = block_payload.verify_payload_digests().unwrap_err();
@@ -1436,6 +1669,28 @@ mod test {
             proofs.to_vec(),
             None,
             inline_batches.to_vec(),
+        );
+
+        // Determine the block info to use
+        let block_info = block_info.unwrap_or_else(|| create_block_info(0, HashValue::random()));
+
+        // Create the block payload
+        BlockPayload::new(block_info, transaction_payload)
+    }
+
+    /// Creates and returns a opt quorum store payload using the given data
+    fn create_block_optqs_payload(
+        block_info: Option<BlockInfo>,
+        signed_transactions: &[SignedTransaction],
+        proofs: &[ProofOfStore],
+        opt_and_inline_batches: &[BatchInfo],
+    ) -> BlockPayload {
+        // Create the transaction payload
+        let transaction_payload = BlockTransactionPayload::new_opt_quorum_store(
+            signed_transactions.to_vec(),
+            proofs.to_vec(),
+            None,
+            opt_and_inline_batches.to_vec(),
         );
 
         // Determine the block info to use

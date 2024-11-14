@@ -30,7 +30,7 @@ use std::{
     fmt::{Debug, Error, Formatter},
     hash::Hash,
     iter,
-    ops::Deref,
+    ops::{Deref, Range},
 };
 
 // =================================================================================================
@@ -1095,34 +1095,35 @@ impl ExpData {
         called
     }
 
-    /// Given that this expression is (part of) a loop body, returns `true` if
-    /// there is an early exit from the body of the nearest enclosing loop,
-    /// i.e., the expression contains a `continue` or `break` statement outside
-    /// of any nested loop. Note that the given expression will appear in
-    /// a `Loop(self)` context, so any exits referring to this implicit loop
+    /// Returns true if the given expression contains a `continue` or
+    /// `break` which refers to a loop in the given `nest_range`.
+    /// For example, `branches_to(loop { break }, 1..10)` will return false,
+    /// but `branches_to(loop { break }, 0..10)` will return true.
     /// count as exit.
-    pub fn has_loop_exit(&self) -> bool {
-        let mut loop_count = 0; // Count internal nested loops.
-        let mut has_exit = false;
+    pub fn branches_to(&self, nest_range: Range<usize>) -> bool {
+        let mut loop_nest = 0;
+        let mut branches = false;
         let mut visitor = |post: bool, e: &ExpData| {
             match e {
                 ExpData::Loop(_, _) => {
                     if post {
-                        loop_count -= 1
+                        loop_nest -= 1
                     } else {
-                        loop_count += 1
+                        loop_nest += 1
                     }
                 },
-                ExpData::LoopCont(_, nest, _) if loop_count == *nest => {
-                    has_exit = true;
-                    return false; // found an exit, exit visit early
+                ExpData::LoopCont(_, nest, _)
+                    if *nest >= loop_nest && nest_range.contains(&(*nest - loop_nest)) =>
+                {
+                    branches = true;
+                    return false; // found a reference, exit visit early
                 },
                 _ => {},
             }
             true
         };
         self.visit_pre_post(&mut visitor);
-        has_exit
+        branches
     }
 
     /// Compute the bindings of break/continue expressions to the associated loop. This
@@ -1171,6 +1172,19 @@ impl ExpData {
         };
         self.visit_pre_post(&mut visit_binding);
         (loop_to_cont, cont_to_loop)
+    }
+
+    /// Rewrite an expression such that any break/continue nests referring to outer loops
+    /// have the given delta added to their nesting. This simulates removing or adding a loop to
+    /// the given expression. Nests bound to loops of the given expression are not effected.
+    ///
+    /// If this is needed elsewhere we can move it out, currently it's a local helper.
+    pub fn rewrite_loop_nest(&self, delta: isize) -> Exp {
+        LoopNestRewriter {
+            loop_depth: 0,
+            delta,
+        }
+        .rewrite_exp(self.clone().into_exp())
     }
 
     /// Returns true of the given expression is valid for a constant expression.
@@ -1691,6 +1705,34 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 
     fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
         (*self.pattern_rewriter)(pat, entering_scope)
+    }
+}
+
+/// A rewriter for lifting loop nests.
+struct LoopNestRewriter {
+    loop_depth: usize,
+    delta: isize,
+}
+
+impl ExpRewriterFunctions for LoopNestRewriter {
+    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        match exp.as_ref() {
+            ExpData::LoopCont(id, nest, cont) if *nest >= self.loop_depth => {
+                let new_nest = (*nest as isize) + self.delta;
+                assert!(
+                    new_nest >= 0,
+                    "loop removed which has break/continue references?"
+                );
+                ExpData::LoopCont(*id, new_nest as usize, *cont).into_exp()
+            },
+            ExpData::Loop(_, _) => {
+                self.loop_depth += 1;
+                let result = self.rewrite_exp_descent(exp);
+                self.loop_depth -= 1;
+                result
+            },
+            _ => self.rewrite_exp_descent(exp),
+        }
     }
 }
 

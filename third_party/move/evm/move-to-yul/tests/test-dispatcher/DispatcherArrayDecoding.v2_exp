@@ -461,7 +461,7 @@ object "A2_M" {
                     case 3 {
                         // $t7 := borrow_local($t0)
                         $t7 := $MakePtr(false, $locals)
-                        // $t8 := vector::length<vector<U256::U256>>($t7)
+                        // $t8 := vector::length<vector<0x2::U256::U256>>($t7)
                         $t8 := A1_vector_length$vec$A2_U256_U256$$($t7)
                         // $t9 := 0
                         $t9 := 0
@@ -488,17 +488,17 @@ object "A2_M" {
                         // label L2
                         // $t11 := borrow_local($t0)
                         $t11 := $MakePtr(false, $locals)
-                        // $t12 := vector::borrow<vector<U256::U256>>($t11, $t1)
+                        // $t12 := vector::borrow<vector<0x2::U256::U256>>($t11, $t1)
                         $t12 := A1_vector_borrow$vec$A2_U256_U256$$($t11, i)
                         // $t13 := 0
                         $t13 := 0
-                        // $t14 := vector::borrow<U256::U256>($t12, $t13)
+                        // $t14 := vector::borrow<0x2::U256::U256>($t12, $t13)
                         $t14 := A1_vector_borrow$A2_U256_U256$($t12, $t13)
                         // $t15 := read_ref($t14)
                         $t15 := $LoadU256($t14)
                         // $t16 := 1
                         $t16 := 1
-                        // $t17 := vector::borrow<U256::U256>($t12, $t16)
+                        // $t17 := vector::borrow<0x2::U256::U256>($t12, $t16)
                         $t17 := A1_vector_borrow$A2_U256_U256$($t12, $t16)
                         // $t18 := read_ref($t17)
                         $t18 := $LoadU256($t17)
@@ -689,9 +689,9 @@ object "A2_M" {
                         // label L2
                         // $t10 := borrow_local($t0)
                         $t10 := $MakePtr(false, $locals)
-                        // $t11 := vector::borrow<vector<U256::U256>>($t10, $t1)
+                        // $t11 := vector::borrow<vector<0x2::U256::U256>>($t10, $t1)
                         $t11 := A1_vector_borrow$vec$A2_U256_U256$$($t10, i)
-                        // $t12 := vector::length<U256::U256>($t11)
+                        // $t12 := vector::length<0x2::U256::U256>($t11)
                         $t12 := A1_vector_length$A2_U256_U256$($t11)
                         // $t13 := 0
                         $t13 := 0
@@ -726,7 +726,7 @@ object "A2_M" {
                     }
                     case 10 {
                         // label L5
-                        // $t15 := vector::borrow<U256::U256>($t11, $t2)
+                        // $t15 := vector::borrow<0x2::U256::U256>($t11, $t2)
                         $t15 := A1_vector_borrow$A2_U256_U256$($t11, j)
                         // $t16 := read_ref($t15)
                         $t16 := $LoadU256($t15)
@@ -959,7 +959,7 @@ object "A2_M" {
                     case 3 {
                         // $t7 := borrow_local($t0)
                         $t7 := $MakePtr(false, $locals)
-                        // $t8 := vector::length<vector<U256::U256>>($t7)
+                        // $t8 := vector::length<vector<0x2::U256::U256>>($t7)
                         $t8 := A1_vector_length$vec$A2_U256_U256$$($t7)
                         // $t9 := 0
                         $t9 := 0
@@ -986,17 +986,17 @@ object "A2_M" {
                         // label L2
                         // $t11 := borrow_local($t0)
                         $t11 := $MakePtr(false, $locals)
-                        // $t12 := vector::borrow<vector<U256::U256>>($t11, $t1)
+                        // $t12 := vector::borrow<vector<0x2::U256::U256>>($t11, $t1)
                         $t12 := A1_vector_borrow$vec$A2_U256_U256$$($t11, i)
                         // $t13 := 0
                         $t13 := 0
-                        // $t14 := vector::borrow<U256::U256>($t12, $t13)
+                        // $t14 := vector::borrow<0x2::U256::U256>($t12, $t13)
                         $t14 := A1_vector_borrow$A2_U256_U256$($t12, $t13)
                         // $t15 := read_ref($t14)
                         $t15 := $LoadU256($t14)
                         // $t16 := 1
                         $t16 := 1
-                        // $t17 := vector::borrow<U256::U256>($t12, $t16)
+                        // $t17 := vector::borrow<0x2::U256::U256>($t12, $t16)
                         $t17 := A1_vector_borrow$A2_U256_U256$($t12, $t16)
                         // $t18 := read_ref($t17)
                         $t18 := $LoadU256($t17)

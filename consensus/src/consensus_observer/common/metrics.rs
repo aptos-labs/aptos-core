@@ -5,8 +5,8 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -119,6 +119,17 @@ pub static OBSERVER_RECEIVED_MESSAGE_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
         "consensus_observer_received_message_rounds",
         "Gauge for tracking the rounds of received messages by the consensus observer",
         &["message_type"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking observer message processing latencies
+pub static OBSERVER_MESSAGE_PROCESSING_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "consensus_observer_message_processing_latency",
+        "Counters related to observer message processing latencies",
+        &["message_type", "network_id"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });
@@ -243,13 +254,13 @@ pub fn increment_counter_without_labels(counter: &Lazy<IntCounter>) {
 /// Observes the value for the provided histogram and label
 pub fn observe_value_with_label(
     histogram: &Lazy<HistogramVec>,
-    request_label: &str,
+    label: &str,
     peer_network_id: &PeerNetworkId,
     value: f64,
 ) {
     let network_id = peer_network_id.network_id();
     histogram
-        .with_label_values(&[request_label, network_id.as_str()])
+        .with_label_values(&[label, network_id.as_str()])
         .observe(value)
 }
 

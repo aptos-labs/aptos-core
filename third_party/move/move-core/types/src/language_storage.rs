@@ -5,7 +5,7 @@
 use crate::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    parser::{parse_struct_tag, parse_type_tag},
+    parser::{parse_module_id, parse_struct_tag, parse_type_tag},
     safe_serialize,
 };
 #[cfg(any(test, feature = "fuzzing"))]
@@ -23,7 +23,10 @@ pub const RESOURCE_TAG: u8 = 1;
 pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum TypeTag {
     // alias for compatibility with old json serialized data.
     #[serde(rename = "bool", alias = "Bool")]
@@ -102,7 +105,10 @@ impl FromStr for TypeTag {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct StructTag {
@@ -212,7 +218,10 @@ impl ResourceKey {
 /// Represents the initial key into global storage where we first index by the address, and then
 /// the struct tag. The struct fields are public to support pattern matching.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct ModuleId {
@@ -223,6 +232,14 @@ pub struct ModuleId {
 impl From<ModuleId> for (AccountAddress, Identifier) {
     fn from(module_id: ModuleId) -> Self {
         (module_id.address, module_id.name)
+    }
+}
+
+impl FromStr for ModuleId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_module_id(s)
     }
 }
 

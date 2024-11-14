@@ -286,6 +286,7 @@ impl NodeSetup {
             Arc::from(DirectMempoolPayloadManager::new()),
             false,
             Arc::new(Mutex::new(PendingBlocks::new())),
+            None,
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());

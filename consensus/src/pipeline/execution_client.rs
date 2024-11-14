@@ -13,6 +13,7 @@ use crate::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         errors::Error,
+        pipeline_builder::PipelineBuilder,
         signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::{
@@ -104,6 +105,9 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Shutdown the current processor at the end of the epoch.
     async fn end_epoch(&self);
+
+    /// Returns a pipeline builder for the current epoch.
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder;
 }
 
 struct BufferManagerHandle {
@@ -510,6 +514,10 @@ impl TExecutionClient for ExecutionProxyClient {
         }
         self.execution_proxy.end_epoch();
     }
+
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        self.execution_proxy.pipeline_builder(signer)
+    }
 }
 
 pub struct DummyExecutionClient;
@@ -567,4 +575,8 @@ impl TExecutionClient for DummyExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        todo!()
+    }
 }

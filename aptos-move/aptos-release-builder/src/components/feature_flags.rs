@@ -131,6 +131,8 @@ pub enum FeatureFlag {
     FederatedKeyless,
     TransactionSimulationEnhancement,
     CollectionOwner,
+    NativeMemoryOperations,
+    EnableLoaderV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -347,6 +349,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
         }
     }
 }
@@ -490,6 +494,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::TransactionSimulationEnhancement
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
+            AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
+            AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
         }
     }
 }

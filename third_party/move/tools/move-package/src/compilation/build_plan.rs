@@ -18,9 +18,10 @@ use move_compiler::{
     diagnostics::{report_diagnostics_to_color_buffer, report_warnings, FilesSourceText},
     Compiler,
 };
+use move_compiler_v2::external_checks::ExternalChecks;
 use move_model::model;
 use petgraph::algo::toposort;
-use std::{collections::BTreeSet, io::Write, path::Path};
+use std::{collections::BTreeSet, io::Write, path::Path, sync::Arc};
 #[cfg(feature = "evm-backend")]
 use {
     colored::Colorize,
@@ -126,6 +127,7 @@ impl BuildPlan {
         self.compile_with_driver(
             writer,
             config,
+            vec![],
             |compiler| {
                 let (files, units) = compiler.build_and_report()?;
                 Ok((files, units, None))
@@ -135,15 +137,19 @@ impl BuildPlan {
         .map(|(package, _)| package)
     }
 
-    /// Compilation process does not exit even if warnings/failures are encountered
+    /// Compilation process does not exit even if warnings/failures are encountered.
+    /// External checks on Move code can be provided via `external_checks`, these checks
+    /// are only run when using the compiler v2.
     pub fn compile_no_exit<W: Write>(
         &self,
         config: &CompilerConfig,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
         writer: &mut W,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         self.compile_with_driver(
             writer,
             config,
+            external_checks,
             |compiler| {
                 let (files, units_res) = compiler.build()?;
                 match units_res {
@@ -169,6 +175,7 @@ impl BuildPlan {
         &self,
         writer: &mut W,
         config: &CompilerConfig,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
         compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
         compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
@@ -213,6 +220,7 @@ impl BuildPlan {
             root_package.clone(),
             transitive_dependencies,
             config,
+            external_checks,
             &self.resolution_graph,
             compiler_driver_v1,
             compiler_driver_v2,

@@ -31,7 +31,6 @@ error: unknown assertion failed
    =     at ../move-stdlib/sources/signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
-   =     at tests/sources/functional/is_txn_signer.move:30: f4_incorrect
    =     at tests/sources/functional/is_txn_signer.move:31: f4_incorrect
 
 error: precondition does not hold at this call

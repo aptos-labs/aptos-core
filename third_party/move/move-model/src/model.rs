@@ -31,11 +31,12 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityInference, AbilityInferer, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
-        TypeDisplayContext, TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext,
+        TypeUnificationAdapter, Variance,
     },
     well_known,
 };
+use anyhow::bail;
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label, LabelStyle, Severity},
@@ -1043,16 +1044,15 @@ impl GlobalEnv {
         self.internal_loc.clone()
     }
 
-    /// Converts a Loc as used by the move-compiler compiler to the one we are using here.
+    /// Converts a Loc as used by the move compiler to the one we are using here.
     pub fn to_loc(&self, loc: &MoveIrLoc) -> Loc {
-        let file_id = self.get_file_id(loc.file_hash()).unwrap_or_else(|| {
-            panic!(
-                "Unable to find source file '{}' in the environment",
-                loc.file_hash()
-            )
-        });
-        // Note that move-compiler doesn't use "inlined from"
-        Loc::new(file_id, Span::new(loc.start(), loc.end()))
+        if let Some(file_id) = self.get_file_id(loc.file_hash()) {
+            // Note that move-compiler doesn't use "inlined from"
+            Loc::new(file_id, Span::new(loc.start(), loc.end()))
+        } else {
+            // Cannot map this location, return unknown loc
+            self.unknown_loc.clone()
+        }
     }
 
     /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
@@ -1189,6 +1189,25 @@ impl GlobalEnv {
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
         self.report_diag_with_filter(writer, |d| d.severity >= severity)
+    }
+
+    /// Helper function to report diagnostics, check for errors, and fail with a message on
+    /// errors. This function is idempotent and will not report the same diagnostics again.
+    pub fn check_diag<W>(
+        &self,
+        error_writer: &mut W,
+        report_severity: Severity,
+        msg: &str,
+    ) -> anyhow::Result<()>
+    where
+        W: WriteColor + std::io::Write,
+    {
+        self.report_diag(error_writer, report_severity);
+        if self.has_errors() {
+            bail!("exiting with {}", msg);
+        } else {
+            Ok(())
+        }
     }
 
     // Comparison of Diagnostic values that tries to match program ordering so we
@@ -2647,10 +2666,10 @@ pub struct ModuleData {
     pub(crate) id: ModuleId,
 
     /// Attributes attached to this module.
-    attributes: Vec<Attribute>,
+    pub(crate) attributes: Vec<Attribute>,
 
     /// Use declarations
-    use_decls: Vec<UseDecl>,
+    pub(crate) use_decls: Vec<UseDecl>,
 
     /// Friend declarations
     pub(crate) friend_decls: Vec<FriendDecl>,
@@ -2701,6 +2720,33 @@ pub struct ModuleData {
 
     /// Holds the set of modules declared as friend.
     pub(crate) friend_modules: BTreeSet<ModuleId>,
+}
+
+impl ModuleData {
+    pub fn new(name: ModuleName, id: ModuleId, loc: Loc) -> Self {
+        Self {
+            name,
+            id,
+            loc,
+            attributes: vec![],
+            use_decls: vec![],
+            friend_decls: vec![],
+            compiled_module: None,
+            source_map: None,
+            named_constants: Default::default(),
+            struct_data: Default::default(),
+            struct_idx_to_id: Default::default(),
+            function_data: Default::default(),
+            function_idx_to_id: Default::default(),
+            spec_vars: Default::default(),
+            spec_funs: Default::default(),
+            module_spec: RefCell::new(Default::default()),
+            spec_block_infos: vec![],
+            used_modules: Default::default(),
+            used_modules_including_specs: RefCell::new(None),
+            friend_modules: Default::default(),
+        }
+    }
 }
 
 /// Represents a module environment.
@@ -2956,6 +3002,11 @@ impl<'env> ModuleEnv<'env> {
         self.data.compiled_module.as_ref()
     }
 
+    /// Gets the underlying source map, if one is attached.
+    pub fn get_source_map(&'env self) -> Option<&'env SourceMap> {
+        self.data.source_map.as_ref()
+    }
+
     /// Gets a `NamedConstantEnv` in this module by name
     pub fn find_named_constant(&'env self, name: Symbol) -> Option<NamedConstantEnv<'env>> {
         let id = NamedConstantId(name);
@@ -3023,11 +3074,13 @@ impl<'env> ModuleEnv<'env> {
 
     /// Gets a FunctionEnv by id.
     pub fn into_function(self, id: FunId) -> FunctionEnv<'env> {
-        let data = self
-            .data
-            .function_data
-            .get(&id)
-            .unwrap_or_else(|| panic!("FunId {} undefined", id.0.display(self.symbol_pool())));
+        let data = self.data.function_data.get(&id).unwrap_or_else(|| {
+            panic!(
+                "FunId {}::{} undefined",
+                self.get_full_name_str(),
+                id.0.display(self.symbol_pool())
+            )
+        });
         FunctionEnv {
             module_env: self,
             data,
@@ -3167,80 +3220,27 @@ impl<'env> ModuleEnv<'env> {
     /// Globalizes a signature local to this module. This requires a compiled module to be
     /// attached.
     pub fn globalize_signature(&self, sig: &SignatureToken) -> Option<Type> {
-        Some(self.internal_globalize_signature(self.data.compiled_module.as_ref()?, sig))
-    }
-
-    pub(crate) fn internal_globalize_signature(
-        &self,
-        module: &CompiledModule,
-        sig: &SignatureToken,
-    ) -> Type {
-        match sig {
-            SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
-            SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
-            SignatureToken::U16 => Type::Primitive(PrimitiveType::U16),
-            SignatureToken::U32 => Type::Primitive(PrimitiveType::U32),
-            SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
-            SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
-            SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
-            SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
-            SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
-            SignatureToken::Reference(t) => Type::Reference(
-                ReferenceKind::Immutable,
-                Box::new(self.internal_globalize_signature(module, t)),
-            ),
-            SignatureToken::MutableReference(t) => Type::Reference(
-                ReferenceKind::Mutable,
-                Box::new(self.internal_globalize_signature(module, t)),
-            ),
-            SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
-            SignatureToken::Vector(bt) => {
-                Type::Vector(Box::new(self.internal_globalize_signature(module, bt)))
-            },
-            SignatureToken::Struct(handle_idx) => {
-                let struct_view =
-                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
-                let declaring_module_env = self
-                    .env
-                    .find_module(&self.env.to_module_name(&struct_view.module_id()))
-                    .expect("undefined module");
-                let struct_env = declaring_module_env
-                    .find_struct(self.env.symbol_pool.make(struct_view.name().as_str()))
-                    .expect("undefined struct");
-                Type::Struct(declaring_module_env.data.id, struct_env.get_id(), vec![])
-            },
-            SignatureToken::StructInstantiation(handle_idx, args) => {
-                let struct_view =
-                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
-                let declaring_module_env = self
-                    .env
-                    .find_module(&self.env.to_module_name(&struct_view.module_id()))
-                    .expect("undefined module");
-                let struct_env = declaring_module_env
-                    .find_struct(self.env.symbol_pool.make(struct_view.name().as_str()))
-                    .expect("undefined struct");
-                Type::Struct(
-                    declaring_module_env.data.id,
-                    struct_env.get_id(),
-                    self.internal_globalize_signatures(module, args),
-                )
-            },
-        }
+        let struct_resolver = |module_name: ModuleName, struct_name: Symbol| {
+            let declaring_module_env = self
+                .env
+                .find_module(&module_name)
+                .expect("expected defined module name");
+            let struct_env = declaring_module_env
+                .find_struct(struct_name)
+                .expect("expected defined struct name");
+            declaring_module_env.get_id().qualified(struct_env.get_id())
+        };
+        Some(Type::from_signature_token(
+            self.env,
+            self.data.compiled_module.as_ref()?,
+            &struct_resolver,
+            sig,
+        ))
     }
 
     /// Globalizes a list of signatures.
     pub fn globalize_signatures(&self, sigs: &[SignatureToken]) -> Option<Vec<Type>> {
-        Some(self.internal_globalize_signatures(self.data.compiled_module.as_ref()?, sigs))
-    }
-
-    pub(crate) fn internal_globalize_signatures(
-        &self,
-        module: &CompiledModule,
-        sigs: &[SignatureToken],
-    ) -> Vec<Type> {
-        sigs.iter()
-            .map(|sig| self.internal_globalize_signature(module, sig))
-            .collect()
+        sigs.iter().map(|s| self.globalize_signature(s)).collect()
     }
 
     /// Gets a list of type actuals associated with the index in the bytecode, if
@@ -3444,6 +3444,24 @@ pub struct StructData {
     pub is_native: bool,
 }
 
+impl StructData {
+    pub fn new(name: Symbol, loc: Loc) -> Self {
+        Self {
+            name,
+            loc,
+            def_idx: None,
+            attributes: vec![],
+            type_params: vec![],
+            abilities: AbilitySet::ALL,
+            spec_var_opt: None,
+            field_data: Default::default(),
+            variants: None,
+            spec: RefCell::new(Default::default()),
+            is_native: false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct StructVariant {
     pub(crate) loc: Loc,
@@ -3457,7 +3475,7 @@ pub struct StructEnv<'env> {
     pub module_env: ModuleEnv<'env>,
 
     /// Reference to the struct data.
-    data: &'env StructData,
+    pub data: &'env StructData,
 }
 
 impl<'env> StructEnv<'env> {
@@ -3814,7 +3832,17 @@ impl<'env> FieldEnv<'env> {
 
     /// Gets the id of this field.
     pub fn get_id(&self) -> FieldId {
-        FieldId(self.data.name)
+        if let Some(variant) = self.get_variant() {
+            // TODO: this is inefficient and we may want to cache it
+            let spool = self.struct_env.symbol_pool();
+            let id_str = FieldId::make_variant_field_id_str(
+                spool.string(variant).as_str(),
+                spool.string(self.data.name).as_str(),
+            );
+            FieldId(spool.make(&id_str))
+        } else {
+            FieldId(self.data.name)
+        }
     }
 
     /// Returns true if this is a positional field. Identified by that the name
@@ -4048,6 +4076,18 @@ pub struct FunctionLoc {
     pub(crate) result_type_loc: Loc,
 }
 
+impl FunctionLoc {
+    pub fn from_single(loc: Loc) -> Self {
+        // TODO: consider making non-full locations optional, as we do not always have this
+        //   information.
+        Self {
+            full: loc.clone(),
+            id_loc: loc.clone(),
+            result_type_loc: loc,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FunctionData {
     /// Name of this function.
@@ -4107,6 +4147,31 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+}
+
+impl FunctionData {
+    pub fn new(name: Symbol, loc: Loc) -> Self {
+        Self {
+            name,
+            loc: FunctionLoc::from_single(loc),
+            def_idx: None,
+            handle_idx: None,
+            visibility: Default::default(),
+            has_package_visibility: false,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params: vec![],
+            params: vec![],
+            result_type: Type::unit(),
+            access_specifiers: None,
+            spec: RefCell::new(Default::default()),
+            def: None,
+            called_funs: None,
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+        }
+    }
 }
 
 /// Kind of a function,

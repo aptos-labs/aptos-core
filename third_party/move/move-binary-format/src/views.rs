@@ -12,7 +12,7 @@
 //!   immediately -- the views are a convenience to make that simpler. They've been written as lazy
 //!   iterators to aid understanding of the file format and to make it easy to generate views.
 
-use crate::{access::ModuleAccess, file_format::*, SignatureTokenKind};
+use crate::{access::ModuleAccess, file_format::*};
 use move_core_types::{identifier::IdentStr, language_storage::ModuleId};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -349,6 +349,10 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
         self.struct_handle_view.abilities()
     }
 
+    pub fn handle_idx(&self) -> StructHandleIndex {
+        self.struct_def.struct_handle
+    }
+
     pub fn is_native(&self) -> bool {
         match &self.struct_def.field_information {
             StructFieldInformation::Native => true,
@@ -489,6 +493,10 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
             function_def,
             function_handle_view,
         }
+    }
+
+    pub fn handle_idx(&self) -> FunctionHandleIndex {
+        self.function_def.function
     }
 
     pub fn visibility(&self) -> Visibility {
@@ -675,11 +683,6 @@ impl<'a, T: ModuleAccess> SignatureTokenView<'a, T> {
     #[inline]
     pub fn signature_token(&self) -> &SignatureToken {
         self.token
-    }
-
-    #[inline]
-    pub fn signature_token_kind(&self) -> SignatureTokenKind {
-        self.token.signature_token_kind()
     }
 
     #[inline]

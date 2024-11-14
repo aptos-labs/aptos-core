@@ -8,6 +8,7 @@ Using the following image tags:
 Checking if image exists in GCP: aptos/validator-testing:banana
 Checking if image exists in GCP: aptos/validator-testing:banana
 Checking if image exists in GCP: aptos/forge:banana
+forge_args: ['forge', '--suite', 'banana-test', '--duration-secs', '300', 'test', 'k8s-swarm', '--image-tag', 'banana', '--upgrade-image-tag', 'banana', '--namespace', 'forge-perry-1659078000']
 === Start temp-pre-comment ===
 ### Forge is running suite `banana-test` on `banana`
 * [Grafana dashboard (auto-refresh)](https://aptoslabs.grafana.net/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global%20%28Non-mainnet%29&var-BigQuery=Google%20BigQuery&var-namespace=forge-perry-1659078000&var-metrics_source=All&var-chain_name=forge-big-1&refresh=10s&from=now-15m&to=now)
@@ -19,6 +20,7 @@ Checking if image exists in GCP: aptos/forge:banana
 * Test run is land-blocking
 === End temp-pre-comment ===
 Deleting forge pod for namespace forge-perry-1659078000
+rendered_forge_test_runner: 
 Deleting forge pod for namespace forge-perry-1659078000
 === Start temp-report ===
 Forge test runner terminated:

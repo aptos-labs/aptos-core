@@ -93,6 +93,7 @@ fn build_empty_store(
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
         Arc::new(Mutex::new(PendingBlocks::new())),
+        None,
     ))
 }
 

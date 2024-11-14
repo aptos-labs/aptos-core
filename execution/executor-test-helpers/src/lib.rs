@@ -21,11 +21,11 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use std::sync::Arc;
 
 /// Helper function for test to blindly bootstrap without waypoint.
-pub fn bootstrap_genesis<V: VMExecutor>(
+pub fn bootstrap_genesis<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
 ) -> anyhow::Result<Waypoint> {
@@ -50,7 +50,7 @@ pub fn gen_ledger_info_with_sigs(
             0, /* round */
             commit_block_id,
             output.root_hash(),
-            output.version(),
+            output.expect_last_version(),
             0, /* timestamp */
             output.epoch_state().clone(),
         ),

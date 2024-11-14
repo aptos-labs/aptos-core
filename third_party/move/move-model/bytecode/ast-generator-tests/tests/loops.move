@@ -1,7 +1,7 @@
 module 0x815::m {
 
     fun while_1(c: u64) {
-        while (c > 0) c = c - 1
+        while (c > 0) c = c - 1;
     }
 
     fun while_2(c: u64): u64 {
@@ -30,5 +30,17 @@ module 0x815::m {
             if (c % 2 == 1) break;
         };
         c
+    }
+
+    fun nested_loop(x: u64): u64 {
+        while (x > 0) {
+            while (x > 10) {
+                x = x - 1;
+                break;
+            };
+            x = x - 1;
+            continue;
+        };
+        x
     }
 }

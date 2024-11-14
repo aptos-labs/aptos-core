@@ -179,6 +179,10 @@ impl BatchSortKey {
     pub fn author(&self) -> PeerId {
         self.batch_key.author
     }
+
+    pub fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
+    }
 }
 
 impl PartialOrd<Self> for BatchSortKey {

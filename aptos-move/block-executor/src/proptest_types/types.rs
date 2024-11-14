@@ -25,7 +25,10 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
+    module_and_script_storage::code_storage::AptosCodeStorage,
+    module_write_set::ModuleWrite,
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
@@ -33,7 +36,9 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_core_types::{
+    ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -106,30 +111,6 @@ where
         } else {
             Ok(None)
         }
-    }
-
-    fn id(&self) -> StateViewId {
-        StateViewId::Miscellaneous
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-        unreachable!("Not used in tests");
-    }
-}
-
-pub(crate) struct EmptyDataView<K> {
-    pub(crate) phantom: PhantomData<K>,
-}
-
-impl<K> TStateView for EmptyDataView<K>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-{
-    type Key = K;
-
-    /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
-        Ok(None)
     }
 
     fn id(&self) -> StateViewId {
@@ -840,12 +821,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 // Mock transaction executor implementation.
 ///////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-pub(crate) struct MockTask<K, E>(PhantomData<(K, E)>);
+pub(crate) struct MockTask<K, E> {
+    phantom_data: PhantomData<(K, E)>,
+}
 
 impl<K, E> MockTask<K, E> {
     pub fn new() -> Self {
-        Self(PhantomData)
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 }
 
@@ -854,19 +838,19 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Environment = ();
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_env: Self::Environment, _state_view: &impl TStateView<Key = K>) -> Self {
+    fn init(_environment: AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
         Self::new()
     }
 
     fn execute_transaction(
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
-              + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
+              + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
+              + AptosCodeStorage),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
@@ -1106,11 +1090,15 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> BTreeMap<K, ValueType> {
+    fn module_write_set(&self) -> BTreeMap<K, ModuleWrite<ValueType>> {
         self.writes
             .iter()
             .filter(|(k, _)| k.is_module_path())
-            .cloned()
+            .map(|(k, v)| {
+                let dummy_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
+                let write = ModuleWrite::new(dummy_id, v.clone());
+                (k.clone(), write)
+            })
             .collect()
     }
 

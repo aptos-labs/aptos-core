@@ -4,6 +4,7 @@
 
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
+    peer::DisconnectReason,
     protocols::{
         network::{Message, NetworkEvents, NetworkSender},
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
@@ -39,7 +40,11 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
     /// Requests that the network connection for the specified peer
     /// is disconnected.
     // TODO: support disconnect reasons.
-    async fn disconnect_from_peer(&self, _peer: PeerNetworkId) -> Result<(), Error>;
+    async fn disconnect_from_peer(
+        &self,
+        _peer: PeerNetworkId,
+        _disconnect_reason: DisconnectReason,
+    ) -> Result<(), Error>;
 
     /// Returns a list of available peers (i.e., those that are
     /// currently connected and support the relevant protocols
@@ -196,9 +201,15 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         unimplemented!("Adding peers to discovery is not yet supported!");
     }
 
-    async fn disconnect_from_peer(&self, peer: PeerNetworkId) -> Result<(), Error> {
+    async fn disconnect_from_peer(
+        &self,
+        peer: PeerNetworkId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        Ok(network_sender.disconnect_peer(peer.peer_id()).await?)
+        Ok(network_sender
+            .disconnect_peer(peer.peer_id(), disconnect_reason)
+            .await?)
     }
 
     fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {

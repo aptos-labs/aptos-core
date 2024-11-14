@@ -3,19 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
-            TransactionGenParams,
+            KeyType, MockOutput, MockTask, MockTransaction, TransactionGen, TransactionGenParams,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType,
+    executable::ExecutableTestType, state_store::MockStateView,
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -117,9 +117,7 @@ where
     }
 
     pub(crate) fn run(self) {
-        let data_view = EmptyDataView::<KeyType<K>> {
-            phantom: PhantomData,
-        };
+        let state_view = MockStateView::empty();
 
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -129,14 +127,16 @@ where
         );
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
-            EmptyDataView<KeyType<K>>,
+            MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(config, executor_thread_pool, None)
-        .execute_transactions_parallel(&(), &self.transactions, &data_view);
+        .execute_transactions_parallel(&self.transactions, &state_view, &mut guard);
 
         self.baseline_output.assert_parallel_output(&output);
     }

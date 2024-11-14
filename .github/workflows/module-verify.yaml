@@ -48,7 +48,7 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
-      BUCKET: aptos-mainnet-backup-backup-831a69a8
+      BUCKET: aptos-mainnet-backup-backup-6addc21b
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config

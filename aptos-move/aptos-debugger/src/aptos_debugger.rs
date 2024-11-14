@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        execution_state::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     state_store::TStateView,
@@ -27,8 +30,9 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     AptosVM,
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use itertools::Itertools;
 use std::{path::Path, sync::Arc, time::Instant};
 
@@ -119,11 +123,14 @@ impl AptosDebugger {
             bail!("Module bundle payload has been removed")
         }
 
-        let vm = AptosVM::new(&state_view);
+        let env = AptosEnvironment::new(&state_view);
+        let vm = AptosVM::new(env.clone(), &state_view);
         let resolver = state_view.as_move_resolver();
+        let code_storage = state_view.as_aptos_code_storage(env);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
+            &code_storage,
             &txn,
             &log_context,
             |gas_meter| {
@@ -427,14 +434,12 @@ fn execute_block_no_limit(
     BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
         sig_verified_txns,
         state_view,
+        &AptosModuleCacheManager::new(),
         BlockExecutorConfig {
-            local: BlockExecutorLocalConfig {
-                concurrency_level,
-                allow_fallback: true,
-                discard_failed_blocks: false,
-            },
+            local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         },
+        TransactionSliceMetadata::unknown(),
         None,
     )
     .map(BlockOutput::into_transaction_outputs_forced)

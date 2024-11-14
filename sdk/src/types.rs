@@ -18,6 +18,7 @@ use crate::{
 use anyhow::{Context, Result};
 use aptos_crypto::{ed25519::Ed25519Signature, secp256r1_ecdsa, PrivateKey, SigningKey};
 use aptos_ledger::AptosLedgerError;
+use aptos_rest_client::{Client, PepperRequest, ProverRequest};
 pub use aptos_types::*;
 use aptos_types::{
     event::EventKey,
@@ -557,7 +558,6 @@ pub struct EphemeralKeyPair {
     #[allow(dead_code)]
     nonce: String,
     expiry_date_secs: u64,
-    #[allow(dead_code)]
     blinder: Vec<u8>,
 }
 
@@ -582,6 +582,17 @@ impl EphemeralKeyPair {
             expiry_date_secs,
             blinder,
         })
+    }
+
+    pub fn new_ed25519(
+        private_key: Ed25519PrivateKey,
+        expiry_date_secs: u64,
+        blinder: Vec<u8>,
+    ) -> Result<Self> {
+        let esk = EphemeralPrivateKey::Ed25519 {
+            inner_private_key: private_key,
+        };
+        Self::new(esk, expiry_date_secs, blinder)
     }
 }
 
@@ -628,8 +639,8 @@ impl KeylessAccount {
         jwt: &str,
         ephemeral_key_pair: EphemeralKeyPair,
         uid_key: Option<&str>,
-        pepper: Option<Pepper>,
-        zk_sig: Option<ZeroKnowledgeSig>,
+        pepper: Pepper,
+        zk_sig: ZeroKnowledgeSig,
     ) -> Result<Self> {
         let claims = extract_claims_from_jwt(jwt)?;
         let uid_key = uid_key.unwrap_or("sub").to_string();
@@ -643,8 +654,8 @@ impl KeylessAccount {
             &uid_val,
             &extract_header_json_from_jwt(jwt)?,
             ephemeral_key_pair,
-            pepper.expect("pepper fetch not implemented"),
-            zk_sig.expect("proof fetch not implemented"),
+            pepper,
+            zk_sig,
         )?;
         account.jwt = Some(jwt.to_string());
         Ok(account)
@@ -687,8 +698,8 @@ impl FederatedKeylessAccount {
         ephemeral_key_pair: EphemeralKeyPair,
         jwk_addr: AccountAddress,
         uid_key: Option<&str>,
-        pepper: Option<Pepper>,
-        zk_sig: Option<ZeroKnowledgeSig>,
+        pepper: Pepper,
+        zk_sig: ZeroKnowledgeSig,
     ) -> Result<Self> {
         let claims = extract_claims_from_jwt(jwt)?;
         let uid_key = uid_key.unwrap_or("sub").to_string();
@@ -702,8 +713,8 @@ impl FederatedKeylessAccount {
             &uid_val,
             &extract_header_json_from_jwt(jwt)?,
             ephemeral_key_pair,
-            pepper.expect("pepper fetch not implemented"),
-            zk_sig.expect("proof fetch not implemented"),
+            pepper,
+            zk_sig,
             jwk_addr,
         )?;
         account.jwt = Some(jwt.to_string());
@@ -748,6 +759,73 @@ fn create_federated_public_key(
             idc,
         },
         jwk_addr,
+    })
+}
+
+pub async fn derive_keyless_account(
+    rest_client: &Client,
+    jwt: &str,
+    ephemeral_key_pair: EphemeralKeyPair,
+    jwk_addr: Option<AccountAddress>,
+) -> Result<LocalAccount> {
+    let pepper = get_pepper_from_jwt(rest_client, jwt, &ephemeral_key_pair).await?;
+    let zksig = get_proof_from_jwt(rest_client, jwt, &ephemeral_key_pair, &pepper).await?;
+
+    let account = match jwk_addr {
+        Some(jwk_addr) => {
+            let federated_account = FederatedKeylessAccount::new_from_jwt(
+                jwt,
+                ephemeral_key_pair,
+                jwk_addr,
+                Some("sub"),
+                pepper.clone(),
+                zksig,
+            )?;
+            LocalAccount::new_federated_keyless(
+                federated_account.authentication_key().account_address(),
+                federated_account,
+                0, // We'll update this with the actual sequence number below
+            )
+        },
+        None => {
+            let keyless_account = KeylessAccount::new_from_jwt(
+                jwt,
+                ephemeral_key_pair,
+                Some("sub"),
+                pepper.clone(),
+                zksig,
+            )?;
+            LocalAccount::new_keyless(
+                keyless_account.authentication_key().account_address(),
+                keyless_account,
+                0, // We'll update this with the actual sequence number below
+            )
+        },
+    };
+
+    // Look up the on-chain address and sequence number
+    let address = rest_client
+        .lookup_address(account.authentication_key().account_address(), false)
+        .await?;
+    let sequence_number = rest_client
+        .get_account_sequence_number(account.authentication_key().account_address())
+        .await?;
+
+    // Create the final account with the correct address and sequence number
+    Ok(match account.auth {
+        LocalAccountAuthenticator::Keyless(keyless_account) => LocalAccount::new_keyless(
+            address.into_inner(),
+            keyless_account,
+            sequence_number.into_inner(),
+        ),
+        LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account) => {
+            LocalAccount::new_federated_keyless(
+                address.into_inner(),
+                federated_keyless_account,
+                sequence_number.into_inner(),
+            )
+        },
+        _ => unreachable!("We only create keyless or federated keyless accounts here"),
     })
 }
 
@@ -818,9 +896,49 @@ impl CommonKeylessAccount for &FederatedKeylessAccount {
     }
 }
 
+async fn get_proof_from_jwt(
+    rest_client: &Client,
+    jwt: &str,
+    ephemeral_key_pair: &EphemeralKeyPair,
+    pepper: &Pepper,
+) -> Result<ZeroKnowledgeSig> {
+    let default_config = Configuration::new_for_devnet();
+    let prover_request = ProverRequest {
+        jwt_b64: jwt.to_string(),
+        epk: bcs::to_bytes(&ephemeral_key_pair.public_key)?,
+        epk_blinder: ephemeral_key_pair.blinder.clone(),
+        exp_date_secs: ephemeral_key_pair.expiry_date_secs,
+        exp_horizon_secs: default_config.max_exp_horizon_secs,
+        pepper: pepper.to_bytes().to_vec(),
+        uid_key: "sub".to_string(),
+    };
+    let response = rest_client.make_prover_request(prover_request).await?;
+    Ok(response)
+}
+
+async fn get_pepper_from_jwt(
+    rest_client: &Client,
+    jwt: &str,
+    ephemeral_key_pair: &EphemeralKeyPair,
+) -> Result<Pepper> {
+    let pepper_request = PepperRequest {
+        jwt_b64: jwt.to_string(),
+        epk: bcs::to_bytes(&ephemeral_key_pair.public_key)?,
+        epk_blinder: ephemeral_key_pair.blinder.clone(),
+        exp_date_secs: ephemeral_key_pair.expiry_date_secs,
+        uid_key: "sub".to_string(),
+    };
+    let response = rest_client.make_pepper_request(pepper_request).await?;
+    Ok(response)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coin_client::CoinClient;
+    use aptos_crypto::ed25519::Ed25519PrivateKey;
+    use aptos_rest_client::{AptosBaseUrl, FaucetClient};
+    use reqwest::Url;
 
     #[test]
     fn test_recover_account_from_derive_path() {
@@ -861,5 +979,69 @@ mod tests {
 
         // Test invalid private key hex literal.
         assert!(LocalAccount::from_private_key("invalid_private_key", 0).is_err());
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_derive_keyless_account() {
+        let aptos_rest_client = Client::builder(AptosBaseUrl::Devnet).build();
+        // This JWT is taken from https://github.com/aptos-labs/aptos-ts-sdk/blob/f644e61beb70e69dfd489e75287c67b527385135/tests/e2e/api/keyless.test.ts#L11
+        // As is the ephemeralKeyPair
+        // This ephemeralKeyPair expires December 29, 2024.
+        let jwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3QtcnNhIn0.eyJpc3MiOiJ0ZXN0Lm9pZGMucHJvdmlkZXIiLCJhdWQiOiJ0ZXN0LWtleWxlc3MtZGFwcCIsInN1YiI6InRlc3QtdXNlci0wIiwiZW1haWwiOiJ0ZXN0QGFwdG9zbGFicy5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaWF0IjoxNzI1NDc1MTEyLCJleHAiOjI3MDAwMDAwMDAsIm5vbmNlIjoiNzA5NTI0MjMzMzk2NDQ1NzI2NzkzNDcyMzc2ODA4MDMwMzMyNDQ2MjgyMTE5MTc1NjQwOTQ1MDA5OTUxOTc4MTA1MTkxMDE4NzExOCJ9.eHqJLdje0FRD3UPmSw8sFHRYe9lwqSydAMcfHcpxkFwew2OTy6bWFsLQTdJp-eCZPhNzlfBXwNxaAJZksCWFWkzCz2913a5b88XRT9Im7JBDtA1e1IBXrnfXG0MDpsVRAuRNzLWqDi_4Fl1OELvoEOK-Tl4cmIwOhBr943S-b14PRVhrQ1XBD5MXaHWcJyxMaEtZfu_xxCQ-jjR---iguD243Ze98JlcOIV8VmEBg3YiSyVdMDZ8cgRia0DI8DwFn7rIxaV2H5FXb9JcehLgNP82-gsfEGV0iAXuBk7ZvRzMVA-srE9JvxVOyq5UkYu0Ss9LjKzX0KVojl7Au_OxGA";
+        let sk_bytes =
+            hex::decode("1111111111111111111111111111111111111111111111111111111111111111")
+                .unwrap();
+        let esk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+        let ephemeral_key_pair =
+            EphemeralKeyPair::new_ed25519(esk, 1735475012, vec![0; 31]).unwrap();
+        let mut account = derive_keyless_account(&aptos_rest_client, jwt, ephemeral_key_pair, None)
+            .await
+            .unwrap();
+        println!("Address: {}", account.address().to_hex_literal());
+        let balance = aptos_rest_client
+            .view_apt_account_balance(account.address())
+            .await
+            .unwrap()
+            .into_inner();
+        if balance < 10000000 {
+            println!("Funding account");
+            let faucet_client = FaucetClient::new_from_rest_client(
+                Url::from_str("https://faucet.devnet.aptoslabs.com").unwrap(),
+                aptos_rest_client.clone(),
+            );
+            faucet_client
+                .fund(account.address(), 10000000)
+                .await
+                .unwrap();
+        }
+        println!(
+            "Balance: {}",
+            aptos_rest_client
+                .view_apt_account_balance(account.address())
+                .await
+                .unwrap()
+                .into_inner()
+        );
+        let coin_client = CoinClient::new(&aptos_rest_client);
+        let signed_txn = coin_client
+            .get_signed_transfer_txn(
+                &mut account,
+                AccountAddress::from_hex_literal(
+                    "0x7968dab936c1bad187c60ce4082f307d030d780e91e694ae03aef16aba73f30",
+                )
+                .unwrap(),
+                1111111,
+                None,
+            )
+            .await
+            .unwrap();
+        println!(
+            "Sent 1111111 to 0x7968dab936c1bad187c60ce4082f307d030d780e91e694ae03aef16aba73f30"
+        );
+        aptos_rest_client
+            .submit_without_deserializing_response(&signed_txn)
+            .await
+            .unwrap();
     }
 }

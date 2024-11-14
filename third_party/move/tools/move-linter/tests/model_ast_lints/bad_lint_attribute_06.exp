@@ -1,0 +1,7 @@
+Aborting with compilation errors:
+exiting with checking errors
+error: unexpected nested attributes
+  ┌─ tests/model_ast_lints/bad_lint_attribute_06.move:2:18
+  │
+2 │     #[lint::skip(while_true(yes=1))]
+  │                  ^^^^^^^^^^^^^^^^^

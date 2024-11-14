@@ -5,10 +5,10 @@
 
 pub mod nft_metadata_crawler {
     diesel::table! {
-        nft_metadata_crawler.asset_uploader_request_statuses (request_id, asset_uri) {
-            request_id -> Uuid,
+        nft_metadata_crawler.asset_uploader_request_statuses (idempotency_key, application_id, asset_uri) {
+            idempotency_key -> Varchar,
+            application_id -> Varchar,
             asset_uri -> Varchar,
-            application_id -> Uuid,
             status_code -> Int8,
             error_messages -> Nullable<Array<Nullable<Text>>>,
             cdn_image_uri -> Nullable<Varchar>,

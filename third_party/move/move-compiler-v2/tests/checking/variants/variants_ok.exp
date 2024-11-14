@@ -331,9 +331,9 @@ module 0x815::m {
         }
     }
     fun t9_common_field(self: CommonFields): u64 {
-        self.Foo.x
+        self.x
     }
     fun t9_common_field_ref(self: &CommonFields): &u64 {
-        &self.Foo.x
+        &self.x
     }
 }

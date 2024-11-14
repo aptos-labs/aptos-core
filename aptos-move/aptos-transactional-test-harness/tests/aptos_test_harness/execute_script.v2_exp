@@ -7,7 +7,7 @@ key 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin> {
     }
     frozen: false
     deposit_events: store 0x1::event::EventHandle<0x1::coin::DepositEvent> {
-        counter: 2
+        counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
                 creation_num: 2

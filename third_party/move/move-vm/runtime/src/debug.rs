@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::Interpreter, loader::Loader, LoadedFunction};
+use crate::{interpreter::Interpreter, loader::Resolver, LoadedFunction};
 use move_binary_format::file_format::Bytecode;
 use move_vm_types::values::{self, Locals};
 use std::{
@@ -101,7 +101,7 @@ impl DebugContext {
         locals: &Locals,
         pc: u16,
         instr: &Bytecode,
-        resolver: &Loader,
+        resolver: &Resolver,
         interp: &Interpreter,
     ) {
         let instr_string = format!("{:?}", instr);

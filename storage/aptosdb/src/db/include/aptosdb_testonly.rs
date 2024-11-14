@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::buffered_state::BufferedState;
 use aptos_config::config::{ BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
-use aptos_infallible::Mutex;
-use aptos_types::state_store::create_empty_sharded_state_updates;
+use aptos_types::state_store::{create_empty_sharded_state_updates, ShardedStateUpdates};
 use std::default::Default;
-use aptos_types::transaction::TransactionStatus;
+use aptos_storage_interface::cached_state_view::ShardedStateCache;
+use aptos_storage_interface::state_delta::StateDelta;
+use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -89,11 +89,6 @@ impl AptosDB {
         )
     }
 
-    /// This gets the current buffered_state in StateStore.
-    pub fn buffered_state(&self) -> &Mutex<BufferedState> {
-        self.state_store.buffered_state()
-    }
-
     pub(crate) fn state_merkle_db(&self) -> Arc<StateMerkleDb> {
         self.state_store.state_db.state_merkle_db.clone()
     }
@@ -153,6 +148,12 @@ impl ChunkToCommitOwned {
             &transaction_infos,
         );
 
+        let is_reconfig = transaction_outputs
+            .iter()
+            .rev()
+            .flat_map(TransactionOutput::events)
+            .any(ContractEvent::is_new_epoch_event);
+
         Self {
             first_version,
             transactions,
@@ -163,7 +164,7 @@ impl ChunkToCommitOwned {
             per_version_state_updates,
             state_updates_until_last_checkpoint,
             sharded_state_cache: None,
-            is_reconfig: false,
+            is_reconfig,
         }
     }
 

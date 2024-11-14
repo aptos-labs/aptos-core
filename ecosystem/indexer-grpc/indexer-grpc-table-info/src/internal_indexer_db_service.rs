@@ -50,8 +50,7 @@ impl InternalIndexerDBService {
             open_internal_indexer_db(db_path_buf.as_path(), &rocksdb_config)
                 .expect("Failed to open internal indexer db"),
         );
-
-        let internal_indexer_db_config = InternalIndexerDBConfig::new(false, false, true, 10_000);
+        let internal_indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 10_000);
         Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))
     }
 

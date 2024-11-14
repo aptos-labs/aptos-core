@@ -4,9 +4,12 @@
 use crate::account_address::AccountAddress;
 use move_core_types::{
     ident_str,
+    identifier::IdentStr,
     language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
 pub trait CoinType {
     fn type_tag() -> TypeTag;
@@ -23,6 +26,7 @@ static APTOS_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     }))
 });
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AptosCoinType;
 
 impl CoinType for AptosCoinType {
@@ -33,4 +37,9 @@ impl CoinType for AptosCoinType {
     fn coin_info_address() -> AccountAddress {
         AccountAddress::ONE
     }
+}
+
+impl MoveStructType for AptosCoinType {
+    const MODULE_NAME: &'static IdentStr = ident_str!("aptos_coin");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("AptosCoin");
 }
