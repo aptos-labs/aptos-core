@@ -1,0 +1,74 @@
+{
+    "benchmark-n4-32": {
+      "runner_name": "benchmark-n4-32",
+      "machine_type": "n4-standard-32",
+      "disk_size": 500,
+      "boot_disk_type": "hyperdisk-balanced"
+    },
+    "benchmark-t2d-32": {
+      "runner_name": "benchmark-t2d-32",
+      "machine_type": "t2d-standard-32",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "benchmark-t2d-60": {
+      "runner_name": "benchmark-t2d-60", 
+      "machine_type": "t2d-standard-60",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "benchmark-c3d-30": {
+      "runner_name": "benchmark-c3d-30",
+      "machine_type": "c3d-standard-30",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "benchmark-c3d-60": {
+      "runner_name": "benchmark-c3d-60",
+      "machine_type": "c3d-standard-60", 
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "benchmark-c3d-180": {
+      "runner_name": "benchmark-c3d-180",
+      "machine_type": "c3d-standard-180",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "benchmark-c4-32": {
+      "runner_name": "benchmark-c4-32",
+      "machine_type": "c4-standard-32",
+      "disk_size": 500,
+      "boot_disk_type": "hyperdisk-balanced"
+    },
+    "benchmark-c4-48": {
+      "runner_name": "benchmark-c4-48",
+      "machine_type": "c4-standard-48",
+      "disk_size": 500,
+      "boot_disk_type": "hyperdisk-balanced"
+    },
+    "benchmark-c4-96": {
+      "runner_name": "benchmark-c4-96",
+      "machine_type": "c4-standard-96",
+      "disk_size": 500,
+      "boot_disk_type": "hyperdisk-balanced"
+    },
+    "executor-benchmark-runner": {
+      "runner_name": "executor-benchmark-runner",
+      "machine_type": "t2d-standard-60",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "executor-benchmark-ext4": {
+      "runner_name": "executor-benchmark-ext4",
+      "machine_type": "t2d-standard-60",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    },
+    "executor-benchmark-xfs": {
+      "runner_name": "executor-benchmark-xfs",
+      "machine_type": "t2d-standard-60",
+      "disk_size": 500,
+      "boot_disk_type": "pd-ssd"
+    }
+  }

@@ -26,7 +26,7 @@ runs:
 
     - name: install protoc and related tools
       shell: bash
-      run: scripts/dev_setup.sh -b -r -y -P -J -t
+      run: scripts/dev_setup.sh -b -r -y -P -J -t -k
 
     - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
       shell: bash
