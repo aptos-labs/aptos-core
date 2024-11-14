@@ -11,7 +11,7 @@ use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::calculate_genesis;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use clap::Parser;
 use std::{
     fs::File,
@@ -76,8 +76,9 @@ impl Command {
             )
         }
 
-        let committer = calculate_genesis::<AptosVM>(&db, executed_trees, &genesis_txn)
-            .with_context(|| format_err!("Failed to calculate genesis."))?;
+        let committer =
+            calculate_genesis::<AptosVMBlockExecutor>(&db, executed_trees, &genesis_txn)
+                .with_context(|| format_err!("Failed to calculate genesis."))?;
         println!(
             "Successfully calculated genesis. Got waypoint: {}",
             committer.waypoint()

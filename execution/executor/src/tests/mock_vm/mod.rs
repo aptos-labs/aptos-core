@@ -5,20 +5,14 @@
 #[cfg(test)]
 mod mock_vm_test;
 
-use crate::{
-    block_executor::TransactionBlockExecutor,
-    workflow::do_get_execution_output::DoGetExecutionOutput,
-};
 use anyhow::Result;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
-use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_storage_interface::cached_state_view::CachedStateView;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableTransactions, PartitionedTransactions},
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -37,7 +31,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    VMExecutor,
+    VMBlockExecutor,
 };
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
@@ -59,33 +53,22 @@ enum MockVMTransaction {
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Keep(ExecutionStatus::Success));
 
-// We use 10 as the assertion error code for insufficient balance within the Aptos coin contract.
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 
 pub struct MockVM;
 
-impl TransactionBlockExecutor for MockVM {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput> {
-        DoGetExecutionOutput::by_transaction_execution::<MockVM>(
-            transactions,
-            state_view,
-            onchain_config,
-            append_state_checkpoint_to_block,
-        )
+impl VMBlockExecutor for MockVM {
+    fn new() -> Self {
+        Self
     }
-}
 
-impl VMExecutor for MockVM {
     fn execute_block(
+        &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.

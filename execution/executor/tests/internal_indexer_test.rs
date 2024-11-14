@@ -205,6 +205,7 @@ fn test_db_indexer_data() {
         ident_str!("any"),
         ident_str!("bcs"),
         ident_str!("dkg"),
+        ident_str!("mem"),
         ident_str!("code"),
         ident_str!("coin"),
         ident_str!("guid"),

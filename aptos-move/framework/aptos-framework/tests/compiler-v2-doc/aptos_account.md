@@ -15,6 +15,9 @@
 -  [Function `batch_transfer_coins`](#0x1_aptos_account_batch_transfer_coins)
 -  [Function `transfer_coins`](#0x1_aptos_account_transfer_coins)
 -  [Function `deposit_coins`](#0x1_aptos_account_deposit_coins)
+-  [Function `batch_transfer_fungible_assets`](#0x1_aptos_account_batch_transfer_fungible_assets)
+-  [Function `transfer_fungible_assets`](#0x1_aptos_account_transfer_fungible_assets)
+-  [Function `deposit_fungible_assets`](#0x1_aptos_account_deposit_fungible_assets)
 -  [Function `assert_account_exists`](#0x1_aptos_account_assert_account_exists)
 -  [Function `assert_account_is_registered_for_apt`](#0x1_aptos_account_assert_account_is_registered_for_apt)
 -  [Function `set_allow_direct_coin_transfers`](#0x1_aptos_account_set_allow_direct_coin_transfers)
@@ -34,6 +37,9 @@
     -  [Function `batch_transfer_coins`](#@Specification_1_batch_transfer_coins)
     -  [Function `transfer_coins`](#@Specification_1_transfer_coins)
     -  [Function `deposit_coins`](#@Specification_1_deposit_coins)
+    -  [Function `batch_transfer_fungible_assets`](#@Specification_1_batch_transfer_fungible_assets)
+    -  [Function `transfer_fungible_assets`](#@Specification_1_transfer_fungible_assets)
+    -  [Function `deposit_fungible_assets`](#@Specification_1_deposit_fungible_assets)
     -  [Function `assert_account_exists`](#@Specification_1_assert_account_exists)
     -  [Function `assert_account_is_registered_for_apt`](#@Specification_1_assert_account_is_registered_for_apt)
     -  [Function `set_allow_direct_coin_transfers`](#@Specification_1_set_allow_direct_coin_transfers)
@@ -413,6 +419,100 @@ This would create the recipient account first and register it to receive the Coi
 
 </details>
 
+<a id="0x1_aptos_account_batch_transfer_fungible_assets"></a>
+
+## Function `batch_transfer_fungible_assets`
+
+Batch version of transfer_fungible_assets.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_batch_transfer_fungible_assets">batch_transfer_fungible_assets</a>(from: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, recipients: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_batch_transfer_fungible_assets">batch_transfer_fungible_assets</a>(
+    from: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>,
+    metadata: Object&lt;Metadata&gt;,
+    recipients: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    amounts: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+) {
+    <b>let</b> recipients_len = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_length">vector::length</a>(&recipients);
+    <b>assert</b>!(
+        recipients_len == <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_length">vector::length</a>(&amounts),
+        <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
+    );
+
+    <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
+        <b>let</b> amount = *<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
+        <a href="aptos_account.md#0x1_aptos_account_transfer_fungible_assets">transfer_fungible_assets</a>(from, metadata, *<b>to</b>, amount);
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_account_transfer_fungible_assets"></a>
+
+## Function `transfer_fungible_assets`
+
+Convenient function to deposit fungible asset into a recipient account that might not exist.
+This would create the recipient account first to receive the fungible assets.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_transfer_fungible_assets">transfer_fungible_assets</a>(from: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, <b>to</b>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_transfer_fungible_assets">transfer_fungible_assets</a>(from: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;Metadata&gt;, <b>to</b>: <b>address</b>, amount: u64) {
+    <a href="aptos_account.md#0x1_aptos_account_deposit_fungible_assets">deposit_fungible_assets</a>(<b>to</b>, <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">primary_fungible_store::withdraw</a>(from, metadata, amount));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_account_deposit_fungible_assets"></a>
+
+## Function `deposit_fungible_assets`
+
+Convenient function to deposit fungible asset into a recipient account that might not exist.
+This would create the recipient account first to receive the fungible assets.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_deposit_fungible_assets">deposit_fungible_assets</a>(<b>to</b>: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_deposit_fungible_assets">deposit_fungible_assets</a>(<b>to</b>: <b>address</b>, fa: FungibleAsset) {
+    <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
+        <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>);
+    };
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit">primary_fungible_store::deposit</a>(<b>to</b>, fa)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_aptos_account_assert_account_exists"></a>
 
 ## Function `assert_account_exists`
@@ -491,10 +591,11 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
+                <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         };
-        emit_event(
-            &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
-            <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
     } <b>else</b> {
         <b>let</b> direct_transfer_config = <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
             allow_arbitrary_coin_transfers: allow,
@@ -502,10 +603,11 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
         };
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        } <b>else</b> {
+            emit_event(
+                &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
+                <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         };
-        emit_event(
-            &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
-            <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         <b>move_to</b>(<a href="account.md#0x1_account">account</a>, direct_transfer_config);
     };
 }
@@ -1018,6 +1120,54 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>let</b> <b>post</b> post_coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>ensures</b> if_exist_coin ==&gt; post_coin_store_to == coin_store_to + coins.value;
+</code></pre>
+
+
+
+<a id="@Specification_1_batch_transfer_fungible_assets"></a>
+
+### Function `batch_transfer_fungible_assets`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_batch_transfer_fungible_assets">batch_transfer_fungible_assets</a>(from: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, recipients: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_transfer_fungible_assets"></a>
+
+### Function `transfer_fungible_assets`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_transfer_fungible_assets">transfer_fungible_assets</a>(from: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, <b>to</b>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_deposit_fungible_assets"></a>
+
+### Function `deposit_fungible_assets`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_deposit_fungible_assets">deposit_fungible_assets</a>(<b>to</b>: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

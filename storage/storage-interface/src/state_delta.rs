@@ -47,15 +47,19 @@ impl StateDelta {
         }
     }
 
-    pub fn new_empty() -> Self {
+    pub fn new_empty_with_version(version: Option<u64>) -> StateDelta {
         let smt = SparseMerkleTree::new_empty();
         Self::new(
             smt.clone(),
-            None,
+            version,
             smt,
-            None,
+            version,
             create_empty_sharded_state_updates(),
         )
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new_empty_with_version(None)
     }
 
     pub fn new_at_checkpoint(

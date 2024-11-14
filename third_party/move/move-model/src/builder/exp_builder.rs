@@ -31,7 +31,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast::{self as EA},
+    expansion::ast::{self as EA, Exp_},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
@@ -4136,7 +4136,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         // Translate arguments.
-        let (arg_types, translated_args) = self.translate_exp_list(args);
+        let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
 
         // Special handling of receiver call functions
         if kind == CallKind::Receiver {
@@ -4144,6 +4144,50 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 module.is_none(),
                 "unexpected qualified name in receiver call"
             );
+            debug_assert!(
+                !args.is_empty(),
+                "receiver call needs to have at least one parameter"
+            );
+            let receiver_call_opt = self.get_receiver_function(&arg_types[0], name);
+            if let Some(receiver_call) = receiver_call_opt {
+                if let Exp_::ExpDotted(dotted) = &args[0].value {
+                    // we need a special case for the receiver call S[x].f.fun(&mut...)
+                    // when the first argument is a dotted expression with index notation:
+                    // S[x].y because the reference type is by default set immutable ref
+                    if receiver_call.arg_types[0].is_mutable_reference() {
+                        let first_arg = self.translate_dotted(
+                            dotted,
+                            &arg_types[0],
+                            true,
+                            &ErrorMessageContext::General,
+                        );
+                        translated_args[0] = first_arg.into_exp();
+                    }
+                } else if let Exp_::Index(target, index) = &args[0].value {
+                    // special case for the receiver call S[x].fun(&...), S[x].fun(&mut...)
+                    // so that it behaves the same as (&S[x]).fun(&...), (&mut S[x]).fun(&mut...)
+                    if receiver_call.arg_types[0].is_reference() {
+                        let index_mutate = receiver_call.arg_types[0].is_mutable_reference();
+                        if let Some(first_arg) = self.try_resource_or_vector_index(
+                            loc,
+                            target,
+                            index,
+                            &ErrorMessageContext::General,
+                            &Type::Reference(
+                                ReferenceKind::from_is_mut(index_mutate),
+                                Box::new(arg_types[0].clone()),
+                            ),
+                            index_mutate,
+                        ) {
+                            translated_args[0] = first_arg.into_exp();
+                            arg_types[0] = Type::Reference(
+                                ReferenceKind::from_is_mut(index_mutate),
+                                Box::new(arg_types[0].clone()),
+                            );
+                        }
+                    }
+                }
+            }
             return self.translate_receiver_call(
                 loc,
                 name,

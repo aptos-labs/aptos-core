@@ -22,6 +22,7 @@ use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
+        execution_state::TransactionSliceMetadata,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     contract_event::ContractEvent,
@@ -37,33 +38,35 @@ use aptos_types::{
     },
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
 use std::{iter, sync::Arc};
 
 pub struct DoGetExecutionOutput;
 
 impl DoGetExecutionOutput {
-    pub fn by_transaction_execution<V: VMExecutor>(
+    pub fn by_transaction_execution<V: VMBlockExecutor>(
+        executor: &V,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
         let out = match transactions {
             ExecutableTransactions::Unsharded(txns) => {
                 Self::by_transaction_execution_unsharded::<V>(
+                    executor,
                     txns,
                     state_view,
                     onchain_config,
-                    append_state_checkpoint_to_block,
+                    transaction_slice_metadata,
                 )?
             },
             ExecutableTransactions::Sharded(txns) => Self::by_transaction_execution_sharded::<V>(
                 txns,
                 state_view,
                 onchain_config,
-                append_state_checkpoint_to_block,
+                transaction_slice_metadata.append_state_checkpoint_to_block(),
             )?,
         };
 
@@ -82,13 +85,22 @@ impl DoGetExecutionOutput {
         Ok(ret)
     }
 
-    fn by_transaction_execution_unsharded<V: VMExecutor>(
+    fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
+        executor: &V,
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
-        let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+        let append_state_checkpoint_to_block =
+            transaction_slice_metadata.append_state_checkpoint_to_block();
+        let block_output = Self::execute_block::<V>(
+            executor,
+            &transactions,
+            &state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )?;
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
         Parser::parse(
@@ -101,7 +113,7 @@ impl DoGetExecutionOutput {
         )
     }
 
-    pub fn by_transaction_execution_sharded<V: VMExecutor>(
+    pub fn by_transaction_execution_sharded<V: VMBlockExecutor>(
         transactions: PartitionedTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -168,7 +180,7 @@ impl DoGetExecutionOutput {
         Ok(ret)
     }
 
-    fn execute_block_sharded<V: VMExecutor>(
+    fn execute_block_sharded<V: VMBlockExecutor>(
         partitioned_txns: PartitionedTransactions,
         state_view: Arc<CachedStateView>,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -190,27 +202,36 @@ impl DoGetExecutionOutput {
         }
     }
 
-    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
+    /// Executes the block of [Transaction]s using the [VMBlockExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
-    fn execute_block<V: VMExecutor>(
+    fn execute_block<V: VMBlockExecutor>(
+        executor: &V,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
-        Ok(V::execute_block(transactions, state_view, onchain_config)?)
+        Ok(executor.execute_block(
+            transactions,
+            state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
-    /// [VMExecutor] only if its a genesis block. In all other cases, this
+    /// [VMBlockExecutor] only if its a genesis block. In all other cases, this
     /// method returns an [TransactionOutput] with an empty [WriteSet], constant
     /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
     #[cfg(feature = "consensus-only-perf-test")]
-    fn execute_block<V: VMExecutor>(
+    fn execute_block<V: VMBlockExecutor>(
+        executor: &V,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
@@ -220,9 +241,12 @@ impl DoGetExecutionOutput {
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => {
-                V::execute_block(transactions, state_view, onchain_config)?
-            },
+            StateViewId::Miscellaneous => executor.execute_block(
+                transactions,
+                state_view,
+                onchain_config,
+                transaction_slice_metadata,
+            )?,
             _ => BlockOutput::new(
                 transactions
                     .iter()

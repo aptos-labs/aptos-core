@@ -7,6 +7,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │         ^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:27:11
@@ -15,6 +16,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │           ^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:27:9
@@ -23,6 +25,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:27:26
@@ -31,6 +34,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │                          ^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:27:23
@@ -39,6 +43,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │                       ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:35:9
@@ -47,6 +52,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │         ^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:35:20
@@ -55,6 +61,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │                    ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:35:33
@@ -63,6 +70,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │                                 ^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:35:31
@@ -71,6 +79,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │                               ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:35:45
@@ -79,6 +88,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │                                             ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:43:9
@@ -87,6 +97,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │         ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:9
@@ -95,6 +106,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │         ^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:37
@@ -103,6 +115,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │                                     ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:31
@@ -111,6 +124,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │                               ^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `x`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:59:9
@@ -119,6 +133,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │         ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:67:15
@@ -127,6 +142,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │               ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:67:9
@@ -135,6 +151,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │         ^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:68:9
@@ -143,6 +160,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │         ^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:77:9
@@ -151,6 +169,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │         ^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `0`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:90:9
@@ -159,6 +178,7 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │         ^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `0`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:90:18
@@ -167,6 +187,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │                  ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `0`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:98:9
@@ -175,6 +196,7 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │         ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:9
@@ -183,6 +205,7 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
    │         ^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:37
@@ -191,6 +214,7 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
    │                                     ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:90:18
@@ -199,6 +223,7 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
    │                  ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
     ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:125:18
@@ -207,3 +232,4 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
     │                  ^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.

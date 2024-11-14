@@ -29,6 +29,8 @@ impl DbWriter for AptosDB {
                 self.skip_index_and_usage,
             )?;
 
+            // n.b make sure buffered_state.update() is called after all other commits are done, since
+            // internally it updates state_store.current_state which indicates the "pre-committed version"
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
@@ -40,7 +42,7 @@ impl DbWriter for AptosDB {
                     sync_commit || chunk.is_reconfig,
                 )?;
             }
-            self.ledger_db.metadata_db().set_pre_committed_version(chunk.expect_last_version());
+
             Ok(())
         })
     }
@@ -208,7 +210,6 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
-            self.ledger_db.metadata_db().set_pre_committed_version(version);
             self.state_store.reset();
 
             Ok(())
@@ -236,29 +237,23 @@ impl AptosDB {
             chunk.latest_in_memory_state.current_version.expect("Must exist"),
         );
 
-        let num_transactions_in_db = self.get_pre_committed_version()?.map_or(0, |v| v + 1);
         {
-            let buffered_state = self.state_store.buffered_state().lock();
+            let current_state_guard = self.state_store.current_state();
+            let current_state = current_state_guard.lock();
             ensure!(
-                chunk.base_state_version == buffered_state.current_state().base_version,
+                chunk.base_state_version == current_state.base_version,
                 "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
                 chunk.base_state_version,
-                buffered_state.current_state().base_version,
-                buffered_state.current_state().current_version,
+                current_state.base_version,
+                current_state.current_version,
             );
 
             // Ensure the incoming committing requests are always consecutive and the version in
             // buffered state is consistent with that in db.
-            let next_version_in_buffered_state = buffered_state
-                .current_state()
-                .current_version
-                .map(|version| version + 1)
-                .unwrap_or(0);
-            ensure!(num_transactions_in_db == chunk.first_version && num_transactions_in_db == next_version_in_buffered_state,
-                "The first version passed in ({}), the next version in buffered state ({}) and the next version in db ({}) are inconsistent.",
+            ensure!(chunk.first_version == current_state.next_version(),
+                "The first version passed in ({}), and the next version expected by db ({}) are inconsistent.",
                 chunk.first_version,
-                next_version_in_buffered_state,
-                num_transactions_in_db,
+                current_state.next_version(),
             );
         }
 
@@ -560,7 +555,7 @@ impl AptosDB {
         version_to_commit: Version,
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.ledger_db.metadata_db().get_pre_committed_version();
+        let pre_committed_ver = self.state_store.current_state().lock().current_version;
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",
@@ -614,6 +609,18 @@ impl AptosDB {
             ledger_info_with_sig.ledger_info().epoch(),
             current_epoch,
         );
+
+        // Ensure that state tree at the end of the epoch is persisted.
+        if ledger_info_with_sig.ledger_info().ends_epoch() {
+            let state_snapshot = self.state_store.get_state_snapshot_before(version + 1)?;
+            ensure!(
+                state_snapshot.is_some() && state_snapshot.as_ref().unwrap().0 == version,
+                "State checkpoint not persisted at the end of the epoch, version {}, next_epoch {}, snapshot in db: {:?}",
+                version,
+                ledger_info_with_sig.ledger_info().next_block_epoch(),
+                state_snapshot,
+            );
+        }
 
         // Put write to batch.
         self.ledger_db

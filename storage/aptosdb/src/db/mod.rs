@@ -96,7 +96,9 @@ pub struct AptosDB {
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
+    /// This is just to detect concurrent calls to `pre_commit_ledger()`
     pre_commit_lock: std::sync::Mutex<()>,
+    /// This is just to detect concurrent calls to `commit_ledger()`
     commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,

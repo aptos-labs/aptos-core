@@ -43,7 +43,11 @@ impl ExpChecker for UnnecessaryNumericalExtremeComparison {
             // get the type of the left-hand side.
             let ty = env.get_node_type(lhs.node_id());
             if let Some(result) = Self::check_comparisons_with_extremes(lhs, cmp, rhs, &ty) {
-                self.report(env, &env.get_node_loc(*id), &result.to_string());
+                // TODO: we could report `UseEqInstead` and `UseNeqInstead` as well, but in a strict or pedantic
+                // mode. For now, we skip reporting them as suggestions to reduce perceived false positives.
+                if let ComparisonResult::AlwaysTrue | ComparisonResult::AlwaysFalse = result {
+                    self.report(env, &env.get_node_loc(*id), &result.to_string());
+                }
             }
         }
     }

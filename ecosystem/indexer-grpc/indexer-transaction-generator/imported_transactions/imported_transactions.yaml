@@ -62,3 +62,14 @@ mainnet:
     1830706009: 1830706009_staker_governance_record
     125600867: 125600867_stake_delegation_pool
     4827964: 4827964_stake_initialize
+
+    # user transactions processor
+    685: 685_user_txn_ed25519
+    590098441: 590098441_user_txn_single_sender_ed25519
+    1803170308: 1803170308_user_txn_multi_key_keyless
+    464961735: 464961735_user_txn_single_key_ed25519
+    551057865: 551057865_user_txn_single_sender_webauth
+    407418623: 407418623_user_txn_single_key_secp256k1_ecdsa
+    527013476: 527013476_user_txn_single_sender_secp256k1_ecdsa
+    2175935: 2175935_user_txn_multi_ed25519
+    976087151: 976087151_user_txn_single_sender_keyless
