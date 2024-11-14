@@ -12,6 +12,9 @@ use crate::{
     update::get_revela_path,
 };
 use anyhow::Context;
+use aptos_framework::{
+    get_compilation_metadata_from_compiled_module, get_compilation_metadata_from_compiled_script,
+};
 use async_trait::async_trait;
 use clap::{Args, Parser};
 use itertools::Itertools;
@@ -25,6 +28,7 @@ use move_command_line_common::files::{
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
+use move_model::metadata::CompilerVersion;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -80,6 +84,11 @@ pub struct BytecodeCommand {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// When `--bytecode-path` is set with this option,
+    /// print out the version of compiler that generated the bytecode
+    #[clap(long)]
+    pub print_compiler_version_only: bool,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -141,6 +150,10 @@ impl BytecodeCommand {
             unreachable!("arguments required by clap")
         };
 
+        if self.print_compiler_version_only && self.input.bytecode_path.is_some() {
+            return self.compiler_version(&inputs[0]);
+        }
+
         let mut report = vec![];
         let mut last_out_dir = String::new();
         for bytecode_path in inputs {
@@ -199,6 +212,31 @@ impl BytecodeCommand {
             1 => format!("{}/{}", last_out_dir, report[0]),
             _ => format!("{}/{{{}}}", last_out_dir, report.into_iter().join(",")),
         })
+    }
+
+    fn compiler_version(&self, bytecode_path: &Path) -> Result<String, CliError> {
+        let bytecode_bytes = read_from_file(bytecode_path)?;
+
+        let module: CompiledModule;
+        let script: CompiledScript;
+        let version_string = if self.is_script {
+            script = CompiledScript::deserialize(&bytecode_bytes)
+                .context("Script blob can't be deserialized")?;
+            if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
+                data.compiler_version.to_string()
+            } else {
+                CompilerVersion::V1.to_string()
+            }
+        } else {
+            module = CompiledModule::deserialize(&bytecode_bytes)
+                .context("Module blob can't be deserialized")?;
+            if let Some(data) = get_compilation_metadata_from_compiled_module(&module) {
+                data.compiler_version.to_string()
+            } else {
+                CompilerVersion::V1.to_string()
+            }
+        };
+        Ok(format!("Compiled by v{}", version_string))
     }
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
