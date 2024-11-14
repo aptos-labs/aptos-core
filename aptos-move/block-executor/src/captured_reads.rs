@@ -648,7 +648,7 @@ where
     }
 
     /// For every module read that was captured, checks if the reads are still the same:
-    ///   1. Entries read from the global cross-block module cache are still valid.
+    ///   1. Entries read from the global module cache are not overridden.
     ///   2. Entries that were not in per-block cache before are still not there.
     ///   3. Entries that were in per-block cache have the same commit index.
     pub(crate) fn validate_module_reads(
@@ -661,7 +661,7 @@ where
         }
 
         self.module_reads.iter().all(|(key, read)| match read {
-            ModuleRead::GlobalCache(_) => global_module_cache.contains_valid(key),
+            ModuleRead::GlobalCache(_) => global_module_cache.is_not_overridden(key),
             ModuleRead::PerBlockCache(previous) => {
                 let current_version = per_block_module_cache.get_module_version(key);
                 let previous_version = previous.as_ref().map(|(_, version)| *version);
@@ -1560,7 +1560,7 @@ mod test {
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
         // Now, mark one of the entries in invalid. Validations should fail!
-        global_module_cache.mark_invalid_if_contains(&1);
+        global_module_cache.mark_overridden(&1);
         let valid =
             captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
         assert!(!valid);
@@ -1696,7 +1696,7 @@ mod test {
 
         // Assume we republish this module: validation must fail.
         let a = mock_deserialized_code(100, MockExtension::new(8));
-        global_module_cache.mark_invalid_if_contains(&0);
+        global_module_cache.mark_overridden(&0);
         per_block_module_cache
             .insert_deserialized_module(
                 0,
@@ -1713,6 +1713,6 @@ mod test {
         // Assume we re-read the new correct version. Then validation should pass again.
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(10))));
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
-        assert!(!global_module_cache.contains_valid(&0));
+        assert!(!global_module_cache.is_not_overridden(&0));
     }
 }

@@ -144,7 +144,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                 }
 
                 // Otherwise, it is a miss. Check global cache.
-                if let Some(module) = self.global_module_cache.get_valid(key) {
+                if let Some(module) = self.global_module_cache.get(key) {
                     state
                         .captured_reads
                         .borrow_mut()
@@ -164,7 +164,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                 Ok(read)
             },
             ViewState::Unsync(state) => {
-                if let Some(module) = self.global_module_cache.get_valid(key) {
+                if let Some(module) = self.global_module_cache.get(key) {
                     state.read_set.borrow_mut().capture_module_read(key.clone());
                     return Ok(Some((module, Self::Version::default())));
                 }

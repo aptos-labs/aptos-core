@@ -13,12 +13,12 @@ use std::{
     },
 };
 
-/// Entry stored in [GlobalModuleCache].
+/// Entry stored in [GlobalModuleCache]. Can be invalidated by module publishing.
 struct Entry<Deserialized, Verified, Extension> {
-    /// True if this code is "valid" within the block execution context (i.e., there has been no
-    /// republishing of this module so far). If false, executor needs to read the module from the
-    /// sync/unsync module caches.
-    valid: AtomicBool,
+    /// False if this code is "valid" within the block execution context (i.e., there has been no
+    /// republishing of this module so far). If true, executor needs to read the module from the
+    /// per-block module caches.
+    overridden: AtomicBool,
     /// Cached verified module. Must always be verified.
     module: Arc<ModuleCode<Deserialized, Verified, Extension>>,
 }
@@ -37,19 +37,19 @@ where
         }
 
         Ok(Self {
-            valid: AtomicBool::new(true),
+            overridden: AtomicBool::new(false),
             module,
         })
     }
 
     /// Marks the module as invalid.
-    fn mark_invalid(&self) {
-        self.valid.store(false, Ordering::Release)
+    fn mark_overridden(&self) {
+        self.overridden.store(true, Ordering::Release)
     }
 
-    /// Returns true if the module is valid.
-    pub(crate) fn is_valid(&self) -> bool {
-        self.valid.load(Ordering::Acquire)
+    /// Returns true if the module is not overridden.
+    fn is_not_overridden(&self) -> bool {
+        !self.overridden.load(Ordering::Acquire)
     }
 
     /// Returns the module code stored is this [Entry].
@@ -81,28 +81,30 @@ where
         }
     }
 
-    /// Returns true if the key exists in cache and the corresponding module is valid.
-    pub fn contains_valid(&self, key: &K) -> bool {
+    /// Returns true if the key exists in cache and the corresponding module is not overridden.
+    pub fn is_not_overridden(&self, key: &K) -> bool {
         self.module_cache
             .get(key)
-            .is_some_and(|entry| entry.is_valid())
+            .is_some_and(|entry| entry.is_not_overridden())
     }
 
-    /// Marks the cached module (if it exists) as invalid. As a result, all subsequent calls to the
-    /// cache for the associated key will result in a cache miss. If an entry does not to exist, it
-    /// is a no-op.
-    pub fn mark_invalid_if_contains(&self, key: &K) {
+    /// Marks the cached module (if it exists) as overridden. As a result, all subsequent calls to
+    /// the cache for the associated key will result in a cache miss. If an entry does not exist,
+    /// it is a no-op.
+    pub fn mark_overridden(&self, key: &K) {
         if let Some(entry) = self.module_cache.get(key) {
-            entry.mark_invalid();
+            entry.mark_overridden();
         }
     }
 
     /// Returns the module stored in cache. If the module has not been cached, or it exists but is
     /// not valid, [None] is returned.
-    pub fn get_valid(&self, key: &K) -> Option<Arc<ModuleCode<D, V, E>>> {
-        self.module_cache
-            .get(key)
-            .and_then(|entry| entry.is_valid().then(|| Arc::clone(entry.module_code())))
+    pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<D, V, E>>> {
+        self.module_cache.get(key).and_then(|entry| {
+            entry
+                .is_not_overridden()
+                .then(|| Arc::clone(entry.module_code()))
+        })
     }
 
     /// Returns the number of entries in the cache.
@@ -124,9 +126,9 @@ where
     /// Inserts modules into the cache.
     /// Notes:
     ///   1. Only verified modules are inserted.
-    ///   2. Valid modules should not be removed, and new modules should have unique ownership. If
-    ///      these constraints are violated, a panic error is returned.
-    pub fn insert_verified_unsync(
+    ///   2. Not overridden modules should not be removed, and new modules should have unique
+    ///      ownership. If these constraints are violated, a panic error is returned.
+    pub fn insert_verified(
         &mut self,
         modules: impl Iterator<Item = (K, Arc<ModuleCode<D, V, E>>)>,
     ) -> Result<(), PanicError> {
@@ -134,15 +136,13 @@ where
 
         for (key, module) in modules {
             if let Occupied(entry) = self.module_cache.entry(key.clone()) {
-                if entry.get().is_valid() {
-                    return Err(PanicError::CodeInvariantError(
-                        "Should never overwrite a valid module".to_string(),
-                    ));
-                } else {
-                    // Otherwise, remove the invalid entry.
-                    let size = entry.get().module_code().extension().size_in_bytes();
-                    self.size -= size;
+                if entry.get().is_not_overridden() {
+                    self.size -= entry.get().module_code().extension().size_in_bytes();
                     entry.remove();
+                } else {
+                    return Err(PanicError::CodeInvariantError(
+                        "Should never replace a non-overridden module".to_string(),
+                    ));
                 }
             }
 
@@ -195,36 +195,36 @@ mod test {
     }
 
     #[test]
-    fn test_entry_mark_invalid() {
+    fn test_entry_mark_overridden() {
         let entry = assert_ok!(Entry::new(mock_verified_code(0, MockExtension::new(8))));
-        assert!(entry.is_valid());
+        assert!(entry.is_not_overridden());
 
-        entry.mark_invalid();
-        assert!(!entry.is_valid());
+        entry.mark_overridden();
+        assert!(!entry.is_not_overridden());
     }
 
     #[test]
-    fn test_cache_contains_valid_and_get() {
+    fn test_cache_is_not_overridden_and_get() {
         let mut cache = GlobalModuleCache::empty();
 
         // Set the state.
         cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
         cache.insert(1, mock_verified_code(1, MockExtension::new(8)));
-        cache.mark_invalid_if_contains(&1);
+        cache.mark_overridden(&1);
 
         assert_eq!(cache.num_modules(), 2);
 
-        assert!(cache.contains_valid(&0));
-        assert!(!cache.contains_valid(&1));
-        assert!(!cache.contains_valid(&3));
+        assert!(cache.is_not_overridden(&0));
+        assert!(!cache.is_not_overridden(&1));
+        assert!(!cache.is_not_overridden(&3));
 
-        assert!(cache.get_valid(&0).is_some());
-        assert!(cache.get_valid(&1).is_none());
-        assert!(cache.get_valid(&3).is_none());
+        assert!(cache.get(&0).is_some());
+        assert!(cache.get(&1).is_none());
+        assert!(cache.get(&3).is_none());
     }
 
     #[test]
-    fn test_cache_sizes_and_flush_unchecked() {
+    fn test_cache_sizes_and_flush() {
         let mut cache = GlobalModuleCache::empty();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
@@ -245,16 +245,14 @@ mod test {
     }
 
     #[test]
-    fn test_cache_insert_verified_unchecked() {
+    fn test_cache_insert_verified() {
         let mut cache = GlobalModuleCache::empty();
 
         let mut new_modules = vec![];
         for i in 0..10 {
             new_modules.push((i, mock_verified_code(i, MockExtension::new(8))));
         }
-        assert!(cache
-            .insert_verified_unsync(new_modules.into_iter())
-            .is_ok());
+        assert_ok!(cache.insert_verified(new_modules.into_iter()));
 
         assert_eq!(cache.num_modules(), 10);
         assert_eq!(cache.size_in_bytes(), 80);
@@ -265,14 +263,14 @@ mod test {
         let mut cache = GlobalModuleCache::empty();
 
         let deserialized_modules = vec![(0, mock_deserialized_code(0, MockExtension::new(8)))];
-        assert_ok!(cache.insert_verified_unsync(deserialized_modules.into_iter()));
+        assert_ok!(cache.insert_verified(deserialized_modules.into_iter()));
 
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
     }
 
     #[test]
-    fn test_cache_insert_verified_unchecked_does_not_override_valid_modules() {
+    fn test_cache_insert_verified_does_not_override_valid_modules() {
         let mut cache = GlobalModuleCache::empty();
 
         cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
@@ -280,20 +278,20 @@ mod test {
         assert_eq!(cache.size_in_bytes(), 8);
 
         let new_modules = vec![(0, mock_verified_code(100, MockExtension::new(32)))];
-        assert_err!(cache.insert_verified_unsync(new_modules.into_iter()));
+        assert_err!(cache.insert_verified(new_modules.into_iter()));
     }
 
     #[test]
-    fn test_cache_insert_verified_unchecked_overrides_invalid_modules() {
+    fn test_cache_insert_verified_inserts_overridden_modules() {
         let mut cache = GlobalModuleCache::empty();
 
         cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
-        cache.mark_invalid_if_contains(&0);
+        cache.mark_overridden(&0);
         assert_eq!(cache.num_modules(), 1);
         assert_eq!(cache.size_in_bytes(), 8);
 
         let new_modules = vec![(0, mock_verified_code(100, MockExtension::new(32)))];
-        assert_ok!(cache.insert_verified_unsync(new_modules.into_iter()));
+        assert_ok!(cache.insert_verified(new_modules.into_iter()));
 
         assert_eq!(cache.num_modules(), 1);
         assert_eq!(cache.size_in_bytes(), 32);
