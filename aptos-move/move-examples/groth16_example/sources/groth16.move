@@ -91,6 +91,8 @@ module groth16_example::groth16 {
 
     // This test gives an example of how to take a proof, verification key, and public input in the decimal string format
     // output by snarkjs and verify the proof.
+    // Documentation for the serialization formats used can be found in `aptos-core/aptos-move/framework/aptos-stdlib/sources/cryptography/X.move`,
+    // where X is bn254_algebra for BN254 and bls12381_algebra for BLS12_381
     #[test(fx = @std)]
     fun test_verify_circom_proof(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
